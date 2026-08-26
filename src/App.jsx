@@ -12,6 +12,7 @@ import InventoryView from "./views/InventoryView";
 import ProcurementView from "./views/ProcurementView";
 import ManufacturingView from "./views/ManufacturingView";
 import SalesView from "./views/SalesView";
+import SupportView from "./views/SupportView";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = not checked yet
@@ -79,5 +80,6 @@ function ViewRouter({ view, ...props }) {
   if (view === "procurement") return <ProcurementView {...props} />;
   if (view === "manufacturing") return <ManufacturingView {...props} />;
   if (view === "sales") return <SalesView {...props} />;
+  if (view === "support") return <SupportView {...props} />;
   return null;
 }
