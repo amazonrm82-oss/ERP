@@ -10,6 +10,7 @@ import LedgerView from "./views/LedgerView";
 import PayablesView from "./views/PayablesView";
 import InventoryView from "./views/InventoryView";
 import ProcurementView from "./views/ProcurementView";
+import ManufacturingView from "./views/ManufacturingView";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = not checked yet
@@ -75,5 +76,6 @@ function ViewRouter({ view, ...props }) {
   if (view === "payables") return <PayablesView {...props} />;
   if (view === "inventory") return <InventoryView {...props} />;
   if (view === "procurement") return <ProcurementView {...props} />;
+  if (view === "manufacturing") return <ManufacturingView {...props} />;
   return null;
 }
