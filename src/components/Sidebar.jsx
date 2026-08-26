@@ -1,5 +1,5 @@
 import React from "react";
-import { LayoutDashboard, Users, Receipt, BookOpen, Truck, LogOut, Package, ClipboardList, Factory } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, BookOpen, Truck, LogOut, Package, ClipboardList, Factory, TrendingUp } from "lucide-react";
 import { colors } from "../lib/theme";
 import { supabase } from "../lib/supabaseClient";
 
@@ -13,6 +13,7 @@ export const NAV_ITEMS = [
   { key: "inventory", label: "מלאי", icon: Package, group: "רכש ומלאי" },
   { key: "procurement", label: "רכש", icon: ClipboardList, group: "רכש ומלאי" },
   { key: "manufacturing", label: "ייצור", icon: Factory, group: "רכש ומלאי" },
+  { key: "sales", label: "מכירות ו-CRM", icon: TrendingUp, group: "מכירות" },
 ];
 
 export default function Sidebar({ profile, view, setView }) {
