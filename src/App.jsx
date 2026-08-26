@@ -15,6 +15,8 @@ import SalesView from "./views/SalesView";
 import SupportView from "./views/SupportView";
 import HRView from "./views/HRView";
 import ProjectsView from "./views/ProjectsView";
+import SettingsView from "./views/SettingsView";
+import DashboardView from "./views/DashboardView";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = not checked yet
@@ -66,14 +68,7 @@ function MainApp({ profile }) {
 }
 
 function ViewRouter({ view, ...props }) {
-  if (view === "home") {
-    return (
-      <div style={{ color: colors.text }}>
-        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>שלום {props.profile.name}</div>
-        <div style={{ fontSize: 13.5, color: colors.mutedText }}>בחרו מסך מהתפריט. מודולים נוספים (רכש, מלאי, ייצור, שירות, כ״א) יתווספו כאן בהמשך.</div>
-      </div>
-    );
-  }
+  if (view === "home") return <DashboardView {...props} />;
   if (view === "customers") return <CustomersView {...props} />;
   if (view === "invoices") return <InvoicesView {...props} />;
   if (view === "ledger") return <LedgerView {...props} />;
@@ -85,5 +80,6 @@ function ViewRouter({ view, ...props }) {
   if (view === "support") return <SupportView {...props} />;
   if (view === "hr") return <HRView {...props} />;
   if (view === "projects") return <ProjectsView {...props} />;
+  if (view === "settings") return <SettingsView {...props} />;
   return null;
 }
