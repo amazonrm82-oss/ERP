@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { countUnread, listNotifications } from "@/features/notifications/queries";
 import { AvailabilityToggle } from "@/features/shell/components/availability-toggle";
 import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
@@ -28,6 +30,7 @@ export default async function OrgLayout({ children, params }: Props) {
   const context = await getOrgContext(orgId);
   const { org, user, subscription } = context;
   const notice = ORG_STATUS_NOTICES[org.status];
+  const [notifications, unread] = await Promise.all([listNotifications(org.id, user.id, 8), countUnread(org.id, user.id)]);
 
   return (
     <div className="min-h-dvh md:ps-60">
@@ -55,23 +58,33 @@ export default async function OrgLayout({ children, params }: Props) {
           <p className="truncate font-semibold">{org.name}</p>
           {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} /> : null}
         </div>
-        <UserMenu
-          name={user.displayName}
-          email={user.email}
-          roleLabel={ROLE_LABELS[context.role]}
-          links={[
-            { href: paths.companies(org.id), label: "חברות", mobileOnly: true },
-            { href: paths.settings(org.id), label: "הגדרות", mobileOnly: true },
-            { href: paths.home, label: "החלפת עסק" },
-          ]}
-        >
-          {context.role === "viewer" ? null : (
-            <div className="border-b border-line pb-1.5">
-              <AvailabilityToggle key={String(context.isAvailable)} orgId={org.id} userId={user.id} available={context.isAvailable} />
-            </div>
-          )}
-          <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
-        </UserMenu>
+        <div className="flex shrink-0 items-center gap-1">
+          <NotificationBell
+            // new server data (after marking read, or navigation) starts the bell afresh
+            key={`${unread}:${notifications[0]?.id ?? ""}`}
+            orgId={org.id}
+            userId={user.id}
+            initial={notifications}
+            unread={unread}
+          />
+          <UserMenu
+            name={user.displayName}
+            email={user.email}
+            roleLabel={ROLE_LABELS[context.role]}
+            links={[
+              { href: paths.companies(org.id), label: "חברות", mobileOnly: true },
+              { href: paths.settings(org.id), label: "הגדרות", mobileOnly: true },
+              { href: paths.home, label: "החלפת עסק" },
+            ]}
+          >
+            {context.role === "viewer" ? null : (
+              <div className="border-b border-line pb-1.5">
+                <AvailabilityToggle key={String(context.isAvailable)} orgId={org.id} userId={user.id} available={context.isAvailable} />
+              </div>
+            )}
+            <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
+          </UserMenu>
+        </div>
       </header>
 
       {notice ? (

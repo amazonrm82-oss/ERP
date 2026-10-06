@@ -40,6 +40,8 @@ await client.end();
 // Mutations that change nothing, so no test can (or should) notice them.
 const equivalent = new Set([
   "plans.plans_select", // already "using (true)": the price list is the same for everyone
+  // user_id has no insert grant and a trigger sets it from the session, so the policy cannot be bypassed
+  "push_subscriptions.push_subscriptions_insert",
 ]);
 
 const survivors = [];

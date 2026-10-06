@@ -8,6 +8,7 @@ export type TaskItem = {
   id: string;
   title: string;
   dueAt: string | null;
+  remindAt: string | null;
   ownerId: string | null;
   ownerName: string | null;
   taskType: string;
@@ -36,7 +37,7 @@ const DONE_SHOWN = 20;
  */
 export async function listTaskGroups(orgId: string, ownerId: string | null): Promise<TaskGroups> {
   const supabase = await createClient();
-  const columns = "id, title, task_type, due_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+  const columns = "id, title, task_type, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
 
   let open = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "open").is("deleted_at", null);
   let done = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "done").is("deleted_at", null);
@@ -62,6 +63,7 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
     id: row.id,
     title: row.title,
     dueAt: row.due_at,
+    remindAt: row.remind_at,
     ownerId: row.owner_id,
     ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
     taskType: row.task_type,

@@ -7,9 +7,10 @@ import { safeNextPath } from "@/lib/paths";
 
 const AUTH_PAGES = ["/login", "/signup"];
 
-// Reached without a session: sign-in pages, auth callbacks, and the lead
-// intake (public forms and webhooks).
-const PUBLIC_PREFIXES = ["/auth/", "/f/", "/api/forms/", "/api/in/"];
+// Reached without a session: sign-in pages, auth callbacks, the lead intake
+// (public forms and webhooks), the push dispatcher (called by the database with
+// a secret) and the service worker script.
+const PUBLIC_PREFIXES = ["/auth/", "/f/", "/api/forms/", "/api/in/", "/api/push/dispatch", "/sw.js"];
 
 function isPublicPath(pathname: string): boolean {
   return AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));

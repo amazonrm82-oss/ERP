@@ -1,0 +1,63 @@
+import "server-only";
+
+import { formatDateTime } from "@/lib/format";
+import { createClient } from "@/lib/supabase/server";
+
+import { notificationHref } from "./links";
+
+export type NotificationView = {
+  id: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  read: boolean;
+  // formatted on the server so server and browser output cannot differ
+  when: string;
+  createdAt: string;
+};
+
+const COLUMNS = "id, title, body, entity_type, entity_id, read_at, created_at";
+
+type Row = { id: string; title: string; body: string | null; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
+
+export function toNotificationView(orgId: string, row: Row): NotificationView {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    href: notificationHref(orgId, row.entity_type, row.entity_id),
+    read: row.read_at !== null,
+    when: formatDateTime(row.created_at),
+    createdAt: row.created_at,
+  };
+}
+
+/** The user's latest notifications in this organization (RLS: only their own). */
+export async function listNotifications(orgId: string, userId: string, limit: number): Promise<NotificationView[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("notifications")
+    .select(COLUMNS)
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(`notifications query failed: ${error.message}`);
+  }
+  return data.map((row) => toNotificationView(orgId, row));
+}
+
+export async function countUnread(orgId: string, userId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (error) {
+    throw new Error(`unread count failed: ${error.message}`);
+  }
+  return count ?? 0;
+}

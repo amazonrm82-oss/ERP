@@ -24,6 +24,15 @@ function dueAt(date: string | null, time: string | null): string | null {
   return date ? zonedIso(date, `${time ?? DEFAULT_DUE_TIME}:00`) : null;
 }
 
+function remindAt(due: string | null, remind: string): string | null {
+  return due && remind !== "" ? new Date(Date.parse(due) - Number(remind) * 60_000).toISOString() : null;
+}
+
+function schedule(data: { due_date: string | null; due_time: string | null; remind: string }) {
+  const due = dueAt(data.due_date, data.due_time);
+  return { due_at: due, remind_at: remindAt(due, data.remind) };
+}
+
 /** New task. Without an assignee it is the creator's (the database assigns it). */
 export async function createTaskAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
@@ -40,7 +49,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
     organization_id: orgId,
     title: parsed.data.title,
     task_type: parsed.data.task_type,
-    due_at: dueAt(parsed.data.due_date, parsed.data.due_time),
+    ...schedule(parsed.data),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
   });
   if (error) {
@@ -71,7 +80,7 @@ export async function updateTaskAction(
     .update({
       title: parsed.data.title,
       task_type: parsed.data.task_type,
-      due_at: dueAt(parsed.data.due_date, parsed.data.due_time),
+      ...schedule(parsed.data),
       ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
     })
     .eq("organization_id", orgId)

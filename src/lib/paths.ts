@@ -19,6 +19,7 @@ export const paths = {
   dealNew: (orgId: string) => `/o/${orgId}/deals/new`,
   deal: (orgId: string, dealId: string) => `/o/${orgId}/deals/${dealId}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
+  notifications: (orgId: string) => `/o/${orgId}/notifications`,
   settings: (orgId: string) => `/o/${orgId}/settings`,
   settingsUsers: (orgId: string) => `/o/${orgId}/settings/users`,
   settingsPipelines: (orgId: string) => `/o/${orgId}/settings/pipelines`,

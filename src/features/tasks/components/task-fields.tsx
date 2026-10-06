@@ -2,7 +2,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 
 export type AssigneeOption = { userId: string; name: string };
 
-export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null };
+export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null; remind?: string | null };
 
 export const TASK_TYPE_OPTIONS = [
   { value: "todo", label: "משימה" },
@@ -11,9 +11,26 @@ export const TASK_TYPE_OPTIONS = [
   { value: "follow_up", label: "מעקב" },
 ] as const;
 
+export const REMIND_OPTIONS = [
+  { value: "", label: "בלי תזכורת" },
+  { value: "0", label: "בזמן היעד" },
+  { value: "15", label: "רבע שעה לפני" },
+  { value: "60", label: "שעה לפני" },
+  { value: "1440", label: "יום לפני" },
+] as const;
+
+/** The reminder option matching a saved due time and reminder time, or "" when it matches none. */
+export function remindOption(dueAt: string | null, remindAt: string | null): string {
+  if (!dueAt || !remindAt) {
+    return "";
+  }
+  const minutes = String(Math.round((Date.parse(dueAt) - Date.parse(remindAt)) / 60_000));
+  return REMIND_OPTIONS.some((option) => option.value === minutes) ? minutes : "";
+}
+
 type Props = { values: TaskValues; errors: Record<string, string>; assignees: AssigneeOption[]; defaultOwnerId: string };
 
-/** Title, due date and time, assignee. Shared by the new-task form and the edit form. */
+/** Title, due date and time, reminder, assignee. Shared by the new-task form and the edit form. */
 export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
@@ -41,6 +58,13 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props)
       {/* key: a select only takes defaultValue on mount */}
       <SelectField key={`type-${values.task_type ?? "todo"}`} label="סוג" name="task_type" defaultValue={values.task_type ?? "todo"} error={errors.task_type}>
         {TASK_TYPE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
+      <SelectField key={`remind-${values.remind ?? ""}`} label="תזכורת" name="remind" defaultValue={values.remind ?? ""} error={errors.remind}>
+        {REMIND_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

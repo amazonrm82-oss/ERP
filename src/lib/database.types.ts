@@ -291,6 +291,33 @@ export type AutomationRunRow = {
   created_at: string;
 };
 
+export type NotificationRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  // assigned | inquiry | automation | task_reminder ...
+  type: string;
+  title: string;
+  body: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read_at: string | null;
+  // set by the push dispatcher
+  pushed_at: string | null;
+  created_at: string;
+};
+
+export type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+  last_used_at: string | null;
+};
+
 export type CompanyRow = {
   id: string;
   organization_id: string;
@@ -547,6 +574,8 @@ export type TaskRow = {
   task_type: string;
   due_at: string | null;
   remind_at: string | null;
+  // set when the reminder was sent; cleared when remind_at changes
+  reminded_at: string | null;
   priority: number;
   status: TaskStatus;
   completed_at: string | null;
@@ -752,6 +781,13 @@ export type Database = {
       >;
       // written only by the automation engine
       automation_runs: ReadOnlyTable<AutomationRunRow>;
+      notifications: Table<NotificationRow, Record<string, never>, { read_at?: string | null }>;
+      push_subscriptions: Table<
+        PushSubscriptionRow,
+        // user_id is set by the database from the session
+        { endpoint: string; p256dh: string; auth: string; user_agent?: string | null },
+        Record<string, never>
+      >;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;
@@ -788,6 +824,12 @@ export type Database = {
           p_user_agent?: string | null;
           p_is_spam?: boolean;
         };
+        Returns: Json;
+      };
+      // service-role only (the app's push dispatcher)
+      claim_push_notifications: {
+        Args: { p_limit?: number };
+        // [{ id, organization_id, user_id, title, body, entity_type, entity_id, organization_name }]
         Returns: Json;
       };
       run_automation_now: {

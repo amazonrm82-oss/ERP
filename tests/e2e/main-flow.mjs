@@ -544,6 +544,54 @@ try {
   await ownerDesk.goto(dealUrl);
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor();
 
+  // ---------------------------------------------------------------- section 7: notifications
+  step("notifications: the bell updates live when a task is assigned");
+  await invitee.goto(`${orgUrl}/companies`);
+  const inviteeBell = invitee.getByRole("button", { name: /^התראות/ });
+  await inviteeBell.waitFor();
+  const unreadBefore = await inviteeBell.getAttribute("aria-label");
+  await invitee.waitForTimeout(2000); // the realtime channel joins
+  await ownerDesk.goto(`${orgUrl}/tasks`);
+  await ownerDesk.getByLabel("מה צריך לעשות").fill("משימה חיה לדנה");
+  await ownerDesk.getByLabel("באחריות").selectOption({ label: "דנה חברה" });
+  await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  // no reload on Dana's side: the count changes by itself
+  await invitee.waitForFunction(
+    (before) => document.querySelector('button[aria-label^="התראות"]')?.getAttribute("aria-label") !== before,
+    unreadBefore,
+    { timeout: 15000 },
+  );
+  console.log("bell after assignment:", await inviteeBell.getAttribute("aria-label"));
+  await inviteeBell.click();
+  await shot(invitee, "70-bell-open");
+  await invitee.getByRole("link", { name: /משימה חדשה הוקצתה לך/ }).first().click();
+  await invitee.waitForURL(/\/tasks$/);
+  await expectText(invitee, "משימה חיה לדנה");
+
+  step("notifications: a task reminder arrives through the scheduled job");
+  await ownerDesk.goto(`${orgUrl}/tasks`);
+  await ownerDesk.getByLabel("מה צריך לעשות").fill("תזכורת לבדיקה");
+  await ownerDesk.getByLabel("תאריך יעד").fill(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date()));
+  await ownerDesk.getByLabel("שעה").fill("00:01");
+  await ownerDesk.getByLabel("תזכורת").selectOption({ label: "בזמן היעד" });
+  await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  await expectText(ownerDesk, "תזכורת בזמן היעד");
+  let reminded = false;
+  for (let i = 0; i < 24 && !reminded; i++) {
+    await ownerDesk.waitForTimeout(5000);
+    await ownerDesk.goto(`${orgUrl}/notifications`);
+    reminded = (await ownerDesk.getByText("תזכורת: תזכורת לבדיקה").count()) > 0;
+  }
+  console.log("reminder delivered by the scheduled job:", reminded);
+  if (!reminded) throw new Error("the task reminder did not arrive within two minutes");
+  await ownerDesk.getByRole("heading", { name: "התראות לנייד ולמחשב" }).waitFor();
+  await ownerDesk.getByRole("button", { name: "סימון הכל כנקרא" }).first().click();
+  await ownerDesk.getByRole("button", { name: "סימון הכל כנקרא" }).waitFor({ state: "detached", timeout: 15000 });
+  await shot(ownerDesk, "71-notifications-1280");
+  await owner.goto(`${orgUrl}/notifications`);
+  await shot(owner, "72-notifications-360");
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("notifications page scrolls sideways at 360px");
+
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);
   await expectText(owner, "משימות פתוחות");

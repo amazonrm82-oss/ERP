@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { TaskForm } from "@/features/tasks/components/task-form";
+import { remindOption } from "@/features/tasks/components/task-fields";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
 import { listTaskGroups, type TaskItem } from "@/features/tasks/queries";
 import { cn } from "@/lib/cn";
@@ -56,6 +57,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       dueText: task.dueAt ? formatDateTime(task.dueAt) : null,
       dueDate: due ? zoneDate(due) : null,
       dueTime: due ? zoneTime(due) : null,
+      remind: remindOption(task.dueAt, task.remindAt),
       completedText: task.completedAt ? formatDateTime(task.completedAt) : null,
       ownerId: task.ownerId,
       ownerName: task.ownerName,
@@ -116,7 +118,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                   <ul className="divide-y divide-line">
                     {section.tasks.map((task) => (
                       <TaskRow
-                        key={`${task.id}-${task.dueAt}-${task.ownerId}`}
+                        key={`${task.id}-${task.dueAt}-${task.remindAt}-${task.ownerId}`}
                         orgId={orgId}
                         task={view(task, section.overdue === true)}
                         canEdit={canWrite}

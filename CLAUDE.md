@@ -36,9 +36,12 @@ and build this CRM here instead. The old code is preserved on the branch
    host that is not local and any database whose name does not end in `_test`. Do not weaken that guard.
    `tests/db/supabase-shim.sql` is test-only and must never be run on a real Supabase project.
 5. **No secrets in the repo.** Only `.env.example` is committed. The service-role key is never used in
-   browser code and never in code that handles a user request on the user's behalf. Its one use is the
-   lead intake (`src/lib/supabase/service.ts`, called from `src/features/intake/`), which calls
-   `public.intake_submit()` and reads a form's public display settings.
+   browser code and never in code that handles a user request on the user's behalf. It has two uses
+   (`src/lib/supabase/service.ts`): the lead intake (`src/features/intake/`), which calls
+   `public.intake_submit()` and reads a form's public display settings; and the push dispatcher
+   (`src/features/notifications/push-server.ts`, route `/api/push/dispatch`, called by the database
+   with a shared secret), which calls `public.claim_push_notifications()` and reads/deletes
+   `push_subscriptions`.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -84,11 +87,17 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   are protected by **missing grants / column-level grants**, not by policies.
 - Operations that span tables or need elevated rights are **RPC functions in `public`**
   (`create_organization`, `create_invitation`, `accept_invitation`, `transfer_ownership`,
-  `convert_lead`, `run_automation_now`; `intake_submit` is granted to `service_role` only).
+  `convert_lead`, `run_automation_now`; `intake_submit` and `claim_push_notifications` are granted to
+  `service_role` only). They are `security definer`, pin `search_path = ''`, and check permissions first.
 - The automation engine lives in the database (migration 0009): `app.process_outbox()` every minute and
   `app.run_scheduled_automations()` every 15 minutes, scheduled with pg_cron. Every id inside a rule's
   JSON is re-checked against the rule's organization when it runs. Changes made by an automation are
-  marked `payload.origin = 'automation'` in the outbox and do not trigger automations. They are `security definer`, pin `search_path = ''`, and check permissions first.
+  marked `payload.origin = 'automation'` in the outbox and do not trigger automations.
+- Notifications (migration 0010): `notifications` is in the `supabase_realtime` publication (the bell
+  subscribes with the user's token, RLS filters). pg_cron job `crm-notifications` runs every minute:
+  `app.send_task_reminders()` then `app.dispatch_push()`, which pings the app through pg_net using
+  `app.settings` (`push_dispatch_url`, `push_dispatch_secret`), filled in by hand per environment.
+  `push_subscriptions` is per user (no `organization_id`); `user_id` is set from the session by trigger.
 - A trigger function that must tell a browser write from a server write uses `current_user` and is
   therefore **security invoker**. Inside a `security definer` function `current_user` is the owner.
 - PL/pgSQL gotcha that already bit this project twice: `new.some_column` raises when the firing table
