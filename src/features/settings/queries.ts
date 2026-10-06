@@ -61,6 +61,7 @@ export type Member = {
   role: MembershipRole;
   seatType: SeatType;
   status: MembershipStatus;
+  isAvailable: boolean;
   joinedAt: string;
 };
 
@@ -75,7 +76,7 @@ export async function listMembers(orgId: string): Promise<Member[]> {
   const supabase = await createClient();
   const { data: memberships, error } = await supabase
     .from("memberships")
-    .select("user_id, role, seat_type, status, created_at")
+    .select("user_id, role, seat_type, status, is_available, created_at")
     .eq("organization_id", orgId);
   if (error) {
     throw new Error(`memberships query failed: ${error.message}`);
@@ -102,6 +103,7 @@ export async function listMembers(orgId: string): Promise<Member[]> {
       role: m.role,
       seatType: m.seat_type,
       status: m.status,
+      isAvailable: m.is_available,
       joinedAt: m.created_at,
     };
   });

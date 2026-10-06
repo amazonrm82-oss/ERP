@@ -11,7 +11,7 @@ import { CopyBlock, IntakeSettingsForm } from "@/features/intake/components/inta
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { listMembers } from "@/features/settings/queries";
+import { listMembers, listTeams } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
@@ -27,11 +27,12 @@ export default async function IntakeItemPage({ params }: Props) {
   if (!isUuid(formId) || !isAdminRole(role)) {
     notFound();
   }
-  const [intake, submissions, lookups, members, origin] = await Promise.all([
+  const [intake, submissions, lookups, members, teams, origin] = await Promise.all([
     getIntake(orgId, formId),
     listSubmissions(orgId, formId),
     getLeadLookups(orgId),
     listMembers(orgId),
+    listTeams(orgId),
     siteOrigin(),
   ]);
   if (!intake) {
@@ -105,7 +106,13 @@ export default async function IntakeItemPage({ params }: Props) {
         <CardHeader id="intake-settings-title" title="הגדרות" />
         <CardBody>
           {canWrite ? (
-            <IntakeSettingsForm orgId={orgId} intake={intake} sources={sources} members={assignable} />
+            <IntakeSettingsForm
+              orgId={orgId}
+              intake={intake}
+              sources={sources}
+              members={assignable}
+              teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+            />
           ) : (
             <p className="text-[0.9375rem] text-ink-soft">החשבון במצב קריאה בלבד.</p>
           )}
@@ -132,7 +139,13 @@ export default async function IntakeItemPage({ params }: Props) {
                   )}
                   <span className="block text-sm text-ink-soft">{formatDateTime(submission.createdAt)}</span>
                 </span>
-                {submission.status === "spam" ? <Badge tone="warning">ספאם, לא נוצר ליד</Badge> : <Badge tone="success">ליד נוצר</Badge>}
+                {submission.status === "spam" ? (
+                  <Badge tone="warning">ספאם, לא נוצר ליד</Badge>
+                ) : submission.status === "duplicate" ? (
+                  <Badge tone="accent">פנייה חוזרת, נוספה לרשומה קיימת</Badge>
+                ) : (
+                  <Badge tone="success">ליד נוצר</Badge>
+                )}
               </li>
             ))}
           </ul>

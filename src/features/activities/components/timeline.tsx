@@ -46,7 +46,7 @@ export async function Timeline({ orgId, subject, canWrite }: Props) {
                   <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
                 </p>
                 {item.text ? (
-                  <p className={cn("mt-1 break-words", item.isUserContent ? "whitespace-pre-wrap" : "text-ink-soft")}>
+                  <p className={cn("mt-1 break-words whitespace-pre-wrap", !item.isUserContent && "text-ink-soft")}>
                     {item.text}
                   </p>
                 ) : null}

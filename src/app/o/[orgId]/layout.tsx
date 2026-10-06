@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
+import { AvailabilityToggle } from "@/features/shell/components/availability-toggle";
 import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
@@ -64,6 +65,11 @@ export default async function OrgLayout({ children, params }: Props) {
             { href: paths.home, label: "החלפת עסק" },
           ]}
         >
+          {context.role === "viewer" ? null : (
+            <div className="border-b border-line pb-1.5">
+              <AvailabilityToggle key={String(context.isAvailable)} orgId={org.id} userId={user.id} available={context.isAvailable} />
+            </div>
+          )}
           <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
         </UserMenu>
       </header>

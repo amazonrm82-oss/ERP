@@ -45,7 +45,19 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
     return context;
   }
   const parsed = updateIntakeSchema.safeParse(
-    pick(formData, ["name", "title", "intro", "submit_label", "success_message", "redirect_url", "source_id", "owner_id", "is_active"]),
+    pick(formData, [
+      "name",
+      "title",
+      "intro",
+      "submit_label",
+      "success_message",
+      "redirect_url",
+      "source_id",
+      "owner_id",
+      "team_id",
+      "assign_mode",
+      "is_active",
+    ]),
   );
   if (!parsed.success) {
     return invalid(parsed.error, formData);

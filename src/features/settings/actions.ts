@@ -174,6 +174,32 @@ export async function setMemberStatusAction(orgId: string, userId: string, statu
   return ok();
 }
 
+/**
+ * Marks a member available or not for the lead round robin. Everyone may set
+ * their own; admins anyone's (RLS).
+ */
+export async function setAvailabilityAction(orgId: string, userId: string, available: boolean): Promise<ActionResult> {
+  const context = await actionContext(orgId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("memberships")
+    .update({ is_available: available === true })
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsUsers(orgId));
+  revalidatePath(paths.org(orgId), "layout");
+  return ok();
+}
+
 export async function transferOwnershipAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
   if (!context.ok) {

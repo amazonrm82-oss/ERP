@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 
+import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
@@ -12,7 +13,7 @@ import type { FormState } from "@/lib/action-result";
 import type { MembershipRole } from "@/lib/database.types";
 import { submitWith } from "@/lib/use-submit";
 
-import { changeMemberRoleAction, setMemberStatusAction } from "../actions";
+import { changeMemberRoleAction, setAvailabilityAction, setMemberStatusAction } from "../actions";
 import { canManageMember, type InvitableRole } from "../permissions";
 import type { Member } from "../queries";
 
@@ -32,7 +33,7 @@ export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members 
       {members.map((member) => (
         <MemberRow
           // remount when the saved role or status changes, so the controls reset
-          key={`${member.userId}-${member.role}-${member.status}`}
+          key={`${member.userId}-${member.role}-${member.status}-${member.isAvailable}`}
           orgId={orgId}
           member={member}
           isMe={member.userId === myUserId}
@@ -57,6 +58,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles }: RowProps) {
           {isMe ? <span className="text-sm font-normal text-ink-soft">(החשבון שלך)</span> : null}
           <Badge tone={member.role === "owner" ? "accent" : "neutral"}>{ROLE_LABELS[member.role]}</Badge>
           {suspended ? <Badge tone="warning">מושבת</Badge> : null}
+          {!suspended && !member.isAvailable ? <Badge>לא זמין ללידים</Badge> : null}
         </p>
         {member.email ? (
           <p dir="ltr" className="truncate text-end text-sm text-ink-soft sm:text-start">
@@ -67,6 +69,16 @@ function MemberRow({ orgId, member, isMe, manageable, roles }: RowProps) {
       {manageable ? (
         <div className="flex flex-wrap items-start gap-2">
           {suspended ? null : <RoleForm orgId={orgId} member={member} roles={roles} />}
+          {suspended || member.role === "viewer" ? null : (
+            <ActionButton
+              action={setAvailabilityAction.bind(null, orgId, member.userId, !member.isAvailable)}
+              pendingText="מעדכן…"
+              variant="ghost"
+              srLabel={member.name}
+            >
+              {member.isAvailable ? "סימון כלא זמין" : "סימון כזמין"}
+            </ActionButton>
+          )}
           <StatusButton orgId={orgId} member={member} />
         </div>
       ) : null}

@@ -30,6 +30,7 @@ const TYPE_LABELS: Record<string, string> = {
   conversion: "המרה",
   assignment: "הקצאה",
   system: "מערכת",
+  inquiry: "פנייה חוזרת",
 };
 
 function metaString(metadata: Json, key: string): string | null {
@@ -87,6 +88,16 @@ export async function getTimeline(orgId: string, subject: TimelineSubject): Prom
       const from = stageNames.get(metaString(activity.metadata, "from_stage_id") ?? "");
       const to = stageNames.get(metaString(activity.metadata, "to_stage_id") ?? "");
       text = from && to ? `העסקה עברה מהשלב "${from}" לשלב "${to}".` : "העסקה עברה שלב.";
+      isUserContent = false;
+    } else if (activity.type === "inquiry") {
+      // a repeat submission from a form or webhook: who wrote, through which channel, and what
+      // phone and email are wrapped in bidi isolates so they keep their order inside Hebrew text
+      const ltr = (value: string | null) => (value ? `\u2066${value}\u2069` : null);
+      const who = [metaString(activity.metadata, "full_name"), ltr(metaString(activity.metadata, "phone")), ltr(metaString(activity.metadata, "email"))]
+        .filter(Boolean)
+        .join(", ");
+      const channel = metaString(activity.metadata, "form_name");
+      text = [`פנייה נוספת${channel ? ` דרך "${channel}"` : ""}${who ? `: ${who}` : ""}.`, body].filter(Boolean).join("\n");
       isUserContent = false;
     } else if (activity.type === "conversion") {
       text = "הליד הומר לאיש קשר.";

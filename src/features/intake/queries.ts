@@ -58,6 +58,8 @@ export type IntakeDetails = {
   fields: FormFieldConfig[];
   sourceId: string | null;
   ownerId: string | null;
+  teamId: string | null;
+  assignMode: "owner" | "round_robin";
   isActive: boolean;
 };
 
@@ -65,7 +67,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, is_active")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active")
     .eq("organization_id", orgId)
     .eq("id", formId)
     .maybeSingle();
@@ -88,6 +90,8 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     fields: parseFieldsConfig(data.fields),
     sourceId: data.source_id,
     ownerId: data.owner_id,
+    teamId: data.team_id,
+    assignMode: data.assign_mode === "round_robin" ? "round_robin" : "owner",
     isActive: data.is_active,
   };
 }

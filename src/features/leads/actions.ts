@@ -9,6 +9,7 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import type { ConvertLeadResult } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import { normalizePhone } from "@/lib/phone";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
@@ -20,6 +21,47 @@ function revalidateLead(orgId: string, leadId?: string) {
   if (leadId) {
     revalidatePath(paths.lead(orgId, leadId));
   }
+}
+
+type Existing = { kind: "lead" | "contact"; name: string; href: string };
+
+/** The newest live, unconverted lead, else contact, with this phone (normalized) or email. */
+async function findExisting(
+  supabase: Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"],
+  orgId: string,
+  phone: string | null,
+  email: string | null,
+): Promise<Existing | null> {
+  const e164 = normalizePhone(phone);
+  // emails are stored lower-cased; quoting keeps "," and ")" in a value harmless
+  const filters = [e164 ? `phone_e164.eq."${e164}"` : null, email ? `email.eq."${email.toLowerCase().replace(/"/g, "")}"` : null].filter(Boolean);
+  if (filters.length === 0) {
+    return null;
+  }
+  for (const kind of ["lead", "contact"] as const) {
+    let query = supabase
+      .from(kind === "lead" ? "leads" : "contacts")
+      .select("id, full_name, phone, email")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
+    // a converted lead lives on as its contact, which is the record to open
+    if (kind === "lead") {
+      query = query.is("converted_at", null);
+    }
+    const { data } = await query
+      .or(filters.join(","))
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const row = data?.[0];
+    if (row) {
+      return {
+        kind,
+        name: row.full_name || row.email || row.phone || "ללא שם",
+        href: kind === "lead" ? paths.lead(orgId, row.id) : paths.contact(orgId, row.id),
+      };
+    }
+  }
+  return null;
 }
 
 export async function createLeadAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -35,6 +77,18 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   const custom = await customFieldsFromForm(context.supabase, orgId, "lead", formData);
   if (!custom.ok) {
     return custom;
+  }
+
+  // A repeat lead (same phone or email as a lead or contact the user can see)
+  // is pointed out first; the user may still create a new one.
+  if (formData.get("allow_duplicate") !== "on") {
+    const duplicate = await findExisting(context.supabase, orgId, parsed.data.phone, parsed.data.email);
+    if (duplicate) {
+      return fail(`כבר קיים ${duplicate.kind === "lead" ? "ליד" : "איש קשר"} עם הטלפון או האימייל האלה: ${duplicate.name}.`, {
+        fieldErrors: { allow_duplicate: duplicate.href },
+        values: formValues(formData),
+      });
+    }
   }
 
   // owner_id is left out: the database assigns the lead to its creator.

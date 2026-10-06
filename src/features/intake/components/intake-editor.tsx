@@ -43,9 +43,9 @@ export function CreateIntakeForm({ orgId }: { orgId: string }) {
   );
 }
 
-type EditProps = { orgId: string; intake: IntakeDetails; sources: Option[]; members: Option[] };
+type EditProps = { orgId: string; intake: IntakeDetails; sources: Option[]; members: Option[]; teams: Option[] };
 
-export function IntakeSettingsForm({ orgId, intake, sources, members }: EditProps) {
+export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
@@ -56,6 +56,8 @@ export function IntakeSettingsForm({ orgId, intake, sources, members }: EditProp
     values ? values[`required_${key}`] === "on" : intake.fields.some((field) => field.key === key && field.required);
   const sourceValue = values?.source_id ?? intake.sourceId ?? "";
   const ownerValue = values?.owner_id ?? intake.ownerId ?? "";
+  const teamValue = values?.team_id ?? intake.teamId ?? "";
+  const [mode, setMode] = useState(values?.assign_mode ?? intake.assignMode);
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -108,31 +110,74 @@ export function IntakeSettingsForm({ orgId, intake, sources, members }: EditProp
         </>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField key={`source-${sourceValue}`} label="מקור הליד" name="source_id" defaultValue={sourceValue} error={errors.source_id}>
-          <option value="">ללא מקור</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          key={`owner-${ownerValue}`}
-          label="הלידים מוקצים ל"
-          name="owner_id"
-          defaultValue={ownerValue}
-          error={errors.owner_id}
-          hint="בלי בעלים: רק מנהלים יראו את הליד, אלא אם כולם רואים הכול."
-        >
-          <option value="">ללא בעלים</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.name}
-            </option>
-          ))}
-        </SelectField>
-      </div>
+      <SelectField key={`source-${sourceValue}`} label="מקור הליד" name="source_id" defaultValue={sourceValue} error={errors.source_id}>
+        <option value="">ללא מקור</option>
+        {sources.map((source) => (
+          <option key={source.id} value={source.id}>
+            {source.name}
+          </option>
+        ))}
+      </SelectField>
+
+      <fieldset className="space-y-4 rounded-md border border-line p-3">
+        <legend className="px-1 text-sm font-medium">למי הולך ליד חדש</legend>
+        <div className="space-y-2">
+          <label className="flex items-start gap-2.5 text-[0.9375rem]">
+            <input
+              type="radio"
+              name="assign_mode"
+              value="owner"
+              checked={mode === "owner"}
+              onChange={() => setMode("owner")}
+              className="mt-1 size-4 accent-accent"
+            />
+            <span>לנציג קבוע</span>
+          </label>
+          <label className="flex items-start gap-2.5 text-[0.9375rem]">
+            <input
+              type="radio"
+              name="assign_mode"
+              value="round_robin"
+              checked={mode === "round_robin"}
+              onChange={() => setMode("round_robin")}
+              className="mt-1 size-4 accent-accent"
+            />
+            <span>
+              בסבב בין הנציגים הזמינים
+              <span className="block text-sm text-ink-soft">כל ליד הולך למי שקיבל ליד הכי מזמן. מי שסימן שהוא לא זמין מדולג.</span>
+            </span>
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {mode === "round_robin" ? (
+            <SelectField key={`team-${teamValue}`} label="מי משתתף בסבב" name="team_id" defaultValue={teamValue} error={errors.team_id}>
+              <option value="">כל המשתמשים בעסק</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  צוות {team.name}
+                </option>
+              ))}
+            </SelectField>
+          ) : (
+            <input type="hidden" name="team_id" value={teamValue} />
+          )}
+          <SelectField
+            key={`owner-${ownerValue}`}
+            label={mode === "round_robin" ? "אם אף אחד לא זמין" : "הנציג"}
+            name="owner_id"
+            defaultValue={ownerValue}
+            error={errors.owner_id}
+            hint="בלי בעלים: רק מנהלים יראו את הליד, אלא אם כולם רואים הכול."
+          >
+            <option value="">ללא בעלים</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+      </fieldset>
       <label className="flex items-center gap-2.5 text-[0.9375rem]">
         <input type="checkbox" name="is_active" defaultChecked={values ? values.is_active === "on" : intake.isActive} className="size-4.5 accent-accent" />
         פעיל (מקבל פניות)

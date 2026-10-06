@@ -432,6 +432,7 @@ try {
   await ownerDesk.getByLabel("סוג").selectOption("webhook");
   await ownerDesk.getByRole("button", { name: "יצירה" }).click();
   await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
+  const hookAdminUrl = ownerDesk.url();
   const hookUrl = await ownerDesk.getByLabel("כתובת ה-webhook").inputValue();
   const hookReply = await fetch(hookUrl, {
     method: "POST",
@@ -444,6 +445,67 @@ try {
   if (badReply.status !== 400) throw new Error(`a webhook without name/phone/email should get 400, got ${badReply.status}`);
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("אבי מזאפייר")}`);
   await ownerDesk.getByRole("link", { name: "אבי מזאפייר" }).waitFor({ timeout: 15000 });
+
+  // ---------------------------------------------------------------- section 5: routing and repeat leads
+  step("repeat lead: the webhook adds to the existing lead instead of creating one");
+  const again = await fetch(hookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "אבי שוב", phone: "+972-3-555-6677", message: "רוצה הצעה עדכנית" }),
+  });
+  if (again.status !== 200) throw new Error(`repeat webhook answered ${again.status}`);
+  await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("אבי")}`);
+  const aviRows = await ownerDesk.locator("tbody tr").count();
+  if (aviRows !== 1) throw new Error(`expected one lead for Avi, found ${aviRows}`);
+  await ownerDesk.getByRole("link", { name: "אבי מזאפייר" }).click();
+  await expectText(ownerDesk, "פנייה נוספת דרך \"Zapier\"");
+  await expectText(ownerDesk, "רוצה הצעה עדכנית");
+  await shot(ownerDesk, "50-repeat-inquiry-1280");
+
+  step("repeat lead: a manual lead with a known phone gets a warning first");
+  await ownerDesk.goto(`${orgUrl}/leads/new`);
+  await ownerDesk.getByLabel("שם מלא").fill("משה שוב");
+  await ownerDesk.getByLabel("טלפון").fill("0501234567");
+  await ownerDesk.getByLabel("תאריך פגישה").fill("2026-12-01");
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await expectText(ownerDesk, "כבר קיים איש קשר עם הטלפון או האימייל האלה: משה כהן");
+  await ownerDesk.getByLabel("ליצור ליד חדש בכל זאת").check();
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 15000 });
+
+  step("round robin: leads alternate, and an unavailable rep is skipped");
+  await ownerDesk.goto(hookAdminUrl);
+  await ownerDesk.getByLabel("בסבב בין הנציגים הזמינים").check();
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await expectText(ownerDesk, "נשמר.");
+  const sendLead = async (name, phone) => {
+    const r = await fetch(hookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, phone }) });
+    if (r.status !== 200) throw new Error(`webhook answered ${r.status}`);
+  };
+  const ownerOfLead = async (name) => {
+    await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent(name)}`);
+    await ownerDesk.getByRole("link", { name }).click();
+    await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+    return (await ownerDesk.locator("dt", { hasText: "בעלים" }).locator("xpath=following-sibling::dd[1]").innerText()).trim();
+  };
+  await sendLead("סבב אחד", "058-1000001");
+  await sendLead("סבב שתיים", "058-1000002");
+  const rr = [await ownerOfLead("סבב אחד"), await ownerOfLead("סבב שתיים")];
+  console.log("round robin owners:", rr.join(" / "));
+  if (rr[0] === rr[1]) throw new Error("round robin should alternate between Ronit and Dana");
+
+  // Dana goes on vacation from her own account menu
+  await invitee.goto(orgUrl);
+  await invitee.getByRole("button", { name: /דנה חברה/ }).click();
+  await invitee.getByRole("switch", { name: "זמין לקבלת לידים" }).uncheck();
+  await expectText(invitee, "לידים חדשים בסבב לא יגיעו אליך");
+  await sendLead("סבב שלוש", "058-1000003");
+  await sendLead("סבב ארבע", "058-1000004");
+  const afterVacation = [await ownerOfLead("סבב שלוש"), await ownerOfLead("סבב ארבע")];
+  console.log("while Dana is away:", afterVacation.join(" / "));
+  if (afterVacation.some((name) => name !== "רונית בעלים")) throw new Error("an unavailable rep got a lead");
+  await ownerDesk.goto(`${orgUrl}/settings/users`);
+  await expectText(ownerDesk, "לא זמין ללידים");
 
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);

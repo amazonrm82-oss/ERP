@@ -12,6 +12,8 @@ export type OrgContext = {
   user: SessionUser & { displayName: string };
   org: { id: string; name: string; status: OrgStatus };
   role: MembershipRole;
+  // false = skipped by the lead round robin ("on vacation")
+  isAvailable: boolean;
   subscription: {
     status: SubscriptionStatus;
     planName: string;
@@ -41,7 +43,7 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     supabase.from("organizations").select("id, name, status").eq("id", orgId).is("deleted_at", null).maybeSingle(),
     supabase
       .from("memberships")
-      .select("role")
+      .select("role, is_available")
       .eq("organization_id", orgId)
       .eq("user_id", user.id)
       .eq("status", "active")
@@ -81,6 +83,7 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     user: { ...user, displayName },
     org,
     role,
+    isAvailable: membership.is_available,
     subscription,
     canWrite: writable && role !== "viewer",
     // members cannot move records to the recycle bin; managers can for their own and their teams'

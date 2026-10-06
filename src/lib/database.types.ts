@@ -83,6 +83,8 @@ export type MembershipRow = {
   seat_type: SeatType;
   status: MembershipStatus;
   is_available: boolean;
+  // round-robin memory, written only by the database
+  last_lead_assigned_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -224,6 +226,7 @@ export type SavedViewRow = {
 };
 
 export type FormKind = "form" | "webhook";
+export type AssignMode = "owner" | "round_robin";
 
 export type FormRow = {
   id: string;
@@ -241,6 +244,7 @@ export type FormRow = {
   source_id: string | null;
   owner_id: string | null;
   team_id: string | null;
+  assign_mode: string;
   is_active: boolean;
   created_by: string | null;
   created_at: string;
@@ -676,6 +680,7 @@ export type Database = {
           source_id?: string | null;
           owner_id?: string | null;
           team_id?: string | null;
+          assign_mode?: AssignMode;
           is_active?: boolean;
         },
         {
@@ -689,6 +694,7 @@ export type Database = {
           source_id?: string | null;
           owner_id?: string | null;
           team_id?: string | null;
+          assign_mode?: AssignMode;
           is_active?: boolean;
         }
       >;

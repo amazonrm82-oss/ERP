@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { ButtonLink } from "@/components/ui/button";
@@ -31,6 +32,17 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <FormError message={failure?.message} />
+      {errors.allow_duplicate ? (
+        <div className="space-y-2 rounded-md border border-line p-3">
+          <Link href={errors.allow_duplicate} className="text-[0.9375rem] font-medium text-accent underline underline-offset-4">
+            לפתוח את הרשומה הקיימת
+          </Link>
+          <label className="flex items-center gap-2.5 text-[0.9375rem]">
+            <input type="checkbox" name="allow_duplicate" className="size-4.5 accent-accent" />
+            ליצור ליד חדש בכל זאת
+          </label>
+        </div>
+      ) : null}
       <TextField
         label="שם מלא"
         name="full_name"

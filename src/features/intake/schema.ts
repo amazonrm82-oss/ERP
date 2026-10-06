@@ -30,6 +30,8 @@ export const updateIntakeSchema = z.object({
   redirect_url: optionalHttpsUrl,
   source_id: optionalId,
   owner_id: optionalId,
+  team_id: optionalId,
+  assign_mode: z.enum(["owner", "round_robin"], { error: "יש לבחור איך מחלקים את הלידים." }),
   is_active: checkbox,
 });
 
