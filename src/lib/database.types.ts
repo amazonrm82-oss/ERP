@@ -223,6 +223,42 @@ export type SavedViewRow = {
   updated_at: string;
 };
 
+export type FormKind = "form" | "webhook";
+
+export type FormRow = {
+  id: string;
+  organization_id: string;
+  kind: string;
+  name: string;
+  // forms: public id in the embed code; webhooks: the secret in the URL
+  token: string;
+  title: string | null;
+  intro: string | null;
+  submit_label: string | null;
+  success_message: string | null;
+  redirect_url: string | null;
+  fields: Json;
+  source_id: string | null;
+  owner_id: string | null;
+  team_id: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FormSubmissionRow = {
+  id: string;
+  organization_id: string;
+  form_id: string;
+  status: string;
+  lead_id: string | null;
+  payload: Json;
+  ip_hash: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 export type CompanyRow = {
   id: string;
   organization_id: string;
@@ -625,6 +661,39 @@ export type Database = {
           team_id?: string | null;
         }
       >;
+      forms: Table<
+        FormRow,
+        {
+          organization_id: string;
+          kind?: FormKind;
+          name: string;
+          title?: string | null;
+          intro?: string | null;
+          submit_label?: string | null;
+          success_message?: string | null;
+          redirect_url?: string | null;
+          fields?: Json;
+          source_id?: string | null;
+          owner_id?: string | null;
+          team_id?: string | null;
+          is_active?: boolean;
+        },
+        {
+          name?: string;
+          title?: string | null;
+          intro?: string | null;
+          submit_label?: string | null;
+          success_message?: string | null;
+          redirect_url?: string | null;
+          fields?: Json;
+          source_id?: string | null;
+          owner_id?: string | null;
+          team_id?: string | null;
+          is_active?: boolean;
+        }
+      >;
+      // written only by intake_submit()
+      form_submissions: ReadOnlyTable<FormSubmissionRow>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;
@@ -650,6 +719,18 @@ export type Database = {
       transfer_ownership: {
         Args: { p_organization_id: string; p_new_owner: string };
         Returns: undefined;
+      };
+      // service-role only (the app's intake routes)
+      intake_submit: {
+        Args: {
+          p_token: string;
+          p_kind: FormKind;
+          p_payload: Json;
+          p_ip_hash?: string | null;
+          p_user_agent?: string | null;
+          p_is_spam?: boolean;
+        };
+        Returns: Json;
       };
       convert_lead: {
         Args: {

@@ -19,6 +19,7 @@ export function SettingsTabs({ orgId, showTrash, showCustomization }: { orgId: s
           { href: paths.settingsLeads(orgId), label: "סטטוסים ומקורות" },
           { href: paths.settingsFields(orgId), label: "שדות" },
           { href: paths.settingsTags(orgId), label: "תגיות" },
+          { href: paths.settingsIntake(orgId), label: "קליטת לידים" },
         ]
       : []),
     ...(showTrash ? [{ href: paths.settingsTrash(orgId), label: "סל מחזור" }] : []),

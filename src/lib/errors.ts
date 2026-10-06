@@ -25,6 +25,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_pipelines": "הגעתם למספר הפייפליינים המרבי בחבילה. כדי להוסיף פייפליין יש לשדרג חבילה.",
   "limit:max_custom_fields_per_object": "הגעתם למספר השדות המותאמים המרבי בחבילה.",
   "limit:owned_organizations": "אפשר להיות הבעלים של עד 5 עסקים.",
+  "limit:max_forms": "הגעתם למספר הטפסים המרבי בחבילה. כדי להוסיף טופס יש לשדרג חבילה.",
+  "feature:api": "חיבור webhook אינו כלול בחבילה הנוכחית. יש לשדרג חבילה.",
   "feature:view_seats": "מושבי צפייה אינם כלולים בחבילה הנוכחית. יש לשדרג חבילה.",
 };
 

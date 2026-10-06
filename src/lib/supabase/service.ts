@@ -1,0 +1,25 @@
+import "server-only";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/lib/database.types";
+import { getSupabaseEnv } from "@/lib/env";
+
+/**
+ * Supabase client with the service-role key: bypasses Row Level Security.
+ * Allowed in exactly one place, the lead intake (src/features/intake), where a
+ * stranger's form submission arrives with no session. It only calls
+ * public.intake_submit() and reads a form's public settings by token.
+ * Never import this from code that serves a signed-in user.
+ * Returns null when the key is not configured.
+ */
+export function createServiceClient(): SupabaseClient<Database> | null {
+  const env = getSupabaseEnv();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!env || !key) {
+    return null;
+  }
+  return createClient<Database>(env.url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}

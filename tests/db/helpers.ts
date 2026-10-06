@@ -87,6 +87,14 @@ export function asAnon<T>(fn: (q: Query) => Promise<T>): Promise<T> {
   }, fn);
 }
 
+/** The app's server with the service-role key (used only by the lead intake routes). */
+export function asService<T>(fn: (q: Query) => Promise<T>): Promise<T> {
+  return inTransaction(async (q) => {
+    await q("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: "service_role" })]);
+    await q("set local role service_role");
+  }, fn);
+}
+
 export async function createUser(label = "user"): Promise<{ id: string; email: string }> {
   const email = `${label}-${randomUUID().slice(0, 8)}@example.test`;
   const id = await asAdmin(async (q) => {

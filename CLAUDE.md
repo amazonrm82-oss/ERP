@@ -34,7 +34,9 @@ and build this CRM here instead. The old code is preserved on the branch
    host that is not local and any database whose name does not end in `_test`. Do not weaken that guard.
    `tests/db/supabase-shim.sql` is test-only and must never be run on a real Supabase project.
 5. **No secrets in the repo.** Only `.env.example` is committed. The service-role key is never used in
-   browser code and never in code that handles a user request on the user's behalf.
+   browser code and never in code that handles a user request on the user's behalf. Its one use is the
+   lead intake (`src/lib/supabase/service.ts`, called from `src/features/intake/`), which calls
+   `public.intake_submit()` and reads a form's public display settings.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -80,7 +82,7 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   are protected by **missing grants / column-level grants**, not by policies.
 - Operations that span tables or need elevated rights are **RPC functions in `public`**
   (`create_organization`, `create_invitation`, `accept_invitation`, `transfer_ownership`,
-  `convert_lead`). They are `security definer`, pin `search_path = ''`, and check permissions first.
+  `convert_lead`; `intake_submit` is granted to `service_role` only). They are `security definer`, pin `search_path = ''`, and check permissions first.
 - A trigger function that must tell a browser write from a server write uses `current_user` and is
   therefore **security invoker**. Inside a `security definer` function `current_user` is the owner.
 - PL/pgSQL gotcha that already bit this project twice: `new.some_column` raises when the firing table

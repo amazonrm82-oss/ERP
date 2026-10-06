@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   asAdmin,
+  asService,
   asUser,
   closePool,
   count,
@@ -74,7 +75,15 @@ describe("tenant isolation", () => {
       );
       await q("insert into public.teams (organization_id, name) values ($1, 'מכירות')", [orgA]);
       await q("select public.create_invitation($1, 'someone@example.test')", [orgA]);
+      const form = (
+        await q<{ id: string; token: string }>("insert into public.forms (organization_id, name) values ($1, 'טופס אתר') returning id, token", [orgA])
+      ).rows[0];
+      ids.formA = form.id;
+      ids.formTokenA = form.token;
     });
+    await asService((q) =>
+      q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
+    );
   });
 
   const tenantTables = [
@@ -96,6 +105,8 @@ describe("tenant isolation", () => {
     "tasks",
     "field_definitions",
     "audit_log",
+    "forms",
+    "form_submissions",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -193,6 +204,8 @@ describe("tenant isolation", () => {
       tasks: "title = title",
       field_definitions: "label = label",
       saved_views: "name = name",
+      forms: "name = name",
+      form_submissions: "status = status",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -250,6 +263,8 @@ describe("tenant isolation", () => {
       ["insert into public.subscriptions (organization_id, plan_key) values ($1, 'business')", [orgA]],
       ["insert into public.notifications (organization_id, user_id, type, title) values ($1, $2, 'x', 'x')", [orgA, a.id]],
       ["insert into public.audit_log (organization_id, action, entity_type) values ($1, 'x', 'x')", [orgA]],
+      ["insert into public.forms (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.form_submissions (organization_id, form_id, status) values ($1, $2, 'accepted')", [orgA, ids.formA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -291,6 +306,8 @@ describe("tenant isolation", () => {
       ["tasks", "outcome = 'HACKED'", "outcome = 'HACKED'"],
       ["field_definitions", "help_text = 'HACKED'", "help_text = 'HACKED'"],
       ["saved_views", "name = 'HACKED'", "name = 'HACKED'"],
+      ["forms", "title = 'HACKED'", "title = 'HACKED'"],
+      ["form_submissions", "user_agent = 'HACKED'", "user_agent = 'HACKED'"],
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
     ];
     // which rows of each table belong to alice's organization

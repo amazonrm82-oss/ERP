@@ -381,6 +381,70 @@ try {
   await expectText(invitee, "לא נמצאו לידים");
   await ownerDesk.goto(leadUrl);
 
+  // ---------------------------------------------------------------- section 4: lead intake
+  step("intake: create a web form, set it up");
+  await ownerDesk.goto(`${orgUrl}/settings/intake`);
+  await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("טופס צור קשר");
+  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
+  const formAdminUrl = ownerDesk.url();
+  await ownerDesk.getByLabel("כותרת הטופס").fill("השאירו פרטים ונחזור אליכם");
+  await ownerDesk.getByRole("checkbox", { name: "חברה", exact: true }).check();
+  await ownerDesk.getByLabel("מקור הליד").selectOption({ label: "טופס באתר" });
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await expectText(ownerDesk, "נשמר.");
+  const publicUrl = await ownerDesk.getByLabel("קישור ישיר לטופס").inputValue();
+  await shot(ownerDesk, "40-intake-form-1280");
+
+  step("intake: a visitor (signed out, phone) fills the public form");
+  const frameHeaders = (await fetch(publicUrl)).headers.get("content-security-policy");
+  console.log("public form frame-ancestors:", frameHeaders);
+  if (!frameHeaders?.includes("frame-ancestors *")) throw new Error("the public form must be embeddable");
+  const visitor = await newPage(360);
+  await visitor.goto(`${publicUrl}?embed=1`);
+  await visitor.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
+  await visitor.getByLabel("שם מלא").fill("גלית מהאתר");
+  await visitor.getByLabel("טלפון").fill("054-7778899");
+  await visitor.getByLabel("חברה").fill("גלית עיצובים");
+  await visitor.waitForTimeout(2200); // a person takes a moment; faster than 2 seconds counts as a bot
+  await visitor.getByRole("button", { name: "שליחה" }).click();
+  await expectText(visitor, "תודה! קיבלנו את הפרטים");
+  await shot(visitor, "41-public-form-360");
+
+  step("intake: a bot that fills the hidden field makes no lead");
+  const formToken = publicUrl.split("/f/")[1];
+  const botReply = await fetch(`${APP}/api/forms/${formToken}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full_name: "Bot", phone: "1234567", website_url: "http://spam.example" }),
+  }).then((r) => r.json());
+  if (!botReply.ok) throw new Error("spam must be answered like a success");
+  await ownerDesk.goto(formAdminUrl);
+  await expectText(ownerDesk, "ספאם, לא נוצר ליד");
+  await ownerDesk.getByRole("link", { name: /גלית מהאתר/ }).click();
+  await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+  await expectText(ownerDesk, "גלית עיצובים");
+  await expectText(ownerDesk, "טופס באתר");
+
+  step("intake: a webhook takes JSON with other field names");
+  await ownerDesk.goto(`${orgUrl}/settings/intake`);
+  await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("Zapier");
+  await ownerDesk.getByLabel("סוג").selectOption("webhook");
+  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
+  const hookUrl = await ownerDesk.getByLabel("כתובת ה-webhook").inputValue();
+  const hookReply = await fetch(hookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "אבי מזאפייר", tel: "03-5556677", notes: "הגיע מקמפיין" }),
+  });
+  console.log("webhook status:", hookReply.status);
+  if (hookReply.status !== 200) throw new Error(`webhook answered ${hookReply.status}`);
+  const badReply = await fetch(hookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: "בלי פרטים" }) });
+  if (badReply.status !== 400) throw new Error(`a webhook without name/phone/email should get 400, got ${badReply.status}`);
+  await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("אבי מזאפייר")}`);
+  await ownerDesk.getByRole("link", { name: "אבי מזאפייר" }).waitFor({ timeout: 15000 });
+
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);
   await expectText(owner, "משימות פתוחות");
