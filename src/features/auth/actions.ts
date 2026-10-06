@@ -1,11 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
 import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
+import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
 
@@ -26,30 +26,15 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   redirect(safeNextPath(formData.get("next")?.toString()));
 }
 
-// Where the confirmation email sends the user back to. NEXT_PUBLIC_SITE_URL
-// wins when set; otherwise the origin of this request. Supabase only honours
-// URLs on the project's redirect allow-list, so a forged Host header cannot
-// redirect a confirmation link to another site.
-async function siteOrigin(): Promise<string> {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
-  if (configured) {
-    return configured;
-  }
-  const headerList = await headers();
-  const origin = headerList.get("origin");
-  if (origin) {
-    return origin;
-  }
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
-  const protocol = headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${protocol}://${host}`;
-}
-
 export async function signUpAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = signUpSchema.safeParse(pick(formData, ["full_name", "email", "password"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+
+  // where to continue after confirming, e.g. an invitation link
+  const next = safeNextPath(formData.get("next")?.toString());
+  const callback = next === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(next)}`;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -58,7 +43,7 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
     options: {
       // copied to profiles.full_name by the handle_new_user trigger
       data: { full_name: parsed.data.full_name },
-      emailRedirectTo: `${await siteOrigin()}/auth/callback`,
+      emailRedirectTo: `${await siteOrigin()}${callback}`,
     },
   });
   if (error) {
@@ -73,7 +58,7 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
 
   if (data.session) {
     // email confirmation is off: the user is already signed in
-    redirect(paths.onboarding);
+    redirect(next === "/" ? paths.onboarding : next);
   }
 
   return {

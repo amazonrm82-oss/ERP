@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:db": "vitest run --config vitest.db.config.mts",
     "db:test:start": "bash scripts/test-db.sh start",
-    "db:test:stop": "bash scripts/test-db.sh stop"
+    "db:test:stop": "bash scripts/test-db.sh stop",
+    "test:e2e": "node tests/e2e/main-flow.mjs"
   },
   "dependencies": {
     "@fontsource-variable/heebo": "^5.3.0",
@@ -30,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "pg": "^8.23.1",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.3"

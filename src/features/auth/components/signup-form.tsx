@@ -10,7 +10,7 @@ import type { FormState } from "@/lib/action-result";
 import { signUpAction } from "../actions";
 import { PASSWORD_MIN } from "../schema";
 
-export function SignupForm() {
+export function SignupForm({ next }: { next: string }) {
   const [state, formAction] = useActionState<FormState, FormData>(signUpAction, null);
   const failure = state && !state.ok ? state : null;
 
@@ -21,6 +21,7 @@ export function SignupForm() {
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
+      <input type="hidden" name="next" value={next} />
       <FormError message={failure?.message} />
       <TextField
         label="שם מלא"

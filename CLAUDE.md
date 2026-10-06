@@ -55,6 +55,7 @@ npm run build
 npm run db:test:start  # start a throwaway local PostgreSQL on 127.0.0.1:54329
 npm run test:db        # rebuild crm_saas_test from the migrations and run all database tests
 npm run db:test:stop
+npm run test:e2e       # browser flow; needs `npx supabase start` (Docker) + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy
 ```
 
@@ -108,8 +109,9 @@ that back.
 ### Migrations
 
 - `supabase/migrations/<timestamp>_<name>.sql`, applied in name order. Never edit a migration that
-  has been applied to a hosted project; add a new one. (Nothing is hosted yet as of the first commit,
-  so the five initial files may still be edited.)
+  has been applied to a hosted project; add a new one. 0001–0005 are applied to the hosted project.
+  The owner applies new migrations by hand in the SQL Editor; code that depends on a migration is
+  pushed to `main` (which deploys) only after the owner confirms it ran.
 - Money is integer agorot + currency code. Times are `timestamptz` (UTC), shown in the organization's
   time zone (default `Asia/Jerusalem`). Phones are stored as typed plus `phone_e164` (set by trigger).
 - Plan limits and feature flags live in `plans.limits` / `plans.features`, with per-organization
@@ -144,11 +146,13 @@ Verified:
 - The CI workflow (`.github/workflows/ci.yml`) passed on GitHub for the first push: lint, typecheck,
   database tests against a `postgres:16` service, and build.
 
+Verified on 6 October 2026:
+- All migrations apply on a real (local, Docker) Supabase stack, and the whole flow passes there in a
+  real browser: `tests/e2e/main-flow.mjs`.
+- The owner ran migrations 0001–0005 on the hosted project (`eowuxxkiedpjrqvfqcgn`).
+
 Not verified yet:
-- **The app has never run against a real Supabase project.** Signed-in screens were exercised only
-  against a hand-written HTTP stub. First task once a project exists: run the whole flow for real
-  (sign up, confirm email, create organization, lead → note → convert, deal board) and fix what breaks.
-- The migrations on real Supabase (the test database uses a stand-in for the `auth` schema and roles).
+- The flow on the hosted project and the live site (`https://erp-3yft.vercel.app`).
 - Performance of the per-row access functions on large tables.
 
 ## Working agreement

@@ -34,6 +34,20 @@ const RAISED_MESSAGES: Array<[RegExp, string]> = [
   [/no open stage/i, "אין בפייפליין שלב פתוח לשים בו את העסקה. יש להוסיף שלב בהגדרות."],
 ];
 
+// Exceptions our own functions and triggers raise with other codes, recognised
+// by their (stable) English message. Checked before the generic code mapping.
+const OWN_MESSAGES: Array<[RegExp, string]> = [
+  [/only the owner can (change|remove) another admin/i, "רק הבעלים יכול לשנות או להסיר מנהל מערכת אחר."],
+  [/only the owner can (make someone|invite) an admin/i, "רק הבעלים יכול למנות מנהל מערכת."],
+  [/cannot change your own role/i, "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך."],
+  [/owner cannot be (removed|suspended)|ownership changes only/i, "אי אפשר לשנות את הבעלים. אפשר להעביר בעלות."],
+  [/already a member/i, "המשתמש כבר חבר בעסק."],
+  [/invitation is invalid or has expired/i, "ההזמנה אינה בתוקף. בקשו ממי שהזמין אתכם לשלוח הזמנה חדשה."],
+  [/invitation was sent to a different email/i, "ההזמנה נשלחה לכתובת אימייל אחרת. התחברו עם החשבון של הכתובת שאליה נשלחה ההזמנה."],
+  [/new owner must be an active member/i, "הבעלים החדש צריך להיות משתמש פעיל עם מושב מלא."],
+  [/invalid email address/i, "כתובת האימייל אינה תקינה."],
+];
+
 const AUTH_MESSAGES: Record<string, string> = {
   invalid_credentials: "האימייל או הסיסמה שגויים.",
   email_not_confirmed: "כתובת האימייל עוד לא אומתה. חפשו את הודעת האימות בתיבת הדואר.",
@@ -96,6 +110,11 @@ export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR)
       }
     }
     return fallback;
+  }
+
+  const ownMessage = OWN_MESSAGES.find(([pattern]) => pattern.test(e.message ?? ""));
+  if (ownMessage) {
+    return ownMessage[1];
   }
 
   switch (code) {

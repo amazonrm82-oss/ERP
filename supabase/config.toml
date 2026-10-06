@@ -1,0 +1,12 @@
+# Settings for the LOCAL Supabase stack only (`npx supabase start`, Docker).
+# It has nothing to do with the hosted project and holds no secrets; every
+# setting not listed here keeps the CLI default. Used by `npm run test:e2e`.
+project_id = "crm-saas-local"
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**"]
+
+[auth.email]
+# same as a hosted project: a new account must confirm its email address
+enable_confirmations = true

@@ -86,6 +86,36 @@ export type MembershipRow = {
   updated_at: string;
 };
 
+export type TeamRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  parent_team_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamMemberRow = {
+  organization_id: string;
+  team_id: string;
+  user_id: string;
+  is_manager: boolean;
+  created_at: string;
+};
+
+export type InvitationRow = {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: MembershipRole;
+  token_hash: string;
+  invited_by: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
 export type SubscriptionRow = {
   organization_id: string;
   plan_key: string;
@@ -483,6 +513,18 @@ export type Database = {
         { role?: MembershipRole; seat_type?: SeatType; status?: MembershipStatus; is_available?: boolean }
       >;
       subscriptions: ReadOnlyTable<SubscriptionRow>;
+      teams: Table<TeamRow, { organization_id: string; name: string; parent_team_id?: string | null }>;
+      team_members: Table<
+        TeamMemberRow,
+        { organization_id: string; team_id: string; user_id: string; is_manager?: boolean },
+        { is_manager?: boolean }
+      >;
+      invitations: Table<
+        InvitationRow,
+        // created only through create_invitation()
+        Record<string, never>,
+        { revoked_at?: string | null }
+      >;
       pipelines: Table<
         PipelineRow,
         { organization_id: string; name: string; position?: number; is_default?: boolean; deleted_at?: string | null }

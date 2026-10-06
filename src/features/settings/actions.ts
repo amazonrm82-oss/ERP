@@ -1,0 +1,353 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { actionContext } from "@/lib/action-context";
+import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import type { MembershipStatus } from "@/lib/database.types";
+import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { paths } from "@/lib/paths";
+import { siteOrigin } from "@/lib/site-origin";
+import { pick } from "@/lib/validation";
+
+import {
+  addTeamMemberSchema,
+  changeRoleSchema,
+  inviteSchema,
+  ORGANIZATION_FIELD_NAMES,
+  teamNameSchema,
+  transferOwnershipSchema,
+  updateOrganizationSchema,
+} from "./schema";
+
+// ---------------------------------------------------------------------------
+// Business details
+// ---------------------------------------------------------------------------
+
+export async function updateOrganizationAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = updateOrganizationSchema.safeParse(pick(formData, ORGANIZATION_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  const { data, error } = await context.supabase
+    .from("organizations")
+    .update({
+      name: parsed.data.name,
+      industry: parsed.data.industry || null,
+      team_size: parsed.data.team_size || null,
+      phone: parsed.data.phone,
+      record_visibility: parsed.data.record_visibility,
+    })
+    .eq("id", orgId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את פרטי העסק. נסו שוב."), { values: formValues(formData) });
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
+  }
+
+  // the name shows in the header of every page
+  revalidatePath(paths.org(orgId), "layout");
+  return { ok: true, message: "פרטי העסק נשמרו." };
+}
+
+// ---------------------------------------------------------------------------
+// Users and invitations
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates an invitation and returns its link. No email is sent yet (no email
+ * provider is chosen); the admin copies the link or shares it on WhatsApp.
+ * The raw token exists only in this response; the database keeps its hash.
+ */
+export async function inviteUserAction(
+  orgId: string,
+  _prev: FormState<{ link: string; email: string }>,
+  formData: FormData,
+): Promise<FormState<{ link: string; email: string }>> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = inviteSchema.safeParse(pick(formData, ["email", "role"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  const { data: token, error } = await context.supabase.rpc("create_invitation", {
+    p_organization_id: orgId,
+    p_email: parsed.data.email,
+    p_role: parsed.data.role,
+  });
+  if (error || !token) {
+    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את ההזמנה. נסו שוב."), { values: formValues(formData) });
+  }
+
+  revalidatePath(paths.settingsUsers(orgId));
+  return ok({ link: `${await siteOrigin()}${paths.invite(token)}`, email: parsed.data.email });
+}
+
+export async function revokeInvitationAction(orgId: string, invitationId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, invitationId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("organization_id", orgId)
+    .eq("id", invitationId)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לבטל את ההזמנה. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsUsers(orgId));
+  return ok();
+}
+
+export async function changeMemberRoleAction(
+  orgId: string,
+  userId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const context = await actionContext(orgId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = changeRoleSchema.safeParse(pick(formData, ["role"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  // a viewer always sits on a view seat and nobody else does (check constraint)
+  const { data, error } = await context.supabase
+    .from("memberships")
+    .update({ role: parsed.data.role, seat_type: parsed.data.role === "viewer" ? "view" : "full" })
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשנות את התפקיד. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsUsers(orgId));
+  return { ok: true, message: "התפקיד עודכן." };
+}
+
+/** Suspends a member (blocked at once, history kept) or lets them back in. */
+export async function setMemberStatusAction(orgId: string, userId: string, status: MembershipStatus): Promise<ActionResult> {
+  const context = await actionContext(orgId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  if (status !== "active" && status !== "suspended") {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  const { data, error } = await context.supabase
+    .from("memberships")
+    .update({ status })
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את המשתמש. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsUsers(orgId));
+  return ok();
+}
+
+export async function transferOwnershipAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = transferOwnershipSchema.safeParse(pick(formData, ["user_id", "confirm"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const { error } = await context.supabase.rpc("transfer_ownership", {
+    p_organization_id: orgId,
+    p_new_owner: parsed.data.user_id,
+  });
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו להעביר את הבעלות. נסו שוב."));
+  }
+  revalidatePath(paths.org(orgId), "layout");
+  return { ok: true, message: "הבעלות הועברה. התפקיד שלך עכשיו: מנהל מערכת." };
+}
+
+// ---------------------------------------------------------------------------
+// Teams
+// ---------------------------------------------------------------------------
+
+export async function createTeamAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = teamNameSchema.safeParse(pick(formData, ["name"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const { data, error } = await context.supabase
+    .from("teams")
+    .insert({ organization_id: orgId, name: parsed.data.name })
+    .select("id")
+    .single();
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את הצוות. נסו שוב."), { values: formValues(formData) });
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  redirect(paths.settingsTeam(orgId, data.id));
+}
+
+export async function renameTeamAction(
+  orgId: string,
+  teamId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const context = await actionContext(orgId, teamId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = teamNameSchema.safeParse(pick(formData, ["name"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const { data, error } = await context.supabase
+    .from("teams")
+    .update({ name: parsed.data.name })
+    .eq("organization_id", orgId)
+    .eq("id", teamId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את שם הצוות. נסו שוב."), { values: formValues(formData) });
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  revalidatePath(paths.settingsTeam(orgId, teamId));
+  return { ok: true, message: "שם הצוות נשמר." };
+}
+
+/** Deletes the team. Records that pointed to it keep their owner and lose the team. */
+export async function deleteTeamAction(orgId: string, teamId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, teamId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("teams")
+    .delete()
+    .eq("organization_id", orgId)
+    .eq("id", teamId)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו למחוק את הצוות. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  redirect(paths.settingsTeams(orgId));
+}
+
+export async function addTeamMemberAction(
+  orgId: string,
+  teamId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const context = await actionContext(orgId, teamId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = addTeamMemberSchema.safeParse(pick(formData, ["user_id", "is_manager"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const { error } = await context.supabase.from("team_members").insert({
+    organization_id: orgId,
+    team_id: teamId,
+    user_id: parsed.data.user_id,
+    is_manager: parsed.data.is_manager,
+  });
+  if (error) {
+    const message = error.code === "23505" ? "המשתמש כבר בצוות." : dbErrorMessage(error, "לא הצלחנו להוסיף את המשתמש לצוות. נסו שוב.");
+    return fail(message);
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  revalidatePath(paths.settingsTeam(orgId, teamId));
+  return ok();
+}
+
+export async function setTeamManagerAction(
+  orgId: string,
+  teamId: string,
+  userId: string,
+  isManager: boolean,
+): Promise<ActionResult> {
+  const context = await actionContext(orgId, teamId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("team_members")
+    .update({ is_manager: isManager === true })
+    .eq("organization_id", orgId)
+    .eq("team_id", teamId)
+    .eq("user_id", userId)
+    .select("user_id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את הצוות. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  revalidatePath(paths.settingsTeam(orgId, teamId));
+  return ok();
+}
+
+export async function removeTeamMemberAction(orgId: string, teamId: string, userId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, teamId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("team_members")
+    .delete()
+    .eq("organization_id", orgId)
+    .eq("team_id", teamId)
+    .eq("user_id", userId)
+    .select("user_id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו להסיר את המשתמש מהצוות. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  revalidatePath(paths.settingsTeam(orgId, teamId));
+  return ok();
+}

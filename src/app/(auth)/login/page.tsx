@@ -15,6 +15,7 @@ type Props = { searchParams: Promise<{ next?: string | string[]; error?: string 
 export default async function LoginPage({ searchParams }: Props) {
   const params = await searchParams;
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
+  const signupHref = next === "/" ? paths.signup : `${paths.signup}?next=${encodeURIComponent(next)}`;
   const error = typeof params.error === "string" ? ERRORS[params.error] : undefined;
 
   return (
@@ -24,7 +25,7 @@ export default async function LoginPage({ searchParams }: Props) {
       <LoginForm next={next} initialError={error} />
       <p className="mt-6 text-[0.9375rem] text-ink-soft">
         עוד אין לך חשבון?{" "}
-        <Link href={paths.signup} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
+        <Link href={signupHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
           הרשמה
         </Link>
       </p>

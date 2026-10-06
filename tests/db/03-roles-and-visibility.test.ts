@@ -375,6 +375,16 @@ describe("roles and record visibility", () => {
     );
     expect(adminRemovesAdmin.code).toBe("42501");
 
+    // only the owner adds admins, by invitation or by promotion
+    const adminPromotes = await pgError(
+      asUser(admin.id, (q) => q("update public.memberships set role = 'admin' where organization_id = $1 and user_id = $2", [org, m1.id])),
+    );
+    expect(adminPromotes.code).toBe("42501");
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.memberships set role = 'admin' where organization_id = $1 and user_id = $2", [org, m1.id])).rowCount).toBe(1);
+      expect((await q("update public.memberships set role = 'member' where organization_id = $1 and user_id = $2", [org, m1.id])).rowCount).toBe(1);
+    });
+
     // an admin does manage ordinary members
     await asUser(admin.id, async (q) => {
       expect(

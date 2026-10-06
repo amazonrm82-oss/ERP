@@ -48,6 +48,25 @@ describe("CRM behaviour", () => {
     }
   });
 
+  it("an admin deletes a team that records still point to; the records keep their owner", async () => {
+    const team = await asUser(owner.id, async (q) => {
+      const id = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות זמני') returning id", [org])).rows[0].id;
+      await q("insert into public.team_members (organization_id, team_id, user_id, is_manager) values ($1, $2, $3, true)", [org, id, member.id]);
+      return id;
+    });
+    const lead = await insertLead(member.id, org, { full_name: "ליד של צוות", team_id: team });
+
+    await asUser(owner.id, async (q) => {
+      expect((await q("delete from public.teams where organization_id = $1 and id = $2", [org, team])).rowCount).toBe(1);
+    });
+    const row = await asAdmin(async (q) =>
+      (await q<{ team_id: string | null; owner_id: string }>("select team_id, owner_id from public.leads where id = $1", [lead])).rows[0],
+    );
+    expect(row.team_id).toBeNull();
+    expect(row.owner_id).toBe(member.id);
+    expect(await asAdmin((q) => count(q, "select 1 from public.team_members where team_id = $1", [team]))).toBe(0);
+  });
+
   it("derived and audit columns cannot be forged by a client", async () => {
     const id = await insertLead(member.id, org, { phone: "050-1111111", created_by: owner.id, phone_e164: "+10000000000" });
     await asUser(member.id, (q) =>
