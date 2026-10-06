@@ -5,6 +5,8 @@ import { ContactActions } from "@/components/contact-actions";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { trashContactAction } from "@/features/contacts/actions";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
@@ -13,6 +15,8 @@ import { getContact } from "@/features/contacts/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import { listTags } from "@/features/tags/queries";
 import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -27,7 +31,12 @@ export default async function ContactPage({ params }: Props) {
     notFound();
   }
 
-  const [contact, deals] = await Promise.all([getContact(orgId, contactId), listRelatedDeals(orgId, { contactId })]);
+  const [contact, deals, fields] = await Promise.all([
+    getContact(orgId, contactId),
+    listRelatedDeals(orgId, { contactId }),
+    listFieldDefinitions(orgId, "contact"),
+  ]);
+  const tags = await listTags(orgId);
   if (!contact) {
     notFound();
   }
@@ -57,8 +66,14 @@ export default async function ContactPage({ params }: Props) {
             orgId={orgId}
             canEdit={canEdit}
             companies={companies}
-            contact={{ ...contact, createdAtText: formatDateTime(contact.created_at) }}
+            contact={{
+              ...contact,
+              createdAtText: formatDateTime(contact.created_at),
+              custom: { definitions: fields, values: asCustomValues(contact.custom_fields) },
+            }}
           />
+
+          <TagPicker orgId={orgId} kind="contact" recordId={contact.id} allTags={tags} selectedIds={contact.tag_ids} canEdit={canEdit} />
 
           <RelatedDealsCard
             orgId={orgId}

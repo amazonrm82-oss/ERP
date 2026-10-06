@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -29,11 +30,16 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "contact", formData);
+  if (!custom.ok) {
+    return custom;
+  }
+
   // owner_id is left out: the database assigns the contact to its creator.
   // A company id from another organization fails the composite foreign key.
   const { data, error } = await context.supabase
     .from("contacts")
-    .insert({ organization_id: orgId, ...parsed.data })
+    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -59,9 +65,14 @@ export async function updateContactAction(
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "contact", formData, contactId);
+  if (!custom.ok) {
+    return custom;
+  }
+
   const { data, error } = await context.supabase
     .from("contacts")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

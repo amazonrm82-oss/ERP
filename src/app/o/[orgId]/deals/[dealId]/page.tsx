@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { listContactOptions } from "@/features/contacts/queries";
 import { trashDealAction } from "@/features/deals/actions";
@@ -14,6 +16,8 @@ import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import { listTags } from "@/features/tags/queries";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -27,7 +31,7 @@ export default async function DealPage({ params }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
-  const deal = await getDeal(orgId, dealId);
+  const [deal, fields, tags] = await Promise.all([getDeal(orgId, dealId), listFieldDefinitions(orgId, "deal"), listTags(orgId)]);
   if (!deal) {
     notFound();
   }
@@ -96,8 +100,11 @@ export default async function DealPage({ params }: Props) {
               closedAtText: deal.closed_at ? formatDateTime(deal.closed_at) : null,
               ownerName: deal.ownerName,
               createdAtText: formatDateTime(deal.created_at),
+              custom: { definitions: fields, values: asCustomValues(deal.custom_fields) },
             }}
           />
+
+          <TagPicker orgId={orgId} kind="deal" recordId={deal.id} allTags={tags} selectedIds={deal.tag_ids} canEdit={canEdit} />
 
           {context.canDelete ? <TrashRecordButton noun="העסקה" action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
         </div>

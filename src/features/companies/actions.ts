@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -29,10 +30,15 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "company", formData);
+  if (!custom.ok) {
+    return custom;
+  }
+
   // owner_id is left out: the database assigns the company to its creator.
   const { data, error } = await context.supabase
     .from("companies")
-    .insert({ organization_id: orgId, ...parsed.data })
+    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -58,9 +64,14 @@ export async function updateCompanyAction(
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "company", formData, companyId);
+  if (!custom.ok) {
+    return custom;
+  }
+
   const { data, error } = await context.supabase
     .from("companies")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)

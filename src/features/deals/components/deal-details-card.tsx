@@ -9,6 +9,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import type { StageKind } from "@/lib/database.types";
 import { paths } from "@/lib/paths";
@@ -34,6 +37,8 @@ export type DealDetailsView = {
   closedAtText: string | null;
   ownerName: string | null;
   createdAtText: string;
+  // active custom fields and the values stored on the record
+  custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
 type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; canEdit: boolean };
@@ -89,6 +94,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, canEdit }: P
           {deal.status === "lost" ? <Detail label="סיבת הפסד" value={deal.lostReason} /> : null}
           <Detail label="בעלים" value={deal.ownerName} />
           <Detail label="נוצרה" value={deal.createdAtText} />
+          <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} />
         </DetailList>
       </CardBody>
     </Card>
@@ -169,6 +175,7 @@ function DealEditForm({ orgId, deal, contacts, companies, onDone }: EditProps) {
           ) : (
             <input type="hidden" name="lost_reason" value={deal.lostReason ?? ""} />
           )}
+          <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} />
           <div className="flex flex-wrap gap-2 pt-1">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

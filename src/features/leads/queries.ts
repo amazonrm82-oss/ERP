@@ -6,7 +6,7 @@ import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
 export type LeadStatusOption = { id: string; name: string; kind: LeadStatusKind; isDefault: boolean };
-export type LeadSourceOption = { id: string; name: string };
+export type LeadSourceOption = { id: string; name: string; isActive: boolean };
 
 /** Statuses (in their configured order) and active sources of the organization. */
 export async function getLeadLookups(orgId: string): Promise<{ statuses: LeadStatusOption[]; sources: LeadSourceOption[] }> {
@@ -32,8 +32,9 @@ export async function getLeadLookups(orgId: string): Promise<{ statuses: LeadSta
   }
   return {
     statuses: statuses.data.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isDefault: s.is_default })),
-    // inactive sources stay in the list so existing leads still show their source name
-    sources: sources.data.map((s) => ({ id: s.id, name: s.is_active ? s.name : `${s.name} (לא פעיל)` })),
+    // hidden sources stay in the list so existing leads still show their source name;
+    // forms offer them only to a lead that already has one
+    sources: sources.data.map((s) => ({ id: s.id, name: s.name, isActive: s.is_active })),
   };
 }
 
@@ -50,7 +51,7 @@ export type LeadListItem = {
   createdAt: string;
 };
 
-type ListOptions = { search: string; statusId: string | null; page: number };
+type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number };
 
 /** One page of live leads, newest first. Fetches one extra row to know if there is a next page. */
 export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
@@ -65,6 +66,9 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   if (options.statusId) {
     query = query.eq("status_id", options.statusId);
+  }
+  if (options.tagId) {
+    query = query.contains("tag_ids", [options.tagId]);
   }
   const searchFilter = personSearchFilter(["full_name", "company_name"], options.search);
   if (searchFilter) {
@@ -107,7 +111,7 @@ export async function getLead(orgId: string, leadId: string) {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, message, disqualify_reason, owner_id, created_at, converted_at, converted_contact_id, converted_deal_id",
+      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, message, disqualify_reason, owner_id, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids",
     )
     .eq("organization_id", orgId)
     .eq("id", leadId)

@@ -6,6 +6,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
@@ -20,10 +22,11 @@ type Props = {
   // preselected when the form is opened from a contact's or a company's page
   defaultContactId: string;
   defaultCompanyId: string;
+  fields: FieldDefinition[];
 };
 
 /** New deal form. On success the action redirects to the board. */
-export function DealForm({ orgId, stages, contacts, companies, defaultContactId, defaultCompanyId }: Props) {
+export function DealForm({ orgId, stages, contacts, companies, defaultContactId, defaultCompanyId, fields }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createDealAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -99,6 +102,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
           error={errors.expected_close_date}
         />
       </div>
+      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצר עסקה…">יצירת עסקה</SubmitButton>
         <ButtonLink href={paths.deals(orgId)} variant="ghost">

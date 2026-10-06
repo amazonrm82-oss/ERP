@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Card, CardBody } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompanyForm } from "@/features/companies/components/company-form";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
@@ -25,12 +26,14 @@ export default async function NewCompanyPage({ params }: Props) {
     );
   }
 
+  const fields = await listFieldDefinitions(orgId, "company");
+
   return (
     <div className="max-w-2xl">
       <PageHeader title="חברה חדשה" back={back} />
       <Card>
         <CardBody>
-          <CompanyForm orgId={orgId} />
+          <CompanyForm orgId={orgId} fields={fields} />
         </CardBody>
       </Card>
     </div>

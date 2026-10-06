@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { ConvertLeadResult } from "@/lib/database.types";
@@ -31,10 +32,15 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "lead", formData);
+  if (!custom.ok) {
+    return custom;
+  }
+
   // owner_id is left out: the database assigns the lead to its creator.
   const { data, error } = await context.supabase
     .from("leads")
-    .insert({ organization_id: orgId, ...parsed.data })
+    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -60,9 +66,14 @@ export async function updateLeadAction(
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "lead", formData, leadId);
+  if (!custom.ok) {
+    return custom;
+  }
+
   const { data, error } = await context.supabase
     .from("leads")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

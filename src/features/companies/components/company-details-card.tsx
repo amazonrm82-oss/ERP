@@ -8,6 +8,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { INDUSTRIES } from "@/features/onboarding/options";
+import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 
 import { updateCompanyAction } from "../actions";
@@ -18,6 +21,8 @@ export type CompanyDetailsView = CompanyValues & {
   ownerName: string | null;
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
+  // active custom fields and the values stored on the record
+  custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
 type Props = { orgId: string; company: CompanyDetailsView; canEdit: boolean };
@@ -65,6 +70,7 @@ export function CompanyDetailsCard({ orgId, company, canEdit }: Props) {
           <Detail label="כתובת" value={company.address_line} />
           <Detail label="בעלים" value={company.ownerName} />
           <Detail label="נוצר" value={company.createdAtText} />
+          <CustomFieldDetails definitions={company.custom.definitions} values={company.custom.values} />
         </DetailList>
       </CardBody>
     </Card>
@@ -88,6 +94,12 @@ function CompanyEditForm({ orgId, company, onDone }: { orgId: string; company: C
         <form action={formAction} className="space-y-4" noValidate>
           <FormError message={failure?.message} />
           <CompanyFields values={failure?.values ?? company} errors={failure?.fieldErrors ?? {}} />
+          <CustomFieldInputs
+            definitions={company.custom.definitions}
+            stored={company.custom.values}
+            submitted={failure?.values}
+            errors={failure?.fieldErrors}
+          />
           <div className="flex flex-wrap gap-2 pt-1">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

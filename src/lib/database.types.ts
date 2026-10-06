@@ -22,6 +22,7 @@ export type BillingCycle = "monthly" | "annual";
 export type StageKind = "open" | "won" | "lost";
 export type LeadStatusKind = "open" | "converted" | "disqualified";
 export type TaskStatus = "open" | "done" | "cancelled";
+export type ViewScope = "private" | "team" | "org";
 
 type Table<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -179,6 +180,45 @@ export type LeadSourceRow = {
   name: string;
   kind: string;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TagRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  color: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type FieldDefinitionRow = {
+  id: string;
+  organization_id: string;
+  object_type: string;
+  key: string;
+  label: string;
+  field_type: string;
+  options: Json;
+  is_required: boolean;
+  is_active: boolean;
+  help_text: string | null;
+  position: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SavedViewRow = {
+  id: string;
+  organization_id: string;
+  object_type: string;
+  name: string;
+  config: Json;
+  scope: ViewScope;
+  owner_id: string;
+  team_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -557,6 +597,34 @@ export type Database = {
         LeadSourceRow,
         { organization_id: string; name: string; kind?: string; is_active?: boolean }
       >;
+      tags: Table<TagRow, { organization_id: string; name: string; color?: string | null }>;
+      field_definitions: Table<
+        FieldDefinitionRow,
+        {
+          organization_id: string;
+          object_type: string;
+          key: string;
+          label: string;
+          field_type: string;
+          options?: Json;
+          is_required?: boolean;
+          is_active?: boolean;
+          help_text?: string | null;
+          position?: number;
+        }
+      >;
+      saved_views: Table<
+        SavedViewRow,
+        {
+          organization_id: string;
+          object_type: string;
+          name: string;
+          config?: Json;
+          scope?: ViewScope;
+          owner_id: string;
+          team_id?: string | null;
+        }
+      >;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;
@@ -599,6 +667,7 @@ export type Database = {
       seat_type: SeatType;
       org_status: OrgStatus;
       record_visibility: RecordVisibility;
+      view_scope: ViewScope;
       subscription_status: SubscriptionStatus;
       billing_cycle: BillingCycle;
       stage_kind: StageKind;

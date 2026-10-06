@@ -26,26 +26,39 @@ export type Board = {
 // The board loads at most this many deals (most recently moved first).
 export const BOARD_LIMIT = 500;
 
-/** The organization's default pipeline (or its first one) with its stages in order. */
-export async function getDefaultPipeline(orgId: string): Promise<{ id: string; name: string; stages: StageOption[] } | null> {
+export type PipelineOption = { id: string; name: string; isDefault: boolean };
+
+/** Live pipelines, default first. */
+export async function listPipelines(orgId: string): Promise<PipelineOption[]> {
   const supabase = await createClient();
-  const { data: pipelines, error } = await supabase
+  const { data, error } = await supabase
     .from("pipelines")
-    .select("id, name")
+    .select("id, name, is_default")
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .order("is_default", { ascending: false })
     .order("position", { ascending: true })
-    .order("created_at", { ascending: true })
-    .limit(1);
+    .order("created_at", { ascending: true });
   if (error) {
     throw new Error(`pipelines query failed: ${error.message}`);
   }
-  const pipeline = pipelines[0];
+  return data.map((row) => ({ id: row.id, name: row.name, isDefault: row.is_default }));
+}
+
+/**
+ * A live pipeline with its stages in order: the requested one when it exists,
+ * else the default (or first) one. Null when the organization has none.
+ */
+export async function getPipeline(
+  orgId: string,
+  pipelineId?: string | null,
+): Promise<{ id: string; name: string; stages: StageOption[] } | null> {
+  const pipelines = await listPipelines(orgId);
+  const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0];
   if (!pipeline) {
     return null;
   }
-
+  const supabase = await createClient();
   const { data: stages, error: stagesError } = await supabase
     .from("stages")
     .select("id, name, kind")
@@ -55,12 +68,12 @@ export async function getDefaultPipeline(orgId: string): Promise<{ id: string; n
   if (stagesError) {
     throw new Error(`stages query failed: ${stagesError.message}`);
   }
-  return { ...pipeline, stages };
+  return { id: pipeline.id, name: pipeline.name, stages };
 }
 
-/** Kanban data for the default pipeline, or null when the organization has no pipeline. */
-export async function getBoard(orgId: string): Promise<Board | null> {
-  const pipeline = await getDefaultPipeline(orgId);
+/** Kanban data for a pipeline (default: the default one), or null when the organization has no pipeline. */
+export async function getBoard(orgId: string, pipelineId?: string | null): Promise<Board | null> {
+  const pipeline = await getPipeline(orgId, pipelineId);
   if (!pipeline) {
     return null;
   }
@@ -153,7 +166,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, contact_id, company_id, owner_id, created_at",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)

@@ -7,12 +7,16 @@ import { TrashRecordButton } from "@/components/trash-record-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
 import { getCompany, listContactsOfCompany } from "@/features/companies/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import { listTags } from "@/features/tags/queries";
 import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -27,10 +31,12 @@ export default async function CompanyPage({ params }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals] = await Promise.all([
+  const [company, contacts, deals, fields, tags] = await Promise.all([
     getCompany(orgId, companyId),
     listContactsOfCompany(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
+    listFieldDefinitions(orgId, "company"),
+    listTags(orgId),
   ]);
   if (!company) {
     notFound();
@@ -53,7 +59,20 @@ export default async function CompanyPage({ params }: Props) {
           <CompanyDetailsCard
             orgId={orgId}
             canEdit={canEditRecordHint(context, company.owner_id)}
-            company={{ ...company, createdAtText: formatDateTime(company.created_at) }}
+            company={{
+              ...company,
+              createdAtText: formatDateTime(company.created_at),
+              custom: { definitions: fields, values: asCustomValues(company.custom_fields) },
+            }}
+          />
+
+          <TagPicker
+            orgId={orgId}
+            kind="company"
+            recordId={company.id}
+            allTags={tags}
+            selectedIds={company.tag_ids}
+            canEdit={canEditRecordHint(context, company.owner_id)}
           />
 
           <Card aria-labelledby="company-contacts-title">

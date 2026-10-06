@@ -8,13 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
-import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { canEditRecordHint, getOrgContext, getUserNames } from "@/features/shell/queries";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import { listTags } from "@/features/tags/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -26,12 +30,14 @@ const linkClass = "font-medium text-accent underline underline-offset-4 hover:te
 
 export default async function LeadPage({ params }: Props) {
   const { orgId, leadId } = await params;
-  const { canWrite, canDelete } = await getOrgContext(orgId);
+  const context = await getOrgContext(orgId);
+  const { canWrite, canDelete } = context;
   if (!isUuid(leadId)) {
     notFound();
   }
 
-  const [lead, lookups] = await Promise.all([getLead(orgId, leadId), getLeadLookups(orgId)]);
+  const [lead, lookups, fields] = await Promise.all([getLead(orgId, leadId), getLeadLookups(orgId), listFieldDefinitions(orgId, "lead")]);
+  const tags = await listTags(orgId);
   if (!lead) {
     notFound();
   }
@@ -116,7 +122,17 @@ export default async function LeadPage({ params }: Props) {
               disqualifyReason: lead.disqualify_reason,
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
               createdAtText: formatDateTime(lead.created_at),
+              custom: { definitions: fields, values: asCustomValues(lead.custom_fields) },
             }}
+          />
+
+          <TagPicker
+            orgId={orgId}
+            kind="lead"
+            recordId={lead.id}
+            allTags={tags}
+            selectedIds={lead.tag_ids}
+            canEdit={canEditRecordHint(context, lead.owner_id)}
           />
 
           {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}

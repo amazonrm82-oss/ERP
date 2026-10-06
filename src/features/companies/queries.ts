@@ -17,7 +17,7 @@ export type CompanyListItem = {
 /** One page of live companies, by name. Fetches one extra row to know if there is a next page. */
 export async function listCompanies(
   orgId: string,
-  options: { search: string; page: number },
+  options: { search: string; tagId?: string | null; page: number },
 ): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -30,6 +30,9 @@ export async function listCompanies(
   const searchFilter = personSearchFilter(["name", "tax_id", "city"], options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
+  }
+  if (options.tagId) {
+    query = query.contains("tag_ids", [options.tagId]);
   }
 
   const { data, error } = await query
@@ -61,7 +64,7 @@ export async function getCompany(orgId: string, companyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("companies")
-    .select("id, name, tax_id, industry, phone, phone_e164, email, website, city, address_line, owner_id, created_at")
+    .select("id, name, tax_id, industry, phone, phone_e164, email, website, city, address_line, owner_id, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)

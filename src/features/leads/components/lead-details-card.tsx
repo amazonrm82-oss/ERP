@@ -8,6 +8,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 
 import { updateLeadAction } from "../actions";
@@ -25,6 +28,8 @@ export type LeadDetailsView = {
   // formatted on the server so server and browser output cannot differ
   ownerName: string | null;
   createdAtText: string;
+  // active custom fields and the values stored on the record
+  custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
 type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean };
@@ -62,6 +67,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
           <Detail label="בעלים" value={lead.ownerName} />
           <Detail label="נוצר" value={lead.createdAtText} />
           {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
+          <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} />
         </DetailList>
         {lead.message ? (
           <div className="mt-4 border-t border-line pt-4">
@@ -133,7 +139,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
           />
           <SelectField key={`source-${sourceValue}`} label="מקור" name="source_id" defaultValue={sourceValue} error={errors.source_id}>
             <option value="">ללא מקור</option>
-            {sources.map((source) => (
+            {sources.filter((source) => source.isActive || source.id === lead.sourceId).map((source) => (
               <option key={source.id} value={source.id}>
                 {source.name}
               </option>
@@ -147,6 +153,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             defaultValue={values?.message ?? lead.message ?? ""}
             error={errors.message}
           />
+          <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} />
           <div className="flex flex-wrap gap-2">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

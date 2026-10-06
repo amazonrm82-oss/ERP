@@ -33,7 +33,7 @@ async function getCompanyNames(orgId: string, companyIds: Array<string | null>):
 /** One page of live contacts, newest first. Fetches one extra row to know if there is a next page. */
 export async function listContacts(
   orgId: string,
-  options: { search: string; page: number },
+  options: { search: string; tagId?: string | null; page: number },
 ): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -47,6 +47,9 @@ export async function listContacts(
   const searchFilter = personSearchFilter(["full_name"], options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
+  }
+  if (options.tagId) {
+    query = query.contains("tag_ids", [options.tagId]);
   }
 
   const { data, error } = await query
@@ -86,7 +89,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, email, job_title, company_id, source_id, owner_id, created_at")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, email, job_title, company_id, source_id, owner_id, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

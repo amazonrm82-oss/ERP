@@ -292,6 +292,95 @@ try {
   await ownerDesk.goto(contactUrl);
   await expectText(ownerDesk, "פרטי איש הקשר");
 
+  // ---------------------------------------------------------------- section 3: customization
+  step("pipelines: create, add a stage, switch on the board");
+  await ownerDesk.goto(`${orgUrl}/settings/pipelines`);
+  await ownerDesk.getByLabel("שם הפייפליין").fill("השכרות");
+  await ownerDesk.getByRole("button", { name: "יצירת פייפליין" }).click();
+  await expectText(ownerDesk, "הפייפליין נוצר");
+  const rentals = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "השכרות" }) });
+  await rentals.getByLabel("שם השלב החדש").fill("סיור בנכס");
+  await rentals.getByRole("button", { name: "הוספת שלב" }).click();
+  await rentals.locator('input[name="name"][value="סיור בנכס"]').waitFor({ timeout: 15000 });
+  const stageNames = await rentals.locator('ol input[name="name"]').evaluateAll((els) => els.map((el) => el.value));
+  console.log("rentals stages:", stageNames.join(" > "));
+  if (stageNames[1] !== "סיור בנכס") throw new Error("a new open stage should go before the closing stages");
+  await shot(ownerDesk, "30-pipelines-1280");
+  await ownerDesk.goto(`${orgUrl}/deals`);
+  await ownerDesk.getByRole("link", { name: "השכרות" }).click();
+  await ownerDesk.getByRole("heading", { name: /סיור בנכס/ }).waitFor({ timeout: 15000 });
+
+  step("lead statuses and sources");
+  await ownerDesk.goto(`${orgUrl}/settings/leads`);
+  await ownerDesk.getByLabel("שם הסטטוס החדש").fill("ממתין לתשובה");
+  await ownerDesk.getByRole("button", { name: "הוספת סטטוס" }).click();
+  await ownerDesk.locator('input[name="name"][value="ממתין לתשובה"]').waitFor({ timeout: 15000 });
+  await ownerDesk.getByLabel("שם המקור החדש").fill("תערוכה");
+  await ownerDesk.getByRole("button", { name: "הוספת מקור" }).click();
+  await ownerDesk.locator('input[name="name"][value="תערוכה"]').waitFor({ timeout: 15000 });
+  await ownerDesk.getByRole("button", { name: /הסתרה.*: תערוכה/ }).click();
+  await ownerDesk.locator("li", { has: ownerDesk.locator('input[value="תערוכה"]') }).getByText("מוסתר").waitFor({ timeout: 15000 });
+  // the in-use status cannot be deleted
+  const usedStatus = ownerDesk.locator("li", { has: ownerDesk.locator('input[name="name"][value="הומר"]') });
+  await usedStatus.getByRole("button", { name: "מחיקה" }).click();
+  await usedStatus.getByRole("button", { name: "כן" }).click();
+  await usedStatus.getByText("יש לידים בסטטוס הזה").waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "31-lead-settings-1280");
+
+  step("custom fields: define, fill in a new lead, see on the card");
+  await ownerDesk.goto(`${orgUrl}/settings/fields?object=lead`);
+  await ownerDesk.getByLabel("שם השדה").fill("תקציב");
+  await ownerDesk.getByLabel("סוג השדה").selectOption("select");
+  await ownerDesk.getByLabel("אפשרויות, כל אחת בשורה").fill("עד 10,000\n10,000-50,000\nמעל 50,000");
+  await ownerDesk.getByRole("button", { name: "הוספת שדה" }).click();
+  await expectText(ownerDesk, "השדה נוסף");
+  await ownerDesk.getByLabel("שם השדה").fill("תאריך פגישה");
+  await ownerDesk.getByLabel("סוג השדה").selectOption("date");
+  await ownerDesk.getByLabel("שדה חובה").check();
+  await ownerDesk.getByRole("button", { name: "הוספת שדה" }).click();
+  await ownerDesk.locator("li", { hasText: "תאריך פגישה" }).getByText("חובה").waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "32-fields-1280");
+
+  await ownerDesk.goto(`${orgUrl}/leads/new`);
+  await ownerDesk.getByLabel("שם מלא").fill("רחל לוי");
+  await ownerDesk.getByLabel("תקציב").selectOption("10,000-50,000");
+  const sourceOptions = await ownerDesk.getByLabel("מקור").locator("option").allTextContents();
+  if (sourceOptions.includes("תערוכה")) throw new Error("a hidden source is offered in the form");
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await expectText(ownerDesk, "יש למלא את השדה");
+  await ownerDesk.getByLabel("תאריך פגישה").fill("2026-11-01");
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 15000 });
+  await expectText(ownerDesk, "10,000-50,000");
+  await expectText(ownerDesk, "1 בנוב׳ 2026");
+  const leadUrl = ownerDesk.url();
+
+  step("tags: create on a record, filter the list, save a view");
+  await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByRole("button", { name: "עריכת תגיות" }).click();
+  await ownerDesk.getByLabel("תגית חדשה").fill("VIP");
+  await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByRole("button", { name: "שמירה" }).click();
+  await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor({ timeout: 15000 });
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("combobox", { name: "תגית" }).selectOption({ label: "VIP" });
+  await ownerDesk.getByRole("button", { name: "חיפוש" }).click();
+  await ownerDesk.waitForURL(/tag=/);
+  const rows = await ownerDesk.locator("tbody tr").count();
+  console.log("leads tagged VIP:", rows);
+  if (rows !== 1) throw new Error("tag filter should leave exactly one lead");
+  await ownerDesk.getByRole("button", { name: "שמירת הסינון כתצוגה" }).click();
+  await ownerDesk.getByLabel("שם התצוגה").fill("לקוחות VIP");
+  await ownerDesk.getByLabel("למי").selectOption("org");
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await ownerDesk.getByRole("link", { name: /לקוחות VIP/ }).waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "33-leads-view-1280");
+  // a shared view shows for a colleague too. Record visibility is "by team"
+  // (set above) and the lead is the owner's, so Dana sees the view but not the lead.
+  await invitee.goto(`${orgUrl}/leads`);
+  await invitee.getByRole("link", { name: /לקוחות VIP/ }).click();
+  await invitee.waitForURL(/tag=/);
+  await expectText(invitee, "לא נמצאו לידים");
+  await ownerDesk.goto(leadUrl);
+
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);
   await expectText(owner, "משימות פתוחות");

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Card, CardBody } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import { getLeadLookups } from "@/features/leads/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
@@ -26,14 +27,14 @@ export default async function NewLeadPage({ params }: Props) {
     );
   }
 
-  const { statuses, sources } = await getLeadLookups(orgId);
+  const [{ statuses, sources }, fields] = await Promise.all([getLeadLookups(orgId), listFieldDefinitions(orgId, "lead")]);
 
   return (
     <div className="max-w-2xl">
       <PageHeader title="ליד חדש" back={back} />
       <Card>
         <CardBody>
-          <LeadForm orgId={orgId} statuses={statuses} sources={sources} />
+          <LeadForm orgId={orgId} statuses={statuses} sources={sources} fields={fields} />
         </CardBody>
       </Card>
     </div>

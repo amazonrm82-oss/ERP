@@ -6,16 +6,18 @@ import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
 import { createLeadAction } from "../actions";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[] };
+type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[] };
 
 /** New lead form. On success the action redirects to the lead's page. */
-export function LeadForm({ orgId, statuses, sources }: Props) {
+export function LeadForm({ orgId, statuses, sources, fields }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -71,7 +73,7 @@ export function LeadForm({ orgId, statuses, sources }: Props) {
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField key={`source-${manualSource}`} label="מקור" name="source_id" defaultValue={manualSource} error={errors.source_id}>
           <option value="">ללא מקור</option>
-          {sources.map((source) => (
+          {sources.filter((source) => source.isActive).map((source) => (
             <option key={source.id} value={source.id}>
               {source.name}
             </option>
@@ -100,6 +102,7 @@ export function LeadForm({ orgId, statuses, sources }: Props) {
         defaultValue={values.message}
         error={errors.message}
       />
+      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצר ליד…">יצירת ליד</SubmitButton>
         <ButtonLink href={paths.leads(orgId)} variant="ghost">

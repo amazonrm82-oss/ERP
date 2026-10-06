@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -33,6 +34,11 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
     return invalid(parsed.error, formData);
   }
 
+  const custom = await customFieldsFromForm(context.supabase, orgId, "deal", formData);
+  if (!custom.ok) {
+    return custom;
+  }
+
   // The pipeline comes from the stage, read from the database, not from the form.
   const { data: stage } = await context.supabase
     .from("stages")
@@ -55,6 +61,7 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
     contact_id: parsed.data.contact_id,
     company_id: parsed.data.company_id,
     expected_close_date: parsed.data.expected_close_date,
+    ...customFieldsPatch(custom.customFields),
   }).select("id").single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו ליצור את העסקה. נסו שוב."), { values: formValues(formData) });
@@ -130,10 +137,14 @@ export async function updateDealAction(
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+  const custom = await customFieldsFromForm(context.supabase, orgId, "deal", formData, dealId);
+  if (!custom.ok) {
+    return custom;
+  }
   const { lost_reason, amount, ...rest } = parsed.data;
   const { data, error } = await context.supabase
     .from("deals")
-    .update({ ...rest, amount_agorot: amount, lost_reason })
+    .update({ ...rest, amount_agorot: amount, lost_reason, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)

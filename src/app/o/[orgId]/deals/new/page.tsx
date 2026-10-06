@@ -5,8 +5,9 @@ import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { listContactOptions } from "@/features/contacts/queries";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { DealForm } from "@/features/deals/components/deal-form";
-import { getDefaultPipeline } from "@/features/deals/queries";
+import { getPipeline } from "@/features/deals/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
@@ -33,12 +34,13 @@ export default async function NewDealPage({ params, searchParams }: Props) {
     );
   }
 
-  const [pipeline, contacts, companies] = await Promise.all([
-    getDefaultPipeline(orgId),
+  const query = await searchParams;
+  const [pipeline, contacts, companies, fields] = await Promise.all([
+    getPipeline(orgId, firstParam(query.pipeline)),
     listContactOptions(orgId),
     listCompanyOptions(orgId),
+    listFieldDefinitions(orgId, "deal"),
   ]);
-  const query = await searchParams;
   const contactParam = firstParam(query.contact);
   const companyParam = firstParam(query.company);
   // only preselect a contact that is actually in the list
@@ -58,6 +60,7 @@ export default async function NewDealPage({ params, searchParams }: Props) {
               companies={companies}
               defaultContactId={defaultContactId}
               defaultCompanyId={defaultCompanyId}
+              fields={fields}
             />
           </CardBody>
         ) : (
