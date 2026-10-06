@@ -8,6 +8,7 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import type { ConvertLeadResult } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
 import { changeStatusSchema, convertLeadSchema, createLeadSchema, LEAD_FIELD_NAMES, updateLeadSchema } from "./schema";
@@ -188,21 +189,10 @@ export async function trashLeadAction(orgId: string, leadId: string): Promise<Ac
   if (!context.ok) {
     return context;
   }
-
-  const { data, error } = await context.supabase
-    .from("leads")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("organization_id", orgId)
-    .eq("id", leadId)
-    .is("deleted_at", null)
-    .select("id");
-  if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו להעביר את הליד לסל המחזור. נסו שוב."));
+  const result = await setTrashed(context.supabase, "leads", orgId, leadId, true);
+  if (!result.ok) {
+    return result;
   }
-  if (data.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
-  }
-
   revalidateLead(orgId, leadId);
   redirect(paths.leads(orgId));
 }

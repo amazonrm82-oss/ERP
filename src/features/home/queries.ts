@@ -82,7 +82,8 @@ export async function getMyDay(orgId: string, userId: string): Promise<MyDay> {
       id: task.id,
       title: task.title,
       dueAt: task.due_at,
-      isOverdue: task.due_at !== null && task.due_at < startOfToday,
+      // compared as numbers: PostgREST writes "+00:00", toISOString() writes "Z"
+      isOverdue: task.due_at !== null && Date.parse(task.due_at) < Date.parse(startOfToday),
     })),
     newLeads: (leads.data ?? []).map((lead) => ({
       id: lead.id,

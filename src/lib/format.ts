@@ -102,3 +102,8 @@ export function daysUntil(iso: string | null | undefined, now: Date = new Date()
   const ms = new Date(iso).getTime() - now.getTime();
   return ms > 0 ? Math.ceil(ms / 86_400_000) : 0;
 }
+
+/** Wall-clock time "HH:MM" of an instant in the zone. */
+export function zoneTime(at: Date, timeZone: string = TIME_ZONE): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);
+}

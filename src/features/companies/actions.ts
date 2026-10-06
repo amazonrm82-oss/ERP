@@ -1,0 +1,91 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { actionContext } from "@/lib/action-context";
+import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
+import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { paths } from "@/lib/paths";
+import { setTrashed } from "@/lib/record-trash";
+import { pick } from "@/lib/validation";
+
+import { COMPANY_FIELD_NAMES, companySchema } from "./schema";
+
+function revalidateCompany(orgId: string, companyId?: string) {
+  revalidatePath(paths.companies(orgId));
+  if (companyId) {
+    revalidatePath(paths.company(orgId, companyId));
+  }
+}
+
+export async function createCompanyAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = companySchema.safeParse(pick(formData, COMPANY_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  // owner_id is left out: the database assigns the company to its creator.
+  const { data, error } = await context.supabase
+    .from("companies")
+    .insert({ organization_id: orgId, ...parsed.data })
+    .select("id")
+    .single();
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את החברה. נסו שוב."), { values: formValues(formData) });
+  }
+
+  revalidateCompany(orgId);
+  redirect(paths.company(orgId, data.id));
+}
+
+export async function updateCompanyAction(
+  orgId: string,
+  companyId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const context = await actionContext(orgId, companyId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = companySchema.safeParse(pick(formData, COMPANY_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  const { data, error } = await context.supabase
+    .from("companies")
+    .update(parsed.data)
+    .eq("organization_id", orgId)
+    .eq("id", companyId)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את השינויים. נסו שוב."), { values: formValues(formData) });
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
+  }
+
+  revalidateCompany(orgId, companyId);
+  return { ok: true };
+}
+
+/** Moves the company to the recycle bin. Its contacts and deals stay and keep pointing at it. */
+export async function trashCompanyAction(orgId: string, companyId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, companyId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await setTrashed(context.supabase, "companies", orgId, companyId, true);
+  if (!result.ok) {
+    return result;
+  }
+  revalidateCompany(orgId, companyId);
+  redirect(paths.companies(orgId));
+}

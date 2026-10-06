@@ -31,7 +31,9 @@ function step(name) {
 
 // screenshots only when E2E_SHOTS_DIR is set
 async function shot(page, name) {
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+  // caret: "initial": the default ("hide") injects a style into inputs, which React
+  // reports as a hydration mismatch when the shot is taken before hydration ends
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true, caret: "initial" });
 }
 
 async function confirmationLink(email) {
@@ -214,6 +216,93 @@ try {
   step("the phone session is still signed in");
   await owner.goto(orgUrl);
   console.log("owner (phone) still signed in:", owner.url());
+
+  // ---------------------------------------------------------------- section 2: core screens
+  step("companies: list, card, edit");
+  await ownerDesk.goto(`${orgUrl}/companies`);
+  await ownerDesk.getByRole("link", { name: "כהן ובניו" }).click();
+  await ownerDesk.waitForURL(/\/companies\/[0-9a-f-]{36}$/);
+  await expectText(ownerDesk, "משה כהן");
+  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByLabel("עיר").fill("חיפה");
+  await ownerDesk.getByLabel("אתר").fill("cohen.co.il");
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await expectText(ownerDesk, "https://cohen.co.il".replace("https://", ""));
+  await shot(ownerDesk, "20-company-1280");
+
+  step("contact: edit");
+  await ownerDesk.getByRole("link", { name: "משה כהן" }).first().click();
+  await ownerDesk.waitForURL(/\/contacts\/[0-9a-f-]{36}$/);
+  const contactUrl = ownerDesk.url();
+  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByLabel("תפקיד").fill("מנכ\"ל");
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
+
+  step("deal card: open from board, edit amount");
+  await ownerDesk.goto(`${orgUrl}/deals`);
+  await ownerDesk.getByRole("link", { name: "משה כהן" }).first().click();
+  await ownerDesk.waitForURL(/\/deals\/[0-9a-f-]{36}$/);
+  const dealUrl = ownerDesk.url();
+  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByLabel("שווי (₪)").fill("15,000");
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await expectText(ownerDesk, "15,000");
+  await shot(ownerDesk, "21-deal-1280");
+
+  step("board: drag the deal to the third stage");
+  await ownerDesk.goto(`${orgUrl}/deals`);
+  const card = ownerDesk.locator("li[draggable=true]", { hasText: "משה כהן" }).first();
+  const target = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: /הצעת מחיר/ }) });
+  await card.dragTo(target);
+  await target.locator("li", { hasText: "משה כהן" }).first().waitFor({ timeout: 15000 });
+  await ownerDesk.goto(dealUrl);
+  await ownerDesk.locator("span.font-medium", { hasText: /^הצעת מחיר$/ }).first().waitFor({ timeout: 15000 });
+  console.log("drag moved the deal: yes");
+
+  step("tasks: create for a colleague, complete, reopen");
+  await ownerDesk.goto(`${orgUrl}/tasks`);
+  await ownerDesk.getByLabel("מה צריך לעשות").fill("לשלוח הצעת מחיר למשה");
+  await ownerDesk.getByLabel("שעה").fill("16:30");
+  await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  await expectText(ownerDesk, "לשלוח הצעת מחיר למשה");
+  await ownerDesk.getByRole("button", { name: /^בוצע.*לשלוח הצעת מחיר/ }).click();
+  await ownerDesk.getByRole("heading", { name: "הושלמו לאחרונה" }).waitFor({ timeout: 15000 });
+  await ownerDesk.getByRole("button", { name: /החזרה לפתוחות.*לשלוח הצעת מחיר/ }).click();
+  await ownerDesk.getByRole("button", { name: /^בוצע.*לשלוח הצעת מחיר/ }).waitFor({ timeout: 15000 });
+  await ownerDesk.getByLabel("מה צריך לעשות").fill("משימה לדנה");
+  await ownerDesk.getByLabel("באחריות").selectOption({ label: "דנה חברה" });
+  await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  await ownerDesk.goto(`${orgUrl}/tasks?who=all`);
+  await expectText(ownerDesk, "באחריות דנה חברה");
+  await shot(ownerDesk, "22-tasks-1280");
+  await invitee.goto(`${orgUrl}/tasks`);
+  await expectText(invitee, "משימה לדנה");
+
+  step("recycle bin: trash a contact, restore it");
+  await ownerDesk.goto(contactUrl);
+  await ownerDesk.getByRole("button", { name: "העברה לסל המחזור" }).click();
+  await ownerDesk.getByRole("button", { name: "כן, להעביר לסל" }).click();
+  await ownerDesk.waitForURL(/\/contacts$/);
+  await ownerDesk.goto(`${orgUrl}/settings/trash`);
+  await expectText(ownerDesk, "משה כהן");
+  await shot(ownerDesk, "23-trash-1280");
+  await ownerDesk.getByRole("button", { name: /שחזור.*משה כהן/ }).click();
+  await expectText(ownerDesk, "סל המחזור ריק");
+  await ownerDesk.goto(contactUrl);
+  await expectText(ownerDesk, "פרטי איש הקשר");
+
+  step("phone width: tasks and deal card");
+  await owner.goto(`${orgUrl}/tasks`);
+  await expectText(owner, "משימות פתוחות");
+  await shot(owner, "24-tasks-360");
+  const tasksOverflow = await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  await owner.goto(dealUrl);
+  await expectText(owner, "פרטי העסקה");
+  await shot(owner, "25-deal-360");
+  const overflow = tasksOverflow || (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth));
+  console.log("horizontal overflow at 360px (tasks, deal card):", overflow);
+  if (overflow) throw new Error("page scrolls sideways at 360px");
 
   console.log("\nFLOW OK");
   process.exitCode = 0;

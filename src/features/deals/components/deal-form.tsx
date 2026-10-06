@@ -16,12 +16,14 @@ type Props = {
   orgId: string;
   stages: StageOption[];
   contacts: Array<{ id: string; name: string }>;
-  // preselected when the form is opened from a contact's page
+  companies: Array<{ id: string; name: string }>;
+  // preselected when the form is opened from a contact's or a company's page
   defaultContactId: string;
+  defaultCompanyId: string;
 };
 
 /** New deal form. On success the action redirects to the board. */
-export function DealForm({ orgId, stages, contacts, defaultContactId }: Props) {
+export function DealForm({ orgId, stages, contacts, companies, defaultContactId, defaultCompanyId }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createDealAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -29,6 +31,7 @@ export function DealForm({ orgId, stages, contacts, defaultContactId }: Props) {
 
   const stageValue = values.stage_id ?? stages.find((stage) => stage.kind === "open")?.id ?? stages[0]?.id ?? "";
   const contactValue = values.contact_id ?? defaultContactId;
+  const companyValue = values.company_id ?? defaultCompanyId;
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -78,6 +81,16 @@ export function DealForm({ orgId, stages, contacts, defaultContactId }: Props) {
             </option>
           ))}
         </SelectField>
+        <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
+          <option value="">ללא חברה</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           label="תאריך סגירה צפוי"
           name="expected_close_date"

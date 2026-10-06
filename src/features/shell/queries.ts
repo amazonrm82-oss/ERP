@@ -102,3 +102,14 @@ export async function getUserNames(userIds: Array<string | null | undefined>): P
   }
   return names;
 }
+
+/**
+ * UI hint: may the user edit this record? Mirrors app.can_edit_record() without
+ * the team lookup (managers are shown the controls and the database decides).
+ */
+export function canEditRecordHint(context: OrgContext, ownerId: string | null): boolean {
+  if (!context.canWrite) {
+    return false;
+  }
+  return context.role === "owner" || context.role === "admin" || context.role === "manager" || ownerId === context.user.id;
+}

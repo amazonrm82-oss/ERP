@@ -5,11 +5,17 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { TrashIcon } from "@/components/ui/icons";
+import type { ActionResult } from "@/lib/action-result";
 
-import { trashLeadAction } from "../actions";
+type Props = {
+  // "הליד", "איש הקשר", "החברה", "העסקה"
+  noun: string;
+  // a bound Server Action; on success it redirects to the list
+  action: () => Promise<ActionResult>;
+};
 
-/** Move-to-recycle-bin with a confirm step. On success the action redirects to the leads list. */
-export function TrashLeadButton({ orgId, leadId }: { orgId: string; leadId: string }) {
+/** Move-to-recycle-bin with a confirm step. */
+export function TrashRecordButton({ noun, action }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -17,7 +23,7 @@ export function TrashLeadButton({ orgId, leadId }: { orgId: string; leadId: stri
   function confirm() {
     setError(null);
     startTransition(async () => {
-      const result = await trashLeadAction(orgId, leadId);
+      const result = await action();
       // only reached when the action did not redirect
       if (!result.ok) {
         setError(result.message);
@@ -37,9 +43,11 @@ export function TrashLeadButton({ orgId, leadId }: { orgId: string; leadId: stri
   return (
     <div role="group" aria-labelledby="trash-confirm-title" className="rounded-lg border border-line bg-surface p-4">
       <p id="trash-confirm-title" className="font-medium">
-        להעביר את הליד לסל המחזור?
+        להעביר את {noun} לסל המחזור?
       </p>
-      <p className="mt-1 text-sm text-ink-soft">הליד יוסר מהרשימות ויישמר בסל המחזור 30 יום לפני מחיקה סופית.</p>
+      <p className="mt-1 text-sm text-ink-soft">
+        הרשומה תוסר מהרשימות. מנהלים יכולים לשחזר אותה מסל המחזור שבהגדרות.
+      </p>
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={confirm} disabled={pending} aria-busy={pending || undefined}>

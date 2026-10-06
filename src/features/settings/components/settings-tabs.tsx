@@ -7,12 +7,13 @@ import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 
 /** Section links of the settings area. Scrolls sideways on narrow screens. */
-export function SettingsTabs({ orgId }: { orgId: string }) {
+export function SettingsTabs({ orgId, showTrash }: { orgId: string; showTrash: boolean }) {
   const pathname = usePathname();
   const tabs = [
     { href: paths.settings(orgId), label: "פרטי העסק", exact: true },
     { href: paths.settingsUsers(orgId), label: "משתמשים" },
     { href: paths.settingsTeams(orgId), label: "צוותים" },
+    ...(showTrash ? [{ href: paths.settingsTrash(orgId), label: "סל מחזור" }] : []),
   ];
 
   return (

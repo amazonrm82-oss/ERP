@@ -3,14 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { TrashRecordButton } from "@/components/trash-record-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
-import { TrashLeadButton } from "@/features/leads/components/trash-lead-button";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
@@ -118,7 +119,7 @@ export default async function LeadPage({ params }: Props) {
             }}
           />
 
-          {canDelete ? <TrashLeadButton orgId={orgId} leadId={lead.id} /> : null}
+          {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
         </div>
       </div>
     </>

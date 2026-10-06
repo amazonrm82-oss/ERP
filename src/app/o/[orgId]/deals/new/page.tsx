@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { listCompanyOptions } from "@/features/companies/queries";
 import { listContactOptions } from "@/features/contacts/queries";
 import { DealForm } from "@/features/deals/components/deal-form";
 import { getDefaultPipeline } from "@/features/deals/queries";
@@ -32,10 +33,17 @@ export default async function NewDealPage({ params, searchParams }: Props) {
     );
   }
 
-  const [pipeline, contacts] = await Promise.all([getDefaultPipeline(orgId), listContactOptions(orgId)]);
-  const contactParam = firstParam((await searchParams).contact);
+  const [pipeline, contacts, companies] = await Promise.all([
+    getDefaultPipeline(orgId),
+    listContactOptions(orgId),
+    listCompanyOptions(orgId),
+  ]);
+  const query = await searchParams;
+  const contactParam = firstParam(query.contact);
+  const companyParam = firstParam(query.company);
   // only preselect a contact that is actually in the list
   const defaultContactId = isUuid(contactParam) && contacts.some((contact) => contact.id === contactParam) ? contactParam : "";
+  const defaultCompanyId = isUuid(companyParam) && companies.some((company) => company.id === companyParam) ? companyParam : "";
 
   return (
     <div className="max-w-2xl">
@@ -43,7 +51,14 @@ export default async function NewDealPage({ params, searchParams }: Props) {
       <Card>
         {pipeline && pipeline.stages.length > 0 ? (
           <CardBody>
-            <DealForm orgId={orgId} stages={pipeline.stages} contacts={contacts} defaultContactId={defaultContactId} />
+            <DealForm
+              orgId={orgId}
+              stages={pipeline.stages}
+              contacts={contacts}
+              companies={companies}
+              defaultContactId={defaultContactId}
+              defaultCompanyId={defaultCompanyId}
+            />
           </CardBody>
         ) : (
           <EmptyState

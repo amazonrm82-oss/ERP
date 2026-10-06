@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Card, CardBody } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { listCompanyOptions } from "@/features/companies/queries";
 import { ContactForm } from "@/features/contacts/components/contact-form";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
 import { getOrgContext } from "@/features/shell/queries";
@@ -25,12 +26,14 @@ export default async function NewContactPage({ params }: Props) {
     );
   }
 
+  const companies = await listCompanyOptions(orgId);
+
   return (
     <div className="max-w-2xl">
       <PageHeader title="איש קשר חדש" back={back} />
       <Card>
         <CardBody>
-          <ContactForm orgId={orgId} />
+          <ContactForm orgId={orgId} companies={companies} />
         </CardBody>
       </Card>
     </div>
