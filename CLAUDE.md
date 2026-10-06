@@ -8,6 +8,8 @@ Every customer ("organization") signs up alone, picks a plan and adds employees 
 - Full product spec (Hebrew): `docs/SPEC.md`
 - What is built and what comes next: `docs/BACKLOG.md`
 - Decisions and open questions: `docs/DECISIONS.md`
+- Full QA plan (Hebrew): `docs/QA-PLAN.md` — a separate phase that starts only after the whole
+  backlog is built and the owner says to start. Do not run it during the build.
 
 ## Hard safety rules — read before doing anything
 
