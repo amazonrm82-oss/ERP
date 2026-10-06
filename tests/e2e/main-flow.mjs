@@ -105,8 +105,9 @@ try {
   await owner.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 15000 });
 
   step("add note");
-  await owner.getByLabel("הערה חדשה").fill("דיברנו בטלפון, מעוניין בהצעה");
-  await owner.getByRole("button", { name: "הוספת הערה" }).click();
+  await owner.getByLabel("סוג הפעילות").selectOption({ label: "שיחה" });
+  await owner.getByLabel("תיעוד").fill("דיברנו בטלפון, מעוניין בהצעה");
+  await owner.getByRole("button", { name: "הוספה לציר הזמן" }).click();
   await expectText(owner, "דיברנו בטלפון, מעוניין בהצעה");
 
   step("convert lead");
@@ -591,6 +592,47 @@ try {
   await owner.goto(`${orgUrl}/notifications`);
   await shot(owner, "72-notifications-360");
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("notifications page scrolls sideways at 360px");
+
+  // ---------------------------------------------------------------- section 8: reports
+  step("reports: manager dashboard, every report opens, export for managers only");
+  await ownerDesk.goto(`${orgUrl}/reports`);
+  await expectText(ownerDesk, "תמונת מצב");
+  await expectText(ownerDesk, "לידים חדשים החודש");
+  await shot(ownerDesk, "80-reports-1280");
+  for (const key of ["sources", "funnel", "response", "reps", "activity", "forecast", "lost", "cycle", "stuck", "revenue"]) {
+    await ownerDesk.goto(`${orgUrl}/reports/${key}`);
+    await ownerDesk.getByRole("link", { name: "כל הדוחות" }).waitFor({ timeout: 15000 });
+    if ((await ownerDesk.getByText("משהו השתבש").count()) > 0) throw new Error(`report ${key} failed`);
+  }
+  await ownerDesk.goto(`${orgUrl}/reports/sources?period=this_year`);
+  const sourcesText = await ownerDesk.locator("main").innerText();
+  console.log("sources report shows leads:", /לפי מקור/.test(sourcesText));
+  await shot(ownerDesk, "81-report-sources-1280");
+  const csv = await ownerDesk.context().request.get(`${orgUrl}/reports/revenue/export?period=this_year`);
+  const csvBody = await csv.text();
+  console.log("export:", csv.status(), csv.headers()["content-type"]);
+  if (csv.status() !== 200 || !csvBody.includes("הכנסות")) throw new Error("the owner could not export a report");
+  // Dana is a team manager here (allowed to export); as a plain member she may not
+  const setDanaRole = async (role, badge) => {
+    await ownerDesk.goto(`${orgUrl}/settings/users`);
+    await ownerDesk.getByLabel("תפקיד של דנה חברה").selectOption(role);
+    await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+    await ownerDesk.locator("span", { hasText: badge }).first().waitFor({ timeout: 15000 });
+  };
+  await setDanaRole("member", /^משתמש$/);
+  await invitee.goto(`${orgUrl}/reports/revenue`);
+  await expectText(invitee, "הכנסה שנסגרה");
+  if ((await invitee.getByText("ייצוא ל-Excel").count()) > 0) throw new Error("a member sees the export button");
+  const memberCsv = await invitee.context().request.get(`${orgUrl}/reports/revenue/export`);
+  console.log("member export status:", memberCsv.status());
+  if (memberCsv.status() !== 403) throw new Error("a member could export");
+  await setDanaRole("manager", /^מנהל צוות$/);
+  await owner.goto(`${orgUrl}/reports/reps`);
+  await shot(owner, "82-report-reps-360");
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("report scrolls sideways at 360px");
+  await owner.goto(`${orgUrl}/reports`);
+  await shot(owner, "83-reports-360");
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("reports page scrolls sideways at 360px");
 
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);

@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from "react";
 import {
   BoardIcon,
   BuildingIcon,
+  ChartIcon,
   CheckSquareIcon,
   HomeIcon,
   InboxIcon,
@@ -30,6 +31,7 @@ export function navItems(orgId: string): NavItem[] {
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
     { key: "deals", label: "עסקאות", href: paths.deals(orgId), icon: BoardIcon, mobile: true },
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },
+    { key: "reports", label: "דוחות", href: paths.reports(orgId), icon: ChartIcon, mobile: false },
     { key: "settings", label: "הגדרות", href: paths.settings(orgId), icon: SettingsIcon, mobile: false },
   ];
 }

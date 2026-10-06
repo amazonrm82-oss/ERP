@@ -170,3 +170,12 @@ export function BellIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function ChartIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h16" />
+      <path d="M7 16v-5M12 16V7M17 16v-8" />
+    </Icon>
+  );
+}

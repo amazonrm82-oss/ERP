@@ -73,6 +73,7 @@ export default async function OrgLayout({ children, params }: Props) {
             roleLabel={ROLE_LABELS[context.role]}
             links={[
               { href: paths.companies(org.id), label: "חברות", mobileOnly: true },
+              { href: paths.reports(org.id), label: "דוחות", mobileOnly: true },
               { href: paths.settings(org.id), label: "הגדרות", mobileOnly: true },
               { href: paths.home, label: "החלפת עסק" },
             ]}

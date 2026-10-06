@@ -98,6 +98,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `app.send_task_reminders()` then `app.dispatch_push()`, which pings the app through pg_net using
   `app.settings` (`push_dispatch_url`, `push_dispatch_secret`), filled in by hand per environment.
   `push_subscriptions` is per user (no `organization_id`); `user_id` is set from the session by trigger.
+- Reports (migration 0011) are `public.report_*` functions, **security invoker** on purpose: RLS decides
+  what is counted. Do not make them security definer. They return jsonb; `src/features/reports/build.ts`
+  shapes it into tables for the screen and the CSV export.
 - A trigger function that must tell a browser write from a server write uses `current_user` and is
   therefore **security invoker**. Inside a `security definer` function `current_user` is the owner.
 - PL/pgSQL gotcha that already bit this project twice: `new.some_column` raises when the firing table
@@ -128,7 +131,9 @@ that back.
 - `supabase/migrations/<timestamp>_<name>.sql`, applied in name order. Never edit a migration that
   has been applied to a hosted project; add a new one. 0001–0005 are applied to the hosted project.
   The owner applies new migrations by hand in the SQL Editor; code that depends on a migration is
-  pushed to `main` (which deploys) only after the owner confirms it ran.
+  pushed to `main` (which deploys) only after the owner confirms it ran. Hand them over in parts:
+  `node scripts/split-for-sql-editor.mjs <migration>` (a longer paste was cut off at ~4,000 chars and
+  0010 ran half way). Prefer statements that are safe to run twice, so a failed part can be rerun.
 - Money is integer agorot + currency code. Times are `timestamptz` (UTC), shown in the organization's
   time zone (default `Asia/Jerusalem`). Phones are stored as typed plus `phone_e164` (set by trigger).
 - Plan limits and feature flags live in `plans.limits` / `plans.features`, with per-organization

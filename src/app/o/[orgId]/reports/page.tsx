@@ -1,0 +1,39 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { PageHeader } from "@/components/ui/page-header";
+import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
+import { getDashboard } from "@/features/reports/dashboard";
+import { REPORTS } from "@/features/reports/definitions";
+import { getOrgContext } from "@/features/shell/queries";
+import { paths } from "@/lib/paths";
+
+export const metadata: Metadata = { title: "דוחות" };
+
+export default async function ReportsPage({ params }: { params: Promise<{ orgId: string }> }) {
+  const { orgId } = await params;
+  const { role } = await getOrgContext(orgId);
+  // the dashboard is for people who manage others; reps get the reports list
+  const dashboard = role === "owner" || role === "admin" || role === "manager" ? await getDashboard(orgId) : null;
+
+  return (
+    <>
+      <PageHeader title="דוחות" description="כל דוח מציג רק את הרשומות שמותר לך לראות." />
+      {dashboard ? <ManagerDashboard dashboard={dashboard} /> : null}
+      <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {REPORTS.map((report) => (
+          <li key={report.key}>
+            <Link
+              href={paths.report(orgId, report.key)}
+              className="block h-full rounded-lg border border-line bg-surface p-4 hover:border-accent hover:bg-accent-soft/40"
+            >
+              <span className="block font-semibold">{report.title}</span>
+              <span className="mt-1 block text-[0.9375rem] text-ink-soft">{report.description}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}

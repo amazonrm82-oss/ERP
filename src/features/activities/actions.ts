@@ -38,13 +38,13 @@ export async function addNoteAction(
     return context;
   }
 
-  const parsed = noteSchema.safeParse(pick(formData, ["body"]));
+  const parsed = noteSchema.safeParse(pick(formData, ["type", "body"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
 
   // RLS: allowed when the user can write in the organization and can see the record.
-  const row: ActivityInsert = { organization_id: orgId, type: "note", body: parsed.data.body };
+  const row: ActivityInsert = { organization_id: orgId, type: parsed.data.type, body: parsed.data.body };
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
   const { error } = await context.supabase.from("activities").insert(row);
   if (error) {

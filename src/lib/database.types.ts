@@ -826,6 +826,21 @@ export type Database = {
         };
         Returns: Json;
       };
+      // reports (migration 0011): security invoker, RLS decides what is counted; all return jsonb
+      report_leads_by_source: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
+      report_funnel: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null; p_pipeline?: string | null }; Returns: Json };
+      report_response_time: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
+      report_rep_performance: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null }; Returns: Json };
+      report_activity: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
+      report_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_lost_reasons: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_cycle_length: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_stuck_deals: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null; p_days?: number }; Returns: Json };
+      report_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_summary: {
+        Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
+        Returns: Json;
+      };
       // service-role only (the app's push dispatcher)
       claim_push_notifications: {
         Args: { p_limit?: number };
