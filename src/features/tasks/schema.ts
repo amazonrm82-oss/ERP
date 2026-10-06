@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { optionalDate, optionalId, optionalText, requiredText } from "@/lib/validation";
 
-export const TASK_FIELD_NAMES = ["title", "due_date", "due_time", "owner_id"] as const;
+export const TASK_FIELD_NAMES = ["title", "due_date", "due_time", "owner_id", "task_type"] as const;
+
+export const TASK_TYPE_VALUES = ["todo", "call", "meeting", "follow_up"] as const;
 
 const optionalTime = optionalText(5).refine((value) => value === null || /^([01]\d|2[0-3]):[0-5]\d$/.test(value), {
   error: "השעה אינה תקינה.",
@@ -15,6 +17,8 @@ export const taskSchema = z
     due_time: optionalTime,
     // empty: the task is the creator's (set by the database)
     owner_id: optionalId,
+    // the quick-add on the home page does not send it
+    task_type: z.preprocess((value) => (value === null || value === "" ? "todo" : value), z.enum(TASK_TYPE_VALUES, { error: "יש לבחור סוג." })),
   })
   .refine((task) => task.due_time === null || task.due_date !== null, {
     path: ["due_date"],

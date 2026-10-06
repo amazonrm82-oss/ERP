@@ -507,6 +507,43 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/users`);
   await expectText(ownerDesk, "לא זמין ללידים");
 
+  // ---------------------------------------------------------------- section 6: automations
+  step("automations: a template runs by itself (pg_cron) on a new lead");
+  await ownerDesk.goto(`${orgUrl}/settings/automations`);
+  await ownerDesk.getByRole("button", { name: /הוספה.*ליד חדש: לחזור תוך 15 דקות/ }).click();
+  await ownerDesk.waitForURL(/\/settings\/automations\/[0-9a-f-]{36}$/);
+  await expectText(ownerDesk, "יצירת משימה: \"להתקשר ל{{name}}\", בעוד 15 דקות, לבעלים");
+  await sendLead("אוטו ליד", "058-2000001");
+  let autoTask = false;
+  for (let i = 0; i < 24 && !autoTask; i++) {
+    await ownerDesk.waitForTimeout(5000);
+    await ownerDesk.goto(`${orgUrl}/tasks?who=all`);
+    autoTask = (await ownerDesk.getByText("להתקשר לאוטו ליד").count()) > 0;
+  }
+  console.log("task created by the scheduled engine:", autoTask);
+  if (!autoTask) throw new Error("the automation did not run within two minutes");
+  await shot(ownerDesk, "60-auto-task-1280");
+
+  step("automations: build a rule, test it on one record, see the log");
+  await ownerDesk.goto(`${orgUrl}/settings/automations/new`);
+  await ownerDesk.getByLabel("שם האוטומציה").fill("עסקה גדולה מקבלת VIP");
+  await ownerDesk.getByLabel("מה קורה").selectOption("deal:created");
+  await ownerDesk.getByRole("button", { name: "הוספת תנאי" }).click();
+  await ownerDesk.getByLabel("תנאי 1", { exact: true }).selectOption("amount");
+  await ownerDesk.getByLabel("ערך לתנאי 1").fill("10,000");
+  await ownerDesk.getByLabel("סוג פעולה 1").selectOption("add_tag");
+  await ownerDesk.getByLabel("תגית").selectOption({ label: "VIP" });
+  await shot(ownerDesk, "61-builder-1280");
+  await ownerDesk.getByRole("button", { name: "שמירה והפעלה" }).click();
+  await ownerDesk.waitForURL(/\/settings\/automations\/[0-9a-f-]{36}$/);
+  await expectText(ownerDesk, "השווי לפחות (₪) 10,000");
+  await ownerDesk.getByLabel("רשומה לבדיקה").selectOption({ label: "משה כהן" });
+  await ownerDesk.getByRole("button", { name: "הרצת בדיקה" }).click();
+  await expectText(ownerDesk, "הבדיקה הסתיימה: כל הפעולות בוצעו");
+  await ownerDesk.locator("li", { hasText: "הצליחה" }).first().waitFor();
+  await ownerDesk.goto(dealUrl);
+  await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor();
+
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);
   await expectText(owner, "משימות פתוחות");

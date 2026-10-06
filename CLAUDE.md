@@ -84,7 +84,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   are protected by **missing grants / column-level grants**, not by policies.
 - Operations that span tables or need elevated rights are **RPC functions in `public`**
   (`create_organization`, `create_invitation`, `accept_invitation`, `transfer_ownership`,
-  `convert_lead`; `intake_submit` is granted to `service_role` only). They are `security definer`, pin `search_path = ''`, and check permissions first.
+  `convert_lead`, `run_automation_now`; `intake_submit` is granted to `service_role` only).
+- The automation engine lives in the database (migration 0009): `app.process_outbox()` every minute and
+  `app.run_scheduled_automations()` every 15 minutes, scheduled with pg_cron. Every id inside a rule's
+  JSON is re-checked against the rule's organization when it runs. Changes made by an automation are
+  marked `payload.origin = 'automation'` in the outbox and do not trigger automations. They are `security definer`, pin `search_path = ''`, and check permissions first.
 - A trigger function that must tell a browser write from a server write uses `current_user` and is
   therefore **security invoker**. Inside a `security definer` function `current_user` is the owner.
 - PL/pgSQL gotcha that already bit this project twice: `new.some_column` raises when the firing table

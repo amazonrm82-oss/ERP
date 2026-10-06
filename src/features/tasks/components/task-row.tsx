@@ -10,7 +10,7 @@ import type { FormState } from "@/lib/action-result";
 import { cn } from "@/lib/cn";
 
 import { completeTaskAction, reopenTaskAction, updateTaskAction } from "../actions";
-import { TaskFields, type AssigneeOption } from "./task-fields";
+import { TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
 export type TaskRowView = {
   id: string;
@@ -24,6 +24,7 @@ export type TaskRowView = {
   completedText: string | null;
   ownerId: string | null;
   ownerName: string | null;
+  taskType: string;
   related: { href: string; label: string } | null;
 };
 
@@ -59,6 +60,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
         <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
           {task.done && task.completedText ? <span>הושלמה {task.completedText}</span> : null}
           {!task.done && task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
+          {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
           {showOwner && task.ownerName ? <span>באחריות {task.ownerName}</span> : null}
           {task.related ? (
             <Link href={task.related.href} className="underline underline-offset-4 hover:text-ink">
@@ -111,7 +113,7 @@ function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
     <form action={formAction} className="space-y-4" noValidate aria-label={`עריכת המשימה ${task.title}`}>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <TaskFields
-        values={failure?.values ?? { title: task.title, due_date: task.dueDate, due_time: task.dueTime, owner_id: task.ownerId }}
+        values={failure?.values ?? { title: task.title, due_date: task.dueDate, due_time: task.dueTime, owner_id: task.ownerId, task_type: task.taskType }}
         errors={failure?.fieldErrors ?? {}}
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}

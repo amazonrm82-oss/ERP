@@ -263,6 +263,34 @@ export type FormSubmissionRow = {
   created_at: string;
 };
 
+export type AutomationRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  template_key: string | null;
+  is_active: boolean;
+  entity_type: string;
+  trigger_type: string;
+  trigger_config: Json;
+  conditions: Json;
+  actions: Json;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationRunRow = {
+  id: string;
+  organization_id: string;
+  automation_id: string;
+  entity_type: string;
+  entity_id: string;
+  run_key: string;
+  status: string;
+  steps: Json;
+  created_at: string;
+};
+
 export type CompanyRow = {
   id: string;
   organization_id: string;
@@ -700,6 +728,30 @@ export type Database = {
       >;
       // written only by intake_submit()
       form_submissions: ReadOnlyTable<FormSubmissionRow>;
+      automations: Table<
+        AutomationRow,
+        {
+          organization_id: string;
+          name: string;
+          template_key?: string | null;
+          is_active?: boolean;
+          entity_type: string;
+          trigger_type: string;
+          trigger_config?: Json;
+          conditions?: Json;
+          actions: Json;
+        },
+        {
+          name?: string;
+          is_active?: boolean;
+          trigger_type?: string;
+          trigger_config?: Json;
+          conditions?: Json;
+          actions?: Json;
+        }
+      >;
+      // written only by the automation engine
+      automation_runs: ReadOnlyTable<AutomationRunRow>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;
@@ -736,6 +788,11 @@ export type Database = {
           p_user_agent?: string | null;
           p_is_spam?: boolean;
         };
+        Returns: Json;
+      };
+      run_automation_now: {
+        Args: { p_automation_id: string; p_entity_id: string };
+        // { status, steps }
         Returns: Json;
       };
       convert_lead: {

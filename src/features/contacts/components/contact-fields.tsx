@@ -8,6 +8,7 @@ export type ContactValues = {
   email?: string | null;
   job_title?: string | null;
   company_id?: string | null;
+  birth_date?: string | null;
 };
 
 type Props = { values: ContactValues; errors: Record<string, string>; companies: CompanyOption[] };
@@ -76,6 +77,7 @@ export function ContactFields({ values, errors, companies }: Props) {
           ))}
         </SelectField>
       </div>
+      <TextField label="יום הולדת" name="birth_date" type="date" defaultValue={values.birth_date ?? ""} error={errors.birth_date} className="sm:max-w-56" />
       <p className="text-sm text-ink-soft">חובה למלא לפחות אחד: שם, טלפון או אימייל.</p>
     </>
   );

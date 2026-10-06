@@ -59,6 +59,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       completedText: task.completedAt ? formatDateTime(task.completedAt) : null,
       ownerId: task.ownerId,
       ownerName: task.ownerName,
+      taskType: task.taskType,
       related: task.related ? { href: relatedHref(orgId, task.related), label: RELATED_LABEL[task.related.kind] } : null,
     };
   };

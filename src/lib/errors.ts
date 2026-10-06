@@ -27,6 +27,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "limit:owned_organizations": "אפשר להיות הבעלים של עד 5 עסקים.",
   "limit:max_forms": "הגעתם למספר הטפסים המרבי בחבילה. כדי להוסיף טופס יש לשדרג חבילה.",
   "feature:api": "חיבור webhook אינו כלול בחבילה הנוכחית. יש לשדרג חבילה.",
+  "limit:max_active_automations": "הגעתם למספר האוטומציות הפעילות המרבי בחבילה. כבו אוטומציה אחרת או שדרגו חבילה.",
   "feature:view_seats": "מושבי צפייה אינם כלולים בחבילה הנוכחית. יש לשדרג חבילה.",
 };
 

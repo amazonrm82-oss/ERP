@@ -80,10 +80,17 @@ describe("tenant isolation", () => {
       ).rows[0];
       ids.formA = form.id;
       ids.formTokenA = form.token;
+      ids.automationA = (
+        await q<{ id: string }>(
+          "insert into public.automations (organization_id, name, entity_type, trigger_type, actions) values ($1, 'כלל', 'lead', 'created', '[{\"type\":\"notify\"}]') returning id",
+          [orgA],
+        )
+      ).rows[0].id;
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
     );
+    await asAdmin((q) => q("select app.process_outbox(5000)"));
   });
 
   const tenantTables = [
@@ -107,6 +114,8 @@ describe("tenant isolation", () => {
     "audit_log",
     "forms",
     "form_submissions",
+    "automations",
+    "automation_runs",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -206,6 +215,8 @@ describe("tenant isolation", () => {
       saved_views: "name = name",
       forms: "name = name",
       form_submissions: "status = status",
+      automations: "name = name",
+      automation_runs: "status = status",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -265,6 +276,8 @@ describe("tenant isolation", () => {
       ["insert into public.audit_log (organization_id, action, entity_type) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.forms (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.form_submissions (organization_id, form_id, status) values ($1, $2, 'accepted')", [orgA, ids.formA]],
+      ["insert into public.automations (organization_id, name, entity_type, trigger_type, actions) values ($1, 'x', 'lead', 'created', '[{\"type\":\"notify\"}]')", [orgA]],
+      ["insert into public.automation_runs (organization_id, automation_id, entity_type, entity_id, run_key, status) values ($1, $2, 'lead', $3, 'x', 'success')", [orgA, ids.automationA, ids.leadA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -308,6 +321,8 @@ describe("tenant isolation", () => {
       ["saved_views", "name = 'HACKED'", "name = 'HACKED'"],
       ["forms", "title = 'HACKED'", "title = 'HACKED'"],
       ["form_submissions", "user_agent = 'HACKED'", "user_agent = 'HACKED'"],
+      ["automations", "name = 'HACKED'", "name = 'HACKED'"],
+      ["automation_runs", "status = 'skipped'", "status = 'skipped'"],
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
     ];
     // which rows of each table belong to alice's organization

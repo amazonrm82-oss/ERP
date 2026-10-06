@@ -17,7 +17,7 @@ import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "איש קשר" };
@@ -69,6 +69,7 @@ export default async function ContactPage({ params }: Props) {
             contact={{
               ...contact,
               createdAtText: formatDateTime(contact.created_at),
+              birthDateText: contact.birth_date ? formatDate(contact.birth_date) : null,
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields) },
             }}
           />

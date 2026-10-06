@@ -39,6 +39,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
   const { error } = await context.supabase.from("tasks").insert({
     organization_id: orgId,
     title: parsed.data.title,
+    task_type: parsed.data.task_type,
     due_at: dueAt(parsed.data.due_date, parsed.data.due_time),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
   });
@@ -69,6 +70,7 @@ export async function updateTaskAction(
     .from("tasks")
     .update({
       title: parsed.data.title,
+      task_type: parsed.data.task_type,
       due_at: dueAt(parsed.data.due_date, parsed.data.due_time),
       ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
     })

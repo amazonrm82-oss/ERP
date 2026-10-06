@@ -24,6 +24,7 @@ export type ContactDetailsView = ContactValues & {
   companyName: string | null;
   sourceName: string | null;
   ownerName: string | null;
+  birthDateText: string | null;
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
   // active custom fields and the values stored on the record
@@ -70,6 +71,7 @@ export function ContactDetailsCard({ orgId, contact, companies, canEdit }: Props
               ) : null
             }
           />
+          <Detail label="יום הולדת" value={contact.birthDateText} />
           <Detail label="מקור" value={contact.sourceName} />
           <Detail label="בעלים" value={contact.ownerName} />
           <Detail label="נוצר" value={contact.createdAtText} />

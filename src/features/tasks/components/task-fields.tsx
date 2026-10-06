@@ -2,7 +2,14 @@ import { SelectField, TextField } from "@/components/ui/field";
 
 export type AssigneeOption = { userId: string; name: string };
 
-export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null };
+export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null };
+
+export const TASK_TYPE_OPTIONS = [
+  { value: "todo", label: "משימה" },
+  { value: "call", label: "שיחה" },
+  { value: "meeting", label: "פגישה" },
+  { value: "follow_up", label: "מעקב" },
+] as const;
 
 type Props = { values: TaskValues; errors: Record<string, string>; assignees: AssigneeOption[]; defaultOwnerId: string };
 
@@ -32,6 +39,13 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props)
         />
       </div>
       {/* key: a select only takes defaultValue on mount */}
+      <SelectField key={`type-${values.task_type ?? "todo"}`} label="סוג" name="task_type" defaultValue={values.task_type ?? "todo"} error={errors.task_type}>
+        {TASK_TYPE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
       <SelectField key={`owner-${owner}`} label="באחריות" name="owner_id" defaultValue={owner} error={errors.owner_id}>
         {assignees.map((assignee) => (
           <option key={assignee.userId} value={assignee.userId}>

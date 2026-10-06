@@ -1,0 +1,67 @@
+import { z } from "zod";
+
+import { CONDITIONS, TASK_TYPES, TRIGGERS } from "./definitions";
+
+const id = z.guid({ error: "יש לבחור ערך." });
+const text = (max: number, missing: string) => z.string().trim().min(1, { error: missing }).max(max, { error: "הטקסט ארוך מדי." });
+
+const actionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("create_task"),
+    title: text(300, "יש לכתוב כותרת למשימה."),
+    due_amount: z.coerce.number().int().min(0).max(10_000).default(0),
+    due_unit: z.enum(["none", "minutes", "days"]).default("none"),
+    assign: z.enum(["owner", "user"]).default("owner"),
+    user_id: id.optional(),
+    task_type: z.enum(TASK_TYPES.map((t) => t.value)).default("todo"),
+  }),
+  z.object({
+    type: z.literal("notify"),
+    to: z.enum(["owner", "admins", "user"]),
+    user_id: id.optional(),
+    title: text(200, "יש לכתוב את נוסח ההתראה."),
+  }),
+  z.object({
+    type: z.literal("assign_owner"),
+    mode: z.enum(["user", "round_robin"]),
+    user_id: id.optional(),
+    team_id: id.optional(),
+  }),
+  z.object({ type: z.literal("add_tag"), tag_id: id }),
+  z.object({ type: z.literal("set_lead_status"), status_id: id }),
+  z.object({ type: z.literal("move_deal_stage"), stage_id: id }),
+]);
+
+export type RuleAction = z.infer<typeof actionSchema>;
+
+/** What the builder sends (as JSON in one form field). */
+export const ruleSchema = z
+  .object({
+    name: text(80, "יש לתת שם לאוטומציה."),
+    trigger: z.string().refine((key) => TRIGGERS.some((t) => t.key === key), { error: "יש לבחור מתי זה קורה." }),
+    trigger_to: id.optional(),
+    trigger_number: z.coerce.number().int().min(1).max(10_080).optional(),
+    conditions: z
+      .array(z.object({ key: z.string().refine((key) => CONDITIONS.some((c) => c.key === key)), value: z.string().max(100).optional() }))
+      .max(5, { error: "עד 5 תנאים." }),
+    actions: z.array(actionSchema).min(1, { error: "יש להוסיף לפחות פעולה אחת." }).max(10, { error: "עד 10 פעולות." }),
+  })
+  .superRefine((rule, ctx) => {
+    rule.actions.forEach((action, index) => {
+      const needsUser =
+        (action.type === "create_task" && action.assign === "user") ||
+        (action.type === "notify" && action.to === "user") ||
+        (action.type === "assign_owner" && action.mode === "user");
+      if (needsUser && !("user_id" in action && action.user_id)) {
+        ctx.addIssue({ code: "custom", path: ["actions", index], message: "יש לבחור משתמש." });
+      }
+    });
+    rule.conditions.forEach((condition, index) => {
+      const option = CONDITIONS.find((c) => c.key === condition.key);
+      if (option && option.input !== "none" && !condition.value) {
+        ctx.addIssue({ code: "custom", path: ["conditions", index], message: "יש לבחור ערך לתנאי." });
+      }
+    });
+  });
+
+export type Rule = z.infer<typeof ruleSchema>;
