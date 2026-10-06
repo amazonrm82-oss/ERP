@@ -141,13 +141,14 @@ Verified:
 - Weakening any of the 80 non-trivial RLS policies to "allow all" makes the tests fail.
 - `lint`, `typecheck` and `build` pass. Login/signup screens were looked at in a browser at 1280px
   and 360px.
+- The CI workflow (`.github/workflows/ci.yml`) passed on GitHub for the first push: lint, typecheck,
+  database tests against a `postgres:16` service, and build.
 
 Not verified yet:
 - **The app has never run against a real Supabase project.** Signed-in screens were exercised only
   against a hand-written HTTP stub. First task once a project exists: run the whole flow for real
   (sign up, confirm email, create organization, lead → note → convert, deal board) and fix what breaks.
 - The migrations on real Supabase (the test database uses a stand-in for the `auth` schema and roles).
-- `.github/workflows/ci.yml` has never run.
 - Performance of the per-row access functions on large tables.
 
 ## Working agreement
