@@ -1,0 +1,126 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { ContactActions } from "@/components/contact-actions";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Timeline } from "@/features/activities/components/timeline";
+import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
+import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
+import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
+import { TrashLeadButton } from "@/features/leads/components/trash-lead-button";
+import { leadDisplayName, statusTone } from "@/features/leads/display";
+import { getLead, getLeadLookups } from "@/features/leads/queries";
+import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { formatDate, formatDateTime } from "@/lib/format";
+import { isUuid, paths } from "@/lib/paths";
+
+export const metadata: Metadata = { title: "ליד" };
+
+type Props = { params: Promise<{ orgId: string; leadId: string }> };
+
+const linkClass = "font-medium text-accent underline underline-offset-4 hover:text-accent-strong";
+
+export default async function LeadPage({ params }: Props) {
+  const { orgId, leadId } = await params;
+  const { canWrite, canDelete } = await getOrgContext(orgId);
+  if (!isUuid(leadId)) {
+    notFound();
+  }
+
+  const [lead, lookups] = await Promise.all([getLead(orgId, leadId), getLeadLookups(orgId)]);
+  if (!lead) {
+    notFound();
+  }
+  const owners = await getUserNames([lead.owner_id]);
+
+  const name = leadDisplayName({ fullName: lead.full_name, email: lead.email, phone: lead.phone });
+  const status = lookups.statuses.find((option) => option.id === lead.status_id);
+  const isConverted = lead.converted_at !== null;
+
+  return (
+    <>
+      <PageHeader
+        title={name}
+        back={{ href: paths.leads(orgId), label: "לידים" }}
+        actions={<Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>}
+      />
+      <div className="mb-5">
+        <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} />
+      </div>
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        {/* On phones the record's own details come before its history. */}
+        <div className="order-2 lg:order-1">
+          <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} />
+        </div>
+
+        <div className="order-1 space-y-5 lg:order-2">
+          {isConverted ? (
+            <Card aria-labelledby="converted-title">
+              <CardHeader id="converted-title" title="הליד הומר" />
+              <CardBody>
+                <p className="text-[0.9375rem] text-ink-soft">הומר בתאריך {formatDate(lead.converted_at)}.</p>
+                <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[0.9375rem]">
+                  {lead.converted_contact_id ? (
+                    <Link href={paths.contact(orgId, lead.converted_contact_id)} className={linkClass}>
+                      לאיש הקשר
+                    </Link>
+                  ) : null}
+                  {lead.converted_deal_id ? (
+                    <Link href={paths.deals(orgId)} className={linkClass}>
+                      לעסקה בלוח העסקאות
+                    </Link>
+                  ) : null}
+                </p>
+              </CardBody>
+            </Card>
+          ) : canWrite ? (
+            <Card aria-labelledby="status-title">
+              <CardHeader id="status-title" title="סטטוס והמרה" />
+              <CardBody className="space-y-5">
+                <LeadStatusForm
+                  key={lead.status_id}
+                  orgId={orgId}
+                  leadId={lead.id}
+                  currentStatusId={lead.status_id}
+                  statuses={lookups.statuses}
+                />
+                <div className="border-t border-line pt-5">
+                  <ConvertLeadPanel
+                    orgId={orgId}
+                    leadId={lead.id}
+                    defaultDealName={lead.full_name ?? lead.company_name ?? ""}
+                    hasCompany={Boolean(lead.company_name)}
+                  />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          <LeadDetailsCard
+            orgId={orgId}
+            canWrite={canWrite}
+            sources={lookups.sources}
+            lead={{
+              id: lead.id,
+              fullName: lead.full_name,
+              phone: lead.phone,
+              email: lead.email,
+              companyName: lead.company_name,
+              sourceId: lead.source_id,
+              message: lead.message,
+              disqualifyReason: lead.disqualify_reason,
+              ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
+              createdAtText: formatDateTime(lead.created_at),
+            }}
+          />
+
+          {canDelete ? <TrashLeadButton orgId={orgId} leadId={lead.id} /> : null}
+        </div>
+      </div>
+    </>
+  );
+}

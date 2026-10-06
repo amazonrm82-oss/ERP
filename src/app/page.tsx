@@ -1,0 +1,63 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { ChevronIcon } from "@/components/ui/icons";
+import { Wordmark } from "@/components/wordmark";
+import { SignOutButton } from "@/features/auth/components/sign-out-button";
+import { listMyOrganizations } from "@/features/onboarding/queries";
+import { ROLE_LABELS } from "@/features/shell/labels";
+import { APP_NAME } from "@/lib/app";
+import { requireUser } from "@/lib/auth";
+import { paths } from "@/lib/paths";
+
+// The title template of the root layout does not apply to the root page itself.
+export const metadata: Metadata = { title: `בחירת עסק | ${APP_NAME}` };
+
+// Entry point after sign-in: no business -> onboarding, one -> straight in,
+// several -> pick one.
+export default async function RootPage() {
+  const user = await requireUser();
+  const organizations = await listMyOrganizations(user.id);
+
+  if (organizations.length === 0) {
+    redirect(paths.onboarding);
+  }
+  if (organizations.length === 1) {
+    redirect(paths.org(organizations[0].id));
+  }
+
+  return (
+    <div className="min-h-dvh bg-surface">
+      <header className="flex items-center justify-between px-5 py-4 sm:px-10">
+        <Wordmark className="text-lg" />
+        <SignOutButton />
+      </header>
+      <main className="mx-auto w-full max-w-md px-5 pt-6 pb-16 sm:pt-12">
+        <h1 className="text-2xl font-semibold">לאיזה עסק להיכנס?</h1>
+        <p className="mt-1 mb-6 text-ink-soft">החשבון שלך משויך לכמה עסקים.</p>
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {organizations.map((org) => (
+            <li key={org.id}>
+              <Link
+                href={paths.org(org.id)}
+                className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-canvas"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{org.name}</span>
+                  <span className="block text-sm text-ink-soft">{ROLE_LABELS[org.role]}</span>
+                </span>
+                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-6 text-[0.9375rem]">
+          <Link href={`${paths.onboarding}?new=1`} className="text-accent underline underline-offset-4 hover:text-accent-strong">
+            הוספת עסק חדש
+          </Link>
+        </p>
+      </main>
+    </div>
+  );
+}

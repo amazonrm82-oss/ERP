@@ -1,0 +1,160 @@
+"use client";
+
+import { useActionState, useState } from "react";
+
+import { Detail, DetailList } from "@/components/detail-list";
+import { Button } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { FormError } from "@/components/ui/feedback";
+import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { SubmitButton } from "@/components/ui/submit-button";
+import type { FormState } from "@/lib/action-result";
+
+import { updateLeadAction } from "../actions";
+import type { LeadSourceOption } from "../queries";
+
+export type LeadDetailsView = {
+  id: string;
+  fullName: string | null;
+  phone: string | null;
+  email: string | null;
+  companyName: string | null;
+  sourceId: string | null;
+  message: string | null;
+  disqualifyReason: string | null;
+  // formatted on the server so server and browser output cannot differ
+  ownerName: string | null;
+  createdAtText: string;
+};
+
+type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean };
+
+/** Lead details that switch in place between reading and editing. */
+export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
+  const [editing, setEditing] = useState(false);
+  const sourceName = sources.find((source) => source.id === lead.sourceId)?.name ?? null;
+
+  if (editing) {
+    // mounted only while editing, so every edit starts with a clean form state
+    return <LeadEditForm orgId={orgId} lead={lead} sources={sources} onDone={() => setEditing(false)} />;
+  }
+
+  return (
+    <Card aria-labelledby="lead-details-title">
+      <CardHeader
+        id="lead-details-title"
+        title="פרטי הליד"
+        action={
+          canWrite ? (
+            <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+              עריכה
+            </Button>
+          ) : null
+        }
+      />
+      <CardBody>
+        <DetailList>
+          <Detail label="שם מלא" value={lead.fullName} />
+          <Detail label="טלפון" value={lead.phone} ltr />
+          <Detail label="אימייל" value={lead.email} ltr />
+          <Detail label="חברה" value={lead.companyName} />
+          <Detail label="מקור" value={sourceName} />
+          <Detail label="בעלים" value={lead.ownerName} />
+          <Detail label="נוצר" value={lead.createdAtText} />
+          {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
+        </DetailList>
+        {lead.message ? (
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-sm text-ink-soft">הודעה</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-[0.9375rem]">{lead.message}</p>
+          </div>
+        ) : null}
+      </CardBody>
+    </Card>
+  );
+}
+
+type EditProps = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; onDone: () => void };
+
+function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
+  const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
+    const result = await updateLeadAction(orgId, lead.id, prev, formData);
+    if (result?.ok) {
+      onDone();
+    }
+    return result;
+  }, null);
+  const failure = state && !state.ok ? state : null;
+  const values = failure?.values;
+  const errors = failure?.fieldErrors ?? {};
+  const sourceValue = values?.source_id ?? lead.sourceId ?? "";
+
+  return (
+    <Card aria-labelledby="lead-details-title">
+      <CardHeader id="lead-details-title" title="עריכת פרטי הליד" />
+      <CardBody>
+        <form action={formAction} className="space-y-4" noValidate>
+          <FormError message={failure?.message} />
+          <TextField
+            label="שם מלא"
+            name="full_name"
+            maxLength={200}
+            autoComplete="off"
+            defaultValue={values?.full_name ?? lead.fullName ?? ""}
+            error={errors.full_name}
+          />
+          <TextField
+            label="טלפון"
+            name="phone"
+            type="tel"
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="off"
+            defaultValue={values?.phone ?? lead.phone ?? ""}
+            error={errors.phone}
+          />
+          <TextField
+            label="אימייל"
+            name="email"
+            type="email"
+            dir="ltr"
+            inputMode="email"
+            autoComplete="off"
+            defaultValue={values?.email ?? lead.email ?? ""}
+            error={errors.email}
+          />
+          <TextField
+            label="חברה"
+            name="company_name"
+            maxLength={200}
+            autoComplete="off"
+            defaultValue={values?.company_name ?? lead.companyName ?? ""}
+            error={errors.company_name}
+          />
+          <SelectField key={`source-${sourceValue}`} label="מקור" name="source_id" defaultValue={sourceValue} error={errors.source_id}>
+            <option value="">ללא מקור</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </SelectField>
+          <TextareaField
+            label="הודעה"
+            name="message"
+            rows={4}
+            maxLength={5000}
+            defaultValue={values?.message ?? lead.message ?? ""}
+            error={errors.message}
+          />
+          <div className="flex flex-wrap gap-2">
+            <SubmitButton size="sm">שמירה</SubmitButton>
+            <Button variant="ghost" size="sm" onClick={onDone}>
+              ביטול
+            </Button>
+          </div>
+        </form>
+      </CardBody>
+    </Card>
+  );
+}
