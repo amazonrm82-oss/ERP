@@ -1,0 +1,359 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+
+import { companySchema } from "@/features/companies/schema";
+import { parseCustomFields } from "@/features/custom-fields/values";
+import { inputName, type FieldDefinition } from "@/features/custom-fields/types";
+import type { Database, Json } from "@/lib/database.types";
+import { dbErrorMessage } from "@/lib/errors";
+import { normalizePhone } from "@/lib/phone";
+import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
+
+import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fields";
+
+type Client = SupabaseClient<Database>;
+
+export type RowOutcome = { row: number; status: "created" | "updated" | "skipped" | "failed" | "ok"; message?: string };
+
+export type ImportContext = {
+  supabase: Client;
+  orgId: string;
+  userId: string;
+  entity: ImportEntityKey;
+  mode: DuplicateModeKey;
+  // per column: target key, "" = not imported
+  mapping: string[];
+  definitions: FieldDefinition[];
+};
+
+type Lookups = {
+  statuses: Map<string, string>;
+  defaultStatus: string | null;
+  sources: Map<string, string>;
+  owners: Map<string, string>;
+};
+
+const key = (text: string) => text.trim().toLowerCase();
+
+/** A phone typed into Excel as a number loses its leading 0 (0521234567 -> 521234567). */
+export function restorePhone(value: string): string {
+  const digits = value.trim();
+  if (/^5\d{8}$/.test(digits) || /^[23489]\d{7}$/.test(digits) || /^7\d{8}$/.test(digits)) {
+    return `0${digits}`;
+  }
+  return value;
+}
+
+/** "31/12/1980", "31.12.1980" or "1980-12-31" -> "1980-12-31"; anything else is returned as is (and fails validation). */
+export function normalizeDate(value: string): string {
+  const v = value.trim();
+  const dmy = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  }
+  return v;
+}
+
+async function loadLookups(ctx: ImportContext): Promise<Lookups> {
+  const { supabase, orgId } = ctx;
+  const [statuses, sources, members] = await Promise.all([
+    ctx.entity === "lead" ? supabase.from("lead_statuses").select("id, name, is_default").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
+    ctx.entity === "lead" ? supabase.from("lead_sources").select("id, name").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
+    supabase.from("memberships").select("user_id").eq("organization_id", orgId).eq("status", "active").neq("role", "viewer"),
+  ]);
+  const ids = (members.data ?? []).map((m) => m.user_id);
+  const { data: profiles } = ids.length ? await supabase.from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
+  const owners = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    if (p.email) owners.set(key(p.email), p.id);
+    if (p.full_name) owners.set(key(p.full_name), p.id);
+  }
+  const statusRows = (statuses.data ?? []) as Array<{ id: string; name: string; is_default?: boolean }>;
+  return {
+    statuses: new Map(statusRows.map((s) => [key(s.name), s.id])),
+    defaultStatus: statusRows.find((s) => s.is_default)?.id ?? statusRows[0]?.id ?? null,
+    sources: new Map(((sources.data ?? []) as Array<{ id: string; name: string }>).map((s) => [key(s.name), s.id])),
+    owners,
+  };
+}
+
+function firstIssue(error: z.ZodError): string {
+  return error.issues[0]?.message ?? "השורה אינה תקינה.";
+}
+
+const leadRowSchema = z
+  .object({
+    full_name: optionalText(200, "השם ארוך מדי (עד 200 תווים)."),
+    phone: optionalPhone,
+    email: optionalEmail,
+    company_name: optionalText(200, "שם החברה ארוך מדי (עד 200 תווים)."),
+    job_title: optionalText(120, "התפקיד ארוך מדי (עד 120 תווים)."),
+    campaign: optionalText(200, "שם הקמפיין ארוך מדי."),
+    message: optionalText(5000, "ההודעה ארוכה מדי (עד 5,000 תווים)."),
+  })
+  .refine((l) => Boolean(l.full_name || l.phone || l.email), { error: "חסר שם, טלפון או אימייל." });
+
+const contactRowSchema = z
+  .object({
+    first_name: optionalText(100, "השם ארוך מדי (עד 100 תווים)."),
+    last_name: optionalText(100, "שם המשפחה ארוך מדי (עד 100 תווים)."),
+    phone: optionalPhone,
+    email: optionalEmail,
+    job_title: optionalText(120, "התפקיד ארוך מדי (עד 120 תווים)."),
+    birth_date: optionalDate,
+  })
+  .refine((c) => Boolean(c.first_name || c.last_name || c.phone || c.email), { error: "חסר שם, טלפון או אימייל." });
+
+type Prepared = {
+  row: number;
+  // the columns to write (insert or update)
+  values: Record<string, unknown>;
+  // for duplicate detection
+  phoneE164: string | null;
+  email: string | null;
+  taxId: string | null;
+  name: string | null;
+  companyName: string | null;
+};
+
+/** Validates one row and turns it into column values. Returns a message when the row cannot be imported. */
+function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: number): Prepared | string {
+  const raw: Record<string, string> = {};
+  const custom = new FormData();
+  ctx.mapping.forEach((target, index) => {
+    if (!target) return;
+    const value = String(cells[index] ?? "").trim();
+    if (target.startsWith(CUSTOM_PREFIX)) {
+      custom.set(inputName(target.slice(CUSTOM_PREFIX.length)), value);
+    } else if (value !== "") {
+      raw[target] = target === "phone" ? restorePhone(value) : value;
+    }
+  });
+
+  const values: Record<string, unknown> = {};
+  let name: string | null = null;
+  let companyName: string | null = null;
+
+  if (ctx.entity === "lead") {
+    const parsed = leadRowSchema.safeParse({
+      full_name: raw.full_name ?? [raw.first_name, raw.last_name].filter(Boolean).join(" "),
+      phone: raw.phone,
+      email: raw.email,
+      company_name: raw.company_name,
+      job_title: raw.job_title,
+      campaign: raw.campaign,
+      message: raw.message,
+    });
+    if (!parsed.success) return firstIssue(parsed.error);
+    Object.assign(values, parsed.data);
+    if (raw.status) {
+      const status = lookups.statuses.get(key(raw.status));
+      if (!status) return `אין סטטוס בשם "${raw.status}".`;
+      values.status_id = status;
+    }
+    if (raw.source) {
+      const source = lookups.sources.get(key(raw.source));
+      if (!source) return `אין מקור בשם "${raw.source}". אפשר להוסיף אותו בהגדרות ולייבא שוב.`;
+      values.source_id = source;
+    }
+    name = parsed.data.full_name;
+  } else if (ctx.entity === "contact") {
+    let first: string | undefined = raw.first_name;
+    let last: string | undefined = raw.last_name;
+    if (!first && !last && raw.full_name) {
+      const [head, ...rest] = raw.full_name.split(/\s+/);
+      first = head;
+      last = rest.join(" ") || undefined;
+    }
+    const parsed = contactRowSchema.safeParse({
+      first_name: first,
+      last_name: last,
+      phone: raw.phone,
+      email: raw.email,
+      job_title: raw.job_title,
+      birth_date: raw.birth_date ? normalizeDate(raw.birth_date) : undefined,
+    });
+    if (!parsed.success) return firstIssue(parsed.error);
+    Object.assign(values, parsed.data);
+    companyName = raw.company ?? null;
+    if (companyName && companyName.length > 200) return "שם החברה ארוך מדי (עד 200 תווים).";
+    name = [parsed.data.first_name, parsed.data.last_name].filter(Boolean).join(" ") || null;
+  } else {
+    const parsed = companySchema.safeParse({
+      name: raw.name,
+      tax_id: raw.tax_id,
+      industry: "",
+      phone: raw.phone,
+      email: raw.email,
+      website: raw.website,
+      city: raw.city,
+      address_line: raw.address_line,
+    });
+    if (!parsed.success) return firstIssue(parsed.error);
+    const { industry: _industry, ...rest } = parsed.data;
+    void _industry;
+    Object.assign(values, rest);
+    name = parsed.data.name;
+  }
+
+  if (raw.owner) {
+    const owner = lookups.owners.get(key(raw.owner));
+    if (!owner) return `לא נמצא משתמש פעיל "${raw.owner}" (לפי אימייל או שם).`;
+    values.owner_id = owner;
+  }
+
+  const mappedFields = ctx.definitions.filter((d) => ctx.mapping.includes(`${CUSTOM_PREFIX}${d.key}`));
+  if (mappedFields.length > 0) {
+    const { values: customValues, errors } = parseCustomFields(
+      mappedFields.map((d) => ({ ...d, isRequired: false })),
+      custom,
+    );
+    const error = Object.values(errors)[0];
+    if (error) return error;
+    values.custom_fields = customValues as Json;
+  }
+
+  return {
+    row,
+    values,
+    phoneE164: normalizePhone(values.phone as string | null),
+    email: (values.email as string | null) ?? null,
+    taxId: (values.tax_id as string | null) ?? null,
+    name,
+    companyName,
+  };
+}
+
+const TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
+
+type Existing = { id: string; phone_e164?: string | null; email?: string | null; tax_id?: string | null; name?: string | null; custom_fields?: Json };
+
+/** Records already in the organization (that the user can see) matching any row of the chunk. */
+async function findExisting(ctx: ImportContext, rows: Prepared[]): Promise<Existing[]> {
+  const table = TABLE[ctx.entity];
+  const phones = [...new Set(rows.map((r) => r.phoneE164).filter((v): v is string => Boolean(v)))];
+  const emails = [...new Set(rows.map((r) => r.email).filter((v): v is string => Boolean(v)))];
+  const found: Existing[] = [];
+  const base = () => ctx.supabase.from(table).select(ctx.entity === "company" ? "id, phone_e164, email, tax_id, name, custom_fields" : "id, phone_e164, email, custom_fields").eq("organization_id", ctx.orgId).is("deleted_at", null);
+  // leads that were converted are not duplicates of a new lead
+  const scoped = <T extends { is: (c: string, v: null) => T }>(q: T) => (ctx.entity === "lead" ? q.is("converted_at", null) : q);
+  if (phones.length) found.push(...(((await scoped(base().in("phone_e164", phones))).data ?? []) as unknown as Existing[]));
+  if (emails.length) found.push(...(((await scoped(base().in("email", emails))).data ?? []) as unknown as Existing[]));
+  if (ctx.entity === "company") {
+    const taxIds = [...new Set(rows.map((r) => r.taxId).filter((v): v is string => Boolean(v)))];
+    const names = [...new Set(rows.map((r) => r.name).filter((v): v is string => Boolean(v)))];
+    if (taxIds.length) found.push(...(((await base().in("tax_id", taxIds)).data ?? []) as unknown as Existing[]));
+    if (names.length) found.push(...(((await base().in("name", names)).data ?? []) as unknown as Existing[]));
+  }
+  return found;
+}
+
+function matchExisting(entity: ImportEntityKey, existing: Existing[], row: Prepared): Existing | undefined {
+  return existing.find(
+    (e) =>
+      (row.phoneE164 && e.phone_e164 === row.phoneE164) ||
+      (row.email && e.email === row.email) ||
+      (entity === "company" && ((row.taxId && e.tax_id === row.taxId) || (row.name && e.name?.toLowerCase() === row.name.toLowerCase()))),
+  );
+}
+
+/** Company ids by name for contacts; missing companies are created (not tagged with the import). */
+async function resolveCompanies(ctx: ImportContext, rows: Prepared[], create: boolean): Promise<Map<string, string>> {
+  const names = [...new Set(rows.map((r) => r.companyName).filter((v): v is string => Boolean(v)))];
+  const ids = new Map<string, string>();
+  if (names.length === 0) return ids;
+  const { data } = await ctx.supabase.from("companies").select("id, name").eq("organization_id", ctx.orgId).is("deleted_at", null).in("name", names);
+  for (const c of data ?? []) ids.set(key(c.name), c.id);
+  const missing = names.filter((n) => !ids.has(key(n)));
+  if (create && missing.length) {
+    const { data: created } = await ctx.supabase
+      .from("companies")
+      .insert(missing.map((n) => ({ organization_id: ctx.orgId, name: n })))
+      .select("id, name");
+    for (const c of created ?? []) ids.set(key(c.name), c.id);
+  }
+  return ids;
+}
+
+export class ImportStopped extends Error {}
+
+/**
+ * Validates and writes one chunk. With jobId null it is a dry run (the preview):
+ * nothing is written and valid rows come back as "ok", or "skipped"/"updated"
+ * when they match an existing record.
+ */
+export async function processChunk(ctx: ImportContext, lookups: Lookups | null, chunk: string[][], firstRow: number, jobId: string | null): Promise<RowOutcome[]> {
+  const look = lookups ?? (await loadLookups(ctx));
+  const outcomes: RowOutcome[] = [];
+  const prepared: Prepared[] = [];
+  chunk.forEach((cells, i) => {
+    const result = prepareRow(ctx, look, cells, firstRow + i);
+    if (typeof result === "string") outcomes.push({ row: firstRow + i, status: "failed", message: result });
+    else prepared.push(result);
+  });
+
+  const existing = ctx.mode === "create" ? [] : await findExisting(ctx, prepared);
+  const toInsert: Prepared[] = [];
+  const seen: Prepared[] = [];
+  for (const row of prepared) {
+    // a repeat of an earlier row in the same chunk counts as a duplicate too
+    const earlier = ctx.mode === "create" ? undefined : seen.find((s) => (row.phoneE164 && s.phoneE164 === row.phoneE164) || (row.email && s.email === row.email));
+    seen.push(row);
+    const match = matchExisting(ctx.entity, existing, row);
+    if (earlier || (match && ctx.mode === "skip")) {
+      outcomes.push({ row: row.row, status: "skipped", message: "כבר קיים" });
+    } else if (match && ctx.mode === "update") {
+      if (!jobId) {
+        outcomes.push({ row: row.row, status: "updated" });
+        continue;
+      }
+      const values = { ...row.values };
+      if (values.custom_fields && match.custom_fields && typeof match.custom_fields === "object" && !Array.isArray(match.custom_fields)) {
+        values.custom_fields = { ...match.custom_fields, ...(values.custom_fields as Record<string, Json>) };
+      }
+      // only what the file filled in; an empty cell does not erase
+      for (const [k, v] of Object.entries(values)) if (v === null) delete values[k];
+      const { data, error } = await ctx.supabase.from(TABLE[ctx.entity]).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
+      if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : "אין הרשאה לעדכן את הרשומה הקיימת." });
+      else outcomes.push({ row: row.row, status: "updated" });
+    } else {
+      toInsert.push(row);
+    }
+  }
+
+  if (!jobId) {
+    for (const row of toInsert) outcomes.push({ row: row.row, status: "ok" });
+    return outcomes.sort((a, b) => a.row - b.row);
+  }
+
+  const companies = ctx.entity === "contact" ? await resolveCompanies(ctx, toInsert, true) : new Map<string, string>();
+  const insertRow = (row: Prepared) => ({
+    organization_id: ctx.orgId,
+    import_job_id: jobId,
+    ...(ctx.entity === "lead" && !row.values.status_id ? { status_id: look.defaultStatus } : {}),
+    ...(row.companyName ? { company_id: companies.get(key(row.companyName)) ?? null } : {}),
+    ...row.values,
+  });
+
+  if (toInsert.length) {
+    const { error } = await ctx.supabase.from(TABLE[ctx.entity]).insert(toInsert.map(insertRow) as never);
+    if (!error) {
+      for (const row of toInsert) outcomes.push({ row: row.row, status: "created" });
+    } else if (error.code === "P0001") {
+      // a plan limit: stop the whole import, nothing after this will fit either
+      throw new ImportStopped(dbErrorMessage(error, "הגעתם למגבלת החבילה."));
+    } else {
+      // one bad row fails the batch: insert one by one to find it
+      for (const row of toInsert) {
+        const { error: rowError } = await ctx.supabase.from(TABLE[ctx.entity]).insert(insertRow(row) as never);
+        if (rowError?.code === "P0001") throw new ImportStopped(dbErrorMessage(rowError, "הגעתם למגבלת החבילה."));
+        outcomes.push(rowError ? { row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") } : { row: row.row, status: "created" });
+      }
+    }
+  }
+  return outcomes.sort((a, b) => a.row - b.row);
+}
+
+export { loadLookups };

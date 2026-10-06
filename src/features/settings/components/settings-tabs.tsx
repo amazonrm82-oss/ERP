@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 
 /** Section links of the settings area. Scrolls sideways on narrow screens. */
-export function SettingsTabs({ orgId, showTrash, showCustomization }: { orgId: string; showTrash: boolean; showCustomization: boolean }) {
+type Props = { orgId: string; showTrash: boolean; showCustomization: boolean; showImport: boolean };
+
+export function SettingsTabs({ orgId, showTrash, showCustomization, showImport }: Props) {
   const pathname = usePathname();
   const tabs = [
     { href: paths.settings(orgId), label: "פרטי העסק", exact: true },
@@ -23,6 +25,7 @@ export function SettingsTabs({ orgId, showTrash, showCustomization }: { orgId: s
           { href: paths.settingsAutomations(orgId), label: "אוטומציות" },
         ]
       : []),
+    ...(showImport ? [{ href: paths.imports(orgId), label: "ייבוא וייצוא" }] : []),
     ...(showTrash ? [{ href: paths.settingsTrash(orgId), label: "סל מחזור" }] : []),
   ];
 

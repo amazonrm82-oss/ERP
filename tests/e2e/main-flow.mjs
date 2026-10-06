@@ -6,6 +6,7 @@
 // business -> lead -> note -> convert -> deal board -> settings -> invite a
 // second user -> they sign up from the link and join -> roles, teams, suspend.
 // It refuses to run against anything that is not on this machine.
+import { strToU8, zipSync } from "fflate";
 import { chromium } from "playwright";
 
 const APP = process.env.E2E_APP_URL ?? "http://localhost:3000";
@@ -633,6 +634,101 @@ try {
   await owner.goto(`${orgUrl}/reports`);
   await shot(owner, "83-reports-360");
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("reports page scrolls sideways at 360px");
+
+  // ---------------------------------------------------------------- section 9: import and export
+  step("import: a CSV of leads with a duplicate, a repeat and a bad row; then undo");
+  await ownerDesk.goto(`${orgUrl}/settings/import`);
+  await ownerDesk.getByRole("link", { name: "ייבוא קובץ" }).click();
+  await ownerDesk.getByLabel("לידים", { exact: true }).check();
+  const leadsCsv = [
+    "שם מלא,טלפון,אימייל,הערות",
+    "יובל מהקובץ,0521110001,yuval@example.test,ראשון",
+    "נועה מהקובץ,521110002,,טלפון בלי 0 כמו ב-Excel",
+    "קיים כבר,058-1000001,,כפילות של ליד קיים",
+    ",,,שורה בלי שם טלפון או אימייל",
+    "יובל שוב,052-111-0001,,כפילות בתוך הקובץ",
+    "דורון מהקובץ,,doron@example.test,",
+  ].join("\n");
+  await ownerDesk.locator('input[type="file"]').setInputFiles({ name: "לידים.csv", mimeType: "text/csv", buffer: Buffer.from("﻿" + leadsCsv, "utf8") });
+  await expectText(ownerDesk, "6 שורות");
+  if ((await ownerDesk.getByLabel("שדה לעמודה טלפון").inputValue()) !== "phone") throw new Error("the phone column was not mapped by itself");
+  if ((await ownerDesk.getByLabel("שדה לעמודה הערות").inputValue()) !== "message") throw new Error("the notes column was not mapped by itself");
+  await ownerDesk.getByRole("button", { name: "בדיקת 20 השורות הראשונות" }).click();
+  await expectText(ownerDesk, "חסר שם, טלפון או אימייל");
+  await shot(ownerDesk, "90-import-preview-1280");
+  await ownerDesk.getByRole("button", { name: "ייבוא 6 שורות" }).click();
+  await expectText(ownerDesk, "הייבוא הסתיים");
+  const importSummary = await ownerDesk.locator("dl").last().innerText();
+  console.log("import summary:", importSummary.replace(/\s+/g, " "));
+  if (!/נוצרו\s*3/.test(importSummary) || !/דולגו \(כבר קיימים\)\s*2/.test(importSummary) || !/נכשלו\s*1/.test(importSummary)) throw new Error("unexpected import counts");
+  await ownerDesk.getByRole("button", { name: /הורדת 1 השורות שנכשלו/ }).waitFor();
+  await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("נועה מהקובץ")}`);
+  await ownerDesk.getByRole("link", { name: "נועה מהקובץ" }).click();
+  await expectText(ownerDesk, "0521110002"); // the leading 0 Excel drops is restored
+  await ownerDesk.goto(`${orgUrl}/settings/import`);
+  await shot(ownerDesk, "91-import-history-1280");
+  await ownerDesk.getByRole("button", { name: /^ביטול הייבוא/ }).first().click();
+  await ownerDesk.getByRole("button", { name: /^(כן|אישור)/ }).first().click();
+  await expectText(ownerDesk, "בוטל");
+  await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("יובל מהקובץ")}`);
+  if ((await ownerDesk.getByRole("link", { name: "יובל מהקובץ" }).count()) > 0) throw new Error("undo did not remove the imported lead");
+
+  step("import: contacts from a Windows-1255 CSV, companies from an xlsx");
+  const cp1255 = (text) => Buffer.from([...text].map((ch) => {
+    const code = ch.codePointAt(0);
+    if (code >= 0x5d0 && code <= 0x5ea) return code - 0x5d0 + 0xe0;
+    if (code < 0x80) return code;
+    throw new Error(`no cp1255 byte for ${ch}`);
+  }));
+  await ownerDesk.goto(`${orgUrl}/settings/import/new`);
+  await ownerDesk.getByLabel("אנשי קשר", { exact: true }).check();
+  await ownerDesk.locator('input[type="file"]').setInputFiles({
+    name: "contacts.csv",
+    mimeType: "text/csv",
+    buffer: cp1255("שם פרטי,שם משפחה,טלפון,חברה,תאריך לידה\nאורית,לוי,0547770001,חברת ייבוא,15/03/1985\n"),
+  });
+  await expectText(ownerDesk, "1 שורות");
+  await ownerDesk.getByRole("button", { name: "בדיקת 20 השורות הראשונות" }).click();
+  await ownerDesk.getByRole("button", { name: "ייבוא 1 שורות" }).click();
+  await expectText(ownerDesk, "הייבוא הסתיים");
+  await ownerDesk.goto(`${orgUrl}/contacts?q=${encodeURIComponent("אורית")}`);
+  await ownerDesk.getByRole("link", { name: /אורית לוי/ }).click();
+  await expectText(ownerDesk, "חברת ייבוא");
+
+  const sheetXml = (rows) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows
+      .map((cells, r) => `<row r="${r + 1}">${cells.map((v, c) => (typeof v === "number" ? `<c r="${String.fromCharCode(65 + c)}${r + 1}"><v>${v}</v></c>` : `<c r="${String.fromCharCode(65 + c)}${r + 1}" t="inlineStr"><is><t>${v}</t></is></c>`)).join("")}</row>`)
+      .join("")}</sheetData></worksheet>`;
+  const xlsx = zipSync({
+    "[Content_Types].xml": strToU8('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'),
+    "_rels/.rels": strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+    "xl/workbook.xml": strToU8('<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="חברות" sheetId="1" r:id="rId1"/></sheets></workbook>'),
+    "xl/_rels/workbook.xml.rels": strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'),
+    "xl/worksheets/sheet1.xml": strToU8(sheetXml([["שם החברה", "ח.פ.", "עיר", "טלפון"], ["אקסל בע\"מ", 515151515, "חיפה", 48001122]])),
+  });
+  await ownerDesk.goto(`${orgUrl}/settings/import/new`);
+  await ownerDesk.getByLabel("חברות", { exact: true }).check();
+  await ownerDesk.locator('input[type="file"]').setInputFiles({ name: "companies.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(xlsx) });
+  await expectText(ownerDesk, "1 שורות");
+  await ownerDesk.getByRole("button", { name: "בדיקת 20 השורות הראשונות" }).click();
+  await ownerDesk.getByRole("button", { name: "ייבוא 1 שורות" }).click();
+  await expectText(ownerDesk, "הייבוא הסתיים");
+  await ownerDesk.goto(`${orgUrl}/companies?q=${encodeURIComponent("אקסל")}`);
+  await ownerDesk.getByRole("link", { name: /אקסל בע"מ/ }).click();
+  await expectText(ownerDesk, "515151515");
+  await expectText(ownerDesk, "חיפה");
+
+  step("export: the owner downloads everything; a team manager may not");
+  const zipRes = await ownerDesk.context().request.get(`${orgUrl}/settings/import/export`);
+  const zipBytes = await zipRes.body();
+  console.log("full export:", zipRes.status(), zipRes.headers()["content-type"], `${zipBytes.length} bytes`);
+  if (zipRes.status() !== 200 || zipBytes[0] !== 0x50 || zipBytes[1] !== 0x4b) throw new Error("full export is not a zip");
+  const danaZip = await invitee.context().request.get(`${orgUrl}/settings/import/export`);
+  console.log("manager full export status:", danaZip.status());
+  if (danaZip.status() !== 403) throw new Error("a team manager downloaded the full export");
+  await owner.goto(`${orgUrl}/settings/import/new`);
+  await shot(owner, "92-import-360");
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("import page scrolls sideways at 360px");
 
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);

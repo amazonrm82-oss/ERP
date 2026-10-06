@@ -1,3 +1,4 @@
+import { defuseFormula } from "@/lib/csv";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 import type { ColumnKind } from "./definitions";
@@ -34,7 +35,5 @@ export function csvCell(kind: ColumnKind, value: string | number | null | undefi
   if (typeof value === "number") {
     return String(kind === "money" ? value / 100 : value);
   }
-  // quote, and defuse spreadsheet formulas typed into names (=, +, -, @)
-  const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return `"${text.replace(/"/g, '""')}"`;
+  return `"${defuseFormula(value).replace(/"/g, '""')}"`;
 }

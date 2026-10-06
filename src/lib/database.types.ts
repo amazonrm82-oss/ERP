@@ -307,6 +307,32 @@ export type NotificationRow = {
   created_at: string;
 };
 
+export type ImportEntity = "lead" | "contact" | "company";
+export type DuplicateMode = "skip" | "update" | "create";
+export type ImportStatus = "running" | "done" | "failed" | "undone";
+
+export type ImportJobRow = {
+  id: string;
+  organization_id: string;
+  // ImportEntity (text + check constraint)
+  entity_type: string;
+  file_name: string;
+  // DuplicateMode
+  duplicate_mode: string;
+  // ImportStatus
+  status: string;
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  failed_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+  undone_at: string | null;
+};
+
 export type PushSubscriptionRow = {
   id: string;
   user_id: string;
@@ -344,10 +370,13 @@ export type CompanyRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // set when the record was created by an import (undo moves these to the recycle bin)
+  import_job_id: string | null;
 };
 
 export type CompanyInsert = {
   organization_id: string;
+  import_job_id?: string | null;
   name: string;
   tax_id?: string | null;
   company_type?: string | null;
@@ -396,10 +425,13 @@ export type ContactRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // set when the record was created by an import (undo moves these to the recycle bin)
+  import_job_id: string | null;
 };
 
 export type ContactInsert = {
   organization_id: string;
+  import_job_id?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
@@ -452,10 +484,13 @@ export type LeadRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // set when the record was created by an import (undo moves these to the recycle bin)
+  import_job_id: string | null;
 };
 
 export type LeadInsert = {
   organization_id: string;
+  import_job_id?: string | null;
   status_id: string;
   full_name?: string | null;
   email?: string | null;
@@ -782,6 +817,19 @@ export type Database = {
       // written only by the automation engine
       automation_runs: ReadOnlyTable<AutomationRunRow>;
       notifications: Table<NotificationRow, Record<string, never>, { read_at?: string | null }>;
+      import_jobs: Table<
+        ImportJobRow,
+        { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number },
+        {
+          status?: ImportStatus;
+          created_count?: number;
+          updated_count?: number;
+          skipped_count?: number;
+          failed_count?: number;
+          finished_at?: string | null;
+          undone_at?: string | null;
+        }
+      >;
       push_subscriptions: Table<
         PushSubscriptionRow,
         // user_id is set by the database from the session
