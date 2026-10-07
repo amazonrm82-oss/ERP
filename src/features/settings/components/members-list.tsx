@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
 import { ActionButton } from "@/components/action-button";
@@ -11,6 +12,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import type { FormState } from "@/lib/action-result";
 import type { MembershipRole } from "@/lib/database.types";
+import { paths } from "@/lib/paths";
 import { submitWith } from "@/lib/use-submit";
 
 import { changeMemberRoleAction, resetMemberMfaAction, setAvailabilityAction, setMemberStatusAction } from "../actions";
@@ -94,6 +96,12 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
               איפוס אימות דו-שלבי
             </ActionButton>
           ) : null}
+          <Link
+            href={paths.transferRecords(orgId, member.userId)}
+            className="inline-flex min-h-9 items-center px-2 text-sm text-accent-strong underline underline-offset-4"
+          >
+            העברת רשומות<span className="sr-only">: {member.name}</span>
+          </Link>
           <StatusButton orgId={orgId} member={member} />
         </div>
       ) : null}

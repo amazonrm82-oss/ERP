@@ -7,7 +7,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { MembershipStatus } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { paths } from "@/lib/paths";
+import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { pick } from "@/lib/validation";
 
@@ -394,4 +394,23 @@ export async function resetMemberMfaAction(orgId: string, userId: string): Promi
   }
   revalidatePath(paths.settingsUsers(orgId));
   return ok();
+}
+
+/** Moves everything one user owns to another (owners and admins; the database checks). */
+export async function transferRecordsAction(orgId: string, fromUserId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const to = formData.get("to");
+  if (typeof to !== "string" || !isUuid(to)) return fail("יש לבחור למי להעביר.");
+  const context = await actionContext(orgId, fromUserId, to);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("transfer_records", { p_org: orgId, p_from: fromUserId, p_to: to });
+  if (error) {
+    if (error.hint === "transfer:target") return fail("אפשר להעביר רק למשתמש פעיל שאינו צופה.");
+    return fail(dbErrorMessage(error, "ההעברה נכשלה. נסו שוב."));
+  }
+  const moved = (data ?? {}) as Record<string, number>;
+  revalidatePath(paths.settingsUsers(orgId));
+  return {
+    ok: true,
+    message: `הועברו ${moved.leads ?? 0} לידים, ${moved.contacts ?? 0} אנשי קשר, ${moved.companies ?? 0} חברות, ${moved.deals ?? 0} עסקאות ו-${moved.tasks ?? 0} משימות.`,
+  };
 }

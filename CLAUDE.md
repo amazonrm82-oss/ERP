@@ -132,6 +132,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `/api/files/cleanup` (URL from `app.settings` `files_cleanup_url`, else derived from
   `push_dispatch_url`; secret `push_dispatch_secret`). The route claims paths, removes the objects
   with the service role, and reports them done.
+- Handover (migration 0024): `public.transfer_records(org, from, to)` moves owner_id on leads,
+  contacts, companies, deals and tasks. It sets `app.bulk_transfer` (notify_assignment skips) and
+  `app.automation_running` (events marked as automation, so automations skip) for its duration.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

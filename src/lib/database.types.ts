@@ -975,6 +975,8 @@ export type Database = {
       deal_stage_totals: { Args: { p_org: string; p_pipeline: string }; Returns: Json };
       // invitation page (migration 0023): null when the token matches nothing
       invitation_preview: { Args: { p_token: string }; Returns: Json };
+      // handover (migration 0024): { leads, contacts, companies, deals, tasks } moved
+      transfer_records: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       // merging duplicates (migration 0020): picks = { column: "merge" }
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       my_sessions: { Args: Record<string, never>; Returns: Json };

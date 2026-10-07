@@ -35,6 +35,7 @@ export const paths = {
   report: (orgId: string, key: string) => `/o/${orgId}/reports/${key}`,
   settings: (orgId: string) => `/o/${orgId}/settings`,
   settingsUsers: (orgId: string) => `/o/${orgId}/settings/users`,
+  transferRecords: (orgId: string, userId: string) => `/o/${orgId}/settings/users/${userId}/transfer`,
   settingsPipelines: (orgId: string) => `/o/${orgId}/settings/pipelines`,
   settingsLeads: (orgId: string) => `/o/${orgId}/settings/leads`,
   settingsFields: (orgId: string) => `/o/${orgId}/settings/fields`,

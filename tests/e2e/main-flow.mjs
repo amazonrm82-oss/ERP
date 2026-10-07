@@ -1186,6 +1186,20 @@ try {
   console.log("orphan file removed from storage:", objectGone, "queue left:", queued);
   if (!objectGone || queued !== 0) throw new Error("the nightly file cleanup did not remove the object");
 
+  step("handover: an admin moves all of a member's records to another user");
+  await lost.goto(`${orgUrl}/settings/users`);
+  await lost.getByRole("link", { name: /העברת רשומות.*דנה חברה/ }).click();
+  await lost.waitForURL(/\/transfer$/);
+  await lost.getByLabel("למי להעביר").selectOption({ label: "רונית בעלים" });
+  await lost.getByRole("button", { name: "העברת כל הרשומות" }).click();
+  await expectText(lost, "הועברו");
+  const [{ n: danaOwns }] = await sql(
+    "select count(*)::int as n from public.leads l join auth.users u on u.id = l.owner_id where u.email = $1",
+    [inviteeEmail],
+  );
+  console.log("Dana's leads after the handover:", danaOwns);
+  if (danaOwns !== 0) throw new Error("records were left with the member");
+
   console.log("\nFLOW OK");
   process.exitCode = 0;
 } catch (error) {
