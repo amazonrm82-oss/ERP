@@ -21,14 +21,15 @@ const columnRule: Record<StageKind, string> = {
 
 const DRAG_TYPE = "application/x-deal-id";
 
-type Props = { orgId: string; board: Board; canWrite: boolean };
+// links built by the page: "showClosed", and one per stage id that opens that stage in full
+type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string> };
 
 /**
  * Kanban board: one column per stage, in pipeline order (first stage on the start side).
  * With a mouse, cards are dragged between columns; the stage menu on every card
  * does the same with a keyboard or a touch screen.
  */
-export function DealsBoard({ orgId, board, canWrite }: Props) {
+export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
   const [deals, moveOptimistic] = useOptimistic(board.deals, (current: BoardDeal[], move: { dealId: string; stageId: string }) =>
     current.map((deal) => (deal.id === move.dealId ? { ...deal, stageId: move.stageId } : deal)),
   );
@@ -81,7 +82,14 @@ export function DealsBoard({ orgId, board, canWrite }: Props) {
         <ol className="flex min-w-max items-start gap-3">
           {board.stages.map((stage) => {
             const stageDeals = deals.filter((deal) => deal.stageId === stage.id);
-            const total = stageDeals.reduce((sum, deal) => sum + deal.amountAgorot, 0);
+            // exact totals from the database, adjusted by cards moved here or away on this screen
+            const loadedHere = board.deals.filter((deal) => deal.stageId === stage.id);
+            const exact = board.totals[stage.id] ?? { count: 0, amountAgorot: 0 };
+            const sum = (list: BoardDeal[]) => list.reduce((acc, deal) => acc + deal.amountAgorot, 0);
+            const count = exact.count - loadedHere.length + stageDeals.length;
+            const total = exact.amountAgorot - sum(loadedHere) + sum(stageDeals);
+            const loaded = board.loadedStages.includes(stage.id);
+            const hidden = count - stageDeals.length;
             const headingId = `stage-${stage.id}`;
             return (
               <li key={stage.id} className="w-[17.5rem] shrink-0">
@@ -109,7 +117,7 @@ export function DealsBoard({ orgId, board, canWrite }: Props) {
                     <h2 id={headingId} className="flex items-baseline justify-between gap-2 font-semibold">
                       <span className="truncate">{stage.name}</span>
                       <span className="text-sm font-normal text-ink-soft">
-                        {formatNumber(stageDeals.length)}
+                        {formatNumber(count)}
                         <span className="sr-only"> עסקאות</span>
                       </span>
                     </h2>
@@ -125,7 +133,17 @@ export function DealsBoard({ orgId, board, canWrite }: Props) {
                       overStage === stage.id && "bg-accent-soft outline-2 outline-accent outline-dashed -outline-offset-4",
                     )}
                   >
-                    {stageDeals.length === 0 ? (
+                    {!loaded && stageDeals.length === 0 ? (
+                      <p className="px-2 py-4 text-center text-sm text-ink-soft">
+                        {count === 0 ? (
+                          "אין עסקאות בשלב הזה"
+                        ) : (
+                          <Link href={hrefs.showClosed} className="text-accent-strong underline underline-offset-4">
+                            הצגת {formatNumber(count)} העסקאות
+                          </Link>
+                        )}
+                      </p>
+                    ) : stageDeals.length === 0 ? (
                       <p className="px-2 py-4 text-center text-sm text-ink-soft">אין עסקאות בשלב הזה</p>
                     ) : (
                       <ul className="space-y-2">
@@ -172,6 +190,16 @@ export function DealsBoard({ orgId, board, canWrite }: Props) {
                         ))}
                       </ul>
                     )}
+                    {loaded && hidden > 0 ? (
+                      <p className="px-2 pt-2 text-center text-sm text-ink-soft">
+                        {`מוצגות ${formatNumber(stageDeals.length)} מתוך ${formatNumber(count)}. `}
+                        {hrefs[stage.id] ? (
+                          <Link href={hrefs[stage.id]} className="text-accent-strong underline underline-offset-4">
+                            הצגת כולן
+                          </Link>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
                 </section>
               </li>

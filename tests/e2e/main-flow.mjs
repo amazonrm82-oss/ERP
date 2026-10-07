@@ -654,6 +654,15 @@ try {
   await invitee.getByRole("button", { name: /דנה חברה/ }).click();
   await invitee.getByRole("switch", { name: "זמין לקבלת לידים" }).uncheck();
   await expectText(invitee, "לידים חדשים בסבב לא יגיעו אליך");
+  // the switch answers at once; wait until the server has saved it before sending leads
+  for (let i = 0; i < 40; i++) {
+    const [{ available }] = await sql(
+      "select m.is_available as available from public.memberships m join auth.users u on u.id = m.user_id where u.email = $1",
+      [inviteeEmail],
+    );
+    if (!available) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   await sendLead("סבב שלוש", "058-1000003");
   await sendLead("סבב ארבע", "058-1000004");
   const afterVacation = [await ownerOfLead("סבב שלוש"), await ownerOfLead("סבב ארבע")];

@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DealsBoard } from "@/features/deals/components/deals-board";
-import { BOARD_LIMIT, getBoard, listPipelines } from "@/features/deals/queries";
+import { getBoard, listPipelines } from "@/features/deals/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -23,8 +23,11 @@ type Props = {
 export default async function DealsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const { canWrite } = await getOrgContext(orgId);
-  const requested = firstParam((await searchParams).pipeline);
-  const [board, pipelines] = await Promise.all([getBoard(orgId, requested), listPipelines(orgId)]);
+  const query = await searchParams;
+  const requested = firstParam(query.pipeline);
+  const showClosed = firstParam(query.closed) === "1";
+  const fullStage = firstParam(query.stage);
+  const [board, pipelines] = await Promise.all([getBoard(orgId, requested, { showClosed, fullStage }), listPipelines(orgId)]);
 
   if (!board) {
     return (
@@ -40,9 +43,18 @@ export default async function DealsPage({ params, searchParams }: Props) {
     );
   }
 
-  const openStageIds = new Set(board.stages.filter((stage) => stage.kind === "open").map((stage) => stage.id));
-  const openDeals = board.deals.filter((deal) => openStageIds.has(deal.stageId));
-  const openTotal = openDeals.reduce((sum, deal) => sum + deal.amountAgorot, 0);
+  const openStages = board.stages.filter((stage) => stage.kind === "open");
+  const openCount = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.count ?? 0), 0);
+  const openTotal = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.amountAgorot ?? 0), 0);
+  const anyDeals = Object.values(board.totals).some((t) => t.count > 0);
+  // the board's address with one setting changed, keeping the others
+  const boardHref = (change: Record<string, string | null>) => {
+    const params = new URLSearchParams();
+    const current: Record<string, string | null> = { pipeline: requested ?? null, closed: showClosed ? "1" : null, stage: fullStage ?? null, ...change };
+    for (const [key, value] of Object.entries(current)) if (value) params.set(key, value);
+    const qs = params.toString();
+    return qs ? `${paths.deals(orgId)}?${qs}` : paths.deals(orgId);
+  };
 
   const newDealButton = canWrite ? (
     <ButtonLink href={`${paths.dealNew(orgId)}?pipeline=${board.pipeline.id}`}>
@@ -56,8 +68,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
       <PageHeader
         title="עסקאות"
         description={
-          board.deals.length > 0
-            ? `פייפליין ${board.pipeline.name}: ${formatNumber(openDeals.length)} עסקאות פתוחות בשווי ${formatMoney(openTotal)}.`
+          anyDeals
+            ? `פייפליין ${board.pipeline.name}: ${formatNumber(openCount)} עסקאות פתוחות בשווי ${formatMoney(openTotal)}.`
             : `פייפליין ${board.pipeline.name}`
         }
         actions={newDealButton}
@@ -84,13 +96,13 @@ export default async function DealsPage({ params, searchParams }: Props) {
         </nav>
       ) : null}
 
-      {board.truncated ? (
-        <p role="status" className="mb-4 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          מוצגות {formatNumber(BOARD_LIMIT)} העסקאות שעודכנו לאחרונה. הספירה והסכומים בלוח מתייחסים רק אליהן.
-        </p>
-      ) : null}
+      <p className="mb-3 text-sm">
+        <Link href={boardHref({ closed: showClosed ? null : "1" })} className="text-accent-strong underline underline-offset-4">
+          {showClosed ? "הסתרת עסקאות שנסגרו" : "הצגת עסקאות שנסגרו (בהצלחה ואבודות)"}
+        </Link>
+      </p>
 
-      {board.deals.length === 0 ? (
+      {!anyDeals ? (
         <div className="mb-5 rounded-lg border border-line bg-surface">
           <EmptyState
             title="עוד אין עסקאות"
@@ -100,7 +112,15 @@ export default async function DealsPage({ params, searchParams }: Props) {
         </div>
       ) : null}
 
-      <DealsBoard orgId={orgId} board={board} canWrite={canWrite} />
+      <DealsBoard
+        orgId={orgId}
+        board={board}
+        canWrite={canWrite}
+        hrefs={{
+          showClosed: boardHref({ closed: "1" }),
+          ...Object.fromEntries(board.stages.map((stage) => [stage.id, boardHref({ stage: stage.id })])),
+        }}
+      />
     </>
   );
 }

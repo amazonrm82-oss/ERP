@@ -15,16 +15,22 @@ export type BoardDeal = {
   contactName: string | null;
 };
 
+export type StageTotal = { count: number; amountAgorot: number };
+
 export type Board = {
   pipeline: { id: string; name: string };
   stages: StageOption[];
   deals: BoardDeal[];
-  // true when the pipeline has more live deals than the board loads
-  truncated: boolean;
+  // exact count and sum per stage (the board loads only part of the deals)
+  totals: Record<string, StageTotal>;
+  // stages whose deals were loaded (closed stages only on request)
+  loadedStages: string[];
+  showClosed: boolean;
 };
 
-// The board loads at most this many deals (most recently moved first).
-export const BOARD_LIMIT = 500;
+// Cards loaded per stage: the most recently moved first. One stage can be opened in full.
+export const STAGE_LIMIT = 50;
+export const STAGE_FULL_LIMIT = 500;
 
 export type PipelineOption = { id: string; name: string; isDefault: boolean };
 
@@ -72,26 +78,45 @@ export async function getPipeline(
 }
 
 /** Kanban data for a pipeline (default: the default one), or null when the organization has no pipeline. */
-export async function getBoard(orgId: string, pipelineId?: string | null): Promise<Board | null> {
+export async function getBoard(
+  orgId: string,
+  pipelineId?: string | null,
+  options: { showClosed?: boolean; fullStage?: string | null } = {},
+): Promise<Board | null> {
   const pipeline = await getPipeline(orgId, pipelineId);
   if (!pipeline) {
     return null;
   }
   const supabase = await createClient();
+  const showClosed = options.showClosed === true;
+  const loadedStages = pipeline.stages.filter((stage) => showClosed || stage.kind === "open").map((stage) => stage.id);
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select("id, name, amount_agorot, stage_id, contact_id")
-    .eq("organization_id", orgId)
-    .eq("pipeline_id", pipeline.id)
-    .is("deleted_at", null)
-    .order("stage_entered_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(BOARD_LIMIT + 1);
-  if (error) {
-    throw new Error(`deals query failed: ${error.message}`);
+  const [totalsResult, ...stageResults] = await Promise.all([
+    supabase.rpc("deal_stage_totals", { p_org: orgId, p_pipeline: pipeline.id }),
+    ...loadedStages.map((stageId) =>
+      supabase
+        .from("deals")
+        .select("id, name, amount_agorot, stage_id, contact_id")
+        .eq("organization_id", orgId)
+        .eq("pipeline_id", pipeline.id)
+        .eq("stage_id", stageId)
+        .is("deleted_at", null)
+        .order("stage_entered_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(options.fullStage === stageId ? STAGE_FULL_LIMIT : STAGE_LIMIT),
+    ),
+  ]);
+  for (const result of stageResults) {
+    if (result.error) {
+      throw new Error(`deals query failed: ${result.error.message}`);
+    }
   }
-  const rows = data.slice(0, BOARD_LIMIT);
+  const rows = stageResults.flatMap((result) => result.data ?? []);
+
+  const totals: Record<string, StageTotal> = {};
+  for (const t of (Array.isArray(totalsResult.data) ? totalsResult.data : []) as Array<{ stage_id: string; count: number; amount_agorot: number }>) {
+    totals[t.stage_id] = { count: Number(t.count), amountAgorot: Number(t.amount_agorot) };
+  }
 
   const contactIds = [...new Set(rows.map((row) => row.contact_id).filter((id): id is string => Boolean(id)))];
   const contactNames = new Map<string, string>();
@@ -109,7 +134,9 @@ export async function getBoard(orgId: string, pipelineId?: string | null): Promi
   return {
     pipeline: { id: pipeline.id, name: pipeline.name },
     stages: pipeline.stages,
-    truncated: data.length > BOARD_LIMIT,
+    totals,
+    loadedStages,
+    showClosed,
     deals: rows.map((row) => ({
       id: row.id,
       name: row.name,

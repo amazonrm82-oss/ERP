@@ -61,3 +61,23 @@ describe("global search", () => {
     expect((await search(owner.id, org, "שרה")).leads).toEqual([]);
   });
 });
+
+describe("deals board totals", () => {
+  it("counts and sums per stage, only what the user may see", async () => {
+    const owner = await createUser("board-owner");
+    const org = await createOrg(owner.id);
+    const member = await addMember(org, owner.id, "member");
+    const pipe = await asAdmin(async (q) => {
+      const p = (await q<{ id: string }>("select id from public.pipelines where organization_id = $1 and is_default", [org])).rows[0].id;
+      const s = (await q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [p])).rows[0].id;
+      return { p, s };
+    });
+    await asUser(owner.id, (q) => q("insert into public.deals (organization_id, name, pipeline_id, stage_id, amount_agorot) values ($1, 'א', $2, $3, 1000), ($1, 'ב', $2, $3, 2500)", [org, pipe.p, pipe.s]));
+    await asUser(member.id, (q) => q("insert into public.deals (organization_id, name, pipeline_id, stage_id, amount_agorot, owner_id) values ($1, 'ג', $2, $3, 400, $4)", [org, pipe.p, pipe.s, member.id]));
+    const totals = (userId: string) =>
+      asUser(userId, async (q) => (await q<{ r: Array<{ stage_id: string; count: number; amount_agorot: number }> }>("select public.deal_stage_totals($1, $2) as r", [org, pipe.p])).rows[0].r);
+    expect(await totals(owner.id)).toEqual([{ stage_id: pipe.s, count: 3, amount_agorot: 3900 }]);
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    expect(await totals(member.id)).toEqual([{ stage_id: pipe.s, count: 1, amount_agorot: 400 }]);
+  });
+});
