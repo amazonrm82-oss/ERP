@@ -6,12 +6,17 @@
 // business -> lead -> note -> convert -> deal board -> settings -> invite a
 // second user -> they sign up from the link and join -> roles, teams, suspend.
 // It refuses to run against anything that is not on this machine.
+import { createHmac } from "node:crypto";
+
 import { strToU8, zipSync } from "fflate";
+import pg from "pg";
 import { chromium } from "playwright";
 
 const APP = process.env.E2E_APP_URL ?? "http://localhost:3000";
 const MAIL = process.env.E2E_MAIL_URL ?? "http://127.0.0.1:54324";
-for (const url of [APP, MAIL]) {
+// the local Supabase database: used only to make a test user platform staff
+const DB = process.env.E2E_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+for (const url of [APP, MAIL, DB.replace(/^postgresql:/, "http:")]) {
   if (!["localhost", "127.0.0.1"].includes(new URL(url).hostname)) {
     throw new Error(`Refusing to run against ${url}: the end-to-end test creates accounts and only runs locally.`);
   }
@@ -28,6 +33,29 @@ const browser = await chromium.launch({ executablePath: process.env.E2E_CHROMIUM
 
 function step(name) {
   console.log(`\n== ${name}`);
+}
+
+// RFC 6238 code from a base32 secret, as an authenticator app computes it
+function totp(secret) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secret.replace(/=+$/, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const hmac = createHmac("sha1", key).update(counter).digest();
+  const offset = hmac[hmac.length - 1] & 0xf;
+  return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+async function sql(text, params = []) {
+  const client = new pg.Client({ connectionString: DB });
+  await client.connect();
+  try {
+    return (await client.query(text, params)).rows;
+  } finally {
+    await client.end();
+  }
 }
 
 // screenshots only when E2E_SHOTS_DIR is set
@@ -729,6 +757,66 @@ try {
   await owner.goto(`${orgUrl}/settings/import/new`);
   await shot(owner, "92-import-360");
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("import page scrolls sideways at 360px");
+
+  // ---------------------------------------------------------------- section 11: platform admin
+  step("platform: staff only, two-step verification, organizations, support access with consent");
+  const staffEmail = `staff-${run}@example.test`;
+  const staff = await newPage(1280);
+  await signUp(staff, "צוות פלטפורמה", staffEmail, `${APP}/signup`);
+  await sql("insert into app.platform_staff (user_id, role) select id, 'owner' from auth.users where email = $1", [staffEmail]);
+  // a customer who is not staff: the panel does not exist for them
+  const notStaff = await invitee.goto(`${APP}/admin`);
+  console.log("admin panel for a customer:", notStaff?.status());
+  if (notStaff?.status() !== 404) throw new Error("a customer reached the admin panel");
+  await staff.goto(`${APP}/admin`);
+  await expectText(staff, "אימות דו-שלבי");
+  const secret = (await staff.locator("code").first().innerText()).trim();
+  await staff.getByLabel("קוד אימות").fill(totp(secret));
+  await staff.getByRole("button", { name: "אימות" }).click();
+  await expectText(staff, "הכנסה חודשית חוזרת");
+  await shot(staff, "100-admin-metrics-1280");
+
+  await staff.goto(`${APP}/admin/orgs?q=${encodeURIComponent("שיפוצים")}`);
+  await staff.getByRole("link", { name: /שיפוצים/ }).first().click();
+  await expectText(staff, "הלקוח לא אישר גישת תמיכה");
+  // the customer lets support in for an hour
+  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.getByRole("button", { name: "לשעה" }).click();
+  await expectText(ownerDesk, "גישת תמיכה פתוחה עד");
+  await staff.reload();
+  await staff.getByRole("button", { name: "כניסה לארגון (צפייה)" }).click();
+  await staff.waitForURL(new RegExp(`/o/${orgUrl.split("/o/")[1]}$`));
+  await expectText(staff, "מצב תמיכה: צפייה בלבד");
+  await staff.goto(`${orgUrl}/leads`);
+  await expectText(staff, "משה כהן");
+  if ((await staff.getByRole("link", { name: "ליד חדש" }).count()) > 0) throw new Error("support sees the new lead button");
+  await shot(staff, "101-support-session-1280");
+  const opened = await sql("select count(*)::int as n from public.audit_log where organization_id = $1 and action = 'support_open'", [orgUrl.split("/o/")[1]]);
+  console.log("support entries in the customer's audit log:", opened[0].n);
+  if (opened[0].n < 1) throw new Error("support access was not logged for the customer");
+
+  // a plan change, with its reason in the platform log
+  await staff.goto(`${APP}/admin/orgs/${orgUrl.split("/o/")[1]}`);
+  await staff.getByLabel("חבילה", { exact: true }).selectOption({ label: "עסקי" });
+  await staff.getByLabel("סיבה (נרשמת ביומן)").first().fill("פיילוט בבדיקה");
+  await staff.getByRole("button", { name: "שמירה" }).first().click();
+  await expectText(staff, "נשמר.");
+  await staff.reload();
+  await expectText(staff, "פיילוט בבדיקה");
+  await shot(staff, "102-admin-org-1280");
+
+  // the customer closes the door: support is out at once
+  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.getByRole("button", { name: "סגירת הגישה עכשיו" }).click();
+  await ownerDesk.getByRole("button", { name: "לשעה" }).waitFor({ timeout: 15000 });
+  const afterRevoke = await staff.goto(`${orgUrl}/leads`);
+  console.log("support after the customer revoked:", afterRevoke?.status());
+  if (afterRevoke?.status() !== 404) throw new Error("support kept access after it was revoked");
+  const staffPhone = await newPage(360);
+  await staffPhone.context().addCookies(await staff.context().cookies());
+  await staffPhone.goto(`${APP}/admin/orgs`);
+  await shot(staffPhone, "103-admin-orgs-360");
+  if (await staffPhone.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("admin page scrolls sideways at 360px");
 
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);

@@ -39,6 +39,12 @@ export const paths = {
   settingsTeams: (orgId: string) => `/o/${orgId}/settings/teams`,
   settingsTeam: (orgId: string, teamId: string) => `/o/${orgId}/settings/teams/${teamId}`,
   invite: (token: string) => `/invite/${token}`,
+  admin: "/admin",
+  adminOrgs: "/admin/orgs",
+  adminOrg: (orgId: string) => `/admin/orgs/${orgId}`,
+  adminPlans: "/admin/plans",
+  adminStaff: "/admin/staff",
+  adminLog: "/admin/log",
 } as const;
 
 // Only same-origin paths are accepted as a post-login destination; anything

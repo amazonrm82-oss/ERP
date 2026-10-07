@@ -98,6 +98,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `app.send_task_reminders()` then `app.dispatch_push()`, which pings the app through pg_net using
   `app.settings` (`push_dispatch_url`, `push_dispatch_secret`), filled in by hand per environment.
   `push_subscriptions` is per user (no `organization_id`); `user_id` is set from the session by trigger.
+- Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
+  append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
+  with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).
+  Platform staff see customer data only in a support session: an open `support_access_grants` row
+  makes `app.role_in()` return `viewer` for them (`app.membership_role()` is the plain membership).
+  The panel is `src/app/admin` + `src/features/platform/`.
 - Imports (migration 0012): `import_jobs` plus `import_job_id` on leads/contacts/companies (guarded:
   only a running job of the same user and type, set on insert, never changed). `emit_event` marks such
   inserts `origin: 'import'`; `process_outbox` skips origins `automation` and `import`;

@@ -333,6 +333,18 @@ export type ImportJobRow = {
   undone_at: string | null;
 };
 
+export type SupportAccessGrantRow = {
+  id: string;
+  organization_id: string;
+  granted_by: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlatformRole = "owner" | "support" | "finance" | "readonly";
+
 export type PushSubscriptionRow = {
   id: string;
   user_id: string;
@@ -817,6 +829,7 @@ export type Database = {
       // written only by the automation engine
       automation_runs: ReadOnlyTable<AutomationRunRow>;
       notifications: Table<NotificationRow, Record<string, never>, { read_at?: string | null }>;
+      support_access_grants: Table<SupportAccessGrantRow, { organization_id: string; expires_at: string }, { revoked_at?: string | null }>;
       import_jobs: Table<
         ImportJobRow,
         { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number },
@@ -889,6 +902,37 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
         Returns: Json;
       };
+      // platform admin (migration 0013): each checks the platform role and aal2 itself
+      support_session_info: { Args: { p_org: string }; Returns: Json };
+      platform_me: { Args: Record<string, never>; Returns: Json };
+      platform_list_orgs: {
+        Args: { p_search?: string | null; p_status?: string | null; p_plan?: string | null; p_limit?: number; p_offset?: number };
+        Returns: Json;
+      };
+      platform_org: { Args: { p_org: string }; Returns: Json };
+      platform_update_subscription: {
+        Args: { p_org: string; p_plan_key: string; p_seats: number | null; p_trial_ends_at: string | null; p_reason: string };
+        Returns: undefined;
+      };
+      platform_set_overrides: { Args: { p_org: string; p_limits: Json; p_features: Json; p_reason: string }; Returns: undefined };
+      platform_set_org_status: { Args: { p_org: string; p_status: OrgStatus; p_reason: string }; Returns: undefined };
+      platform_update_plan: {
+        Args: {
+          p_key: string;
+          p_name_he: string;
+          p_price_monthly_agorot: number;
+          p_price_annual_agorot: number;
+          p_limits: Json;
+          p_features: Json;
+          p_is_public: boolean;
+        };
+        Returns: undefined;
+      };
+      platform_metrics: { Args: Record<string, never>; Returns: Json };
+      platform_staff_list: { Args: Record<string, never>; Returns: Json };
+      platform_set_staff: { Args: { p_email: string; p_role: PlatformRole | null }; Returns: undefined };
+      platform_log_list: { Args: { p_org?: string | null; p_limit?: number }; Returns: Json };
+      platform_open_support: { Args: { p_org: string }; Returns: string };
       // service-role only (the app's push dispatcher)
       claim_push_notifications: {
         Args: { p_limit?: number };

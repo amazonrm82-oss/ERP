@@ -87,6 +87,7 @@ describe("tenant isolation", () => {
         )
       ).rows[0].id;
       await q("insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'leads.csv', 'skip')", [orgA]);
+      await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -118,6 +119,7 @@ describe("tenant isolation", () => {
     "automations",
     "automation_runs",
     "import_jobs",
+    "support_access_grants",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -220,6 +222,7 @@ describe("tenant isolation", () => {
       automations: "name = name",
       automation_runs: "status = status",
       import_jobs: "status = status",
+      support_access_grants: "revoked_at = revoked_at",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -282,6 +285,7 @@ describe("tenant isolation", () => {
       ["insert into public.automations (organization_id, name, entity_type, trigger_type, actions) values ($1, 'x', 'lead', 'created', '[{\"type\":\"notify\"}]')", [orgA]],
       ["insert into public.automation_runs (organization_id, automation_id, entity_type, entity_id, run_key, status) values ($1, $2, 'lead', $3, 'x', 'success')", [orgA, ids.automationA, ids.leadA]],
       ["insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'x.csv', 'skip')", [orgA]],
+      ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -328,6 +332,7 @@ describe("tenant isolation", () => {
       ["automations", "name = 'HACKED'", "name = 'HACKED'"],
       ["automation_runs", "status = 'skipped'", "status = 'skipped'"],
       ["import_jobs", "status = 'failed'", "status = 'failed'"],
+      ["support_access_grants", "revoked_at = '2001-01-01'", "revoked_at = '2001-01-01'"],
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
     ];
     // which rows of each table belong to alice's organization

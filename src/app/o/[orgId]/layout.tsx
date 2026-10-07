@@ -13,7 +13,7 @@ import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
 import { getOrgContext } from "@/features/shell/queries";
-import { daysUntil } from "@/lib/format";
+import { daysUntil, formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 type Props = { children: ReactNode; params: Promise<{ orgId: string }> };
@@ -87,6 +87,15 @@ export default async function OrgLayout({ children, params }: Props) {
           </UserMenu>
         </div>
       </header>
+
+      {context.supportUntil ? (
+        <p role="status" className="border-b border-danger bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger-strong sm:px-6">
+          מצב תמיכה: צפייה בלבד בנתוני הלקוח, באישורו, עד {formatDateTime(context.supportUntil)}. הכניסה נרשמה ביומן הביקורת של הלקוח.{" "}
+          <Link href={paths.admin} className="underline underline-offset-4">
+            חזרה לפאנל הניהול
+          </Link>
+        </p>
+      ) : null}
 
       {notice ? (
         <p role="status" className="border-b border-line bg-warning-soft px-4 py-2.5 text-sm text-warning sm:px-6">

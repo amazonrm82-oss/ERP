@@ -14,6 +14,8 @@ export type OrgContext = {
   role: MembershipRole;
   // false = skipped by the lead round robin ("on vacation")
   isAvailable: boolean;
+  // set when this is platform support in a customer-approved session (read-only), not a member
+  supportUntil: string | null;
   subscription: {
     status: SubscriptionStatus;
     planName: string;
@@ -56,7 +58,17 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     throw new Error(`organization query failed: ${orgResult.error.message}`);
   }
   const org = orgResult.data;
-  const membership = membershipResult.data;
+  let membership = membershipResult.data;
+  let supportUntil: string | null = null;
+  if (org && !membership) {
+    // not a member: maybe platform support the customer let in (the database makes them a viewer)
+    const { data: session } = await supabase.rpc("support_session_info", { p_org: orgId });
+    const until = session && typeof session === "object" && !Array.isArray(session) ? session.expires_at : null;
+    if (typeof until === "string") {
+      supportUntil = until;
+      membership = { role: "viewer", is_available: false };
+    }
+  }
   if (!org || !membership) {
     notFound();
   }
@@ -84,6 +96,7 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     org,
     role,
     isAvailable: membership.is_available,
+    supportUntil,
     subscription,
     canWrite: writable && role !== "viewer",
     // members cannot move records to the recycle bin; managers can for their own and their teams'

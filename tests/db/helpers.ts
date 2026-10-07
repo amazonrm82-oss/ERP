@@ -70,13 +70,18 @@ export function asAdmin<T>(fn: (q: Query) => Promise<T>): Promise<T> {
 }
 
 /** Exactly what a signed-in browser gets: role `authenticated` + a JWT subject. */
-export function asUser<T>(userId: string, fn: (q: Query) => Promise<T>): Promise<T> {
+export function asUser<T>(userId: string, fn: (q: Query) => Promise<T>, claims: Record<string, unknown> = {}): Promise<T> {
   return inTransaction(async (q) => {
     await q("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: userId, role: "authenticated" }),
+      JSON.stringify({ sub: userId, role: "authenticated", ...claims }),
     ]);
     await q("set local role authenticated");
   }, fn);
+}
+
+/** A signed-in user whose session passed the second factor (Supabase MFA: aal2). */
+export function asMfaUser<T>(userId: string, fn: (q: Query) => Promise<T>): Promise<T> {
+  return asUser(userId, fn, { aal: "aal2" });
 }
 
 /** A visitor with no session. */

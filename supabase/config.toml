@@ -10,3 +10,9 @@ additional_redirect_urls = ["http://localhost:3000/**"]
 [auth.email]
 # same as a hosted project: a new account must confirm its email address
 enable_confirmations = true
+
+# two-step verification (TOTP); the platform admin panel requires it.
+# On a hosted project: Authentication -> Sign In / Providers -> Multi-Factor (TOTP enabled by default).
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

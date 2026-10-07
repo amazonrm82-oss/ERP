@@ -6,6 +6,7 @@ import { ChevronIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { listMyOrganizations } from "@/features/onboarding/queries";
+import { getPlatformMe } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import { APP_NAME } from "@/lib/app";
 import { requireUser } from "@/lib/auth";
@@ -21,7 +22,8 @@ export default async function RootPage() {
   const organizations = await listMyOrganizations(user.id);
 
   if (organizations.length === 0) {
-    redirect(paths.onboarding);
+    // platform staff without a business of their own go to the admin panel
+    redirect((await getPlatformMe()) ? paths.admin : paths.onboarding);
   }
   if (organizations.length === 1) {
     redirect(paths.org(organizations[0].id));
