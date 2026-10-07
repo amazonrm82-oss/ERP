@@ -21,7 +21,7 @@ export default async function InvitePage({ params }: Props) {
   return (
     <div className="min-h-dvh bg-surface">
       <header className="flex items-center justify-between px-5 py-4 sm:px-10">
-        <Wordmark className="text-lg" />
+        <Wordmark className="h-7" />
         <SignOutButton />
       </header>
       <main className="mx-auto w-full max-w-md px-5 pt-6 pb-16 sm:pt-12">

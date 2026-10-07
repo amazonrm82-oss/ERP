@@ -76,6 +76,7 @@ export default async function OrgLayout({ children, params }: Props) {
               { href: paths.reports(org.id), label: "דוחות", mobileOnly: true },
               { href: paths.settings(org.id), label: "הגדרות", mobileOnly: true },
               { href: paths.home, label: "החלפת עסק" },
+              { href: paths.help, label: "מרכז עזרה" },
             ]}
           >
             {context.role === "viewer" ? null : (

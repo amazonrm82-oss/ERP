@@ -9,8 +9,20 @@ const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
-// a secret), the service worker, the offline page and the app manifest.
-const PUBLIC_PREFIXES = ["/auth/", "/f/", "/api/forms/", "/api/in/", "/api/push/dispatch", "/sw.js", "/offline.html", "/manifest.webmanifest"];
+// a secret), the service worker, the offline page, the app manifest, the help
+// center and the legal documents.
+const PUBLIC_PREFIXES = [
+  "/auth/",
+  "/f/",
+  "/api/forms/",
+  "/api/in/",
+  "/api/push/dispatch",
+  "/sw.js",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/help",
+  "/legal/",
+];
 
 function isPublicPath(pathname: string): boolean {
   return AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));

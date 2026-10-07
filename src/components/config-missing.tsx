@@ -4,7 +4,7 @@ import { Wordmark } from "@/components/wordmark";
 export function ConfigMissing() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-5 py-12">
-      <Wordmark className="mb-10 text-lg" />
+      <Wordmark className="mb-10 h-7" />
       <h1 className="text-2xl font-semibold leading-tight">המערכת עוד לא הוגדרה</h1>
       <p className="mt-3 text-ink-soft">
         חסרים פרטי החיבור למסד הנתונים, ולכן אי אפשר להתחבר או להציג נתונים. זו הגדרה חד-פעמית של מי שמתקין את

@@ -249,6 +249,19 @@ try {
   if (!(await ownerDesk.evaluate(() => window.__installPrompted === true))) throw new Error("install prompt not shown");
   await ownerDesk.keyboard.press("Escape");
 
+  step("help center and legal pages open without signing in");
+  const anon = await newPage(360);
+  await anon.goto(`${APP}/help`);
+  await anon.getByLabel("חיפוש במרכז העזרה").fill("אקסל");
+  await anon.getByRole("link", { name: "ייבוא לידים ואנשי קשר מאקסל" }).first().click(); // the search result comes first
+  await anon.waitForURL(/\/help\/import$/);
+  await expectText(anon, "ביטול ייבוא");
+  await anon.goto(`${APP}/legal/accessibility`);
+  await expectText(anon, "טיוטה. המסמך עוד לא בתוקף.");
+  if (new URL(anon.url()).pathname !== "/legal/accessibility") throw new Error("legal page redirected");
+  await shot(anon, "pwa-help-legal-360");
+  await anon.context().close();
+
   await ownerDesk.goto(`${orgUrl}/settings/users`);
   await ownerDesk.getByLabel("תפקיד של דנה חברה").selectOption("manager");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();

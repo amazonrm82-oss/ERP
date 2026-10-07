@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
-  Design tokens. One accent (deep teal), cool neutral greys, white surfaces.
+  Design tokens. One accent (the logo's blue), cool neutral greys, white surfaces.
   Text/background pairs below meet WCAG AA (4.5:1) for normal text:
     ink on surface 16.4, ink-soft on surface 6.3, ink-soft on canvas 5.8,
-    white on accent 6.3, accent-strong on accent-soft 7.7, danger on surface 6.6,
+    white on accent 6.3, accent on canvas 5.8, accent-strong on accent-soft 8.3, danger on surface 6.6,
     danger on danger-soft 5.8, warning on warning-soft 5.7, success on success-soft 5.5.
 */
 @theme {
@@ -19,9 +19,9 @@
   --color-ink: #17202b;
   --color-ink-soft: #55616f;
 
-  --color-accent: #0f6b6b;
-  --color-accent-strong: #0b5252;
-  --color-accent-soft: #e4f1f0;
+  --color-accent: #1e56d6;
+  --color-accent-strong: #183f99;
+  --color-accent-soft: #e9f0fe;
 
   --color-danger: #b42318;
   --color-danger-strong: #8f1b12;
