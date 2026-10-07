@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { NotificationList } from "@/features/notifications/components/notificati
 import { PushToggle } from "@/features/notifications/components/push-toggle";
 import { listNotifications } from "@/features/notifications/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "התראות" };
 
@@ -48,6 +50,11 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
           <CardBody className="space-y-3">
             <p className="text-sm text-ink-soft">כל התראה כאן תקפוץ גם בטלפון או במחשב, גם כשהמערכת סגורה. ההגדרה היא לכל דפדפן בנפרד.</p>
             <PushToggle orgId={orgId} />
+            <p className="text-sm">
+              <Link href={paths.settingsAccount(orgId)} className="text-accent-strong underline underline-offset-4">
+                בחירה אילו התראות לקבל
+              </Link>
+            </p>
           </CardBody>
         </Card>
       </div>

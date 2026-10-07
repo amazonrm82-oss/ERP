@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
-import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { fail, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+
+import { NOTIFICATION_KINDS } from "./settings";
 
 function revalidateNotifications(orgId: string) {
   // the bell keeps its own state; only the full list is re-read
@@ -77,3 +79,24 @@ export async function deletePushSubscriptionAction(orgId: string, endpoint: stri
   return ok();
 }
 
+
+/** Saves which notifications the user gets, and where (bell, phone). Applies in every organization. */
+export async function saveNotificationSettingsAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const muted: string[] = [];
+  const noPush: string[] = [];
+  for (const kind of NOTIFICATION_KINDS) {
+    const choice = formData.get(`kind_${kind.key}`);
+    if (choice === "off") muted.push(kind.key);
+    else if (choice === "bell") noPush.push(kind.key);
+  }
+  const { error } = await context.supabase.rpc("set_notification_settings", { p_muted: muted, p_no_push: noPush });
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."));
+  }
+  revalidatePath(paths.settingsAccount(orgId));
+  return { ok: true, message: "ההעדפות נשמרו." };
+}

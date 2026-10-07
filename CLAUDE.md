@@ -149,6 +149,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Conversion (migration 0029): trigger `leads_convert_custom_fields` (after `converted_at` is first set)
   copies lead custom fields to the new contact/deal by matching label + type (`app.carry_custom_fields()`,
   value checked with `app.custom_value_ok()`); `convert_lead()` itself is unchanged.
+- Notification preferences (migration 0031): `public.notification_settings` (per user, no organization_id,
+  read own row; written only by `set_notification_settings()`). Trigger `notifications_apply_settings`
+  drops a muted kind and sets `pushed_at` for a bell-only kind. `system` is never mutable; a new kind
+  must be added to the table's check constraint and to `src/features/notifications/settings.ts`.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

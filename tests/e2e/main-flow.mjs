@@ -1039,6 +1039,32 @@ try {
   await relogin.waitForURL((url) => !url.pathname.startsWith("/login"));
   console.log("signed in with the new password:", relogin.url());
 
+  step("notifications: each user chooses which kinds to get, and where");
+  await ownerDesk.goto(`${orgUrl}/settings/account`);
+  await ownerDesk.getByLabel("התראות מאוטומציות").selectOption("off");
+  await ownerDesk.getByLabel("רשומה או משימה הוקצתה לי").selectOption("bell");
+  await ownerDesk.getByRole("button", { name: "שמירת ההעדפות" }).click();
+  await expectText(ownerDesk, "ההעדפות נשמרו.");
+  await shot(ownerDesk, "105-notification-settings-1280");
+  // after saving, the form still shows what was chosen
+  if ((await ownerDesk.getByLabel("התראות מאוטומציות").inputValue()) !== "off") throw new Error("the form went back to the old choice after saving");
+  const [prefs] = await sql("select s.muted, s.no_push from public.notification_settings s join auth.users u on u.id = s.user_id where u.email = $1", [ownerEmail]);
+  if (prefs.muted.join() !== "automation" || prefs.no_push.join() !== "assigned") throw new Error(`notification settings not saved: ${JSON.stringify(prefs)}`);
+  const [{ n: mutedCount }] = await sql(
+    `with u as (select id from auth.users where email = $1),
+          ins as (insert into public.notifications (organization_id, user_id, type, title)
+                  select $2, u.id, 'automation', 'מושתק' from u returning id)
+     select count(*)::int as n from ins`,
+    [ownerEmail, orgUrl.split("/").pop()],
+  );
+  if (mutedCount !== 0) throw new Error("a muted notification was still created");
+  await ownerDesk.reload();
+  if ((await ownerDesk.getByLabel("התראות מאוטומציות").inputValue()) !== "off") throw new Error("the saved choice is not shown");
+  await ownerDesk.getByLabel("התראות מאוטומציות").selectOption("all");
+  await ownerDesk.getByLabel("רשומה או משימה הוקצתה לי").selectOption("all");
+  await ownerDesk.getByRole("button", { name: "שמירת ההעדפות" }).click();
+  await expectText(ownerDesk, "ההעדפות נשמרו.");
+
   step("security: two-step verification for me, then required for the whole business");
   await ownerDesk.goto(`${orgUrl}/settings/account`);
   await ownerDesk.getByRole("button", { name: "הפעלת אימות דו-שלבי" }).click();

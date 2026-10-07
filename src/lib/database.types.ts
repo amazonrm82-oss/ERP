@@ -34,6 +34,13 @@ type Table<Row, Insert, Update = Partial<Insert>> = {
 // A table the client can only read.
 type ReadOnlyTable<Row> = Table<Row, Record<string, never>, Record<string, never>>;
 
+export type NotificationSettingsRow = {
+  user_id: string;
+  muted: string[];
+  no_push: string[];
+  updated_at: string;
+};
+
 export type PlanRow = {
   key: string;
   name_he: string;
@@ -897,6 +904,8 @@ export type Database = {
         { endpoint: string; p256dh: string; auth: string; user_agent?: string | null },
         Record<string, never>
       >;
+      // read your own row; written through set_notification_settings() (migration 0031)
+      notification_settings: ReadOnlyTable<NotificationSettingsRow>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;
@@ -968,6 +977,7 @@ export type Database = {
       // signed agreement (migration 0016)
       sign_agreement: { Args: { p_version: string; p_documents: Json; p_full_name: string; p_method: string; p_signature: string | null }; Returns: string };
       agreement_status: { Args: Record<string, never>; Returns: string | null };
+      set_notification_settings: { Args: { p_muted: string[]; p_no_push: string[] }; Returns: undefined };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       my_agreement: { Args: Record<string, never>; Returns: Json };

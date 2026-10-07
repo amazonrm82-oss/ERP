@@ -8,6 +8,8 @@ import { MfaSettings } from "@/features/account/components/mfa-settings";
 import { describeDevice, getRecoveryCodesLeft, listMySessions } from "@/features/account/queries";
 import { NewPasswordForm } from "@/features/auth/components/new-password-form";
 import { getSignedVersion } from "@/features/legal/queries";
+import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
+import { getNotificationSettings } from "@/features/notifications/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -19,11 +21,12 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
   const { orgId } = await params;
   const { user } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [sessions, { data: org }, codesLeft, signedVersion] = await Promise.all([
+  const [sessions, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
     getRecoveryCodesLeft(),
     getSignedVersion(),
+    getNotificationSettings(),
   ]);
 
   return (
@@ -54,6 +57,13 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
           <Link href={signedVersion ? paths.agreementSigned : paths.agreement} className="mt-2 inline-block text-accent-strong underline underline-offset-4">
             {signedVersion ? "צפייה בעותק החתום" : "לחתימה"}
           </Link>
+        </CardBody>
+      </Card>
+
+      <Card aria-labelledby="account-notifications" className="lg:col-span-2">
+        <CardHeader id="account-notifications" title="התראות" />
+        <CardBody>
+          <NotificationSettingsForm orgId={orgId} settings={notificationSettings} />
         </CardBody>
       </Card>
 

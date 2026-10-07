@@ -4,6 +4,7 @@ import { formatDateTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { notificationHref } from "./links";
+import { NOTIFICATION_KINDS, type NotificationSettings } from "./settings";
 
 export type NotificationView = {
   id: string;
@@ -60,4 +61,16 @@ export async function countUnread(orgId: string, userId: string): Promise<number
     throw new Error(`unread count failed: ${error.message}`);
   }
   return count ?? 0;
+}
+
+/** The signed-in user's choices; a kind with no choice gets everything. */
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("notification_settings").select("muted, no_push").maybeSingle();
+  const settings = Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k.key, "all"])) as NotificationSettings;
+  for (const kind of NOTIFICATION_KINDS) {
+    if (data?.no_push.includes(kind.key)) settings[kind.key] = "bell";
+    if (data?.muted.includes(kind.key)) settings[kind.key] = "off";
+  }
+  return settings;
 }
