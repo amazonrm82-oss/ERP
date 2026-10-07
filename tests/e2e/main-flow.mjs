@@ -229,6 +229,26 @@ try {
   await ownerDesk.getByLabel("סיסמה").fill(PASSWORD);
   await ownerDesk.getByRole("button", { name: "כניסה" }).click();
   await ownerDesk.waitForURL(/\/o\//);
+
+  step("PWA: manifest, and the install item appears when the browser offers installation");
+  const manifest = await (await ownerDesk.request.get(`${APP}/manifest.webmanifest`)).json();
+  if (manifest.name !== "Mexuz" || manifest.display !== "standalone" || manifest.icons.length < 3) throw new Error("bad manifest");
+  await ownerDesk.waitForLoadState("networkidle");
+  const menuButton = ownerDesk.getByRole("button", { name: /רונית בעלים/ });
+  await menuButton.click();
+  if (await ownerDesk.getByRole("button", { name: "התקנת האפליקציה" }).count()) throw new Error("install item shown without an offer");
+  await menuButton.click();
+  await ownerDesk.evaluate(() => {
+    const event = new Event("beforeinstallprompt", { cancelable: true });
+    event.prompt = async () => { window.__installPrompted = true; };
+    event.userChoice = Promise.resolve({ outcome: "accepted" });
+    window.dispatchEvent(event);
+  });
+  await menuButton.click();
+  await ownerDesk.getByRole("button", { name: "התקנת האפליקציה" }).click();
+  if (!(await ownerDesk.evaluate(() => window.__installPrompted === true))) throw new Error("install prompt not shown");
+  await ownerDesk.keyboard.press("Escape");
+
   await ownerDesk.goto(`${orgUrl}/settings/users`);
   await ownerDesk.getByLabel("תפקיד של דנה חברה").selectOption("manager");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();

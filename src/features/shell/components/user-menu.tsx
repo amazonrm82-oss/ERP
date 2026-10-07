@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { ChevronDownIcon } from "@/components/ui/icons";
 
+import { InstallApp } from "./install-app";
+
 type MenuLink = { href: string; label: string; mobileOnly?: boolean };
 
 type Props = {
@@ -92,6 +94,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
                 </Link>
               </li>
             ))}
+            <InstallApp />
           </ul>
           <div className="border-t border-line px-2.5 pt-1.5">{children}</div>
         </div>

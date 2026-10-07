@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
+import { APP_NAME } from "@/lib/app";
 import { createClient } from "@/lib/supabase/client";
 
 type Step = { kind: "loading" } | { kind: "enroll"; factorId: string; qr: string; secret: string } | { kind: "verify"; factorId: string };
@@ -47,7 +48,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       for (const factor of factors.filter((f) => f.status === "unverified")) {
         await supabase.auth.mfa.unenroll({ factorId: factor.id });
       }
-      const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `CRM ${Date.now()}` });
+      const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: APP_NAME, friendlyName: `${APP_NAME} ${Date.now()}` });
       if (enrollError?.code === "mfa_totp_enroll_not_enabled") {
         if (!cancelled) setError("אימות דו-שלבי כבוי בפרויקט Supabase. יש להפעיל אותו ב-Authentication ← Multi-Factor (TOTP).");
         return;
