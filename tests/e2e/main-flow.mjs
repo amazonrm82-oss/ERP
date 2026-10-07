@@ -375,6 +375,14 @@ try {
   const target = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: /הצעת מחיר/ }) });
   await card.dragTo(target);
   await target.locator("li", { hasText: "משה כהן" }).first().waitFor({ timeout: 15000 });
+  // the board moves the card at once; wait until the server has saved it before opening the deal
+  for (let i = 0; i < 60; i++) {
+    const [{ stage }] = await sql("select s.name as stage from public.deals d join public.stages s on s.id = d.stage_id where d.id = $1", [
+      new URL(dealUrl).pathname.split("/").pop(),
+    ]);
+    if (stage === "הצעת מחיר") break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   await ownerDesk.goto(dealUrl);
   await ownerDesk.locator("span.font-medium", { hasText: /^הצעת מחיר$/ }).first().waitFor({ timeout: 15000 });
   console.log("drag moved the deal: yes");

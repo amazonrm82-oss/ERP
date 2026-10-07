@@ -146,6 +146,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Org context (migration 0028): `public.org_context(org)` (security invoker) returns org, membership,
   subscription + plan name, profile name and signed agreement version in one call; `getOrgContext()`
   uses it. A part the caller may not see comes back null, exactly like the separate queries did.
+- Conversion (migration 0029): trigger `leads_convert_custom_fields` (after `converted_at` is first set)
+  copies lead custom fields to the new contact/deal by matching label + type (`app.carry_custom_fields()`,
+  value checked with `app.custom_value_ok()`); `convert_lead()` itself is unchanged.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
