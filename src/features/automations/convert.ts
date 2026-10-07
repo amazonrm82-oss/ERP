@@ -1,4 +1,4 @@
-import { CONDITIONS, TRIGGERS, type Entity } from "./definitions";
+import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 
@@ -89,4 +89,72 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
   }
 
   return { name: rule.name, entity_type: entity, trigger_type: trigger.type, trigger_config, conditions, actions };
+}
+
+/** What the builder starts from when editing: a saved rule turned back into the builder's form values. */
+export type BuilderInitial = {
+  name: string;
+  trigger: string;
+  triggerTo: string;
+  triggerNumber: string;
+  conditions: Array<{ key: string; value: string }>;
+  actions: Array<Record<string, string>>;
+};
+
+const str = (value: unknown) => (value === undefined || value === null ? "" : String(value));
+
+export function fromDbRule(rule: {
+  name: string;
+  entity: string;
+  triggerType: string;
+  triggerConfig: Record<string, unknown>;
+  conditions: Array<Record<string, unknown>>;
+  actions: Array<Record<string, unknown>>;
+}): BuilderInitial | null {
+  const trigger = triggerOf(rule.entity, rule.triggerType, rule.triggerConfig);
+  if (!trigger) return null;
+  const conditions = rule.conditions.flatMap((c) => {
+    const option = CONDITIONS.find((o) => o.field === c.field && o.op === c.op && o.entities.includes(trigger.entity));
+    if (!option) return [];
+    const value = option.input === "shekels" ? str(Number(c.value ?? 0) / 100) : str(c.value);
+    return [{ key: option.key, value: option.input === "none" ? "" : value }];
+  });
+  const actions = rule.actions.flatMap((a): Array<Record<string, string>> => {
+    switch (a.type) {
+      case "create_task": {
+        const unit = a.due_in_minutes !== undefined ? "minutes" : a.due_in_days !== undefined ? "days" : "none";
+        return [
+          {
+            type: "create_task",
+            title: str(a.title),
+            due_unit: unit,
+            due_amount: unit === "minutes" ? str(a.due_in_minutes) : unit === "days" ? str(a.due_in_days) : "0",
+            assign: str(a.assign) || "owner",
+            user_id: str(a.user_id),
+            task_type: str(a.task_type) || "todo",
+          },
+        ];
+      }
+      case "notify":
+        return [{ type: "notify", to: str(a.to) || "owner", user_id: str(a.user_id), title: str(a.title) }];
+      case "assign_owner":
+        return [{ type: "assign_owner", mode: str(a.mode) || "round_robin", user_id: str(a.user_id), team_id: str(a.team_id) }];
+      case "add_tag":
+        return [{ type: "add_tag", tag_id: str(a.tag_id) }];
+      case "set_lead_status":
+        return [{ type: "set_lead_status", status_id: str(a.status_id) }];
+      case "move_deal_stage":
+        return [{ type: "move_deal_stage", stage_id: str(a.stage_id) }];
+      default:
+        return [];
+    }
+  });
+  return {
+    name: rule.name,
+    trigger: trigger.key,
+    triggerTo: str(rule.triggerConfig.to),
+    triggerNumber: trigger.number ? str(rule.triggerConfig[trigger.number.key] ?? trigger.number.default) : "",
+    conditions,
+    actions,
+  };
 }

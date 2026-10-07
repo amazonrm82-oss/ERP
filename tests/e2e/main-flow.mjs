@@ -714,6 +714,7 @@ try {
   await shot(ownerDesk, "61-builder-1280");
   await ownerDesk.getByRole("button", { name: "שמירה והפעלה" }).click();
   await ownerDesk.waitForURL(/\/settings\/automations\/[0-9a-f-]{36}$/);
+  const builtRuleUrl = ownerDesk.url();
   await expectText(ownerDesk, "השווי לפחות (₪) 10,000");
   await ownerDesk.getByLabel("רשומה לבדיקה").selectOption({ label: "משה כהן" });
   await ownerDesk.getByRole("button", { name: "הרצת בדיקה" }).click();
@@ -721,6 +722,24 @@ try {
   await ownerDesk.locator("li", { hasText: "הצליחה" }).first().waitFor();
   await ownerDesk.goto(dealUrl);
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor();
+
+  step("automations: edit a saved rule; the form starts from what was saved");
+  await ownerDesk.goto(builtRuleUrl);
+  await ownerDesk.getByRole("link", { name: "עריכה", exact: true }).click();
+  await ownerDesk.waitForURL(/\/edit$/);
+  if ((await ownerDesk.getByLabel("ערך לתנאי 1").inputValue()) !== "10000") throw new Error("the edit form did not start from the saved condition");
+  if ((await ownerDesk.getByLabel("מה קורה").inputValue()) !== "deal:created") throw new Error("the edit form did not start from the saved trigger");
+  // the record type stays: only deal triggers are offered
+  if (await ownerDesk.getByLabel("מה קורה").locator('option[value="lead:created"]').count()) throw new Error("the edit form offers another record type");
+  await ownerDesk.getByLabel("שם האוטומציה").fill("עסקה גדולה מאוד מקבלת VIP");
+  await ownerDesk.getByLabel("ערך לתנאי 1").fill("50,000");
+  await shot(ownerDesk, "62-builder-edit-1280");
+  await ownerDesk.getByRole("button", { name: "שמירת השינויים" }).click();
+  await ownerDesk.waitForURL(builtRuleUrl);
+  await expectText(ownerDesk, "השווי לפחות (₪) 50,000");
+  await expectText(ownerDesk, "עסקה גדולה מאוד מקבלת VIP");
+  const editedRule = await sql("select conditions, actions from public.automations where id = $1", [builtRuleUrl.split("/").pop()]);
+  if (editedRule[0].conditions[0].value !== "5000000" || editedRule[0].actions[0].type !== "add_tag") throw new Error("the edited rule was not saved as expected");
 
   // ---------------------------------------------------------------- section 7: notifications
   step("notifications: the bell updates live when a task is assigned");

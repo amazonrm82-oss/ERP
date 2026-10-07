@@ -45,6 +45,7 @@ export const paths = {
   settingsAutomations: (orgId: string) => `/o/${orgId}/settings/automations`,
   settingsAutomationNew: (orgId: string) => `/o/${orgId}/settings/automations/new`,
   settingsAutomation: (orgId: string, id: string) => `/o/${orgId}/settings/automations/${id}`,
+  settingsAutomationEdit: (orgId: string, id: string) => `/o/${orgId}/settings/automations/${id}/edit`,
   imports: (orgId: string) => `/o/${orgId}/settings/import`,
   importNew: (orgId: string) => `/o/${orgId}/settings/import/new`,
   settingsAudit: (orgId: string) => `/o/${orgId}/settings/audit`,

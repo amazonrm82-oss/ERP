@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ChevronIcon } from "@/components/ui/icons";
 import { deleteAutomationAction, setAutomationActiveAction } from "@/features/automations/actions";
@@ -61,9 +62,14 @@ export default async function AutomationPage({ params }: Props) {
           title="מה היא עושה"
           action={
             canWrite ? (
-              <ActionButton action={setAutomationActiveAction.bind(null, orgId, automation.id, !automation.isActive)} pendingText="מעדכן…">
-                {automation.isActive ? "כיבוי" : "הפעלה"}
-              </ActionButton>
+              <span className="flex flex-wrap gap-2">
+                <Link href={paths.settingsAutomationEdit(orgId, automation.id)} className={buttonClasses("secondary", "sm")}>
+                  עריכה
+                </Link>
+                <ActionButton action={setAutomationActiveAction.bind(null, orgId, automation.id, !automation.isActive)} pendingText="מעדכן…">
+                  {automation.isActive ? "כיבוי" : "הפעלה"}
+                </ActionButton>
+              </span>
             ) : null
           }
         />

@@ -60,6 +60,50 @@ export async function createAutomationAction(orgId: string, _prev: FormState, fo
   redirect(paths.settingsAutomation(orgId, result.data!.id));
 }
 
+/** Saves changes to an existing rule. Its record type stays (the database does not let it change). */
+export async function updateAutomationAction(orgId: string, id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("rule") ?? ""));
+  } catch {
+    return fail("לא הצלחנו לקרוא את האוטומציה. רעננו את הדף ונסו שוב.");
+  }
+  const context = await actionContext(orgId, id);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = ruleSchema.safeParse(raw);
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? "יש לבדוק את הפרטים.");
+  }
+  const rule = toDbRule(parsed.data, await getLookups(orgId));
+  if (typeof rule === "string") {
+    return fail(rule);
+  }
+  const { data: current } = await context.supabase.from("automations").select("entity_type").eq("organization_id", orgId).eq("id", id).maybeSingle();
+  if (!current) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  if (current.entity_type !== rule.entity_type) {
+    return fail("אי אפשר לשנות את סוג הרשומה של אוטומציה קיימת. אפשר ליצור אוטומציה חדשה.");
+  }
+  const { data, error } = await context.supabase
+    .from("automations")
+    .update({ name: rule.name, trigger_type: rule.trigger_type, trigger_config: rule.trigger_config, conditions: rule.conditions, actions: rule.actions })
+    .eq("organization_id", orgId)
+    .eq("id", id)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את האוטומציה. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(paths.settingsAutomations(orgId));
+  revalidatePath(paths.settingsAutomation(orgId, id));
+  redirect(paths.settingsAutomation(orgId, id));
+}
+
 export async function createFromTemplateAction(orgId: string, templateKey: string): Promise<ActionResult> {
   const template = TEMPLATES.find((t) => t.key === templateKey);
   if (!template?.build) {

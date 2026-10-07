@@ -9,7 +9,8 @@ import { Select, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
-import { createAutomationAction } from "../actions";
+import { createAutomationAction, updateAutomationAction } from "../actions";
+import type { BuilderInitial } from "../convert";
 import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType } from "../definitions";
 import type { Lookups } from "../queries";
 
@@ -46,17 +47,32 @@ function clean(draft: Draft): Record<string, string> {
   return Object.fromEntries(Object.entries(draft).filter(([, value]) => value !== ""));
 }
 
-/** "When … if … then …" form for a new automation. */
-export function RuleBuilder({ orgId, lookups }: { orgId: string; lookups: Lookups }) {
-  const [state, formAction] = useActionState<FormState, FormData>(createAutomationAction.bind(null, orgId), null);
-  const failure = state && !state.ok ? state : null;
+type Props = {
+  orgId: string;
+  lookups: Lookups;
+  // editing an existing rule: its id and saved values (its record type cannot change)
+  edit?: { id: string; initial: BuilderInitial };
+};
 
-  const [name, setName] = useState("");
-  const [triggerKey, setTriggerKey] = useState(TRIGGERS[0].key);
-  const [triggerTo, setTriggerTo] = useState("");
-  const [triggerNumber, setTriggerNumber] = useState("");
-  const [conditions, setConditions] = useState<Condition[]>([]);
-  const [actions, setActions] = useState<Draft[]>([blankAction("create_task")]);
+/** "When … if … then …" form for a new automation, or to edit one. */
+export function RuleBuilder({ orgId, lookups, edit }: Props) {
+  const [state, formAction] = useActionState<FormState, FormData>(
+    edit ? updateAutomationAction.bind(null, orgId, edit.id) : createAutomationAction.bind(null, orgId),
+    null,
+  );
+  const failure = state && !state.ok ? state : null;
+  const initial = edit?.initial;
+
+  const [name, setName] = useState(initial?.name ?? "");
+  const [triggerKey, setTriggerKey] = useState(initial?.trigger ?? TRIGGERS[0].key);
+  const [triggerTo, setTriggerTo] = useState(initial?.triggerTo ?? "");
+  const [triggerNumber, setTriggerNumber] = useState(initial?.triggerNumber ?? "");
+  const [conditions, setConditions] = useState<Condition[]>(initial?.conditions ?? []);
+  const [actions, setActions] = useState<Draft[]>(
+    initial?.actions.length ? initial.actions.map((a) => ({ ...blankAction(a.type as ActionType), ...a })) : [blankAction("create_task")],
+  );
+  // an existing rule keeps its record type
+  const fixedEntity = initial ? TRIGGERS.find((t) => t.key === initial.trigger)?.entity : undefined;
 
   const trigger = TRIGGERS.find((t) => t.key === triggerKey)!;
   const entity = trigger.entity;
@@ -132,7 +148,7 @@ export function RuleBuilder({ orgId, lookups }: { orgId: string; lookups: Lookup
         <CardHeader id="when-title" title="כאשר" />
         <CardBody className="space-y-4">
           <SelectField label="מה קורה" value={triggerKey} onChange={(e) => changeTrigger(e.target.value)}>
-            {ENTITY_GROUPS.map((group) => (
+            {ENTITY_GROUPS.filter((group) => !fixedEntity || group.entity === fixedEntity).map((group) => (
               <optgroup key={group.entity} label={group.label}>
                 {TRIGGERS.filter((t) => t.entity === group.entity).map((t) => (
                   <option key={t.key} value={t.key}>
@@ -231,7 +247,7 @@ export function RuleBuilder({ orgId, lookups }: { orgId: string; lookups: Lookup
         </CardBody>
       </Card>
 
-      <SubmitButton pendingText="שומר…">שמירה והפעלה</SubmitButton>
+      <SubmitButton pendingText="שומר…">{edit ? "שמירת השינויים" : "שמירה והפעלה"}</SubmitButton>
     </form>
   );
 }
