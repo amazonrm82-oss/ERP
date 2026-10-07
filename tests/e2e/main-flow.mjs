@@ -236,6 +236,9 @@ try {
   await signUp(invitee, "דנה חברה", inviteeEmail, invitee.url());
   console.log("after confirm:", invitee.url().replace(/[0-9a-f]{64}/, "<token>"));
   await invitee.waitForURL(/\/invite\//, { timeout: 15000 });
+  // the business name and the role are there before joining
+  await invitee.getByRole("heading", { name: /הזמנה להצטרף לשיפוצים/ }).waitFor();
+  await expectText(invitee, "משתמש");
   await shot(invitee, "07-invite-accept-1280");
   await invitee.getByRole("button", { name: "הצטרפות לעסק" }).click();
   await invitee.waitForURL(/\/o\/[0-9a-f-]{36}$/, { timeout: 15000 });
@@ -245,10 +248,10 @@ try {
   const inviteeSeesInvite = await invitee.getByText("הזמנת משתמש").count();
   console.log("member sees invite form:", inviteeSeesInvite);
 
-  step("invite link reused -> rejected");
+  step("invite link opened again by the member -> already in");
   await invitee.goto(inviteLink);
-  await invitee.getByRole("button", { name: "הצטרפות לעסק" }).click();
-  await expectText(invitee, "אינה בתוקף");
+  await expectText(invitee, "כבר יש לך גישה לעסק הזה");
+  if (await invitee.getByRole("button", { name: "הצטרפות לעסק" }).count()) throw new Error("a used invitation still offers to join");
 
   // ---------------------------------------------------------------- owner manages, desktop
   step("owner: change role, team, suspend");

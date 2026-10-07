@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
+import { addMember, asAdmin, asAnon, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
 
@@ -185,5 +185,25 @@ describe("seats and plan user limits", () => {
     const err = await pgError(createOrg(owner.id, "עסק שישי"));
     expect(err.code).toBe("P0001");
     expect(err.hint).toBe("limit:owned_organizations");
+  });
+});
+
+describe("invitation preview", () => {
+  it("shows the business to the holder of the link, and nothing without it", async () => {
+    const owner = await createUser("preview-owner");
+    const org = await createOrg(owner.id, "מאפיית השכונה");
+    const invited = await createUser("preview-invited");
+    const stranger = await createUser("preview-stranger");
+    const token = await asUser(owner.id, async (q) => (await q<{ t: string }>("select public.create_invitation($1, $2, 'member') as t", [org, invited.email])).rows[0].t);
+    const preview = (userId: string, t: string) => asUser(userId, async (q) => (await q<{ r: Record<string, unknown> | null }>("select public.invitation_preview($1) as r", [t])).rows[0].r);
+
+    const mine = await preview(invited.id, token);
+    expect(mine).toMatchObject({ organization_name: "מאפיית השכונה", role: "member", status: "valid", for_me: true, already_member: false });
+    expect(String(mine?.email_hint)).not.toContain(invited.email.split("@")[0].slice(1));
+    // the link alone does not say it is yours
+    expect(await preview(stranger.id, token)).toMatchObject({ organization_name: "מאפיית השכונה", for_me: false });
+    // a wrong token says nothing
+    expect(await preview(invited.id, token.slice(0, -2) + "xx")).toBeNull();
+    expect((await pgError(asAnon((q) => q("select public.invitation_preview($1)", [token])))).code).toBe("42501");
   });
 });
