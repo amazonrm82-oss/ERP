@@ -108,6 +108,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   API access). `mfa_recovery_codes_create()` needs aal2; `mfa_recover(code)` (password session) deletes
   the user's rows in `auth.mfa_factors`, logs `mfa_recovery` in the audit log of their organizations,
   and answers `{ok, reason}` instead of raising so the attempt counter (5 per 15 minutes) survives.
+- Migration 0016: `app.reset_user_mfa()` (factors, codes, sessions; audit + notifications) behind
+  `org_reset_member_mfa()` (owner/admin, aal2, target in no other org) and `platform_reset_mfa()`
+  (support, identity check required). `app.agreement_signatures` (not in the API) keeps every signed
+  copy; `requireAgreement()` (`src/features/legal/queries.ts`) gates `/`, onboarding, invites and
+  `getOrgContext`. Changing a legal text means a new `LEGAL_VERSION`, and everyone signs again.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

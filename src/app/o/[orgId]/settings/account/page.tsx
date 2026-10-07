@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -6,8 +7,10 @@ import { signOutOthersAction } from "@/features/account/actions";
 import { MfaSettings } from "@/features/account/components/mfa-settings";
 import { describeDevice, getRecoveryCodesLeft, listMySessions } from "@/features/account/queries";
 import { NewPasswordForm } from "@/features/auth/components/new-password-form";
+import { getSignedVersion } from "@/features/legal/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
+import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "החשבון שלי" };
@@ -16,10 +19,11 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
   const { orgId } = await params;
   const { user } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [sessions, { data: org }, codesLeft] = await Promise.all([
+  const [sessions, { data: org }, codesLeft, signedVersion] = await Promise.all([
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
     getRecoveryCodesLeft(),
+    getSignedVersion(),
   ]);
 
   return (
@@ -38,6 +42,18 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
             החשבון: <span dir="ltr">{user.email}</span>
           </p>
           <NewPasswordForm />
+        </CardBody>
+      </Card>
+
+      <Card aria-labelledby="account-agreement">
+        <CardHeader id="account-agreement" title="ההסכם שלך" />
+        <CardBody>
+          <p className="text-[0.9375rem]">
+            {signedVersion ? `חתמת על תנאי השימוש, מדיניות הפרטיות והסכם עיבוד המידע (גרסה ${signedVersion}).` : "עוד לא חתמת על ההסכם."}
+          </p>
+          <Link href={signedVersion ? paths.agreementSigned : paths.agreement} className="mt-2 inline-block text-accent-strong underline underline-offset-4">
+            {signedVersion ? "צפייה בעותק החתום" : "לחתימה"}
+          </Link>
         </CardBody>
       </Card>
 

@@ -6,7 +6,7 @@ import { MembersList } from "@/features/settings/components/members-list";
 import { PendingInvitations } from "@/features/settings/components/pending-invitations";
 import { TransferOwnershipForm } from "@/features/settings/components/transfer-ownership-form";
 import { assignableRoles, isAdminRole } from "@/features/settings/permissions";
-import { listMembers, listPendingInvitations, orgHasFeature } from "@/features/settings/queries";
+import { listMembers, listMembersWithMfa, listPendingInvitations, orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate } from "@/lib/format";
 
@@ -19,10 +19,11 @@ export default async function UsersSettingsPage({ params }: Props) {
   const { org, user, role, canWrite } = await getOrgContext(orgId);
   const isAdmin = isAdminRole(role);
 
-  const [members, invitations, hasViewSeats] = await Promise.all([
+  const [members, invitations, hasViewSeats, mfaUserIds] = await Promise.all([
     listMembers(orgId),
     isAdmin ? listPendingInvitations(orgId) : Promise.resolve([]),
     isAdmin ? orgHasFeature(orgId, "view_seats") : Promise.resolve(false),
+    isAdmin ? listMembersWithMfa(orgId) : Promise.resolve([]),
   ]);
   const roles = assignableRoles(role, hasViewSeats);
   const activeCount = members.filter((member) => member.status === "active").length;
@@ -59,7 +60,7 @@ export default async function UsersSettingsPage({ params }: Props) {
 
       <Card aria-labelledby="members-title">
         <CardHeader id="members-title" title={`משתמשים פעילים (${activeCount})`} />
-        <MembersList orgId={orgId} myUserId={user.id} myRole={role} roles={roles} canWrite={canWrite} members={members} />
+        <MembersList orgId={orgId} myUserId={user.id} myRole={role} roles={roles} canWrite={canWrite} members={members} mfaUserIds={mfaUserIds} />
       </Card>
 
       {role === "owner" && canWrite ? (

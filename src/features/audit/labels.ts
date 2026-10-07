@@ -28,6 +28,7 @@ export const ACTION_LABELS: Record<string, string> = {
   restore: "שחזור מסל המחזור",
   support_open: "כניסת צוות התמיכה (צפייה)",
   mfa_recovery: "כניסה עם קוד גיבוי (אפליקציית האימות הוסרה)",
+  mfa_reset: "איפוס אימות דו-שלבי",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

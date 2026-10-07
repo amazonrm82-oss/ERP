@@ -6,6 +6,7 @@ import { ChevronIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { listMfaBlockedOrganizations, listMyOrganizations } from "@/features/onboarding/queries";
+import { requireAgreement } from "@/features/legal/queries";
 import { getPlatformMe } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import { APP_NAME } from "@/lib/app";
@@ -19,6 +20,7 @@ export const metadata: Metadata = { title: `בחירת עסק | ${APP_NAME}` };
 // several -> pick one.
 export default async function RootPage() {
   const user = await requireUser();
+  await requireAgreement(paths.home);
   const organizations = await listMyOrganizations(user.id);
 
   const blocked = await listMfaBlockedOrganizations();

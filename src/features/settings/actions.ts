@@ -377,3 +377,21 @@ export async function removeTeamMemberAction(orgId: string, teamId: string, user
   revalidatePath(paths.settingsTeam(orgId, teamId));
   return ok();
 }
+
+/**
+ * Resets two-step verification of a member who lost both the authenticator and the
+ * backup codes. The database decides who may (see migration 0016).
+ */
+export async function resetMemberMfaAction(orgId: string, userId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const { error } = await context.supabase.rpc("org_reset_member_mfa", { p_org: orgId, p_user: userId });
+  if (error) {
+    if (error.hint === "mfa:self_first") return fail("כדי לאפס לאחרים, הפעילו קודם אימות דו-שלבי בחשבון שלכם.");
+    if (error.hint === "mfa_reset:other_orgs") return fail("המשתמש שייך גם לעסק אחר, ולכן רק צוות התמיכה יכול לאפס לו. הפנו אותו לתמיכה.");
+    if (error.hint === "mfa_reset:none") return fail("אימות דו-שלבי כבר לא פעיל אצל המשתמש.");
+    return fail(dbErrorMessage(error, "לא הצלחנו לאפס."));
+  }
+  revalidatePath(paths.settingsUsers(orgId));
+  return ok();
+}

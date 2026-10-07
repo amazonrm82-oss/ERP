@@ -225,3 +225,10 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
       .sort((a, b) => Number(b.isManager) - Number(a.isManager) || a.name.localeCompare(b.name, "he")),
   };
 }
+
+/** Members who have two-step verification on. For owners and admins (the database refuses others). */
+export async function listMembersWithMfa(orgId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("org_members_mfa", { p_org: orgId });
+  return Array.isArray(data) ? data.filter((id): id is string => typeof id === "string") : [];
+}

@@ -930,6 +930,15 @@ export type Database = {
       mfa_recovery_codes_status: { Args: Record<string, never>; Returns: Json };
       mfa_recovery_codes_clear: { Args: Record<string, never>; Returns: undefined };
       mfa_recover: { Args: { p_code: string }; Returns: Json };
+      // reset of two-step verification (migration 0016)
+      org_members_mfa: { Args: { p_org: string }; Returns: Json };
+      org_reset_member_mfa: { Args: { p_org: string; p_user: string }; Returns: undefined };
+      platform_find_user: { Args: { p_email: string }; Returns: Json };
+      platform_reset_mfa: { Args: { p_user: string; p_reason: string; p_check: string }; Returns: undefined };
+      // signed agreement (migration 0016)
+      sign_agreement: { Args: { p_version: string; p_documents: Json; p_full_name: string; p_method: string; p_signature: string | null }; Returns: string };
+      agreement_status: { Args: Record<string, never>; Returns: string | null };
+      my_agreement: { Args: Record<string, never>; Returns: Json };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // platform admin (migration 0013): each checks the platform role and aal2 itself

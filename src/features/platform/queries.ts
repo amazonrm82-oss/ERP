@@ -81,3 +81,11 @@ export async function listPlans(): Promise<PlanRow[]> {
   if (error) throw new Error(`plans query failed: ${error.message}`);
   return data;
 }
+
+/** A user by email, with what support needs to check who is asking. Null when there is none. */
+export async function findPlatformUser(email: string): Promise<Obj | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("platform_find_user", { p_email: email });
+  if (error) throw new Error(`platform_find_user failed: ${error.message}`);
+  return data ? obj(data) : null;
+}

@@ -11,6 +11,8 @@ export const paths = {
   help: "/help",
   helpArticle: (slug: string) => `/help/${slug}`,
   legal: (doc: string) => `/legal/${doc}`,
+  agreement: "/agreement",
+  agreementSigned: "/agreement/signed",
   org: (orgId: string) => `/o/${orgId}`,
   leads: (orgId: string) => `/o/${orgId}/leads`,
   leadNew: (orgId: string) => `/o/${orgId}/leads/new`,
@@ -52,6 +54,7 @@ export const paths = {
   adminOrg: (orgId: string) => `/admin/orgs/${orgId}`,
   adminPlans: "/admin/plans",
   adminStaff: "/admin/staff",
+  adminUsers: "/admin/users",
   adminLog: "/admin/log",
 } as const;
 

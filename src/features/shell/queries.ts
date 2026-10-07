@@ -3,6 +3,7 @@ import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
+import { requireAgreement } from "@/features/legal/queries";
 import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
 import { isUuid, paths } from "@/lib/paths";
@@ -78,6 +79,10 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
   }
   if (!org || !membership) {
     notFound();
+  }
+  // a customer's user signs the agreement before working (platform support in a support session does not)
+  if (!supportUntil) {
+    await requireAgreement(paths.org(orgId));
   }
 
   let subscription: OrgContext["subscription"] = null;

@@ -16,6 +16,7 @@ export const metadata: Metadata = { title: { default: "ניהול הפלטפור
 const NAV = [
   { href: paths.admin, label: "מדדים" },
   { href: paths.adminOrgs, label: "ארגונים" },
+  { href: paths.adminUsers, label: "משתמשים" },
   { href: paths.adminPlans, label: "חבילות" },
   { href: paths.adminStaff, label: "צוות" },
   { href: paths.adminLog, label: "יומן" },

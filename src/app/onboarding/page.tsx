@@ -6,6 +6,7 @@ import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { OrganizationForm } from "@/features/onboarding/components/organization-form";
 import { listMyOrganizations } from "@/features/onboarding/queries";
 import { Wordmark } from "@/components/wordmark";
+import { requireAgreement } from "@/features/legal/queries";
 import { requireUser } from "@/lib/auth";
 import { paths } from "@/lib/paths";
 
@@ -15,6 +16,7 @@ type Props = { searchParams: Promise<{ new?: string | string[] }> };
 
 export default async function OnboardingPage({ searchParams }: Props) {
   const user = await requireUser();
+  await requireAgreement(paths.onboarding);
   const organizations = await listMyOrganizations(user.id);
   const wantsAnother = (await searchParams).new === "1";
 

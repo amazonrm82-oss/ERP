@@ -23,6 +23,14 @@ export const ACTION_LABELS: Record<string, string> = {
   "plan.update": "עריכת חבילה",
   "staff.set": "שינוי בצוות הפלטפורמה",
   "support.open": "כניסת תמיכה לארגון",
+  "user.mfa_reset": "איפוס אימות דו-שלבי למשתמש",
+};
+
+/** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */
+export const IDENTITY_CHECKS: Record<string, string> = {
+  org_admin_confirmed: "בעל העסק או מנהל מערכת בעסק אישר בכתב שהבקשה מהמשתמש, אחרי שדיבר איתו",
+  account_email_and_details: "הבקשה הגיעה מכתובת האימייל של החשבון, והמשתמש ענה נכון על פרטים מהחשבון",
+  video_id: "שיחת וידאו עם תעודה מזהה, ששמה תואם לשם בחשבון",
 };
 
 /** Mirrors app.require_platform(): owner passes everywhere. */

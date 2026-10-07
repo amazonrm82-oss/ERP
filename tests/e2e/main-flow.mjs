@@ -129,6 +129,35 @@ async function signUp(page, name, email, startUrl) {
   const link = await confirmationLink(email);
   await page.goto(link);
   await page.waitForLoadState("networkidle");
+  await signAgreement(page, name, firstSigner);
+  firstSigner = false;
+}
+
+// every new user signs the agreement before anything else; the first one draws, the rest type
+let firstSigner = true;
+async function signAgreement(page, name, draw) {
+  await page.waitForURL(/\/agreement/);
+  await page.getByRole("heading", { name: /חתימה על ההסכם/ }).waitFor();
+  await page.waitForLoadState("networkidle");
+  if (draw) {
+    await page.locator("canvas").scrollIntoViewIfNeeded();
+    const box = await page.locator("canvas").boundingBox();
+    await page.mouse.move(box.x + 20, box.y + 100);
+    await page.mouse.down();
+    for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 20 + i * 18, box.y + 100 - (i % 2) * 50);
+    await page.mouse.up();
+    await expectText(page, "נחתם");
+    await shot(page, "05a-agreement-sign-360");
+  } else {
+    await page.getByRole("radio", { name: "הקלדת שם" }).click();
+  }
+  // nothing is signed without the consent box
+  await page.getByRole("button", { name: "חתימה והמשך" }).click();
+  await expectText(page, "יש לסמן שקראתם ואתם מסכימים");
+  await page.getByLabel(/קראתי את תנאי השימוש/).check();
+  await page.getByRole("button", { name: "חתימה והמשך" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/agreement"), { timeout: 15000 });
+  console.log(`${name} signed the agreement (${draw ? "drawn" : "typed"})`);
 }
 
 try {
@@ -1017,6 +1046,32 @@ try {
   await ownerDesk.goto(`${orgUrl}/leads`);
   if (!new URL(ownerDesk.url()).pathname.startsWith("/login")) throw new Error("the other device stayed signed in after a backup code");
   console.log("backup code used, new authenticator set up");
+
+  step("signed agreement: the owner sees the signed copy with the drawn signature");
+  await lost.goto(`${APP}/agreement/signed`);
+  await lost.getByRole("img", { name: "החתימה של רונית בעלים" }).waitFor();
+  await expectText(lost, "טביעת המסמך (SHA-256)");
+  await shot(lost, "115-signed-agreement-360");
+
+  step("security: an admin resets the two-step verification of a member who lost everything");
+  await lost.goto(`${orgUrl}/settings/users`);
+  await lost.getByRole("button", { name: /איפוס אימות דו-שלבי.*דנה חברה/ }).click();
+  await lost.getByRole("button", { name: "כן" }).click();
+  // Dana is signed out everywhere, and sets up a new authenticator at the next sign-in
+  for (let i = 0; i < 20; i++) {
+    await invitee.goto(`${orgUrl}/leads`);
+    if (new URL(invitee.url()).pathname.startsWith("/login")) break;
+    await invitee.waitForTimeout(500);
+  }
+  if (!new URL(invitee.url()).pathname.startsWith("/login")) throw new Error("the member stayed signed in after the reset");
+  await invitee.waitForLoadState("networkidle");
+  await invitee.getByLabel("אימייל").fill(inviteeEmail);
+  await invitee.getByLabel("סיסמה").fill(PASSWORD);
+  await invitee.getByRole("button", { name: "כניסה" }).click();
+  await invitee.waitForURL(/\/login\/mfa/);
+  await invitee.getByRole("img", { name: "קוד QR לחיבור אפליקציית האימות" }).waitFor({ timeout: 15000 });
+  await lost.goto(`${orgUrl}/settings/audit?entity=memberships`);
+  await expectText(lost, "איפוס אימות דו-שלבי");
 
   console.log("\nFLOW OK");
   process.exitCode = 0;

@@ -11,6 +11,8 @@ import { SESSION_EXPIRED } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
+import { IDENTITY_CHECKS } from "./labels";
+
 const ORG_STATUSES = ["trial", "active", "past_due", "read_only", "suspended", "cancelled"] as const;
 
 /** Errors of the platform functions in plain Hebrew. */
@@ -130,6 +132,27 @@ export async function setStaffAction(_prev: FormState, formData: FormData): Prom
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminStaff);
   return { ok: true, message: "נשמר." };
+}
+
+/** Support resets two-step verification of a user who lost the authenticator and the backup codes. */
+export async function platformResetMfaAction(userId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(userId)) return fail(SESSION_EXPIRED);
+  const check = text(formData, "check");
+  const reason = text(formData, "reason");
+  if (!(check in IDENTITY_CHECKS) || reason === "") {
+    return fail("יש לבחור איך זוהה המשתמש ולכתוב סיבה.", { values: formValues(formData) });
+  }
+  if (formData.get("confirm") !== "on") {
+    return fail("יש לאשר שהזיהוי בוצע.", { values: formValues(formData) });
+  }
+  const { error } = await supabase.rpc("platform_reset_mfa", { p_user: userId, p_reason: reason, p_check: check });
+  if (error) {
+    if (error.hint === "mfa_reset:none") return fail("אימות דו-שלבי כבר לא פעיל אצל המשתמש.");
+    return fail(platformError(error), { values: formValues(formData) });
+  }
+  revalidatePath(paths.adminUsers);
+  return { ok: true, message: "האימות הדו-שלבי אופס, והמשתמש נותק מכל המכשירים. בכניסה הבאה יגדיר אימות מחדש." };
 }
 
 /** Support opens a customer's organization (read-only). Logged on both sides. */

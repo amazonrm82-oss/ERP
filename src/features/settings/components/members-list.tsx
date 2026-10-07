@@ -13,7 +13,7 @@ import type { FormState } from "@/lib/action-result";
 import type { MembershipRole } from "@/lib/database.types";
 import { submitWith } from "@/lib/use-submit";
 
-import { changeMemberRoleAction, setAvailabilityAction, setMemberStatusAction } from "../actions";
+import { changeMemberRoleAction, resetMemberMfaAction, setAvailabilityAction, setMemberStatusAction } from "../actions";
 import { canManageMember, type InvitableRole } from "../permissions";
 import type { Member } from "../queries";
 
@@ -25,9 +25,11 @@ type Props = {
   roles: InvitableRole[];
   canWrite: boolean;
   members: Member[];
+  // members with two-step verification on (known to owners and admins only)
+  mfaUserIds?: string[];
 };
 
-export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members }: Props) {
+export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members, mfaUserIds = [] }: Props) {
   return (
     <ul className="divide-y divide-line">
       {members.map((member) => (
@@ -39,15 +41,16 @@ export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members 
           isMe={member.userId === myUserId}
           manageable={canWrite && canManageMember(myRole, myUserId, member)}
           roles={roles}
+          hasMfa={mfaUserIds.includes(member.userId)}
         />
       ))}
     </ul>
   );
 }
 
-type RowProps = { orgId: string; member: Member; isMe: boolean; manageable: boolean; roles: InvitableRole[] };
+type RowProps = { orgId: string; member: Member; isMe: boolean; manageable: boolean; roles: InvitableRole[]; hasMfa: boolean };
 
-function MemberRow({ orgId, member, isMe, manageable, roles }: RowProps) {
+function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps) {
   const suspended = member.status === "suspended";
 
   return (
@@ -59,6 +62,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles }: RowProps) {
           <Badge tone={member.role === "owner" ? "accent" : "neutral"}>{ROLE_LABELS[member.role]}</Badge>
           {suspended ? <Badge tone="warning">מושבת</Badge> : null}
           {!suspended && !member.isAvailable ? <Badge>לא זמין ללידים</Badge> : null}
+          {hasMfa ? <Badge>אימות דו-שלבי</Badge> : null}
         </p>
         {member.email ? (
           <p dir="ltr" className="truncate text-end text-sm text-ink-soft sm:text-start">
@@ -79,6 +83,17 @@ function MemberRow({ orgId, member, isMe, manageable, roles }: RowProps) {
               {member.isAvailable ? "סימון כלא זמין" : "סימון כזמין"}
             </ActionButton>
           )}
+          {hasMfa && !suspended ? (
+            <ActionButton
+              action={resetMemberMfaAction.bind(null, orgId, member.userId)}
+              pendingText="מאפס…"
+              variant="ghost"
+              srLabel={member.name}
+              confirm={`לאפס את האימות הדו-שלבי של ${member.name}? עשו זאת רק אחרי שווידאתם בשיחה או פנים אל פנים שהבקשה באמת ממנו. המשתמש ינותק מכל המכשירים ויגדיר אימות מחדש בכניסה הבאה.`}
+            >
+              איפוס אימות דו-שלבי
+            </ActionButton>
+          ) : null}
           <StatusButton orgId={orgId} member={member} />
         </div>
       ) : null}

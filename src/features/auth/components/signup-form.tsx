@@ -68,7 +68,7 @@ export function SignupForm({ next }: { next: string }) {
         </SubmitButton>
       </form>
       <p className="mt-4 text-sm text-ink-soft">
-        ההרשמה היא הסכמה ל<TermsLink slug="terms">תנאי השימוש</TermsLink>, ל<TermsLink slug="privacy">מדיניות הפרטיות</TermsLink> ול
+        לפני הכניסה הראשונה תתבקשו לחתום על <TermsLink slug="terms">תנאי השימוש</TermsLink>, <TermsLink slug="privacy">מדיניות הפרטיות</TermsLink> ו
         <TermsLink slug="dpa">הסכם עיבוד המידע</TermsLink>.
       </p>
     </>

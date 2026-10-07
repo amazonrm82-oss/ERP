@@ -4,6 +4,7 @@ import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { AcceptInvitationForm } from "@/features/invitations/components/accept-invitation-form";
 import { isInvitationToken } from "@/features/invitations/token";
+import { requireAgreement } from "@/features/legal/queries";
 import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "הזמנה להצטרף", referrer: "no-referrer" };
@@ -16,6 +17,7 @@ type Props = { params: Promise<{ token: string }> };
 export default async function InvitePage({ params }: Props) {
   const { token } = await params;
   const user = await requireUser();
+  await requireAgreement(`/invite/${encodeURIComponent(token)}`);
   const valid = isInvitationToken(token);
 
   return (
