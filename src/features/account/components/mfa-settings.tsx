@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { MfaGate } from "@/features/auth/components/mfa-gate";
 import { createClient } from "@/lib/supabase/client";
 
+import { clearRecoveryCodesAction } from "../actions";
+import { RecoveryCodes } from "./recovery-codes";
+
 type State = { kind: "loading" } | { kind: "on"; factorId: string } | { kind: "off" } | { kind: "setup" };
 
 /** Two-step verification for the signed-in user: on (with a way to turn it off) or off (with set-up). */
-export function MfaSettings({ orgRequires }: { orgRequires: boolean }) {
+export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; codesLeft: number }) {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [confirming, setConfirming] = useState(false);
@@ -45,6 +48,7 @@ export function MfaSettings({ orgRequires }: { orgRequires: boolean }) {
       setError("לא הצלחנו לכבות. התנתקו, התחברו שוב עם הקוד ונסו שוב.");
       return;
     }
+    await clearRecoveryCodesAction();
     await supabase.auth.refreshSession();
     setConfirming(false);
     await load();
@@ -53,7 +57,14 @@ export function MfaSettings({ orgRequires }: { orgRequires: boolean }) {
 
   if (state.kind === "loading") return <p role="status">בודק…</p>;
   if (state.kind === "setup") {
-    return <MfaGate onDone={() => void load()} />;
+    return (
+      <MfaGate
+        onDone={() => {
+          void load();
+          router.refresh();
+        }}
+      />
+    );
   }
   return (
     <div className="space-y-3">
@@ -85,6 +96,7 @@ export function MfaSettings({ orgRequires }: { orgRequires: boolean }) {
           {error}
         </p>
       ) : null}
+      {state.kind === "on" ? <RecoveryCodes left={codesLeft} /> : null}
     </div>
   );
 }

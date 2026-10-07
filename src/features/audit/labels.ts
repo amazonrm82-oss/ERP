@@ -27,6 +27,7 @@ export const ACTION_LABELS: Record<string, string> = {
   trash: "העברה לסל המחזור",
   restore: "שחזור מסל המחזור",
   support_open: "כניסת צוות התמיכה (צפייה)",
+  mfa_recovery: "כניסה עם קוד גיבוי (אפליקציית האימות הוסרה)",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

@@ -25,3 +25,11 @@ export function describeDevice(userAgent: string | null): string {
   const os = /iPhone|iPad/.test(userAgent) ? "iPhone" : /Android/.test(userAgent) ? "Android" : /Windows/.test(userAgent) ? "Windows" : /Mac OS X/.test(userAgent) ? "Mac" : /Linux/.test(userAgent) ? "Linux" : "";
   return os ? `${browser} ב-${os}` : browser;
 }
+
+/** How many unused backup codes the signed-in user has left (0 without two-step verification). */
+export async function getRecoveryCodesLeft(): Promise<number> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("mfa_recovery_codes_status");
+  const status = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  return typeof status.remaining === "number" ? status.remaining : 0;
+}

@@ -977,6 +977,47 @@ try {
   await ownerDesk.getByText(/היסטוריית שינויים/).click();
   await shot(ownerDesk, "113-record-history-1280");
 
+  step("security: backup codes; a lost phone gets in with one and sets up a new authenticator");
+  await ownerDesk.goto(`${orgUrl}/settings/account`);
+  await expectText(ownerDesk, "אין לך קודי גיבוי");
+  await ownerDesk.getByRole("button", { name: "יצירת קודי גיבוי" }).click();
+  const codeList = ownerDesk.getByRole("list", { name: "קודי גיבוי" });
+  await codeList.waitFor();
+  const backupCodes = (await codeList.locator("li").allInnerTexts()).map((c) => c.trim());
+  if (backupCodes.length !== 10) throw new Error(`expected 10 backup codes, got ${backupCodes.length}`);
+  await shot(ownerDesk, "114-backup-codes-1280");
+  await ownerDesk.getByRole("button", { name: "שמרתי את הקודים" }).click();
+  await expectText(ownerDesk, "נשארו 10 קודי גיבוי");
+
+  const lost = await newPage(360);
+  await lost.goto(`${APP}/login`);
+  await lost.waitForLoadState("networkidle");
+  await lost.getByLabel("אימייל").fill(ownerEmail);
+  await lost.getByLabel("סיסמה").fill(PASSWORD);
+  await lost.getByRole("button", { name: "כניסה" }).click();
+  await lost.waitForURL(/\/login\/mfa/);
+  await lost.getByRole("button", { name: /כניסה עם קוד גיבוי/ }).click();
+  await lost.getByLabel("קוד גיבוי").fill("0000-0000-0000");
+  await lost.getByRole("button", { name: "כניסה עם קוד גיבוי", exact: true }).click();
+  await expectText(lost, "הקוד לא נכון");
+  await lost.getByLabel("קוד גיבוי").fill(backupCodes[0].toUpperCase());
+  await lost.getByRole("button", { name: "כניסה עם קוד גיבוי", exact: true }).click();
+  // the business requires two-step verification, so a new authenticator is set up right away
+  await lost.getByRole("img", { name: "קוד QR לחיבור אפליקציית האימות" }).waitFor({ timeout: 15000 });
+  const newSecret = (await lost.locator("code").first().innerText()).trim();
+  await lost.getByLabel("קוד אימות").fill(await freshTotp(newSecret));
+  await lost.getByRole("button", { name: "אימות", exact: true }).click();
+  await lost.waitForURL((url) => url.pathname.startsWith("/o/"), { timeout: 30000 });
+  await lost.goto(`${orgUrl}/settings/account`);
+  await expectText(lost, "אימות דו-שלבי פעיל בחשבון שלך");
+  await expectText(lost, "אין לך קודי גיבוי");
+  await lost.goto(`${orgUrl}/settings/audit?entity=memberships`);
+  await expectText(lost, "כניסה עם קוד גיבוי");
+  // using a code signs out every other device
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  if (!new URL(ownerDesk.url()).pathname.startsWith("/login")) throw new Error("the other device stayed signed in after a backup code");
+  console.log("backup code used, new authenticator set up");
+
   console.log("\nFLOW OK");
   process.exitCode = 0;
 } catch (error) {

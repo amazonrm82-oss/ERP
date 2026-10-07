@@ -104,6 +104,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`mfa_required_orgs()`, `mfa_status()`). The proxy calls `auth.getUser()` so signed-out sessions end
   on the next page load. Each admin page checks `platformReady()` itself: Next renders a page in
   parallel with its layout, so a layout cannot guard its pages.
+- Backup codes (migration 0015): `app.mfa_recovery_codes` holds SHA-256 hashes only (schema app, no
+  API access). `mfa_recovery_codes_create()` needs aal2; `mfa_recover(code)` (password session) deletes
+  the user's rows in `auth.mfa_factors`, logs `mfa_recovery` in the audit log of their organizations,
+  and answers `{ok, reason}` instead of raising so the attempt counter (5 per 15 minutes) survives.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

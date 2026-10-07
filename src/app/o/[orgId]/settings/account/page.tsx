@@ -4,7 +4,7 @@ import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { signOutOthersAction } from "@/features/account/actions";
 import { MfaSettings } from "@/features/account/components/mfa-settings";
-import { describeDevice, listMySessions } from "@/features/account/queries";
+import { describeDevice, getRecoveryCodesLeft, listMySessions } from "@/features/account/queries";
 import { NewPasswordForm } from "@/features/auth/components/new-password-form";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
@@ -16,14 +16,18 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
   const { orgId } = await params;
   const { user } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [sessions, { data: org }] = await Promise.all([listMySessions(), supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle()]);
+  const [sessions, { data: org }, codesLeft] = await Promise.all([
+    listMySessions(),
+    supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
+    getRecoveryCodesLeft(),
+  ]);
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-2">
       <Card aria-labelledby="account-mfa">
         <CardHeader id="account-mfa" title="אימות דו-שלבי" />
         <CardBody>
-          <MfaSettings orgRequires={org?.require_mfa === true} />
+          <MfaSettings orgRequires={org?.require_mfa === true} codesLeft={codesLeft} />
         </CardBody>
       </Card>
 

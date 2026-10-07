@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 
 import { LEGAL_VERSION } from "@/features/legal/documents";
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
-import { owesSecondStep } from "@/lib/auth";
-import { authErrorMessage } from "@/lib/errors";
+import { getSessionUser, owesSecondStep } from "@/lib/auth";
+import { authErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
@@ -111,4 +111,31 @@ export async function signOutAction(): Promise<void> {
   // "local": ends this browser's session only, other devices stay signed in
   await supabase.auth.signOut({ scope: "local" });
   redirect(paths.login);
+}
+
+export type RecoverResult = { ok: true; needsSetup: boolean } | { ok: false; message: string };
+
+/**
+ * Signs in with a backup code instead of the authenticator app: the database checks
+ * the code and removes the lost authenticator. Every other device is signed out, in
+ * case the password is what leaked. `needsSetup`: an organization requires two-step
+ * verification, so a new authenticator must be set up right away.
+ */
+export async function recoverWithCodeAction(code: string): Promise<RecoverResult> {
+  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  if (typeof code !== "string" || code.replace(/[^0-9a-f]/gi, "").length !== 12) {
+    return fail("קוד גיבוי הוא 12 תווים, למשל 1a2b-3c4d-5e6f.");
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mfa_recover", { p_code: code });
+  if (error) return fail("לא הצלחנו לבדוק את הקוד. נסו שוב.");
+  const result = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  if (result.ok !== true) {
+    if (result.reason === "too_many") return fail("יותר מדי ניסיונות. נסו שוב בעוד רבע שעה.");
+    if (result.reason === "no_factor") return fail("אימות דו-שלבי כבר לא פעיל בחשבון. רעננו את הדף.");
+    return fail("הקוד לא נכון, או שכבר השתמשו בו.");
+  }
+  await supabase.auth.signOut({ scope: "others" });
+  const { data: required } = await supabase.rpc("mfa_required_orgs");
+  return { ok: true, needsSetup: Array.isArray(required) && required.length > 0 };
 }

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
-import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { getSessionUser } from "@/lib/auth";
+import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN, SESSION_EXPIRED } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import { createClient } from "@/lib/supabase/server";
 
 /** Signs out every other browser and phone of this user; this one stays signed in. */
 export async function signOutOthersAction(orgId: string): Promise<ActionResult> {
@@ -28,4 +30,24 @@ export async function setRequireMfaAction(orgId: string, required: boolean): Pro
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidatePath(paths.settings(orgId));
   return ok();
+}
+
+/** Ten new backup codes, shown once; the old ones stop working. Needs a session that passed two-step verification. */
+export async function createRecoveryCodesAction(): Promise<{ ok: true; codes: string[] } | { ok: false; message: string }> {
+  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mfa_recovery_codes_create");
+  if (error) {
+    return fail(error.hint === "mfa:aal2_required" ? "צריך להיכנס עם קוד מאפליקציית האימות כדי ליצור קודי גיבוי. התנתקו, התחברו שוב ונסו שוב." : "לא הצלחנו ליצור קודים. נסו שוב.");
+  }
+  const codes = Array.isArray(data) ? data.filter((c): c is string => typeof c === "string") : [];
+  return { ok: true, codes };
+}
+
+/** Called after turning two-step verification off: the backup codes belonged to it. */
+export async function clearRecoveryCodesAction(): Promise<ActionResult> {
+  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mfa_recovery_codes_clear");
+  return error ? fail("לא הצלחנו למחוק את קודי הגיבוי.") : ok();
 }

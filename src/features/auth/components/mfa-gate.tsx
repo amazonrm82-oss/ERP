@@ -9,7 +9,14 @@ import { TextField } from "@/components/ui/field";
 import { APP_NAME } from "@/lib/app";
 import { createClient } from "@/lib/supabase/client";
 
-type Step = { kind: "loading" } | { kind: "enroll"; factorId: string; qr: string; secret: string } | { kind: "verify"; factorId: string };
+import { recoverWithCodeAction } from "../actions";
+
+type Step =
+  | { kind: "loading" }
+  | { kind: "enroll"; factorId: string; qr: string; secret: string }
+  | { kind: "verify"; factorId: string }
+  // a backup code removed the authenticator, and no organization requires a new one
+  | { kind: "recovered" };
 
 /**
  * Two-step verification (Supabase MFA, TOTP): sets up an authenticator app when
@@ -23,6 +30,9 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [useBackup, setUseBackup] = useState(false);
+  // bumped to start over (after a backup code, to set up a new authenticator)
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +71,34 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
     return () => {
       cancelled = true;
     };
-  }, [next, router]);
+  }, [next, router, round]);
+
+  async function recover() {
+    setError(null);
+    setBusy(true);
+    const result = await recoverWithCodeAction(code.trim());
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setCode("");
+    setUseBackup(false);
+    if (result.needsSetup) {
+      setStep({ kind: "loading" });
+      setRound((r) => r + 1);
+    } else {
+      setStep({ kind: "recovered" });
+    }
+  }
+
+  function finish() {
+    onDone?.();
+    if (next) {
+      router.replace(next);
+    }
+    router.refresh();
+  }
 
   async function verify(factorId: string) {
     setError(null);
@@ -76,11 +113,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       setError("הקוד לא התאים. בדקו שהשעה בטלפון נכונה ונסו את הקוד הבא.");
       return;
     }
-    onDone?.();
-    if (next) {
-      router.replace(next);
-    }
-    router.refresh();
+    finish();
   }
 
   return (
@@ -102,8 +135,41 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
           </p>
         </>
       ) : null}
-      {step.kind === "verify" ? <p className="text-[0.9375rem]">הזינו את 6 הספרות מאפליקציית האימות.</p> : null}
-      {step.kind !== "loading" ? (
+      {step.kind === "verify" ? (
+        <p className="text-[0.9375rem]">{useBackup ? "הזינו אחד מקודי הגיבוי ששמרתם. כל קוד עובד פעם אחת." : "הזינו את 6 הספרות מאפליקציית האימות."}</p>
+      ) : null}
+      {step.kind === "recovered" ? (
+        <div role="status" className="space-y-3">
+          <p className="text-[0.9375rem]">
+            קוד הגיבוי התקבל. האימות הדו-שלבי הוסר מהחשבון, וכל המכשירים האחרים נותקו. מומלץ להפעיל אותו שוב עם הטלפון שלכם עכשיו, בהגדרות ← החשבון שלי.
+          </p>
+          <Button onClick={finish}>המשך</Button>
+        </div>
+      ) : null}
+      {step.kind === "verify" && useBackup ? (
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void recover();
+          }}
+        >
+          <TextField
+            label="קוד גיבוי"
+            name="backup_code"
+            autoComplete="off"
+            dir="ltr"
+            maxLength={20}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+          />
+          <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
+            {busy ? "בודק…" : "כניסה עם קוד גיבוי"}
+          </Button>
+        </form>
+      ) : null}
+      {step.kind === "enroll" || (step.kind === "verify" && !useBackup) ? (
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -126,6 +192,19 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
             {busy ? "בודק…" : "אימות"}
           </Button>
         </form>
+      ) : null}
+      {step.kind === "verify" ? (
+        <button
+          type="button"
+          className="text-sm text-accent-strong underline underline-offset-4"
+          onClick={() => {
+            setUseBackup((v) => !v);
+            setCode("");
+            setError(null);
+          }}
+        >
+          {useBackup ? "חזרה לקוד מהאפליקציה" : "אין לי גישה לאפליקציה: כניסה עם קוד גיבוי"}
+        </button>
       ) : null}
       <FormError message={error} />
     </div>

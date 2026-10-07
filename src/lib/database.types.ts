@@ -924,6 +924,12 @@ export type Database = {
       mfa_required_orgs: { Args: Record<string, never>; Returns: Json };
       // { enrolled: boolean, aal: string }
       mfa_status: { Args: Record<string, never>; Returns: Json };
+      // backup codes (migration 0015): create needs aal2 and returns string[] once;
+      // recover returns { ok, reason?: "wrong" | "too_many" | "no_factor" }
+      mfa_recovery_codes_create: { Args: Record<string, never>; Returns: Json };
+      mfa_recovery_codes_status: { Args: Record<string, never>; Returns: Json };
+      mfa_recovery_codes_clear: { Args: Record<string, never>; Returns: undefined };
+      mfa_recover: { Args: { p_code: string }; Returns: Json };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
