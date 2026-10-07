@@ -3,7 +3,7 @@ import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
-import { requireAgreement } from "@/features/legal/queries";
+import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
 import { isUuid, paths } from "@/lib/paths";
@@ -29,6 +29,15 @@ export type OrgContext = {
 
 const WRITABLE_STATUSES: OrgStatus[] = ["trial", "active", "past_due"];
 
+// what public.org_context() returns; a part the caller may not see is null
+type RawContext = {
+  org?: { id: string; name: string; status: OrgStatus } | null;
+  membership?: { role: MembershipRole; is_available: boolean } | null;
+  subscription?: { status: SubscriptionStatus; plan_key: string; plan_name: string | null; trial_ends_at: string | null } | null;
+  full_name?: string | null;
+  agreement_version?: string | null;
+};
+
 /**
  * The signed-in user's view of an organization, or a 404.
  * RLS returns the organization row only to its active members, so "no row"
@@ -42,26 +51,16 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [orgResult, membershipResult, subscriptionResult, profileResult] = await Promise.all([
-    supabase.from("organizations").select("id, name, status").eq("id", orgId).is("deleted_at", null).maybeSingle(),
-    supabase
-      .from("memberships")
-      .select("role, is_available")
-      .eq("organization_id", orgId)
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle(),
-    supabase.from("subscriptions").select("status, plan_key, trial_ends_at").eq("organization_id", orgId).maybeSingle(),
-    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-  ]);
-
-  if (orgResult.error) {
-    throw new Error(`organization query failed: ${orgResult.error.message}`);
+  // one round trip, read with the user's rights (migration 0028)
+  const { data, error } = await supabase.rpc("org_context", { p_org: orgId });
+  if (error) {
+    throw new Error(`organization context failed: ${error.message}`);
   }
-  const org = orgResult.data;
-  let membership = membershipResult.data;
+  const ctx = (data ?? {}) as RawContext;
+  const org = ctx.org ?? null;
+  let membership = ctx.membership ?? null;
   let supportUntil: string | null = null;
-  if (!org && !membershipResult.data) {
+  if (!org && !membership) {
     // a member of an organization that requires two-step verification, not yet verified
     const { data: blocked } = await supabase.rpc("mfa_required_orgs");
     if (Array.isArray(blocked) && blocked.some((b) => (b as { id?: string }).id === orgId)) {
@@ -81,27 +80,18 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     notFound();
   }
   // a customer's user signs the agreement before working (platform support in a support session does not)
-  if (!supportUntil) {
-    await requireAgreement(paths.org(orgId));
+  if (!supportUntil && ctx.agreement_version !== AGREEMENT_VERSION) {
+    redirect(`${paths.agreement}?next=${encodeURIComponent(paths.org(orgId))}`);
   }
 
-  let subscription: OrgContext["subscription"] = null;
-  if (subscriptionResult.data) {
-    const { data: plan } = await supabase
-      .from("plans")
-      .select("name_he")
-      .eq("key", subscriptionResult.data.plan_key)
-      .maybeSingle();
-    subscription = {
-      status: subscriptionResult.data.status,
-      planName: plan?.name_he ?? subscriptionResult.data.plan_key,
-      trialEndsAt: subscriptionResult.data.trial_ends_at,
-    };
-  }
+  const sub = ctx.subscription ?? null;
+  const subscription: OrgContext["subscription"] = sub
+    ? { status: sub.status, planName: sub.plan_name ?? sub.plan_key, trialEndsAt: sub.trial_ends_at }
+    : null;
 
   const role = membership.role;
   const writable = WRITABLE_STATUSES.includes(org.status);
-  const displayName = profileResult.data?.full_name?.trim() || user.fullName || user.email || "משתמש";
+  const displayName = ctx.full_name?.trim() || user.fullName || user.email || "משתמש";
 
   return {
     user: { ...user, displayName },

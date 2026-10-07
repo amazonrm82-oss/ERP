@@ -143,6 +143,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   purged first, hint `erase:exists`) sets `changes = {"erased": true}` on the record's audit entries and
   on those of its deleted tasks/files, empties merge snapshots and unlinked form submissions, and logs
   action `erase`. `audit_erase_candidates()` is security invoker. Purging a lead empties its submissions.
+- Org context (migration 0028): `public.org_context(org)` (security invoker) returns org, membership,
+  subscription + plan name, profile name and signed agreement version in one call; `getOrgContext()`
+  uses it. A part the caller may not see comes back null, exactly like the separate queries did.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
