@@ -44,3 +44,6 @@ next-env.d.ts
 # local Supabase CLI state
 supabase/.branches/
 supabase/.temp/
+
+# temporary file of scripts/policy-mutation-sweep.mjs (a deliberately weakened policy)
+supabase/migrations/29990101000000_mutation.sql
