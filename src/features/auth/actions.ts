@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { LEGAL_VERSION } from "@/features/legal/documents";
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
 import { owesSecondStep } from "@/lib/auth";
 import { authErrorMessage } from "@/lib/errors";
@@ -78,8 +79,9 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      // copied to profiles.full_name by the handle_new_user trigger
-      data: { full_name: parsed.data.full_name },
+      // full_name is copied to profiles.full_name by the handle_new_user trigger;
+      // terms_* record which version of the terms the user agreed to by signing up
+      data: { full_name: parsed.data.full_name, terms_version: LEGAL_VERSION, terms_accepted_at: new Date().toISOString() },
       emailRedirectTo: `${await siteOrigin()}${callback}`,
     },
   });

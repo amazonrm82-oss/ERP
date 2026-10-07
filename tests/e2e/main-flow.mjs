@@ -257,7 +257,7 @@ try {
   await anon.waitForURL(/\/help\/import$/);
   await expectText(anon, "ביטול ייבוא");
   await anon.goto(`${APP}/legal/accessibility`);
-  await expectText(anon, "טיוטה. המסמך עוד לא בתוקף.");
+  await expectText(anon, "הנוסח ייבדק על ידי עורך דין");
   if (new URL(anon.url()).pathname !== "/legal/accessibility") throw new Error("legal page redirected");
   await shot(anon, "pwa-help-legal-360");
   await anon.context().close();

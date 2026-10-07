@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
+import { paths } from "@/lib/paths";
 
 import { signUpAction } from "../actions";
 import { GOOGLE_ENABLED, GoogleButton } from "./google-button";
@@ -65,6 +67,19 @@ export function SignupForm({ next }: { next: string }) {
           יצירת חשבון
         </SubmitButton>
       </form>
+      <p className="mt-4 text-sm text-ink-soft">
+        ההרשמה היא הסכמה ל<TermsLink slug="terms">תנאי השימוש</TermsLink>, ל<TermsLink slug="privacy">מדיניות הפרטיות</TermsLink> ול
+        <TermsLink slug="dpa">הסכם עיבוד המידע</TermsLink>.
+      </p>
     </>
+  );
+}
+
+// opens in a new tab, so a half-filled form is not lost
+function TermsLink({ slug, children }: { slug: string; children: string }) {
+  return (
+    <Link href={paths.legal(slug)} target="_blank" rel="noopener" className="text-accent-strong underline underline-offset-4">
+      {children}
+    </Link>
   );
 }
