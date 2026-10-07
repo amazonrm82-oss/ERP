@@ -478,7 +478,7 @@ try {
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor({ timeout: 15000 });
   await ownerDesk.goto(`${orgUrl}/leads`);
   await ownerDesk.getByRole("combobox", { name: "תגית" }).selectOption({ label: "VIP" });
-  await ownerDesk.getByRole("button", { name: "חיפוש" }).click();
+  await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();
   await ownerDesk.waitForURL(/tag=/);
   const rows = await ownerDesk.locator("tbody tr").count();
   console.log("leads tagged VIP:", rows);
@@ -1046,6 +1046,21 @@ try {
   await ownerDesk.goto(`${orgUrl}/leads`);
   if (!new URL(ownerDesk.url()).pathname.startsWith("/login")) throw new Error("the other device stayed signed in after a backup code");
   console.log("backup code used, new authenticator set up");
+
+  step("global search: Ctrl+K, a typo, Enter opens the record; '/' opens it too");
+  await lost.goto(orgUrl);
+  await lost.waitForLoadState("networkidle");
+  await lost.keyboard.press("Control+k");
+  const searchBox = lost.getByRole("combobox", { name: /חיפוש לידים/ });
+  await searchBox.fill("סבב אחת");
+  await lost.getByRole("option", { name: /סבב אחד/ }).first().waitFor({ timeout: 15000 });
+  await shot(lost, "116-search-360");
+  await searchBox.press("Enter");
+  await lost.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+  await lost.keyboard.press("/");
+  await searchBox.fill("0000000000xyz");
+  await expectText(lost, "לא נמצא דבר");
+  await searchBox.press("Escape");
 
   step("signed agreement: the owner sees the signed copy with the drawn signature");
   await lost.goto(`${APP}/agreement/signed`);

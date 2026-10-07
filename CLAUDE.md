@@ -113,6 +113,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (support, identity check required). `app.agreement_signatures` (not in the API) keeps every signed
   copy; `requireAgreement()` (`src/features/legal/queries.ts`) gates `/`, onboarding, invites and
   `getOrgContext`. Changing a legal text means a new `LEGAL_VERSION`, and everyone signs again.
+- Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
+  reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
+  expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

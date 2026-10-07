@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
+import { GlobalSearch } from "@/features/search/components/global-search";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { countUnread, listNotifications } from "@/features/notifications/queries";
 import { AvailabilityToggle } from "@/features/shell/components/availability-toggle";
@@ -59,6 +60,7 @@ export default async function OrgLayout({ children, params }: Props) {
           {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} /> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <GlobalSearch orgId={org.id} />
           <NotificationBell
             // new server data (after marking read, or navigation) starts the bell afresh
             key={`${unread}:${notifications[0]?.id ?? ""}`}

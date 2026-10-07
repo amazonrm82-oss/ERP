@@ -939,6 +939,8 @@ export type Database = {
       sign_agreement: { Args: { p_version: string; p_documents: Json; p_full_name: string; p_method: string; p_signature: string | null }; Returns: string };
       agreement_status: { Args: Record<string, never>; Returns: string | null };
       my_agreement: { Args: Record<string, never>; Returns: Json };
+      // global search (migration 0017), security invoker: { leads, contacts, companies, deals, notes }
+      search_records: { Args: { p_org: string; p_query: string; p_limit?: number }; Returns: Json };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
