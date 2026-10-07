@@ -88,6 +88,28 @@ describe("plan limits", () => {
     await add("lead", "one");
     expect((await pgError(add("lead", "two"))).hint).toBe("limit:max_custom_fields_per_object");
     await add("contact", "one");
+
+    // a hidden field does not count, but showing it again is checked like adding it
+    const setActive = (key: string, active: boolean) =>
+      asUser(owner.id, (q) => q("update public.field_definitions set is_active = $3 where organization_id = $1 and object_type = 'lead' and key = $2", [org, key, active]));
+    await setActive("one", false);
+    await add("lead", "two");
+    expect((await pgError(setActive("one", true))).hint).toBe("limit:max_custom_fields_per_object");
+    await setActive("two", false);
+    await setActive("one", true);
+  });
+
+  it("a deleted pipeline that comes back is checked against the plan", async () => {
+    const owner = await createUser("owner");
+    const org = await createOrg(owner.id);
+    await asAdmin(async (q) => {
+      await q(`update public.subscriptions set limit_overrides = '{"max_pipelines": 2}' where organization_id = $1`, [org]);
+      const second = (await q<{ id: string }>("insert into public.pipelines (organization_id, name) values ($1, 'שני') returning id", [org])).rows[0].id;
+      await q("update public.pipelines set deleted_at = now() where id = $1", [second]);
+      await q("insert into public.pipelines (organization_id, name) values ($1, 'שלישי')", [org]);
+      const err = await pgError(q("update public.pipelines set deleted_at = null where id = $1", [second]));
+      expect(err.hint).toBe("limit:max_pipelines");
+    });
   });
 });
 
