@@ -6,6 +6,13 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_RE = /^\+?[\d\s\-().*]{3,24}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// The database checks the same (migration 0026): 2026-02-30 is not a date.
+function isCalendarDate(text: string): boolean {
+  if (!DATE_RE.test(text)) return false;
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
 /**
  * Reads the custom fields of a form. Returns the values to store (only for the
  * given, active definitions; an empty field becomes null) and per-input errors.
@@ -56,7 +63,7 @@ export function parseCustomFields(
         }
         break;
       case "date":
-        if (!DATE_RE.test(text) || Number.isNaN(Date.parse(text))) {
+        if (!isCalendarDate(text)) {
           errors[name] = "התאריך אינו תקין.";
         } else {
           values[field.key] = text;

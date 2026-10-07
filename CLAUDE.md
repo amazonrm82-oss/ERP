@@ -135,6 +135,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Handover (migration 0024): `public.transfer_records(org, from, to)` moves owner_id on leads,
   contacts, companies, deals and tasks. It sets `app.bulk_transfer` (notify_assignment skips) and
   `app.automation_running` (events marked as automation, so automations skip) for its duration.
+- Custom fields (migration 0026): `app.check_custom_fields()` (security invoker, `*_custom_fields_check`
+  triggers) checks every changed key of `custom_fields` written by `authenticated`/`anon` against
+  `field_definitions` with `app.custom_value_ok()`, mirroring `src/features/custom-fields/values.ts`;
+  keep the two in step. Unknown keys are rejected (hint `custom_field:invalid`); "required" is app-only.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
