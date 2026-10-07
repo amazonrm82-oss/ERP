@@ -4,6 +4,7 @@ import { strToU8, zipSync } from "fflate";
 
 import { csvText } from "@/lib/csv";
 import type { Database, Json } from "@/lib/database.types";
+import { FILES_BUCKET } from "@/features/files/types";
 import { createClient } from "@/lib/supabase/server";
 
 type TableName = keyof Database["public"]["Tables"];
@@ -24,7 +25,11 @@ const TABLES: Array<{ table: TableName; file: string }> = [
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
   { table: "teams", file: "teams.csv" },
+  { table: "files", file: "files.csv" },
 ];
+
+// the files themselves go into the ZIP up to this total; past it, files.csv still lists them
+const FILES_MAX_BYTES = 150 * 1024 * 1024;
 
 const PAGE = 1000;
 // readable names added next to these id columns
@@ -86,6 +91,7 @@ const README = `ייצוא מלא של נתוני הארגון.
 ליד כל מזהה של משתמש, סטטוס, מקור, שלב או חברה מופיעה גם עמודה עם השם.
 עמודות custom:... הן השדות המותאמים. רשומות עם deleted_at נמצאות בסל המחזור.
 סכומים (amount_agorot) הם באגורות: מחלקים ב-100 לקבלת שקלים.
+הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;
 
 /** ZIP of every table, read with the user's session (RLS applies). */
@@ -110,7 +116,31 @@ export async function buildFullExport(orgId: string): Promise<Uint8Array> {
     }
   }
 
-  const files: Record<string, Uint8Array> = { "README.txt": strToU8(README) };
+  const files: Record<string, Uint8Array> = {};
   for (const t of data) files[t.file] = strToU8(toCsv(t.rows, names, tagNames));
+
+  // the stored files, read with the same session (Storage follows the same rules)
+  let total = 0;
+  const skipped: string[] = [];
+  const stored = data.find((t) => t.table === "files")?.rows ?? [];
+  for (const f of stored) {
+    const size = Number(f.size_bytes ?? 0);
+    const name = `files/${String(f.id)}-${String(f.name).replace(/[\\/:*?"<>|]/g, "_")}`;
+    if (total + size > FILES_MAX_BYTES) {
+      skipped.push(String(f.name));
+      continue;
+    }
+    const { data: blob } = await supabase.storage.from(FILES_BUCKET).download(String(f.storage_path));
+    if (!blob) {
+      skipped.push(String(f.name));
+      continue;
+    }
+    files[name] = new Uint8Array(await blob.arrayBuffer());
+    total += size;
+  }
+  const note = skipped.length
+    ? `\nלא נכנסו לקובץ הזה ${skipped.length} קבצים (הגודל הכולל עובר 150 MB, או שהקובץ לא נמצא). אפשר להוריד אותם מהרשומות עצמן.\n`
+    : "";
+  files["README.txt"] = strToU8(README + note);
   return zipSync(files, { level: 6 });
 }

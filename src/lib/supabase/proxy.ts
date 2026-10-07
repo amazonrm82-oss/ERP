@@ -9,7 +9,7 @@ const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
-// a secret), the service worker, the offline page, the app manifest, the help
+// a secret), the file cleanup (same), the service worker, the offline page, the app manifest, the help
 // center and the legal documents.
 const PUBLIC_PREFIXES = [
   "/auth/",
@@ -17,6 +17,7 @@ const PUBLIC_PREFIXES = [
   "/api/forms/",
   "/api/in/",
   "/api/push/dispatch",
+  "/api/files/cleanup",
   "/sw.js",
   "/offline.html",
   "/manifest.webmanifest",

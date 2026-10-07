@@ -7,13 +7,17 @@ import { getSupabaseEnv } from "@/lib/env";
 
 /**
  * Supabase client with the service-role key: bypasses Row Level Security.
- * Allowed in exactly two places, neither of which serves a signed-in user:
+ * Allowed in exactly three places, none of which serves a signed-in user:
  * - the lead intake (src/features/intake), where a stranger's form submission
  *   arrives with no session. It only calls public.intake_submit() and reads a
  *   form's public settings by token;
  * - the push dispatcher (src/features/notifications/push-server.ts), woken by
  *   the database with a shared secret. It calls public.claim_push_notifications()
- *   and reads and prunes push_subscriptions.
+ *   and reads and prunes push_subscriptions;
+ * - the file cleanup (src/features/files/cleanup-server.ts), woken by the
+ *   database at night with the same secret. It calls public.claim_orphan_files()
+ *   and public.finish_orphan_files(), and removes those objects from the
+ *   'record-files' bucket.
  * Never import this from code that serves a signed-in user.
  * Returns null when the key is not configured.
  */

@@ -8,7 +8,7 @@
 // It refuses to run against anything that is not on this machine.
 import { createHmac } from "node:crypto";
 
-import { strToU8, zipSync } from "fflate";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import pg from "pg";
 import { chromium } from "playwright";
 
@@ -876,6 +876,10 @@ try {
   const zipBytes = await zipRes.body();
   console.log("full export:", zipRes.status(), zipRes.headers()["content-type"], `${zipBytes.length} bytes`);
   if (zipRes.status() !== 200 || zipBytes[0] !== 0x50 || zipBytes[1] !== 0x4b) throw new Error("full export is not a zip");
+  const zipEntries = Object.keys(unzipSync(new Uint8Array(zipBytes)));
+  const imageEntry = zipEntries.find((n) => n.startsWith("files/") && n.endsWith("תמונה.png"));
+  console.log("export has files.csv:", zipEntries.includes("files.csv"), "and the uploaded image:", Boolean(imageEntry));
+  if (!zipEntries.includes("files.csv") || !imageEntry) throw new Error("the full export is missing the files");
   const danaZip = await invitee.context().request.get(`${orgUrl}/settings/import/export`);
   console.log("manager full export status:", danaZip.status());
   if (danaZip.status() !== 403) throw new Error("a team manager downloaded the full export");
@@ -1156,6 +1160,19 @@ try {
   await expectText(lost, "מוזג עם רשומה כפולה");
   await lost.goto(firstDupUrl);
   await expectText(lost, "הרשומה לא נמצאה");
+
+  step("files: a deleted row's stored file is removed at night (database -> pg_net -> app -> Storage)");
+  const [{ path: orphanPath }] = await sql("delete from public.files where name = 'תמונה.png' returning storage_path as path");
+  await sql("select app.cleanup_files()");
+  let objectGone = false;
+  for (let i = 0; i < 40 && !objectGone; i++) {
+    const [{ n }] = await sql("select count(*)::int as n from storage.objects where bucket_id = 'record-files' and name = $1", [orphanPath]);
+    objectGone = n === 0;
+    if (!objectGone) await new Promise((r) => setTimeout(r, 500));
+  }
+  const [{ n: queued }] = await sql("select count(*)::int as n from app.orphan_files where storage_path = $1", [orphanPath]);
+  console.log("orphan file removed from storage:", objectGone, "queue left:", queued);
+  if (!objectGone || queued !== 0) throw new Error("the nightly file cleanup did not remove the object");
 
   console.log("\nFLOW OK");
   process.exitCode = 0;

@@ -36,12 +36,14 @@ and build this CRM here instead. The old code is preserved on the branch
    host that is not local and any database whose name does not end in `_test`. Do not weaken that guard.
    `tests/db/supabase-shim.sql` is test-only and must never be run on a real Supabase project.
 5. **No secrets in the repo.** Only `.env.example` is committed. The service-role key is never used in
-   browser code and never in code that handles a user request on the user's behalf. It has two uses
+   browser code and never in code that handles a user request on the user's behalf. It has three uses
    (`src/lib/supabase/service.ts`): the lead intake (`src/features/intake/`), which calls
    `public.intake_submit()` and reads a form's public display settings; and the push dispatcher
    (`src/features/notifications/push-server.ts`, route `/api/push/dispatch`, called by the database
    with a shared secret), which calls `public.claim_push_notifications()` and reads/deletes
-   `push_subscriptions`.
+   `push_subscriptions`; and the file cleanup (`src/features/files/cleanup-server.ts`, route
+   `/api/files/cleanup`, woken at night by the database with the same secret), which calls
+   `public.claim_orphan_files()` / `finish_orphan_files()` and removes those Storage objects.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -125,6 +127,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   policies look up `public.files` with the caller's rights; write `objects.name` there, never bare
   `name` (files has a `name` column). The browser uploads with the user's session after
   `prepareUploadAction`; downloads go through `/o/[orgId]/files/[fileId]` (one-minute signed link).
+- File cleanup (migration 0021): deleted `files` rows leave their path in `app.orphan_files`;
+  pg_cron `crm-file-cleanup` (03:00 UTC) calls `app.cleanup_files()`, which wakes
+  `/api/files/cleanup` (URL from `app.settings` `files_cleanup_url`, else derived from
+  `push_dispatch_url`; secret `push_dispatch_secret`). The route claims paths, removes the objects
+  with the service role, and reports them done.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

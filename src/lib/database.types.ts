@@ -1012,6 +1012,9 @@ export type Database = {
         // [{ id, organization_id, user_id, title, body, entity_type, entity_id, organization_name }]
         Returns: Json;
       };
+      // stored files of deleted rows (migration 0021), service role only
+      claim_orphan_files: { Args: { p_limit?: number }; Returns: Json };
+      finish_orphan_files: { Args: { p_paths: string[] }; Returns: number };
       run_automation_now: {
         Args: { p_automation_id: string; p_entity_id: string };
         // { status, steps }
