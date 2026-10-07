@@ -19,6 +19,7 @@ import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
+import { RecordHistory } from "@/features/audit/components/record-history";
 
 export const metadata: Metadata = { title: "איש קשר" };
 
@@ -59,6 +60,7 @@ export default async function ContactPage({ params }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
+          <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">

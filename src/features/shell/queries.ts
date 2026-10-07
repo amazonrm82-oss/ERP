@@ -1,11 +1,11 @@
 import "server-only";
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
-import { isUuid } from "@/lib/paths";
+import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 export type OrgContext = {
@@ -60,6 +60,13 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
   const org = orgResult.data;
   let membership = membershipResult.data;
   let supportUntil: string | null = null;
+  if (!org && !membershipResult.data) {
+    // a member of an organization that requires two-step verification, not yet verified
+    const { data: blocked } = await supabase.rpc("mfa_required_orgs");
+    if (Array.isArray(blocked) && blocked.some((b) => (b as { id?: string }).id === orgId)) {
+      redirect(`${paths.loginMfa}?next=${encodeURIComponent(paths.org(orgId))}`);
+    }
+  }
   if (org && !membership) {
     // not a member: maybe platform support the customer let in (the database makes them a viewer)
     const { data: session } = await supabase.rpc("support_session_info", { p_org: orgId });

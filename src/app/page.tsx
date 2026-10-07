@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { ChevronIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
-import { listMyOrganizations } from "@/features/onboarding/queries";
+import { listMfaBlockedOrganizations, listMyOrganizations } from "@/features/onboarding/queries";
 import { getPlatformMe } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import { APP_NAME } from "@/lib/app";
@@ -21,11 +21,16 @@ export default async function RootPage() {
   const user = await requireUser();
   const organizations = await listMyOrganizations(user.id);
 
+  const blocked = await listMfaBlockedOrganizations();
+  const mfaHref = (orgId: string) => `${paths.loginMfa}?next=${encodeURIComponent(paths.org(orgId))}`;
+  if (organizations.length === 0 && blocked.length > 0) {
+    redirect(mfaHref(blocked[0].id));
+  }
   if (organizations.length === 0) {
     // platform staff without a business of their own go to the admin panel
     redirect((await getPlatformMe()) ? paths.admin : paths.onboarding);
   }
-  if (organizations.length === 1) {
+  if (organizations.length === 1 && blocked.length === 0) {
     redirect(paths.org(organizations[0].id));
   }
 
@@ -48,6 +53,17 @@ export default async function RootPage() {
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{org.name}</span>
                   <span className="block text-sm text-ink-soft">{ROLE_LABELS[org.role]}</span>
+                </span>
+                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+              </Link>
+            </li>
+          ))}
+          {blocked.map((org) => (
+            <li key={org.id}>
+              <Link href={mfaHref(org.id)} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-canvas">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{org.name}</span>
+                  <span className="block text-sm text-ink-soft">העסק דורש אימות דו-שלבי</span>
                 </span>
                 <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
               </Link>

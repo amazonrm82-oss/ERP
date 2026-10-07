@@ -15,6 +15,7 @@ export function SettingsTabs({ orgId, showTrash, showCustomization, showImport }
     { href: paths.settings(orgId), label: "פרטי העסק", exact: true },
     { href: paths.settingsUsers(orgId), label: "משתמשים" },
     { href: paths.settingsTeams(orgId), label: "צוותים" },
+    { href: paths.settingsAccount(orgId), label: "החשבון שלי" },
     ...(showCustomization
       ? [
           { href: paths.settingsPipelines(orgId), label: "פייפליינים" },
@@ -23,6 +24,7 @@ export function SettingsTabs({ orgId, showTrash, showCustomization, showImport }
           { href: paths.settingsTags(orgId), label: "תגיות" },
           { href: paths.settingsIntake(orgId), label: "קליטת לידים" },
           { href: paths.settingsAutomations(orgId), label: "אוטומציות" },
+          { href: paths.settingsAudit(orgId), label: "יומן ביקורת" },
         ]
       : []),
     ...(showImport ? [{ href: paths.imports(orgId), label: "ייבוא וייצוא" }] : []),

@@ -52,3 +52,11 @@ export async function requireUser(): Promise<SessionUser> {
   }
   return user;
 }
+
+/** Whether this session still owes the two-step code (the account has an authenticator, the session did not pass it). */
+export async function owesSecondStep(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("mfa_status");
+  const status = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  return status.enrolled === true && status.aal !== "aal2";
+}

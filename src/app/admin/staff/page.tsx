@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { setStaffAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { PLATFORM_ROLE_LABELS } from "@/features/platform/labels";
-import { getPlatformMe, listPlatformStaff } from "@/features/platform/queries";
+import { listPlatformStaff, platformReady } from "@/features/platform/queries";
 import type { PlatformRole } from "@/lib/database.types";
 import { formatDate } from "@/lib/format";
 
@@ -20,8 +20,9 @@ const ROLE_HINTS: Record<PlatformRole, string> = {
 };
 
 export default async function AdminStaffPage() {
-  const me = await getPlatformMe();
-  if (me?.role !== "owner") {
+  const me = await platformReady();
+  if (!me) return null;
+  if (me.role !== "owner") {
     return <p>רק בעלי הפלטפורמה מנהלים את הצוות.</p>;
   }
   const staff = await listPlatformStaff();

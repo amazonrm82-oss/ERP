@@ -58,6 +58,8 @@ export type OrganizationRow = {
   currency: string;
   record_visibility: RecordVisibility;
   status: OrgStatus;
+  // members must pass two-step verification (enforced in app.membership_role)
+  require_mfa: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -344,6 +346,19 @@ export type SupportAccessGrantRow = {
 };
 
 export type PlatformRole = "owner" | "support" | "finance" | "readonly";
+
+export type AuditLogRow = {
+  id: number;
+  organization_id: string;
+  actor_id: string | null;
+  // insert | update | delete | trash | restore | support_open
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  // update: { field: { old, new } }   delete: the full old row
+  changes: Json;
+  created_at: string;
+};
 
 export type PushSubscriptionRow = {
   id: string;
@@ -683,6 +698,7 @@ export type Database = {
           timezone?: string;
           currency?: string;
           record_visibility?: RecordVisibility;
+          require_mfa?: boolean;
         }
       >;
       profiles: Table<
@@ -828,6 +844,8 @@ export type Database = {
       >;
       // written only by the automation engine
       automation_runs: ReadOnlyTable<AutomationRunRow>;
+      // written only by triggers and platform functions; readable by the organization's admins
+      audit_log: ReadOnlyTable<AuditLogRow>;
       notifications: Table<NotificationRow, Record<string, never>, { read_at?: string | null }>;
       support_access_grants: Table<SupportAccessGrantRow, { organization_id: string; expires_at: string }, { revoked_at?: string | null }>;
       import_jobs: Table<
@@ -902,6 +920,12 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
         Returns: Json;
       };
+      // account security (migration 0014)
+      mfa_required_orgs: { Args: Record<string, never>; Returns: Json };
+      // { enrolled: boolean, aal: string }
+      mfa_status: { Args: Record<string, never>; Returns: Json };
+      my_sessions: { Args: Record<string, never>; Returns: Json };
+      org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
       support_session_info: { Args: { p_org: string }; Returns: Json };
       platform_me: { Args: Record<string, never>; Returns: Json };

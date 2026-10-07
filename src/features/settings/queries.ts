@@ -10,13 +10,14 @@ export type OrganizationSettings = {
   teamSize: string | null;
   phone: string | null;
   recordVisibility: RecordVisibility;
+  requireMfa: boolean;
 };
 
 export async function getOrganizationSettings(orgId: string): Promise<OrganizationSettings | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .select("name, industry, team_size, phone, record_visibility")
+    .select("name, industry, team_size, phone, record_visibility, require_mfa")
     .eq("id", orgId)
     .maybeSingle();
   if (error) {
@@ -31,6 +32,7 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
     teamSize: data.team_size,
     phone: data.phone,
     recordVisibility: data.record_visibility,
+    requireMfa: data.require_mfa,
   };
 }
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ACTION_LABELS } from "@/features/platform/labels";
-import { listPlatformLog } from "@/features/platform/queries";
+import { listPlatformLog, platformReady } from "@/features/platform/queries";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -13,6 +13,7 @@ export const metadata: Metadata = { title: "יומן פלטפורמה" };
 type Obj = Record<string, unknown>;
 
 export default async function AdminLogPage() {
+  if (!(await platformReady())) return null;
   const log = await listPlatformLog(null, 300);
   return (
     <>

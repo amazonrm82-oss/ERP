@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { INDUSTRIES, TEAM_SIZES } from "@/features/onboarding/options";
+import { OrgSecurityCard } from "@/features/account/components/org-security-card";
 import { OrganizationSettingsForm } from "@/features/settings/components/organization-settings-form";
 import { isAdminRole, VISIBILITY_OPTIONS } from "@/features/settings/permissions";
 import { getOrganizationSettings } from "@/features/settings/queries";
@@ -30,6 +31,7 @@ export default async function OrganizationSettingsPage({ params }: Props) {
     return (
       <>
         <OrganizationSettingsForm orgId={orgId} settings={settings} />
+        <OrgSecurityCard orgId={orgId} requireMfa={settings.requireMfa} />
         <SupportAccessCard orgId={orgId} grant={grant} />
       </>
     );

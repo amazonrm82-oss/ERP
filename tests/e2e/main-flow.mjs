@@ -48,6 +48,29 @@ function totp(secret) {
   return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
+// a TOTP code from a time step not used before in this run (servers refuse a code twice)
+let lastTotpStep = 0;
+async function freshTotp(secret) {
+  while (Math.floor(Date.now() / 30000) <= lastTotpStep) await new Promise((r) => setTimeout(r, 1000));
+  lastTotpStep = Math.floor(Date.now() / 30000);
+  return totp(secret);
+}
+
+// the link in the newest email to the address whose subject contains `subject`
+async function mailLink(email, subject) {
+  for (let i = 0; i < 40; i++) {
+    const res = await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email} subject:${subject}`)}`);
+    const list = await res.json();
+    if (list.messages?.length) {
+      const msg = await (await fetch(`${MAIL}/api/v1/message/${list.messages[0].ID}`)).json();
+      const match = (msg.Text ?? msg.HTML).match(/https?:\/\/[^\s"<>)]+verify[^\s"<>)]+/);
+      if (match) return match[0].replace(/&amp;/g, "&");
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`no "${subject}" email for ${email}`);
+}
+
 async function sql(text, params = []) {
   const client = new pg.Client({ connectionString: DB });
   await client.connect();
@@ -88,7 +111,8 @@ async function newPage(width) {
 }
 
 async function expectText(page, text) {
-  await page.getByText(text, { exact: false }).first().waitFor({ timeout: 15000 });
+  // visible only: the same text may also sit in a collapsed change history
+  await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
 }
 
 async function signUp(page, name, email, startUrl) {
@@ -257,7 +281,7 @@ try {
   await ownerDesk.getByLabel("עיר").fill("חיפה");
   await ownerDesk.getByLabel("אתר").fill("cohen.co.il");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
-  await expectText(ownerDesk, "https://cohen.co.il".replace("https://", ""));
+  await ownerDesk.getByRole("link", { name: "cohen.co.il" }).waitFor({ timeout: 15000 });
   await shot(ownerDesk, "20-company-1280");
 
   step("contact: edit");
@@ -829,6 +853,96 @@ try {
   const overflow = tasksOverflow || (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth));
   console.log("horizontal overflow at 360px (tasks, deal card):", overflow);
   if (overflow) throw new Error("page scrolls sideways at 360px");
+
+  // ---------------------------------------------------------------- section 12: security and account (last: it turns on 2FA)
+  step("security: forgotten password by email");
+  const resetEmail = `reset-${run}@example.test`;
+  const resetter = await newPage(1280);
+  await signUp(resetter, "שוכח סיסמה", resetEmail, `${APP}/signup`);
+  const fresh = await newPage(1280);
+  await fresh.goto(`${APP}/login`);
+  await fresh.getByRole("link", { name: "שכחתי סיסמה" }).click();
+  await fresh.waitForURL(/\/forgot-password$/);
+  await fresh.waitForLoadState("networkidle");
+  await fresh.getByLabel("אימייל").fill(resetEmail);
+  await fresh.getByRole("button", { name: "שליחת קישור" }).click();
+  await expectText(fresh, "שלחנו אליה קישור");
+  const resetLink = await mailLink(resetEmail, "Reset");
+  await fresh.goto(resetLink);
+  await fresh.waitForURL(/\/reset-password/);
+  await fresh.waitForLoadState("networkidle");
+  await fresh.getByLabel("סיסמה חדשה").fill("New-pass-67890");
+  await fresh.getByLabel("הסיסמה שוב").fill("New-pass-67890");
+  await fresh.getByRole("button", { name: "שמירת הסיסמה" }).click();
+  await expectText(fresh, "הסיסמה עודכנה");
+  const relogin = await newPage(1280);
+  await relogin.goto(`${APP}/login`);
+  await relogin.waitForLoadState("networkidle");
+  await relogin.getByLabel("אימייל").fill(resetEmail);
+  await relogin.getByLabel("סיסמה").fill("New-pass-67890");
+  await relogin.getByRole("button", { name: "כניסה" }).click();
+  await relogin.waitForURL((url) => !url.pathname.startsWith("/login"));
+  console.log("signed in with the new password:", relogin.url());
+
+  step("security: two-step verification for me, then required for the whole business");
+  await ownerDesk.goto(`${orgUrl}/settings/account`);
+  await ownerDesk.getByRole("button", { name: "הפעלת אימות דו-שלבי" }).click();
+  const ownerSecret = (await ownerDesk.locator("code").first().innerText()).trim();
+  await ownerDesk.getByLabel("קוד אימות").fill(await freshTotp(ownerSecret));
+  await ownerDesk.getByRole("button", { name: "אימות", exact: true }).click();
+  await expectText(ownerDesk, "אימות דו-שלבי פעיל בחשבון שלך");
+  await shot(ownerDesk, "110-account-1280");
+  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.getByRole("button", { name: "חיוב אימות דו-שלבי לכולם" }).click();
+  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await expectText(ownerDesk, "כל המשתמשים בעסק חייבים אימות דו-שלבי");
+  // Dana has no authenticator yet: she is sent to set one up before she can open the business
+  await invitee.goto(`${orgUrl}/leads`);
+  await invitee.waitForURL(/\/login\/mfa/);
+  const danaSecret = (await invitee.locator("code").first().innerText()).trim();
+  await invitee.getByLabel("קוד אימות").fill(await freshTotp(danaSecret));
+  await invitee.getByRole("button", { name: "אימות", exact: true }).click();
+  await invitee.waitForURL((url) => url.pathname === `/o/${orgUrl.split("/o/")[1]}`);
+  await invitee.goto(`${orgUrl}/leads`);
+  await invitee.getByRole("heading", { name: "לידים", level: 1 }).waitFor({ timeout: 15000 });
+  // turning on two-step verification signed the owner out of every other device (Supabase does this);
+  // the phone signs in again: password, then the code
+  await owner.goto(orgUrl);
+  await owner.waitForURL(/\/login(\?|$)/, { timeout: 30000 });
+  await owner.waitForLoadState("networkidle");
+  await owner.getByLabel("אימייל").fill(ownerEmail);
+  await owner.getByLabel("סיסמה").fill(PASSWORD);
+  await owner.getByRole("button", { name: "כניסה" }).click();
+  await owner.waitForURL(/\/login\/mfa/);
+  await shot(owner, "111-mfa-360");
+  await owner.getByLabel("קוד אימות").fill(await freshTotp(ownerSecret));
+  await owner.getByRole("button", { name: "אימות", exact: true }).click();
+  await owner.waitForURL((url) => url.pathname.startsWith("/o/"));
+  await owner.getByRole("heading", { level: 1 }).first().waitFor();
+
+  step("security: devices, sign out the others; audit log and record history");
+  await ownerDesk.goto(`${orgUrl}/settings/account`);
+  await expectText(ownerDesk, "המכשיר הזה");
+  const devices = await ownerDesk.locator("#account-sessions").locator("xpath=ancestor::section[1]").locator("li").count();
+  console.log("devices listed for the owner:", devices);
+  await ownerDesk.getByRole("button", { name: "ניתוק כל המכשירים האחרים" }).click();
+  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  // the list is re-read after the action: one device left (this one)
+  const deviceRows = ownerDesk.locator("#account-sessions").locator("xpath=ancestor::section[1]").locator("li");
+  for (let i = 0; i < 30 && (await deviceRows.count()) > 1; i++) await ownerDesk.waitForTimeout(500);
+  console.log("devices after signing out the others:", await deviceRows.count());
+  await owner.goto(`${orgUrl}/leads`);
+  console.log("the owner's phone after 'sign out the others':", new URL(owner.url()).pathname);
+  if (!owner.url().includes("/login")) throw new Error("the other device stayed signed in");
+  await ownerDesk.goto(`${orgUrl}/settings/audit?entity=leads`);
+  await expectText(ownerDesk, "יצירה");
+  await shot(ownerDesk, "112-audit-1280");
+  await ownerDesk.goto(`${orgUrl}/settings/audit?tab=logins`);
+  await expectText(ownerDesk, "כניסה");
+  await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("סבב אחד")}`);
+  await ownerDesk.getByRole("link", { name: "סבב אחד" }).click();
+  await ownerDesk.getByText(/היסטוריית שינויים/).click();
+  await shot(ownerDesk, "113-record-history-1280");
 
   console.log("\nFLOW OK");
   process.exitCode = 0;

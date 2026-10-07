@@ -1,13 +1,14 @@
 import { Card, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
-import { getPlatformMetrics } from "@/features/platform/queries";
+import { getPlatformMetrics, platformReady } from "@/features/platform/queries";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 type Obj = Record<string, unknown>;
 const n = (value: unknown) => Number(value ?? 0) || 0;
 
 export default async function AdminHomePage() {
+  if (!(await platformReady())) return null;
   const m = await getPlatformMetrics();
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;

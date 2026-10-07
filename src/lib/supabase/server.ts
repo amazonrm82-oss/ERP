@@ -2,7 +2,7 @@ import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
@@ -16,12 +16,23 @@ export const createClient = cache(async (): Promise<SupabaseClient<Database>> =>
   // Read cookies first: it marks the caller as request-time (dynamic), so a
   // build without the environment variables never tries to prerender it.
   const cookieStore = await cookies();
+  const requestHeaders = await headers();
   const env = getSupabaseEnv();
   if (!env) {
     throw new MissingConfigError();
   }
 
+  // Sign-in and sign-up happen here, on the server: pass on the browser's user agent and
+  // address so Supabase Auth records the user's device (devices list, login log) and
+  // rate-limits per user rather than per server. Vercel sets x-forwarded-for itself.
+  const forwarded: Record<string, string> = {};
+  const userAgent = requestHeaders.get("user-agent");
+  const clientIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || requestHeaders.get("x-real-ip");
+  if (userAgent) forwarded["User-Agent"] = userAgent.slice(0, 400);
+  if (clientIp) forwarded["X-Forwarded-For"] = clientIp;
+
   return createServerClient<Database>(env.url, env.anonKey, {
+    global: { headers: forwarded },
     cookies: {
       getAll() {
         return cookieStore.getAll();

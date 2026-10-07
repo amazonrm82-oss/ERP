@@ -40,3 +40,10 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     return name === undefined ? [] : [{ id: m.organization_id, name, role: m.role }];
   });
 }
+
+/** Organizations the user belongs to but may not open until they pass two-step verification. */
+export async function listMfaBlockedOrganizations(): Promise<Array<{ id: string; name: string }>> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("mfa_required_orgs");
+  return Array.isArray(data) ? (data as Array<{ id: string; name: string }>) : [];
+}

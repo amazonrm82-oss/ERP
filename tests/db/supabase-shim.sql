@@ -30,6 +30,31 @@ create table auth.users (
   created_at         timestamptz not null default now()
 );
 
+-- the parts of Supabase Auth's own tables that the app reads
+create table auth.sessions (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users (id) on delete cascade,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now(),
+  refreshed_at timestamp,
+  aal          text,
+  user_agent   text,
+  ip           inet
+);
+
+create table auth.mfa_factors (
+  id      uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  status  text not null default 'unverified'
+);
+
+create table auth.audit_log_entries (
+  id         uuid primary key default gen_random_uuid(),
+  payload    json,
+  created_at timestamptz default now(),
+  ip_address varchar(64) not null default ''
+);
+
 create function auth.uid() returns uuid
 language sql stable
 as $$

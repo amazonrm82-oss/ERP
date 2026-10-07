@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
-import { MfaGate } from "@/features/platform/components/mfa-gate";
+import { MfaGate } from "@/features/auth/components/mfa-gate";
 import { PLATFORM_ROLE_LABELS } from "@/features/platform/labels";
 import { getPlatformMe } from "@/features/platform/queries";
 import { requireUser } from "@/lib/auth";

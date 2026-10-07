@@ -11,10 +11,12 @@ import { createClient } from "@/lib/supabase/client";
 type Step = { kind: "loading" } | { kind: "enroll"; factorId: string; qr: string; secret: string } | { kind: "verify"; factorId: string };
 
 /**
- * Two-step verification for platform staff (Supabase MFA, TOTP). The database
- * accepts platform calls only from a session that passed it (aal2).
+ * Two-step verification (Supabase MFA, TOTP): sets up an authenticator app when
+ * the account has none, otherwise asks for its code. Used after the password,
+ * by organizations that require it, and by the platform admin panel. After a
+ * good code the session is aal2; `next` is where to go then (default: reload).
  */
-export function MfaGate() {
+export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>({ kind: "loading" });
   const [code, setCode] = useState("");
@@ -25,18 +27,27 @@ export function MfaGate() {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      const { data, error: listError } = await supabase.auth.mfa.listFactors();
-      if (listError) throw listError;
-      const verified = data.totp.find((f) => f.status === "verified");
+      // getUser() asks the server: the session's own copy of the user can predate an
+      // authenticator added on another device
+      const { data: fresh, error: userError } = await supabase.auth.getUser();
+      if (userError || !fresh.user) {
+        // this device's session is gone (for example, turning on two-step verification on
+        // another device signs out all the others): sign in again
+        await supabase.auth.signOut({ scope: "local" });
+        router.replace(`/login?next=${encodeURIComponent(next ?? window.location.pathname)}`);
+        return;
+      }
+      const factors = fresh.user?.factors ?? [];
+      const verified = factors.find((f) => f.factor_type === "totp" && f.status === "verified");
       if (verified) {
         if (!cancelled) setStep({ kind: "verify", factorId: verified.id });
         return;
       }
       // an enrollment that was started and never finished blocks a new one
-      for (const factor of data.all.filter((f) => f.status === "unverified")) {
+      for (const factor of factors.filter((f) => f.status === "unverified")) {
         await supabase.auth.mfa.unenroll({ factorId: factor.id });
       }
-      const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `ניהול ${Date.now()}` });
+      const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `CRM ${Date.now()}` });
       if (enrollError?.code === "mfa_totp_enroll_not_enabled") {
         if (!cancelled) setError("אימות דו-שלבי כבוי בפרויקט Supabase. יש להפעיל אותו ב-Authentication ← Multi-Factor (TOTP).");
         return;
@@ -49,7 +60,7 @@ export function MfaGate() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [next, router]);
 
   async function verify(factorId: string) {
     setError(null);
@@ -64,6 +75,10 @@ export function MfaGate() {
       setError("הקוד לא התאים. בדקו שהשעה בטלפון נכונה ונסו את הקוד הבא.");
       return;
     }
+    onDone?.();
+    if (next) {
+      router.replace(next);
+    }
     router.refresh();
   }
 
@@ -74,7 +89,7 @@ export function MfaGate() {
       {step.kind === "enroll" ? (
         <>
           <p className="text-[0.9375rem]">
-            פאנל הניהול דורש אימות דו-שלבי. סרקו את הקוד באפליקציית אימות (Google Authenticator, Microsoft Authenticator או 1Password) והזינו את 6 הספרות שהיא מציגה.
+            כדי להמשיך צריך אימות דו-שלבי. סרקו את הקוד באפליקציית אימות (Google Authenticator, Microsoft Authenticator או 1Password) והזינו את 6 הספרות שהיא מציגה.
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element -- a data: URL from Supabase, nothing to optimize */}
           <img src={step.qr} alt="קוד QR לחיבור אפליקציית האימות" className="mx-auto size-48 rounded-md bg-white p-2" />

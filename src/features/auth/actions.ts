@@ -3,13 +3,14 @@
 import { redirect } from "next/navigation";
 
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
+import { owesSecondStep } from "@/lib/auth";
 import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
 
-import { signInSchema, signUpSchema } from "./schema";
+import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = signInSchema.safeParse(pick(formData, ["email", "password"]));
@@ -23,7 +24,43 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
     return fail(authErrorMessage(error, "לא הצלחנו לחבר אותך. נסו שוב."), { values: formValues(formData) });
   }
 
-  redirect(safeNextPath(formData.get("next")?.toString()));
+  const next = safeNextPath(formData.get("next")?.toString());
+  // a verified authenticator on the account: the code comes next
+  if (await owesSecondStep()) {
+    redirect(`${paths.loginMfa}?next=${encodeURIComponent(next)}`);
+  }
+  redirect(next);
+}
+
+/** Sends a reset link. Answers the same whether or not the address has an account. */
+export async function forgotPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = forgotPasswordSchema.safeParse(pick(formData, ["email"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`,
+  });
+  // rate limits are worth telling; "no such user" is not (it would reveal who has an account)
+  if (error && error.status === 429) {
+    return fail(authErrorMessage(error, "נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות."), { values: formValues(formData) });
+  }
+  return { ok: true, message: `אם יש חשבון עם הכתובת ${parsed.data.email}, שלחנו אליה קישור לבחירת סיסמה חדשה.` };
+}
+
+/** New password for the signed-in user (after a reset link, or from the account page). */
+export async function setPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = newPasswordSchema.safeParse({ password: formData.get("password"), confirm: formData.get("confirm") });
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    return fail(authErrorMessage(error, "לא הצלחנו לשמור את הסיסמה. נסו שוב."));
+  }
+  return { ok: true, message: "הסיסמה עודכנה." };
 }
 
 export async function signUpAction(_prev: FormState, formData: FormData): Promise<FormState> {

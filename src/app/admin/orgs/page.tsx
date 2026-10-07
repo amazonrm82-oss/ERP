@@ -5,7 +5,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
-import { listPlans, listPlatformOrgs, ORGS_PAGE_SIZE } from "@/features/platform/queries";
+import { listPlans, listPlatformOrgs, ORGS_PAGE_SIZE, platformReady } from "@/features/platform/queries";
 import { formatDate, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
@@ -15,6 +15,7 @@ export const metadata: Metadata = { title: "ארגונים" };
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function AdminOrgsPage({ searchParams }: Props) {
+  if (!(await platformReady())) return null;
   const params = await searchParams;
   const search = firstParam(params.q).trim().slice(0, 100) || null;
   const status = firstParam(params.status) in ORG_STATUS_LABELS ? firstParam(params.status) : null;

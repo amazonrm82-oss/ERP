@@ -5,7 +5,7 @@ import { TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { updatePlanAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
-import { getPlatformMe, listPlans } from "@/features/platform/queries";
+import { listPlans, platformReady } from "@/features/platform/queries";
 import { formatMoney } from "@/lib/format";
 
 export const metadata: Metadata = { title: "חבילות" };
@@ -13,8 +13,10 @@ export const metadata: Metadata = { title: "חבילות" };
 const shekels = (agorot: number) => String(agorot / 100);
 
 export default async function AdminPlansPage() {
-  const [me, plans] = await Promise.all([getPlatformMe(), listPlans()]);
-  const canEdit = me?.role === "owner";
+  const me = await platformReady();
+  if (!me) return null;
+  const plans = await listPlans();
+  const canEdit = me.role === "owner";
 
   return (
     <>

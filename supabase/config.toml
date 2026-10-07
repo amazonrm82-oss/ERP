@@ -4,6 +4,8 @@
 project_id = "crm-saas-local"
 
 [auth]
+# same as the hosted project should be (Authentication -> Providers -> Email)
+minimum_password_length = 10
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/**"]
 

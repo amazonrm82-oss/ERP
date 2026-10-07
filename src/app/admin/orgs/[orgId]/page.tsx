@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { openSupportAction, setOrgStatusAction, setOverridesAction, updateSubscriptionAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { ACTION_LABELS, canDo, ORG_STATUS_LABELS } from "@/features/platform/labels";
-import { getPlatformMe, getPlatformOrg, listPlans, listPlatformLog } from "@/features/platform/queries";
+import { getPlatformOrg, listPlans, listPlatformLog, platformReady } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import type { MembershipRole } from "@/lib/database.types";
 import { formatDate, formatDateTime, formatNumber, zoneDate } from "@/lib/format";
@@ -24,8 +24,10 @@ const REASON = <TextField label="סיבה (נרשמת ביומן)" name="reason"
 export default async function AdminOrgPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
   if (!isUuid(orgId)) notFound();
-  const [me, data, plans, log] = await Promise.all([getPlatformMe(), getPlatformOrg(orgId), listPlans(), listPlatformLog(orgId, 50)]);
-  if (!me || !data) notFound();
+  const me = await platformReady();
+  if (!me) return null;
+  const [data, plans, log] = await Promise.all([getPlatformOrg(orgId), listPlans(), listPlatformLog(orgId, 50)]);
+  if (!data) notFound();
 
   const org = data.org as Obj;
   const sub = (data.subscription ?? {}) as Obj;

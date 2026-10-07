@@ -3,6 +3,9 @@
 export const paths = {
   home: "/",
   login: "/login",
+  loginMfa: "/login/mfa",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   signup: "/signup",
   onboarding: "/onboarding",
   org: (orgId: string) => `/o/${orgId}`,
@@ -35,6 +38,8 @@ export const paths = {
   settingsAutomation: (orgId: string, id: string) => `/o/${orgId}/settings/automations/${id}`,
   imports: (orgId: string) => `/o/${orgId}/settings/import`,
   importNew: (orgId: string) => `/o/${orgId}/settings/import/new`,
+  settingsAudit: (orgId: string) => `/o/${orgId}/settings/audit`,
+  settingsAccount: (orgId: string) => `/o/${orgId}/settings/account`,
   settingsTrash: (orgId: string) => `/o/${orgId}/settings/trash`,
   settingsTeams: (orgId: string) => `/o/${orgId}/settings/teams`,
   settingsTeam: (orgId: string, teamId: string) => `/o/${orgId}/settings/teams/${teamId}`,

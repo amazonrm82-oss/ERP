@@ -19,6 +19,16 @@ export const getPlatformMe = cache(async (): Promise<PlatformMe | null> => {
   return { role: me.role as PlatformRole, needsMfa: me.needs_mfa === true };
 });
 
+/**
+ * For each admin page: the caller's platform role once they passed the second
+ * step, else null (the page renders nothing; the layout shows the gate or a 404).
+ * Pages check this themselves: Next renders a page in parallel with its layout.
+ */
+export async function platformReady(): Promise<PlatformMe | null> {
+  const me = await getPlatformMe();
+  return me && !me.needsMfa ? me : null;
+}
+
 async function call(name: "platform_metrics" | "platform_staff_list"): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
