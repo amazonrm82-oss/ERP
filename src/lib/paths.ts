@@ -29,6 +29,8 @@ export const paths = {
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
   notifications: (orgId: string) => `/o/${orgId}/notifications`,
   file: (orgId: string, fileId: string) => `/o/${orgId}/files/${fileId}`,
+  merge: (orgId: string, type: string, keep: string, merge?: string) =>
+    `/o/${orgId}/merge?type=${type}&keep=${keep}${merge ? `&merge=${merge}` : ""}`,
   reports: (orgId: string) => `/o/${orgId}/reports`,
   report: (orgId: string, key: string) => `/o/${orgId}/reports/${key}`,
   settings: (orgId: string) => `/o/${orgId}/settings`,

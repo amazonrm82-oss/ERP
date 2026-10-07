@@ -971,6 +971,8 @@ export type Database = {
       my_agreement: { Args: Record<string, never>; Returns: Json };
       // global search (migration 0017), security invoker: { leads, contacts, companies, deals, notes }
       search_records: { Args: { p_org: string; p_query: string; p_limit?: number }; Returns: Json };
+      // merging duplicates (migration 0020): picks = { column: "merge" }
+      merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // platform admin (migration 0013): each checks the platform role and aal2 itself

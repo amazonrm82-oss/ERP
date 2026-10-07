@@ -21,6 +21,7 @@ import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
+import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "חברה" };
@@ -57,6 +58,7 @@ export default async function CompanyPage({ params }: Props) {
         <div className="order-2 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
+          {context.canDelete ? <DuplicatesCard orgId={orgId} type="company" id={company.id} /> : null}
           <RecordHistory orgId={orgId} entityType="companies" entityId={company.id} />
         </div>
 

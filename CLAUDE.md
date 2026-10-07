@@ -125,6 +125,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   policies look up `public.files` with the caller's rights; write `objects.name` there, never bare
   `name` (files has a `name` column). The browser uploads with the user's session after
   `prepareUploadAction`; downloads go through `/o/[orgId]/files/[fileId]` (one-minute signed link).
+- Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
+  listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
+  references leads, contacts or companies must be added to `app.merge_move_links()`.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

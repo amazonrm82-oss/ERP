@@ -1127,6 +1127,36 @@ try {
   await lost.goto(`${orgUrl}/settings/audit?entity=memberships`);
   await expectText(lost, "איפוס אימות דו-שלבי");
 
+  step("duplicates: the record page offers a merge; picked values stay, the duplicate goes");
+  const makeLead = async (name, force) => {
+    await lost.goto(`${orgUrl}/leads/new`);
+    await lost.waitForLoadState("networkidle");
+    await lost.getByLabel("שם מלא").fill(name);
+    await lost.getByLabel("טלפון").fill("054-9998877");
+    // a required custom field defined earlier in the flow
+    await lost.getByLabel("תאריך פגישה").fill("2026-12-01");
+    await lost.getByRole("button", { name: "יצירת ליד" }).click();
+    if (force) {
+      await lost.getByLabel("ליצור ליד חדש בכל זאת").check();
+      await lost.getByRole("button", { name: "יצירת ליד" }).click();
+    }
+    await lost.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 15000 });
+    return lost.url();
+  };
+  const firstDupUrl = await makeLead("כפול ראשון", false);
+  const secondDupUrl = await makeLead("כפול שני", true);
+  await lost.getByRole("heading", { name: "כפילויות אפשריות" }).waitFor();
+  await lost.getByRole("link", { name: /מיזוג.*כפול ראשון/ }).click();
+  await lost.waitForURL(/\/merge\?/);
+  await lost.getByRole("radiogroup", { name: "שם מלא" }).getByLabel(/כפול ראשון/).check();
+  await shot(lost, "117-merge-360");
+  await lost.getByRole("button", { name: "מיזוג" }).click();
+  await lost.waitForURL((url) => url.href === secondDupUrl, { timeout: 15000 });
+  await lost.getByRole("heading", { name: "כפול ראשון", level: 1 }).waitFor();
+  await expectText(lost, "מוזג עם רשומה כפולה");
+  await lost.goto(firstDupUrl);
+  await expectText(lost, "הרשומה לא נמצאה");
+
   console.log("\nFLOW OK");
   process.exitCode = 0;
 } catch (error) {

@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
+import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "איש קשר" };
@@ -63,6 +64,7 @@ export default async function ContactPage({ params }: Props) {
         <div className="order-2 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
+          {context.canDelete ? <DuplicatesCard orgId={orgId} type="contact" id={contact.id} /> : null}
           <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />
         </div>
 
