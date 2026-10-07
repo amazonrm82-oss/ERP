@@ -38,6 +38,7 @@ export function AuditEntries({ items, names, showEntity = true }: Props) {
             <p className="text-sm text-ink-soft">
               {formatDateTime(item.createdAt)} · {item.actorName ?? "המערכת"}
             </p>
+            {item.erased ? <p className="mt-1.5 text-sm text-ink-soft">הפרטים נמחקו לבקשת פרטיות.</p> : null}
             {changes.length > 0 ? (
               <ul className="mt-1.5 space-y-0.5 text-sm">
                 {changes.map((c) => (

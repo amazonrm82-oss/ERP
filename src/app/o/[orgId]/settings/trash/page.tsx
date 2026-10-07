@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { purgeRecordAction } from "@/features/trash/actions";
 import { RestoreButton } from "@/features/trash/components/restore-button";
 import { listTrash } from "@/features/trash/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { paths } from "@/lib/paths";
 import type { TrashableTable } from "@/lib/record-trash";
 
 export const metadata: Metadata = { title: "סל מחזור" };
@@ -44,7 +46,19 @@ export default async function TrashPage({ params }: Props) {
         <EmptyState title="סל המחזור ריק" description="רשומות שמעבירים לסל המחזור מופיעות כאן, ואפשר לשחזר אותן." />
       ) : (
         <>
-          <p className="border-b border-line px-4 py-2.5 text-sm text-ink-soft sm:px-5">רשומה נמחקת לצמיתות 30 יום אחרי שהועברה לסל.</p>
+          <p className="border-b border-line px-4 py-2.5 text-sm text-ink-soft sm:px-5">
+            רשומה נמחקת לצמיתות 30 יום אחרי שהועברה לסל.
+            {canPurge ? (
+              <>
+                {" "}
+                אדם ביקש למחוק את הפרטים שלו? אחרי מחיקה לצמיתות, מוחקים אותם גם{" "}
+                <Link href={`${paths.settingsAudit(orgId)}?tab=privacy`} className="text-accent-strong underline">
+                  מיומן הביקורת
+                </Link>
+                .
+              </>
+            ) : null}
+          </p>
           <ul className="divide-y divide-line">
             {records.map((record) => (
               <li key={`${record.table}-${record.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">

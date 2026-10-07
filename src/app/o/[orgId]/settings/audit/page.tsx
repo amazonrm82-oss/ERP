@@ -2,18 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ActionButton } from "@/components/action-button";
+import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
+import { eraseFromAuditAction } from "@/features/audit/actions";
 import { AuditEntries, idsInChanges } from "@/features/audit/components/audit-entries";
 import { ENTITY_LABELS, LOGIN_ACTION_LABELS } from "@/features/audit/labels";
 import { nameIds } from "@/features/audit/names";
-import { listAudit, listLoginEvents } from "@/features/audit/queries";
+import { findEraseCandidates, listAudit, listLoginEvents } from "@/features/audit/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
-import { formatDateTime, formatNumber, zonedIso } from "@/lib/format";
+import { formatDate, formatDateTime, formatNumber, zonedIso } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
 
@@ -26,12 +29,15 @@ type Props = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+const KIND_LABEL: Record<string, string> = { leads: "ליד", contacts: "איש קשר", companies: "חברה", deals: "עסקה" };
+
 export default async function AuditPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const { role } = await getOrgContext(orgId);
+  const { role, canWrite } = await getOrgContext(orgId);
   if (!isAdminRole(role)) notFound();
   const query = await searchParams;
-  const tab = firstParam(query.tab) === "logins" ? "logins" : "changes";
+  const tabParam = firstParam(query.tab);
+  const tab = tabParam === "logins" || tabParam === "privacy" ? tabParam : "changes";
   const base = paths.settingsAudit(orgId);
 
   const tabs = (
@@ -39,6 +45,7 @@ export default async function AuditPage({ params, searchParams }: Props) {
       {[
         { key: "changes", label: "שינויים", href: base },
         { key: "logins", label: "כניסות", href: `${base}?tab=logins` },
+        { key: "privacy", label: "בקשת מחיקה", href: `${base}?tab=privacy` },
       ].map((t) => (
         <Link
           key={t.key}
@@ -51,6 +58,83 @@ export default async function AuditPage({ params, searchParams }: Props) {
       ))}
     </nav>
   );
+
+  if (tab === "privacy") {
+    const search = firstParam(query.q).trim().slice(0, 100);
+    const found = search.length >= 2 ? await findEraseCandidates(orgId, search) : [];
+    return (
+      <>
+        {tabs}
+        <div className="mb-4 max-w-2xl space-y-2 text-sm text-ink-soft">
+          <p>
+            כשאדם מבקש למחוק את הפרטים שלו: מעבירים את הרשומה לסל המחזור ומוחקים אותה משם לצמיתות. היומן עדיין שומר את הפרטים שהיו בה, ומכאן
+            מוחקים גם אותם.
+          </p>
+          <p>
+            ביומן נשאר רק שהייתה רשומה, מי שינה אותה ומתי. נמחקים גם הפרטים שנשמרו במיזוג כפולים ובפניות מטופס לידים.
+          </p>
+        </div>
+        <form method="get" className="mb-5 flex flex-wrap items-end gap-3" role="search" aria-label="חיפוש רשומה שנמחקה">
+          <input type="hidden" name="tab" value="privacy" />
+          <label>
+            <span className="mb-1.5 block text-sm font-medium">שם, טלפון או אימייל</span>
+            <Input name="q" defaultValue={search} className="w-64" minLength={2} maxLength={100} />
+          </label>
+          <button type="submit" className={buttonClasses("secondary", "md")}>
+            חיפוש
+          </button>
+        </form>
+        {search.length >= 2 ? (
+          <Card>
+            {found.length === 0 ? (
+              <p className="px-4 py-6 text-ink-soft sm:px-5">
+                לא נמצאה ביומן רשומה שנמחקה לצמיתות עם הפרטים האלה. רשומה שעדיין קיימת, או שנמצאת בסל המחזור, צריך קודם למחוק לצמיתות.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {found.map((c) => (
+                  <li key={`${c.entityType}-${c.entityId}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <span className="break-words font-medium">{c.name ?? "ללא שם"}</span>
+                        <Badge>{KIND_LABEL[c.entityType] ?? c.entityType}</Badge>
+                      </p>
+                      <p className="text-sm text-ink-soft">
+                        {`נמחקה ב-${formatDate(c.deletedAt)}`}
+                        {c.phone ? (
+                          <>
+                            {" · "}
+                            <span dir="ltr">{c.phone}</span>
+                          </>
+                        ) : null}
+                        {c.email ? (
+                          <>
+                            {" · "}
+                            <span dir="ltr">{c.email}</span>
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                    {canWrite ? (
+                      <ActionButton
+                        action={eraseFromAuditAction.bind(null, orgId, c.entityType, c.entityId)}
+                        pendingText="מוחק…"
+                        variant="danger-ghost"
+                        srLabel={c.name ?? undefined}
+                        confirm="למחוק את הפרטים של הרשומה הזו מהיומן? אי אפשר לשחזר אותם."
+                      >
+                        מחיקת הפרטים מהיומן
+                      </ActionButton>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ) : null}
+      </>
+    );
+  }
 
   if (tab === "logins") {
     const events = await listLoginEvents(orgId);

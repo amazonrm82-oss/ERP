@@ -139,6 +139,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   triggers) checks every changed key of `custom_fields` written by `authenticated`/`anon` against
   `field_definitions` with `app.custom_value_ok()`, mirroring `src/features/custom-fields/values.ts`;
   keep the two in step. Unknown keys are rejected (hint `custom_field:invalid`); "required" is app-only.
+- Privacy erasure (migration 0027): `public.audit_erase_record(org, type, id)` (owner/admin, record must be
+  purged first, hint `erase:exists`) sets `changes = {"erased": true}` on the record's audit entries and
+  on those of its deleted tasks/files, empties merge snapshots and unlinked form submissions, and logs
+  action `erase`. `audit_erase_candidates()` is security invoker. Purging a lead empties its submissions.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

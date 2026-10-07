@@ -981,6 +981,9 @@ export type Database = {
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
+      // privacy erasure (migration 0027)
+      audit_erase_candidates: { Args: { p_org: string; p_query: string }; Returns: Json };
+      audit_erase_record: { Args: { p_org: string; p_type: string; p_id: string }; Returns: number };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
       support_session_info: { Args: { p_org: string }; Returns: Json };
       platform_me: { Args: Record<string, never>; Returns: Json };

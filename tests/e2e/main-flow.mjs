@@ -427,6 +427,17 @@ try {
   const purgedLeft = await sql("select count(*)::int as n from public.leads where id = $1", [purgedLeadId]);
   if (purgedLeft[0].n !== 0) throw new Error("the purged lead is still in the database");
 
+  step("privacy request: erase the purged lead from the audit log");
+  await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);
+  await ownerDesk.getByLabel("שם, טלפון או אימייל").fill("ליד למחיקה");
+  await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();
+  await ownerDesk.getByRole("button", { name: /מחיקת הפרטים מהיומן.*ליד למחיקה/ }).click();
+  await shot(ownerDesk, "23b-audit-erase-1280");
+  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await expectText(ownerDesk, "לא נמצאה ביומן רשומה שנמחקה לצמיתות");
+  const leftInLog = await sql("select count(*)::int as n from public.audit_log where entity_id = $1 and changes::text like '%ליד למחיקה%'", [purgedLeadId]);
+  if (leftInLog[0].n !== 0) throw new Error("the erased lead's name is still in the audit log");
+
   step("files: upload to a contact, open, delete");
   await ownerDesk.goto(contactUrl);
   await ownerDesk.waitForLoadState("networkidle");

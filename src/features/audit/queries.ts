@@ -14,13 +14,20 @@ export type AuditItem = {
   entityType: string;
   entityId: string | null;
   changes: AuditChange[];
+  // contents erased on a privacy request (migration 0027)
+  erased: boolean;
 };
 
 export type AuditFilters = { entityType: string | null; actorId: string | null; from: string | null; to: string | null; page: number };
 
 export const AUDIT_PAGE = 50;
 
+function isErased(changes: Json): boolean {
+  return !!changes && typeof changes === "object" && !Array.isArray(changes) && changes.erased === true;
+}
+
 function toChanges(action: string, changes: Json): AuditChange[] {
+  if (isErased(changes)) return [];
   if (action !== "update" && action !== "trash" && action !== "restore") return [];
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) return [];
   return Object.entries(changes).map(([field, value]) => {
@@ -69,6 +76,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
       entityType: r.entity_type,
       entityId: r.entity_id,
       changes: toChanges(r.action, r.changes),
+    erased: isErased(r.changes),
     })),
     more: data.length > AUDIT_PAGE,
     days,
@@ -96,6 +104,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     entityType: r.entity_type,
     entityId: r.entity_id,
     changes: toChanges(r.action, r.changes),
+    erased: isErased(r.changes),
   }));
 }
 
@@ -108,4 +117,21 @@ export async function listLoginEvents(orgId: string): Promise<LoginEvent[]> {
   const rows = (Array.isArray(data) ? data : []) as Array<{ created_at: string; action: string; ip: string | null; user_id: string | null }>;
   const names = await getUserNames(rows.map((r) => r.user_id));
   return rows.map((r) => ({ createdAt: r.created_at, action: r.action, ip: r.ip || null, userName: r.user_id ? (names.get(r.user_id) ?? "משתמש") : "—" }));
+}
+
+export type EraseCandidate = { entityType: string; entityId: string; deletedAt: string; name: string | null; email: string | null; phone: string | null };
+
+/** Permanently deleted leads, contacts, companies and deals in the log that match a name, phone or email. */
+export async function findEraseCandidates(orgId: string, query: string): Promise<EraseCandidate[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("audit_erase_candidates", { p_org: orgId, p_query: query });
+  if (error || !Array.isArray(data)) return [];
+  return (data as Array<Record<string, string | null>>).map((r) => ({
+    entityType: r.entity_type ?? "",
+    entityId: r.entity_id ?? "",
+    deletedAt: r.deleted_at ?? "",
+    name: r.name || null,
+    email: r.email || null,
+    phone: r.phone || null,
+  }));
 }
