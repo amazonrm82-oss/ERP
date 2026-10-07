@@ -29,6 +29,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "feature:api": "חיבור webhook אינו כלול בחבילה הנוכחית. יש לשדרג חבילה.",
   "limit:max_active_automations": "הגעתם למספר האוטומציות הפעילות המרבי בחבילה. כבו אוטומציה אחרת או שדרגו חבילה.",
   "feature:view_seats": "מושבי צפייה אינם כלולים בחבילה הנוכחית. יש לשדרג חבילה.",
+  "limit:storage_gb": "נגמר נפח האחסון בחבילה. כדי להעלות עוד קבצים יש למחוק קבצים ישנים או לשדרג חבילה.",
 };
 
 // P0001 raised without a hint: recognised by the (stable) English message.

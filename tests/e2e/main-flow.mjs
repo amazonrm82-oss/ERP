@@ -424,6 +424,29 @@ try {
   const purgedLeft = await sql("select count(*)::int as n from public.leads where id = $1", [purgedLeadId]);
   if (purgedLeft[0].n !== 0) throw new Error("the purged lead is still in the database");
 
+  step("files: upload to a contact, open, delete");
+  await ownerDesk.goto(contactUrl);
+  await ownerDesk.waitForLoadState("networkidle");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await ownerDesk.getByLabel("בחירת קבצים").setInputFiles([
+    { name: "תמונה.png", mimeType: "image/png", buffer: png },
+    { name: "הצעת מחיר.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%test\n") },
+    { name: "דף.html", mimeType: "text/html", buffer: Buffer.from("<script>alert(1)</script>") },
+  ]);
+  await expectText(ownerDesk, "אי אפשר להעלות את סוג הקובץ של דף.html");
+  await ownerDesk.getByRole("link", { name: "הצעת מחיר.pdf" }).waitFor({ timeout: 15000 });
+  await ownerDesk.getByRole("link", { name: "תמונה.png" }).waitFor();
+  await shot(ownerDesk, "26-files-1280");
+  const imageHref = await ownerDesk.getByRole("link", { name: "תמונה.png" }).getAttribute("href");
+  const openedFile = await ownerDesk.request.get(`${APP}${imageHref}`);
+  if (openedFile.status() !== 200 || !(openedFile.headers()["content-type"] ?? "").startsWith("image/png")) throw new Error(`file did not open: ${openedFile.status()}`);
+  await ownerDesk.getByRole("button", { name: /מחיקה.*הצעת מחיר\.pdf/ }).click();
+  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("link", { name: "הצעת מחיר.pdf" }).waitFor({ state: "detached", timeout: 15000 });
+  const objectsLeft = await sql("select count(*)::int as n from storage.objects o join public.files f on f.storage_path = o.name where f.name = 'הצעת מחיר.pdf'");
+  if (objectsLeft[0].n !== 0) throw new Error("the deleted file is still in storage");
+  console.log("files: uploaded 2, refused 1, opened the image, deleted the PDF");
+
   // ---------------------------------------------------------------- section 3: customization
   step("pipelines: create, add a stage, switch on the board");
   await ownerDesk.goto(`${orgUrl}/settings/pipelines`);

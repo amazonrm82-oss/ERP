@@ -21,6 +21,8 @@ import { listTags } from "@/features/tags/queries";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
+import { RecordFiles } from "@/features/files/components/record-files";
+import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "עסקה" };
 
@@ -57,6 +59,7 @@ export default async function DealPage({ params }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} />
+          <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <RecordHistory orgId={orgId} entityType="deals" entityId={deal.id} />
         </div>
 

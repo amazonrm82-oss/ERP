@@ -20,6 +20,8 @@ import { listTags } from "@/features/tags/queries";
 import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
+import { RecordFiles } from "@/features/files/components/record-files";
+import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "חברה" };
 
@@ -54,6 +56,7 @@ export default async function CompanyPage({ params }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
+          <RecordFiles orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <RecordHistory orgId={orgId} entityType="companies" entityId={company.id} />
         </div>
 

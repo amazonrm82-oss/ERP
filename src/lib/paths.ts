@@ -28,6 +28,7 @@ export const paths = {
   deal: (orgId: string, dealId: string) => `/o/${orgId}/deals/${dealId}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
   notifications: (orgId: string) => `/o/${orgId}/notifications`,
+  file: (orgId: string, fileId: string) => `/o/${orgId}/files/${fileId}`,
   reports: (orgId: string) => `/o/${orgId}/reports`,
   report: (orgId: string, key: string) => `/o/${orgId}/reports/${key}`,
   settings: (orgId: string) => `/o/${orgId}/settings`,

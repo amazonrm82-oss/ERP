@@ -65,6 +65,27 @@ as $$
     ), '')::uuid
 $$;
 
+-- Storage: the bucket list and the objects table (RLS on, as in Supabase)
+create schema storage;
+create table storage.buckets (
+  id              text primary key,
+  name            text not null,
+  public          boolean default false,
+  file_size_limit bigint
+);
+create table storage.objects (
+  id         uuid primary key default gen_random_uuid(),
+  bucket_id  text references storage.buckets (id),
+  name       text,
+  owner      uuid,
+  created_at timestamptz default now(),
+  unique (bucket_id, name)
+);
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated, service_role;
+
 grant usage on schema public, auth, extensions to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 

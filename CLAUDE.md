@@ -120,6 +120,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `on delete set null (x_id)`; the `before delete` trigger `app.purge_links()` first deletes the ones
   that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
   (`app.purge_trash()`, 02:30 UTC) deletes what has been in the recycle bin for 30 days.
+- Files (migration 0019): `public.files` rows (one subject each; path `<org>/<file id>` and uploader set
+  by trigger; plan cap `storage_gb`) and the private bucket `record-files`. The `storage.objects`
+  policies look up `public.files` with the caller's rights; write `objects.name` there, never bare
+  `name` (files has a `name` column). The browser uploads with the user's session after
+  `prepareUploadAction`; downloads go through `/o/[orgId]/files/[fileId]` (one-minute signed link).
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

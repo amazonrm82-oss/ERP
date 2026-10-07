@@ -66,6 +66,10 @@ describe("tenant isolation", () => {
           [orgA, ids.leadA],
         )
       ).rows[0].id;
+      await q(
+        "insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'הצעה.pdf', 'application/pdf', 1000)",
+        [orgA, ids.leadA],
+      );
       ids.tagA = (
         await q<{ id: string }>("insert into public.tags (organization_id, name) values ($1, 'VIP') returning id", [orgA])
       ).rows[0].id;
@@ -120,6 +124,7 @@ describe("tenant isolation", () => {
     "automation_runs",
     "import_jobs",
     "support_access_grants",
+    "files",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -223,6 +228,7 @@ describe("tenant isolation", () => {
       automation_runs: "status = status",
       import_jobs: "status = status",
       support_access_grants: "revoked_at = revoked_at",
+      files: "name = name",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -286,6 +292,7 @@ describe("tenant isolation", () => {
       ["insert into public.automation_runs (organization_id, automation_id, entity_type, entity_id, run_key, status) values ($1, $2, 'lead', $3, 'x', 'success')", [orgA, ids.automationA, ids.leadA]],
       ["insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'x.csv', 'skip')", [orgA]],
       ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
+      ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -334,6 +341,7 @@ describe("tenant isolation", () => {
       ["import_jobs", "status = 'failed'", "status = 'failed'"],
       ["support_access_grants", "revoked_at = '2001-01-01'", "revoked_at = '2001-01-01'"],
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
+      ["files", "name = 'HACKED'", "name = 'HACKED'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>
@@ -435,6 +443,14 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaActivity.code);
+
+    // a file in org B hung on org A's lead
+    const viaFile = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgB, ids.leadA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaFile.code);
 
     // sanity: the same inserts work with org B's own ids
     await asUser(b.id, (q) =>

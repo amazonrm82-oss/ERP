@@ -345,6 +345,21 @@ export type SupportAccessGrantRow = {
   updated_at: string;
 };
 
+export type FileRow = {
+  id: string;
+  organization_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  name: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_path: string;
+  uploaded_by: string | null;
+  created_at: string;
+};
+
 export type PlatformRole = "owner" | "support" | "finance" | "readonly";
 
 export type AuditLogRow = {
@@ -848,6 +863,21 @@ export type Database = {
       audit_log: ReadOnlyTable<AuditLogRow>;
       notifications: Table<NotificationRow, Record<string, never>, { read_at?: string | null }>;
       support_access_grants: Table<SupportAccessGrantRow, { organization_id: string; expires_at: string }, { revoked_at?: string | null }>;
+      // files on records (migration 0019): the path and the uploader are set by trigger; no updates
+      files: Table<
+        FileRow,
+        {
+          organization_id: string;
+          lead_id?: string | null;
+          contact_id?: string | null;
+          company_id?: string | null;
+          deal_id?: string | null;
+          name: string;
+          mime_type: string;
+          size_bytes: number;
+        },
+        Record<string, never>
+      >;
       import_jobs: Table<
         ImportJobRow,
         { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number },
