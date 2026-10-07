@@ -116,6 +116,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
+- Purge (migration 0018): activities and tasks reference leads/contacts/companies/deals with
+  `on delete set null (x_id)`; the `before delete` trigger `app.purge_links()` first deletes the ones
+  that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
+  (`app.purge_trash()`, 02:30 UTC) deletes what has been in the recycle bin for 30 days.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).

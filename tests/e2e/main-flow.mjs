@@ -408,6 +408,22 @@ try {
   await ownerDesk.goto(contactUrl);
   await expectText(ownerDesk, "פרטי איש הקשר");
 
+  step("recycle bin: an admin deletes a lead for good");
+  await ownerDesk.goto(`${orgUrl}/leads/new`);
+  await ownerDesk.getByLabel("שם מלא").fill("ליד למחיקה");
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+  const purgedLeadId = new URL(ownerDesk.url()).pathname.split("/").pop();
+  await ownerDesk.getByRole("button", { name: "העברה לסל המחזור" }).click();
+  await ownerDesk.getByRole("button", { name: "כן, להעביר לסל" }).click();
+  await ownerDesk.waitForURL(/\/leads$/);
+  await ownerDesk.goto(`${orgUrl}/settings/trash`);
+  await ownerDesk.getByRole("button", { name: /מחיקה לצמיתות.*ליד למחיקה/ }).click();
+  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await expectText(ownerDesk, "סל המחזור ריק");
+  const purgedLeft = await sql("select count(*)::int as n from public.leads where id = $1", [purgedLeadId]);
+  if (purgedLeft[0].n !== 0) throw new Error("the purged lead is still in the database");
+
   // ---------------------------------------------------------------- section 3: customization
   step("pipelines: create, add a stage, switch on the board");
   await ownerDesk.goto(`${orgUrl}/settings/pipelines`);
