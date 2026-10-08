@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
+import type { InlineEditing } from "@/features/inline-edit/server";
 import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
@@ -20,10 +22,12 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // editing name and owner in the cell (LST-06)
+  editing: InlineEditing;
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing }: Props) {
   return (
     <ListTable
       label="טבלת אנשי קשר"
@@ -37,9 +41,20 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
       customValues={(contact) => asCustomValues(contact.customFields)}
       nameCell={(contact) => (
         <>
-          <Link href={paths.contact(orgId, contact.id)} className="font-medium text-ink underline-offset-4 hover:underline">
-            {contactDisplayName(contact)}
-          </Link>
+          <InlineEdit
+            orgId={orgId}
+            object="contact"
+            id={contact.id}
+            field="name"
+            kind="person"
+            label={`שם: ${contactDisplayName(contact)}`}
+            initial={{ first: contact.firstName ?? "", last: contact.lastName ?? "" }}
+            canEdit={editing.canEdit(contact.ownerId)}
+          >
+            <Link href={paths.contact(orgId, contact.id)} className="font-medium text-ink underline-offset-4 hover:underline">
+              {contactDisplayName(contact)}
+            </Link>
+          </InlineEdit>
           {contact.jobTitle && !columns.some((c) => c.key === "job_title") ? (
             <span className="block text-sm text-ink-soft">{contact.jobTitle}</span>
           ) : null}
@@ -64,7 +79,22 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
           case "company":
             return contact.companyName;
           case "owner":
-            return contact.ownerName;
+            return (
+              <InlineEdit
+                orgId={orgId}
+                object="contact"
+                id={contact.id}
+                field="owner"
+                kind="select"
+                label={`בעלים: ${contactDisplayName(contact)}`}
+                initial={{ id: contact.ownerId }}
+                options={editing.owners}
+                emptyOption="ללא בעלים"
+                canEdit={editing.canReassign(contact.ownerId)}
+              >
+                {contact.ownerName}
+              </InlineEdit>
+            );
           case "created":
             return (
               <time dateTime={contact.createdAt} className="whitespace-nowrap text-ink-soft">

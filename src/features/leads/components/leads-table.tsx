@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
+import type { InlineEditing } from "@/features/inline-edit/server";
 import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
@@ -23,11 +25,15 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // editing name, status and owner in the cell (LST-06)
+  editing: InlineEditing;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
+  // "converted" is set only by the conversion
+  const statusOptions = statuses.filter((s) => s.kind !== "converted").map((s) => ({ value: s.id, label: s.name, needsReason: s.kind === "disqualified" }));
   const sourceById = new Map(sources.map((source) => [source.id, source.name]));
 
   return (
@@ -43,9 +49,20 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
       customValues={(lead) => asCustomValues(lead.customFields)}
       nameCell={(lead) => (
         <>
-          <Link href={paths.lead(orgId, lead.id)} className="font-medium text-ink underline-offset-4 hover:underline">
-            {leadDisplayName(lead)}
-          </Link>
+          <InlineEdit
+            orgId={orgId}
+            object="lead"
+            id={lead.id}
+            field="name"
+            kind="text"
+            label={`שם: ${leadDisplayName(lead)}`}
+            initial={{ text: lead.fullName ?? "" }}
+            canEdit={editing.canEdit(lead.ownerId)}
+          >
+            <Link href={paths.lead(orgId, lead.id)} className="font-medium text-ink underline-offset-4 hover:underline">
+              {leadDisplayName(lead)}
+            </Link>
+          </InlineEdit>
           {lead.companyName && !columns.some((c) => c.key === "company") ? (
             <span className="block text-sm text-ink-soft">{lead.companyName}</span>
           ) : null}
@@ -70,12 +87,41 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
             return lead.companyName;
           case "status": {
             const status = statusById.get(lead.statusId);
-            return <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>;
+            return (
+              <InlineEdit
+                orgId={orgId}
+                object="lead"
+                id={lead.id}
+                field="status"
+                kind="select"
+                label={`סטטוס: ${leadDisplayName(lead)}`}
+                initial={{ id: lead.statusId }}
+                options={statusOptions}
+                canEdit={status?.kind !== "converted" && editing.canEdit(lead.ownerId)}
+              >
+                <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
+              </InlineEdit>
+            );
           }
           case "source":
             return lead.sourceId ? sourceById.get(lead.sourceId) : null;
           case "owner":
-            return lead.ownerName;
+            return (
+              <InlineEdit
+                orgId={orgId}
+                object="lead"
+                id={lead.id}
+                field="owner"
+                kind="select"
+                label={`בעלים: ${leadDisplayName(lead)}`}
+                initial={{ id: lead.ownerId }}
+                options={editing.owners}
+                emptyOption="ללא בעלים"
+                canEdit={editing.canReassign(lead.ownerId)}
+              >
+                {lead.ownerName}
+              </InlineEdit>
+            );
           case "created":
             return (
               <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">

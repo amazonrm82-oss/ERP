@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { inlineEditing } from "@/features/inline-edit/server";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { LeadsTable } from "@/features/leads/components/leads-table";
@@ -52,7 +53,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof LEAD_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
-  const [lookups, tags, viewData, list, board] = await Promise.all([
+  const [editing, lookups, tags, viewData, list, board] = await Promise.all([
+    inlineEditing(orgId, context),
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
@@ -171,6 +173,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
           fields={listColumns.fields}
           sort={sort}
           sortHref={sortHref}
+          editing={editing}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

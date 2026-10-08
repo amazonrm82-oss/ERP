@@ -13,6 +13,7 @@ export type CompanyListItem = {
   phone: string | null;
   city: string | null;
   website: string | null;
+  ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
   customFields: Json;
@@ -67,6 +68,7 @@ export async function listCompanies(
       phone: row.phone,
       city: row.city,
       website: row.website,
+      ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
       customFields: row.custom_fields,

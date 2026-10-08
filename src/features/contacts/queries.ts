@@ -10,10 +10,13 @@ import { createClient } from "@/lib/supabase/server";
 export type ContactListItem = {
   id: string;
   fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   phone: string | null;
   email: string | null;
   jobTitle: string | null;
   companyName: string | null;
+  ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
   customFields: Json;
@@ -58,7 +61,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, phone, email, job_title, company_id, owner_id, created_at, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, email, job_title, company_id, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -96,10 +99,13 @@ export async function listContacts(
     contacts: rows.map((row) => ({
       id: row.id,
       fullName: row.full_name,
+      firstName: row.first_name,
+      lastName: row.last_name,
       phone: row.phone,
       email: row.email,
       jobTitle: row.job_title,
       companyName: row.company_id ? (companies.get(row.company_id) ?? null) : null,
+      ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
       customFields: row.custom_fields,

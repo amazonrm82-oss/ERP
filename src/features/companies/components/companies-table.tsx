@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
+import type { InlineEditing } from "@/features/inline-edit/server";
 import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
@@ -19,10 +21,12 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // editing name and owner in the cell (LST-06)
+  editing: InlineEditing;
 };
 
 /** Companies as a table, with the columns the user chose. */
-export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref }: Props) {
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing }: Props) {
   return (
     <ListTable
       label="טבלת חברות"
@@ -35,9 +39,20 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
       sortHref={sortHref}
       customValues={(company) => asCustomValues(company.customFields)}
       nameCell={(company) => (
-        <Link href={paths.company(orgId, company.id)} className="font-medium text-ink underline-offset-4 hover:underline">
-          {company.name}
-        </Link>
+        <InlineEdit
+          orgId={orgId}
+          object="company"
+          id={company.id}
+          field="name"
+          kind="text"
+          label={`שם: ${company.name}`}
+          initial={{ text: company.name }}
+          canEdit={editing.canEdit(company.ownerId)}
+        >
+          <Link href={paths.company(orgId, company.id)} className="font-medium text-ink underline-offset-4 hover:underline">
+            {company.name}
+          </Link>
+        </InlineEdit>
       )}
       cell={(key, company) => {
         switch (key) {
@@ -56,7 +71,22 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
               </span>
             ) : null;
           case "owner":
-            return company.ownerName;
+            return (
+              <InlineEdit
+                orgId={orgId}
+                object="company"
+                id={company.id}
+                field="owner"
+                kind="select"
+                label={`בעלים: ${company.name}`}
+                initial={{ id: company.ownerId }}
+                options={editing.owners}
+                emptyOption="ללא בעלים"
+                canEdit={editing.canReassign(company.ownerId)}
+              >
+                {company.ownerName}
+              </InlineEdit>
+            );
           case "created":
             return (
               <time dateTime={company.createdAt} className="whitespace-nowrap text-ink-soft">

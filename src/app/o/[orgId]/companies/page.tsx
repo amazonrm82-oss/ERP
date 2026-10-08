@@ -9,6 +9,7 @@ import { PlusIcon, SearchIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
+import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -46,7 +47,8 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
   const sortKeys = [...Object.keys(COMPANY_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
-  const [tags, viewData, { companies, hasMore }] = await Promise.all([
+  const [editing, tags, viewData, { companies, hasMore }] = await Promise.all([
+    inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "company", context),
     listCompanies(orgId, { search, tagId, page, sort, filter: filter.logic }),
@@ -146,6 +148,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
           fields={listColumns.fields}
           sort={sort}
           sortHref={sortHref}
+          editing={editing}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

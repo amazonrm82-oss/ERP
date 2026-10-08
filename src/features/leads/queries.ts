@@ -48,6 +48,7 @@ export type LeadListItem = {
   companyName: string | null;
   statusId: string;
   sourceId: string | null;
+  ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
   customFields: Json;
@@ -126,6 +127,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       companyName: row.company_name,
       statusId: row.status_id,
       sourceId: row.source_id,
+      ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
       customFields: row.custom_fields,

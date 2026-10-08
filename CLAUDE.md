@@ -164,6 +164,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Advanced filters (LST-05, no migration): `src/features/list-filters/`. The tree travels as JSON in `f=`;
   `filterToPostgrest()` checks every field/op/value against the list's fields and builds one PostgREST
   logic tree for `.or()`. Values are double-quoted with `"` and `\` removed; ids must be in the options.
+- Inline editing (LST-06, no migration): `src/features/inline-edit/`. `inlineEditAction()` updates name /
+  owner with the user's session (0 rows = not permitted); lead status goes through `setLeadStatus()`
+  (`src/features/leads/status.ts`), shared with the status form and the board.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

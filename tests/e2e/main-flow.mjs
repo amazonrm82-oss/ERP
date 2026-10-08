@@ -731,6 +731,63 @@ try {
   await invitee.getByRole("link", { name: /לפי שם, לצוות/ }).click();
   await invitee.waitForURL(/sv=/);
   await expectText(invitee, "העמודות לפי התצוגה");
+
+  step("inline editing: name, status and owner change in the list's cell");
+  const orgIdNow = orgUrl.split("/").pop();
+  const pollLead = async (id, test, what) => {
+    for (let i = 0; i < 60; i++) {
+      const [row] = await sql("select full_name, status_id, owner_id from public.leads where id = $1", [id]);
+      if (test(row)) return row;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error(`inline edit not saved: ${what}`);
+  };
+  const [inlineLead] = await sql(
+    `select l.id, l.full_name, l.owner_id, l.status_id from public.leads l join public.lead_statuses s on s.organization_id = l.organization_id and s.id = l.status_id
+      where l.organization_id = $1 and l.deleted_at is null and l.full_name is not null and s.kind = 'open' and l.converted_at is null order by l.created_at desc limit 1`,
+    [orgIdNow],
+  );
+  const [{ id: otherStatus, name: otherStatusName }] = await sql(
+    "select id, name from public.lead_statuses where organization_id = $1 and kind = 'open' and id <> $2 order by position limit 1",
+    [orgIdNow, inlineLead.status_id],
+  );
+  const [{ id: danaId }] = await sql("select id from auth.users where email = $1", [inviteeEmail]);
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  const inlineRow = () => ownerDesk.locator("tbody tr", { has: ownerDesk.getByRole("link", { name: inlineLead.full_name, exact: true }) });
+  // the name: Enter saves
+  await inlineRow().getByRole("button", { name: `עריכת שם: ${inlineLead.full_name}` }).click();
+  await ownerDesk.getByRole("textbox", { name: `שם: ${inlineLead.full_name}` }).fill(`${inlineLead.full_name} בדיקה`);
+  await shot(ownerDesk, "34-inline-edit-1280");
+  await ownerDesk.getByRole("textbox", { name: `שם: ${inlineLead.full_name}` }).press("Enter");
+  await pollLead(inlineLead.id, (r) => r.full_name === `${inlineLead.full_name} בדיקה`, "name");
+  // Escape cancels without saving
+  const renamed = `${inlineLead.full_name} בדיקה`;
+  const row2 = () => ownerDesk.locator("tbody tr", { has: ownerDesk.getByRole("link", { name: renamed, exact: true }) });
+  await row2().getByRole("button", { name: `עריכת שם: ${renamed}` }).click();
+  await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).fill("לא נשמר");
+  await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).press("Escape");
+  await row2().getByRole("button", { name: `עריכת שם: ${renamed}` }).waitFor();
+  // the status
+  await row2().getByRole("button", { name: `עריכת סטטוס: ${renamed}` }).click();
+  await row2().getByRole("combobox", { name: `סטטוס: ${renamed}` }).selectOption(otherStatus);
+  await row2().getByRole("button", { name: "שמירה" }).click();
+  await pollLead(inlineLead.id, (r) => r.status_id === otherStatus, "status");
+  await row2().getByText(otherStatusName).waitFor({ timeout: 15000 });
+  // the owner: to Dana, and back
+  await row2().getByRole("button", { name: `עריכת בעלים: ${renamed}` }).click();
+  await row2().getByRole("combobox", { name: `בעלים: ${renamed}` }).selectOption(danaId);
+  await row2().getByRole("button", { name: "שמירה" }).click();
+  await pollLead(inlineLead.id, (r) => r.owner_id === danaId, "owner");
+  await row2().getByText("דנה חברה").waitFor({ timeout: 15000 });
+  await row2().getByRole("button", { name: `עריכת בעלים: ${renamed}` }).click();
+  await row2().getByRole("combobox", { name: `בעלים: ${renamed}` }).selectOption(inlineLead.owner_id);
+  await row2().getByRole("button", { name: "שמירה" }).click();
+  await pollLead(inlineLead.id, (r) => r.owner_id === inlineLead.owner_id, "owner back");
+  // and the name back, so later steps find the lead as before
+  await row2().getByRole("button", { name: `עריכת שם: ${renamed}` }).click();
+  await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).fill(inlineLead.full_name);
+  await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).press("Enter");
+  await pollLead(inlineLead.id, (r) => r.full_name === inlineLead.full_name, "name back");
   await ownerDesk.goto(leadUrl);
 
   // ---------------------------------------------------------------- section 4: lead intake

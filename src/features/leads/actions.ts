@@ -3,12 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
-import type { ConvertLeadResult, Database } from "@/lib/database.types";
+import type { ConvertLeadResult } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { normalizePhone } from "@/lib/phone";
@@ -16,6 +14,7 @@ import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
 import { changeStatusSchema, convertLeadSchema, createLeadSchema, LEAD_FIELD_NAMES, updateLeadSchema } from "./schema";
+import { setLeadStatus } from "./status";
 
 function revalidateLead(orgId: string, leadId?: string) {
   revalidatePath(paths.leads(orgId));
@@ -169,46 +168,6 @@ export async function changeLeadStatusAction(
 
   revalidateLead(orgId, leadId);
   return ok();
-}
-
-type StatusResult = { ok: true } | { ok: false; message: string; needsReason?: boolean };
-
-/**
- * The rules of a status change, shared by the status form and the leads board:
- * the status must belong to the organization, "converted" is set only by the
- * conversion, and "not relevant" needs a reason.
- */
-async function setLeadStatus(
-  supabase: SupabaseClient<Database>,
-  orgId: string,
-  leadId: string,
-  statusId: string,
-  reason: string | null,
-): Promise<StatusResult> {
-  const { data: status } = await supabase.from("lead_statuses").select("id, kind").eq("organization_id", orgId).eq("id", statusId).maybeSingle();
-  if (!status) {
-    return { ok: false, message: "הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב." };
-  }
-  if (status.kind === "converted") {
-    return { ok: false, message: 'כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.' };
-  }
-  if (status.kind === "disqualified" && !reason) {
-    return { ok: false, message: "יש לציין למה הליד לא רלוונטי.", needsReason: true };
-  }
-  const { data, error } = await supabase
-    .from("leads")
-    .update({ status_id: status.id, disqualify_reason: status.kind === "disqualified" ? reason : null })
-    .eq("organization_id", orgId)
-    .eq("id", leadId)
-    .is("deleted_at", null)
-    .select("id");
-  if (error) {
-    return { ok: false, message: dbErrorMessage(error, "לא הצלחנו לעדכן את הסטטוס. נסו שוב.") };
-  }
-  if (data.length === 0) {
-    return { ok: false, message: NOT_FOUND_OR_FORBIDDEN };
-  }
-  return { ok: true };
 }
 
 /** From the leads board: a card dropped on another status (a reason comes with "not relevant"). */
