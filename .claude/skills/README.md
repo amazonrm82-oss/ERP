@@ -14,3 +14,6 @@ skill says. Licenses are inside each folder.
 | differential-review, sharp-edges | trailofbits/skills (CC BY-SA 4.0) | `allowed-tools` removed from differential-review |
 | saas-adversarial-audit | jlacera/saas-claude-skills (MIT) | Spanish; do not run its scanner against production |
 | database-schema-designer, process-mapper, procurement-optimizer, vendor-management | alirezarezvani/claude-skills (MIT) | general guidance for new systems and ERP/purchasing modules |
+| accessibility-review, design-critique, ux-copy, design-handoff | anthropics/knowledge-work-plugins `design` (Apache 2.0) | |
+| design-taste-frontend, redesign-existing-projects | Leonxlnx/taste-skill (MIT) | aimed at marketing sites; the CRM keeps its own RTL and accessibility rules |
+| web-design-guidelines | vercel-labs/agent-skills + web-interface-guidelines (MIT) | rules copied locally on 2026-10-08 instead of fetched live |
