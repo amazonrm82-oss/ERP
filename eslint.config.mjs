@@ -23,6 +23,30 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // FXC-08: the service-role key has three uses only (CLAUDE.md, hard rule 5); a new one is the owner's decision
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: [
+      "src/lib/supabase/service.ts",
+      "src/features/intake/server.ts",
+      "src/features/intake/public-form.ts",
+      "src/features/notifications/push-server.ts",
+      "src/features/files/cleanup-server.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^@/lib/supabase/service$|/supabase/service$)",
+              message: "The service-role key is only for the uses listed in CLAUDE.md (hard rule 5). Ask the owner before adding one.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

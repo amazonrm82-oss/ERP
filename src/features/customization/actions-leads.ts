@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, booleanArg, directionArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { must } from "@/lib/db-read";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -96,6 +97,7 @@ export async function updateStatusAction(orgId: string, statusId: string, _prev:
 }
 
 export async function moveStatusAction(orgId: string, statusId: string, direction: "up" | "down"): Promise<ActionResult> {
+  if (!validArg(directionArg, direction)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, statusId);
   if (!context.ok) {
     return context;
@@ -232,6 +234,7 @@ export async function renameSourceAction(orgId: string, sourceId: string, _prev:
 
 /** A hidden source stays on existing records but is no longer offered in forms. */
 export async function setSourceActiveAction(orgId: string, sourceId: string, isActive: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, isActive)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, sourceId);
   if (!context.ok) {
     return context;

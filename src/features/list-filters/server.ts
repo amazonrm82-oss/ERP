@@ -7,6 +7,7 @@ import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
 
 import { OPS_BY_KIND, valueKind, type FilterField, type FilterKind, type FilterOp, type FilterTree } from "./model";
+import { isCalendarDate } from "@/lib/calendar-date";
 
 export type FilterObject = ListObject;
 
@@ -150,7 +151,6 @@ export function publicFields(fields: ServerField[]): FilterField[] {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 // a value inside a PostgREST filter: double-quoted, so commas and parentheses cannot break out
 const quote = (value: string) => `"${value.replace(/["\\]/g, "")}"`;
@@ -213,7 +213,7 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
       const bound = (day: string) => (field.kind === "date" ? quote(zonedIso(day, "00:00:00", zone)) : quote(day));
       const range = (from: string, toExclusive: string) => `and(${c}.gte.${bound(from)},${c}.lt.${bound(toExclusive)})`;
       if (op === "on_or_after" || op === "before") {
-        if (!DAY.test(value)) return null;
+        if (!isCalendarDate(value)) return null;
         return op === "on_or_after" ? `${c}.gte.${bound(value)}` : `${c}.lt.${bound(value)}`;
       }
       if (op === "last_days" || op === "older_than_days") {

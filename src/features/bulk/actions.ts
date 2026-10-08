@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { setLeadStatus } from "@/features/leads/status";
+import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
@@ -39,7 +41,19 @@ async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): P
   return done;
 }
 
+// the shape of BulkChange, checked at runtime (FXC-08)
+const changeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("owner"), ownerId: z.string().nullable() }),
+  z.object({ kind: z.literal("status"), statusId: z.string(), reason: z.string().max(2000).nullish() }),
+  z.object({ kind: z.literal("stage"), stageId: z.string() }),
+  z.object({ kind: z.literal("tag"), tagId: z.string() }),
+  z.object({ kind: z.literal("trash") }),
+]);
+
 export async function bulkAction(orgId: string, object: BulkObject, ids: string[], change: BulkChange): Promise<ActionResult<BulkOutcome>> {
+  if (!validArg(changeSchema, change) || !validArg(z.array(z.string()), ids)) {
+    return fail(INVALID_ARGS);
+  }
   if (!(object in TABLE) || !Array.isArray(ids) || ids.length === 0) {
     return fail("לא נבחרו רשומות.");
   }

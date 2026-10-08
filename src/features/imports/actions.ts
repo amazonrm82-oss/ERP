@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -57,6 +58,9 @@ export async function startImportAction(
   orgId: string,
   input: { entity: string; mode: string; fileName: string; totalRows: number },
 ): Promise<ActionResult<{ jobId: string }>> {
+  if (!validArg(z.object({ entity: z.string(), mode: z.string(), fileName: z.string().max(2000), totalRows: z.number() }), input)) {
+    return fail(INVALID_ARGS);
+  }
   const context = await actionContext(orgId);
   if (!context.ok) return context;
   const entity = entitySchema.safeParse(input.entity);
@@ -137,6 +141,9 @@ export async function finishImportAction(
   jobId: string,
   input: { updated: number; skipped: number; failed: number; stopped: boolean },
 ): Promise<ActionResult> {
+  if (!validArg(z.object({ updated: z.number(), skipped: z.number(), failed: z.number(), stopped: z.boolean() }), input)) {
+    return fail(INVALID_ARGS);
+  }
   const context = await actionContext(orgId, jobId);
   if (!context.ok) return context;
   const { data: job, error: jobError } = await context.supabase.from("import_jobs").select("entity_type").eq("organization_id", orgId).eq("id", jobId).maybeSingle();

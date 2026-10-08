@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, directionArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { must } from "@/lib/db-read";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -282,6 +283,7 @@ export async function updateStageAction(orgId: string, stageId: string, _prev: F
 }
 
 export async function moveStageAction(orgId: string, stageId: string, direction: "up" | "down"): Promise<ActionResult> {
+  if (!validArg(directionArg, direction)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, stageId);
   if (!context.ok) {
     return context;

@@ -12,6 +12,7 @@ import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { IDENTITY_CHECKS } from "./labels";
+import { isCalendarDate } from "@/lib/calendar-date";
 
 const ORG_STATUSES = ["trial", "active", "past_due", "read_only", "suspended", "cancelled"] as const;
 
@@ -53,7 +54,7 @@ export async function updateSubscriptionAction(orgId: string, _prev: FormState, 
   if (seats !== null && (!Number.isInteger(seats) || seats < 1 || seats > 10_000)) {
     return fail("מספר המושבים אינו תקין.", { values: formValues(formData) });
   }
-  if (trialText !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(trialText)) {
+  if (trialText !== "" && !isCalendarDate(trialText)) {
     return fail("התאריך אינו תקין.", { values: formValues(formData) });
   }
   const { error } = await supabase.rpc("platform_update_subscription", {

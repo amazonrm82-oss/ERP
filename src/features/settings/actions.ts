@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { MembershipStatus } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -179,6 +180,7 @@ export async function setMemberStatusAction(orgId: string, userId: string, statu
  * their own; admins anyone's (RLS).
  */
 export async function setAvailabilityAction(orgId: string, userId: string, available: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, available)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, userId);
   if (!context.ok) {
     return context;

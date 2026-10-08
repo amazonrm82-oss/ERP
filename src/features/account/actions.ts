@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { getSessionUser } from "@/lib/auth";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN, SESSION_EXPIRED } from "@/lib/errors";
@@ -21,6 +22,7 @@ export async function signOutOthersAction(orgId: string): Promise<ActionResult> 
 
 /** Organization-wide two-step verification (owner and admins; the database checks). */
 export async function setRequireMfaAction(orgId: string, required: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, required)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId);
   if (!context.ok) return context;
   const { data, error } = await context.supabase.from("organizations").update({ require_mfa: required }).eq("id", orgId).select("id");

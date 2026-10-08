@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, booleanArg, directionArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
@@ -105,6 +106,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
 
 /** A hidden field disappears from forms and cards; the values already stored are kept. */
 export async function setFieldActiveAction(orgId: string, fieldId: string, isActive: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, isActive)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, fieldId);
   if (!context.ok) {
     return context;
@@ -126,6 +128,7 @@ export async function setFieldActiveAction(orgId: string, fieldId: string, isAct
 }
 
 export async function moveFieldAction(orgId: string, fieldId: string, direction: "up" | "down"): Promise<ActionResult> {
+  if (!validArg(directionArg, direction)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, fieldId);
   if (!context.ok) {
     return context;

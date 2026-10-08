@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
@@ -46,6 +47,7 @@ const subscriptionSchema = z.object({
 
 /** Saves this browser's Web Push subscription for the signed-in user (the database sets user_id). */
 export async function savePushSubscriptionAction(orgId: string, subscription: unknown, userAgent: string): Promise<ActionResult> {
+  if (!validArg(optionalTextArg(300), userAgent)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
@@ -59,7 +61,7 @@ export async function savePushSubscriptionAction(orgId: string, subscription: un
   await context.supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
   const { error } = await context.supabase
     .from("push_subscriptions")
-    .insert({ endpoint, p256dh: keys.p256dh, auth: keys.auth, user_agent: userAgent.slice(0, 300) || null });
+    .insert({ endpoint, p256dh: keys.p256dh, auth: keys.auth, user_agent: userAgent?.slice(0, 300) || null });
   if (error) {
     // 23505: the endpoint is registered to another user who signed in on this browser before
     return fail(error.code === "23505" ? "הדפדפן הזה רשום להתראות של משתמש אחר. יש לבטל שם קודם." : dbErrorMessage(error, "לא הצלחנו להפעיל התראות. נסו שוב."));
@@ -68,6 +70,7 @@ export async function savePushSubscriptionAction(orgId: string, subscription: un
 }
 
 export async function deletePushSubscriptionAction(orgId: string, endpoint: string): Promise<ActionResult> {
+  if (!validArg(z.string().url().max(2000), endpoint)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;

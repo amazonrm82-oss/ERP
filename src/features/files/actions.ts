@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { subjectSchema, type TimelineSubject } from "@/features/activities/schema";
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
@@ -63,6 +64,7 @@ export async function prepareUploadAction(
 
 /** Step 2: the upload is done (or failed, and the row goes away). */
 export async function finishUploadAction(orgId: string, subject: TimelineSubject, fileId: string, uploaded: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, uploaded)) return fail(INVALID_ARGS);
   const parsedSubject = subjectSchema.safeParse(subject);
   if (!parsedSubject.success || !isUuid(fileId)) return fail(NOT_FOUND_OR_FORBIDDEN);
   const context = await actionContext(orgId, fileId);

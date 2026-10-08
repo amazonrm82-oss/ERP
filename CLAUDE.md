@@ -287,6 +287,9 @@ that back.
 - Feature folders: `src/features/<area>/{queries,actions,schema}.ts` + `components/`.
   Shared primitives in `src/components/ui/`. No PostgREST embedding so far; lookups are fetched
   separately and joined in code.
+- Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with
+  zod via `validArg()` (`src/lib/action-args.ts`, FXC-08). Dates go through `isCalendarDate()`. Importing
+  `@/lib/supabase/service` outside the allowed files fails lint.
 - A database read checks its error (FXC-05, enforced by lint): pages use `must()` from
   `src/lib/db-read.ts` (throws, so error.tsx shows), Server Actions return `fail(dbErrorMessage(error))`.
 - An update blocked by RLS returns zero rows and no error: always select the id back and treat

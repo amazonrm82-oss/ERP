@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { setLeadStatus } from "@/features/leads/status";
+import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -31,7 +32,19 @@ const RECORD = { lead: paths.lead, contact: paths.contact, company: paths.compan
 
 const text = (max: number) => z.string().trim().max(max, { error: "הטקסט ארוך מדי." });
 
+// the shape of InlineValue, checked at runtime (FXC-08)
+const valueSchema = z.object({
+  text: z.string().max(1000).optional(),
+  first: z.string().max(1000).optional(),
+  last: z.string().max(1000).optional(),
+  id: z.string().nullable().optional(),
+  reason: z.string().max(2000).optional(),
+});
+
 export async function inlineEditAction(orgId: string, object: InlineObject, id: string, field: InlineField, value: InlineValue): Promise<ActionResult> {
+  if (!validArg(valueSchema, value) || typeof object !== "string" || typeof field !== "string") {
+    return fail(INVALID_ARGS);
+  }
   if (!(object in TABLE) || !ALLOWED[object].includes(field)) {
     return fail("אי אפשר לערוך את השדה הזה מהרשימה.");
   }

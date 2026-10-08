@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, formatNumber, zonedIso } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
+import { isCalendarDate } from "@/lib/calendar-date";
 
 export const metadata: Metadata = { title: "יומן ביקורת" };
 
@@ -27,7 +28,6 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const KIND_LABEL: Record<string, string> = { leads: "ליד", contacts: "איש קשר", companies: "חברה", deals: "עסקה" };
 
@@ -171,8 +171,8 @@ export default async function AuditPage({ params, searchParams }: Props) {
 
   const entityType = firstParam(query.entity) in ENTITY_LABELS ? firstParam(query.entity) : null;
   const actorId = isUuid(firstParam(query.user)) ? firstParam(query.user) : null;
-  const fromDate = DATE_RE.test(firstParam(query.from)) ? firstParam(query.from) : "";
-  const toDate = DATE_RE.test(firstParam(query.to)) ? firstParam(query.to) : "";
+  const fromDate = isCalendarDate(firstParam(query.from)) ? firstParam(query.from) : "";
+  const toDate = isCalendarDate(firstParam(query.to)) ? firstParam(query.to) : "";
   const page = Math.max(1, Math.min(200, Number(firstParam(query.page)) || 1));
   const [{ items, more, days }, members] = await Promise.all([
     listAudit(orgId, {

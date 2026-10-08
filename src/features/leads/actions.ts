@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { must } from "@/lib/db-read";
 import type { ConvertLeadResult } from "@/lib/database.types";
@@ -173,6 +174,7 @@ export async function changeLeadStatusAction(
 
 /** From the leads board: a card dropped on another status (a reason comes with "not relevant"). */
 export async function dropLeadAction(orgId: string, leadId: string, statusId: string, reason: string | null): Promise<ActionResult> {
+  if (!validArg(optionalTextArg(500), reason)) return fail(INVALID_ARGS);
   if (!isUuid(statusId)) {
     return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
   }

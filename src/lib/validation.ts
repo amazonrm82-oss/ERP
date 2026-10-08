@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { parseMoneyToAgorot } from "@/lib/format";
+import { isCalendarDate } from "@/lib/calendar-date";
 
 // Shared zod building blocks for form fields. FormData gives strings (or null
 // when the field is absent), so every schema starts from "string or nothing".
@@ -53,7 +54,7 @@ export const requiredId = (missing: string) =>
 
 /** Optional calendar date from <input type="date">. */
 export const optionalDate = raw
-  .refine((value) => value === "" || (/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))), {
+  .refine((value) => value === "" || isCalendarDate(value), {
     error: "התאריך אינו תקין.",
   })
   .transform((value) => (value === "" ? null : value));

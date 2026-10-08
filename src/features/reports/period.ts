@@ -1,4 +1,5 @@
 import { zoneDate, zonedIso } from "@/lib/format";
+import { isCalendarDate } from "@/lib/calendar-date";
 
 export const PERIOD_OPTIONS = [
   { value: "this_month", label: "החודש" },
@@ -24,7 +25,6 @@ export type Period = {
   prevTo: string;
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -37,7 +37,7 @@ function daysBetween(a: string, b: string): number {
 }
 
 function validDate(value: string | undefined): value is string {
-  return Boolean(value && DATE_RE.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)));
+  return Boolean(value && isCalendarDate(value));
 }
 
 /** The report period from the query string; "this month" when missing or invalid. */
