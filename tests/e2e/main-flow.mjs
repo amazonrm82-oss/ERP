@@ -861,10 +861,16 @@ try {
   );
   if (exportsLogged.length !== 4 || exportsLogged[0].changes.filters?.q !== bulkLeads[1].full_name || exportsLogged[3].changes.scope !== "selected" || exportsLogged[3].changes.rows !== 2)
     throw new Error(`export audit: ${JSON.stringify(exportsLogged)}`);
-  // Dana is a member: no menu, and the address refuses her
+  // Dana is a team manager here; as a plain member she gets no menu, and the address refuses her
+  const [{ id: danaUser }] = await sql("select id from auth.users where email = $1", [inviteeEmail]);
+  await sql("update public.memberships set role = 'member' where organization_id = $1 and user_id = $2", [orgIdNow, danaUser]);
   await invitee.goto(`${orgUrl}/leads`);
-  if ((await invitee.getByText("ייצוא", { exact: true }).count()) !== 0) throw new Error("a member sees the export menu");
-  if ((await invitee.request.get(`${orgUrl}/leads/export?format=csv`)).status() !== 403) throw new Error("a member could export");
+  await invitee.getByRole("heading", { name: "לידים" }).waitFor();
+  const memberSeesExport = (await invitee.getByText("ייצוא", { exact: true }).count()) !== 0;
+  const memberExportStatus = (await invitee.request.get(`${orgUrl}/leads/export?format=csv`)).status();
+  await sql("update public.memberships set role = 'manager' where organization_id = $1 and user_id = $2", [orgIdNow, danaUser]);
+  if (memberSeesExport) throw new Error("a member sees the export menu");
+  if (memberExportStatus !== 403) throw new Error(`a member could export: ${memberExportStatus}`);
   await ownerDesk.goto(leadUrl);
 
   // ---------------------------------------------------------------- section 4: lead intake
