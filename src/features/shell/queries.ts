@@ -9,6 +9,7 @@ import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type OrgContext = {
   user: SessionUser & { displayName: string };
@@ -66,14 +67,14 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
   let supportUntil: string | null = null;
   if (!org && !membership) {
     // a member of an organization that requires two-step verification, not yet verified
-    const { data: blocked } = await supabase.rpc("mfa_required_orgs");
+    const blocked = must(await supabase.rpc("mfa_required_orgs"), "mfa_required_orgs");
     if (Array.isArray(blocked) && blocked.some((b) => (b as { id?: string }).id === orgId)) {
       redirect(`${paths.loginMfa}?next=${encodeURIComponent(paths.org(orgId))}`);
     }
   }
   if (org && !membership) {
     // not a member: maybe platform support the customer let in (the database makes them a viewer)
-    const { data: session } = await supabase.rpc("support_session_info", { p_org: orgId });
+    const session = must(await supabase.rpc("support_session_info", { p_org: orgId }), "support_session_info");
     const until = session && typeof session === "object" && !Array.isArray(session) ? session.expires_at : null;
     if (typeof until === "string") {
       supportUntil = until;
@@ -118,7 +119,7 @@ export async function getUserNames(userIds: Array<string | null | undefined>): P
     return names;
   }
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+  const data = must(await supabase.from("profiles").select("id, full_name, email").in("id", ids), "profiles");
   for (const profile of data ?? []) {
     names.set(profile.id, profile.full_name?.trim() || profile.email || "משתמש");
   }

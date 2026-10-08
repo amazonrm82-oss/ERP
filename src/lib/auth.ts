@@ -7,6 +7,7 @@ import { cache } from "react";
 import { getSupabaseEnv } from "@/lib/env";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type SessionUser = {
   id: string;
@@ -56,7 +57,7 @@ export async function requireUser(): Promise<SessionUser> {
 /** Whether this session still owes the two-step code (the account has an authenticator, the session did not pass it). */
 export async function owesSecondStep(): Promise<boolean> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("mfa_status");
+  const data = must(await supabase.rpc("mfa_status"), "mfa_status");
   const status = data && typeof data === "object" && !Array.isArray(data) ? data : {};
   return status.enrolled === true && status.aal !== "aal2";
 }

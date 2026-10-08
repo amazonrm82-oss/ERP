@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { clearRecoveryCodesAction } from "../actions";
 import { RecoveryCodes } from "./recovery-codes";
 
-type State = { kind: "loading" } | { kind: "on"; factorId: string } | { kind: "off" } | { kind: "setup" };
+type State = { kind: "loading" } | { kind: "unknown" } | { kind: "on"; factorId: string } | { kind: "off" } | { kind: "setup" };
 
 /** Two-step verification for the signed-in user: on (with a way to turn it off) or off (with set-up). */
 export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; codesLeft: number }) {
@@ -21,7 +21,9 @@ export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; 
 
   async function readState(): Promise<State> {
     // from the server, not the session's copy (it can predate a change made on another device)
-    const { data } = await createClient().auth.getUser();
+    const { data, error: readError } = await createClient().auth.getUser();
+    // not "off": that would invite setting up a second factor next to the one that exists
+    if (readError) return { kind: "unknown" };
     const verified = data.user?.factors?.find((f) => f.factor_type === "totp" && f.status === "verified");
     return verified ? { kind: "on", factorId: verified.id } : { kind: "off" };
   }
@@ -56,6 +58,7 @@ export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; 
   }
 
   if (state.kind === "loading") return <p role="status">בודק…</p>;
+  if (state.kind === "unknown") return <p role="alert">לא הצלחנו לבדוק את מצב האימות הדו-שלבי. רעננו את הדף.</p>;
   if (state.kind === "setup") {
     return (
       <MfaGate

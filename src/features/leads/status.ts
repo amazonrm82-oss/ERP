@@ -19,7 +19,10 @@ export async function setLeadStatus(
   statusId: string,
   reason: string | null,
 ): Promise<StatusResult> {
-  const { data: status } = await supabase.from("lead_statuses").select("id, kind").eq("organization_id", orgId).eq("id", statusId).maybeSingle();
+  const { data: status, error: statusError } = await supabase.from("lead_statuses").select("id, kind").eq("organization_id", orgId).eq("id", statusId).maybeSingle();
+  if (statusError) {
+    return { ok: false, message: dbErrorMessage(statusError) };
+  }
   if (!status) {
     return { ok: false, message: "הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב." };
   }

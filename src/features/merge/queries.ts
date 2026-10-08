@@ -5,6 +5,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { MERGE_FIELDS, MERGE_TABLE, type MergeType } from "./fields";
+import { must } from "@/lib/db-read";
 
 export type Candidate = { id: string; title: string; subtitle: string | null };
 type Row = Record<string, unknown>;
@@ -19,7 +20,7 @@ export function recordTitle(type: MergeType, row: Row): string {
 export async function findDuplicateCandidates(orgId: string, type: MergeType, id: string): Promise<Candidate[]> {
   const supabase = await createClient();
   const table = MERGE_TABLE[type];
-  const { data: self } = await supabase.from(table).select("*").eq("organization_id", orgId).eq("id", id).maybeSingle();
+  const self = must(await supabase.from(table).select("*").eq("organization_id", orgId).eq("id", id).maybeSingle(), "self");
   if (!self) return [];
   const row = self as Row;
   const ors: string[] = [];
@@ -30,14 +31,14 @@ export async function findDuplicateCandidates(orgId: string, type: MergeType, id
   if (email && /^[^,()\s]+@[^,()\s]+$/.test(email)) ors.push(`email.ilike.${email}`);
   if (taxId && /^\d{5,12}$/.test(taxId)) ors.push(`tax_id.eq.${taxId}`);
   if (ors.length === 0) return [];
-  const { data } = await supabase
+  const data = must(await supabase
     .from(table)
     .select("*")
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .neq("id", id)
     .or(ors.join(","))
-    .limit(5);
+    .limit(5), "data");
   return ((data ?? []) as Row[]).map((r) => ({
     id: String(r.id),
     title: recordTitle(type, r),
@@ -51,7 +52,7 @@ export type MergeSide = { id: string; title: string; values: Record<string, stri
 export async function loadMergePair(orgId: string, type: MergeType, keepId: string, mergeId: string): Promise<[MergeSide, MergeSide] | null> {
   const supabase = await createClient();
   const table = MERGE_TABLE[type];
-  const { data } = await supabase.from(table).select("*").eq("organization_id", orgId).is("deleted_at", null).in("id", [keepId, mergeId]);
+  const data = must(await supabase.from(table).select("*").eq("organization_id", orgId).is("deleted_at", null).in("id", [keepId, mergeId]), "data");
   const rows = (data ?? []) as Row[];
   const keep = rows.find((r) => r.id === keepId);
   const dup = rows.find((r) => r.id === mergeId);

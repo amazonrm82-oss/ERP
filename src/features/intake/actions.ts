@@ -62,7 +62,8 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const { data: current } = await context.supabase.from("forms").select("kind").eq("organization_id", orgId).eq("id", formId).maybeSingle();
+  const { data: current, error: currentError } = await context.supabase.from("forms").select("kind").eq("organization_id", orgId).eq("id", formId).maybeSingle();
+  if (currentError) return fail(dbErrorMessage(currentError));
   if (!current) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }

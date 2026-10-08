@@ -3,6 +3,7 @@ import "server-only";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type AuditChange = { field: string; old: Json; new: Json };
 
@@ -39,11 +40,11 @@ function toChanges(action: string, changes: Json): AuditChange[] {
 /** How many days back the plan keeps the audit log (null: unlimited). */
 async function retentionDays(orgId: string): Promise<number | null> {
   const supabase = await createClient();
-  const { data: sub } = await supabase.from("subscriptions").select("plan_key, limit_overrides").eq("organization_id", orgId).maybeSingle();
+  const sub = must(await supabase.from("subscriptions").select("plan_key, limit_overrides").eq("organization_id", orgId).maybeSingle(), "subscriptions");
   if (!sub) return null;
   const overrides = sub.limit_overrides as Record<string, Json> | null;
   if (overrides && "audit_log_days" in overrides) return typeof overrides.audit_log_days === "number" ? overrides.audit_log_days : null;
-  const { data: plan } = await supabase.from("plans").select("limits").eq("key", sub.plan_key).maybeSingle();
+  const plan = must(await supabase.from("plans").select("limits").eq("key", sub.plan_key).maybeSingle(), "plans");
   const days = (plan?.limits as Record<string, Json> | undefined)?.audit_log_days;
   return typeof days === "number" ? days : null;
 }
@@ -86,14 +87,14 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
 /** Changes of one record (admins only; others get an empty list from RLS). */
 export async function listRecordHistory(orgId: string, entityType: string, entityId: string): Promise<AuditItem[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const data = must(await supabase
     .from("audit_log")
     .select("id, created_at, actor_id, action, entity_type, entity_id, changes")
     .eq("organization_id", orgId)
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(30), "audit_log");
   const rows = data ?? [];
   const names = await getUserNames(rows.map((r) => r.actor_id));
   return rows.map((r) => ({

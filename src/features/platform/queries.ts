@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import type { Json, PlatformRole, PlanRow } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type PlatformMe = { role: PlatformRole; needsMfa: boolean };
 
@@ -13,7 +14,7 @@ const obj = (value: Json | null): Obj => (value && typeof value === "object" && 
 /** The caller's platform role, or null for everyone else. Memoized per request. */
 export const getPlatformMe = cache(async (): Promise<PlatformMe | null> => {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("platform_me");
+  const data = must(await supabase.rpc("platform_me"), "platform_me");
   const me = obj(data);
   if (typeof me.role !== "string") return null;
   return { role: me.role as PlatformRole, needsMfa: me.needs_mfa === true };

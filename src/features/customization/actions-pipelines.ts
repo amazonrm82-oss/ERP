@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import { must } from "@/lib/db-read";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
@@ -173,13 +174,13 @@ export async function deletePipelineAction(orgId: string, pipelineId: string): P
 type StageRowLite = { id: string; kind: string; position: number };
 
 async function stagesOf(context: Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>, orgId: string, pipelineId: string) {
-  const { data } = await context.supabase
+  const data = must(await context.supabase
     .from("stages")
     .select("id, kind, position")
     .eq("organization_id", orgId)
     .eq("pipeline_id", pipelineId)
     .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }), "stages");
   return (data ?? []) as StageRowLite[];
 }
 
@@ -285,7 +286,8 @@ export async function moveStageAction(orgId: string, stageId: string, direction:
   if (!context.ok) {
     return context;
   }
-  const { data: stage } = await context.supabase.from("stages").select("pipeline_id").eq("organization_id", orgId).eq("id", stageId).maybeSingle();
+  const { data: stage, error: stageError } = await context.supabase.from("stages").select("pipeline_id").eq("organization_id", orgId).eq("id", stageId).maybeSingle();
+  if (stageError) return fail(dbErrorMessage(stageError));
   if (!stage) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }

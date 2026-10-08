@@ -3,6 +3,7 @@ import "server-only";
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type Lookups = {
   statuses: Array<{ id: string; name: string; kind: string }>;
@@ -144,12 +145,12 @@ export async function listTestRecords(orgId: string, entity: string): Promise<Ar
     return [];
   }
   const column = entity === "task" ? "title" : entity === "company" || entity === "deal" ? "name" : "full_name";
-  const { data } = await supabase
+  const data = must(await supabase
     .from(table as "leads")
     .select(`id, ${column}`)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(30), "data");
   return ((data ?? []) as unknown as Array<Record<string, string | null>>).map((row) => ({ id: String(row.id), name: row[column] || "ללא שם" }));
 }

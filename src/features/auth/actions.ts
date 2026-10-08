@@ -136,6 +136,7 @@ export async function recoverWithCodeAction(code: string): Promise<RecoverResult
     return fail("הקוד לא נכון, או שכבר השתמשו בו.");
   }
   await supabase.auth.signOut({ scope: "others" });
-  const { data: required } = await supabase.rpc("mfa_required_orgs");
-  return { ok: true, needsSetup: Array.isArray(required) && required.length > 0 };
+  const { data: required, error: requiredError } = await supabase.rpc("mfa_required_orgs");
+  // when unsure, send them to the set-up page, which checks again
+  return { ok: true, needsSetup: Boolean(requiredError) || (Array.isArray(required) && required.length > 0) };
 }

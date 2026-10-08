@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ReportRow, ReportView } from "./definitions";
 import { formatCell } from "./format";
 import type { Period } from "./period";
+import { must } from "@/lib/db-read";
 
 export type ReportFilters = { period: Period; ownerId: string | null; pipelineId: string | null };
 
@@ -58,7 +59,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
     case "sources": {
       const rows = list(await rpc("report_leads_by_source", { ...range, p_owner: ownerId }));
       const supabase = await createClient();
-      const { data: sources } = await supabase.from("lead_sources").select("id, name").eq("organization_id", orgId);
+      const sources = must(await supabase.from("lead_sources").select("id, name").eq("organization_id", orgId), "lead_sources");
       const sourceName = new Map((sources ?? []).map((s) => [s.id, s.name]));
       const bySource = new Map<string, { name: string; leads: number; converted: number; won: number; revenue: number }>();
       for (const r of rows) {

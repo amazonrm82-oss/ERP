@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import { must } from "@/lib/db-read";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
@@ -19,12 +20,12 @@ function revalidateLeadSettings(orgId: string) {
 type Context = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
 
 async function statusesOf(context: Context, orgId: string) {
-  const { data } = await context.supabase
+  const data = must(await context.supabase
     .from("lead_statuses")
     .select("id, kind, position, is_default")
     .eq("organization_id", orgId)
     .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }), "lead_statuses");
   return data ?? [];
 }
 

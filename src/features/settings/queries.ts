@@ -3,6 +3,7 @@ import "server-only";
 import { getUserNames } from "@/features/shell/queries";
 import type { MembershipRole, MembershipStatus, RecordVisibility, SeatType } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type OrganizationSettings = {
   name: string;
@@ -39,11 +40,11 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
 /** Effective feature flag (plan + per-organization override), as app.org_has_feature() computes it. */
 export async function orgHasFeature(orgId: string, key: string): Promise<boolean> {
   const supabase = await createClient();
-  const { data: subscription } = await supabase
+  const subscription = must(await supabase
     .from("subscriptions")
     .select("plan_key, feature_overrides")
     .eq("organization_id", orgId)
-    .maybeSingle();
+    .maybeSingle(), "subscriptions");
   if (!subscription) {
     return false;
   }
@@ -51,7 +52,7 @@ export async function orgHasFeature(orgId: string, key: string): Promise<boolean
   if (overrides && typeof overrides === "object" && !Array.isArray(overrides) && key in overrides) {
     return overrides[key] === true;
   }
-  const { data: plan } = await supabase.from("plans").select("features").eq("key", subscription.plan_key).maybeSingle();
+  const plan = must(await supabase.from("plans").select("features").eq("key", subscription.plan_key).maybeSingle(), "plans");
   const features = plan?.features;
   return Boolean(features && typeof features === "object" && !Array.isArray(features) && features[key] === true);
 }
@@ -87,13 +88,13 @@ export async function listMembers(orgId: string): Promise<Member[]> {
     return [];
   }
 
-  const { data: profiles } = await supabase
+  const profiles = must(await supabase
     .from("profiles")
     .select("id, full_name, email")
     .in(
       "id",
       memberships.map((m) => m.user_id),
-    );
+    ), "profiles");
   const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   const members = memberships.map((m): Member => {
@@ -195,18 +196,18 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
   if (!team) {
     return null;
   }
-  const { data: rows } = await supabase
+  const rows = must(await supabase
     .from("team_members")
     .select("user_id, is_manager")
     .eq("organization_id", orgId)
-    .eq("team_id", teamId);
-  const { data: profiles } = await supabase
+    .eq("team_id", teamId), "team_members");
+  const profiles = must(await supabase
     .from("profiles")
     .select("id, full_name, email")
     .in(
       "id",
       (rows ?? []).map((row) => row.user_id),
-    );
+    ), "profiles");
   const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   return {
@@ -229,6 +230,6 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
 /** Members who have two-step verification on. For owners and admins (the database refuses others). */
 export async function listMembersWithMfa(orgId: string): Promise<string[]> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("org_members_mfa", { p_org: orgId });
+  const data = must(await supabase.rpc("org_members_mfa", { p_org: orgId }), "org_members_mfa");
   return Array.isArray(data) ? data.filter((id): id is string => typeof id === "string") : [];
 }

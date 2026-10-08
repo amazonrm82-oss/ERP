@@ -7,11 +7,12 @@ import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { AGREEMENT_VERSION } from "./agreement";
+import { must } from "@/lib/db-read";
 
 /** The agreement version the signed-in user signed last, or null. Memoized per request. */
 export const getSignedVersion = cache(async (): Promise<string | null> => {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("agreement_status");
+  const data = must(await supabase.rpc("agreement_status"), "agreement_status");
   return typeof data === "string" ? data : null;
 });
 
@@ -37,7 +38,7 @@ export type SignedAgreement = {
 
 export async function getMyAgreement(): Promise<SignedAgreement | null> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("my_agreement");
+  const data = must(await supabase.rpc("my_agreement"), "my_agreement");
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const r = data as Record<string, unknown>;
   return {

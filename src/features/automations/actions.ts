@@ -80,7 +80,8 @@ export async function updateAutomationAction(orgId: string, id: string, _prev: F
   if (typeof rule === "string") {
     return fail(rule);
   }
-  const { data: current } = await context.supabase.from("automations").select("entity_type").eq("organization_id", orgId).eq("id", id).maybeSingle();
+  const { data: current, error: currentError } = await context.supabase.from("automations").select("entity_type").eq("organization_id", orgId).eq("id", id).maybeSingle();
+  if (currentError) return fail(dbErrorMessage(currentError));
   if (!current) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }

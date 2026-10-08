@@ -93,8 +93,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     // the other devices", or turning on two-step verification) ends on the next page
     // load instead of when its token expires. Refreshes an expired token too, and must
     // run before any response is produced so refreshed cookies can still be written.
-    const { data } = await supabase.auth.getUser();
-    isSignedIn = Boolean(data?.user?.id);
+    const { data, error } = await supabase.auth.getUser();
+    isSignedIn = !error && Boolean(data.user?.id);
   } catch {
     isSignedIn = false;
   }

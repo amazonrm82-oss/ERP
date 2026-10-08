@@ -95,12 +95,13 @@ export async function importChunkAction(
     return fail("הנתונים שנשלחו אינם תקינים.");
   }
   // the job decides the object and the duplicate rule, not the browser
-  const { data: job } = await context.supabase
+  const { data: job, error: jobError } = await context.supabase
     .from("import_jobs")
     .select("entity_type, duplicate_mode, status, created_by")
     .eq("organization_id", orgId)
     .eq("id", jobId)
     .maybeSingle();
+  if (jobError) return fail(dbErrorMessage(jobError));
   if (!job || job.created_by !== context.user.id) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
@@ -138,7 +139,8 @@ export async function finishImportAction(
 ): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
   if (!context.ok) return context;
-  const { data: job } = await context.supabase.from("import_jobs").select("entity_type").eq("organization_id", orgId).eq("id", jobId).maybeSingle();
+  const { data: job, error: jobError } = await context.supabase.from("import_jobs").select("entity_type").eq("organization_id", orgId).eq("id", jobId).maybeSingle();
+  if (jobError) return fail(dbErrorMessage(jobError));
   if (!job) return fail(NOT_FOUND_OR_FORBIDDEN);
   const entity = entitySchema.parse(job.entity_type);
   const { count } = await context.supabase
@@ -204,12 +206,13 @@ async function trashImportedCompanies(supabase: ImportContext["supabase"], orgId
 export async function undoImportAction(orgId: string, jobId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
   if (!context.ok) return context;
-  const { data: job } = await context.supabase
+  const { data: job, error: jobReadError } = await context.supabase
     .from("import_jobs")
     .select("entity_type, status, created_by, created_at")
     .eq("organization_id", orgId)
     .eq("id", jobId)
     .maybeSingle();
+  if (jobReadError) return fail(dbErrorMessage(jobReadError));
   if (!job || job.created_by !== context.user.id) return fail("רק מי שייבא את הקובץ יכול לבטל את הייבוא.");
   if (job.status === "undone") return fail("הייבוא כבר בוטל.");
   if (job.status === "running") return fail("הייבוא עדיין רץ.");

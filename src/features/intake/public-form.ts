@@ -3,6 +3,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseFieldsConfig, type FormFieldConfig } from "./fields";
+import { must } from "@/lib/db-read";
 
 export type PublicForm = { title: string; intro: string | null; submitLabel: string; fields: FormFieldConfig[] };
 
@@ -18,12 +19,12 @@ export async function getPublicForm(token: string): Promise<PublicForm | null | 
   if (!service) {
     return "not-configured";
   }
-  const { data } = await service
+  const data = must(await service
     .from("forms")
     .select("name, title, intro, submit_label, fields, is_active")
     .eq("token", token)
     .eq("kind", "form")
-    .maybeSingle();
+    .maybeSingle(), "forms");
   if (!data || !data.is_active) {
     return null;
   }

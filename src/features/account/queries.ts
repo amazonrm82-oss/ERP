@@ -1,12 +1,13 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type SessionItem = { id: string; createdAt: string; lastActiveAt: string; userAgent: string | null; ip: string | null; isCurrent: boolean };
 
 export async function listMySessions(): Promise<SessionItem[]> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("my_sessions");
+  const data = must(await supabase.rpc("my_sessions"), "my_sessions");
   const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
   return rows.map((r) => ({
     id: String(r.id),
@@ -29,7 +30,7 @@ export function describeDevice(userAgent: string | null): string {
 /** How many unused backup codes the signed-in user has left (0 without two-step verification). */
 export async function getRecoveryCodesLeft(): Promise<number> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("mfa_recovery_codes_status");
+  const data = must(await supabase.rpc("mfa_recovery_codes_status"), "mfa_recovery_codes_status");
   const status = data && typeof data === "object" && !Array.isArray(data) ? data : {};
   return typeof status.remaining === "number" ? status.remaining : 0;
 }

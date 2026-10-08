@@ -2,6 +2,7 @@ import "server-only";
 
 import type { MembershipRole } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type MyOrganization = { id: string; name: string; role: MembershipRole };
 
@@ -44,6 +45,6 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
 /** Organizations the user belongs to but may not open until they pass two-step verification. */
 export async function listMfaBlockedOrganizations(): Promise<Array<{ id: string; name: string }>> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("mfa_required_orgs");
+  const data = must(await supabase.rpc("mfa_required_orgs"), "mfa_required_orgs");
   return Array.isArray(data) ? (data as Array<{ id: string; name: string }>) : [];
 }

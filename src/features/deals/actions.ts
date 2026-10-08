@@ -40,12 +40,13 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
   }
 
   // The pipeline comes from the stage, read from the database, not from the form.
-  const { data: stage } = await context.supabase
+  const { data: stage, error: stageError } = await context.supabase
     .from("stages")
     .select("id, pipeline_id")
     .eq("organization_id", orgId)
     .eq("id", parsed.data.stage_id)
     .maybeSingle();
+  if (stageError) return fail(dbErrorMessage(stageError), { values: formValues(formData) });
   if (!stage) {
     return fail(STAGE_GONE, { values: formValues(formData) });
   }

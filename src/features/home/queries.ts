@@ -2,6 +2,7 @@ import "server-only";
 
 import { endOfToday, zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean };
 export type MyNewLead = { id: string; fullName: string | null; email: string | null; phone: string | null; companyName: string | null; createdAt: string };
@@ -27,12 +28,12 @@ export async function getMyDay(orgId: string, userId: string): Promise<MyDay> {
   const today = zoneDate(now);
   const startOfToday = zonedIso(today, "00:00:00");
 
-  const { data: defaultStatus } = await supabase
+  const defaultStatus = must(await supabase
     .from("lead_statuses")
     .select("id")
     .eq("organization_id", orgId)
     .eq("is_default", true)
-    .maybeSingle();
+    .maybeSingle(), "lead_statuses");
 
   const [tasks, leads, deals] = await Promise.all([
     supabase

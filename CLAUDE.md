@@ -287,6 +287,8 @@ that back.
 - Feature folders: `src/features/<area>/{queries,actions,schema}.ts` + `components/`.
   Shared primitives in `src/components/ui/`. No PostgREST embedding so far; lookups are fetched
   separately and joined in code.
+- A database read checks its error (FXC-05, enforced by lint): pages use `must()` from
+  `src/lib/db-read.ts` (throws, so error.tsx shows), Server Actions return `fail(dbErrorMessage(error))`.
 - An update blocked by RLS returns zero rows and no error: always select the id back and treat
   "0 rows" as "deleted or not permitted".
 - All user-facing text is Hebrew, short and plain. Code, identifiers, comments: English.

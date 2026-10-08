@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import { must } from "@/lib/db-read";
 import type { ConvertLeadResult } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
@@ -49,10 +50,10 @@ async function findExisting(
     if (kind === "lead") {
       query = query.is("converted_at", null);
     }
-    const { data } = await query
+    const data = must(await query
       .or(filters.join(","))
       .order("created_at", { ascending: false })
-      .limit(1);
+      .limit(1), "duplicate search");
     const row = data?.[0];
     if (row) {
       return {
@@ -210,13 +211,14 @@ export async function convertLeadAction(
 
   // convert_lead looks the lead up by id only, so first make sure it belongs
   // to the organization in the URL (RLS hides it otherwise).
-  const { data: lead } = await context.supabase
+  const { data: lead, error: leadError } = await context.supabase
     .from("leads")
     .select("id")
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)
     .maybeSingle();
+  if (leadError) return fail(dbErrorMessage(leadError));
   if (!lead) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }

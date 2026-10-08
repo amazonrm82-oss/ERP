@@ -5,6 +5,7 @@ import type { Json, StageKind } from "@/lib/database.types";
 import { ilikeAny, PAGE_SIZE } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type StageOption = { id: string; name: string; kind: StageKind };
 
@@ -123,11 +124,11 @@ export async function getBoard(
   const contactIds = [...new Set(rows.map((row) => row.contact_id).filter((id): id is string => Boolean(id)))];
   const contactNames = new Map<string, string>();
   if (contactIds.length > 0) {
-    const { data: contacts } = await supabase
+    const contacts = must(await supabase
       .from("contacts")
       .select("id, full_name, email, phone")
       .eq("organization_id", orgId)
-      .in("id", contactIds);
+      .in("id", contactIds), "contacts");
     for (const contact of contacts ?? []) {
       contactNames.set(contact.id, contact.full_name || contact.email || contact.phone || "איש קשר ללא שם");
     }
@@ -173,11 +174,11 @@ export async function listRelatedDeals(
   if (data.length === 0) {
     return [];
   }
-  const { data: stages } = await supabase
+  const stages = must(await supabase
     .from("stages")
     .select("id, name")
     .eq("organization_id", orgId)
-    .in("id", [...new Set(data.map((deal) => deal.stage_id))]);
+    .in("id", [...new Set(data.map((deal) => deal.stage_id))]), "stages");
   const stageNames = new Map((stages ?? []).map((stage) => [stage.id, stage.name]));
 
   return data.map((deal) => ({

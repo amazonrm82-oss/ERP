@@ -80,7 +80,8 @@ export async function deleteFileAction(orgId: string, subject: TimelineSubject, 
   if (!parsedSubject.success || !isUuid(fileId)) return fail(NOT_FOUND_OR_FORBIDDEN);
   const context = await actionContext(orgId, fileId);
   if (!context.ok) return context;
-  const { data: file } = await context.supabase.from("files").select("storage_path").eq("organization_id", orgId).eq("id", fileId).maybeSingle();
+  const { data: file, error: fileError } = await context.supabase.from("files").select("storage_path").eq("organization_id", orgId).eq("id", fileId).maybeSingle();
+  if (fileError) return fail(dbErrorMessage(fileError));
   if (!file) return fail(NOT_FOUND_OR_FORBIDDEN);
   const { data: removed, error: storageError } = await context.supabase.storage.from(FILES_BUCKET).remove([file.storage_path]);
   if (storageError) return fail("לא הצלחנו למחוק את הקובץ. נסו שוב.");

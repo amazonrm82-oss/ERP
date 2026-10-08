@@ -18,12 +18,13 @@ export async function GET(request: NextRequest, { params }: Context) {
     return new NextResponse("לא נמצא", { status: 404 });
   }
   const supabase = await createClient();
-  const { data: file } = await supabase
+  const { data: file, error: fileError } = await supabase
     .from("files")
     .select("name, mime_type, storage_path")
     .eq("organization_id", orgId)
     .eq("id", fileId)
     .maybeSingle();
+  if (fileError) return new NextResponse("משהו השתבש. נסו שוב בעוד רגע.", { status: 500 });
   if (!file) return new NextResponse("לא נמצא", { status: 404 });
   const view = request.nextUrl.searchParams.get("view") === "1" && (file.mime_type.startsWith("image/") || file.mime_type === "application/pdf");
   const { data, error } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(file.storage_path, 60, view ? undefined : { download: file.name });

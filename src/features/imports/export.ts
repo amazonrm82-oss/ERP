@@ -5,6 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import { csvText } from "@/lib/csv";
 import type { Database, Json } from "@/lib/database.types";
 import { FILES_BUCKET } from "@/features/files/types";
+import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 type TableName = keyof Database["public"]["Tables"];
@@ -98,10 +99,10 @@ const README = `ייצוא מלא של נתוני הארגון.
 export async function buildFullExport(orgId: string): Promise<Uint8Array> {
   const data = await Promise.all(TABLES.map(async (t) => ({ ...t, rows: await fetchAll(t.table, orgId) })));
   const supabase = await createClient();
-  const { data: members } = await supabase.from("memberships").select("user_id").eq("organization_id", orgId);
-  const { data: profiles } = members?.length
-    ? await supabase.from("profiles").select("id, full_name, email").in("id", members.map((m) => m.user_id))
-    : { data: [] };
+  const members = must(await supabase.from("memberships").select("user_id").eq("organization_id", orgId), "memberships");
+  const profiles = members.length
+    ? must(await supabase.from("profiles").select("id, full_name, email").in("id", members.map((m) => m.user_id)), "profiles")
+    : [];
 
   const names = new Map<string, string>();
   for (const p of profiles ?? []) names.set(p.id, p.full_name?.trim() || p.email || "");
@@ -130,8 +131,9 @@ export async function buildFullExport(orgId: string): Promise<Uint8Array> {
       skipped.push(String(f.name));
       continue;
     }
-    const { data: blob } = await supabase.storage.from(FILES_BUCKET).download(String(f.storage_path));
-    if (!blob) {
+    // a stored file that cannot be read is listed as left out, like one over the size cap
+    const { data: blob, error: blobError } = await supabase.storage.from(FILES_BUCKET).download(String(f.storage_path));
+    if (blobError || !blob) {
       skipped.push(String(f.name));
       continue;
     }

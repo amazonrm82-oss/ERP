@@ -31,11 +31,12 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
   const images = data.filter((f) => f.mime_type.startsWith("image/") && f.mime_type !== "image/heic");
   const thumbs = new Map<string, string>();
   if (images.length > 0) {
-    const { data: signed } = await supabase.storage.from(FILES_BUCKET).createSignedUrls(
+    const { data: signed, error: signError } = await supabase.storage.from(FILES_BUCKET).createSignedUrls(
       images.map((f) => f.storage_path),
       600,
     );
-    for (const s of signed ?? []) if (s.path && s.signedUrl) thumbs.set(s.path, s.signedUrl);
+    // a thumbnail is a nicety: when the links cannot be made, the files are listed without one
+    if (!signError) for (const s of signed) if (s.path && s.signedUrl) thumbs.set(s.path, s.signedUrl);
   }
   const names = await getUserNames(data.map((f) => f.uploaded_by));
   return data.map((f) => ({

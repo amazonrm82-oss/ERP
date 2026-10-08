@@ -6,6 +6,7 @@ import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
+import { must } from "@/lib/db-read";
 
 export type ContactListItem = {
   id: string;
@@ -30,7 +31,7 @@ async function getCompanyNames(orgId: string, companyIds: Array<string | null>):
     return names;
   }
   const supabase = await createClient();
-  const { data } = await supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", ids);
+  const data = must(await supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", ids), "companies");
   for (const company of data ?? []) {
     names.set(company.id, company.name);
   }

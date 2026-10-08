@@ -66,12 +66,13 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const { data: field } = await context.supabase
+  const { data: field, error: fieldError } = await context.supabase
     .from("field_definitions")
     .select("field_type")
     .eq("organization_id", orgId)
     .eq("id", fieldId)
     .maybeSingle();
+  if (fieldError) return fail(dbErrorMessage(fieldError));
   if (!field) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
@@ -129,22 +130,24 @@ export async function moveFieldAction(orgId: string, fieldId: string, direction:
   if (!context.ok) {
     return context;
   }
-  const { data: field } = await context.supabase
+  const { data: field, error: fieldError } = await context.supabase
     .from("field_definitions")
     .select("object_type")
     .eq("organization_id", orgId)
     .eq("id", fieldId)
     .maybeSingle();
+  if (fieldError) return fail(dbErrorMessage(fieldError));
   if (!field) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  const { data: rows } = await context.supabase
+  const { data: rows, error: rowsError } = await context.supabase
     .from("field_definitions")
     .select("id, position")
     .eq("organization_id", orgId)
     .eq("object_type", field.object_type)
     .order("position", { ascending: true })
     .order("created_at", { ascending: true });
+  if (rowsError) return fail(dbErrorMessage(rowsError));
   const ordered = rows ?? [];
   const index = ordered.findIndex((row) => row.id === fieldId);
   const target = direction === "up" ? index - 1 : index + 1;
