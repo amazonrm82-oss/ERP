@@ -2,6 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
+import type { Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type CompanyListItem = {
@@ -14,10 +15,15 @@ export type CompanyListItem = {
   createdAt: string;
 };
 
-/** One page of live companies, by name. Fetches one extra row to know if there is a next page. */
+// columns the company table can be sorted by (LST-02)
+export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", created: "created_at" } as const;
+export type CompanySortKey = keyof typeof COMPANY_SORT_COLUMNS;
+export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascending: true };
+
+/** One page of live companies, by name unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listCompanies(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey> },
 ): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -35,9 +41,10 @@ export async function listCompanies(
     query = query.contains("tag_ids", [options.tagId]);
   }
 
+  const sort = options.sort ?? COMPANY_DEFAULT_SORT;
   const { data, error } = await query
-    .order("name", { ascending: true })
-    .order("id", { ascending: true })
+    .order(COMPANY_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
     throw new Error(`companies query failed: ${error.message}`);

@@ -3,6 +3,7 @@ import "server-only";
 import { getUserNames } from "@/features/shell/queries";
 import type { LeadStatusKind } from "@/lib/database.types";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
+import type { Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type LeadStatusOption = { id: string; name: string; kind: LeadStatusKind; isDefault: boolean };
@@ -51,9 +52,14 @@ export type LeadListItem = {
   createdAt: string;
 };
 
-type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number };
+// columns the leads table can be sorted by (LST-02); "created" newest first is the default
+export const LEAD_SORT_COLUMNS = { name: "full_name", phone: "phone", email: "email", created: "created_at" } as const;
+export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
+export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
 
-/** One page of live leads, newest first. Fetches one extra row to know if there is a next page. */
+type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number; sort?: Sort<LeadSortKey> };
+
+/** One page of live leads, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -75,9 +81,10 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
     query = query.or(searchFilter);
   }
 
+  const sort = options.sort ?? LEAD_DEFAULT_SORT;
   const { data, error } = await query
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
+    .order(LEAD_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
     throw new Error(`leads query failed: ${error.message}`);

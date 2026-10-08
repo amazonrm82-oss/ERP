@@ -2,6 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
+import type { Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type ContactListItem = {
@@ -30,10 +31,15 @@ async function getCompanyNames(orgId: string, companyIds: Array<string | null>):
   return names;
 }
 
-/** One page of live contacts, newest first. Fetches one extra row to know if there is a next page. */
+// columns the contact table can be sorted by (LST-02)
+export const CONTACT_SORT_COLUMNS = { name: "full_name", phone: "phone", email: "email", created: "created_at" } as const;
+export type ContactSortKey = keyof typeof CONTACT_SORT_COLUMNS;
+export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", ascending: false };
+
+/** One page of live contacts, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listContacts(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey> },
 ): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -52,9 +58,10 @@ export async function listContacts(
     query = query.contains("tag_ids", [options.tagId]);
   }
 
+  const sort = options.sort ?? CONTACT_DEFAULT_SORT;
   const { data, error } = await query
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
+    .order(CONTACT_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
     throw new Error(`contacts query failed: ${error.message}`);

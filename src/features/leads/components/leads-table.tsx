@@ -1,13 +1,24 @@
 import Link from "next/link";
 
+import { SortableHeader } from "@/components/sortable-header";
+
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import type { Sort } from "@/lib/sort";
 
 import { leadDisplayName, statusTone } from "../display";
-import type { LeadListItem, LeadSourceOption, LeadStatusOption } from "../queries";
+import type { LeadListItem, LeadSortKey, LeadSourceOption, LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; leads: LeadListItem[]; statuses: LeadStatusOption[]; sources: LeadSourceOption[] };
+type Props = {
+  orgId: string;
+  leads: LeadListItem[];
+  statuses: LeadStatusOption[];
+  sources: LeadSourceOption[];
+  // the current sort, and the address that sorts by a column (LST-02)
+  sort: Sort<LeadSortKey>;
+  sortHref: (key: LeadSortKey) => string;
+};
 
 const th = "px-4 py-2.5 text-start text-sm font-medium text-ink-soft whitespace-nowrap";
 const td = "px-4 py-3 align-top";
@@ -16,7 +27,15 @@ const td = "px-4 py-3 align-top";
  * Leads as a table. On narrow screens the secondary columns are hidden and
  * the phone moves under the name, so each row stays readable at 360px.
  */
-export function LeadsTable({ orgId, leads, statuses, sources }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, sort, sortHref }: Props) {
+  const header = (key: LeadSortKey, label: string, className: string) => (
+    <SortableHeader
+      label={label}
+      className={className}
+      direction={sort.key === key ? (sort.ascending ? "ascending" : "descending") : null}
+      href={sortHref(key)}
+    />
+  );
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   const sourceById = new Map(sources.map((source) => [source.id, source.name]));
 
@@ -25,15 +44,9 @@ export function LeadsTable({ orgId, leads, statuses, sources }: Props) {
       <table className="w-full border-collapse text-[0.9375rem]">
         <thead className="border-b border-line bg-canvas/60">
           <tr>
-            <th scope="col" className={`${th} sm:min-w-52`}>
-              שם
-            </th>
-            <th scope="col" className={`${th} hidden sm:table-cell`}>
-              טלפון
-            </th>
-            <th scope="col" className={`${th} hidden lg:table-cell`}>
-              אימייל
-            </th>
+            {header("name", "שם", `${th} sm:min-w-52`)}
+            {header("phone", "טלפון", `${th} hidden sm:table-cell`)}
+            {header("email", "אימייל", `${th} hidden lg:table-cell`)}
             <th scope="col" className={th}>
               סטטוס
             </th>
@@ -43,9 +56,7 @@ export function LeadsTable({ orgId, leads, statuses, sources }: Props) {
             <th scope="col" className={`${th} hidden xl:table-cell`}>
               בעלים
             </th>
-            <th scope="col" className={`${th} hidden md:table-cell`}>
-              נוצר
-            </th>
+            {header("created", "נוצר", `${th} hidden md:table-cell`)}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">

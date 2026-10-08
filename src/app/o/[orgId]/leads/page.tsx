@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { LeadsTable } from "@/features/leads/components/leads-table";
-import { getLeadBoard, getLeadLookups, listLeads } from "@/features/leads/queries";
+import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads, type LeadSortKey } from "@/features/leads/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -17,6 +17,7 @@ import { viewChips } from "@/features/views/server";
 import { cn } from "@/lib/cn";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
+import { nextSort, parseSort, sortValue } from "@/lib/sort";
 
 export const metadata: Metadata = { title: "לידים" };
 
@@ -38,12 +39,13 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
   const boardView = firstParam(query.view) === "board";
+  const sort = parseSort(firstParam(query.sort), Object.keys(LEAD_SORT_COLUMNS) as LeadSortKey[], LEAD_DEFAULT_SORT);
 
   const [lookups, tags, views, list, board] = await Promise.all([
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
-    boardView ? null : listLeads(orgId, { search, statusId, tagId, page }),
+    boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort }),
     boardView ? getLeadBoard(orgId, { search, tagId }) : null,
   ]);
   const leads = list?.leads ?? [];
@@ -56,19 +58,24 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     if (search) next.set("q", search);
     if (tagId) next.set("tag", tagId);
     if (target === "table" && statusId) next.set("status", statusId);
+    if (target === "table" && sortValue(sort) !== sortValue(LEAD_DEFAULT_SORT)) next.set("sort", sortValue(sort));
     if (target === "board") next.set("view", "board");
     const suffix = next.toString();
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
   };
-  const hrefFor = (target: number) => {
+  const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
     if (search) next.set("q", search);
     if (statusId) next.set("status", statusId);
     if (tagId) next.set("tag", tagId);
+    if (sortParam !== sortValue(LEAD_DEFAULT_SORT)) next.set("sort", sortParam);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
   };
+  const hrefFor = (target: number) => listHref(target, sortValue(sort));
+  // a new sort starts again from the first page; dates start with the newest
+  const sortHref = (key: LeadSortKey) => listHref(1, sortValue(nextSort(sort, key, key !== "created")));
 
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>
@@ -117,7 +124,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       {board ? (
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} />
       ) : leads.length > 0 ? (
-        <LeadsTable orgId={orgId} leads={leads} statuses={lookups.statuses} sources={lookups.sources} />
+        <LeadsTable orgId={orgId} leads={leads} statuses={lookups.statuses} sources={lookups.sources} sort={sort} sortHref={sortHref} />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (

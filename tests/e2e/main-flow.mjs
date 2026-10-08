@@ -400,6 +400,12 @@ try {
   await ownerDesk.getByLabel("מה צריך לעשות").fill("משימה לדנה");
   await ownerDesk.getByLabel("באחריות").selectOption({ label: "דנה חברה" });
   await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  // leaving the page before the save answers would cut it off
+  for (let i = 0; i < 60; i++) {
+    const [{ n }] = await sql("select count(*)::int as n from public.tasks where title = 'משימה לדנה' and organization_id = $1", [orgUrl.split("/").pop()]);
+    if (n > 0) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   await ownerDesk.goto(`${orgUrl}/tasks?who=all`);
   await expectText(ownerDesk, "באחריות דנה חברה");
   await shot(ownerDesk, "22-tasks-1280");
@@ -476,6 +482,26 @@ try {
   await leadCard().getByRole("button", { name: "העברה" }).click();
   const back = await boardStatus("חדש");
   if (back.reason !== null) throw new Error("the reason stayed after the lead was reopened");
+
+  step("lists: a click on a column header sorts by it, a second click reverses");
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  const nameHeader = ownerDesk.getByRole("columnheader", { name: /^שם/ });
+  await nameHeader.getByRole("link").click();
+  await ownerDesk.waitForURL(/sort=name/);
+  if ((await nameHeader.getAttribute("aria-sort")) !== "ascending") throw new Error("the name column is not marked as sorted");
+  // the first row is the database's first name in its own collation
+  const [{ first }] = await sql(
+    "select full_name as first from public.leads where organization_id = $1 and deleted_at is null order by full_name nulls last, id limit 1",
+    [orgUrl.split("/").pop()],
+  );
+  const firstShown = (await ownerDesk.locator("tbody tr td:first-child a").first().innerText()).trim();
+  if (firstShown !== first) throw new Error(`leads are not sorted by name: first shown ${firstShown}, expected ${first}`);
+  await nameHeader.getByRole("link").click();
+  await ownerDesk.waitForURL(/sort=-name/);
+  if ((await nameHeader.getAttribute("aria-sort")) !== "descending") throw new Error("a second click did not reverse the sort");
+  await ownerDesk.goto(`${orgUrl}/companies`);
+  await ownerDesk.getByRole("columnheader", { name: /^נוצר/ }).getByRole("link").click();
+  await ownerDesk.waitForURL(/sort=-created/);
 
   step("privacy request: erase the purged lead from the audit log");
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);

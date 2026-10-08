@@ -8,13 +8,14 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
-import { listCompanies } from "@/features/companies/queries";
+import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies, type CompanySortKey } from "@/features/companies/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
+import { nextSort, parseSort, sortValue } from "@/lib/sort";
 
 export const metadata: Metadata = { title: "חברות" };
 
@@ -33,20 +34,25 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const tagParam = firstParam(query.tag);
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
+  const sort = parseSort(firstParam(query.sort), Object.keys(COMPANY_SORT_COLUMNS) as CompanySortKey[], COMPANY_DEFAULT_SORT);
   const [tags, views, { companies, hasMore }] = await Promise.all([
     listTags(orgId),
     viewChips(orgId, "company", context),
-    listCompanies(orgId, { search, tagId, page }),
+    listCompanies(orgId, { search, tagId, page, sort }),
   ]);
 
-  const hrefFor = (target: number) => {
+  const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
     if (search) next.set("q", search);
     if (tagId) next.set("tag", tagId);
+    if (sortParam !== sortValue(COMPANY_DEFAULT_SORT)) next.set("sort", sortParam);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
     return suffix ? `${paths.companies(orgId)}?${suffix}` : paths.companies(orgId);
   };
+  const hrefFor = (target: number) => listHref(target, sortValue(sort));
+  // a new sort starts again from the first page; dates start with the newest
+  const sortHref = (key: CompanySortKey) => listHref(1, sortValue(nextSort(sort, key, key !== "created")));
 
   const newCompanyButton = canWrite ? (
     <ButtonLink href={paths.companyNew(orgId)}>
@@ -96,7 +102,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
       </Form>
 
       {companies.length > 0 ? (
-        <CompaniesTable orgId={orgId} companies={companies} />
+        <CompaniesTable orgId={orgId} companies={companies} sort={sort} sortHref={sortHref} />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || page > 1 ? (
