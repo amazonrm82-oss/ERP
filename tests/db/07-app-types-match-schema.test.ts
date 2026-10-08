@@ -105,7 +105,11 @@ describe("app types match the database", () => {
       }
 
       const fns = await q<{ proname: string; names: string[] | null; defaults: number }>(`
-        select p.proname, p.proargnames as names, p.pronargdefaults as defaults
+        -- input arguments only: a "returns table" function lists its output columns in proargnames too
+        select p.proname, p.pronargdefaults as defaults,
+               case when p.proargmodes is null then p.proargnames
+                    else array(select a.name from unnest(p.proargnames, p.proargmodes) as a(name, mode)
+                                where a.mode in ('i', 'b', 'v')) end as names
         from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`);
       dbFunctions = Object.fromEntries(fns.rows.map((r) => [r.proname, { names: r.names ?? [], defaults: r.defaults }]));
     });

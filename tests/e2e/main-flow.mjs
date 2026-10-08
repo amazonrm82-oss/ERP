@@ -1293,6 +1293,28 @@ try {
   await expectText(ownerDesk, "515151515");
   await expectText(ownerDesk, "חיפה");
 
+  step("import: undoing a contacts import removes the company it created, not one that was there (FXC-02)");
+  await ownerDesk.goto(`${orgUrl}/settings/import/new`);
+  await ownerDesk.getByLabel("אנשי קשר", { exact: true }).check();
+  await ownerDesk.locator('input[type="file"]').setInputFiles({
+    name: "contacts-2.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("﻿שם פרטי,שם משפחה,טלפון,חברה\nרון,זמני,0547770002,חברה זמנית\nשירה,זמנית,0547770003,\"אקסל בע\"\"מ\"\n", "utf8"),
+  });
+  await expectText(ownerDesk, "2 שורות");
+  await ownerDesk.getByRole("button", { name: "בדיקת 20 השורות הראשונות" }).click();
+  await ownerDesk.getByRole("button", { name: "ייבוא 2 שורות" }).click();
+  await expectText(ownerDesk, "הייבוא הסתיים");
+  const tempCompanies = async () => (await sql("select count(*)::int as n from public.companies where organization_id = $1 and deleted_at is null and name in ('חברה זמנית', 'אקסל בע\"מ')", [orgUrl.split("/").pop()]))[0].n;
+  if ((await tempCompanies()) !== 2) throw new Error("the contacts import did not create its company or matched the wrong one");
+  await ownerDesk.goto(`${orgUrl}/settings/import`);
+  await ownerDesk.getByRole("button", { name: /^ביטול הייבוא/ }).first().click();
+  await ownerDesk.getByRole("button", { name: /^(כן|אישור)/ }).first().click();
+  // "בוטל" is already on the page from the leads import: wait for the database instead
+  for (let i = 0; i < 40 && (await tempCompanies()) !== 1; i++) await new Promise((r) => setTimeout(r, 250));
+  const left = (await sql("select name from public.companies where organization_id = $1 and deleted_at is null and name in ('חברה זמנית', 'אקסל בע\"מ')", [orgUrl.split("/").pop()])).map((r) => r.name);
+  if (left.length !== 1 || left[0] !== 'אקסל בע"מ') throw new Error(`undo left the wrong companies: ${left.join(", ")}`);
+
   step("export: the owner downloads everything; a team manager may not");
   const zipRes = await ownerDesk.context().request.get(`${orgUrl}/settings/import/export`);
   const zipBytes = await zipRes.body();
@@ -1636,6 +1658,9 @@ try {
   console.log("Dana's leads after the handover:", danaOwns);
   if (danaOwns !== 0) throw new Error("records were left with the member");
 
+  // a blocked resource is a broken screen (FXS-05: file thumbnails were blocked once)
+  const blocked = errors.filter((e) => e.includes("Content Security Policy"));
+  if (blocked.length) throw new Error(`the security policy blocked ${blocked.length} resources: ${blocked[0].slice(0, 200)}`);
   console.log("\nFLOW OK");
   process.exitCode = 0;
 } catch (error) {

@@ -228,51 +228,59 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
 
 const TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
 
-type Existing = { id: string; phone_e164?: string | null; email?: string | null; tax_id?: string | null; name?: string | null; custom_fields?: Json };
+type Existing = { id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null };
 
-/** Records already in the organization (that the user can see) matching any row of the chunk. */
-async function findExisting(ctx: ImportContext, rows: Prepared[]): Promise<Existing[]> {
-  const table = TABLE[ctx.entity];
-  const phones = [...new Set(rows.map((r) => r.phoneE164).filter((v): v is string => Boolean(v)))];
-  const emails = [...new Set(rows.map((r) => r.email).filter((v): v is string => Boolean(v)))];
-  const found: Existing[] = [];
-  const base = () => ctx.supabase.from(table).select(ctx.entity === "company" ? "id, phone_e164, email, tax_id, name, custom_fields" : "id, phone_e164, email, custom_fields").eq("organization_id", ctx.orgId).is("deleted_at", null);
-  // leads that were converted are not duplicates of a new lead
-  const scoped = <T extends { is: (c: string, v: null) => T }>(q: T) => (ctx.entity === "lead" ? q.is("converted_at", null) : q);
-  if (phones.length) found.push(...(((await scoped(base().in("phone_e164", phones))).data ?? []) as unknown as Existing[]));
-  if (emails.length) found.push(...(((await scoped(base().in("email", emails))).data ?? []) as unknown as Existing[]));
-  if (ctx.entity === "company") {
-    const taxIds = [...new Set(rows.map((r) => r.taxId).filter((v): v is string => Boolean(v)))];
-    const names = [...new Set(rows.map((r) => r.name).filter((v): v is string => Boolean(v)))];
-    if (taxIds.length) found.push(...(((await base().in("tax_id", taxIds)).data ?? []) as unknown as Existing[]));
-    if (names.length) found.push(...(((await base().in("name", names)).data ?? []) as unknown as Existing[]));
-  }
-  return found;
+/** A lookup that failed: the chunk fails as a whole rather than guessing (FXC-02). */
+class LookupFailed extends Error {}
+
+const present = (values: Array<string | null>) => [...new Set(values.filter((v): v is string => Boolean(v)))];
+
+/** Records already in the organization (that the user can see) matching any row of the chunk; one query in the database. */
+async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: Array<Pick<Prepared, "phoneE164" | "email" | "taxId" | "name">>): Promise<Existing[]> {
+  if (rows.length === 0) return [];
+  const { data, error } = await ctx.supabase.rpc("import_find_duplicates", {
+    p_org: ctx.orgId,
+    p_entity: entity,
+    p_phones: present(rows.map((r) => r.phoneE164)),
+    p_emails: present(rows.map((r) => r.email)),
+    p_tax_ids: entity === "company" ? present(rows.map((r) => r.taxId)) : [],
+    p_names: entity === "company" ? present(rows.map((r) => r.name)) : [],
+  });
+  if (error) throw new LookupFailed(error.message);
+  return data;
 }
+
+const same = (a: string | null | undefined, b: string | null | undefined) => Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 
 function matchExisting(entity: ImportEntityKey, existing: Existing[], row: Prepared): Existing | undefined {
   return existing.find(
     (e) =>
       (row.phoneE164 && e.phone_e164 === row.phoneE164) ||
-      (row.email && e.email === row.email) ||
-      (entity === "company" && ((row.taxId && e.tax_id === row.taxId) || (row.name && e.name?.toLowerCase() === row.name.toLowerCase()))),
+      same(row.email, e.email) ||
+      (entity === "company" && ((row.taxId && e.tax_id === row.taxId) || same(row.name, e.name))),
   );
 }
 
-/** Company ids by name for contacts; missing companies are created (not tagged with the import). */
-async function resolveCompanies(ctx: ImportContext, rows: Prepared[], create: boolean): Promise<Map<string, string>> {
-  const names = [...new Set(rows.map((r) => r.companyName).filter((v): v is string => Boolean(v)))];
+/** Company ids by name for contacts. Missing companies are created, tagged with the import, so undoing it removes them. */
+async function resolveCompanies(ctx: ImportContext, rows: Prepared[], jobId: string): Promise<Map<string, string>> {
+  const names = present(rows.map((r) => r.companyName));
   const ids = new Map<string, string>();
   if (names.length === 0) return ids;
-  const { data } = await ctx.supabase.from("companies").select("id, name").eq("organization_id", ctx.orgId).is("deleted_at", null).in("name", names);
-  for (const c of data ?? []) ids.set(key(c.name), c.id);
+  const found = await findExisting(
+    ctx,
+    "company",
+    names.map((name) => ({ phoneE164: null, email: null, taxId: null, name })),
+  );
+  for (const c of found) if (c.name && names.some((n) => same(n, c.name))) ids.set(key(c.name), c.id);
   const missing = names.filter((n) => !ids.has(key(n)));
-  if (create && missing.length) {
-    const { data: created } = await ctx.supabase
+  if (missing.length) {
+    const { data: created, error } = await ctx.supabase
       .from("companies")
-      .insert(missing.map((n) => ({ organization_id: ctx.orgId, name: n })))
+      .insert(missing.map((n) => ({ organization_id: ctx.orgId, name: n, import_job_id: jobId })))
       .select("id, name");
-    for (const c of created ?? []) ids.set(key(c.name), c.id);
+    if (error?.code === "P0001") throw new ImportStopped(dbErrorMessage(error, "הגעתם למגבלת החבילה."));
+    if (error) throw new LookupFailed(error.message);
+    for (const c of created) ids.set(key(c.name), c.id);
   }
   return ids;
 }
@@ -294,12 +302,26 @@ export async function processChunk(ctx: ImportContext, lookups: Lookups | null, 
     else prepared.push(result);
   });
 
-  const existing = ctx.mode === "create" ? [] : await findExisting(ctx, prepared);
+  try {
+    return await writeChunk(ctx, look, prepared, outcomes, jobId);
+  } catch (error) {
+    if (!(error instanceof LookupFailed)) throw error;
+    // rows already updated keep their outcome; the rest of the chunk was not written
+    const done = new Set(outcomes.map((o) => o.row));
+    for (const row of prepared) {
+      if (!done.has(row.row)) outcomes.push({ row: row.row, status: "failed", message: "בדיקת הכפילויות נכשלה. נסו לייבא את השורה שוב." });
+    }
+    return outcomes.sort((a, b) => a.row - b.row);
+  }
+}
+
+async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[], outcomes: RowOutcome[], jobId: string | null): Promise<RowOutcome[]> {
+  const existing = ctx.mode === "create" ? [] : await findExisting(ctx, ctx.entity, prepared);
   const toInsert: Prepared[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
     // a repeat of an earlier row in the same chunk counts as a duplicate too
-    const earlier = ctx.mode === "create" ? undefined : seen.find((s) => (row.phoneE164 && s.phoneE164 === row.phoneE164) || (row.email && s.email === row.email));
+    const earlier = ctx.mode === "create" ? undefined : seen.find((s) => (row.phoneE164 && s.phoneE164 === row.phoneE164) || same(row.email, s.email));
     seen.push(row);
     const match = matchExisting(ctx.entity, existing, row);
     if (earlier || (match && ctx.mode === "skip")) {
@@ -310,11 +332,14 @@ export async function processChunk(ctx: ImportContext, lookups: Lookups | null, 
         continue;
       }
       const values = { ...row.values };
-      if (values.custom_fields && match.custom_fields && typeof match.custom_fields === "object" && !Array.isArray(match.custom_fields)) {
-        values.custom_fields = { ...match.custom_fields, ...(values.custom_fields as Record<string, Json>) };
-      }
       // only what the file filled in; an empty cell does not erase
       for (const [k, v] of Object.entries(values)) if (v === null) delete values[k];
+      if (values.custom_fields) {
+        // merged into the record in the database (FXD-04); an empty cell does not erase there either
+        const filled = Object.fromEntries(Object.entries(values.custom_fields as Record<string, Json>).filter(([, v]) => v !== null));
+        if (Object.keys(filled).length) values.custom_fields = { $merge: filled };
+        else delete values.custom_fields;
+      }
       const { data, error } = await ctx.supabase.from(TABLE[ctx.entity]).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
       if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : "אין הרשאה לעדכן את הרשומה הקיימת." });
       else outcomes.push({ row: row.row, status: "updated" });
@@ -328,7 +353,7 @@ export async function processChunk(ctx: ImportContext, lookups: Lookups | null, 
     return outcomes.sort((a, b) => a.row - b.row);
   }
 
-  const companies = ctx.entity === "contact" ? await resolveCompanies(ctx, toInsert, true) : new Map<string, string>();
+  const companies = ctx.entity === "contact" ? await resolveCompanies(ctx, toInsert, jobId) : new Map<string, string>();
   const insertRow = (row: Prepared) => ({
     organization_id: ctx.orgId,
     import_job_id: jobId,

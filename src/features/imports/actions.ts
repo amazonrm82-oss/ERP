@@ -155,6 +155,39 @@ export async function finishImportAction(
   return ok();
 }
 
+/**
+ * The companies a contacts import created go to the recycle bin with its contacts,
+ * except one that a contact from outside the import uses by now.
+ */
+async function trashImportedCompanies(supabase: ImportContext["supabase"], orgId: string, jobId: string): Promise<string | null> {
+  const { data: companies, error } = await supabase.from("companies").select("id").eq("organization_id", orgId).eq("import_job_id", jobId).is("deleted_at", null);
+  if (error) return dbErrorMessage(error, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.");
+  if (companies.length === 0) return null;
+  const ids = companies.map((c) => c.id);
+  const inUse = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: users, error: usersError } = await supabase
+      .from("contacts")
+      .select("company_id, import_job_id")
+      .eq("organization_id", orgId)
+      .in("company_id", ids.slice(i, i + 200))
+      .is("deleted_at", null);
+    if (usersError) return dbErrorMessage(usersError, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.");
+    for (const u of users) if (u.company_id && u.import_job_id !== jobId) inUse.add(u.company_id);
+  }
+  const unused = ids.filter((id) => !inUse.has(id));
+  for (let i = 0; i < unused.length; i += 200) {
+    const { error: trashError } = await supabase
+      .from("companies")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("organization_id", orgId)
+      .in("id", unused.slice(i, i + 200))
+      .is("deleted_at", null);
+    if (trashError) return dbErrorMessage(trashError, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו להעביר את החברות שנוצרו בייבוא.");
+  }
+  return null;
+}
+
 /** Moves the records an import created to the recycle bin (within 7 days). Updates are not reverted. */
 export async function undoImportAction(orgId: string, jobId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
@@ -178,6 +211,10 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
     .eq("import_job_id", jobId)
     .is("deleted_at", null);
   if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
+  if (entity === "contact") {
+    const companiesError = await trashImportedCompanies(context.supabase, orgId, jobId);
+    if (companiesError) return fail(companiesError);
+  }
   const { error: jobError } = await context.supabase
     .from("import_jobs")
     .update({ status: "undone", undone_at: new Date().toISOString() })

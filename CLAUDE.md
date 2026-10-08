@@ -216,6 +216,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   inserts `origin: 'import'`; `process_outbox` skips origins `automation` and `import`;
   `notify_assignment` skips imported inserts. The wizard sends rows in chunks to Server Actions
   (`src/features/imports/`), which write with the user's session.
+  Since 0044 duplicates are found by `public.import_find_duplicates()` (security invoker; a lookup error
+  fails the chunk), and a contacts import tags the companies it creates, so undo removes them too.
 - Reports (migration 0011) are `public.report_*` functions, **security invoker** on purpose: RLS decides
   what is counted. Do not make them security definer. They return jsonb; `src/features/reports/build.ts`
   shapes it into tables for the screen and the CSV export.

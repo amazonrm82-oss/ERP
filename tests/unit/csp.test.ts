@@ -19,6 +19,11 @@ describe("content security policy (FXS-05)", () => {
     expect(contentSecurityPolicy({ ...base, supabaseUrl: "http://127.0.0.1:54321", isDev: true })).toContain("connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321");
   });
 
+  it("images from this site and from Supabase Storage (file thumbnails), nowhere else", () => {
+    expect(contentSecurityPolicy(base)).toContain("img-src 'self' blob: data: https://ref.supabase.co;");
+    expect(contentSecurityPolicy({ ...base, supabaseUrl: "" })).toContain("img-src 'self' blob: data:;");
+  });
+
   it("the public form may redirect to the customer's site; the app may not post elsewhere", () => {
     expect(contentSecurityPolicy({ ...base, publicForm: true })).toContain("form-action 'self' https:");
     expect(contentSecurityPolicy(base)).toContain("form-action 'self' https://ref.supabase.co https://accounts.google.com");

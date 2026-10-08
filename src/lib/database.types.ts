@@ -1017,6 +1017,11 @@ export type Database = {
       audit_erase_record: { Args: { p_org: string; p_type: string; p_id: string }; Returns: number };
       // adds and removes tags on one record (migration 0042)
       change_record_tags: { Args: { p_table: string; p_org: string; p_id: string; p_add: string[]; p_remove: string[] }; Returns: boolean };
+      // import duplicates of a chunk, with the caller's rights (migration 0044)
+      import_find_duplicates: {
+        Args: { p_org: string; p_entity: string; p_phones: string[]; p_emails: string[]; p_tax_ids: string[]; p_names: string[] };
+        Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
+      };
       // an exported list goes to the audit log (migration 0034)
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };
       // platform admin (migration 0013): each checks the platform role and aal2 itself

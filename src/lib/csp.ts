@@ -32,7 +32,8 @@ export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }:
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    // file thumbnails are signed links to Supabase Storage
+    `img-src 'self' blob: data:${supabase ? ` ${supabase.origin}` : ""}`,
     "font-src 'self' data:",
     `connect-src ${connect.join(" ")}`,
     "worker-src 'self'",
