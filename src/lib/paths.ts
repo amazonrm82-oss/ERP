@@ -69,7 +69,6 @@ export const paths = {
 // stand-in origin and must stay on it (FXS-01).
 const SAME_SITE = "http://same-site.invalid";
 // control characters (browsers drop tabs and newlines from URLs) and backslashes (read as slashes)
-// eslint-disable-next-line no-control-regex
 const UNSAFE_IN_PATH = /[\u0000-\u001f\u007f\\]/;
 
 export function safeNextPath(next: string | null | undefined): string {

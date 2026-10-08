@@ -21,6 +21,11 @@ const ALIASES: Record<IntakeField, string[]> = {
 // A human needs more than this to fill in a form.
 const MIN_FILL_MS = 2000;
 
+// FXS-02: a form post is a few fields. Bigger bodies are refused before the
+// database, and each field is cut to the length the lead keeps.
+export const MAX_BODY_BYTES = 32 * 1024;
+const MAX_LENGTH: Record<IntakeField, number> = { full_name: 200, phone: 40, email: 254, company_name: 200, message: 5000 };
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -32,15 +37,23 @@ export function preflight(): Response {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown> | null> {
+/** The body as an object; "too_large" past MAX_BODY_BYTES (read in pieces, so a huge body is never held whole). */
+async function readBody(request: Request): Promise<Record<string, unknown> | null | "too_large"> {
   const type = request.headers.get("content-type") ?? "";
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {
+    return "too_large";
+  }
+  const bytes = await readLimited(request);
+  if (bytes === "too_large") {
+    return bytes;
+  }
   try {
     if (type.includes("application/json")) {
-      const body: unknown = await request.json();
+      const body: unknown = JSON.parse(new TextDecoder().decode(bytes));
       return body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
     }
     if (type.includes("application/x-www-form-urlencoded") || type.includes("multipart/form-data")) {
-      const form = await request.formData();
+      const form = await new Response(bytes as unknown as BodyInit, { headers: { "content-type": type } }).formData();
       const out: Record<string, unknown> = {};
       for (const [key, value] of form.entries()) {
         if (typeof value === "string") out[key] = value;
@@ -53,13 +66,39 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
   return null;
 }
 
+async function readLimited(request: Request): Promise<Uint8Array | "too_large"> {
+  if (!request.body) {
+    return new Uint8Array();
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return "too_large";
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 function text(value: unknown): string | null {
   if (typeof value === "number") return String(value);
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
 /** The known lead fields from a body, whatever the sender called them. */
-function normalize(body: Record<string, unknown>): Record<IntakeField, string | null> {
+export function normalize(body: Record<string, unknown>): Record<IntakeField, string | null> {
   const out = {} as Record<IntakeField, string | null>;
   for (const [field, names] of Object.entries(ALIASES) as Array<[IntakeField, string[]]>) {
     out[field] = names.map((name) => text(body[name])).find((value) => value !== null) ?? null;
@@ -68,6 +107,9 @@ function normalize(body: Record<string, unknown>): Record<IntakeField, string | 
   const last = text(body.last_name);
   if (out.full_name && last && text(body.first_name) === out.full_name) {
     out.full_name = `${out.full_name} ${last}`;
+  }
+  for (const field of Object.keys(out) as IntakeField[]) {
+    out[field] = out[field]?.slice(0, MAX_LENGTH[field]) ?? null;
   }
   return out;
 }
@@ -82,6 +124,7 @@ type Reply = { ok: boolean; message: string; redirectUrl?: string | null };
 const MESSAGES = {
   notConfigured: "קליטת הלידים עוד לא הוגדרה במערכת.",
   badRequest: "לא הצלחנו לקרוא את הפרטים שנשלחו.",
+  tooLarge: "הפרטים שנשלחו ארוכים מדי.",
   notFound: "הטופס לא נמצא או שאינו פעיל.",
   invalid: "חלק מהפרטים חסרים או לא תקינים. יש למלא שם, טלפון או אימייל, ואת כל שדות החובה.",
   rateLimited: "נשלחו יותר מדי פניות בזמן קצר. נסו שוב בעוד כמה דקות.",
@@ -111,6 +154,14 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     return respond(503, { ok: false, message: MESSAGES.notConfigured });
   }
   const body = await readBody(request);
+  const ip = clientIp(request);
+  // salted per form: the stored value cannot be matched across forms or reversed cheaply
+  const ipHash = ip ? createHash("sha256").update(`${token}:${ip}`).digest("hex") : null;
+  if (body === "too_large") {
+    // still counted against the sender's rate limit: logged as spam with nothing in it
+    await service.rpc("intake_submit", { p_token: token, p_kind: kind, p_payload: {}, p_ip_hash: ipHash, p_user_agent: null, p_is_spam: true });
+    return respond(413, { ok: false, message: MESSAGES.tooLarge });
+  }
   if (!body) {
     return respond(400, { ok: false, message: MESSAGES.badRequest });
   }
@@ -123,13 +174,11 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     isSpam = text(body[HONEYPOT_FIELD]) !== null || (Number.isFinite(startedAt) && startedAt > 0 && Date.now() - startedAt < MIN_FILL_MS);
   }
 
-  const ip = clientIp(request);
   const { data, error } = await service.rpc("intake_submit", {
     p_token: token,
     p_kind: kind,
     p_payload: normalize(body) as unknown as Json,
-    // salted per form: the stored value cannot be matched across forms or reversed cheaply
-    p_ip_hash: ip ? createHash("sha256").update(`${token}:${ip}`).digest("hex") : null,
+    p_ip_hash: ipHash,
     p_user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
     p_is_spam: isSpam,
   });

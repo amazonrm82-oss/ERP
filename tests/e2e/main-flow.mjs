@@ -987,6 +987,11 @@ try {
   if (hookReply.status !== 200) throw new Error(`webhook answered ${hookReply.status}`);
   const badReply = await fetch(hookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: "בלי פרטים" }) });
   if (badReply.status !== 400) throw new Error(`a webhook without name/phone/email should get 400, got ${badReply.status}`);
+  // FXS-02: a body over 32KB is refused before the database, and still counts against the sender's rate limit
+  const hugeReply = await fetch(hookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "גדול", notes: "x".repeat(40_000) }) });
+  if (hugeReply.status !== 413) throw new Error(`a 40KB webhook body should get 413, got ${hugeReply.status}`);
+  const [{ n: hugeLogged }] = await sql("select count(*)::int as n from public.form_submissions s join public.forms f on f.id = s.form_id where f.name = 'Zapier' and s.status = 'spam'");
+  if (hugeLogged < 1) throw new Error("the refused body was not counted");
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("אבי מזאפייר")}`);
   await ownerDesk.getByRole("link", { name: "אבי מזאפייר" }).waitFor({ timeout: 15000 });
 
