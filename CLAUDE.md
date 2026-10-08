@@ -64,6 +64,9 @@ and build this CRM here instead. The old code is preserved on the branch
    `push_subscriptions`; and the file cleanup (`src/features/files/cleanup-server.ts`, route
    `/api/files/cleanup`, woken at night by the database with the same secret), which calls
    `public.claim_orphan_files()` / `finish_orphan_files()` and removes those Storage objects.
+   Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
+   `QUO-08`, `CAL-10`, `BAL-04`): a server route calls one `security definer` function granted to
+   `service_role` only, which checks the token and does only what that page needs; no direct table access.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
