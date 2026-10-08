@@ -1,7 +1,9 @@
 import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
-import type { StageKind } from "@/lib/database.types";
+import type { Json, StageKind } from "@/lib/database.types";
+import { ilikeAny, PAGE_SIZE } from "@/lib/search";
+import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type StageOption = { id: string; name: string; kind: StageKind };
@@ -230,5 +232,115 @@ export async function getDeal(orgId: string, dealId: string) {
     contactName: contact.data ? contact.data.full_name || contact.data.email || contact.data.phone || "איש קשר ללא שם" : null,
     companyName: company.data?.name ?? null,
     ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
+  };
+}
+
+export type DealListItem = {
+  id: string;
+  name: string;
+  amountAgorot: number;
+  currency: string;
+  stageId: string;
+  status: StageKind;
+  contactId: string | null;
+  contactName: string | null;
+  companyName: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  expectedCloseDate: string | null;
+  createdAt: string;
+  customFields: Json;
+};
+
+// columns the deals table can be sorted by (LST-09); stage, contact, company and owner are computed fields (migration 0035)
+export const DEAL_SORT_COLUMNS = {
+  name: "name",
+  amount: "amount_agorot",
+  stage: "sort_stage",
+  status: "status",
+  contact: "sort_contact",
+  company: "sort_company",
+  owner: "sort_owner",
+  expected_close: "expected_close_date",
+  created: "created_at",
+} as const;
+export type DealSortKey = keyof typeof DEAL_SORT_COLUMNS;
+export const DEAL_DEFAULT_SORT: Sort<DealSortKey> = { key: "created", ascending: false };
+
+/** One page of a pipeline's live deals (the table view), newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
+export async function listDeals(
+  orgId: string,
+  options: {
+    pipelineId: string;
+    search: string;
+    tagId?: string | null;
+    page: number;
+    sort?: Sort<DealSortKey | CustomSortKey>;
+    filter?: string | null;
+    ids?: string[];
+    chunk?: { from: number; size: number };
+  },
+): Promise<{ deals: DealListItem[]; hasMore: boolean }> {
+  const supabase = await createClient();
+  const size = options.chunk?.size ?? PAGE_SIZE;
+  const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
+
+  let query = supabase
+    .from("deals")
+    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, created_at, custom_fields")
+    .eq("organization_id", orgId)
+    .eq("pipeline_id", options.pipelineId)
+    .is("deleted_at", null);
+  const searchFilter = ilikeAny(["name"], options.search);
+  if (searchFilter) {
+    query = query.or(searchFilter);
+  }
+  if (options.tagId) {
+    query = query.contains("tag_ids", [options.tagId]);
+  }
+  if (options.ids) {
+    query = query.in("id", options.ids);
+  }
+  if (options.filter) {
+    query = query.or(options.filter);
+  }
+  const sort = options.sort ?? DEAL_DEFAULT_SORT;
+  const { data, error } = await query
+    .order(sortColumn(DEAL_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+    .order("id", { ascending: sort.ascending })
+    .range(from, from + size);
+  if (error) {
+    throw new Error(`deals query failed: ${error.message}`);
+  }
+  const rows = data.slice(0, size);
+
+  const contactIds = [...new Set(rows.map((row) => row.contact_id).filter((id): id is string => Boolean(id)))];
+  const companyIds = [...new Set(rows.map((row) => row.company_id).filter((id): id is string => Boolean(id)))];
+  const [owners, contacts, companies] = await Promise.all([
+    getUserNames(rows.map((row) => row.owner_id)),
+    contactIds.length > 0 ? supabase.from("contacts").select("id, full_name, email, phone").eq("organization_id", orgId).in("id", contactIds) : Promise.resolve({ data: [] }),
+    companyIds.length > 0 ? supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", companyIds) : Promise.resolve({ data: [] }),
+  ]);
+  const contactName = new Map((contacts.data ?? []).map((c) => [c.id, c.full_name || c.email || c.phone || "איש קשר ללא שם"]));
+  const companyName = new Map((companies.data ?? []).map((c) => [c.id, c.name]));
+
+  return {
+    hasMore: data.length > size,
+    deals: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      amountAgorot: row.amount_agorot,
+      currency: row.currency,
+      stageId: row.stage_id,
+      status: row.status,
+      contactId: row.contact_id,
+      contactName: row.contact_id ? (contactName.get(row.contact_id) ?? null) : null,
+      companyName: row.company_id ? (companyName.get(row.company_id) ?? null) : null,
+      ownerId: row.owner_id,
+      ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+      expectedCloseDate: row.expected_close_date,
+      createdAt: row.created_at,
+      customFields: row.custom_fields,
+    })),
   };
 }

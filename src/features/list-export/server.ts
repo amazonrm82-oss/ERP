@@ -2,6 +2,8 @@ import "server-only";
 
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
+import { DEAL_STATUS } from "@/features/deals/display";
+import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getPipeline, listDeals } from "@/features/deals/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { displayCustomFields } from "@/features/custom-fields/values";
@@ -12,10 +14,12 @@ import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
+import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
+import { listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskSortKey } from "@/features/tasks/queries";
 import { viewChips } from "@/features/views/server";
 import { csvText } from "@/lib/csv";
 import type { Json } from "@/lib/database.types";
-import { formatDate, zoneDate } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format";
 import { isUuid } from "@/lib/paths";
 import { parseSort, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
@@ -31,8 +35,11 @@ const CHUNK = 1000;
 const MAX_ROWS = 50000;
 const MAX_PICKED = 100;
 
-const SHEET = { lead: "לידים", contact: "אנשי קשר", company: "חברות" } as const;
-const FILE = { lead: "leads", contact: "contacts", company: "companies" } as const;
+const SHEET = { lead: "לידים", contact: "אנשי קשר", company: "חברות", deal: "עסקאות", task: "משימות" } as const;
+const FILE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
+const TASK_STATUS_LABELS = { open: "פתוחה", done: "הושלמה", cancelled: "בוטלה" } as const;
+const PRIORITY_LABELS: Record<number, string> = { 1: "גבוהה", 2: "רגילה", 3: "נמוכה" };
+const TASK_TYPE_LABELS = new Map<string, string>(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
 const text = (message: string, status: number) => new Response(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
@@ -53,12 +60,18 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   const scope = params.has("ids") ? "selected" : "filtered";
 
   const listColumns = await getListColumns(orgId, object);
-  const filter = await prepareListFilter(orgId, object, params.get("f") ?? "", context.user.id, listColumns.fields);
+  // the deals table shows one pipeline; tasks are the user's own unless "who=all"
+  const pipeline = object === "deal" ? await getPipeline(orgId, params.get("pipeline")) : null;
+  if (object === "deal" && !pipeline) {
+    return text("אין פייפליין מכירות.", 404);
+  }
+  const taskOwner = object === "task" && params.get("who") !== "all" ? context.user.id : null;
+  const filter = await prepareListFilter(orgId, object, params.get("f") ?? "", context.user.id, listColumns.fields, { stages: pipeline?.stages });
   const search = (params.get("q") ?? "").trim();
   const tagId = isUuid(params.get("tag") ?? "") ? params.get("tag") : null;
   const statusId = object === "lead" && isUuid(params.get("status") ?? "") ? params.get("status") : null;
-  const sortColumns = object === "lead" ? LEAD_SORT_COLUMNS : object === "contact" ? CONTACT_SORT_COLUMNS : COMPANY_SORT_COLUMNS;
-  const defaultSort = object === "lead" ? LEAD_DEFAULT_SORT : object === "contact" ? CONTACT_DEFAULT_SORT : COMPANY_DEFAULT_SORT;
+  const sortColumns = { lead: LEAD_SORT_COLUMNS, contact: CONTACT_SORT_COLUMNS, company: COMPANY_SORT_COLUMNS, deal: DEAL_SORT_COLUMNS, task: TASK_SORT_COLUMNS }[object];
+  const defaultSort = { lead: LEAD_DEFAULT_SORT, contact: CONTACT_DEFAULT_SORT, company: COMPANY_DEFAULT_SORT, deal: DEAL_DEFAULT_SORT, task: TASK_DEFAULT_SORT }[object];
   const sortKeys = [...Object.keys(sortColumns), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
   const sort = parseSort(params.get("sort") ?? "", sortKeys, defaultSort as unknown as Sort<CustomSortKey>);
 
@@ -75,6 +88,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   const lookups = object === "lead" ? await getLeadLookups(orgId) : null;
   const statusName = new Map(lookups?.statuses.map((s) => [s.id, s.name]) ?? []);
   const sourceName = new Map(lookups?.sources.map((s) => [s.id, s.name]) ?? []);
+  const stageName = new Map(pipeline?.stages.map((s) => [s.id, s.name]) ?? []);
   const created = (iso: string) => formatDate(iso);
 
   for (let from = 0; ; from += CHUNK) {
@@ -115,6 +129,43 @@ export async function exportList(request: Request, orgId: string, object: ListOb
           },
         });
       }
+    } else if (object === "deal") {
+      const page = await listDeals(orgId, { ...options, pipelineId: pipeline!.id, chunk });
+      more = page.hasMore;
+      for (const deal of page.deals) {
+        rows.push({
+          name: deal.name,
+          customFields: deal.customFields,
+          cells: {
+            amount: formatMoney(deal.amountAgorot),
+            stage: stageName.get(deal.stageId) ?? null,
+            status: DEAL_STATUS[deal.status].label,
+            contact: deal.contactName,
+            company: deal.companyName,
+            owner: deal.ownerName,
+            expected_close: deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : null,
+            created: created(deal.createdAt),
+          },
+        });
+      }
+    } else if (object === "task") {
+      const page = await listTasks(orgId, { ...options, ownerId: scope === "selected" ? null : taskOwner, sort: sort as unknown as Sort<TaskSortKey>, chunk });
+      more = page.hasMore;
+      for (const task of page.tasks) {
+        rows.push({
+          name: task.title,
+          customFields: {},
+          cells: {
+            due: task.dueAt ? formatDateTime(task.dueAt) : null,
+            type: TASK_TYPE_LABELS.get(task.taskType) ?? task.taskType,
+            status: TASK_STATUS_LABELS[task.status],
+            priority: PRIORITY_LABELS[task.priority] ?? null,
+            related: task.related?.name ?? null,
+            owner: task.ownerName,
+            created: created(task.createdAt),
+          },
+        });
+      }
     } else {
       const page = await listCompanies(orgId, { ...options, chunk });
       more = page.hasMore;
@@ -132,7 +183,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
     if (!more) break;
   }
 
-  const header = ["שם", ...columns.map((column) => labels.get(column.key) ?? column.key)];
+  const header = [object === "task" ? "כותרת" : "שם", ...columns.map((column) => labels.get(column.key) ?? column.key)];
   const body = rows.map((row) => [
     row.name,
     ...columns.map((column) => {
@@ -154,6 +205,8 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             status: statusId ?? "",
             f: filter.tree ? JSON.stringify(filter.tree) : "",
             sort: params.get("sort") ?? "",
+            pipeline: pipeline?.name ?? "",
+            who: object === "task" ? (taskOwner ? "mine" : "all") : "",
             view: view?.name ?? "",
           }).filter(([, value]) => value !== ""),
         );

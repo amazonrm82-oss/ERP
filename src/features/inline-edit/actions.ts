@@ -12,14 +12,22 @@ import { isUuid, paths } from "@/lib/paths";
 
 // What can be edited in a list's cell (LST-06), per list. The database decides
 // who may: the update runs with the user's session, and 0 rows means "not allowed".
-export type InlineObject = "lead" | "contact" | "company";
-export type InlineField = "name" | "status" | "owner";
+export type InlineObject = "lead" | "contact" | "company" | "deal" | "task";
+// a task's "name" is its title, and its owner is the person it is assigned to
+export type InlineField = "name" | "status" | "owner" | "stage";
 export type InlineValue = { text?: string; first?: string; last?: string; id?: string | null; reason?: string };
 
-const ALLOWED: Record<InlineObject, InlineField[]> = { lead: ["name", "status", "owner"], contact: ["name", "owner"], company: ["name", "owner"] };
-const TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
-const LIST = { lead: paths.leads, contact: paths.contacts, company: paths.companies } as const;
-const RECORD = { lead: paths.lead, contact: paths.contact, company: paths.company } as const;
+const ALLOWED: Record<InlineObject, InlineField[]> = {
+  lead: ["name", "status", "owner"],
+  contact: ["name", "owner"],
+  company: ["name", "owner"],
+  deal: ["name", "stage", "owner"],
+  task: ["name", "owner"],
+};
+const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
+const LIST = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
+// tasks have no page of their own
+const RECORD = { lead: paths.lead, contact: paths.contact, company: paths.company, deal: paths.deal, task: (orgId: string) => paths.tasks(orgId) } as const;
 
 const text = (max: number) => z.string().trim().max(max, { error: "הטקסט ארוך מדי." });
 
@@ -33,7 +41,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
 
   // the columns differ per table, so the patch is typed loosely and the table name picks the shape
-  let patch: { owner_id?: string | null; first_name?: string | null; last_name?: string | null; name?: string; full_name?: string | null };
+  let patch: { owner_id?: string | null; first_name?: string | null; last_name?: string | null; name?: string; full_name?: string | null; title?: string; stage_id?: string };
   if (field === "status") {
     if (!isUuid(value.id ?? "")) return fail("יש לבחור סטטוס.");
     const result = await setLeadStatus(context.supabase, orgId, id, value.id!, value.reason?.trim().slice(0, 500) || null);
@@ -41,6 +49,10 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     revalidatePath(LIST[object](orgId));
     revalidatePath(RECORD[object](orgId, id));
     return ok();
+  } else if (field === "stage") {
+    // a stage of another pipeline (or organization) is refused by the (pipeline_id, stage_id) foreign key
+    if (!isUuid(value.id ?? "")) return fail("יש לבחור שלב.");
+    patch = { stage_id: value.id! };
   } else if (field === "owner") {
     const owner = value.id ?? null;
     if (owner !== null && !isUuid(owner)) return fail("יש לבחור בעלים.");
@@ -52,11 +64,14 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     if (!first.data && !last.data) return fail("יש לכתוב שם פרטי או שם משפחה.");
     patch = { first_name: first.data || null, last_name: last.data || null };
   } else {
-    const name = text(200).safeParse(value.text ?? "");
+    const name = text(object === "task" ? 300 : 200).safeParse(value.text ?? "");
     if (!name.success) return fail(name.error.issues[0]?.message ?? "השם אינו תקין.");
     if (object === "company" && !name.data) return fail("יש לכתוב שם לחברה.");
+    if (object === "deal" && !name.data) return fail("יש לכתוב שם לעסקה.");
+    if (object === "task" && !name.data) return fail("יש לכתוב כותרת למשימה.");
     // a lead may have no name when it has a phone or an email (the database checks)
-    patch = object === "company" ? { name: name.data } : { full_name: name.data || null };
+    patch =
+      object === "company" || object === "deal" ? { name: name.data } : object === "task" ? { title: name.data } : { full_name: name.data || null };
   }
 
   const { data, error } = await context.supabase
@@ -68,6 +83,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     .select("id");
   if (error) {
     if (error.code === "23514") return fail("צריך להשאיר לליד שם, טלפון או אימייל.");
+    if (error.code === "23503" && field === "stage") return fail("השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
     // the new owner is outside what the user may manage (a manager hands a record out of their teams)
     if (error.code === "42501" && field === "owner") return fail("אין לכם הרשאה להעביר את הרשומה לבעלים הזה.");
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."));

@@ -994,6 +994,9 @@ export type Database = {
       sort_source: { Args: Record<string, never>; Returns: string | null };
       sort_owner: { Args: Record<string, never>; Returns: string | null };
       sort_company: { Args: Record<string, never>; Returns: string | null };
+      // deals and tasks lists (migration 0035)
+      sort_stage: { Args: Record<string, never>; Returns: number | null };
+      sort_contact: { Args: Record<string, never>; Returns: string | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       my_agreement: { Args: Record<string, never>; Returns: Json };

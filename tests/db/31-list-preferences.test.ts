@@ -40,7 +40,7 @@ describe("list columns are personal (list_preferences)", () => {
 
   it("one row per user and list; the shape and size are checked", async () => {
     expect((await pgError(save(member.id, []))).code).toBe("23505");
-    expect((await pgError(asUser(owner.id, (q) => q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'deal', '[]')", [org])))).code).toBe("23514");
+    expect((await pgError(asUser(owner.id, (q) => q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'note', '[]')", [org])))).code).toBe("23514");
     expect((await pgError(asUser(owner.id, (q) => q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '{}')", [org])))).code).toBe("23514");
     const tooMany = Array.from({ length: 61 }, (_, i) => ({ key: `k${i}` }));
     expect((await pgError(save(owner.id, tooMany))).code).toBe("23514");

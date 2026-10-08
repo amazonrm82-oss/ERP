@@ -12,7 +12,8 @@ export type ListColumns = { catalog: CatalogColumn[]; columns: ColumnChoice[]; f
 export async function getListColumns(orgId: string, object: ListObject): Promise<ListColumns> {
   const supabase = await createClient();
   const [fields, { data }] = await Promise.all([
-    listFieldDefinitions(orgId, object),
+    // tasks have no custom fields
+    object === "task" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
     supabase.from("list_preferences").select("columns").eq("organization_id", orgId).eq("object_type", object).maybeSingle(),
   ]);
   const catalog = catalogFor(object, fields);

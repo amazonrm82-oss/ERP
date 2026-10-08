@@ -10,7 +10,7 @@ import { paths } from "@/lib/paths";
 
 import { catalogFor, columnChoicesSchema, type ColumnChoice, type ListObject } from "./columns";
 
-const LIST_PATH: Record<ListObject, (orgId: string) => string> = { lead: paths.leads, contact: paths.contacts, company: paths.companies };
+const LIST_PATH: Record<ListObject, (orgId: string) => string> = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks };
 
 /** Saves the user's columns for a list (only columns the list really has). */
 export async function saveListColumnsAction(orgId: string, object: ListObject, columns: ColumnChoice[]): Promise<ActionResult> {
@@ -25,7 +25,7 @@ export async function saveListColumnsAction(orgId: string, object: ListObject, c
   if (!context.ok) {
     return context;
   }
-  const known = new Set(catalogFor(object, await listFieldDefinitions(orgId, object)).map((column) => column.key));
+  const known = new Set(catalogFor(object, object === "task" ? [] : await listFieldDefinitions(orgId, object)).map((column) => column.key));
   if (parsed.data.some((choice) => !known.has(choice.key))) {
     return fail("אחת העמודות כבר לא קיימת. רעננו את הדף ונסו שוב.");
   }

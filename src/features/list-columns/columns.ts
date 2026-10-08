@@ -3,7 +3,7 @@ import { z } from "zod";
 // Which columns a list shows, in what order and how wide (LST-03). Shared by the
 // server (resolving a saved choice) and the "columns" panel in the browser.
 
-export type ListObject = "lead" | "contact" | "company";
+export type ListObject = "lead" | "contact" | "company" | "deal" | "task";
 export type ColumnWidth = "narrow" | "normal" | "wide";
 export type ColumnChoice = { key: string; width: ColumnWidth };
 export type CatalogColumn = { key: string; label: string };
@@ -42,6 +42,32 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "created", label: "נוצר" },
     ],
     defaults: ["phone", "city", "owner", "created"],
+  },
+  // LST-09: the deals table (one pipeline at a time) and the tasks table
+  deal: {
+    columns: [
+      { key: "amount", label: "סכום" },
+      { key: "stage", label: "שלב" },
+      { key: "status", label: "מצב" },
+      { key: "contact", label: "איש קשר" },
+      { key: "company", label: "חברה" },
+      { key: "owner", label: "בעלים" },
+      { key: "expected_close", label: "צפי סגירה" },
+      { key: "created", label: "נוצרה" },
+    ],
+    defaults: ["amount", "stage", "contact", "owner", "expected_close"],
+  },
+  task: {
+    columns: [
+      { key: "due", label: "תאריך יעד" },
+      { key: "type", label: "סוג" },
+      { key: "status", label: "מצב" },
+      { key: "priority", label: "עדיפות" },
+      { key: "related", label: "שייכת ל" },
+      { key: "owner", label: "אחראי" },
+      { key: "created", label: "נוצרה" },
+    ],
+    defaults: ["due", "type", "related", "owner", "status"],
   },
 };
 

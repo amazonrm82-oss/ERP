@@ -37,7 +37,10 @@ type Props = {
   // the rows on this page, in order
   ids: string[];
   owners: Option[] | null;
+  // a lead's statuses, or a task's (open, done, cancelled)
   statuses: Option[] | null;
+  // the deals table: the stages of the pipeline on screen
+  stages?: Option[] | null;
   tags: Option[];
   canTrash: boolean;
   // the list's export route, for "export the picked rows" (LST-08); null when the user may not export
@@ -57,6 +60,7 @@ const FORMATS: Option[] = [
 const KIND_LABELS: Record<Kind, string> = {
   owner: "שינוי בעלים",
   status: "שינוי סטטוס",
+  stage: "שינוי שלב",
   tag: "הוספת תגית",
   trash: "העברה לסל המחזור",
   export: "ייצוא הנבחרים",
@@ -67,7 +71,10 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({ orgId, object, ids, owners, statuses, tags, canTrash, exportPath, enabled, children }: Props) {
+export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, children }: Props) {
+  // a task has a "state" (מצב) rather than a status, and an assignee rather than an owner
+  const labels: Record<Kind, string> =
+    object === "task" ? { ...KIND_LABELS, status: "שינוי מצב", owner: "שינוי אחראי" } : KIND_LABELS;
   const barId = useId();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<Kind | "">("");
@@ -95,11 +102,12 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, tags, canT
     (k) =>
       (k !== "owner" || owners) &&
       (k !== "status" || statuses) &&
+      (k !== "stage" || stages) &&
       (k !== "tag" || tags.length > 0) &&
       (k !== "trash" || canTrash) &&
       (k !== "export" || exportPath),
   );
-  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
+  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
   const needsReason = kind === "status" && options.find((o) => o.value === value)?.needsReason;
   const ready = kind === "trash" || (kind !== "" && value !== "");
 
@@ -120,9 +128,11 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, tags, canT
         ? { kind, ownerId: value === NO_OWNER ? null : value }
         : kind === "status"
           ? { kind, statusId: value, reason }
-          : kind === "tag"
-            ? { kind, tagId: value }
-            : { kind: "trash" };
+          : kind === "stage"
+            ? { kind, stageId: value }
+            : kind === "tag"
+              ? { kind, tagId: value }
+              : { kind: "trash" };
     if (kind === "trash" && !window.confirm(`להעביר ${count} רשומות לסל המחזור? אפשר לשחזר משם במשך 30 יום.`)) return;
     setError(null);
     setNotice(null);
@@ -185,15 +195,29 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, tags, canT
                 <option value="">בחירת פעולה</option>
                 {kinds.map((k) => (
                   <option key={k} value={k}>
-                    {KIND_LABELS[k]}
+                    {labels[k]}
                   </option>
                 ))}
               </Select>
             </div>
-            {kind === "owner" || kind === "status" || kind === "tag" || kind === "export" ? (
+            {kind === "owner" || kind === "status" || kind === "stage" || kind === "tag" || kind === "export" ? (
               <div className="w-44">
                 <Select
-                  aria-label={kind === "owner" ? "בעלים חדש" : kind === "status" ? "סטטוס חדש" : kind === "export" ? "סוג הקובץ" : "תגית"}
+                  aria-label={
+                    kind === "owner"
+                      ? object === "task"
+                        ? "אחראי חדש"
+                        : "בעלים חדש"
+                      : kind === "status"
+                        ? object === "task"
+                          ? "מצב חדש"
+                          : "סטטוס חדש"
+                        : kind === "stage"
+                          ? "שלב חדש"
+                          : kind === "export"
+                            ? "סוג הקובץ"
+                            : "תגית"
+                  }
                   controlSize="sm"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}

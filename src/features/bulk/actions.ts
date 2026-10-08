@@ -7,29 +7,24 @@ import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
-import { setTrashed } from "@/lib/record-trash";
+import { setTrashed, type TrashableTable } from "@/lib/record-trash";
 
 // Bulk actions on the rows picked in a list (LST-07). Each record is changed on
 // its own, with the user's session, so the usual rules hold row by row: a row
 // the user may not change is skipped and counted, and the rest still go through.
-export type BulkObject = "lead" | "contact" | "company";
+export type BulkObject = "lead" | "contact" | "company" | "deal" | "task";
 export type BulkChange =
   | { kind: "owner"; ownerId: string | null }
+  // a lead's status (lead_statuses id), or a task's status (open | done | cancelled)
   | { kind: "status"; statusId: string; reason?: string }
+  | { kind: "stage"; stageId: string }
   | { kind: "tag"; tagId: string }
   | { kind: "trash" };
 export type BulkOutcome = { done: number; skipped: number };
 
-const TABLE = {
-  lead: "leads",
-  contact: "contacts",
-  company: "companies",
-} as const;
-const LIST = {
-  lead: paths.leads,
-  contact: paths.contacts,
-  company: paths.companies,
-} as const;
+const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
+const LIST = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
+const TASK_STATUSES = ["open", "done", "cancelled"] as const;
 // one page of a list; more than that is not picked at once
 const MAX_IDS = 100;
 // rows changed at the same time
@@ -60,16 +55,17 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   const table = TABLE[object];
 
   // the picked rows the user can see; the rest are counted as skipped
+  // tasks have no tags
   const { data: rows, error } = await supabase
     .from(table as "leads")
-    .select("id, tag_ids")
+    .select((object === "task" ? "id" : "id, tag_ids") as "id, tag_ids")
     .eq("organization_id", orgId)
     .in("id", unique)
     .is("deleted_at", null);
   if (error) {
     return fail(dbErrorMessage(error));
   }
-  let live = rows;
+  let live: Array<{ id: string; tag_ids?: string[] }> = rows;
   if (object === "lead" && change.kind === "status") {
     // a converted lead keeps its status
     const { data: open, error: openError } = await supabase.from("leads").select("id").eq("organization_id", orgId).in("id", unique).is("converted_at", null);
@@ -95,6 +91,16 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       break;
     }
     case "status": {
+      if (object === "task") {
+        const status = TASK_STATUSES.find((s) => s === change.statusId);
+        if (!status) return fail("יש לבחור מצב.");
+        // completed_at is stamped (and cleared) by the database from the status
+        done = await eachLimited(live, async (row) => {
+          const { data } = await supabase.from("tasks").update({ status }).eq("organization_id", orgId).eq("id", row.id).is("deleted_at", null).select("id");
+          return (data?.length ?? 0) > 0;
+        });
+        break;
+      }
       if (object !== "lead") return fail("לרשומות האלה אין סטטוס.");
       if (!isUuid(change.statusId)) return fail("יש לבחור סטטוס.");
       const reason = change.reason?.trim().slice(0, 500) || null;
@@ -106,7 +112,24 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       done = await eachLimited(live, async (row) => (await setLeadStatus(supabase, orgId, row.id, change.statusId, reason)).ok);
       break;
     }
+    case "stage": {
+      if (object !== "deal") return fail("לרשומות האלה אין שלב.");
+      if (!isUuid(change.stageId)) return fail("יש לבחור שלב.");
+      // a stage of another pipeline is refused by the (pipeline_id, stage_id) foreign key, and that deal is skipped
+      done = await eachLimited(live, async (row) => {
+        const { data } = await supabase
+          .from("deals")
+          .update({ stage_id: change.stageId })
+          .eq("organization_id", orgId)
+          .eq("id", row.id)
+          .is("deleted_at", null)
+          .select("id");
+        return (data?.length ?? 0) > 0;
+      });
+      break;
+    }
     case "tag": {
+      if (object === "task") return fail("למשימות אין תגיות.");
       if (!isUuid(change.tagId)) return fail("יש לבחור תגית.");
       const { data: tag } = await supabase.from("tags").select("id").eq("organization_id", orgId).eq("id", change.tagId).maybeSingle();
       if (!tag) return fail("התגית כבר לא קיימת. רעננו את הדף ונסו שוב.");
@@ -125,7 +148,8 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       break;
     }
     case "trash": {
-      done = await eachLimited(live, async (row) => (await setTrashed(supabase, table, orgId, row.id, true)).ok);
+      if (object === "task") return fail("משימות לא עוברות לסל המחזור.");
+      done = await eachLimited(live, async (row) => (await setTrashed(supabase, table as TrashableTable, orgId, row.id, true)).ok);
       break;
     }
     default:

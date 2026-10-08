@@ -873,6 +873,58 @@ try {
   if (memberExportStatus !== 403) throw new Error(`a member could export: ${memberExportStatus}`);
   await ownerDesk.goto(leadUrl);
 
+  step("deals and tasks as tables: edit a cell, sort, act on picked rows, export");
+  const [tableDeal] = await sql(
+    `select d.id, d.name, d.stage_id, d.pipeline_id from public.deals d join public.pipelines p on p.id = d.pipeline_id and p.is_default
+      where d.organization_id = $1 and d.deleted_at is null
+        and (select count(*) from public.deals x where x.pipeline_id = d.pipeline_id and x.name = d.name and x.deleted_at is null) = 1
+      order by d.created_at limit 1`,
+    [orgIdNow],
+  );
+  const [otherDealStage] = await sql("select id, name from public.stages where pipeline_id = $1 and id <> $2 and kind = 'open' order by position limit 1", [
+    tableDeal.pipeline_id,
+    tableDeal.stage_id,
+  ]);
+  await ownerDesk.goto(`${orgUrl}/deals?view=table`);
+  const dealRow = ownerDesk.locator("tbody tr", { has: ownerDesk.getByRole("link", { name: tableDeal.name, exact: true }) });
+  await dealRow.getByRole("button", { name: `עריכת שלב: ${tableDeal.name}` }).click();
+  await dealRow.getByRole("combobox", { name: `שלב: ${tableDeal.name}` }).selectOption(otherDealStage.id);
+  await dealRow.getByRole("button", { name: "שמירה" }).click();
+  for (let i = 0; ; i++) {
+    const [row] = await sql("select stage_id from public.deals where id = $1", [tableDeal.id]);
+    if (row.stage_id === otherDealStage.id) break;
+    if (i > 60) throw new Error("deals table: the stage was not saved");
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  await dealRow.getByText(otherDealStage.name).waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "36-deals-table-1280");
+  await ownerDesk.getByRole("columnheader", { name: /^סכום/ }).getByRole("link").click();
+  await ownerDesk.waitForURL(/sort=/);
+  const dealsCsv = await ownerDesk.request.get(`${orgUrl}/deals/export?view=table&format=csv`);
+  if (dealsCsv.status() !== 200 || !(await dealsCsv.text()).includes(tableDeal.name)) throw new Error(`deals export: ${dealsCsv.status()}`);
+  await sql("update public.deals set stage_id = $2 where id = $1", [tableDeal.id, tableDeal.stage_id]);
+
+  const [tableTask] = await sql(
+    `select t.id, t.title from public.tasks t where t.organization_id = $1 and t.deleted_at is null and t.status = 'open'
+        and (select count(*) from public.tasks x where x.organization_id = t.organization_id and x.title = t.title and x.deleted_at is null) = 1
+      order by t.created_at limit 1`,
+    [orgIdNow],
+  );
+  await ownerDesk.goto(`${orgUrl}/tasks?view=table&who=all`);
+  await ownerDesk.getByRole("checkbox", { name: `בחירה: ${tableTask.title}`, exact: true }).check();
+  const taskBar = ownerDesk.getByRole("group", { name: "פעולות על הנבחרים" });
+  await taskBar.getByLabel("פעולה", { exact: true }).selectOption("status");
+  await taskBar.getByLabel("מצב חדש").selectOption("done");
+  await shot(ownerDesk, "37-tasks-table-1280");
+  await taskBar.getByRole("button", { name: "ביצוע על 1" }).click();
+  await taskBar.getByText("רשומה אחת עודכנה.").waitFor({ timeout: 15000 });
+  const [doneTask] = await sql("select status, completed_at is not null as stamped from public.tasks where id = $1", [tableTask.id]);
+  if (doneTask.status !== "done" || !doneTask.stamped) throw new Error(`tasks table: ${JSON.stringify(doneTask)}`);
+  const tasksCsv = await ownerDesk.request.get(`${orgUrl}/tasks/export?view=table&who=all&format=csv`);
+  if (tasksCsv.status() !== 200 || !(await tasksCsv.text()).includes(tableTask.title)) throw new Error(`tasks export: ${tasksCsv.status()}`);
+  await sql("update public.tasks set status = 'open' where id = $1", [tableTask.id]);
+  await ownerDesk.goto(leadUrl);
+
   // ---------------------------------------------------------------- section 4: lead intake
   step("intake: create a web form, set it up");
   await ownerDesk.goto(`${orgUrl}/settings/intake`);

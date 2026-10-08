@@ -13,7 +13,7 @@ import { columnChoicesSchema } from "@/features/list-columns/columns";
 
 import { cleanFilters, VIEW_OBJECTS, VIEW_SORT_RE, type ViewObject } from "./types";
 
-const LIST_PATH = { lead: paths.leads, contact: paths.contacts, company: paths.companies } as const;
+const LIST_PATH = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
 
 const viewSchema = z
   .object({

@@ -186,6 +186,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Deals and tasks tables (LST-09, migration 0035): `/deals?view=table` (one pipeline) and `/tasks?view=table`
+  use the same pieces (`ListTable`, columns, filters, views, inline edit, bulk, export) with object types
+  `deal` and `task`. Sort fields `sort_stage|sort_contact|sort_company|sort_owner(deals)`, `sort_owner(tasks)`.
+  Tasks have no tags, custom fields or recycle bin. A filter field with `plain` compares enum values, not ids.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

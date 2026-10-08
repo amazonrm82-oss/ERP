@@ -43,7 +43,7 @@ describe("exporting a list is written to the audit log (LST-08)", () => {
   });
 
   it("refuses unknown lists, formats and scopes; keeps no filters that are not an object", async () => {
-    expect((await pgError(log(owner.id, "deal"))).code).toBe("22023");
+    expect((await pgError(log(owner.id, "note"))).code).toBe("22023");
     expect((await pgError(log(owner.id, "lead", "pdf"))).code).toBe("22023");
     expect((await pgError(log(owner.id, "lead", "csv", -1))).code).toBe("22023");
     expect((await pgError(log(owner.id, "lead", "csv", 1, "everything"))).code).toBe("22023");

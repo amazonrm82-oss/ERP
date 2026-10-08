@@ -25,6 +25,8 @@ type Props<R> = {
   sort: Sort<string>;
   sortHref: (key: string) => string;
   label: string;
+  // the first column's sort key and title (tasks: "title", "כותרת")
+  nameColumn?: { key: string; label: string };
 };
 
 /**
@@ -32,7 +34,20 @@ type Props<R> = {
  * first and stays in place while the rest scrolls sideways on a narrow screen,
  * so the page itself never scrolls sideways.
  */
-export function ListTable<R>({ rows, rowKey, nameCell, columns, catalog, fields, cell, customValues, sort, sortHref, label }: Props<R>) {
+export function ListTable<R>({
+  rows,
+  rowKey,
+  nameCell,
+  columns,
+  catalog,
+  fields,
+  cell,
+  customValues,
+  sort,
+  sortHref,
+  label,
+  nameColumn = { key: "name", label: "שם" },
+}: Props<R>) {
   const labels = new Map(catalog.map((column) => [column.key, column.label]));
   const fieldByKey = new Map(fields.map((field) => [`${CUSTOM_PREFIX}${field.key}`, field]));
   const direction = (key: string) => (sort.key === key ? (sort.ascending ? "ascending" : "descending") : null);
@@ -42,7 +57,7 @@ export function ListTable<R>({ rows, rowKey, nameCell, columns, catalog, fields,
       <table className="w-full border-collapse text-[0.9375rem]">
         <thead className="border-b border-line bg-canvas">
           <tr>
-            <SortableHeader label="שם" direction={direction("name")} href={sortHref("name")} className={`${th} sticky start-0 z-10 min-w-44 bg-canvas sm:min-w-52`} />
+            <SortableHeader label={nameColumn.label} direction={direction(nameColumn.key)} href={sortHref(nameColumn.key)} className={`${th} sticky start-0 z-10 min-w-44 bg-canvas sm:min-w-52`} />
             {columns.map((column) => (
               <SortableHeader
                 key={column.key}

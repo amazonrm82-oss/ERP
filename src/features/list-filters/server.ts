@@ -1,20 +1,25 @@
 import "server-only";
 
 import type { FieldDefinition } from "@/features/custom-fields/types";
+import type { ListObject } from "@/features/list-columns/columns";
+import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
 
 import { OPS_BY_KIND, valueKind, type FilterField, type FilterKind, type FilterOp, type FilterTree } from "./model";
 
-export type FilterObject = "lead" | "contact" | "company";
+export type FilterObject = ListObject;
 
 type Option = { value: string; label: string };
-// a field with its database column (a custom field reads custom_fields->key)
-type ServerField = FilterField & { column: string };
+// a field with its database column (a custom field reads custom_fields->key);
+// `plain`: the choices are plain values (an enum, a number), not ids; `scale`: a number shown in shekels, stored in agorot
+type ServerField = FilterField & { column: string; plain?: boolean; scale?: number };
 
 type Lookups = {
   statuses?: Option[];
   sources?: Option[];
+  // the deals table: the stages of the pipeline on screen
+  stages?: Option[];
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -66,6 +71,59 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("website", "אתר", "website"),
       owner,
       tag,
+      created,
+    ],
+    deal: [
+      text("name", "שם", "name"),
+      { key: "amount", label: "סכום (₪)", kind: "number", column: "amount_agorot", scale: 100 },
+      { key: "stage", label: "שלב", kind: "select", column: "stage_id", options: lookups.stages ?? [] },
+      {
+        key: "status",
+        label: "מצב",
+        kind: "select",
+        column: "status",
+        plain: true,
+        options: [
+          { value: "open", label: "פתוחה" },
+          { value: "won", label: "נסגרה בהצלחה" },
+          { value: "lost", label: "אבודה" },
+        ],
+      },
+      owner,
+      tag,
+      { key: "expected_close", label: "צפי סגירה", kind: "day", column: "expected_close_date" },
+      created,
+    ],
+    // tasks have no tags and no custom fields
+    task: [
+      text("title", "כותרת", "title"),
+      { key: "type", label: "סוג", kind: "select", column: "task_type", plain: true, options: TASK_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })) },
+      {
+        key: "status",
+        label: "מצב",
+        kind: "select",
+        column: "status",
+        plain: true,
+        options: [
+          { value: "open", label: "פתוחה" },
+          { value: "done", label: "הושלמה" },
+          { value: "cancelled", label: "בוטלה" },
+        ],
+      },
+      {
+        key: "priority",
+        label: "עדיפות",
+        kind: "select",
+        column: "priority",
+        plain: true,
+        options: [
+          { value: "1", label: "גבוהה" },
+          { value: "2", label: "רגילה" },
+          { value: "3", label: "נמוכה" },
+        ],
+      },
+      { ...owner, label: "אחראי" },
+      { key: "due", label: "תאריך יעד", kind: "date", column: "due_at" },
       created,
     ],
   };
@@ -132,7 +190,7 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
       const chosen = field.kind === "user" && value === "me" ? ctx.userId : value;
       if (!field.options?.some((option) => option.value === value)) return null;
       // built-in list fields hold ids; a custom select holds the option's text
-      const literal = c.startsWith("custom_fields") ? quote(chosen) : UUID.test(chosen) ? chosen : null;
+      const literal = c.startsWith("custom_fields") || field.plain ? quote(chosen) : UUID.test(chosen) ? chosen : null;
       if (!literal) return null;
       return op === "is" ? `${c}.eq.${literal}` : `or(${c}.is.null,${c}.neq.${literal})`;
     }
@@ -140,8 +198,9 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
       if (!UUID.test(value) || !field.options?.some((option) => option.value === value)) return null;
       return op === "has" ? `${c}.cs.{${value}}` : `${c}.not.cs.{${value}}`;
     case "number": {
-      const number = Number(value.replace(/,/g, ""));
-      if (!Number.isFinite(number)) return null;
+      const typed = Number(value.replace(/,/g, ""));
+      if (!Number.isFinite(typed)) return null;
+      const number = field.scale ? Math.round(typed * field.scale) : typed;
       return `${c}.${op === "equals" ? "eq" : op}.${number}`;
     }
     case "checkbox":
