@@ -132,16 +132,20 @@ export async function saveRecordTagsAction(
     }
   }
 
-  const { data, error } = await context.supabase
-    .from(TABLE[kind] as "leads")
-    .update({ tag_ids: [...new Set(tagIds)] })
-    .eq("organization_id", orgId)
-    .eq("id", recordId)
-    .select("id");
+  // only what this user changed: a tag someone else added meanwhile stays (FXD-04)
+  const shown = new Set(formData.getAll("shown_tag_id").filter((value): value is string => isUuid(value)));
+  const chosen = new Set(tagIds);
+  const { data, error } = await context.supabase.rpc("change_record_tags", {
+    p_table: TABLE[kind],
+    p_org: orgId,
+    p_id: recordId,
+    p_add: [...chosen].filter((id) => !shown.has(id)),
+    p_remove: [...shown].filter((id) => !chosen.has(id)),
+  });
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את התגיות. נסו שוב."));
   }
-  if (data.length === 0) {
+  if (!data) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidatePath(PAGE[kind](orgId, recordId));

@@ -192,6 +192,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
+  record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
+  `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
+  add, remove)`. Never read-modify-write these columns in app code.
 - Deals and tasks tables (LST-09, migration 0035): `/deals?view=table` (one pipeline) and `/tasks?view=table`
   use the same pieces (`ListTable`, columns, filters, views, inline edit, bulk, export) with object types
   `deal` and `task`. Sort fields `sort_stage|sort_contact|sort_company|sort_owner(deals)`, `sort_owner(tasks)`.
@@ -255,7 +259,8 @@ that back.
   through the connector. The tables of 0031 and 0033 were seen there; not every function was checked.
   Never re-apply 0001–0033. Before the first connector apply, check read-only that every table and
   function of 0001–0033 exists there and report gaps (0010 once ran half way; see `supabase/repair/`).
-  The hosted database is Postgres 17; the local tests and CI run on PostgreSQL 16.
+  The hosted database is Postgres 17; CI runs the database tests on Postgres 17 (FXD-05), the local
+  `test:db` on whatever PostgreSQL the machine has (16 here), and the local Supabase stack is 17.
 - If the connector is not available in a session, fall back to the old way: hand the migration over in
   parts (`node scripts/split-for-sql-editor.mjs <migration>`; a paste over ~4,000 chars was cut off)
   and push code only after the owner confirms it ran.

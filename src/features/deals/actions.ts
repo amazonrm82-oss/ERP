@@ -34,7 +34,7 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "deal", formData);
+  const custom = await customFieldsFromForm(orgId, "deal", formData);
   if (!custom.ok) {
     return custom;
   }
@@ -137,7 +137,7 @@ export async function updateDealAction(
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const custom = await customFieldsFromForm(context.supabase, orgId, "deal", formData, dealId);
+  const custom = await customFieldsFromForm(orgId, "deal", formData, dealId);
   if (!custom.ok) {
     return custom;
   }

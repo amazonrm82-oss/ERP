@@ -15,7 +15,7 @@ jobs:
     services:
       # A throwaway PostgreSQL that exists only for this job.
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
         ports:

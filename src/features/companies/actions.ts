@@ -30,7 +30,7 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "company", formData);
+  const custom = await customFieldsFromForm(orgId, "company", formData);
   if (!custom.ok) {
     return custom;
   }
@@ -64,7 +64,7 @@ export async function updateCompanyAction(
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "company", formData, companyId);
+  const custom = await customFieldsFromForm(orgId, "company", formData, companyId);
   if (!custom.ok) {
     return custom;
   }

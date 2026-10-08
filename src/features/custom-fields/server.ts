@@ -1,23 +1,20 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { fail, FORM_INVALID, formValues } from "@/lib/action-result";
-import type { Database, Json } from "@/lib/database.types";
+import type { Json } from "@/lib/database.types";
 
 import { listFieldDefinitions } from "./queries";
-import { asCustomValues, type CustomValues, type FieldObject } from "./types";
+import type { FieldObject } from "./types";
 import { parseCustomFields } from "./values";
 
-const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals" } as const;
-
 /**
- * Custom fields of a submitted form, ready to store: the active fields from the
- * form merged over what the record already holds (so values of inactive or
- * unsupported fields are kept). Returns a failure result when a field is invalid.
+ * Custom fields of a submitted form, ready to store. A new record gets the
+ * filled-in fields. An existing record gets {"$merge": ...}: the database
+ * merges the form's fields into the row as it is now (FXD-04, migration 0042),
+ * so fields the form does not show keep their values and two editors do not
+ * overwrite each other. Returns a failure result when a field is invalid.
  */
 export async function customFieldsFromForm(
-  supabase: SupabaseClient<Database>,
   orgId: string,
   objectType: FieldObject,
   formData: FormData,
@@ -32,18 +29,12 @@ export async function customFieldsFromForm(
     return fail(FORM_INVALID, { fieldErrors: errors, values: formValues(formData) });
   }
 
-  let current: CustomValues = {};
   if (recordId) {
-    const { data } = await supabase
-      .from(TABLE[objectType] as "leads")
-      .select("custom_fields")
-      .eq("organization_id", orgId)
-      .eq("id", recordId)
-      .maybeSingle();
-    current = asCustomValues((data?.custom_fields as Json | undefined) ?? {});
+    // a null clears that field
+    return { ok: true, customFields: { $merge: values as Record<string, Json> } };
   }
   const merged: Record<string, Json> = {};
-  for (const [key, value] of Object.entries({ ...current, ...values })) {
+  for (const [key, value] of Object.entries(values)) {
     if (value !== null && value !== undefined) {
       merged[key] = value;
     }

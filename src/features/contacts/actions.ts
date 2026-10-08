@@ -30,7 +30,7 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "contact", formData);
+  const custom = await customFieldsFromForm(orgId, "contact", formData);
   if (!custom.ok) {
     return custom;
   }
@@ -65,7 +65,7 @@ export async function updateContactAction(
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "contact", formData, contactId);
+  const custom = await customFieldsFromForm(orgId, "contact", formData, contactId);
   if (!custom.ok) {
     return custom;
   }

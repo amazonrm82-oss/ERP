@@ -75,7 +75,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "lead", formData);
+  const custom = await customFieldsFromForm(orgId, "lead", formData);
   if (!custom.ok) {
     return custom;
   }
@@ -121,7 +121,7 @@ export async function updateLeadAction(
     return invalid(parsed.error, formData);
   }
 
-  const custom = await customFieldsFromForm(context.supabase, orgId, "lead", formData, leadId);
+  const custom = await customFieldsFromForm(orgId, "lead", formData, leadId);
   if (!custom.ok) {
     return custom;
   }

@@ -133,17 +133,10 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       if (!isUuid(change.tagId)) return fail("יש לבחור תגית.");
       const { data: tag } = await supabase.from("tags").select("id").eq("organization_id", orgId).eq("id", change.tagId).maybeSingle();
       if (!tag) return fail("התגית כבר לא קיימת. רעננו את הדף ונסו שוב.");
+      // added in the database, so a tag someone else added meanwhile stays (FXD-04)
       done = await eachLimited(live, async (row) => {
-        // already tagged counts as done
-        if ((row.tag_ids ?? []).includes(tag.id)) return true;
-        const { data } = await supabase
-          .from(table as "leads")
-          .update({ tag_ids: [...(row.tag_ids ?? []), tag.id] })
-          .eq("organization_id", orgId)
-          .eq("id", row.id)
-          .is("deleted_at", null)
-          .select("id");
-        return (data?.length ?? 0) > 0;
+        const { data } = await supabase.rpc("change_record_tags", { p_table: table, p_org: orgId, p_id: row.id, p_add: [tag.id], p_remove: [] });
+        return data === true;
       });
       break;
     }

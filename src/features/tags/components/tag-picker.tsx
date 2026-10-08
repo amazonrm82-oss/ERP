@@ -67,6 +67,10 @@ function TagForm({ orgId, kind, recordId, allTags, selectedIds, onDone }: FormPr
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
+      {/* what the record had when the picker opened: the save adds and removes against it (FXD-04) */}
+      {selectedIds.map((id) => (
+        <input key={id} type="hidden" name="shown_tag_id" value={id} />
+      ))}
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       {allTags.length > 0 ? (
         <fieldset>
