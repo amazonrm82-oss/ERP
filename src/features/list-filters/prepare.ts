@@ -3,6 +3,7 @@ import "server-only";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { getLeadLookups } from "@/features/leads/queries";
 import { listMembers } from "@/features/settings/queries";
+import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 
 import { parseFilterParam } from "./model";
@@ -22,7 +23,9 @@ export async function prepareListFilter(
   // the deals table: the stages of the pipeline on screen
   extra: { stages?: Array<{ id: string; name: string }> } = {},
 ): Promise<PreparedFilter> {
-  const [lookups, members, tags] = await Promise.all([
+  const [context, lookups, members, tags] = await Promise.all([
+    // memoized per request: the page has already read it
+    getOrgContext(orgId),
     object === "lead" || object === "contact" ? getLeadLookups(orgId) : null,
     listMembers(orgId),
     object === "task" ? [] : listTags(orgId),
@@ -36,6 +39,6 @@ export async function prepareListFilter(
     fields: customFields,
   });
   const tree = parseFilterParam(param);
-  const built = tree ? filterToPostgrest(tree, fields, { userId, now: new Date() }) : { logic: null, skipped: 0 };
+  const built = tree ? filterToPostgrest(tree, fields, { userId, now: new Date(), timeZone: context.org.timeZone }) : { logic: null, skipped: 0 };
   return { fields: publicFields(fields), tree, logic: built.logic, skipped: built.skipped };
 }

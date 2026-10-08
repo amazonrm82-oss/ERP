@@ -167,6 +167,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Org context (migration 0028): `public.org_context(org)` (security invoker) returns org, membership,
   subscription + plan name, profile name and signed agreement version in one call; `getOrgContext()`
   uses it. A part the caller may not see comes back null, exactly like the separate queries did.
+  Since 0043 the org part carries `timezone` and `currency` (`OrgContext.org.timeZone/currency`); pass
+  them to the zone helpers in `src/lib/format.ts` instead of the `TIME_ZONE` default where you can.
 - Conversion (migration 0029): trigger `leads_convert_custom_fields` (after `converted_at` is first set)
   copies lead custom fields to the new contact/deal by matching label + type (`app.carry_custom_fields()`,
   value checked with `app.custom_value_ok()`); `convert_lead()` itself is unchanged.

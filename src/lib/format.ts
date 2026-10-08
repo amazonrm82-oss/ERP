@@ -67,13 +67,13 @@ export function telUrl(phoneE164: string | null | undefined, phone: string | nul
 
 // --- Dates in the organization's time zone -----------------------------------
 
-/** Offset of the zone from UTC at the given instant, as "+03:00". */
-function zoneOffset(at: Date, timeZone: string): string {
+/** Offset of the zone from UTC at the given instant, in minutes (Jerusalem in summer: 180). */
+function zoneOffsetMinutes(at: Date, timeZone: string): number {
   const part = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
     .formatToParts(at)
     .find((p) => p.type === "timeZoneName")?.value;
-  const match = part?.match(/GMT([+-]\d{2}:\d{2})/);
-  return match ? match[1] : "+00:00";
+  const match = part?.match(/GMT([+-])(\d{2}):(\d{2})/);
+  return match ? (match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3])) : 0;
 }
 
 /** Calendar date "YYYY-MM-DD" of an instant in the zone. */
@@ -83,10 +83,13 @@ export function zoneDate(at: Date, timeZone: string = TIME_ZONE): string {
 
 /** UTC instant (ISO) of a wall-clock time on a calendar date in the zone. */
 export function zonedIso(date: string, time: string, timeZone: string = TIME_ZONE): string {
-  // The offset is looked up at noon UTC of that date, which is the right side
-  // of a DST switch for every wall-clock time except the switch hour itself.
-  const offset = zoneOffset(new Date(`${date}T12:00:00Z`), timeZone);
-  return new Date(`${date}T${time}${offset}`).toISOString();
+  // The offset is taken at the target instant itself, not at noon: on a clock
+  // change day midnight and noon have different offsets (FXC-04). The first
+  // guess uses the offset at the wall-clock time read as UTC; the second
+  // corrects it with the offset at the guessed instant.
+  const wall = Date.parse(`${date}T${time}Z`);
+  const guess = wall - zoneOffsetMinutes(new Date(wall), timeZone) * 60_000;
+  return new Date(wall - zoneOffsetMinutes(new Date(guess), timeZone) * 60_000).toISOString();
 }
 
 /** Last millisecond of "today" in the zone, as a UTC ISO string. */

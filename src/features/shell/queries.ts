@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
+import { TIME_ZONE } from "@/lib/app";
 import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
 import { isUuid, paths } from "@/lib/paths";
@@ -11,7 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export type OrgContext = {
   user: SessionUser & { displayName: string };
-  org: { id: string; name: string; status: OrgStatus };
+  // timeZone and currency: the organization's own settings (dates and amounts are shown in them)
+  org: { id: string; name: string; status: OrgStatus; timeZone: string; currency: string };
   role: MembershipRole;
   // false = skipped by the lead round robin ("on vacation")
   isAvailable: boolean;
@@ -31,7 +33,7 @@ const WRITABLE_STATUSES: OrgStatus[] = ["trial", "active", "past_due"];
 
 // what public.org_context() returns; a part the caller may not see is null
 type RawContext = {
-  org?: { id: string; name: string; status: OrgStatus } | null;
+  org?: { id: string; name: string; status: OrgStatus; timezone?: string; currency?: string } | null;
   membership?: { role: MembershipRole; is_available: boolean } | null;
   subscription?: { status: SubscriptionStatus; plan_key: string; plan_name: string | null; trial_ends_at: string | null } | null;
   full_name?: string | null;
@@ -57,7 +59,9 @@ export const getOrgContext = cache(async (orgId: string): Promise<OrgContext> =>
     throw new Error(`organization context failed: ${error.message}`);
   }
   const ctx = (data ?? {}) as RawContext;
-  const org = ctx.org ?? null;
+  const raw = ctx.org ?? null;
+  // before migration 0043 the two settings are missing; the defaults are what every organization has
+  const org = raw ? { id: raw.id, name: raw.name, status: raw.status, timeZone: raw.timezone ?? TIME_ZONE, currency: raw.currency ?? "ILS" } : null;
   let membership = ctx.membership ?? null;
   let supportUntil: string | null = null;
   if (!org && !membership) {

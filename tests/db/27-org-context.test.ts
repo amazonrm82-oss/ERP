@@ -4,7 +4,7 @@ import { addMember, asAdmin, asMfaUser, asUser, closePool, createOrg, createUser
 afterAll(closePool);
 
 type Ctx = {
-  org: { id: string; name: string; status: string } | null;
+  org: { id: string; name: string; status: string; timezone: string; currency: string } | null;
   membership: { role: string; is_available: boolean } | null;
   subscription: { status: string; plan_key: string; plan_name: string | null; trial_ends_at: string | null } | null;
   full_name: string | null;
@@ -28,7 +28,7 @@ describe("org_context: a page's organization context in one call", () => {
 
   it("a member gets the organization, their role, the plan's name and their name", async () => {
     const ctx = await context(member.id);
-    expect(ctx.org).toMatchObject({ id: org, name: "עסק הקשר" });
+    expect(ctx.org).toMatchObject({ id: org, name: "עסק הקשר", timezone: "Asia/Jerusalem", currency: "ILS" });
     expect(ctx.membership).toEqual({ role: "member", is_available: true });
     expect(ctx.subscription?.plan_name).toBeTruthy();
     expect(ctx.subscription?.status).toBe("trialing");
@@ -38,7 +38,7 @@ describe("org_context: a page's organization context in one call", () => {
 
   it("matches the separate queries it replaces", async () => {
     const separate = await asUser(member.id, async (q) => ({
-      org: (await q("select id, name, status from public.organizations where id = $1 and deleted_at is null", [org])).rows[0],
+      org: (await q("select id, name, status, timezone, currency from public.organizations where id = $1 and deleted_at is null", [org])).rows[0],
       plan: (await q("select p.name_he from public.subscriptions s join public.plans p on p.key = s.plan_key where s.organization_id = $1", [org])).rows[0]
         .name_he,
     }));
