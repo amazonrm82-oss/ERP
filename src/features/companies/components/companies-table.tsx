@@ -1,67 +1,72 @@
 import Link from "next/link";
 
-import { SortableHeader } from "@/components/sortable-header";
-
+import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
+import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
+import { ListTable } from "@/features/list-columns/components/list-table";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
-import type { CompanyListItem, CompanySortKey } from "../queries";
-
-const th = "px-4 py-2.5 text-start text-sm font-medium text-ink-soft whitespace-nowrap";
-const td = "px-4 py-3 align-top";
+import type { CompanyListItem } from "../queries";
 
 type Props = {
   orgId: string;
   companies: CompanyListItem[];
+  // the user's columns (LST-03) and the organization's custom fields
+  columns: ColumnChoice[];
+  catalog: CatalogColumn[];
+  fields: FieldDefinition[];
   // the current sort, and the address that sorts by a column (LST-02)
-  sort: Sort<CompanySortKey>;
-  sortHref: (key: CompanySortKey) => string;
+  sort: Sort<string>;
+  sortHref: (key: string) => string;
 };
 
-/** Companies as a table; secondary columns drop out on narrow screens. */
-export function CompaniesTable({ orgId, companies, sort, sortHref }: Props) {
-  const header = (key: CompanySortKey, label: string, className: string) => (
-    <SortableHeader
-      label={label}
-      className={className}
-      direction={sort.key === key ? (sort.ascending ? "ascending" : "descending") : null}
-      href={sortHref(key)}
-    />
-  );
+/** Companies as a table, with the columns the user chose. */
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref }: Props) {
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface">
-      <table className="w-full border-collapse text-[0.9375rem]">
-        <thead className="border-b border-line bg-canvas/60">
-          <tr>
-            {header("name", "שם", `${th} sm:min-w-52`)}
-            {header("phone", "טלפון", `${th} hidden sm:table-cell`)}
-            {header("city", "עיר", `${th} hidden md:table-cell`)}
-            {header("owner", "בעלים", `${th} hidden xl:table-cell`)}
-            {header("created", "נוצר", `${th} hidden lg:table-cell`)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {companies.map((company) => (
-            <tr key={company.id} className="hover:bg-canvas/50">
-              <td className={td}>
-                <Link href={paths.company(orgId, company.id)} className="font-medium text-ink underline-offset-4 hover:underline">
-                  {company.name}
-                </Link>
-                {company.city ? <span className="block text-sm text-ink-soft md:hidden">{company.city}</span> : null}
-              </td>
-              <td className={`${td} hidden whitespace-nowrap sm:table-cell`}>
-                {company.phone ? <span dir="ltr">{company.phone}</span> : null}
-              </td>
-              <td className={`${td} hidden md:table-cell`}>{company.city}</td>
-              <td className={`${td} hidden whitespace-nowrap xl:table-cell`}>{company.ownerName}</td>
-              <td className={`${td} hidden whitespace-nowrap text-ink-soft lg:table-cell`}>
-                <time dateTime={company.createdAt}>{formatDate(company.createdAt)}</time>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListTable
+      label="טבלת חברות"
+      rows={companies}
+      rowKey={(company) => company.id}
+      columns={columns}
+      catalog={catalog}
+      fields={fields}
+      sort={sort}
+      sortHref={sortHref}
+      customValues={(company) => asCustomValues(company.customFields)}
+      nameCell={(company) => (
+        <Link href={paths.company(orgId, company.id)} className="font-medium text-ink underline-offset-4 hover:underline">
+          {company.name}
+        </Link>
+      )}
+      cell={(key, company) => {
+        switch (key) {
+          case "phone":
+            return company.phone ? (
+              <span dir="ltr" className="whitespace-nowrap">
+                {company.phone}
+              </span>
+            ) : null;
+          case "city":
+            return company.city;
+          case "website":
+            return company.website ? (
+              <span dir="ltr" title={company.website} className="block max-w-52 truncate text-end">
+                {company.website}
+              </span>
+            ) : null;
+          case "owner":
+            return company.ownerName;
+          case "created":
+            return (
+              <time dateTime={company.createdAt} className="whitespace-nowrap text-ink-soft">
+                {formatDate(company.createdAt)}
+              </time>
+            );
+          default:
+            return null;
+        }
+      }}
+    />
   );
 }

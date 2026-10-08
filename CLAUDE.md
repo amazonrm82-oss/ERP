@@ -158,6 +158,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - List sorting (migration 0032): computed fields `sort_status(leads)`, `sort_source(leads)`,
   `sort_owner(leads|contacts|companies)`, `sort_company(contacts)` (security invoker) are ordered by as
   PostgREST columns (`order=sort_owner`); each list's `*_SORT_COLUMNS` maps URL keys to columns.
+- List columns (migration 0033): `public.list_preferences` (organization, user from the session, list,
+  `columns` jsonb), own rows only. `src/features/list-columns/` holds the catalog (built-in + `cf:<key>`
+  custom fields), the panel and `ListTable`; custom field columns sort by `custom_fields->key`.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

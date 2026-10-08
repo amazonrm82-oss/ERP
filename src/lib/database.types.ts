@@ -34,6 +34,15 @@ type Table<Row, Insert, Update = Partial<Insert>> = {
 // A table the client can only read.
 type ReadOnlyTable<Row> = Table<Row, Record<string, never>, Record<string, never>>;
 
+export type ListPreferencesRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  object_type: string;
+  columns: Json;
+  updated_at: string;
+};
+
 export type NotificationSettingsRow = {
   user_id: string;
   muted: string[];
@@ -906,6 +915,8 @@ export type Database = {
       >;
       // read your own row; written through set_notification_settings() (migration 0031)
       notification_settings: ReadOnlyTable<NotificationSettingsRow>;
+      // each user's columns per list (migration 0033); user_id comes from the session
+      list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       leads: Table<LeadRow, LeadInsert>;

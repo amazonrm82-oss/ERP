@@ -622,6 +622,34 @@ try {
   await expectText(ownerDesk, "1 בנוב׳ 2026");
   const leadUrl = ownerDesk.url();
 
+  step("list columns: hide one, add a custom field, move it, sort by it; back to the default");
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("button", { name: "עמודות" }).click();
+  const columnsPanel = ownerDesk.getByRole("group", { name: "בחירת עמודות" });
+  await columnsPanel.getByLabel("מקור", { exact: true }).uncheck();
+  await columnsPanel.getByLabel("תאריך פגישה", { exact: true }).check();
+  await columnsPanel.getByRole("button", { name: "למעלה: תאריך פגישה" }).click();
+  await columnsPanel.getByLabel("רוחב: תאריך פגישה").selectOption("wide");
+  await shot(ownerDesk, "31-columns-1280");
+  await columnsPanel.getByRole("button", { name: "שמירת העמודות" }).click();
+  await ownerDesk.getByRole("columnheader", { name: /^תאריך פגישה/ }).waitFor({ timeout: 15000 });
+  if (await ownerDesk.getByRole("columnheader", { name: /^מקור/ }).count()) throw new Error("the hidden column is still shown");
+  await expectText(ownerDesk, "1 בנוב׳ 2026");
+  const [saved] = await sql(
+    "select p.columns from public.list_preferences p join auth.users u on u.id = p.user_id where u.email = $1 and p.object_type = 'lead'",
+    [ownerEmail],
+  );
+  const savedKeys = saved.columns.map((c) => c.key);
+  if (savedKeys.includes("source") || !savedKeys.some((k) => k.startsWith("cf:"))) throw new Error(`columns not saved: ${savedKeys.join(",")}`);
+  // a custom field column sorts too
+  await ownerDesk.getByRole("columnheader", { name: /^תאריך פגישה/ }).getByRole("link").click();
+  await ownerDesk.waitForURL(/sort=cf%3A|sort=cf:/);
+  await ownerDesk.locator("tbody tr").first().waitFor();
+  await ownerDesk.getByRole("button", { name: "עמודות" }).click();
+  await ownerDesk.getByRole("button", { name: "חזרה לברירת המחדל" }).click();
+  await ownerDesk.getByRole("columnheader", { name: /^מקור/ }).waitFor({ timeout: 15000 });
+  await ownerDesk.goto(leadUrl);
+
   step("tags: create on a record, filter the list, save a view");
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByRole("button", { name: "עריכת תגיות" }).click();
   await ownerDesk.getByLabel("תגית חדשה").fill("VIP");

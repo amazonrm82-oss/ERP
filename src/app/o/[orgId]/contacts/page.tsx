@@ -8,14 +8,17 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
-import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts, type ContactSortKey } from "@/features/contacts/queries";
+import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
+import { CUSTOM_PREFIX } from "@/features/list-columns/columns";
+import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
+import { getListColumns } from "@/features/list-columns/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
-import { nextSort, parseSort, sortValue } from "@/lib/sort";
+import { nextSort, parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 
 export const metadata: Metadata = { title: "אנשי קשר" };
 
@@ -34,7 +37,10 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const tagParam = firstParam(query.tag);
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
-  const sort = parseSort(firstParam(query.sort), Object.keys(CONTACT_SORT_COLUMNS) as ContactSortKey[], CONTACT_DEFAULT_SORT);
+  const listColumns = await getListColumns(orgId, "contact");
+  // any column the list can show sorts, custom fields included (LST-02, LST-03)
+  const sortKeys = [...Object.keys(CONTACT_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof CONTACT_SORT_COLUMNS | CustomSortKey>;
+  const sort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const [tags, views, { contacts, hasMore }] = await Promise.all([
     listTags(orgId),
     viewChips(orgId, "contact", context),
@@ -52,7 +58,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   };
   const hrefFor = (target: number) => listHref(target, sortValue(sort));
   // a new sort starts again from the first page; dates start with the newest
-  const sortHref = (key: ContactSortKey) => listHref(1, sortValue(nextSort(sort, key, key !== "created")));
+  const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created")));
 
   const newContactButton = canWrite ? (
     <ButtonLink href={paths.contactNew(orgId)}>
@@ -75,6 +81,9 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         canShare={context.role === "owner" || context.role === "admin"}
       />
 
+      <div className="mb-3 flex justify-end">
+        <ColumnsPanel orgId={orgId} object="contact" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+      </div>
       <Form action={paths.contacts(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField
           label="חיפוש אנשי קשר"
@@ -102,7 +111,15 @@ export default async function ContactsPage({ params, searchParams }: Props) {
       </Form>
 
       {contacts.length > 0 ? (
-        <ContactsTable orgId={orgId} contacts={contacts} sort={sort} sortHref={sortHref} />
+        <ContactsTable
+          orgId={orgId}
+          contacts={contacts}
+          columns={listColumns.columns}
+          catalog={listColumns.catalog}
+          fields={listColumns.fields}
+          sort={sort}
+          sortHref={sortHref}
+        />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || page > 1 ? (

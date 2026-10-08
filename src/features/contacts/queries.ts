@@ -1,8 +1,10 @@
 import "server-only";
 
+import type { Json } from "@/lib/database.types";
+
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
-import type { Sort } from "@/lib/sort";
+import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type ContactListItem = {
@@ -14,6 +16,7 @@ export type ContactListItem = {
   companyName: string | null;
   ownerName: string | null;
   createdAt: string;
+  customFields: Json;
 };
 
 /** Names of live companies by id (for list rows and cards). */
@@ -37,6 +40,7 @@ export const CONTACT_SORT_COLUMNS = {
   name: "full_name",
   phone: "phone",
   email: "email",
+  job_title: "job_title",
   company: "sort_company",
   owner: "sort_owner",
   created: "created_at",
@@ -47,14 +51,14 @@ export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", asce
 /** One page of live contacts, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listContacts(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey> },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey> },
 ): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, phone, email, job_title, company_id, owner_id, created_at")
+    .select("id, full_name, phone, email, job_title, company_id, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -68,7 +72,7 @@ export async function listContacts(
 
   const sort = options.sort ?? CONTACT_DEFAULT_SORT;
   const { data, error } = await query
-    .order(CONTACT_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order(sortColumn(CONTACT_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
@@ -95,6 +99,7 @@ export async function listContacts(
       companyName: row.company_id ? (companies.get(row.company_id) ?? null) : null,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
+      customFields: row.custom_fields,
     })),
   };
 }

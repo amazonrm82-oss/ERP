@@ -1,8 +1,10 @@
 import "server-only";
 
+import type { Json } from "@/lib/database.types";
+
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
-import type { Sort } from "@/lib/sort";
+import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type CompanyListItem = {
@@ -13,25 +15,26 @@ export type CompanyListItem = {
   website: string | null;
   ownerName: string | null;
   createdAt: string;
+  customFields: Json;
 };
 
 // columns the company table can be sorted by (LST-02)
 // owner is a computed field (migration 0032)
-export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", owner: "sort_owner", created: "created_at" } as const;
+export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", website: "website", owner: "sort_owner", created: "created_at" } as const;
 export type CompanySortKey = keyof typeof COMPANY_SORT_COLUMNS;
 export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascending: true };
 
 /** One page of live companies, by name unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listCompanies(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey> },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey> },
 ): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("companies")
-    .select("id, name, phone, city, website, owner_id, created_at")
+    .select("id, name, phone, city, website, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   const searchFilter = personSearchFilter(["name", "tax_id", "city"], options.search);
@@ -44,7 +47,7 @@ export async function listCompanies(
 
   const sort = options.sort ?? COMPANY_DEFAULT_SORT;
   const { data, error } = await query
-    .order(COMPANY_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order(sortColumn(COMPANY_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
@@ -63,6 +66,7 @@ export async function listCompanies(
       website: row.website,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
+      customFields: row.custom_fields,
     })),
   };
 }

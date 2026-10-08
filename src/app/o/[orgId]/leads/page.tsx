@@ -9,7 +9,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { LeadsTable } from "@/features/leads/components/leads-table";
-import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads, type LeadSortKey } from "@/features/leads/queries";
+import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
+import { CUSTOM_PREFIX } from "@/features/list-columns/columns";
+import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
+import { getListColumns } from "@/features/list-columns/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -17,7 +20,7 @@ import { viewChips } from "@/features/views/server";
 import { cn } from "@/lib/cn";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
-import { nextSort, parseSort, sortValue } from "@/lib/sort";
+import { nextSort, parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 
 export const metadata: Metadata = { title: "לידים" };
 
@@ -39,7 +42,10 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
   const boardView = firstParam(query.view) === "board";
-  const sort = parseSort(firstParam(query.sort), Object.keys(LEAD_SORT_COLUMNS) as LeadSortKey[], LEAD_DEFAULT_SORT);
+  const listColumns = await getListColumns(orgId, "lead");
+  // any column the list can show sorts, custom fields included (LST-02, LST-03)
+  const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof LEAD_SORT_COLUMNS | CustomSortKey>;
+  const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
   const [lookups, tags, views, list, board] = await Promise.all([
     getLeadLookups(orgId),
@@ -75,7 +81,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   };
   const hrefFor = (target: number) => listHref(target, sortValue(sort));
   // a new sort starts again from the first page; dates start with the newest
-  const sortHref = (key: LeadSortKey) => listHref(1, sortValue(nextSort(sort, key, key !== "created")));
+  const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created")));
 
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>
@@ -96,7 +102,10 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         canSave={context.role !== "viewer"}
         canShare={context.role === "owner" || context.role === "admin"}
       />
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        {boardView ? null : (
+          <ColumnsPanel orgId={orgId} object="lead" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+        )}
         <nav aria-label="תצוגה" className="flex gap-1 rounded-md border border-line bg-surface p-1">
           {(
             [
@@ -124,7 +133,17 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       {board ? (
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} />
       ) : leads.length > 0 ? (
-        <LeadsTable orgId={orgId} leads={leads} statuses={lookups.statuses} sources={lookups.sources} sort={sort} sortHref={sortHref} />
+        <LeadsTable
+          orgId={orgId}
+          leads={leads}
+          statuses={lookups.statuses}
+          sources={lookups.sources}
+          columns={listColumns.columns}
+          catalog={listColumns.catalog}
+          fields={listColumns.fields}
+          sort={sort}
+          sortHref={sortHref}
+        />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (

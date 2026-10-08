@@ -1,9 +1,9 @@
 import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
-import type { LeadStatusKind } from "@/lib/database.types";
+import type { Json, LeadStatusKind } from "@/lib/database.types";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
-import type { Sort } from "@/lib/sort";
+import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 export type LeadStatusOption = { id: string; name: string; kind: LeadStatusKind; isDefault: boolean };
@@ -50,6 +50,7 @@ export type LeadListItem = {
   sourceId: string | null;
   ownerName: string | null;
   createdAt: string;
+  customFields: Json;
 };
 
 // columns the leads table can be sorted by (LST-02); "created" newest first is the default
@@ -58,6 +59,7 @@ export const LEAD_SORT_COLUMNS = {
   name: "full_name",
   phone: "phone",
   email: "email",
+  company: "company_name",
   status: "sort_status",
   source: "sort_source",
   owner: "sort_owner",
@@ -66,7 +68,7 @@ export const LEAD_SORT_COLUMNS = {
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
 export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
 
-type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number; sort?: Sort<LeadSortKey> };
+type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number; sort?: Sort<LeadSortKey | CustomSortKey> };
 
 /** One page of live leads, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
@@ -75,7 +77,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   let query = supabase
     .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, owner_id, created_at")
+    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -92,7 +94,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   const sort = options.sort ?? LEAD_DEFAULT_SORT;
   const { data, error } = await query
-    .order(LEAD_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+    .order(sortColumn(LEAD_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
     .range(from, from + PAGE_SIZE);
   if (error) {
@@ -115,6 +117,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       sourceId: row.source_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
+      customFields: row.custom_fields,
     })),
   };
 }
