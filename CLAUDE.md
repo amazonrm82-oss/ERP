@@ -287,6 +287,9 @@ that back.
 - Feature folders: `src/features/<area>/{queries,actions,schema}.ts` + `components/`.
   Shared primitives in `src/components/ui/`. No PostgREST embedding so far; lookups are fetched
   separately and joined in code.
+- Entry (LND-01/06/07/08): `/` is the public landing page (`paths.landing`); the business picker is `/app`
+  (`paths.home`). The proxy sends a signed-in visitor of `/` to `/app`; the installed app starts at `/app`
+  (manifest `id` stays `/`), and the landing page opened inside it goes to `/login`.
 - Record types (FXC-06): `src/lib/record-types.ts` (`RECORD_TYPES`, `isRecordType`, `recordPage`) says each
   type's table, pages, Hebrew names and features. Use it instead of a local map; a new type is added there.
 - Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with

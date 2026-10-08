@@ -12,7 +12,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-surface">
       <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href={paths.home} className="shrink-0 rounded-md">
+          <Link href={paths.landing} className="shrink-0 rounded-md">
             <Wordmark className="h-6 sm:h-7" />
           </Link>
           <nav aria-label="ניווט באתר" className="flex items-center gap-0.5 text-[0.9375rem] whitespace-nowrap">

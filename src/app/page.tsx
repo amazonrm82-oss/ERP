@@ -1,83 +1,52 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { ChevronIcon } from "@/components/ui/icons";
+import { SiteFooter } from "@/components/public-shell";
+import { ButtonLink } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
-import { SignOutButton } from "@/features/auth/components/sign-out-button";
-import { listMfaBlockedOrganizations, listMyOrganizations } from "@/features/onboarding/queries";
-import { requireAgreement } from "@/features/legal/queries";
-import { getPlatformMe } from "@/features/platform/queries";
-import { ROLE_LABELS } from "@/features/shell/labels";
-import { APP_NAME } from "@/lib/app";
-import { requireUser } from "@/lib/auth";
+import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
 
-// The title template of the root layout does not apply to the root page itself.
-export const metadata: Metadata = { title: `בחירת עסק | ${APP_NAME}` };
+export const metadata: Metadata = { title: { absolute: `${APP_NAME} | ${APP_DESCRIPTION}` }, description: APP_DESCRIPTION };
 
-// Entry point after sign-in: no business -> onboarding, one -> straight in,
-// several -> pick one.
-export default async function RootPage() {
-  const user = await requireUser();
-  await requireAgreement(paths.home);
-  const organizations = await listMyOrganizations(user.id);
-
-  const blocked = await listMfaBlockedOrganizations();
-  const mfaHref = (orgId: string) => `${paths.loginMfa}?next=${encodeURIComponent(paths.org(orgId))}`;
-  if (organizations.length === 0 && blocked.length > 0) {
-    redirect(mfaHref(blocked[0].id));
-  }
-  if (organizations.length === 0) {
-    // platform staff without a business of their own go to the admin panel
-    redirect((await getPlatformMe()) ? paths.admin : paths.onboarding);
-  }
-  if (organizations.length === 1 && blocked.length === 0) {
-    redirect(paths.org(organizations[0].id));
-  }
-
+// The public landing page (LND-01). A signed-in visitor never sees it: the proxy
+// sends them into the app first (LND-06). The full page, with what the system
+// does and real screenshots (LND-02 to LND-05), comes with the chosen design.
+export default function LandingPage() {
   return (
-    <div className="min-h-dvh bg-surface">
-      <header className="flex items-center justify-between px-5 py-4 sm:px-10">
-        <Wordmark className="h-7" />
-        <SignOutButton />
-      </header>
-      <main className="mx-auto w-full max-w-md px-5 pt-6 pb-16 sm:pt-12">
-        <h1 className="text-2xl font-semibold">לאיזה עסק להיכנס?</h1>
-        <p className="mt-1 mb-6 text-ink-soft">החשבון שלך משויך לכמה עסקים.</p>
-        <ul className="divide-y divide-line rounded-lg border border-line">
-          {organizations.map((org) => (
-            <li key={org.id}>
-              <Link
-                href={paths.org(org.id)}
-                className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-canvas"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{org.name}</span>
-                  <span className="block text-sm text-ink-soft">{ROLE_LABELS[org.role]}</span>
-                </span>
-                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
-              </Link>
-            </li>
-          ))}
-          {blocked.map((org) => (
-            <li key={org.id}>
-              <Link href={mfaHref(org.id)} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-canvas">
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{org.name}</span>
-                  <span className="block text-sm text-ink-soft">העסק דורש אימות דו-שלבי</span>
-                </span>
-                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-6 text-[0.9375rem]">
-          <Link href={`${paths.onboarding}?new=1`} className="text-accent underline underline-offset-4 hover:text-accent-strong">
-            הוספת עסק חדש
+    <div className="flex min-h-dvh flex-col bg-surface">
+      <StandaloneRedirect />
+      <header className="sticky top-0 z-10 border-b border-line bg-surface">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Link href={paths.landing} className="shrink-0 rounded-md">
+            <Wordmark className="h-6 sm:h-7" />
           </Link>
+          <nav aria-label="כניסה והרשמה" className="flex items-center gap-2">
+            <ButtonLink href={paths.login} variant="ghost" size="md">
+              כניסה
+            </ButtonLink>
+            <ButtonLink href={paths.signup} size="md">
+              הרשמה
+            </ButtonLink>
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-12 sm:px-6 sm:py-20">
+        <h1 className="max-w-2xl text-3xl font-semibold sm:text-4xl">כל הלידים, הלקוחות והעסקאות של העסק, במקום אחד</h1>
+        <p className="mt-4 max-w-xl text-lg text-ink-soft">
+          {APP_NAME} היא מערכת לניהול לקוחות לעסקים קטנים ובינוניים בישראל. לידים מהאתר נכנסים לבד, כל אחד בצוות יודע מה מחכה לו היום, ואתם רואים איפה הכסף.
         </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <ButtonLink href={paths.signup} size="md">
+            הרשמה לתקופת ניסיון
+          </ButtonLink>
+          <ButtonLink href={paths.help} variant="ghost" size="md">
+            איך זה עובד
+          </ButtonLink>
+        </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

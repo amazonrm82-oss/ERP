@@ -5,13 +5,15 @@ import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 /** Web app manifest: lets the app be installed to the home screen and open in its own window. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // the id stays "/" so an app installed before LND-07 is not installed twice
     id: "/",
     name: APP_NAME,
     short_name: APP_NAME,
     description: APP_DESCRIPTION,
     lang: "he",
     dir: "rtl",
-    start_url: "/",
+    // the installed app opens the app, not the landing page (LND-07)
+    start_url: "/app",
     scope: "/",
     display: "standalone",
     orientation: "any",

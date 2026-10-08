@@ -30,7 +30,8 @@ const PUBLIC_PREFIXES = [
 ];
 
 function isPublicPath(pathname: string): boolean {
-  return AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  // "/" is the public landing page (LND-01)
+  return pathname === "/" || AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 // Runs on every matched request: refreshes the Supabase session cookies and
@@ -109,6 +110,12 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       url.searchParams.set("next", pathname + search);
     }
     return redirectKeepingCookies(url, response);
+  }
+
+  // a signed-in visitor of the landing page goes straight into the app (LND-06);
+  // decided here, so the landing page itself stays the same for everyone
+  if (isSignedIn && pathname === "/") {
+    return redirectKeepingCookies(new URL("/app", request.url), response);
   }
 
   if (isSignedIn && AUTH_PAGES.includes(pathname)) {

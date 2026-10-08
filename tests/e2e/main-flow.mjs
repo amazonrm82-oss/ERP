@@ -179,6 +179,22 @@ try {
   console.log("org:", orgUrl);
   await shot(owner, "02-home-360");
 
+  step("landing page: public for visitors, straight into the app when signed in (LND-01, LND-06)");
+  {
+    const visitor = await newPage(360);
+    await visitor.goto(`${APP}/`);
+    if (new URL(visitor.url()).pathname !== "/") throw new Error(`a visitor was sent away from the landing page: ${visitor.url()}`);
+    await visitor.getByRole("link", { name: "כניסה", exact: true }).waitFor();
+    await visitor.getByRole("link", { name: "הרשמה", exact: true }).click();
+    await visitor.waitForURL(/\/signup/);
+    await visitor.close();
+    await owner.goto(`${APP}/`);
+    // one business: /app sends on to it
+    await owner.waitForURL(/\/o\/[0-9a-f-]{36}$/, { timeout: 15000 });
+    const manifest = await (await owner.context().request.get(`${APP}/manifest.webmanifest`)).json();
+    if (manifest.start_url !== "/app" || manifest.id !== "/") throw new Error(`manifest: start ${manifest.start_url}, id ${manifest.id}`);
+  }
+
   step("create lead");
   await owner.goto(`${orgUrl}/leads/new`);
   await owner.getByLabel("שם מלא").fill("משה כהן");

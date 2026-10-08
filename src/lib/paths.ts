@@ -1,7 +1,9 @@
 // Route helpers, so URLs are built in one place.
 
 export const paths = {
-  home: "/",
+  // the public landing page (LND-01); the app itself starts at `home`
+  landing: "/",
+  home: "/app",
   login: "/login",
   loginMfa: "/login/mfa",
   forgotPassword: "/forgot-password",
