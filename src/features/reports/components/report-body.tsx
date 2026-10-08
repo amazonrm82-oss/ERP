@@ -37,10 +37,10 @@ function Section({ section, id }: { section: ReportSection; id: string }) {
     <Card aria-labelledby={id}>
       <CardHeader id={id} title={section.title} />
       {section.rows.length === 0 ? (
-        <p className="px-4 py-6 text-[0.9375rem] text-ink-soft sm:px-5">{section.empty}</p>
+        <p className="px-4 py-6 text-md text-ink-soft sm:px-5">{section.empty}</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[32rem] text-[0.9375rem]">
+          <table className="w-full min-w-[32rem] text-md">
             <thead>
               <tr className="border-b border-line text-sm text-ink-soft">
                 <th scope="col" className="px-4 py-2.5 text-start font-medium sm:px-5">

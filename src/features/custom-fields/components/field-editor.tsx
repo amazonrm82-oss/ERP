@@ -55,7 +55,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
         />
       ) : null}
       <TextField label="הסבר קצר (לא חובה)" name="help_text" maxLength={200} autoComplete="off" defaultValue={values?.help_text} error={errors.help_text} />
-      <label className="flex items-center gap-2.5 text-[0.9375rem]">
+      <label className="flex items-center gap-2.5 text-md">
         <input type="checkbox" name="is_required" defaultChecked={values?.is_required === "on"} className="size-4.5 accent-accent" />
         שדה חובה
       </label>
@@ -148,7 +148,7 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
         />
       ) : null}
       <TextField label="הסבר קצר" name="help_text" maxLength={200} autoComplete="off" defaultValue={values?.help_text ?? field.helpText ?? ""} error={errors.help_text} />
-      <label className="flex items-center gap-2.5 text-[0.9375rem]">
+      <label className="flex items-center gap-2.5 text-md">
         <input
           type="checkbox"
           name="is_required"

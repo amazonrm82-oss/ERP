@@ -33,7 +33,7 @@ export function EmptyState({ title, description, action, className }: EmptyState
   return (
     <div className={cn("flex flex-col items-center px-4 py-12 text-center", className)}>
       <p className="text-base font-semibold">{title}</p>
-      {description ? <p className="mt-1 max-w-md text-[0.9375rem] text-ink-soft">{description}</p> : null}
+      {description ? <p className="mt-1 max-w-md text-md text-ink-soft">{description}</p> : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );

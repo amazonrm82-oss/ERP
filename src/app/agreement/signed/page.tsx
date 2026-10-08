@@ -35,7 +35,7 @@ export default async function SignedAgreementPage() {
         <h2 id="signature" className="font-semibold">
           פרטי החתימה
         </h2>
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[0.9375rem]">
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-md">
           <dt className="text-ink-soft">שם</dt>
           <dd>{agreement.fullName}</dd>
           <dt className="text-ink-soft">אימייל</dt>
@@ -63,7 +63,7 @@ export default async function SignedAgreementPage() {
           <p className="text-sm text-ink-soft">חתימה</p>
           {agreement.method === "drawn" && agreement.signature ? (
             // eslint-disable-next-line @next/next/no-img-element -- a stored data: URL
-            <img src={agreement.signature} alt={`החתימה של ${agreement.fullName}`} className="mt-1 h-28 w-auto max-w-full rounded-md border border-line bg-white" />
+            <img src={agreement.signature} alt={`החתימה של ${agreement.fullName}`} className="mt-1 h-28 w-auto max-w-full rounded-md border border-line bg-paper" />
           ) : (
             <p className="mt-1 text-3xl italic">{agreement.fullName}</p>
           )}
@@ -76,7 +76,7 @@ export default async function SignedAgreementPage() {
             {doc.title}
           </h2>
           <p className="text-sm text-ink-soft">גרסה {doc.version}</p>
-          <div className="mt-3 text-[0.9375rem] leading-relaxed whitespace-pre-line">{doc.text}</div>
+          <div className="mt-3 text-md leading-relaxed whitespace-pre-line">{doc.text}</div>
         </section>
       ))}
     </article>

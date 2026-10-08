@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: Props) {
       <h1 className="text-2xl font-semibold">כניסה למערכת</h1>
       <p className="mt-1 mb-6 text-ink-soft">הזינו את האימייל והסיסמה שלכם.</p>
       <LoginForm next={next} initialError={error} />
-      <p className="mt-6 text-[0.9375rem] text-ink-soft">
+      <p className="mt-6 text-md text-ink-soft">
         עוד אין לך חשבון?{" "}
         <Link href={signupHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
           הרשמה

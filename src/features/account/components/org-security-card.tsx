@@ -9,7 +9,7 @@ export function OrgSecurityCard({ orgId, requireMfa }: { orgId: string; requireM
     <Card aria-labelledby="org-security-title" className="mt-5">
       <CardHeader id="org-security-title" title="אבטחה" />
       <CardBody className="space-y-3">
-        <p className="text-[0.9375rem]">
+        <p className="text-md">
           {requireMfa
             ? "כל המשתמשים בעסק חייבים אימות דו-שלבי. מי שלא הפעיל אותו יתבקש להפעיל לפני שייכנס."
             : "אפשר לחייב את כל המשתמשים בעסק להיכנס עם אימות דו-שלבי (קוד מאפליקציה בטלפון, בנוסף לסיסמה)."}

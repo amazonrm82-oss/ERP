@@ -38,7 +38,7 @@ export function SignAgreementForm({ next, defaultName }: { next: string; default
               role="radio"
               aria-checked={method === m}
               onClick={() => setMethod(m)}
-              className={`min-h-10 rounded-md border px-3 text-[0.9375rem] ${method === m ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line-control"}`}
+              className={`min-h-10 rounded-md border px-3 text-md ${method === m ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line-control"}`}
             >
               {m === "drawn" ? "ציור חתימה" : "הקלדת שם"}
             </button>
@@ -53,7 +53,7 @@ export function SignAgreementForm({ next, defaultName }: { next: string; default
         )}
       </fieldset>
 
-      <label className="flex items-start gap-2 text-[0.9375rem]">
+      <label className="flex items-start gap-2 text-md">
         <input type="checkbox" name="agree" className="mt-1 size-4 shrink-0" required />
         <span>קראתי את תנאי השימוש, מדיניות הפרטיות והסכם עיבוד המידע, ואני מסכים/ה להם. החתימה האלקטרונית שלי מחייבת כמו חתימה בכתב יד.</span>
       </label>

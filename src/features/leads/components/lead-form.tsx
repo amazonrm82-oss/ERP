@@ -34,10 +34,10 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
       <FormError message={failure?.message} />
       {errors.allow_duplicate ? (
         <div className="space-y-2 rounded-md border border-line p-3">
-          <Link href={errors.allow_duplicate} className="text-[0.9375rem] font-medium text-accent underline underline-offset-4">
+          <Link href={errors.allow_duplicate} className="text-md font-medium text-accent underline underline-offset-4">
             לפתוח את הרשומה הקיימת
           </Link>
-          <label className="flex items-center gap-2.5 text-[0.9375rem]">
+          <label className="flex items-center gap-2.5 text-md">
             <input type="checkbox" name="allow_duplicate" className="size-4.5 accent-accent" />
             ליצור ליד חדש בכל זאת
           </label>

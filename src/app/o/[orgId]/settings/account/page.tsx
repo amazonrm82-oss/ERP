@@ -51,7 +51,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
       <Card aria-labelledby="account-agreement">
         <CardHeader id="account-agreement" title="ההסכם שלך" />
         <CardBody>
-          <p className="text-[0.9375rem]">
+          <p className="text-md">
             {signedVersion ? `חתמת על תנאי השימוש, מדיניות הפרטיות והסכם עיבוד המידע (גרסה ${signedVersion}).` : "עוד לא חתמת על ההסכם."}
           </p>
           <Link href={signedVersion ? paths.agreementSigned : paths.agreement} className="mt-2 inline-block text-accent-strong underline underline-offset-4">

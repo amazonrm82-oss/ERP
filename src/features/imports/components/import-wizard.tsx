@@ -259,7 +259,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
       {step === "map" && sheet ? (
         <div className="space-y-5">
           <div className="rounded-lg border border-line bg-surface">
-            <p className="border-b border-line px-4 py-3 text-[0.9375rem] sm:px-5">
+            <p className="border-b border-line px-4 py-3 text-md sm:px-5">
               <span className="font-semibold">{sheet.fileName}</span>: {formatNumber(sheet.rows.length)} שורות, ייבוא ל{entityLabel}. לכל עמודה בחרו לאיזה שדה היא נכנסת.
             </p>
             <ul className="divide-y divide-line">
@@ -313,7 +313,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
       {step === "preview" && sheet ? (
         <div className="space-y-5">
           <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-            <table className="w-full min-w-[36rem] text-[0.9375rem]">
+            <table className="w-full min-w-[36rem] text-md">
               <caption className="border-b border-line px-4 py-3 text-start font-semibold sm:px-5">בדיקה של {formatNumber(Math.min(PREVIEW_ROWS, sheet.rows.length))} השורות הראשונות</caption>
               <thead>
                 <tr className="border-b border-line text-sm text-ink-soft">
@@ -349,7 +349,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
       {(step === "running" || step === "done") && sheet ? (
         <div className="space-y-4 rounded-lg border border-line bg-surface p-4 sm:p-5">
           <div>
-            <p className="mb-1.5 text-[0.9375rem]">
+            <p className="mb-1.5 text-md">
               {step === "running" ? "מייבא… אל תסגרו את הדף עד הסוף." : stopped ? "הייבוא נעצר." : "הייבוא הסתיים."} {formatNumber(progress)} מתוך {formatNumber(sheet.rows.length)} שורות.
             </p>
             <div role="progressbar" aria-label="התקדמות הייבוא" aria-valuemin={0} aria-valuemax={sheet.rows.length} aria-valuenow={progress} className="h-2.5 rounded-full bg-canvas">

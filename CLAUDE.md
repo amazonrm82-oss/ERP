@@ -300,6 +300,10 @@ that back.
 - An update blocked by RLS returns zero rows and no error: always select the id back and treat
   "0 rows" as "deleted or not permitted".
 - All user-facing text is Hebrew, short and plain. Code, identifiers, comments: English.
+- Design system (DSN-03 to DSN-06, direction A): every colour and font size lives in `src/app/globals.css`
+  (base `--mx-*`, roles in `@theme`, dark mode under `:root[data-theme="dark"]`). Screens use role classes
+  (`bg-surface`, `text-ink-soft`, `text-on-accent`, `text-md`); lint rejects palette colours, hex/rgb and
+  `text-[…]` sizes. A new text/background pair goes into `tests/unit/design-tokens.test.ts` (4.5:1, both themes).
 - RTL: logical properties only (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`, `text-start`). Phones
   and emails render with `dir="ltr"`. Every screen must work at 360px width.
 - Accessibility target: WCAG 2.0 AA (Israeli standard IS 5568). Labels on inputs, visible focus,

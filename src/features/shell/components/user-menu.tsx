@@ -63,7 +63,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
         <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent-strong">
           {initial}
         </span>
-        <span className="hidden max-w-40 truncate text-[0.9375rem] sm:block">{name}</span>
+        <span className="hidden max-w-40 truncate text-md sm:block">{name}</span>
         <span className="sr-only sm:hidden">{name}</span>
         <ChevronDownIcon className="size-4 text-ink-soft" />
       </button>
@@ -88,7 +88,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
                 <Link
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="flex min-h-10 items-center px-4 text-[0.9375rem] hover:bg-canvas"
+                  className="flex min-h-10 items-center px-4 text-md hover:bg-canvas"
                 >
                   {link.label}
                 </Link>

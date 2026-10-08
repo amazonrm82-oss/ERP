@@ -15,7 +15,7 @@ type Props = { orgId: string; automationId: string; records: Array<{ id: string;
 export function TestRunForm({ orgId, automationId, records }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(testRunAction.bind(null, orgId, automationId), null);
   if (records.length === 0) {
-    return <p className="text-[0.9375rem] text-ink-soft">אין עדיין רשומות מהסוג הזה לבדיקה.</p>;
+    return <p className="text-md text-ink-soft">אין עדיין רשומות מהסוג הזה לבדיקה.</p>;
   }
   return (
     <form action={formAction} className="space-y-3" noValidate>

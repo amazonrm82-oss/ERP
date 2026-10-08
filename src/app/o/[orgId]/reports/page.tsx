@@ -29,7 +29,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
               className="block h-full rounded-lg border border-line bg-surface p-4 hover:border-accent hover:bg-accent-soft/40"
             >
               <span className="block font-semibold">{report.title}</span>
-              <span className="mt-1 block text-[0.9375rem] text-ink-soft">{report.description}</span>
+              <span className="mt-1 block text-md text-ink-soft">{report.description}</span>
             </Link>
           </li>
         ))}

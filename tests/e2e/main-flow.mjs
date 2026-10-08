@@ -1365,16 +1365,7 @@ try {
   await expectText(staff, "הכנסה חודשית חוזרת");
   await shot(staff, "100-admin-metrics-1280");
 
-  step("platform: the three design directions (DSN-02)");
-  for (const d of ["calm", "warm", "bold"]) {
-    for (const v of ["phone", "desktop"]) {
-      await staff.goto(`${APP}/admin/design?d=${d}&v=${v}`);
-      await expectText(staff, "שלושה כיוונים עיצוביים");
-      if ((await staff.locator("figure").count()) !== 6) throw new Error(`design preview ${d}/${v}: not all six screens`);
-      await staff.evaluate(() => document.fonts.ready);
-      await shot(staff, `design-${d}-${v}`);
-    }
-  }
+
 
   await staff.goto(`${APP}/admin/orgs?q=${encodeURIComponent("שיפוצים")}`);
   await staff.getByRole("link", { name: /שיפוצים/ }).first().click();

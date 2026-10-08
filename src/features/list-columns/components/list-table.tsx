@@ -54,7 +54,7 @@ export function ListTable<R>({
 
   return (
     <div role="region" aria-label={label} tabIndex={0} className="relative overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full border-collapse text-[0.9375rem]">
+      <table className="w-full border-collapse text-md">
         <thead className="border-b border-line bg-canvas">
           <tr>
             <SortableHeader label={nameColumn.label} direction={direction(nameColumn.key)} href={sortHref(nameColumn.key)} className={`${th} sticky start-0 z-10 min-w-44 bg-canvas sm:min-w-52`} />

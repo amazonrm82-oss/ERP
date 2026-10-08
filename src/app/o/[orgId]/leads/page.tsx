@@ -155,7 +155,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
                 href={viewHref(option.key)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded px-3 py-1.5 text-[0.9375rem]",
+                  "rounded px-3 py-1.5 text-md",
                   active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas",
                 )}
               >

@@ -20,7 +20,7 @@ export function InstallApp() {
 
   if (mode === "none") return null;
 
-  const itemClass = "flex min-h-10 w-full items-center px-4 text-start text-[0.9375rem] hover:bg-canvas";
+  const itemClass = "flex min-h-10 w-full items-center px-4 text-start text-md hover:bg-canvas";
 
   if (mode === "prompt") {
     return (

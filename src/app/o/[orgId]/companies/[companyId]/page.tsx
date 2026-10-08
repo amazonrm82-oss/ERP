@@ -86,7 +86,7 @@ export default async function CompanyPage({ params }: Props) {
             <CardHeader id="company-contacts-title" title={`אנשי קשר (${contacts.length})`} />
             <CardBody>
               {contacts.length === 0 ? (
-                <p className="text-[0.9375rem] text-ink-soft">עוד אין אנשי קשר בחברה. משייכים איש קשר לחברה בכרטיס שלו.</p>
+                <p className="text-md text-ink-soft">עוד אין אנשי קשר בחברה. משייכים איש קשר לחברה בכרטיס שלו.</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {contacts.map((contact) => (

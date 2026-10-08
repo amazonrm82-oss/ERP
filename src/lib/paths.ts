@@ -63,7 +63,6 @@ export const paths = {
   adminStaff: "/admin/staff",
   adminUsers: "/admin/users",
   adminLog: "/admin/log",
-  adminDesign: "/admin/design",
 } as const;
 
 // Only same-origin paths are accepted as a post-login destination; anything

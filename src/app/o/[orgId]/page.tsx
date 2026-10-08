@@ -47,7 +47,7 @@ export default async function HomePage({ params }: Props) {
       <dl className="mb-5 grid divide-y divide-line rounded-lg border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {summary.map((item) => (
           <div key={item.label} className="flex items-baseline justify-between gap-3 px-4 py-3 sm:block sm:px-5 sm:py-4">
-            <dt className="text-[0.9375rem] text-ink-soft">{item.label}</dt>
+            <dt className="text-md text-ink-soft">{item.label}</dt>
             <dd className="flex items-baseline gap-2 sm:mt-1">
               <span className="text-2xl font-semibold leading-none">{item.value}</span>
               {item.note ? <span className="text-sm text-ink-soft">{item.note}</span> : null}
@@ -66,7 +66,7 @@ export default async function HomePage({ params }: Props) {
               </div>
             ) : null}
             {day.tasks.length === 0 ? (
-              <p className="text-[0.9375rem] text-ink-soft">אין משימות פתוחות להיום. משימה שתוסיפו עם תאריך של היום תופיע כאן.</p>
+              <p className="text-md text-ink-soft">אין משימות פתוחות להיום. משימה שתוסיפו עם תאריך של היום תופיע כאן.</p>
             ) : (
               <ul className="divide-y divide-line">
                 {day.tasks.map((task) => (
@@ -98,7 +98,7 @@ export default async function HomePage({ params }: Props) {
           />
           <CardBody>
             {day.newLeads.length === 0 ? (
-              <p className="text-[0.9375rem] text-ink-soft">אין לידים חדשים שמשויכים אליך. ליד חדש שיוקצה לך יופיע כאן עד שהסטטוס שלו ישתנה.</p>
+              <p className="text-md text-ink-soft">אין לידים חדשים שמשויכים אליך. ליד חדש שיוקצה לך יופיע כאן עד שהסטטוס שלו ישתנה.</p>
             ) : (
               <>
                 <ul className="divide-y divide-line">

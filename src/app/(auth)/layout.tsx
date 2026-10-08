@@ -42,7 +42,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         </nav>
       </main>
 
-      <aside aria-label="איך המערכת עובדת" className="hidden bg-accent-strong px-12 py-16 text-white lg:flex lg:flex-col lg:justify-center">
+      <aside aria-label="איך המערכת עובדת" className="hidden bg-brand px-12 py-16 text-on-brand lg:flex lg:flex-col lg:justify-center">
         <p className="max-w-sm text-3xl font-semibold leading-snug text-balance">
           מהפנייה הראשונה ועד סגירת העסקה, במקום אחד.
         </p>
@@ -50,12 +50,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           {JOURNEY.map((step, index) => (
             <li key={step.title} className="relative flex gap-4 pb-7 last:pb-0">
               {index < JOURNEY.length - 1 ? (
-                <span aria-hidden="true" className="absolute start-[0.4375rem] top-5 bottom-0 w-px bg-white/30" />
+                <span aria-hidden="true" className="absolute start-[0.4375rem] top-5 bottom-0 w-px bg-on-brand/30" />
               ) : null}
-              <span aria-hidden="true" className="relative mt-1.5 size-[0.9375rem] shrink-0 rounded-full border-2 border-white bg-accent-strong" />
+              <span aria-hidden="true" className="relative mt-1.5 size-[0.9375rem] shrink-0 rounded-full border-2 border-on-brand bg-accent" />
               <span>
                 <span className="block font-semibold">{step.title}</span>
-                <span className="block text-[0.9375rem] text-white/85">{step.text}</span>
+                <span className="block text-md text-on-brand/85">{step.text}</span>
               </span>
             </li>
           ))}

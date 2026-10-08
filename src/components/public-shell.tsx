@@ -15,7 +15,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <Link href={paths.landing} className="shrink-0 rounded-md">
             <Wordmark className="h-6 sm:h-7" />
           </Link>
-          <nav aria-label="ניווט באתר" className="flex items-center gap-0.5 text-[0.9375rem] whitespace-nowrap">
+          <nav aria-label="ניווט באתר" className="flex items-center gap-0.5 text-md whitespace-nowrap">
             <Link href={paths.help} className="flex min-h-10 items-center rounded-md px-2 hover:bg-canvas sm:px-3">
               מרכז עזרה
             </Link>

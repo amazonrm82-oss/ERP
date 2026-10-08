@@ -21,7 +21,7 @@ export function TransferRecordsForm({ orgId, fromUserId, fromName, total, candid
     return (
       <div className="space-y-3">
         <FormNotice message={state.message} />
-        <p className="text-[0.9375rem]">
+        <p className="text-md">
           עכשיו אפשר להשבית את {fromName} או להסיר מהעסק, בלי לאבד אף רשומה.{" "}
           <Link href={paths.settingsUsers(orgId)} className="text-accent-strong underline underline-offset-4">
             חזרה למשתמשים

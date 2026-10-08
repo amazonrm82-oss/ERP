@@ -72,7 +72,7 @@ export default async function RootPage() {
             </li>
           ))}
         </ul>
-        <p className="mt-6 text-[0.9375rem]">
+        <p className="mt-6 text-md">
           <Link href={`${paths.onboarding}?new=1`} className="text-accent underline underline-offset-4 hover:text-accent-strong">
             הוספת עסק חדש
           </Link>

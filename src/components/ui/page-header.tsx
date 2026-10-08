@@ -24,7 +24,7 @@ export function PageHeader({ title, description, back, actions }: PageHeaderProp
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold leading-tight text-balance break-words">{title}</h1>
-          {description ? <p className="mt-1 text-[0.9375rem] text-ink-soft">{description}</p> : null}
+          {description ? <p className="mt-1 text-md text-ink-soft">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

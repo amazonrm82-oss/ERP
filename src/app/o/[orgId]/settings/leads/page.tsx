@@ -20,7 +20,7 @@ export default async function LeadSettingsPage({ params }: Props) {
     <div className="space-y-5">
       <Card aria-labelledby="statuses-title">
         <CardHeader id="statuses-title" title="סטטוסים של לידים" />
-        <CardBody className="pb-0 text-[0.9375rem] text-ink-soft">
+        <CardBody className="pb-0 text-md text-ink-soft">
           הסדר כאן הוא הסדר ברשימות. &quot;הומר&quot; נקבע אוטומטית כשממירים ליד, ו&quot;לא רלוונטי&quot; מבקש סיבה. סטטוס שיש בו
           לידים אי אפשר למחוק.
         </CardBody>
@@ -36,7 +36,7 @@ export default async function LeadSettingsPage({ params }: Props) {
 
       <Card aria-labelledby="sources-title">
         <CardHeader id="sources-title" title="מקורות לידים" />
-        <CardBody className="pb-0 text-[0.9375rem] text-ink-soft">
+        <CardBody className="pb-0 text-md text-ink-soft">
           מקור מוסתר נשאר על הלידים הקיימים, אבל לא מוצע יותר בטפסים.
         </CardBody>
         <div className="mt-3 border-t border-line">

@@ -72,7 +72,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
             <div className="divide-y divide-line">
               {INTAKE_FIELDS.map((key) => (
                 <div key={`${key}-${shown(key)}-${required(key)}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <label className="flex items-center gap-2 text-[0.9375rem]">
+                  <label className="flex items-center gap-2 text-md">
                     <input type="checkbox" name={`show_${key}`} defaultChecked={shown(key)} className="size-4.5 accent-accent" />
                     {INTAKE_FIELD_LABELS[key]}
                   </label>
@@ -122,7 +122,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
       <fieldset className="space-y-4 rounded-md border border-line p-3">
         <legend className="px-1 text-sm font-medium">למי הולך ליד חדש</legend>
         <div className="space-y-2">
-          <label className="flex items-start gap-2.5 text-[0.9375rem]">
+          <label className="flex items-start gap-2.5 text-md">
             <input
               type="radio"
               name="assign_mode"
@@ -133,7 +133,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
             />
             <span>לנציג קבוע</span>
           </label>
-          <label className="flex items-start gap-2.5 text-[0.9375rem]">
+          <label className="flex items-start gap-2.5 text-md">
             <input
               type="radio"
               name="assign_mode"
@@ -178,7 +178,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
           </SelectField>
         </div>
       </fieldset>
-      <label className="flex items-center gap-2.5 text-[0.9375rem]">
+      <label className="flex items-center gap-2.5 text-md">
         <input type="checkbox" name="is_active" defaultChecked={values ? values.is_active === "on" : intake.isActive} className="size-4.5 accent-accent" />
         פעיל (מקבל פניות)
       </label>

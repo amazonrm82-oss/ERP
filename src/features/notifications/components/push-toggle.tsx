@@ -112,7 +112,7 @@ export function PushToggle({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-[0.9375rem]" role="status">
+      <p className="text-md" role="status">
         {messages[state]}
       </p>
       {state === "off" ? (

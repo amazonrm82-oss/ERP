@@ -164,7 +164,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
                             >
                               {deal.name}
                             </Link>
-                            <p className="mt-0.5 text-[0.9375rem]">{formatMoney(deal.amountAgorot)}</p>
+                            <p className="mt-0.5 text-md">{formatMoney(deal.amountAgorot)}</p>
                             {deal.contactId && deal.contactName ? (
                               <p className="mt-0.5 text-sm">
                                 <Link

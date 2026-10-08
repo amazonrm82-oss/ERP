@@ -54,7 +54,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
           <Card aria-labelledby="user-details">
             <CardHeader id="user-details" title={str(user.name) || str(user.email)} />
             <CardBody>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[0.9375rem]">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-md">
                 <dt className="text-ink-soft">אימייל</dt>
                 <dd dir="ltr" className="text-end">{str(user.email)}</dd>
                 <dt className="text-ink-soft">נרשם</dt>
@@ -72,7 +72,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
               ) : (
                 <ul className="space-y-2">
                   {orgs.map((o) => (
-                    <li key={str(o.id)} className="text-[0.9375rem]">
+                    <li key={str(o.id)} className="text-md">
                       <a href={paths.adminOrg(str(o.id))} className="font-medium text-accent-strong underline underline-offset-4">
                         {str(o.name)}
                       </a>{" "}
@@ -93,7 +93,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
           <Card aria-labelledby="mfa-reset">
             <CardHeader id="mfa-reset" title="איפוס אימות דו-שלבי" />
             <CardBody className="space-y-4">
-              <div className="text-[0.9375rem]">
+              <div className="text-md">
                 <p className="font-semibold">לפני איפוס, מוודאים שהפונה הוא בעל החשבון:</p>
                 <ol className="mt-1 list-decimal space-y-1 ps-5">
                   <li>משתמש בעסק עם מנהל: מבקשים מהבעלים או ממנהל מערכת בעסק לאשר בכתב, אחרי שדיבר איתו. אם המשתמש שייך רק לעסק אחד, המנהל יכול גם לאפס בעצמו בהגדרות ← משתמשים.</li>
@@ -117,7 +117,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
                     ))}
                   </SelectField>
                   <TextField label="פרטים (נרשמים ביומן)" name="reason" required maxLength={500} hint="למשל: מי אישר, מתי ובאיזה ערוץ" />
-                  <label className="flex items-start gap-2 text-[0.9375rem]">
+                  <label className="flex items-start gap-2 text-md">
                     <input type="checkbox" name="confirm" className="mt-1 size-4" required />
                     בדקתי את זהות הפונה לפי הנוהל
                   </label>

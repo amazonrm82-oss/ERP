@@ -38,7 +38,7 @@ export function TagPicker({ orgId, kind, recordId, allTags, selectedIds, canEdit
         {editing ? (
           <TagForm orgId={orgId} kind={kind} recordId={recordId} allTags={allTags} selectedIds={selectedIds} onDone={() => setEditing(false)} />
         ) : selected.length === 0 ? (
-          <p className="text-[0.9375rem] text-ink-soft">אין תגיות.</p>
+          <p className="text-md text-ink-soft">אין תגיות.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {selected.map((tag) => (

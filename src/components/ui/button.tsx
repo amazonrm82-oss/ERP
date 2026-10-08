@@ -11,17 +11,17 @@ const base =
   "transition-colors disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:bg-accent-strong",
+  primary: "bg-accent text-on-accent hover:bg-accent-strong",
   secondary: "border border-line-strong bg-surface text-ink hover:bg-canvas",
   ghost: "text-ink hover:bg-canvas",
-  danger: "bg-danger text-white hover:bg-danger-strong",
+  danger: "bg-danger text-on-accent hover:bg-danger-strong",
   // a destructive action that should not shout until it is confirmed
   "danger-ghost": "text-danger hover:bg-danger-soft",
 };
 
 // md is 44px tall: a comfortable touch target on phones.
 const sizes: Record<Size, string> = {
-  md: "min-h-11 px-4 text-[0.9375rem]",
+  md: "min-h-11 px-4 text-md",
   sm: "min-h-9 px-3 text-sm",
 };
 

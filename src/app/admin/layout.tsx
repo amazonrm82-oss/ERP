@@ -20,7 +20,6 @@ const NAV = [
   { href: paths.adminPlans, label: "חבילות" },
   { href: paths.adminStaff, label: "צוות" },
   { href: paths.adminLog, label: "יומן" },
-  { href: paths.adminDesign, label: "עיצוב" },
 ];
 
 // The platform owner's panel. To everyone who is not platform staff it does not exist (404).
@@ -51,7 +50,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <ul className="flex gap-1">
               {NAV.map((item) => (
                 <li key={item.href}>
-                  <Link href={item.href} className="flex min-h-11 items-center px-3 text-[0.9375rem] whitespace-nowrap text-ink-soft hover:text-ink">
+                  <Link href={item.href} className="flex min-h-11 items-center px-3 text-md whitespace-nowrap text-ink-soft hover:text-ink">
                     {item.label}
                   </Link>
                 </li>

@@ -21,7 +21,7 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
       <CardBody className="space-y-4">
         {canWrite ? <FileUploader orgId={orgId} subject={subject} /> : null}
         {files.length === 0 ? (
-          <p className="text-[0.9375rem] text-ink-soft">אין קבצים.</p>
+          <p className="text-md text-ink-soft">אין קבצים.</p>
         ) : (
           <ul className="divide-y divide-line">
             {files.map((file) => {

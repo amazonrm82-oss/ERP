@@ -94,7 +94,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
         aria-keyshortcuts="Control+K /"
       >
         <SearchIcon className="size-5 shrink-0" />
-        <span className="sr-only sm:not-sr-only sm:text-[0.9375rem]">
+        <span className="sr-only sm:not-sr-only sm:text-md">
           חיפוש<span className="sr-only"> בכל המערכת</span>
         </span>
         <kbd dir="ltr" className="ms-auto hidden rounded border border-line px-1.5 text-xs lg:inline">

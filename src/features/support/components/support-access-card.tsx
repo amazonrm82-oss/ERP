@@ -12,7 +12,7 @@ export function SupportAccessCard({ orgId, grant }: Props) {
     <Card aria-labelledby="support-access-title" className="mt-5">
       <CardHeader id="support-access-title" title="גישת תמיכה" />
       <CardBody className="space-y-3">
-        <p className="text-[0.9375rem]">
+        <p className="text-md">
           כשפונים לתמיכה, אפשר לאפשר לצוות התמיכה לראות את הנתונים שלכם כדי לעזור. הגישה היא לצפייה בלבד, מוגבלת בזמן, וכל כניסה נרשמת ביומן הביקורת.
           בלי אישור כאן, צוות התמיכה לא רואה את הנתונים של העסק.
         </p>

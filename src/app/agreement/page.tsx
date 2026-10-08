@@ -52,7 +52,7 @@ export default async function AgreementPage({ searchParams }: Props) {
                     {i + 1}. {section.heading}
                   </h3>
                   {section.paragraphs.map((p) => (
-                    <p key={p} className="mt-1 text-[0.9375rem] leading-relaxed">
+                    <p key={p} className="mt-1 text-md leading-relaxed">
                       <BlankText text={p} />
                     </p>
                   ))}

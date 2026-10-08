@@ -73,7 +73,7 @@ export default async function AutomationPage({ params }: Props) {
             ) : null
           }
         />
-        <CardBody className="space-y-3 text-[0.9375rem]">
+        <CardBody className="space-y-3 text-md">
           <p>
             <span className="font-semibold">כאשר </span>
             {description.when}
@@ -112,7 +112,7 @@ export default async function AutomationPage({ params }: Props) {
         <CardHeader id="runs-title" title="יומן הרצות" />
         {runs.length === 0 ? (
           <CardBody>
-            <p className="text-[0.9375rem] text-ink-soft">עוד לא רצה.</p>
+            <p className="text-md text-ink-soft">עוד לא רצה.</p>
           </CardBody>
         ) : (
           <ul className="divide-y divide-line">

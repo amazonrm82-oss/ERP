@@ -76,8 +76,8 @@ export default async function LeadPage({ params }: Props) {
             <Card aria-labelledby="converted-title">
               <CardHeader id="converted-title" title="הליד הומר" />
               <CardBody>
-                <p className="text-[0.9375rem] text-ink-soft">הומר בתאריך {formatDate(lead.converted_at)}.</p>
-                <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[0.9375rem]">
+                <p className="text-md text-ink-soft">הומר בתאריך {formatDate(lead.converted_at)}.</p>
+                <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-md">
                   {lead.converted_contact_id ? (
                     <Link href={paths.contact(orgId, lead.converted_contact_id)} className={linkClass}>
                       לאיש הקשר

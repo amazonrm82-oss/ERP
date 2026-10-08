@@ -23,7 +23,7 @@ export async function Timeline({ orgId, subject, canWrite }: Props) {
         ) : null}
 
         {items.length === 0 ? (
-          <p className="text-[0.9375rem] text-ink-soft">
+          <p className="text-md text-ink-soft">
             עוד אין כאן פעילות. הערות, שינויי סטטוס והמרות יופיעו כאן לפי הסדר.
           </p>
         ) : (

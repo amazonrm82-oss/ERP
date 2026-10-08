@@ -72,7 +72,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
         {lead.message ? (
           <div className="mt-4 border-t border-line pt-4">
             <p className="text-sm text-ink-soft">הודעה</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-[0.9375rem]">{lead.message}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-md">{lead.message}</p>
           </div>
         ) : null}
       </CardBody>

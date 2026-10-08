@@ -38,7 +38,7 @@ export default async function OnboardingPage({ searchParams }: Props) {
         </p>
         <OrganizationForm />
         {organizations.length > 0 ? (
-          <p className="mt-6 text-[0.9375rem]">
+          <p className="mt-6 text-md">
             <Link href={paths.home} className="text-accent underline underline-offset-4 hover:text-accent-strong">
               חזרה לעסקים שלי
             </Link>

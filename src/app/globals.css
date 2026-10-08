@@ -1,35 +1,115 @@
 @import "tailwindcss";
 
 /*
-  Design tokens. One accent (the logo's blue), cool neutral greys, white surfaces.
-  Text/background pairs below meet WCAG AA (4.5:1) for normal text:
-    ink on surface 16.4, ink-soft on surface 6.3, ink-soft on canvas 5.8,
-    white on accent 6.3, accent on canvas 5.8, accent-strong on accent-soft 8.3, danger on surface 6.6,
-    danger on danger-soft 5.8, warning on warning-soft 5.7, success on success-soft 5.5.
+  Design system (direction A, "calm and professional", chosen 8 October 2026; DSN-02 to DSN-06).
+  Three layers, all here and nowhere else:
+    1. Base values (--mx-*): the palette. Screens never use them directly.
+    2. Roles (@theme --color-*, --text-*, --radius-*): what screens use, as Tailwind classes
+       (bg-surface, text-ink-soft, text-md, rounded-lg). Dark mode redefines only the roles.
+    3. Components (src/components/ui): buttons, badges, cards, fields, built from the roles.
+  Every text/background pair, in light and dark, is checked for 4.5:1 by tests/unit/design-tokens.test.ts.
+  eslint refuses colours and font sizes written straight into a screen (DSN-06).
 */
+:root {
+  --mx-white: #ffffff;
+  --mx-grey-50: #f4f6f8;
+  --mx-grey-100: #e2e6eb;
+  --mx-grey-200: #c5ccd5;
+  --mx-grey-400: #838e9b;
+  --mx-grey-600: #525e6c;
+  --mx-grey-900: #141c26;
+  --mx-night-50: #e6ebf1;
+  --mx-night-200: #a3afbd;
+  --mx-night-400: #7a8797;
+  --mx-night-600: #3a4655;
+  --mx-night-700: #2a3441;
+  --mx-night-800: #161d26;
+  --mx-night-900: #0e131a;
+
+  --mx-blue-50: #eaf0fd;
+  --mx-blue-200: #bcd0ff;
+  --mx-blue-300: #8cb0ff;
+  --mx-blue-600: #1e56d6;
+  --mx-blue-700: #173f9e;
+  --mx-blue-900: #0e1c36;
+  --mx-blue-950: #1b2a47;
+
+  --mx-red-50: #fdecea;
+  --mx-red-300: #ff8a80;
+  --mx-red-700: #b42318;
+  --mx-red-800: #8f1b12;
+  --mx-red-950: #3a1d1b;
+  --mx-amber-50: #fdf3dc;
+  --mx-amber-300: #f2c46b;
+  --mx-amber-800: #8a5300;
+  --mx-amber-950: #33280f;
+  --mx-green-50: #e5f4ea;
+  --mx-green-300: #7fd49b;
+  --mx-green-800: #1b6e3f;
+  --mx-green-950: #13301f;
+}
+
 @theme {
   --font-sans: "Heebo Variable", "Heebo", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew", Arial, sans-serif;
 
-  --color-canvas: #f5f6f7;
-  --color-surface: #ffffff;
-  --color-line: #e2e5e9;
-  --color-line-strong: #c5cbd3;
-  /* borders of inputs and selects: 3.3:1 on white (WCAG 1.4.11 non-text contrast) */
-  --color-line-control: #838e9b;
-  --color-ink: #17202b;
-  --color-ink-soft: #55616f;
+  /* type scale: one set of sizes (DSN-03) */
+  --text-2xs: 0.6875rem;
+  --text-caption: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lead: 1.0625rem;
 
-  --color-accent: #1e56d6;
-  --color-accent-strong: #183f99;
-  --color-accent-soft: #e9f0fe;
+  --color-canvas: var(--mx-grey-50);
+  --color-surface: var(--mx-white);
+  --color-line: var(--mx-grey-100);
+  --color-line-strong: var(--mx-grey-200);
+  /* borders of inputs and selects: 3:1 or more on the surface (WCAG 1.4.11 non-text contrast) */
+  --color-line-control: var(--mx-grey-400);
+  --color-ink: var(--mx-grey-900);
+  --color-ink-soft: var(--mx-grey-600);
 
-  --color-danger: #b42318;
-  --color-danger-strong: #8f1b12;
-  --color-danger-soft: #fdecea;
-  --color-warning: #8a5300;
-  --color-warning-soft: #fdf3dc;
-  --color-success: #1b6e3f;
-  --color-success-soft: #e5f4ea;
+  --color-accent: var(--mx-blue-600);
+  --color-accent-strong: var(--mx-blue-700);
+  --color-accent-soft: var(--mx-blue-50);
+  /* text and icons on an accent or danger fill */
+  --color-on-accent: var(--mx-white);
+
+  /* always white, in both themes: behind a QR code or a drawn signature */
+  --color-paper: var(--mx-white);
+
+  /* the logo's navy: the sign-in side panel; the same in both themes */
+  --color-brand: var(--mx-blue-900);
+  --color-on-brand: var(--mx-white);
+
+  --color-danger: var(--mx-red-700);
+  --color-danger-strong: var(--mx-red-800);
+  --color-danger-soft: var(--mx-red-50);
+  --color-warning: var(--mx-amber-800);
+  --color-warning-soft: var(--mx-amber-50);
+  --color-success: var(--mx-green-800);
+  --color-success-soft: var(--mx-green-50);
+}
+
+/* Dark mode (DSN-05): the same roles, other values. Opened to users in wave 2 (USR-07). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: var(--mx-night-900);
+  --color-surface: var(--mx-night-800);
+  --color-line: var(--mx-night-700);
+  --color-line-strong: var(--mx-night-600);
+  --color-line-control: var(--mx-night-400);
+  --color-ink: var(--mx-night-50);
+  --color-ink-soft: var(--mx-night-200);
+  --color-accent: var(--mx-blue-300);
+  --color-accent-strong: var(--mx-blue-200);
+  --color-accent-soft: var(--mx-blue-950);
+  --color-on-accent: var(--mx-night-900);
+  --color-danger: var(--mx-red-300);
+  --color-danger-strong: var(--mx-red-50);
+  --color-danger-soft: var(--mx-red-950);
+  --color-warning: var(--mx-amber-300);
+  --color-warning-soft: var(--mx-amber-950);
+  --color-success: var(--mx-green-300);
+  --color-success-soft: var(--mx-green-950);
 }
 
 :root {

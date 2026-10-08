@@ -42,7 +42,7 @@ export function SettingsTabs({ orgId, showTrash, showCustomization, showImport }
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "-mb-px flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] whitespace-nowrap",
+                  "-mb-px flex min-h-11 items-center border-b-2 px-3 text-md whitespace-nowrap",
                   active ? "border-accent font-semibold text-accent-strong" : "border-transparent text-ink-soft hover:text-ink",
                 )}
               >

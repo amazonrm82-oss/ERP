@@ -62,7 +62,7 @@ export default async function TransferRecordsPage({ params }: Props) {
       <Card className="max-w-xl">
         <CardHeader title={total === 0 ? "אין רשומות להעביר" : `${formatNumber(total)} רשומות`} />
         <CardBody className="space-y-4">
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-[0.9375rem] sm:grid-cols-3">
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-md sm:grid-cols-3">
             {counts.map((c) => (
               <li key={c.table}>
                 {c.label}: <span className="font-semibold">{formatNumber(c.count)}</span>

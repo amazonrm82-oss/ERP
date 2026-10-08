@@ -59,10 +59,10 @@ export function FileUploader({ orgId, subject }: { orgId: string; subject: Timel
         }}
         className={`flex flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-5 text-center ${dragging ? "border-accent bg-accent-soft" : "border-line-strong"}`}
       >
-        <p className="text-[0.9375rem] text-ink-soft">גררו לכאן קבצים, או</p>
+        <p className="text-md text-ink-soft">גררו לכאן קבצים, או</p>
         <label
           htmlFor={inputId}
-          className={`inline-flex min-h-10 cursor-pointer items-center rounded-md border border-line-strong bg-surface px-4 text-[0.9375rem] font-medium hover:bg-canvas focus-within:outline-2 ${busy ? "pointer-events-none opacity-60" : ""}`}
+          className={`inline-flex min-h-10 cursor-pointer items-center rounded-md border border-line-strong bg-surface px-4 text-md font-medium hover:bg-canvas focus-within:outline-2 ${busy ? "pointer-events-none opacity-60" : ""}`}
         >
           בחירת קבצים
           <input

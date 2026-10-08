@@ -18,7 +18,7 @@ export default async function PipelinesSettingsPage({ params }: Props) {
 
   return (
     <div className="space-y-5">
-      <p className="text-[0.9375rem] text-ink-soft">
+      <p className="text-md text-ink-soft">
         פייפליין הוא תהליך המכירה: השלבים שעסקה עוברת עד שהיא נסגרת. פייפליין ברירת המחדל נפתח בלוח העסקאות, ולידים שמומרים
         נכנסים לשלב הפתוח הראשון שלו. שלב שיש בו עסקאות אי אפשר למחוק.
       </p>

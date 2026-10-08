@@ -65,7 +65,7 @@ export default async function IntakeItemPage({ params }: Props) {
         <Card aria-labelledby="embed-title">
           <CardHeader id="embed-title" title="איך מחברים לאתר" />
           <CardBody className="space-y-5">
-            <p className="text-[0.9375rem] text-ink-soft">
+            <p className="text-md text-ink-soft">
               הדרך הפשוטה: להדביק את הקוד הזה באתר במקום שבו הטופס צריך להופיע. אפשר גם לשלוח את הקישור ישירות, למשל ב-WhatsApp
               או במודעה.
             </p>
@@ -74,7 +74,7 @@ export default async function IntakeItemPage({ params }: Props) {
               value={`<iframe src="${pageUrl}?embed=1" title="${(intake.title ?? intake.name).replace(/"/g, "&quot;")}" style="width:100%;max-width:480px;height:560px;border:0" loading="lazy"></iframe>`}
             />
             <CopyBlock label="קישור ישיר לטופס" value={pageUrl} />
-            <details className="text-[0.9375rem]">
+            <details className="text-md">
               <summary className="cursor-pointer font-medium">לבוני אתרים: שליחה מטופס קיים</summary>
               <div className="mt-3 space-y-3">
                 <p className="text-ink-soft">
@@ -89,7 +89,7 @@ export default async function IntakeItemPage({ params }: Props) {
         <Card aria-labelledby="hook-title">
           <CardHeader id="hook-title" title="חיבור ה-webhook" />
           <CardBody className="space-y-4">
-            <p className="text-[0.9375rem] text-ink-soft">
+            <p className="text-md text-ink-soft">
               הכתובת היא הסיסמה: מי שמחזיק בה יכול ליצור לידים. לא לפרסם אותה באתר. שולחים POST עם JSON, עם השדות full_name, phone,
               email, company_name, message (גם name, company ו-notes מתקבלים).
             </p>
@@ -114,7 +114,7 @@ export default async function IntakeItemPage({ params }: Props) {
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
             />
           ) : (
-            <p className="text-[0.9375rem] text-ink-soft">החשבון במצב קריאה בלבד.</p>
+            <p className="text-md text-ink-soft">החשבון במצב קריאה בלבד.</p>
           )}
         </CardBody>
       </Card>
@@ -123,7 +123,7 @@ export default async function IntakeItemPage({ params }: Props) {
         <CardHeader id="submissions-title" title="פניות אחרונות" />
         {submissions.length === 0 ? (
           <CardBody>
-            <p className="text-[0.9375rem] text-ink-soft">עוד לא התקבלו פניות.</p>
+            <p className="text-md text-ink-soft">עוד לא התקבלו פניות.</p>
           </CardBody>
         ) : (
           <ul className="divide-y divide-line">

@@ -15,7 +15,7 @@ export function AvailabilityToggle({ orgId, userId, available }: Props) {
 
   return (
     <div className="px-4 py-2">
-      <label className="flex cursor-pointer items-center justify-between gap-3 text-[0.9375rem]">
+      <label className="flex cursor-pointer items-center justify-between gap-3 text-md">
         <span>זמין לקבלת לידים</span>
         <input
           type="checkbox"

@@ -76,7 +76,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
       <Card aria-labelledby="export-title">
         <CardHeader id="export-title" title="ייצוא מלא" />
         <CardBody className="space-y-3">
-          <p className="text-[0.9375rem]">
+          <p className="text-md">
             קובץ ZIP עם כל הנתונים של העסק: לידים, אנשי קשר, חברות, עסקאות, משימות, ציר הזמן, פייפליינים, תגיות ושדות מותאמים. כל טבלה בקובץ CSV שנפתח ב-Excel.
           </p>
           {role === "owner" ? (

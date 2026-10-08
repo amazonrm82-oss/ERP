@@ -47,7 +47,7 @@ export function CustomFieldInputs({ definitions, stored = {}, submitted, errors 
           case "checkbox":
             return (
               <div key={`${field.id}-${value}`}>
-                <label className="flex min-h-11 items-center gap-2.5 text-[0.9375rem]">
+                <label className="flex min-h-11 items-center gap-2.5 text-md">
                   <input type="checkbox" name={name} defaultChecked={value === "on"} className="size-4.5 accent-accent" />
                   {field.label}
                   {field.isRequired ? (

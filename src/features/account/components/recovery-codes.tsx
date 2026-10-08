@@ -61,7 +61,7 @@ export function RecoveryCodes({ left }: { left: number }) {
         <p className="text-sm text-ink-soft">
           אם תאבדו את הטלפון, כל קוד יכניס אתכם פעם אחת. שמרו אותם במקום בטוח שאינו הטלפון, למשל מודפסים או במנהל סיסמאות. הם לא יוצגו שוב.
         </p>
-        <ul dir="ltr" aria-label="קודי גיבוי" className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[0.9375rem]">
+        <ul dir="ltr" aria-label="קודי גיבוי" className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-md">
           {codes.map((c) => (
             <li key={c}>{c}</li>
           ))}

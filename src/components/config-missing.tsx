@@ -12,7 +12,7 @@ export function ConfigMissing() {
       </p>
       <div className="mt-6 rounded-lg border border-line bg-surface p-5">
         <h2 className="font-semibold">מה צריך לעשות</h2>
-        <ol className="mt-3 list-decimal space-y-2 ps-5 text-[0.9375rem]">
+        <ol className="mt-3 list-decimal space-y-2 ps-5 text-md">
           <li>
             להעתיק את הקובץ{" "}
             <code dir="ltr" className="rounded bg-canvas px-1.5 py-0.5 text-sm">

@@ -45,7 +45,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
         <Card aria-labelledby="account">
           <CardHeader id="account" title="חשבון ושימוש" />
           <CardBody>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[0.9375rem]">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-md">
               <dt className="text-ink-soft">בעלים</dt>
               <dd>
                 {str(owner.name)} <span dir="ltr">{str(owner.email)}</span>
@@ -93,7 +93,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
                 )}
               </>
             ) : (
-              <p className="text-[0.9375rem]">הלקוח לא אישר גישת תמיכה. בלי אישור לא רואים את הנתונים שלו. האישור נעשה אצל הלקוח: הגדרות ← פרטי העסק ← גישת תמיכה.</p>
+              <p className="text-md">הלקוח לא אישר גישת תמיכה. בלי אישור לא רואים את הנתונים שלו. האישור נעשה אצל הלקוח: הגדרות ← פרטי העסק ← גישת תמיכה.</p>
             )}
           </CardBody>
         </Card>

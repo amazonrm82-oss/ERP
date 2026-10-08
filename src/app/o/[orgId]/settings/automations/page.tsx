@@ -34,7 +34,7 @@ export default async function AutomationsPage({ params }: Props) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-[0.9375rem] text-ink-soft">
+        <p className="max-w-2xl text-md text-ink-soft">
           אוטומציה עושה עבודה קבועה בשבילכם: כאשר משהו קורה, ואם התנאים מתקיימים, היא מבצעת פעולות. היא רצה תוך דקה מהאירוע (ובדיקות
           של זמן, כמו &quot;עסקה תקועה&quot;, כל רבע שעה).
         </p>

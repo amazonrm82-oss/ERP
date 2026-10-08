@@ -21,7 +21,7 @@ export function SidebarNav({ orgId }: { orgId: string }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-10 items-center gap-3 rounded-md px-3 text-[0.9375rem]",
+                  "flex min-h-10 items-center gap-3 rounded-md px-3 text-md",
                   active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink hover:bg-canvas",
                 )}
               >

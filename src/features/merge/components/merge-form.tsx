@@ -23,7 +23,7 @@ export function MergeForm({ orgId, type, keep, dup }: Props) {
     <form action={formAction} className="space-y-5">
       <FormError message={failure?.message} />
       {differing.length === 0 ? (
-        <p className="text-[0.9375rem]">אין שדות שונים. כל הפרטים של {keep.title} נשארים.</p>
+        <p className="text-md">אין שדות שונים. כל הפרטים של {keep.title} נשארים.</p>
       ) : (
         <fieldset className="space-y-3">
           <legend className="mb-1 font-semibold">באילו ערכים להשתמש?</legend>
@@ -55,7 +55,7 @@ export function MergeForm({ orgId, type, keep, dup }: Props) {
           זהים או קיימים רק ברשומה שנשארת: {same.map((f) => f.label).join(", ")}.
         </p>
       ) : null}
-      <div className="rounded-lg bg-canvas p-3 text-[0.9375rem]">
+      <div className="rounded-lg bg-canvas p-3 text-md">
         <p>
           הרשומה <strong>{keep.title}</strong> נשארת. ההערות, המשימות, הקבצים, התגיות והעסקאות של <strong>{dup.title}</strong> עוברים אליה, והרשומה {dup.title} נמחקת.
         </p>

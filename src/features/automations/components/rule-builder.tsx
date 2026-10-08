@@ -177,7 +177,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
       <Card aria-labelledby="if-title">
         <CardHeader id="if-title" title="אם (לא חובה)" />
         <CardBody className="space-y-3">
-          {conditions.length === 0 ? <p className="text-[0.9375rem] text-ink-soft">בלי תנאים: האוטומציה רצה בכל פעם.</p> : null}
+          {conditions.length === 0 ? <p className="text-md text-ink-soft">בלי תנאים: האוטומציה רצה בכל פעם.</p> : null}
           {conditions.map((condition, index) => (
             <div key={index} className="flex flex-wrap items-start gap-2">
               <div className="w-full sm:w-52">

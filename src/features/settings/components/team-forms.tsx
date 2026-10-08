@@ -73,7 +73,7 @@ export function AddTeamMemberForm({ orgId, teamId, candidates }: { orgId: string
   const failure = state && !state.ok ? state : null;
 
   if (candidates.length === 0) {
-    return <p className="text-[0.9375rem] text-ink-soft">כל המשתמשים הפעילים כבר בצוות.</p>;
+    return <p className="text-md text-ink-soft">כל המשתמשים הפעילים כבר בצוות.</p>;
   }
 
   return (
@@ -89,7 +89,7 @@ export function AddTeamMemberForm({ orgId, teamId, candidates }: { orgId: string
           </option>
         ))}
       </SelectField>
-      <label className="flex items-start gap-2 text-[0.9375rem]">
+      <label className="flex items-start gap-2 text-md">
         <input type="checkbox" name="is_manager" className="mt-1 size-4 accent-accent" />
         <span>מנהל הצוות (רואה ועורך את רשומות הצוות, אם התפקיד שלו &quot;מנהל צוות&quot;)</span>
       </label>
@@ -104,7 +104,7 @@ type MembersProps = { orgId: string; teamId: string; members: TeamDetails["membe
 
 export function TeamMembersList({ orgId, teamId, members, editable }: MembersProps) {
   if (members.length === 0) {
-    return <p className="px-4 py-6 text-center text-[0.9375rem] text-ink-soft sm:px-5">אין עדיין משתמשים בצוות.</p>;
+    return <p className="px-4 py-6 text-center text-md text-ink-soft sm:px-5">אין עדיין משתמשים בצוות.</p>;
   }
   return (
     <ul className="divide-y divide-line">

@@ -34,7 +34,7 @@ export function RelatedDealsCard({ orgId, deals, newDealQuery, emptyText }: Prop
       />
       <CardBody>
         {deals.length === 0 ? (
-          <p className="text-[0.9375rem] text-ink-soft">{emptyText}</p>
+          <p className="text-md text-ink-soft">{emptyText}</p>
         ) : (
           <ul className="divide-y divide-line">
             {deals.map((deal) => (

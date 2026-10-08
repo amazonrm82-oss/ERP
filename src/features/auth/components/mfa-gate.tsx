@@ -122,11 +122,11 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       {step.kind === "loading" && !error ? <p role="status">טוען…</p> : null}
       {step.kind === "enroll" ? (
         <>
-          <p className="text-[0.9375rem]">
+          <p className="text-md">
             כדי להמשיך צריך אימות דו-שלבי. סרקו את הקוד באפליקציית אימות (Google Authenticator, Microsoft Authenticator או 1Password) והזינו את 6 הספרות שהיא מציגה.
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element -- a data: URL from Supabase, nothing to optimize */}
-          <img src={step.qr} alt="קוד QR לחיבור אפליקציית האימות" className="mx-auto size-48 rounded-md bg-white p-2" />
+          <img src={step.qr} alt="קוד QR לחיבור אפליקציית האימות" className="mx-auto size-48 rounded-md bg-paper p-2" />
           <p className="text-sm text-ink-soft">
             אי אפשר לסרוק? הזינו באפליקציה את המפתח:{" "}
             <code dir="ltr" className="break-all">
@@ -136,11 +136,11 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
         </>
       ) : null}
       {step.kind === "verify" ? (
-        <p className="text-[0.9375rem]">{useBackup ? "הזינו אחד מקודי הגיבוי ששמרתם. כל קוד עובד פעם אחת." : "הזינו את 6 הספרות מאפליקציית האימות."}</p>
+        <p className="text-md">{useBackup ? "הזינו אחד מקודי הגיבוי ששמרתם. כל קוד עובד פעם אחת." : "הזינו את 6 הספרות מאפליקציית האימות."}</p>
       ) : null}
       {step.kind === "recovered" ? (
         <div role="status" className="space-y-3">
-          <p className="text-[0.9375rem]">
+          <p className="text-md">
             קוד הגיבוי התקבל. האימות הדו-שלבי הוסר מהחשבון, וכל המכשירים האחרים נותקו. מומלץ להפעיל אותו שוב עם הטלפון שלכם עכשיו, בהגדרות ← החשבון שלי.
           </p>
           <Button onClick={finish}>המשך</Button>

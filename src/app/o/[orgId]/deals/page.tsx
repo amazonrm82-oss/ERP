@@ -91,7 +91,7 @@ function ViewNav({ orgId, pipelineId, pipelines, table }: { orgId: string; pipel
             key={option.key}
             href={href(current, option.asTable)}
             aria-current={option.asTable === table ? "page" : undefined}
-            className={cn("rounded px-3 py-1.5 text-[0.9375rem]", option.asTable === table ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
+            className={cn("rounded px-3 py-1.5 text-md", option.asTable === table ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
           >
             {option.label}
           </Link>

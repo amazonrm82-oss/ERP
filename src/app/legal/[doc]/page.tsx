@@ -30,7 +30,7 @@ export default async function LegalDocumentPage({ params }: Props) {
       <p className="mt-2 text-lg text-ink-soft">{doc.purpose}</p>
 
       {doc.interim ? (
-        <div role="note" className="mt-6 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-[0.9375rem] text-warning">
+        <div role="note" className="mt-6 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-md text-warning">
           <p>
             <span className="font-semibold">נוסח זמני.</span> הנוסח ייבדק על ידי עורך דין ועשוי להשתנות. על שינוי מהותי נודיע מראש. פרטים שעוד חסרים מסומנים בצהוב.
           </p>

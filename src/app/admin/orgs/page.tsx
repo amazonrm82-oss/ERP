@@ -68,7 +68,7 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
         </button>
       </form>
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full min-w-[44rem] text-[0.9375rem]">
+        <table className="w-full min-w-[44rem] text-md">
           <thead>
             <tr className="border-b border-line text-sm text-ink-soft">
               {["ארגון", "בעלים", "מצב", "חבילה", "משתמשים", "רשומות", "הצטרף"].map((h) => (

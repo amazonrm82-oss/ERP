@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /** Label/value pairs of a record card. Empty values are shown as a dash so the layout stays stable. */
 export function DetailList({ children }: { children: ReactNode }) {
-  return <dl className="grid grid-cols-[minmax(5.5rem,auto)_minmax(0,1fr)] gap-x-4 gap-y-3 text-[0.9375rem]">{children}</dl>;
+  return <dl className="grid grid-cols-[minmax(5.5rem,auto)_minmax(0,1fr)] gap-x-4 gap-y-3 text-md">{children}</dl>;
 }
 
 type DetailProps = {

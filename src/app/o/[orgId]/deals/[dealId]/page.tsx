@@ -67,7 +67,7 @@ export default async function DealPage({ params }: Props) {
           <Card aria-labelledby="deal-stage-title">
             <CardHeader id="deal-stage-title" title="שלב" />
             <CardBody>
-              <p className="text-[0.9375rem]">
+              <p className="text-md">
                 <span className="font-medium">{stage?.name ?? "ללא שלב"}</span>
                 <span className="text-ink-soft">, {formatMoney(amount)}</span>
               </p>

@@ -29,7 +29,7 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
 
   return (
     <div className="space-y-5">
-      <p className="text-[0.9375rem] text-ink-soft">
+      <p className="text-md text-ink-soft">
         שדות נוספים שהעסק צריך, למשל תקציב, תחום עניין או מספר חשבון. הם מופיעים בטופס ובכרטיס של כל רשומה מהסוג שנבחר.
       </p>
       <nav aria-label="סוג רשומה" className="flex flex-wrap gap-2">

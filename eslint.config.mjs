@@ -20,6 +20,24 @@ const eslintConfig = defineConfig([
           selector: "MemberExpression[property.name='data'][object.type='AwaitExpression']",
           message: "A database read must check its error: use must() from @/lib/db-read.",
         },
+        // DSN-06: colours and font sizes come from the design system (src/app/globals.css)
+        ...["Literal", "TemplateElement"].flatMap((node) => {
+          const value = node === "Literal" ? "value" : "value.raw";
+          return [
+            {
+              selector: `${node}[${value}=/(^|[\\s:])(bg|text|border|ring|outline|fill|stroke|from|via|to|decoration|divide|shadow|caret|placeholder)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)\\b/]`,
+              message: "Use a colour of the design system (bg-surface, text-ink-soft, text-on-accent…), not a Tailwind palette colour (DSN-06).",
+            },
+            {
+              selector: `${node}[${value}=/-\\[(#|rgb|hsl)/]`,
+              message: "Colours are defined only in src/app/globals.css (DSN-06).",
+            },
+            {
+              selector: `${node}[${value}=/(^|[\\s:])text-\\[[0-9.]+(rem|px|em)\\]/]`,
+              message: "Use a size of the type scale (text-2xs, text-caption, text-sm, text-md, text-lead…), not a font size written here (DSN-06).",
+            },
+          ];
+        }),
       ],
     },
   },

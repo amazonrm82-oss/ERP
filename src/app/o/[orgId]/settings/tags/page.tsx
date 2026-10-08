@@ -20,7 +20,7 @@ export default async function TagsSettingsPage({ params }: Props) {
   return (
     <Card aria-labelledby="tags-title">
       <CardHeader id="tags-title" title={`תגיות (${tags.length})`} />
-      <CardBody className="pb-0 text-[0.9375rem] text-ink-soft">
+      <CardBody className="pb-0 text-md text-ink-soft">
         תגיות מסמנות רשומות לפי מה שחשוב לעסק, למשל &quot;VIP&quot; או &quot;תערוכה 2026&quot;. מוסיפים תגית לרשומה בכרטיס שלה, ומסננים לפיה ברשימות.
       </CardBody>
       {tags.length === 0 ? (

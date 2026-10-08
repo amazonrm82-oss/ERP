@@ -29,7 +29,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
 
   return (
     <div className="space-y-5">
-      <p className="text-[0.9375rem] text-ink-soft">
+      <p className="text-md text-ink-soft">
         לידים נכנסים מעצמם: מטופס שמטמיעים באתר, או מ-webhook שמחברים למערכת אחרת (Zapier, Make, תוסף לאתר). כל פנייה הופכת לליד עם
         המקור והבעלים שבחרתם.
       </p>

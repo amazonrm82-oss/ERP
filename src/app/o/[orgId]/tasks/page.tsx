@@ -42,7 +42,7 @@ type Props = {
 
 const tabClass = (active: boolean) =>
   cn(
-    "-mb-px flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] whitespace-nowrap",
+    "-mb-px flex min-h-11 items-center border-b-2 px-3 text-md whitespace-nowrap",
     active ? "border-accent font-semibold text-accent-strong" : "border-transparent text-ink-soft hover:text-ink",
   );
 
@@ -82,7 +82,7 @@ function TasksNav({ orgId, showAll, table }: { orgId: string; showAll: boolean; 
             key={option.key}
             href={href(showAll, option.asTable)}
             aria-current={option.asTable === table ? "page" : undefined}
-            className={cn("rounded px-3 py-1.5 text-[0.9375rem]", option.asTable === table ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
+            className={cn("rounded px-3 py-1.5 text-md", option.asTable === table ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
           >
             {option.label}
           </Link>

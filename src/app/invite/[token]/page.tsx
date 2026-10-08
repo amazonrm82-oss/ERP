@@ -59,7 +59,7 @@ export default async function InvitePage({ params }: Props) {
           </p>
         ) : (
           <>
-            <dl className="mt-4 mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[0.9375rem]">
+            <dl className="mt-4 mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-md">
               <dt className="text-ink-soft">תפקיד</dt>
               <dd>{ROLE_LABELS[preview.role] ?? preview.role}</dd>
               {preview.invitedBy ? (

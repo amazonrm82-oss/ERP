@@ -51,7 +51,7 @@ export default async function AuditPage({ params, searchParams }: Props) {
           key={t.key}
           href={t.href}
           aria-current={tab === t.key ? "page" : undefined}
-          className={cn("rounded-md px-3 py-2 text-[0.9375rem]", tab === t.key ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
+          className={cn("rounded-md px-3 py-2 text-md", tab === t.key ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
         >
           {t.label}
         </Link>

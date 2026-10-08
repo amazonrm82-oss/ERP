@@ -20,12 +20,12 @@ export function TransferOwnershipForm({ orgId, candidates }: Props) {
     return <FormNotice message={state.message} />;
   }
   if (candidates.length === 0) {
-    return <p className="text-[0.9375rem] text-ink-soft">אין עדיין משתמש פעיל אחר שאפשר להעביר אליו את הבעלות.</p>;
+    return <p className="text-md text-ink-soft">אין עדיין משתמש פעיל אחר שאפשר להעביר אליו את הבעלות.</p>;
   }
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
-      <p className="text-[0.9375rem] text-ink-soft">
+      <p className="text-md text-ink-soft">
         הבעלים החדש יקבל את כל ההרשאות, כולל חיוב, והתפקיד שלך יהפוך ל&quot;מנהל מערכת&quot;. רק הבעלים החדש יוכל להחזיר את הבעלות.
       </p>
       <FormError message={failure?.message} />
@@ -39,7 +39,7 @@ export function TransferOwnershipForm({ orgId, candidates }: Props) {
           </option>
         ))}
       </SelectField>
-      <label className="flex items-start gap-2 text-[0.9375rem]">
+      <label className="flex items-start gap-2 text-md">
         <input type="checkbox" name="confirm" className="mt-1 size-4 accent-accent" />
         <span>ידוע לי שהבעלות על העסק תעבור למשתמש שבחרתי</span>
       </label>

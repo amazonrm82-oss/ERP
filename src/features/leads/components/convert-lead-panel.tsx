@@ -32,7 +32,7 @@ export function ConvertLeadPanel({ orgId, leadId, defaultDealName, hasCompany }:
     return (
       <div className="space-y-2">
         <FormNotice message="הליד הומר." />
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-[0.9375rem]">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-md">
           <Link href={paths.contact(orgId, state.data.contactId)} className={linkClass}>
             לאיש הקשר שנוצר
           </Link>
@@ -49,7 +49,7 @@ export function ConvertLeadPanel({ orgId, leadId, defaultDealName, hasCompany }:
   if (!open) {
     return (
       <div>
-        <p className="mb-3 text-[0.9375rem] text-ink-soft">
+        <p className="mb-3 text-md text-ink-soft">
           הליד מתאים? המרה יוצרת ממנו איש קשר{hasCompany ? ", חברה" : ""} ועסקה, וציר הזמן עובר איתם.
         </p>
         <Button onClick={() => setOpen(true)} className="w-full">
@@ -63,7 +63,7 @@ export function ConvertLeadPanel({ orgId, leadId, defaultDealName, hasCompany }:
     // submitted by hand: the checkbox is controlled (see submitWith)
     <form onSubmit={submitWith(dispatch)} className="space-y-4" noValidate>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
-      <label className="flex min-h-11 items-center gap-2.5 text-[0.9375rem]">
+      <label className="flex min-h-11 items-center gap-2.5 text-md">
         <input
           type="checkbox"
           name="create_deal"

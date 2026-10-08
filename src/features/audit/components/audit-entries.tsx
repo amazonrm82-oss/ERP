@@ -31,7 +31,7 @@ export function AuditEntries({ items, names, showEntity = true }: Props) {
         const changes = item.changes.filter((c) => !HIDDEN_FIELDS.has(c.field));
         return (
           <li key={item.id} className="px-4 py-3 sm:px-5">
-            <p className="text-[0.9375rem]">
+            <p className="text-md">
               <span className="font-medium">{ACTION_LABELS[item.action] ?? item.action}</span>
               {showEntity ? <span className="text-ink-soft"> · {ENTITY_LABELS[item.entityType] ?? item.entityType}</span> : null}
             </p>
