@@ -28,12 +28,25 @@ and build this CRM here instead. The old code is preserved on the branch
    URLs, keys or env vars from any other project — including the Supabase project the old ERP used.
    These migrations assume an **empty `public` schema**: the old ERP has its own `profiles`,
    customers and leads tables that clash with ours, and migration `…000400_rls.sql` revokes client
-   grants on *all* tables in `public`. Before applying migrations to any hosted database, list its
-   existing tables; if `public` is not empty, stop and ask the owner.
-3. **Destructive database commands need the owner's explicit go-ahead in the current conversation**,
-   and only after printing the target project ref and having it confirmed:
-   `supabase db push`, `supabase db reset`, `supabase link`, any `drop`/`truncate`, any manual SQL on a
-   hosted database.
+   grants on *all* tables in `public`. Before applying migrations to a hosted database where ours have
+   never run, list its existing tables; if `public` is not empty, stop and ask the owner. (The
+   project `eowuxxkiedpjrqvfqcgn` already holds our own schema; see rule 3.)
+3. **The hosted database changes in one way only: committed migrations, on one project.**
+   On 8 October 2026 the owner connected Supabase and asked that migrations be applied without him.
+   - The only project is `eowuxxkiedpjrqvfqcgn` (name `CRM-Saas`). Before every write, read the project
+     back (`get_project`) and check ref and name. If the connector ever shows another project, do not
+     read it or touch it, and tell the owner.
+   - A write to the hosted database is `apply_migration` with the exact content of a migration file
+     that is committed in this repo and has passed `npm run test:db` locally. Nothing else: no ad-hoc
+     DDL or data changes through `execute_sql`, the CLI or the SQL Editor. `execute_sql` is for
+     read-only checks.
+   - **Still needs the owner's explicit go-ahead in the current conversation, every time:** dropping or
+     truncating a table, dropping a column that holds data, any statement that deletes or rewrites
+     existing rows in bulk, `supabase db reset` / `db push` / `link`, changing Auth, API or billing
+     settings, creating, pausing, restoring or deleting a project or a branch, and anything that costs
+     money.
+   - Secrets are not written by migrations or by the agent: `app.settings` values, provider keys and
+     Vercel env vars are filled in by the owner.
 4. **Database tests run only against the local throwaway database.** `tests/db/helpers.ts` refuses any
    host that is not local and any database whose name does not end in `_test`. Do not weaken that guard.
    `tests/db/supabase-shim.sql` is test-only and must never be run on a real Supabase project.
@@ -218,11 +231,24 @@ that back.
 ### Migrations
 
 - `supabase/migrations/<timestamp>_<name>.sql`, applied in name order. Never edit a migration that
-  has been applied to a hosted project; add a new one. 0001–0005 are applied to the hosted project.
-  The owner applies new migrations by hand in the SQL Editor; code that depends on a migration is
-  pushed to `main` (which deploys) only after the owner confirms it ran. Hand them over in parts:
-  `node scripts/split-for-sql-editor.mjs <migration>` (a longer paste was cut off at ~4,000 chars and
-  0010 ran half way). Prefer statements that are safe to run twice, so a failed part can be rerun.
+  has been applied to a hosted project; add a new one.
+- Applying to the hosted project (owner's decision, 8 October 2026; hard rule 3). After `lint`,
+  `typecheck`, `build` and `test:db` pass: apply the migration with the Supabase connector's
+  `apply_migration` (name = the file name without `.sql`, query = the file's content, unchanged);
+  check with read-only queries that its tables, columns, functions, grants and policies are there;
+  run `get_advisors` (security) and fix or report anything new; only then push the code to `main`
+  (which deploys). If an apply fails or stops half way, do not improvise SQL on the hosted database:
+  fix it with a new migration, tested locally first, or stop and ask. Keep statements safe to run
+  twice. Prefer additive changes, because the old code keeps running until the deploy finishes.
+- State of the hosted project on 8 October 2026: the owner applied 0001–0033 by hand in the SQL
+  Editor, so the hosted migration history is empty and starts with the first migration applied
+  through the connector. The tables of 0031 and 0033 were seen there; not every function was checked.
+  Never re-apply 0001–0033. Before the first connector apply, check read-only that every table and
+  function of 0001–0033 exists there and report gaps (0010 once ran half way; see `supabase/repair/`).
+  The hosted database is Postgres 17; the local tests and CI run on PostgreSQL 16.
+- If the connector is not available in a session, fall back to the old way: hand the migration over in
+  parts (`node scripts/split-for-sql-editor.mjs <migration>`; a paste over ~4,000 chars was cut off)
+  and push code only after the owner confirms it ran.
 - Money is integer agorot + currency code. Times are `timestamptz` (UTC), shown in the organization's
   time zone (default `Asia/Jerusalem`). Phones are stored as typed plus `phone_e164` (set by trigger).
 - Plan limits and feature flags live in `plans.limits` / `plans.features`, with per-organization
@@ -268,7 +294,24 @@ Not verified yet:
 
 ## Working agreement
 
-- Take the next item from `docs/BACKLOG.md` unless told otherwise. Keep changes small and reviewable.
-- When a decision is the owner's (pricing, legal wording, which payment provider), ask; do not guess
-  silently. Record the answer in `docs/DECISIONS.md`.
+- **Continuous building** (owner's request, 8 October 2026). Take the next requirement from
+  `docs/BACKLOG.md` / `docs/SPEC-ADDITIONS.md` in wave order and keep going, one requirement after
+  another, without waiting for approval between them. Each change stays small and reviewable: one
+  requirement, all four checks green, migration applied and verified (hard rule 3), then push.
+- When a wave is done, add the next wave to the backlog and continue (1 to 6; chapter 17.6 of the
+  additions spec lists the chapter 18–19 requirements per wave). What depends on a provider the owner
+  has not chosen is built behind the provider layer with a fake provider and tests; the real adapter
+  waits for the choice.
+- **Stop-and-ask list.** Never guessed and never built around: owner decisions (pricing, plan
+  packaging, legal wording, which provider; additions spec 17.4, 18.11, 18.12 and the open list in
+  `docs/DECISIONS.md`); a new use of the service-role key (`WAB-01`, `WAB-02` and anything not listed
+  in hard rule 5); the go-ahead list in hard rule 3; anything that needs a secret, an account or money
+  from the owner; weakening a test, a guard or an RLS policy to make something pass; anything that
+  looks like another system.
+- **A question does not stop the line.** Write it under "שאלות שמחכות לבעל המוצר" in
+  `docs/DECISIONS.md` with the requirement id, skip that requirement, continue with the next one that
+  does not depend on it, and ask all waiting questions together, in plain Hebrew, at the end of the
+  turn. Stop completely only when nothing unblocked is left. Record each answer in DECISIONS.md.
+- The QA phase (`docs/QA-PLAN.md`) still starts only when the whole backlog is built and the owner
+  says so.
 - Say plainly what was tested and what was not.
