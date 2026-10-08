@@ -21,8 +21,6 @@ export type LegalDocument = {
 export const BLANK = {
   company: "[שם הישות העסקית ומספר החברה]",
   address: "[כתובת למשלוח דואר]",
-  email: "[כתובת אימייל לפניות]",
-  privacyEmail: "[כתובת אימייל לפניות בנושא פרטיות]",
   region: "[אזור אחסון הנתונים]",
   court: "[העיר של בית המשפט המוסמך]",
 } as const;
@@ -31,12 +29,15 @@ export const BLANK = {
 export const DETAILS = {
   phone: "052-5621437",
   coordinator: "מתן זזון",
+  email: "zazonmatan@gmail.com",
+  // the same address for privacy requests, until the owner gives another
+  privacyEmail: "zazonmatan@gmail.com",
 } as const;
 
 export const LEGAL_VERSION = "2026-10-07";
 const UPDATED = "7 באוקטובר 2026";
 
-const CONTACT = [`${BLANK.company}`, `אימייל: ${BLANK.email}`, `טלפון: ${DETAILS.phone}`, `כתובת: ${BLANK.address}`];
+const CONTACT = [`${BLANK.company}`, `אימייל: ${DETAILS.email}`, `טלפון: ${DETAILS.phone}`, `כתובת: ${BLANK.address}`];
 
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   {
@@ -103,7 +104,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         heading: "זמינות ותמיכה",
         paragraphs: [
           "אנחנו עושים מאמץ סביר שהשירות יהיה זמין ותקין, אבל לא מתחייבים שהוא יפעל בלי הפסקות או תקלות. על עבודות תחזוקה מתוכננות נודיע מראש ככל האפשר.",
-          `תמיכה ניתנת באימייל ${BLANK.email}, ובערוצים נוספים לפי החבילה.`,
+          `תמיכה ניתנת באימייל ${DETAILS.email}, ובערוצים נוספים לפי החבילה.`,
         ],
       },
       {
@@ -151,7 +152,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         heading: "מי אנחנו",
         paragraphs: [
-          `השירות Mexuz מופעל על ידי ${BLANK.company}. לשאלות ובקשות בנושא פרטיות: ${BLANK.privacyEmail}.`,
+          `השירות Mexuz מופעל על ידי ${BLANK.company}. לשאלות ובקשות בנושא פרטיות: ${DETAILS.privacyEmail}.`,
           "המדיניות כתובה בלשון רבים ומתייחסת לכל המגדרים.",
         ],
       },
@@ -222,7 +223,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         heading: "הזכויות שלכם",
         paragraphs: [
-          `אתם זכאים לעיין במידע עליכם, ולבקש לתקן או למחוק מידע שאינו נכון, שלם, ברור או מעודכן. את רוב הפרטים אפשר לעדכן לבד בהגדרות החשבון. לבקשות אחרות: ${BLANK.privacyEmail}. נענה תוך 30 יום.`,
+          `אתם זכאים לעיין במידע עליכם, ולבקש לתקן או למחוק מידע שאינו נכון, שלם, ברור או מעודכן. את רוב הפרטים אפשר לעדכן לבד בהגדרות החשבון. לבקשות אחרות: ${DETAILS.privacyEmail}. נענה תוך 30 יום.`,
         ],
       },
       {
@@ -354,7 +355,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         heading: "ביטול מנוי",
         paragraphs: [
-          `בעל החשבון רשאי לבטל את המנוי בכל עת, בהודעה באימייל ל-${BLANK.email}. כשיתווסף לשירות מסך חיוב, אפשר יהיה לבטל גם ממנו.`,
+          `בעל החשבון רשאי לבטל את המנוי בכל עת, בהודעה באימייל ל-${DETAILS.email}. כשיתווסף לשירות מסך חיוב, אפשר יהיה לבטל גם ממנו.`,
           "תקופת הניסיון אינה מחויבת, ואין צורך לבטל אותה.",
         ],
       },
@@ -416,7 +417,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       },
       {
         heading: "רכז הנגישות",
-        paragraphs: [`שם: ${DETAILS.coordinator}`, `טלפון: ${DETAILS.phone}`, `אימייל: ${BLANK.email}`, `כתובת: ${BLANK.address}`],
+        paragraphs: [`שם: ${DETAILS.coordinator}`, `טלפון: ${DETAILS.phone}`, `אימייל: ${DETAILS.email}`, `כתובת: ${BLANK.address}`],
       },
       { heading: "עדכון ההצהרה", paragraphs: [`ההצהרה עודכנה ב-${UPDATED}.`] },
     ],
