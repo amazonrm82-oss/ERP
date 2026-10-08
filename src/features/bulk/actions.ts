@@ -35,10 +35,7 @@ const MAX_IDS = 100;
 // rows changed at the same time
 const PARALLEL = 8;
 
-async function eachLimited<T>(
-  items: T[],
-  run: (item: T) => Promise<boolean>,
-): Promise<number> {
+async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): Promise<number> {
   let done = 0;
   for (let i = 0; i < items.length; i += PARALLEL) {
     const results = await Promise.all(items.slice(i, i + PARALLEL).map(run));
@@ -47,12 +44,7 @@ async function eachLimited<T>(
   return done;
 }
 
-export async function bulkAction(
-  orgId: string,
-  object: BulkObject,
-  ids: string[],
-  change: BulkChange,
-): Promise<ActionResult<BulkOutcome>> {
+export async function bulkAction(orgId: string, object: BulkObject, ids: string[], change: BulkChange): Promise<ActionResult<BulkOutcome>> {
   if (!(object in TABLE) || !Array.isArray(ids) || ids.length === 0) {
     return fail("לא נבחרו רשומות.");
   }
@@ -80,12 +72,7 @@ export async function bulkAction(
   let live = rows;
   if (object === "lead" && change.kind === "status") {
     // a converted lead keeps its status
-    const { data: open, error: openError } = await supabase
-      .from("leads")
-      .select("id")
-      .eq("organization_id", orgId)
-      .in("id", unique)
-      .is("converted_at", null);
+    const { data: open, error: openError } = await supabase.from("leads").select("id").eq("organization_id", orgId).in("id", unique).is("converted_at", null);
     if (openError) return fail(dbErrorMessage(openError));
     const openIds = new Set(open.map((row) => row.id));
     live = rows.filter((row) => openIds.has(row.id));
@@ -94,8 +81,7 @@ export async function bulkAction(
   let done = 0;
   switch (change.kind) {
     case "owner": {
-      if (change.ownerId !== null && !isUuid(change.ownerId))
-        return fail("יש לבחור בעלים.");
+      if (change.ownerId !== null && !isUuid(change.ownerId)) return fail("יש לבחור בעלים.");
       done = await eachLimited(live, async (row) => {
         const { data } = await supabase
           .from(table as "leads")
@@ -113,41 +99,16 @@ export async function bulkAction(
       if (!isUuid(change.statusId)) return fail("יש לבחור סטטוס.");
       const reason = change.reason?.trim().slice(0, 500) || null;
       // the status's own rules first (it exists, it is not "converted", "not relevant" needs a reason)
-      const { data: status } = await supabase
-        .from("lead_statuses")
-        .select("kind")
-        .eq("organization_id", orgId)
-        .eq("id", change.statusId)
-        .maybeSingle();
-      if (!status)
-        return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
-      if (status.kind === "converted")
-        return fail('כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.');
-      if (status.kind === "disqualified" && !reason)
-        return fail("יש לציין למה הלידים לא רלוונטיים.");
-      done = await eachLimited(
-        live,
-        async (row) =>
-          (
-            await setLeadStatus(
-              supabase,
-              orgId,
-              row.id,
-              change.statusId,
-              reason,
-            )
-          ).ok,
-      );
+      const { data: status } = await supabase.from("lead_statuses").select("kind").eq("organization_id", orgId).eq("id", change.statusId).maybeSingle();
+      if (!status) return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
+      if (status.kind === "converted") return fail('כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.');
+      if (status.kind === "disqualified" && !reason) return fail("יש לציין למה הלידים לא רלוונטיים.");
+      done = await eachLimited(live, async (row) => (await setLeadStatus(supabase, orgId, row.id, change.statusId, reason)).ok);
       break;
     }
     case "tag": {
       if (!isUuid(change.tagId)) return fail("יש לבחור תגית.");
-      const { data: tag } = await supabase
-        .from("tags")
-        .select("id")
-        .eq("organization_id", orgId)
-        .eq("id", change.tagId)
-        .maybeSingle();
+      const { data: tag } = await supabase.from("tags").select("id").eq("organization_id", orgId).eq("id", change.tagId).maybeSingle();
       if (!tag) return fail("התגית כבר לא קיימת. רעננו את הדף ונסו שוב.");
       done = await eachLimited(live, async (row) => {
         // already tagged counts as done
@@ -164,11 +125,7 @@ export async function bulkAction(
       break;
     }
     case "trash": {
-      done = await eachLimited(
-        live,
-        async (row) =>
-          (await setTrashed(supabase, table, orgId, row.id, true)).ok,
-      );
+      done = await eachLimited(live, async (row) => (await setTrashed(supabase, table, orgId, row.id, true)).ok);
       break;
     }
     default:

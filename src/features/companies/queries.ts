@@ -28,10 +28,12 @@ export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascendi
 /** One page of live companies, by name unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listCompanies(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey>; filter?: string | null },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey>; filter?: string | null; ids?: string[]; chunk?: { from: number; size: number } },
 ): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
-  const from = (options.page - 1) * PAGE_SIZE;
+  // an export reads the list in larger chunks (LST-08)
+  const size = options.chunk?.size ?? PAGE_SIZE;
+  const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("companies")
@@ -45,6 +47,9 @@ export async function listCompanies(
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
   }
+  if (options.ids) {
+    query = query.in("id", options.ids);
+  }
   if (options.filter) {
     query = query.or(options.filter);
   }
@@ -53,15 +58,15 @@ export async function listCompanies(
   const { data, error } = await query
     .order(sortColumn(COMPANY_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
-    .range(from, from + PAGE_SIZE);
+    .range(from, from + size);
   if (error) {
     throw new Error(`companies query failed: ${error.message}`);
   }
-  const rows = data.slice(0, PAGE_SIZE);
+  const rows = data.slice(0, size);
   const owners = await getUserNames(rows.map((row) => row.owner_id));
 
   return {
-    hasMore: data.length > PAGE_SIZE,
+    hasMore: data.length > size,
     companies: rows.map((row) => ({
       id: row.id,
       name: row.name,

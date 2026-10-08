@@ -1,19 +1,10 @@
 import Link from "next/link";
 
-import {
-  BulkSelection,
-  RowCheck,
-} from "@/features/bulk/components/bulk-selection";
+import { BulkSelection, RowCheck } from "@/features/bulk/components/bulk-selection";
+import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
 import type { InlineEditing } from "@/features/inline-edit/server";
-import {
-  asCustomValues,
-  type FieldDefinition,
-} from "@/features/custom-fields/types";
-import type {
-  CatalogColumn,
-  ColumnChoice,
-} from "@/features/list-columns/columns";
+import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
 import { formatDate } from "@/lib/format";
@@ -40,17 +31,7 @@ type Props = {
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({
-  orgId,
-  contacts,
-  columns,
-  catalog,
-  fields,
-  sort,
-  sortHref,
-  editing,
-  tags,
-}: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -60,6 +41,7 @@ export function ContactsTable({
       statuses={null}
       tags={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
       canTrash={editing.bulk?.trash ?? false}
+      exportPath={editing.bulk?.exportable ? `${paths.contacts(orgId)}/export` : null}
       enabled={editing.bulk !== null}
     >
       <ListTable
@@ -89,19 +71,11 @@ export function ContactsTable({
                 }}
                 canEdit={editing.canEdit(contact.ownerId)}
               >
-                <Link
-                  href={paths.contact(orgId, contact.id)}
-                  className="font-medium text-ink underline-offset-4 hover:underline"
-                >
+                <Link href={paths.contact(orgId, contact.id)} className="font-medium text-ink underline-offset-4 hover:underline">
                   {contactDisplayName(contact)}
                 </Link>
               </InlineEdit>
-              {contact.jobTitle &&
-              !columns.some((c) => c.key === "job_title") ? (
-                <span className="block text-sm text-ink-soft">
-                  {contact.jobTitle}
-                </span>
-              ) : null}
+              {contact.jobTitle && !columns.some((c) => c.key === "job_title") ? <span className="block text-sm text-ink-soft">{contact.jobTitle}</span> : null}
             </div>
           </div>
         )}
@@ -115,11 +89,7 @@ export function ContactsTable({
               ) : null;
             case "email":
               return contact.email ? (
-                <span
-                  dir="ltr"
-                  title={contact.email}
-                  className="block max-w-52 truncate text-end"
-                >
+                <span dir="ltr" title={contact.email} className="block max-w-52 truncate text-end">
                   {contact.email}
                 </span>
               ) : null;
@@ -146,10 +116,7 @@ export function ContactsTable({
               );
             case "created":
               return (
-                <time
-                  dateTime={contact.createdAt}
-                  className="whitespace-nowrap text-ink-soft"
-                >
+                <time dateTime={contact.createdAt} className="whitespace-nowrap text-ink-soft">
                   {formatDate(contact.createdAt)}
                 </time>
               );

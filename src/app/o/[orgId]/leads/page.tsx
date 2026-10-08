@@ -14,8 +14,10 @@ import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, lis
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -50,7 +52,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const filter = await prepareListFilter(orgId, "lead", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
-  const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof LEAD_SORT_COLUMNS | CustomSortKey>;
+  const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
+    keyof typeof LEAD_SORT_COLUMNS | CustomSortKey
+  >;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
   const [editing, lookups, tags, viewData, list, board] = await Promise.all([
@@ -122,6 +126,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         canShare={context.role === "owner" || context.role === "admin"}
       />
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        {canExport(context.role) ? <ExportMenu href={exportHref(paths.leads(orgId), listHref(1, sortValue(sort)))} /> : null}
         <AdvancedFilter
           fields={filter.fields}
           current={filter.tree}
@@ -149,7 +154,10 @@ export default async function LeadsPage({ params, searchParams }: Props) {
                 key={option.key}
                 href={viewHref(option.key)}
                 aria-current={active ? "page" : undefined}
-                className={cn("rounded px-3 py-1.5 text-[0.9375rem]", active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas")}
+                className={cn(
+                  "rounded px-3 py-1.5 text-[0.9375rem]",
+                  active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas",
+                )}
               >
                 {option.label}
               </Link>

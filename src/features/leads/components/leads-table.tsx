@@ -1,20 +1,11 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  BulkSelection,
-  RowCheck,
-} from "@/features/bulk/components/bulk-selection";
+import { BulkSelection, RowCheck } from "@/features/bulk/components/bulk-selection";
+import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
 import type { InlineEditing } from "@/features/inline-edit/server";
-import {
-  asCustomValues,
-  type FieldDefinition,
-} from "@/features/custom-fields/types";
-import type {
-  CatalogColumn,
-  ColumnChoice,
-} from "@/features/list-columns/columns";
+import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
 import { formatDate } from "@/lib/format";
@@ -22,11 +13,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import { leadDisplayName, statusTone } from "../display";
-import type {
-  LeadListItem,
-  LeadSourceOption,
-  LeadStatusOption,
-} from "../queries";
+import type { LeadListItem, LeadSourceOption, LeadStatusOption } from "../queries";
 
 type Props = {
   orgId: string;
@@ -47,19 +34,7 @@ type Props = {
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({
-  orgId,
-  leads,
-  statuses,
-  sources,
-  columns,
-  catalog,
-  fields,
-  sort,
-  sortHref,
-  editing,
-  tags,
-}: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -80,6 +55,7 @@ export function LeadsTable({
       statuses={statusOptions}
       tags={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
       canTrash={editing.bulk?.trash ?? false}
+      exportPath={editing.bulk?.exportable ? `${paths.leads(orgId)}/export` : null}
       enabled={editing.bulk !== null}
     >
       <ListTable
@@ -106,18 +82,11 @@ export function LeadsTable({
                 initial={{ text: lead.fullName ?? "" }}
                 canEdit={editing.canEdit(lead.ownerId)}
               >
-                <Link
-                  href={paths.lead(orgId, lead.id)}
-                  className="font-medium text-ink underline-offset-4 hover:underline"
-                >
+                <Link href={paths.lead(orgId, lead.id)} className="font-medium text-ink underline-offset-4 hover:underline">
                   {leadDisplayName(lead)}
                 </Link>
               </InlineEdit>
-              {lead.companyName && !columns.some((c) => c.key === "company") ? (
-                <span className="block text-sm text-ink-soft">
-                  {lead.companyName}
-                </span>
-              ) : null}
+              {lead.companyName && !columns.some((c) => c.key === "company") ? <span className="block text-sm text-ink-soft">{lead.companyName}</span> : null}
             </div>
           </div>
         )}
@@ -132,11 +101,7 @@ export function LeadsTable({
             case "email":
               // long addresses are cut with an ellipsis; the full address is in the tooltip and on the lead's page
               return lead.email ? (
-                <span
-                  dir="ltr"
-                  title={lead.email}
-                  className="block max-w-52 truncate text-end"
-                >
+                <span dir="ltr" title={lead.email} className="block max-w-52 truncate text-end">
                   {lead.email}
                 </span>
               ) : null;
@@ -154,14 +119,9 @@ export function LeadsTable({
                   label={`סטטוס: ${leadDisplayName(lead)}`}
                   initial={{ id: lead.statusId }}
                   options={statusOptions}
-                  canEdit={
-                    status?.kind !== "converted" &&
-                    editing.canEdit(lead.ownerId)
-                  }
+                  canEdit={status?.kind !== "converted" && editing.canEdit(lead.ownerId)}
                 >
-                  <Badge tone={statusTone(status)}>
-                    {status?.name ?? "ללא סטטוס"}
-                  </Badge>
+                  <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
                 </InlineEdit>
               );
             }
@@ -186,10 +146,7 @@ export function LeadsTable({
               );
             case "created":
               return (
-                <time
-                  dateTime={lead.createdAt}
-                  className="whitespace-nowrap text-ink-soft"
-                >
+                <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">
                   {formatDate(lead.createdAt)}
                 </time>
               );

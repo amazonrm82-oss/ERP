@@ -54,10 +54,12 @@ export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", asce
 /** One page of live contacts, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listContacts(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey>; filter?: string | null },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey>; filter?: string | null; ids?: string[]; chunk?: { from: number; size: number } },
 ): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
-  const from = (options.page - 1) * PAGE_SIZE;
+  // an export reads the list in larger chunks (LST-08)
+  const size = options.chunk?.size ?? PAGE_SIZE;
+  const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("contacts")
@@ -72,6 +74,9 @@ export async function listContacts(
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
   }
+  if (options.ids) {
+    query = query.in("id", options.ids);
+  }
   if (options.filter) {
     query = query.or(options.filter);
   }
@@ -80,12 +85,12 @@ export async function listContacts(
   const { data, error } = await query
     .order(sortColumn(CONTACT_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
-    .range(from, from + PAGE_SIZE);
+    .range(from, from + size);
   if (error) {
     throw new Error(`contacts query failed: ${error.message}`);
   }
 
-  const rows = data.slice(0, PAGE_SIZE);
+  const rows = data.slice(0, size);
   const [owners, companies] = await Promise.all([
     getUserNames(rows.map((row) => row.owner_id)),
     getCompanyNames(
@@ -95,7 +100,7 @@ export async function listContacts(
   ]);
 
   return {
-    hasMore: data.length > PAGE_SIZE,
+    hasMore: data.length > size,
     contacts: rows.map((row) => ({
       id: row.id,
       fullName: row.full_name,

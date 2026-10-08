@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useId,
-  useState,
-  useTransition,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useId, useState, useTransition, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
@@ -47,18 +40,26 @@ type Props = {
   statuses: Option[] | null;
   tags: Option[];
   canTrash: boolean;
+  // the list's export route, for "export the picked rows" (LST-08); null when the user may not export
+  exportPath: string | null;
   // false: the list is shown as is, without checkboxes (a viewer)
   enabled: boolean;
   children: ReactNode;
 };
 
-type Kind = BulkChange["kind"];
+// "export" is not a change: it downloads the picked rows through the list's export route
+type Kind = BulkChange["kind"] | "export";
 const NO_OWNER = "none";
+const FORMATS: Option[] = [
+  { value: "xlsx", label: "Excel" },
+  { value: "csv", label: "CSV" },
+];
 const KIND_LABELS: Record<Kind, string> = {
   owner: "שינוי בעלים",
   status: "שינוי סטטוס",
   tag: "הוספת תגית",
   trash: "העברה לסל המחזור",
+  export: "ייצוא הנבחרים",
 };
 
 /**
@@ -66,17 +67,7 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({
-  orgId,
-  object,
-  ids,
-  owners,
-  statuses,
-  tags,
-  canTrash,
-  enabled,
-  children,
-}: Props) {
+export function BulkSelection({ orgId, object, ids, owners, statuses, tags, canTrash, exportPath, enabled, children }: Props) {
   const barId = useId();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<Kind | "">("");
@@ -105,22 +96,25 @@ export function BulkSelection({
       (k !== "owner" || owners) &&
       (k !== "status" || statuses) &&
       (k !== "tag" || tags.length > 0) &&
-      (k !== "trash" || canTrash),
+      (k !== "trash" || canTrash) &&
+      (k !== "export" || exportPath),
   );
-  const options =
-    kind === "owner"
-      ? (owners ?? [])
-      : kind === "status"
-        ? (statuses ?? [])
-        : kind === "tag"
-          ? tags
-          : [];
-  const needsReason =
-    kind === "status" && options.find((o) => o.value === value)?.needsReason;
+  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
+  const needsReason = kind === "status" && options.find((o) => o.value === value)?.needsReason;
   const ready = kind === "trash" || (kind !== "" && value !== "");
 
   function run() {
     if (!kind) return;
+    if (kind === "export") {
+      if (!exportPath) return;
+      // a download link, clicked: the page stays as it is
+      const link = document.createElement("a");
+      link.href = `${exportPath}?ids=${[...shown].join(",")}&format=${value}`;
+      link.download = "";
+      link.click();
+      setNotice(count === 1 ? "הקובץ של הרשומה יורד." : `הקובץ של ${count} הרשומות יורד.`);
+      return;
+    }
     const change: BulkChange =
       kind === "owner"
         ? { kind, ownerId: value === NO_OWNER ? null : value }
@@ -129,13 +123,7 @@ export function BulkSelection({
           : kind === "tag"
             ? { kind, tagId: value }
             : { kind: "trash" };
-    if (
-      kind === "trash" &&
-      !window.confirm(
-        `להעביר ${count} רשומות לסל המחזור? אפשר לשחזר משם במשך 30 יום.`,
-      )
-    )
-      return;
+    if (kind === "trash" && !window.confirm(`להעביר ${count} רשומות לסל המחזור? אפשר לשחזר משם במשך 30 יום.`)) return;
     setError(null);
     setNotice(null);
     startTransition(async () => {
@@ -147,9 +135,7 @@ export function BulkSelection({
       const { done, skipped } = result.data!;
       setNotice(
         (done === 1 ? "רשומה אחת עודכנה." : `${done} רשומות עודכנו.`) +
-          (skipped > 0
-            ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.`
-            : ""),
+          (skipped > 0 ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : ""),
       );
       setPicked(new Set());
       setKind("");
@@ -175,9 +161,7 @@ export function BulkSelection({
             ref={(el) => {
               if (el) el.indeterminate = count > 0 && !allPicked;
             }}
-            onChange={(e) =>
-              setPicked(e.target.checked ? new Set(ids) : new Set())
-            }
+            onChange={(e) => setPicked(e.target.checked ? new Set(ids) : new Set())}
             className="size-4 accent-accent"
           />
           <span>בחירת כל העמוד</span>
@@ -206,24 +190,16 @@ export function BulkSelection({
                 ))}
               </Select>
             </div>
-            {kind === "owner" || kind === "status" || kind === "tag" ? (
+            {kind === "owner" || kind === "status" || kind === "tag" || kind === "export" ? (
               <div className="w-44">
                 <Select
-                  aria-label={
-                    kind === "owner"
-                      ? "בעלים חדש"
-                      : kind === "status"
-                        ? "סטטוס חדש"
-                        : "תגית"
-                  }
+                  aria-label={kind === "owner" ? "בעלים חדש" : kind === "status" ? "סטטוס חדש" : kind === "export" ? "סוג הקובץ" : "תגית"}
                   controlSize="sm"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                 >
                   <option value="">בחירה</option>
-                  {kind === "owner" ? (
-                    <option value={NO_OWNER}>ללא בעלים</option>
-                  ) : null}
+                  {kind === "owner" ? <option value={NO_OWNER}>ללא בעלים</option> : null}
                   {options.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -245,22 +221,11 @@ export function BulkSelection({
               </div>
             ) : null}
             {kind ? (
-              <Button
-                size="sm"
-                variant={kind === "trash" ? "danger" : "primary"}
-                disabled={pending || !ready}
-                aria-busy={pending || undefined}
-                onClick={run}
-              >
+              <Button size="sm" variant={kind === "trash" ? "danger" : "primary"} disabled={pending || !ready} aria-busy={pending || undefined} onClick={run}>
                 {pending ? "מעדכן…" : `ביצוע על ${count}`}
               </Button>
             ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={() => setPicked(new Set())}
-            >
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPicked(new Set())}>
               ניקוי הבחירה
             </Button>
           </>

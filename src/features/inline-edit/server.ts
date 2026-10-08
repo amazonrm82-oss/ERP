@@ -1,5 +1,6 @@
 import "server-only";
 
+import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
 import { canEditRecordHint, type OrgContext } from "@/features/shell/queries";
 
@@ -15,7 +16,7 @@ export type InlineEditing = {
   // handing a record to someone else: a member may only edit what they own, so only managers and up
   canReassign: (ownerId: string | null) => boolean;
   // bulk actions on picked rows (LST-07): for anyone who writes; handing over and the recycle bin as above
-  bulk: { reassign: boolean; trash: boolean } | null;
+  bulk: { reassign: boolean; trash: boolean; exportable: boolean } | null;
 };
 
 export async function inlineEditing(orgId: string, context: OrgContext): Promise<InlineEditing> {
@@ -25,6 +26,6 @@ export async function inlineEditing(orgId: string, context: OrgContext): Promise
     owners: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
     canEdit: (ownerId) => canEditRecordHint(context, ownerId),
     canReassign: (ownerId) => context.role !== "member" && canEditRecordHint(context, ownerId),
-    bulk: context.canWrite ? { reassign: context.role !== "member", trash: context.role !== "member" } : null,
+    bulk: context.canWrite ? { reassign: context.role !== "member", trash: context.role !== "member", exportable: canExport(context.role) } : null,
   };
 }

@@ -1,19 +1,10 @@
 import Link from "next/link";
 
-import {
-  BulkSelection,
-  RowCheck,
-} from "@/features/bulk/components/bulk-selection";
+import { BulkSelection, RowCheck } from "@/features/bulk/components/bulk-selection";
+import { asCustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
 import type { InlineEditing } from "@/features/inline-edit/server";
-import {
-  asCustomValues,
-  type FieldDefinition,
-} from "@/features/custom-fields/types";
-import type {
-  CatalogColumn,
-  ColumnChoice,
-} from "@/features/list-columns/columns";
+import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
 import { formatDate } from "@/lib/format";
@@ -39,17 +30,7 @@ type Props = {
 };
 
 /** Companies as a table, with the columns the user chose. */
-export function CompaniesTable({
-  orgId,
-  companies,
-  columns,
-  catalog,
-  fields,
-  sort,
-  sortHref,
-  editing,
-  tags,
-}: Props) {
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -59,6 +40,7 @@ export function CompaniesTable({
       statuses={null}
       tags={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
       canTrash={editing.bulk?.trash ?? false}
+      exportPath={editing.bulk?.exportable ? `${paths.companies(orgId)}/export` : null}
       enabled={editing.bulk !== null}
     >
       <ListTable
@@ -84,10 +66,7 @@ export function CompaniesTable({
               initial={{ text: company.name }}
               canEdit={editing.canEdit(company.ownerId)}
             >
-              <Link
-                href={paths.company(orgId, company.id)}
-                className="font-medium text-ink underline-offset-4 hover:underline"
-              >
+              <Link href={paths.company(orgId, company.id)} className="font-medium text-ink underline-offset-4 hover:underline">
                 {company.name}
               </Link>
             </InlineEdit>
@@ -105,11 +84,7 @@ export function CompaniesTable({
               return company.city;
             case "website":
               return company.website ? (
-                <span
-                  dir="ltr"
-                  title={company.website}
-                  className="block max-w-52 truncate text-end"
-                >
+                <span dir="ltr" title={company.website} className="block max-w-52 truncate text-end">
                   {company.website}
                 </span>
               ) : null;
@@ -132,10 +107,7 @@ export function CompaniesTable({
               );
             case "created":
               return (
-                <time
-                  dateTime={company.createdAt}
-                  className="whitespace-nowrap text-ink-soft"
-                >
+                <time dateTime={company.createdAt} className="whitespace-nowrap text-ink-soft">
                   {formatDate(company.createdAt)}
                 </time>
               );

@@ -30,6 +30,7 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_recovery: "כניסה עם קוד גיבוי (אפליקציית האימות הוסרה)",
   mfa_reset: "איפוס אימות דו-שלבי",
   erase: "מחיקת פרטים מהיומן (בקשת פרטיות)",
+  export: "ייצוא רשימה",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

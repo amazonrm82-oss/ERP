@@ -77,12 +77,17 @@ type ListOptions = {
   sort?: Sort<LeadSortKey | CustomSortKey>;
   // the advanced filter as a PostgREST logic tree (LST-05)
   filter?: string | null;
+  // only these rows (an export of the picked rows), and a chunk instead of a page
+  ids?: string[];
+  chunk?: { from: number; size: number };
 };
 
 /** One page of live leads, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
-  const from = (options.page - 1) * PAGE_SIZE;
+  // an export reads the list in larger chunks (LST-08)
+  const size = options.chunk?.size ?? PAGE_SIZE;
+  const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("leads")
@@ -100,6 +105,9 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
   if (searchFilter) {
     query = query.or(searchFilter);
   }
+  if (options.ids) {
+    query = query.in("id", options.ids);
+  }
   if (options.filter) {
     query = query.or(options.filter);
   }
@@ -108,16 +116,16 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
   const { data, error } = await query
     .order(sortColumn(LEAD_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
     .order("id", { ascending: sort.ascending })
-    .range(from, from + PAGE_SIZE);
+    .range(from, from + size);
   if (error) {
     throw new Error(`leads query failed: ${error.message}`);
   }
 
-  const rows = data.slice(0, PAGE_SIZE);
+  const rows = data.slice(0, size);
   const owners = await getUserNames(rows.map((row) => row.owner_id));
 
   return {
-    hasMore: data.length > PAGE_SIZE,
+    hasMore: data.length > size,
     leads: rows.map((row) => ({
       id: row.id,
       fullName: row.full_name,

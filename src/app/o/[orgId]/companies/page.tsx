@@ -13,8 +13,10 @@ import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -45,7 +47,9 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const filter = await prepareListFilter(orgId, "company", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
-  const sortKeys = [...Object.keys(COMPANY_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey>;
+  const sortKeys = [...Object.keys(COMPANY_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
+    keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey
+  >;
   const sort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const [editing, tags, viewData, { companies, hasMore }] = await Promise.all([
     inlineEditing(orgId, context),
@@ -100,6 +104,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
       />
 
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        {canExport(context.role) ? <ExportMenu href={exportHref(paths.companies(orgId), listHref(1, sortValue(sort)))} /> : null}
         <AdvancedFilter
           fields={filter.fields}
           current={filter.tree}
@@ -164,11 +169,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               }
             />
           ) : (
-            <EmptyState
-              title="עוד אין חברות"
-              description="חברה נוצרת כשממירים ליד עם שם חברה, או ידנית מכאן."
-              action={newCompanyButton}
-            />
+            <EmptyState title="עוד אין חברות" description="חברה נוצרת כשממירים ליד עם שם חברה, או ידנית מכאן." action={newCompanyButton} />
           )}
         </div>
       )}

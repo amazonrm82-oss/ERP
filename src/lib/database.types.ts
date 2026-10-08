@@ -1012,6 +1012,8 @@ export type Database = {
       // privacy erasure (migration 0027)
       audit_erase_candidates: { Args: { p_org: string; p_query: string }; Returns: Json };
       audit_erase_record: { Args: { p_org: string; p_type: string; p_id: string }; Returns: number };
+      // an exported list goes to the audit log (migration 0034)
+      log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
       support_session_info: { Args: { p_org: string }; Returns: Json };
       platform_me: { Args: Record<string, never>; Returns: Json };

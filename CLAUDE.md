@@ -169,6 +169,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/leads/status.ts`), shared with the status form and the board.
 - Bulk actions (LST-07, no migration): `src/features/bulk/`. `bulkAction()` changes each picked row on its
   own with the user's session (owner, lead status, add tag, recycle bin) and returns `{done, skipped}`.
+- List export (LST-08, migration 0034): `/o/[org]/{leads,contacts,companies}/export` → `exportList()`
+  (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
+  with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
+  before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

@@ -7,8 +7,9 @@
 // second user -> they sign up from the link and join -> roles, teams, suspend.
 // It refuses to run against anything that is not on this machine.
 import { createHmac } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
-import { strToU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import pg from "pg";
 import { chromium } from "playwright";
 
@@ -827,6 +828,43 @@ try {
   for (const lead of bulkLeads) {
     await sql("update public.leads set deleted_at = null, status_id = $2, tag_ids = $3 where id = $1", [lead.id, lead.status_id, lead.tag_ids]);
   }
+
+  step("export: the filtered list as Excel and CSV, the picked rows too; each export is in the audit log; a member may not");
+  const exportsBefore = (await sql("select count(*)::int as n from public.audit_log where organization_id = $1 and action = 'export'", [orgIdNow]))[0].n;
+  // the filter of the list goes into the file: search for one lead
+  const exportQuery = `q=${encodeURIComponent(bulkLeads[1].full_name)}`;
+  const listCsvResponse = await ownerDesk.request.get(`${orgUrl}/leads/export?${exportQuery}&format=csv`);
+  if (listCsvResponse.status() !== 200) throw new Error(`export csv: ${listCsvResponse.status()}`);
+  const listCsvBody = await listCsvResponse.text();
+  const listCsvLines = listCsvBody.replace(/^\uFEFF/, "").trim().split("\r\n");
+  if (!listCsvLines[0].startsWith("שם,") || !listCsvLines.some((line) => line.startsWith(bulkLeads[1].full_name))) throw new Error(`export csv content: ${listCsvBody.slice(0, 300)}`);
+  const listXlsxResponse = await ownerDesk.request.get(`${orgUrl}/leads/export?format=xlsx`);
+  const listSheet = strFromU8(unzipSync(new Uint8Array(await listXlsxResponse.body()))["xl/worksheets/sheet1.xml"]);
+  const [{ n: liveLeads }] = await sql("select count(*)::int as n from public.leads where organization_id = $1 and deleted_at is null", [orgIdNow]);
+  if ((listSheet.match(/<row /g) ?? []).length !== liveLeads + 1) throw new Error(`export xlsx: ${(listSheet.match(/<row /g) ?? []).length} rows, expected ${liveLeads + 1}`);
+  // the menu above the list
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByText("ייצוא", { exact: true }).click();
+  const [menuDownload] = await Promise.all([ownerDesk.waitForEvent("download"), ownerDesk.getByRole("link", { name: "קובץ Excel" }).click()]);
+  if (!menuDownload.suggestedFilename().endsWith(".xlsx")) throw new Error(`export menu: ${menuDownload.suggestedFilename()}`);
+  // the picked rows
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  for (const lead of bulkLeads) await ownerDesk.getByRole("checkbox", { name: `בחירה: ${lead.full_name}`, exact: true }).check();
+  await bar.getByLabel("פעולה", { exact: true }).selectOption("export");
+  await bar.getByLabel("סוג הקובץ").selectOption("csv");
+  const [pickedDownload] = await Promise.all([ownerDesk.waitForEvent("download"), bar.getByRole("button", { name: "ביצוע על 2" }).click()]);
+  const pickedLines = (await readFile(await pickedDownload.path(), "utf8")).trim().split("\r\n");
+  if (pickedLines.length !== 3) throw new Error(`export picked: ${pickedLines.length - 1} rows`);
+  const exportsLogged = await sql(
+    "select changes from public.audit_log where organization_id = $1 and action = 'export' order by id offset $2",
+    [orgIdNow, exportsBefore],
+  );
+  if (exportsLogged.length !== 4 || exportsLogged[0].changes.filters?.q !== bulkLeads[1].full_name || exportsLogged[3].changes.scope !== "selected" || exportsLogged[3].changes.rows !== 2)
+    throw new Error(`export audit: ${JSON.stringify(exportsLogged)}`);
+  // Dana is a member: no menu, and the address refuses her
+  await invitee.goto(`${orgUrl}/leads`);
+  if ((await invitee.getByText("ייצוא", { exact: true }).count()) !== 0) throw new Error("a member sees the export menu");
+  if ((await invitee.request.get(`${orgUrl}/leads/export?format=csv`)).status() !== 403) throw new Error("a member could export");
   await ownerDesk.goto(leadUrl);
 
   // ---------------------------------------------------------------- section 4: lead intake
