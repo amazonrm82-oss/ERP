@@ -101,8 +101,20 @@ export async function importChunkAction(
     .eq("organization_id", orgId)
     .eq("id", jobId)
     .maybeSingle();
-  if (!job || job.created_by !== context.user.id || job.status !== "running") {
+  if (!job || job.created_by !== context.user.id) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  // marks the job as alive (updated_at); a job idle for 10 minutes is closed by the database (FXC-03)
+  const { data: alive, error: aliveError } = await context.supabase
+    .from("import_jobs")
+    .update({ status: "running" })
+    .eq("organization_id", orgId)
+    .eq("id", jobId)
+    .eq("status", "running")
+    .select("id");
+  if (aliveError) return fail(dbErrorMessage(aliveError, "לא הצלחנו להמשיך את הייבוא."));
+  if (alive.length === 0) {
+    return fail("הייבוא נעצר כי לא התקבלו נתונים כמה דקות. אפשר לבטל אותו בהיסטוריית הייבוא ולייבא שוב.");
   }
   const entity = entitySchema.parse(job.entity_type);
   const prepared = await importContext(orgId, entity, modeSchema.parse(job.duplicate_mode), mapping.data);

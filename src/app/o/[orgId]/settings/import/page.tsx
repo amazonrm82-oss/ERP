@@ -15,7 +15,7 @@ import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "ייבוא וייצוא" };
 
-const STATUS_LABEL: Record<string, string> = { running: "רץ או נקטע", done: "הסתיים", failed: "נעצר", undone: "בוטל" };
+const STATUS_LABEL: Record<string, string> = { running: "רץ", done: "הסתיים", failed: "נעצר או נקטע", undone: "בוטל" };
 const UNDO_MS = 7 * 86_400_000;
 
 /** Mirrors undoImportAction: the importer, a finished job that created records, within 7 days. */
