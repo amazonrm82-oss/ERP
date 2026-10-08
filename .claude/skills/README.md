@@ -17,3 +17,4 @@ skill says. Licenses are inside each folder.
 | accessibility-review, design-critique, ux-copy, design-handoff | anthropics/knowledge-work-plugins `design` (Apache 2.0) | |
 | design-taste-frontend, redesign-existing-projects | Leonxlnx/taste-skill (MIT) | aimed at marketing sites; the CRM keeps its own RTL and accessibility rules |
 | web-design-guidelines | vercel-labs/agent-skills + web-interface-guidelines (MIT) | rules copied locally on 2026-10-08 instead of fetched live |
+| impeccable | pbakaus/impeccable (Apache 2.0) | its scripts download a pinned engine binary from the project's GitHub releases (SHA-256 checked) on first use; the design hook is off unless `/impeccable hooks on`; `init` writes PRODUCT.md / DESIGN.md |
