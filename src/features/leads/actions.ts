@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
-import type { ConvertLeadResult } from "@/lib/database.types";
+import type { ConvertLeadResult, Database } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { paths } from "@/lib/paths";
+import { isUuid, paths } from "@/lib/paths";
 import { normalizePhone } from "@/lib/phone";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
@@ -158,43 +160,71 @@ export async function changeLeadStatusAction(
     return invalid(parsed.error, formData);
   }
 
-  // The status must belong to this organization; its kind decides the rules.
-  const { data: status } = await context.supabase
-    .from("lead_statuses")
-    .select("id, kind")
-    .eq("organization_id", orgId)
-    .eq("id", parsed.data.status_id)
-    .maybeSingle();
-  if (!status) {
-    return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
-  }
-  if (status.kind === "converted") {
-    return fail('כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.');
-  }
-  if (status.kind === "disqualified" && !parsed.data.disqualify_reason) {
-    return fail("יש לציין למה הליד לא רלוונטי.", {
-      fieldErrors: { disqualify_reason: "יש לציין סיבה." },
-      values: formValues(formData),
-    });
+  const result = await setLeadStatus(context.supabase, orgId, leadId, parsed.data.status_id, parsed.data.disqualify_reason ?? null);
+  if (!result.ok) {
+    return result.needsReason
+      ? fail(result.message, { fieldErrors: { disqualify_reason: "יש לציין סיבה." }, values: formValues(formData) })
+      : fail(result.message);
   }
 
-  const { data, error } = await context.supabase
+  revalidateLead(orgId, leadId);
+  return ok();
+}
+
+type StatusResult = { ok: true } | { ok: false; message: string; needsReason?: boolean };
+
+/**
+ * The rules of a status change, shared by the status form and the leads board:
+ * the status must belong to the organization, "converted" is set only by the
+ * conversion, and "not relevant" needs a reason.
+ */
+async function setLeadStatus(
+  supabase: SupabaseClient<Database>,
+  orgId: string,
+  leadId: string,
+  statusId: string,
+  reason: string | null,
+): Promise<StatusResult> {
+  const { data: status } = await supabase.from("lead_statuses").select("id, kind").eq("organization_id", orgId).eq("id", statusId).maybeSingle();
+  if (!status) {
+    return { ok: false, message: "הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב." };
+  }
+  if (status.kind === "converted") {
+    return { ok: false, message: 'כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.' };
+  }
+  if (status.kind === "disqualified" && !reason) {
+    return { ok: false, message: "יש לציין למה הליד לא רלוונטי.", needsReason: true };
+  }
+  const { data, error } = await supabase
     .from("leads")
-    .update({
-      status_id: status.id,
-      disqualify_reason: status.kind === "disqualified" ? parsed.data.disqualify_reason : null,
-    })
+    .update({ status_id: status.id, disqualify_reason: status.kind === "disqualified" ? reason : null })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)
     .select("id");
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את הסטטוס. נסו שוב."));
+    return { ok: false, message: dbErrorMessage(error, "לא הצלחנו לעדכן את הסטטוס. נסו שוב.") };
   }
   if (data.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
+    return { ok: false, message: NOT_FOUND_OR_FORBIDDEN };
   }
+  return { ok: true };
+}
 
+/** From the leads board: a card dropped on another status (a reason comes with "not relevant"). */
+export async function dropLeadAction(orgId: string, leadId: string, statusId: string, reason: string | null): Promise<ActionResult> {
+  if (!isUuid(statusId)) {
+    return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
+  }
+  const context = await actionContext(orgId, leadId);
+  if (!context.ok) {
+    return context;
+  }
+  const trimmed = reason?.trim().slice(0, 500) || null;
+  const result = await setLeadStatus(context.supabase, orgId, leadId, statusId, trimmed);
+  if (!result.ok) {
+    return fail(result.message);
+  }
   revalidateLead(orgId, leadId);
   return ok();
 }

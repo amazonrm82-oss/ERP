@@ -90,7 +90,7 @@
 
 | מזהה | דרישה | מצב היום | גל |
 | --- | --- | --- | --- |
-| `LST-01` | תצוגת קנבן ללידים לפי סטטוס, עם גרירה, ומעבר בין טבלה לקנבן | חסר | 1 |
+| `LST-01` | תצוגת קנבן ללידים לפי סטטוס, עם גרירה, ומעבר בין טבלה לקנבן | נבנה ב-8 באוקטובר 2026 | 1 |
 | `LST-02` | מיון לפי כל עמודה בלחיצה על הכותרת | חסר (מיון קבוע לפי תאריך יצירה) | 1 |
 | `LST-03` | בחירת עמודות, סדר ורוחב, כולל שדות מותאמים | חסר | 1 |
 | `LST-04` | תצוגה שמורה זוכרת גם עמודות ומיון, ואפשר לשתף אותה עם צוות | חלקי: זוכרת סינון בלבד; אישית או לכל העסק | 1 |
@@ -1055,7 +1055,7 @@ Mexuz נשארת CRM עם שכבת מכירה, ולא הופכת לתוכנת ה
 
 | תחום | טבלאות | הערות |
 | --- | --- | --- |
-| השלמות ליבה | `contact_methods`, `contact_companies`, `contact_relations`, `record_followers`, `record_shares`, `loss_reasons`, `disqualify_reasons`, `activity_types`, `task_checklist_items`, `scoring_rules`, `routing_rules`, `layouts`, `member_permissions`, `notification_preferences` | `deal_contacts` כבר קיימת. מיתוג ומונחים הם עמודות בארגון |
+| השלמות ליבה | `contact_methods`, `contact_companies`, `contact_relations`, `record_followers`, `record_shares`, `loss_reasons`, `disqualify_reasons`, `activity_types`, `task_checklist_items`, `scoring_rules`, `routing_rules`, `layouts`, `member_permissions`, `notification_settings` (נבנתה, מיגרציה 0031) | `deal_contacts` כבר קיימת. מיתוג ומונחים הם עמודות בארגון |
 | מס וקטלוג | `vat_rates`, `products`, `product_costs`, `product_categories`, `units`, `product_bundle_items`, `price_lists`, `price_list_items`, `deal_line_items` | `vat_rates` של הפלטפורמה. `product_costs` נפרדת בגלל ההרשאה |
 | הצעות וחתימות | `number_sequences`, `quotes`, `quote_versions`, `quote_lines`, `quote_views`, `signatures`, `document_templates`, `signing_requests` | `signatures` משותפת להצעות ולמסמכים לחתימה |
 | הזמנות ומסמכים | `orders`, `order_lines`, `documents`, `document_lines`, `document_links` | `documents` במקום `external_documents` מהאפיון המקורי. `document_links` מקשרת מסמך למקור ולזיכוי |

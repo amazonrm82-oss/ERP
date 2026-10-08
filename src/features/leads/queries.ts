@@ -122,3 +122,66 @@ export async function getLead(orgId: string, leadId: string) {
   }
   return data;
 }
+
+// how many leads a board column shows; the column header has the exact count
+export const LEAD_COLUMN_LIMIT = 50;
+
+export type LeadBoardCard = { id: string; fullName: string | null; companyName: string | null; phone: string | null; statusId: string; ownerName: string | null };
+export type LeadBoard = {
+  // every status a lead can be moved to by hand ("converted" is set by the conversion)
+  statuses: LeadStatusOption[];
+  cards: LeadBoardCard[];
+  counts: Record<string, number>;
+};
+
+/** Live leads that were not converted, by status: the newest per column, and exact counts. */
+export async function getLeadBoard(orgId: string, options: { search: string; tagId: string | null }): Promise<LeadBoard> {
+  const supabase = await createClient();
+  const { statuses: all } = await getLeadLookups(orgId);
+  const statuses = all.filter((status) => status.kind !== "converted");
+  const searchFilter = personSearchFilter(["full_name", "company_name"], options.search);
+
+  // the same filters on the rows and on the count of each column
+  type Filterable<Q> = {
+    eq(column: string, value: string): Q;
+    is(column: string, value: null): Q;
+    contains(column: string, value: string[]): Q;
+    or(filters: string): Q;
+  };
+  const filtered = <Q extends Filterable<Q>>(query: Q, statusId: string): Q => {
+    let next = query.eq("organization_id", orgId).eq("status_id", statusId).is("deleted_at", null).is("converted_at", null);
+    if (options.tagId) next = next.contains("tag_ids", [options.tagId]);
+    if (searchFilter) next = next.or(searchFilter);
+    return next;
+  };
+
+  const columns = await Promise.all(
+    statuses.map(async (status) => {
+      const [rows, count] = await Promise.all([
+        filtered(supabase.from("leads").select("id, full_name, company_name, phone, status_id, owner_id"), status.id)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(LEAD_COLUMN_LIMIT),
+        filtered(supabase.from("leads").select("id", { count: "exact", head: true }), status.id),
+      ]);
+      if (rows.error) throw new Error(`lead board query failed: ${rows.error.message}`);
+      return { statusId: status.id, rows: rows.data, count: count.count ?? 0 };
+    }),
+  );
+
+  const owners = await getUserNames(columns.flatMap((c) => c.rows.map((row) => row.owner_id)));
+  return {
+    statuses,
+    cards: columns.flatMap((c) =>
+      c.rows.map((row) => ({
+        id: row.id,
+        fullName: row.full_name,
+        companyName: row.company_name,
+        phone: row.phone,
+        statusId: row.status_id,
+        ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+      })),
+    ),
+    counts: Object.fromEntries(columns.map((c) => [c.statusId, c.count])),
+  };
+}

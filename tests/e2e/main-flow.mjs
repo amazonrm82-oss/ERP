@@ -435,6 +435,48 @@ try {
   const purgedLeft = await sql("select count(*)::int as n from public.leads where id = $1", [purgedLeadId]);
   if (purgedLeft[0].n !== 0) throw new Error("the purged lead is still in the database");
 
+  step("leads board: drag between statuses; 'not relevant' asks why; the card menu does the same");
+  await ownerDesk.goto(`${orgUrl}/leads/new`);
+  await ownerDesk.getByLabel("שם מלא").fill("ליד בלוח");
+  await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
+  await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+  const boardLeadId = new URL(ownerDesk.url()).pathname.split("/").pop();
+  const boardStatus = async (expected) => {
+    for (let i = 0; i < 60; i++) {
+      const [row] = await sql("select s.name, l.disqualify_reason as reason from public.leads l join public.lead_statuses s on s.id = l.status_id where l.id = $1", [boardLeadId]);
+      if (row.name === expected) return row;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error(`the board did not move the lead to ${expected}`);
+  };
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("link", { name: "לוח", exact: true }).click();
+  await ownerDesk.waitForURL(/view=board/);
+  const leadCard = () => ownerDesk.locator("li[draggable=true]", { hasText: "ליד בלוח" }).first();
+  const statusColumn = (name) => ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: new RegExp(`^${name}`) }) });
+  await leadCard().dragTo(statusColumn("בטיפול"));
+  await boardStatus("בטיפול");
+  // the last column is off screen in the board's sideways scroll; fire the drag events on it directly
+  await ownerDesk.evaluate(() => {
+    const card = [...document.querySelectorAll("li[draggable=true]")].find((li) => li.textContent.includes("ליד בלוח"));
+    const column = [...document.querySelectorAll("section")].find((section) => section.querySelector("h2")?.textContent.startsWith("לא רלוונטי"));
+    const data = new DataTransfer();
+    card.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: data }));
+    column.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: data }));
+    column.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+  });
+  await ownerDesk.getByLabel("למה הליד ליד בלוח לא רלוונטי?").fill("כבר קנה אצל מתחרה");
+  await shot(ownerDesk, "24-leads-board-1280");
+  await ownerDesk.getByRole("form", { name: "סיבה לליד לא רלוונטי" }).getByRole("button", { name: "העברה" }).click();
+  const disqualified = await boardStatus("לא רלוונטי");
+  if (disqualified.reason !== "כבר קנה אצל מתחרה") throw new Error("the reason was not saved");
+  await ownerDesk.reload();
+  await statusColumn("לא רלוונטי").locator("li", { hasText: "ליד בלוח" }).first().waitFor();
+  await ownerDesk.getByLabel("סטטוס של הליד ליד בלוח").selectOption({ label: "חדש" });
+  await leadCard().getByRole("button", { name: "העברה" }).click();
+  const back = await boardStatus("חדש");
+  if (back.reason !== null) throw new Error("the reason stayed after the lead was reopened");
+
   step("privacy request: erase the purged lead from the audit log");
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);
   await ownerDesk.getByLabel("שם, טלפון או אימייל").fill("ליד למחיקה");

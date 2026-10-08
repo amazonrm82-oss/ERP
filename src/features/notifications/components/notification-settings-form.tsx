@@ -1,11 +1,12 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { useActionState, useState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
+import { submitWith } from "@/lib/use-submit";
 
 import { saveNotificationSettingsAction } from "../actions";
 import { NOTIFICATION_KINDS, type DeliveryChoice, type NotificationSettings } from "../settings";
@@ -13,18 +14,10 @@ import { NOTIFICATION_KINDS, type DeliveryChoice, type NotificationSettings } fr
 /** Per kind of notification: in the bell and on the phone, in the bell only, or not at all. */
 export function NotificationSettingsForm({ orgId, settings }: { orgId: string; settings: NotificationSettings }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveNotificationSettingsAction.bind(null, orgId), null);
-  // a form `action` is reset by React after it runs, and the selects would show the old choices;
-  // submitting by hand keeps what the user chose on screen
   const [choices, setChoices] = useState(settings);
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const data = new FormData(e.currentTarget);
-        startTransition(() => formAction(data));
-      }}
-    >
+    // submitted by hand: the selects are controlled (see submitWith)
+    <form onSubmit={submitWith(formAction)} className="space-y-4">
       <FormError message={state && !state.ok ? state.message : null} />
       <FormNotice message={state?.ok ? state.message : null} />
       <div className="grid gap-3 sm:grid-cols-2">
