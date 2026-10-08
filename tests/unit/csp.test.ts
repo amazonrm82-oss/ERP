@@ -24,6 +24,11 @@ describe("content security policy (FXS-05)", () => {
     expect(contentSecurityPolicy(base)).toContain("form-action 'self' https://ref.supabase.co https://accounts.google.com");
   });
 
+  it("the app is never framed; the public form may be embedded anywhere", () => {
+    expect(contentSecurityPolicy(base)).toContain("frame-ancestors 'none'");
+    expect(contentSecurityPolicy({ ...base, publicForm: true })).toContain("frame-ancestors *");
+  });
+
   it("development keeps eval for React's error stacks", () => {
     expect(contentSecurityPolicy({ ...base, isDev: true })).toContain("'unsafe-eval'");
   });

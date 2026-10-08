@@ -40,6 +40,9 @@ export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }:
     "object-src 'none'",
     "base-uri 'self'",
     `form-action ${formAction.join(" ")}`,
+    // this header replaces the one in next.config, so framing is set here too:
+    // the public form is made to be embedded in customers' sites, the app never
+    `frame-ancestors ${publicForm ? "*" : "'none'"}`,
   ];
   if (!isDev) {
     directives.push("upgrade-insecure-requests");
