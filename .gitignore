@@ -47,3 +47,6 @@ supabase/.temp/
 
 # temporary file of scripts/policy-mutation-sweep.mjs (a deliberately weakened policy)
 supabase/migrations/29990101000000_mutation.sql
+
+# Python caches from skill scripts
+__pycache__/
