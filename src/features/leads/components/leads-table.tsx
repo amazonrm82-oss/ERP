@@ -47,15 +47,9 @@ export function LeadsTable({ orgId, leads, statuses, sources, sort, sortHref }: 
             {header("name", "שם", `${th} sm:min-w-52`)}
             {header("phone", "טלפון", `${th} hidden sm:table-cell`)}
             {header("email", "אימייל", `${th} hidden lg:table-cell`)}
-            <th scope="col" className={th}>
-              סטטוס
-            </th>
-            <th scope="col" className={`${th} hidden lg:table-cell`}>
-              מקור
-            </th>
-            <th scope="col" className={`${th} hidden xl:table-cell`}>
-              בעלים
-            </th>
+            {header("status", "סטטוס", th)}
+            {header("source", "מקור", `${th} hidden lg:table-cell`)}
+            {header("owner", "בעלים", `${th} hidden xl:table-cell`)}
             {header("created", "נוצר", `${th} hidden md:table-cell`)}
           </tr>
         </thead>

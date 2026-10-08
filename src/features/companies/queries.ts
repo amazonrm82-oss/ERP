@@ -16,7 +16,8 @@ export type CompanyListItem = {
 };
 
 // columns the company table can be sorted by (LST-02)
-export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", created: "created_at" } as const;
+// owner is a computed field (migration 0032)
+export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", owner: "sort_owner", created: "created_at" } as const;
 export type CompanySortKey = keyof typeof COMPANY_SORT_COLUMNS;
 export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascending: true };
 

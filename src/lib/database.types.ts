@@ -978,6 +978,11 @@ export type Database = {
       sign_agreement: { Args: { p_version: string; p_documents: Json; p_full_name: string; p_method: string; p_signature: string | null }; Returns: string };
       agreement_status: { Args: Record<string, never>; Returns: string | null };
       set_notification_settings: { Args: { p_muted: string[]; p_no_push: string[] }; Returns: undefined };
+      // computed fields for sorting lists (migration 0032): used as `order=sort_owner`, not called as RPCs
+      sort_status: { Args: Record<string, never>; Returns: number | null };
+      sort_source: { Args: Record<string, never>; Returns: string | null };
+      sort_owner: { Args: Record<string, never>; Returns: string | null };
+      sort_company: { Args: Record<string, never>; Returns: string | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       my_agreement: { Args: Record<string, never>; Returns: Json };

@@ -53,7 +53,16 @@ export type LeadListItem = {
 };
 
 // columns the leads table can be sorted by (LST-02); "created" newest first is the default
-export const LEAD_SORT_COLUMNS = { name: "full_name", phone: "phone", email: "email", created: "created_at" } as const;
+// status, source and owner are computed fields (migration 0032): position of the status, names of the others
+export const LEAD_SORT_COLUMNS = {
+  name: "full_name",
+  phone: "phone",
+  email: "email",
+  status: "sort_status",
+  source: "sort_source",
+  owner: "sort_owner",
+  created: "created_at",
+} as const;
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
 export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
 

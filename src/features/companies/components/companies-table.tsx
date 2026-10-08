@@ -37,9 +37,7 @@ export function CompaniesTable({ orgId, companies, sort, sortHref }: Props) {
             {header("name", "שם", `${th} sm:min-w-52`)}
             {header("phone", "טלפון", `${th} hidden sm:table-cell`)}
             {header("city", "עיר", `${th} hidden md:table-cell`)}
-            <th scope="col" className={`${th} hidden xl:table-cell`}>
-              בעלים
-            </th>
+            {header("owner", "בעלים", `${th} hidden xl:table-cell`)}
             {header("created", "נוצר", `${th} hidden lg:table-cell`)}
           </tr>
         </thead>

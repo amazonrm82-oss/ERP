@@ -502,6 +502,28 @@ try {
   await ownerDesk.goto(`${orgUrl}/companies`);
   await ownerDesk.getByRole("columnheader", { name: /^נוצר/ }).getByRole("link").click();
   await ownerDesk.waitForURL(/sort=-created/);
+  // columns that show another table's name sort through computed fields (migration 0032)
+  for (const [path, header, param] of [
+    ["leads", "סטטוס", "status"],
+    ["leads", "מקור", "source"],
+    ["leads", "בעלים", "owner"],
+    ["contacts", "חברה", "company"],
+    ["contacts", "בעלים", "owner"],
+    ["companies", "בעלים", "owner"],
+  ]) {
+    await ownerDesk.goto(`${orgUrl}/${path}?sort=${param}`);
+    const column = ownerDesk.getByRole("columnheader", { name: new RegExp(`^${header}`) });
+    if ((await column.getAttribute("aria-sort")) !== "ascending") throw new Error(`${path}: not sorted by ${header}`);
+    await ownerDesk.locator("tbody tr").first().waitFor({ timeout: 15000 });
+  }
+  const [{ expected }] = await sql(
+    `select l.full_name as expected from public.leads l join public.lead_statuses s on s.organization_id = l.organization_id and s.id = l.status_id
+      where l.organization_id = $1 and l.deleted_at is null order by s.position, l.id limit 1`,
+    [orgUrl.split("/").pop()],
+  );
+  await ownerDesk.goto(`${orgUrl}/leads?sort=status`);
+  const firstByStatus = (await ownerDesk.locator("tbody tr td:first-child a").first().innerText()).trim();
+  if (expected && firstByStatus !== expected) throw new Error(`leads by status: first shown ${firstByStatus}, expected ${expected}`);
 
   step("privacy request: erase the purged lead from the audit log");
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);

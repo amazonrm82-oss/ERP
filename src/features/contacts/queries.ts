@@ -32,7 +32,15 @@ async function getCompanyNames(orgId: string, companyIds: Array<string | null>):
 }
 
 // columns the contact table can be sorted by (LST-02)
-export const CONTACT_SORT_COLUMNS = { name: "full_name", phone: "phone", email: "email", created: "created_at" } as const;
+// company and owner are computed fields (migration 0032)
+export const CONTACT_SORT_COLUMNS = {
+  name: "full_name",
+  phone: "phone",
+  email: "email",
+  company: "sort_company",
+  owner: "sort_owner",
+  created: "created_at",
+} as const;
 export type ContactSortKey = keyof typeof CONTACT_SORT_COLUMNS;
 export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", ascending: false };
 

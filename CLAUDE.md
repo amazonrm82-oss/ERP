@@ -155,6 +155,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   read own row; written only by `set_notification_settings()`). Trigger `notifications_apply_settings`
   drops a muted kind and sets `pushed_at` for a bell-only kind. `system` is never mutable; a new kind
   must be added to the table's check constraint and to `src/features/notifications/settings.ts`.
+- List sorting (migration 0032): computed fields `sort_status(leads)`, `sort_source(leads)`,
+  `sort_owner(leads|contacts|companies)`, `sort_company(contacts)` (security invoker) are ordered by as
+  PostgREST columns (`order=sort_owner`); each list's `*_SORT_COLUMNS` maps URL keys to columns.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
