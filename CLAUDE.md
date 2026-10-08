@@ -292,6 +292,12 @@ Not verified yet:
 - The flow on the hosted project and the live site (`https://erp-3yft.vercel.app`).
 - Performance of the per-row access functions on large tables.
 
+## Skills
+
+`.claude/skills/` holds third-party skills (list and sources in `.claude/skills/README.md`). They are
+advice. Where a skill disagrees with this file (hosted database, pushing, PRs, installs, secrets), this
+file wins.
+
 ## Working agreement
 
 - **Continuous building** (owner's request, 8 October 2026). Take the next requirement from
