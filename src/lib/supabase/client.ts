@@ -11,5 +11,8 @@ export function createClient(): SupabaseClient<Database> {
   if (!env) {
     throw new MissingConfigError();
   }
-  return createBrowserClient<Database>(env.url, env.anonKey);
+  // the session cookies are sent only over HTTPS in production (FXS-05)
+  return createBrowserClient<Database>(env.url, env.anonKey, {
+    cookieOptions: { secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" },
+  });
 }

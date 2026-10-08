@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import "@fontsource-variable/heebo";
@@ -31,7 +32,10 @@ export const viewport: Viewport = {
   themeColor: THEME_COLOR,
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Every page is rendered per request, so each one carries the nonce of its
+  // Content-Security-Policy (FXS-05); a prerendered page would have scripts without it.
+  await connection();
   // Without the Supabase settings nothing below can work, so the whole app is
   // replaced by one screen that says what is missing.
   const isConfigured = getSupabaseEnv() !== null;

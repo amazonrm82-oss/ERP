@@ -1,0 +1,16 @@
+# FXS-06: weekly pull requests for outdated or vulnerable dependencies.
+# Pull requests from anyone but the owner are not merged without the owner saying so.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

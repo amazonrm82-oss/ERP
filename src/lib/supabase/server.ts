@@ -7,6 +7,7 @@ import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv, MissingConfigError } from "@/lib/env";
+import { SESSION_COOKIE } from "@/lib/supabase/proxy";
 
 // Server client for Server Components, Server Actions and Route Handlers.
 // It carries the user's session (anon key + cookies), never a service-role key,
@@ -33,6 +34,7 @@ export const createClient = cache(async (): Promise<SupabaseClient<Database>> =>
 
   return createServerClient<Database>(env.url, env.anonKey, {
     global: { headers: forwarded },
+    cookieOptions: SESSION_COOKIE,
     cookies: {
       getAll() {
         return cookieStore.getAll();
