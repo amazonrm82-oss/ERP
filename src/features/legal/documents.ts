@@ -23,16 +23,20 @@ export const BLANK = {
   address: "[כתובת למשלוח דואר]",
   email: "[כתובת אימייל לפניות]",
   privacyEmail: "[כתובת אימייל לפניות בנושא פרטיות]",
-  phone: "[מספר טלפון]",
-  coordinator: "[שם רכז או רכזת הנגישות]",
   region: "[אזור אחסון הנתונים]",
   court: "[העיר של בית המשפט המוסמך]",
+} as const;
+
+/** Details the owner has given (8 October 2026, docs/DECISIONS.md). */
+export const DETAILS = {
+  phone: "052-5621437",
+  coordinator: "מתן זזון",
 } as const;
 
 export const LEGAL_VERSION = "2026-10-07";
 const UPDATED = "7 באוקטובר 2026";
 
-const CONTACT = [`${BLANK.company}`, `אימייל: ${BLANK.email}`, `טלפון: ${BLANK.phone}`, `כתובת: ${BLANK.address}`];
+const CONTACT = [`${BLANK.company}`, `אימייל: ${BLANK.email}`, `טלפון: ${DETAILS.phone}`, `כתובת: ${BLANK.address}`];
 
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   {
@@ -412,7 +416,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       },
       {
         heading: "רכז הנגישות",
-        paragraphs: [`שם: ${BLANK.coordinator}`, `טלפון: ${BLANK.phone}`, `אימייל: ${BLANK.email}`, `כתובת: ${BLANK.address}`],
+        paragraphs: [`שם: ${DETAILS.coordinator}`, `טלפון: ${DETAILS.phone}`, `אימייל: ${BLANK.email}`, `כתובת: ${BLANK.address}`],
       },
       { heading: "עדכון ההצהרה", paragraphs: [`ההצהרה עודכנה ב-${UPDATED}.`] },
     ],
