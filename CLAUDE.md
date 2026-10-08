@@ -257,8 +257,9 @@ that back.
   `typecheck`, `build` and `test:db` pass: apply the migration with the Supabase connector's
   `apply_migration` (name = the file name without `.sql`, query = the file's content, unchanged);
   check with read-only queries that its tables, columns, functions, grants and policies are there;
-  run `get_advisors` (security) and fix or report anything new; only then push the code to `main`
-  (which deploys). If an apply fails or stops half way, do not improvise SQL on the hosted database:
+  run `get_advisors` (security) and fix or report anything new; only then push the code to `main`.
+  CI promotes `main` to the `production` branch only when every check passed (`GATE-01`); the live
+  site is built from `production` once the owner sets it as Vercel's production branch. If an apply fails or stops half way, do not improvise SQL on the hosted database:
   fix it with a new migration, tested locally first, or stop and ask. Keep statements safe to run
   twice. Prefer additive changes, because the old code keeps running until the deploy finishes.
 - State of the hosted project on 8 October 2026: the owner applied 0001–0033 by hand in the SQL

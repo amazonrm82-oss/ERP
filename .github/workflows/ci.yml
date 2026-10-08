@@ -41,3 +41,21 @@ jobs:
       - run: npm run test:unit
       - run: npm run test:db
       - run: npm run build
+
+  # GATE-01: the live site is built from the `production` branch, which moves
+  # only here, after every check above passed on this commit of main. A plain
+  # push (no force) refuses to move it backwards if an older run ends last.
+  promote:
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: promote-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git push origin HEAD:refs/heads/production
