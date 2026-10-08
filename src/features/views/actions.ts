@@ -49,7 +49,7 @@ export async function saveViewAction(orgId: string, objectType: ViewObject, _pre
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const filters = cleanFilters(pick(formData, ["q", "status", "tag"]));
+  const filters = cleanFilters(pick(formData, ["q", "status", "tag", "f"]));
   const sortRaw = String(formData.get("sort") ?? "");
   const sort = VIEW_SORT_RE.test(sortRaw) ? sortRaw : null;
   const columns = readColumns(formData.get("columns"));

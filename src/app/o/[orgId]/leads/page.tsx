@@ -13,6 +13,8 @@ import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, lis
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
+import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -43,6 +45,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const page = parsePage(query.page);
   const boardView = firstParam(query.view) === "board";
   const listColumns = await getListColumns(orgId, "lead");
+  // the advanced filter (LST-05), checked against the list's fields
+  const filter = await prepareListFilter(orgId, "lead", firstParam(query.f), context.user.id, listColumns.fields);
+  const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
   const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof LEAD_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
@@ -51,13 +56,13 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
-    boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort }),
-    boardView ? getLeadBoard(orgId, { search, tagId }) : null,
+    boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort, filter: filter.logic }),
+    boardView ? getLeadBoard(orgId, { search, tagId, filter: filter.logic }) : null,
   ]);
   const leads = list?.leads ?? [];
   const hasMore = list?.hasMore ?? false;
 
-  const isFiltered = search !== "" || statusId !== null || tagId !== null;
+  const isFiltered = search !== "" || statusId !== null || tagId !== null || filter.tree !== null;
   // the same filters in the other view (the board has no status filter)
   const viewHref = (target: "table" | "board") => {
     const next = new URLSearchParams();
@@ -65,6 +70,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     if (tagId) next.set("tag", tagId);
     if (target === "table" && statusId) next.set("status", statusId);
     if (target === "table" && sortValue(sort) !== sortValue(LEAD_DEFAULT_SORT)) next.set("sort", sortValue(sort));
+    if (filterParam) next.set("f", filterParam);
     if (target === "board") next.set("view", "board");
     const suffix = next.toString();
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
@@ -80,6 +86,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     if (statusId) next.set("status", statusId);
     if (tagId) next.set("tag", tagId);
     if (sortParam !== sortValue(LEAD_DEFAULT_SORT)) next.set("sort", sortParam);
+    if (filterParam) next.set("f", filterParam);
     if (activeView) next.set("sv", activeView.id);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
@@ -105,7 +112,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         listPath={paths.leads(orgId)}
         views={views}
         activeViewId={activeView?.id ?? null}
-        current={{ q: search || undefined, status: statusId ?? undefined, tag: tagId ?? undefined }}
+        current={{ q: search || undefined, f: filterParam ?? undefined, status: statusId ?? undefined, tag: tagId ?? undefined }}
         currentSort={sortValue(sort)}
         currentColumns={shownColumns}
         teams={viewData.teams}
@@ -113,6 +120,15 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         canShare={context.role === "owner" || context.role === "admin"}
       />
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        <AdvancedFilter
+          fields={filter.fields}
+          current={filter.tree}
+          skipped={filter.skipped}
+          listPath={paths.leads(orgId)}
+          keep={Object.fromEntries(
+            Object.entries({ q: search, status: boardView ? "" : (statusId ?? ""), tag: tagId ?? "", view: boardView ? "board" : "" }).filter(([, v]) => v),
+          )}
+        />
         {boardView ? null : activeView?.config.columns ? (
           <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
         ) : (

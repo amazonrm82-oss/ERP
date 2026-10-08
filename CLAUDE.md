@@ -161,6 +161,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - List columns (migration 0033): `public.list_preferences` (organization, user from the session, list,
   `columns` jsonb), own rows only. `src/features/list-columns/` holds the catalog (built-in + `cf:<key>`
   custom fields), the panel and `ListTable`; custom field columns sort by `custom_fields->key`.
+- Advanced filters (LST-05, no migration): `src/features/list-filters/`. The tree travels as JSON in `f=`;
+  `filterToPostgrest()` checks every field/op/value against the list's fields and builds one PostgREST
+  logic tree for `.or()`. Values are double-quoted with `"` and `\` removed; ids must be in the options.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

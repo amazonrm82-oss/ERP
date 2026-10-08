@@ -51,7 +51,7 @@ export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", asce
 /** One page of live contacts, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listContacts(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey> },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey>; filter?: string | null },
 ): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -68,6 +68,9 @@ export async function listContacts(
   }
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
+  }
+  if (options.filter) {
+    query = query.or(options.filter);
   }
 
   const sort = options.sort ?? CONTACT_DEFAULT_SORT;

@@ -27,7 +27,7 @@ export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascendi
 /** One page of live companies, by name unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listCompanies(
   orgId: string,
-  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey> },
+  options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey>; filter?: string | null },
 ): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (options.page - 1) * PAGE_SIZE;
@@ -43,6 +43,9 @@ export async function listCompanies(
   }
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
+  }
+  if (options.filter) {
+    query = query.or(options.filter);
   }
 
   const sort = options.sort ?? COMPANY_DEFAULT_SORT;

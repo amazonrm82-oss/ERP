@@ -650,6 +650,41 @@ try {
   await ownerDesk.getByRole("columnheader", { name: /^מקור/ }).waitFor({ timeout: 15000 });
   await ownerDesk.goto(leadUrl);
 
+  step("advanced filter: conditions in groups, custom fields, saved in a view");
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("button", { name: "סינון מתקדם" }).click();
+  const filterPanel = ownerDesk.getByRole("group", { name: "סינון מתקדם" });
+  await filterPanel.getByLabel("שדה לתנאי 1.1").selectOption({ label: "שם" });
+  await filterPanel.getByLabel("פעולה לתנאי 1.1").selectOption("contains");
+  await filterPanel.getByLabel("ערך לתנאי 1.1").fill("משה");
+  await filterPanel.getByRole("button", { name: "הוספת קבוצה" }).click();
+  await filterPanel.getByLabel("שדה לתנאי 2.1").selectOption({ label: "תאריך פגישה" });
+  await filterPanel.getByLabel("פעולה לתנאי 2.1").selectOption("on_or_after");
+  await filterPanel.getByLabel("ערך לתנאי 2.1").fill("2026-11-01");
+  await filterPanel.getByLabel("להציג רשומות שעונות על").selectOption("any");
+  await shot(ownerDesk, "32-advanced-filter-1280");
+  await filterPanel.getByRole("button", { name: "החלת הסינון" }).click();
+  await ownerDesk.waitForURL(/f=/);
+  await ownerDesk.getByRole("button", { name: "סינון מתקדם (2)" }).waitFor({ timeout: 15000 });
+  const meetingKey = (await sql("select key from public.field_definitions where organization_id = $1 and label = 'תאריך פגישה'", [orgUrl.split("/").pop()]))[0].key;
+  const [{ n: expectedRows }] = await sql(
+    `select count(*)::int as n from public.leads where organization_id = $1 and deleted_at is null
+       and (full_name ilike '%משה%' or custom_fields->>$2 >= '2026-11-01')`,
+    [orgUrl.split("/").pop(), meetingKey],
+  );
+  const shownRows = await ownerDesk.locator("tbody tr").count();
+  if (shownRows !== expectedRows || expectedRows < 2) throw new Error(`advanced filter: shown ${shownRows}, expected ${expectedRows}`);
+  // the filter is part of a saved view
+  await ownerDesk.getByRole("button", { name: "שמירת התצוגה" }).click();
+  await ownerDesk.getByLabel("שם התצוגה").fill("סינון מתקדם שמור");
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await ownerDesk.getByRole("link", { name: /סינון מתקדם שמור/ }).waitFor({ timeout: 15000 });
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("link", { name: /סינון מתקדם שמור/ }).click();
+  await ownerDesk.getByRole("button", { name: "סינון מתקדם (2)" }).waitFor({ timeout: 15000 });
+  if ((await ownerDesk.locator("tbody tr").count()) !== expectedRows) throw new Error("the saved view did not bring the filter back");
+  await ownerDesk.goto(leadUrl);
+
   step("tags: create on a record, filter the list, save a view");
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByRole("button", { name: "עריכת תגיות" }).click();
   await ownerDesk.getByLabel("תגית חדשה").fill("VIP");

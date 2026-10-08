@@ -68,7 +68,15 @@ export const LEAD_SORT_COLUMNS = {
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
 export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
 
-type ListOptions = { search: string; statusId: string | null; tagId?: string | null; page: number; sort?: Sort<LeadSortKey | CustomSortKey> };
+type ListOptions = {
+  search: string;
+  statusId: string | null;
+  tagId?: string | null;
+  page: number;
+  sort?: Sort<LeadSortKey | CustomSortKey>;
+  // the advanced filter as a PostgREST logic tree (LST-05)
+  filter?: string | null;
+};
 
 /** One page of live leads, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
 export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
@@ -90,6 +98,9 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
   const searchFilter = personSearchFilter(["full_name", "company_name"], options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
+  }
+  if (options.filter) {
+    query = query.or(options.filter);
   }
 
   const sort = options.sort ?? LEAD_DEFAULT_SORT;
@@ -154,7 +165,7 @@ export type LeadBoard = {
 };
 
 /** Live leads that were not converted, by status: the newest per column, and exact counts. */
-export async function getLeadBoard(orgId: string, options: { search: string; tagId: string | null }): Promise<LeadBoard> {
+export async function getLeadBoard(orgId: string, options: { search: string; tagId: string | null; filter?: string | null }): Promise<LeadBoard> {
   const supabase = await createClient();
   const { statuses: all } = await getLeadLookups(orgId);
   const statuses = all.filter((status) => status.kind !== "converted");
@@ -171,6 +182,7 @@ export async function getLeadBoard(orgId: string, options: { search: string; tag
     let next = query.eq("organization_id", orgId).eq("status_id", statusId).is("deleted_at", null).is("converted_at", null);
     if (options.tagId) next = next.contains("tag_ids", [options.tagId]);
     if (searchFilter) next = next.or(searchFilter);
+    if (options.filter) next = next.or(options.filter);
     return next;
   };
 

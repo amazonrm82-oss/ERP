@@ -12,6 +12,8 @@ import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/fea
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
+import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -38,13 +40,16 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
   const listColumns = await getListColumns(orgId, "company");
+  // the advanced filter (LST-05), checked against the list's fields
+  const filter = await prepareListFilter(orgId, "company", firstParam(query.f), context.user.id, listColumns.fields);
+  const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
   const sortKeys = [...Object.keys(COMPANY_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const [tags, viewData, { companies, hasMore }] = await Promise.all([
     listTags(orgId),
     viewChips(orgId, "company", context),
-    listCompanies(orgId, { search, tagId, page, sort }),
+    listCompanies(orgId, { search, tagId, page, sort, filter: filter.logic }),
   ]);
 
   const views = viewData.chips;
@@ -57,6 +62,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
     if (search) next.set("q", search);
     if (tagId) next.set("tag", tagId);
     if (sortParam !== sortValue(COMPANY_DEFAULT_SORT)) next.set("sort", sortParam);
+    if (filterParam) next.set("f", filterParam);
     if (activeView) next.set("sv", activeView.id);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
@@ -83,7 +89,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
         listPath={paths.companies(orgId)}
         views={views}
         activeViewId={activeView?.id ?? null}
-        current={{ q: search || undefined, tag: tagId ?? undefined }}
+        current={{ q: search || undefined, f: filterParam ?? undefined, tag: tagId ?? undefined }}
         currentSort={sortValue(sort)}
         currentColumns={shownColumns}
         teams={viewData.teams}
@@ -91,7 +97,14 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
         canShare={context.role === "owner" || context.role === "admin"}
       />
 
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        <AdvancedFilter
+          fields={filter.fields}
+          current={filter.tree}
+          skipped={filter.skipped}
+          listPath={paths.companies(orgId)}
+          keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
+        />
         {activeView?.config.columns ? (
           <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
         ) : (
@@ -136,7 +149,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
-          {search !== "" || tagId !== null || page > 1 ? (
+          {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
             <EmptyState
               title="לא נמצאו חברות"
               description="אין חברות שמתאימות לחיפוש. נסו מילה אחרת."
