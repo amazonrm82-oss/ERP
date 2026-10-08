@@ -167,6 +167,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Inline editing (LST-06, no migration): `src/features/inline-edit/`. `inlineEditAction()` updates name /
   owner with the user's session (0 rows = not permitted); lead status goes through `setLeadStatus()`
   (`src/features/leads/status.ts`), shared with the status form and the board.
+- Bulk actions (LST-07, no migration): `src/features/bulk/`. `bulkAction()` changes each picked row on its
+  own with the user's session (owner, lead status, add tag, recycle bin) and returns `{done, skipped}`.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.

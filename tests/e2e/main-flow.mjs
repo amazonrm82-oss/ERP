@@ -788,6 +788,45 @@ try {
   await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).fill(inlineLead.full_name);
   await ownerDesk.getByRole("textbox", { name: `שם: ${renamed}` }).press("Enter");
   await pollLead(inlineLead.id, (r) => r.full_name === inlineLead.full_name, "name back");
+
+  step("bulk actions: pick leads, add a tag and change the status of all of them, move one to the bin");
+  const bulkLeads = await sql(
+    `select l.id, l.full_name, l.status_id, l.tag_ids from public.leads l join public.lead_statuses s on s.organization_id = l.organization_id and s.id = l.status_id
+      where l.organization_id = $1 and l.deleted_at is null and l.full_name is not null and s.kind = 'open' and l.converted_at is null order by l.created_at desc limit 2`,
+    [orgIdNow],
+  );
+  if (bulkLeads.length < 2) throw new Error("bulk: need two open leads");
+  const [{ id: bulkTag }] = await sql("select id from public.tags where organization_id = $1 and name = 'VIP'", [orgIdNow]);
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  for (const lead of bulkLeads) await ownerDesk.getByRole("checkbox", { name: `בחירה: ${lead.full_name}`, exact: true }).check();
+  const bar = ownerDesk.getByRole("group", { name: "פעולות על הנבחרים" });
+  await bar.getByText("נבחרו 2").waitFor();
+  await bar.getByLabel("פעולה", { exact: true }).selectOption("tag");
+  await bar.getByLabel("תגית", { exact: true }).selectOption(bulkTag);
+  await shot(ownerDesk, "35-bulk-actions-1280");
+  await bar.getByRole("button", { name: "ביצוע על 2" }).click();
+  await bar.getByText("2 רשומות עודכנו.").waitFor({ timeout: 15000 });
+  const tagged = await sql("select count(*)::int as n from public.leads where id = any($1) and $2 = any(tag_ids)", [bulkLeads.map((l) => l.id), bulkTag]);
+  if (tagged[0].n !== 2) throw new Error("bulk: the tag was not added to both leads");
+  for (const lead of bulkLeads) await ownerDesk.getByRole("checkbox", { name: `בחירה: ${lead.full_name}`, exact: true }).check();
+  await bar.getByLabel("פעולה", { exact: true }).selectOption("status");
+  await bar.getByLabel("סטטוס חדש").selectOption(otherStatus);
+  await bar.getByRole("button", { name: "ביצוע על 2" }).click();
+  await bar.getByText("2 רשומות עודכנו.").waitFor({ timeout: 15000 });
+  const moved = await sql("select count(*)::int as n from public.leads where id = any($1) and status_id = $2", [bulkLeads.map((l) => l.id), otherStatus]);
+  if (moved[0].n !== 2) throw new Error("bulk: the status did not change on both leads");
+  // the bin asks first
+  ownerDesk.once("dialog", (dialog) => dialog.accept());
+  await ownerDesk.getByRole("checkbox", { name: `בחירה: ${bulkLeads[0].full_name}`, exact: true }).check();
+  await bar.getByLabel("פעולה", { exact: true }).selectOption("trash");
+  await bar.getByRole("button", { name: "ביצוע על 1" }).click();
+  await bar.getByText("רשומה אחת עודכנה.").waitFor({ timeout: 15000 });
+  const [{ trashed }] = await sql("select deleted_at is not null as trashed from public.leads where id = $1", [bulkLeads[0].id]);
+  if (!trashed) throw new Error("bulk: the lead did not go to the bin");
+  // put everything back, so the later steps see the leads as before
+  for (const lead of bulkLeads) {
+    await sql("update public.leads set deleted_at = null, status_id = $2, tag_ids = $3 where id = $1", [lead.id, lead.status_id, lead.tag_ids]);
+  }
   await ownerDesk.goto(leadUrl);
 
   // ---------------------------------------------------------------- section 4: lead intake

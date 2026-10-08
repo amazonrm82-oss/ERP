@@ -149,6 +149,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
           sort={sort}
           sortHref={sortHref}
           editing={editing}
+          tags={tags}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
