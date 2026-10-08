@@ -58,6 +58,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
     .select("id, created_at, actor_id, action, entity_type, entity_id, changes")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range((filters.page - 1) * AUDIT_PAGE, filters.page * AUDIT_PAGE);
   if (days !== null) query = query.gte("created_at", new Date(Date.now() - days * 86_400_000).toISOString());
   if (filters.entityType) query = query.eq("entity_type", filters.entityType);
@@ -94,6 +95,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(30), "audit_log");
   const rows = data ?? [];
   const names = await getUserNames(rows.map((r) => r.actor_id));

@@ -58,6 +58,8 @@ async function fetchAll(table: TableName, orgId: string): Promise<Row[]> {
       .select("*")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: true })
+      // rows written in one statement share created_at; without a tie-breaker a row can be skipped or repeated between pages (FXC-07)
+      .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`export of ${table} failed: ${error.message}`);
     rows.push(...(data as Row[]));
