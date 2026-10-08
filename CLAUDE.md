@@ -80,6 +80,7 @@ npm run build
 
 npm run db:test:start  # start a throwaway local PostgreSQL on 127.0.0.1:54329
 npm run test:db        # rebuild crm_saas_test from the migrations and run all database tests
+npm run test:unit      # unit tests of the app logic (no database, no browser)
 npm run db:test:stop
 npm run test:e2e       # browser flow; needs `npx supabase start` (Docker) + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy

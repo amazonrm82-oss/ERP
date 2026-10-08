@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:db": "vitest run --config vitest.db.config.mts",
+    "test:unit": "vitest run --config vitest.unit.config.mts",
     "db:test:start": "bash scripts/test-db.sh start",
     "db:test:stop": "bash scripts/test-db.sh stop",
     "test:e2e": "node tests/e2e/main-flow.mjs"
