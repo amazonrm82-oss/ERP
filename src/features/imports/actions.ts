@@ -9,6 +9,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 import { CHUNK_SIZE, CUSTOM_PREFIX, IMPORT_TARGETS, MAX_IMPORT_ROWS, type DuplicateModeKey, type ImportEntityKey } from "./fields";
 import { ImportStopped, loadLookups, processChunk, type ImportContext, type RowOutcome } from "./server";
@@ -18,7 +19,6 @@ const modeSchema = z.enum(["skip", "update", "create"]);
 const cellsSchema = z.array(z.array(z.string().max(10_000)).max(200)).max(CHUNK_SIZE);
 const mappingSchema = z.array(z.string().max(100)).max(200);
 
-const TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
 const UNDO_DAYS = 7;
 
 async function importContext(orgId: string, entity: ImportEntityKey, mode: DuplicateModeKey, mapping: string[]) {
@@ -151,7 +151,7 @@ export async function finishImportAction(
   if (!job) return fail(NOT_FOUND_OR_FORBIDDEN);
   const entity = entitySchema.parse(job.entity_type);
   const { count } = await context.supabase
-    .from(TABLE[entity])
+    .from(RECORD_TYPES[entity].table)
     .select("id", { count: "exact", head: true })
     .eq("organization_id", orgId)
     .eq("import_job_id", jobId);
@@ -227,7 +227,7 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
 
   const entity = entitySchema.parse(job.entity_type);
   const { error } = await context.supabase
-    .from(TABLE[entity])
+    .from(RECORD_TYPES[entity].table)
     .update({ deleted_at: new Date().toISOString() })
     .eq("organization_id", orgId)
     .eq("import_job_id", jobId)

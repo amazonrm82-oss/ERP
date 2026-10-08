@@ -8,10 +8,10 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 import { TAGGABLE, type Taggable } from "./types";
 
-const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals" } as const;
 const PAGE = { lead: paths.lead, contact: paths.contact, company: paths.company, deal: paths.deal } as const;
 
 function revalidateTags(orgId: string) {
@@ -136,7 +136,7 @@ export async function saveRecordTagsAction(
   const shown = new Set(formData.getAll("shown_tag_id").filter((value): value is string => isUuid(value)));
   const chosen = new Set(tagIds);
   const { data, error } = await context.supabase.rpc("change_record_tags", {
-    p_table: TABLE[kind],
+    p_table: RECORD_TYPES[kind].table,
     p_org: orgId,
     p_id: recordId,
     p_add: [...chosen].filter((id) => !shown.has(id)),

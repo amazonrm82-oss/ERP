@@ -6,14 +6,13 @@ import { z } from "zod";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { paths } from "@/lib/paths";
 import { pick, requiredText } from "@/lib/validation";
 
 import { columnChoicesSchema } from "@/features/list-columns/columns";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 import { cleanFilters, VIEW_OBJECTS, VIEW_SORT_RE, type ViewObject } from "./types";
 
-const LIST_PATH = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
 
 const viewSchema = z
   .object({
@@ -67,7 +66,7 @@ export async function saveViewAction(orgId: string, objectType: ViewObject, _pre
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את התצוגה. נסו שוב."), { values: formValues(formData) });
   }
-  revalidatePath(LIST_PATH[objectType](orgId));
+  revalidatePath(RECORD_TYPES[objectType].list(orgId));
   return { ok: true, message: "התצוגה נשמרה." };
 }
 
@@ -86,6 +85,6 @@ export async function deleteViewAction(orgId: string, objectType: ViewObject, vi
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  revalidatePath(LIST_PATH[objectType](orgId));
+  revalidatePath(RECORD_TYPES[objectType].list(orgId));
   return ok();
 }

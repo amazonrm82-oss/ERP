@@ -6,15 +6,14 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { paths } from "@/lib/paths";
+import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
 import { catalogFor, columnChoicesSchema, type ColumnChoice, type ListObject } from "./columns";
 
-const LIST_PATH: Record<ListObject, (orgId: string) => string> = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks };
 
 /** Saves the user's columns for a list (only columns the list really has). */
 export async function saveListColumnsAction(orgId: string, object: ListObject, columns: ColumnChoice[]): Promise<ActionResult> {
-  if (!(object in LIST_PATH)) {
+  if (!isRecordType(object)) {
     return fail("הרשימה לא נמצאה.");
   }
   const parsed = columnChoicesSchema.safeParse(columns);
@@ -46,13 +45,13 @@ export async function saveListColumnsAction(orgId: string, object: ListObject, c
       return fail(dbErrorMessage(insertError, "לא הצלחנו לשמור את העמודות. נסו שוב."));
     }
   }
-  revalidatePath(LIST_PATH[object](orgId));
+  revalidatePath(RECORD_TYPES[object].list(orgId));
   return ok();
 }
 
 /** Back to the list's default columns. */
 export async function resetListColumnsAction(orgId: string, object: ListObject): Promise<ActionResult> {
-  if (!(object in LIST_PATH)) {
+  if (!isRecordType(object)) {
     return fail("הרשימה לא נמצאה.");
   }
   const context = await actionContext(orgId);
@@ -63,6 +62,6 @@ export async function resetListColumnsAction(orgId: string, object: ListObject):
   if (error) {
     return fail(dbErrorMessage(error));
   }
-  revalidatePath(LIST_PATH[object](orgId));
+  revalidatePath(RECORD_TYPES[object].list(orgId));
   return ok();
 }

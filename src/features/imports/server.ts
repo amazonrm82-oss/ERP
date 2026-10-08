@@ -10,6 +10,7 @@ import type { Database, Json } from "@/lib/database.types";
 import { dbErrorMessage } from "@/lib/errors";
 import { normalizePhone } from "@/lib/phone";
 import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fields";
 
@@ -226,7 +227,6 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
   };
 }
 
-const TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
 
 type Existing = { id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null };
 
@@ -340,7 +340,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         if (Object.keys(filled).length) values.custom_fields = { $merge: filled };
         else delete values.custom_fields;
       }
-      const { data, error } = await ctx.supabase.from(TABLE[ctx.entity]).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
+      const { data, error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
       if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : "אין הרשאה לעדכן את הרשומה הקיימת." });
       else outcomes.push({ row: row.row, status: "updated" });
     } else {
@@ -363,7 +363,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   });
 
   if (toInsert.length) {
-    const { error } = await ctx.supabase.from(TABLE[ctx.entity]).insert(toInsert.map(insertRow) as never);
+    const { error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(toInsert.map(insertRow) as never);
     if (!error) {
       for (const row of toInsert) outcomes.push({ row: row.row, status: "created" });
     } else if (error.code === "P0001") {
@@ -372,7 +372,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     } else {
       // one bad row fails the batch: insert one by one to find it
       for (const row of toInsert) {
-        const { error: rowError } = await ctx.supabase.from(TABLE[ctx.entity]).insert(insertRow(row) as never);
+        const { error: rowError } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(insertRow(row) as never);
         if (rowError?.code === "P0001") throw new ImportStopped(dbErrorMessage(rowError, "הגעתם למגבלת החבילה."));
         outcomes.push(rowError ? { row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") } : { row: row.row, status: "created" });
       }

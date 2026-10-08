@@ -2,6 +2,7 @@ import "server-only";
 
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
+import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
@@ -140,7 +141,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
 /** Recent records of a type, to pick one for a test run. */
 export async function listTestRecords(orgId: string, entity: string): Promise<Array<{ id: string; name: string }>> {
   const supabase = await createClient();
-  const table = ({ lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const)[entity as "lead"];
+  const table = RECORD_TYPES[entity as "lead"].table;
   if (!table) {
     return [];
   }

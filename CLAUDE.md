@@ -287,6 +287,8 @@ that back.
 - Feature folders: `src/features/<area>/{queries,actions,schema}.ts` + `components/`.
   Shared primitives in `src/components/ui/`. No PostgREST embedding so far; lookups are fetched
   separately and joined in code.
+- Record types (FXC-06): `src/lib/record-types.ts` (`RECORD_TYPES`, `isRecordType`, `recordPage`) says each
+  type's table, pages, Hebrew names and features. Use it instead of a local map; a new type is added there.
 - Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with
   zod via `validArg()` (`src/lib/action-args.ts`, FXC-08). Dates go through `isCalendarDate()`. Importing
   `@/lib/supabase/service` outside the allowed files fails lint.

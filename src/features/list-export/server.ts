@@ -24,6 +24,7 @@ import { isUuid } from "@/lib/paths";
 import { parseSort, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { xlsxFile } from "@/lib/xlsx";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 // Exporting a list (LST-08): the rows the list shows with its filters, search
 // and sort (or only the rows picked in it), in the columns the user sees, as
@@ -35,8 +36,6 @@ const CHUNK = 1000;
 const MAX_ROWS = 50000;
 const MAX_PICKED = 100;
 
-const SHEET = { lead: "לידים", contact: "אנשי קשר", company: "חברות", deal: "עסקאות", task: "משימות" } as const;
-const FILE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
 const TASK_STATUS_LABELS = { open: "פתוחה", done: "הושלמה", cancelled: "בוטלה" } as const;
 const PRIORITY_LABELS: Record<number, string> = { 1: "גבוהה", 2: "רגילה", 3: "נמוכה" };
 const TASK_TYPE_LABELS = new Map<string, string>(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
@@ -225,9 +224,9 @@ export async function exportList(request: Request, orgId: string, object: ListOb
     );
   }
 
-  const filename = `${FILE[object]}-${zoneDate(new Date())}.${format}`;
+  const filename = `${RECORD_TYPES[object].table}-${zoneDate(new Date())}.${format}`;
   if (format === "xlsx") {
-    return new Response(xlsxFile(SHEET[object], header, body) as unknown as BodyInit, {
+    return new Response(xlsxFile(RECORD_TYPES[object].plural, header, body) as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,

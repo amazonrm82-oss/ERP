@@ -8,8 +8,9 @@ import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { isUuid, paths } from "@/lib/paths";
+import { isUuid } from "@/lib/paths";
 import { setTrashed, type TrashableTable } from "@/lib/record-trash";
+import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
 // Bulk actions on the rows picked in a list (LST-07). Each record is changed on
 // its own, with the user's session, so the usual rules hold row by row: a row
@@ -24,8 +25,6 @@ export type BulkChange =
   | { kind: "trash" };
 export type BulkOutcome = { done: number; skipped: number };
 
-const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
-const LIST = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
 const TASK_STATUSES = ["open", "done", "cancelled"] as const;
 // one page of a list; more than that is not picked at once
 const MAX_IDS = 100;
@@ -54,7 +53,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   if (!validArg(changeSchema, change) || !validArg(z.array(z.string()), ids)) {
     return fail(INVALID_ARGS);
   }
-  if (!(object in TABLE) || !Array.isArray(ids) || ids.length === 0) {
+  if (!isRecordType(object) || !Array.isArray(ids) || ids.length === 0) {
     return fail("לא נבחרו רשומות.");
   }
   if (ids.length > MAX_IDS) {
@@ -66,7 +65,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
     return context;
   }
   const { supabase } = context;
-  const table = TABLE[object];
+  const table = RECORD_TYPES[object].table;
 
   // the picked rows the user can see; the rest are counted as skipped
   // tasks have no tags
@@ -166,6 +165,6 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       return fail("פעולה לא מוכרת.");
   }
 
-  revalidatePath(LIST[object](orgId));
+  revalidatePath(RECORD_TYPES[object].list(orgId));
   return ok({ done, skipped: unique.length - done });
 }

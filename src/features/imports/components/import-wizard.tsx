@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { defuseFormula } from "@/lib/csv";
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 import { finishImportAction, importChunkAction, previewImportAction, startImportAction } from "../actions";
 import {
@@ -33,7 +34,6 @@ type Step = "file" | "map" | "preview" | "running" | "done";
 type Totals = { created: number; updated: number; skipped: number; failed: number };
 
 const PREVIEW_ROWS = 20;
-const LIST_PATH = { lead: paths.leads, contact: paths.contacts, company: paths.companies } as const;
 
 function cellText(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -372,7 +372,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
           {stopped ? <p role="alert" className="text-danger">{stopped}</p> : null}
           {step === "done" ? (
             <div className="flex flex-wrap gap-2">
-              <Link href={LIST_PATH[entity](orgId)} className={buttonClasses("primary", "md")}>
+              <Link href={RECORD_TYPES[entity].list(orgId)} className={buttonClasses("primary", "md")}>
                 ל{entityLabel}
               </Link>
               {failures.length > 0 ? (

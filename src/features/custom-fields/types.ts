@@ -1,14 +1,15 @@
 import type { Json } from "@/lib/database.types";
+import { RECORD_TYPES } from "@/lib/record-types";
 
 // Objects that carry custom fields (field_definitions.object_type).
 export const FIELD_OBJECTS = ["lead", "contact", "company", "deal"] as const;
 export type FieldObject = (typeof FIELD_OBJECTS)[number];
 
 export const FIELD_OBJECT_LABELS: Record<FieldObject, string> = {
-  lead: "לידים",
-  contact: "אנשי קשר",
-  company: "חברות",
-  deal: "עסקאות",
+  lead: RECORD_TYPES.lead.plural,
+  contact: RECORD_TYPES.contact.plural,
+  company: RECORD_TYPES.company.plural,
+  deal: RECORD_TYPES.deal.plural,
 };
 
 // The field types the screens support so far (the database accepts more).

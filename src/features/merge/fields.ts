@@ -1,10 +1,12 @@
+import { RECORD_TYPES } from "@/lib/record-types";
+
 // What can be merged, and how each field is named on the merge screen.
 // Must match app.merge_columns() in migration 0020.
 
 export const MERGE_TYPES = ["lead", "contact", "company"] as const;
 export type MergeType = (typeof MERGE_TYPES)[number];
 
-export const MERGE_TABLE = { lead: "leads", contact: "contacts", company: "companies" } as const;
+export const MERGE_TABLE = { lead: RECORD_TYPES.lead.table, contact: RECORD_TYPES.contact.table, company: RECORD_TYPES.company.table } as const;
 
 export const MERGE_FIELDS: Record<MergeType, Array<{ key: string; label: string }>> = {
   lead: [

@@ -9,7 +9,8 @@ import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import type { Database } from "@/lib/database.types";
-import { isUuid, paths } from "@/lib/paths";
+import { isUuid } from "@/lib/paths";
+import { isRecordType, RECORD_TYPES, recordPage } from "@/lib/record-types";
 
 // What can be edited in a list's cell (LST-06), per list. The database decides
 // who may: the update runs with the user's session, and 0 rows means "not allowed".
@@ -25,10 +26,7 @@ const ALLOWED: Record<InlineObject, InlineField[]> = {
   deal: ["name", "stage", "owner"],
   task: ["name", "owner"],
 };
-const TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals", task: "tasks" } as const;
-const LIST = { lead: paths.leads, contact: paths.contacts, company: paths.companies, deal: paths.deals, task: paths.tasks } as const;
 // tasks have no page of their own
-const RECORD = { lead: paths.lead, contact: paths.contact, company: paths.company, deal: paths.deal, task: (orgId: string) => paths.tasks(orgId) } as const;
 
 const text = (max: number) => z.string().trim().max(max, { error: "הטקסט ארוך מדי." });
 
@@ -45,7 +43,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   if (!validArg(valueSchema, value) || typeof object !== "string" || typeof field !== "string") {
     return fail(INVALID_ARGS);
   }
-  if (!(object in TABLE) || !ALLOWED[object].includes(field)) {
+  if (!isRecordType(object) || !ALLOWED[object].includes(field)) {
     return fail("אי אפשר לערוך את השדה הזה מהרשימה.");
   }
   const context = await actionContext(orgId, id);
@@ -59,8 +57,8 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     if (!isUuid(value.id ?? "")) return fail("יש לבחור סטטוס.");
     const result = await setLeadStatus(context.supabase, orgId, id, value.id!, value.reason?.trim().slice(0, 500) || null);
     if (!result.ok) return fail(result.message);
-    revalidatePath(LIST[object](orgId));
-    revalidatePath(RECORD[object](orgId, id));
+    revalidatePath(RECORD_TYPES[object].list(orgId));
+    revalidatePath(recordPage(object, orgId, id));
     return ok();
   } else if (field === "stage") {
     // a stage of another pipeline (or organization) is refused by the (pipeline_id, stage_id) foreign key
@@ -88,7 +86,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
 
   const { data, error } = await context.supabase
-    .from(TABLE[object] as "contacts")
+    .from(RECORD_TYPES[object].table as "contacts")
     .update(patch as Database["public"]["Tables"]["contacts"]["Update"])
     .eq("organization_id", orgId)
     .eq("id", id)
@@ -104,7 +102,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  revalidatePath(LIST[object](orgId));
-  revalidatePath(RECORD[object](orgId, id));
+  revalidatePath(RECORD_TYPES[object].list(orgId));
+  revalidatePath(recordPage(object, orgId, id));
   return ok();
 }
