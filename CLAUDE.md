@@ -329,14 +329,15 @@ file wins.
   waits for the choice.
 - **Stop-and-ask list.** Never guessed and never built around: owner decisions (pricing, plan
   packaging, legal wording, which provider; additions spec 17.4, 18.11, 18.12 and the open list in
-  `docs/DECISIONS.md`); a new use of the service-role key (`WAB-01`, `WAB-02` and anything not listed
+  `docs/DECISIONS.md`; legal texts are drafted by Claude Code and marked as drafts until the lawyer
+  edits them, owner's decision of 8 October 2026); a new use of the service-role key (`WAB-01`, `WAB-02` and anything not listed
   in hard rule 5); the go-ahead list in hard rule 3; anything that needs a secret, an account or money
   from the owner; weakening a test, a guard or an RLS policy to make something pass; anything that
   looks like another system.
 - **A question does not stop the line.** Write it under "שאלות שמחכות לבעל המוצר" in
   `docs/DECISIONS.md` with the requirement id, skip that requirement, continue with the next one that
-  does not depend on it, and ask all waiting questions together, in plain Hebrew, at the end of the
-  turn. Stop completely only when nothing unblocked is left. Record each answer in DECISIONS.md.
+  does not depend on it, and ask the waiting questions in plain Hebrew at the end of the turn, **one
+  question at a time** (owner's request, 8 October 2026): the next one only after he answers. Stop completely only when nothing unblocked is left. Record each answer in DECISIONS.md.
 - **Design direction is the owner's choice** (`DSN-02`). Show the three directions on real screens,
   ask, and until he answers do only work that does not change how screens look. After the choice,
   every new or changed screen uses the design system (`DSN-16`): no colour or size outside the tokens.
