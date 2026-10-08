@@ -6,6 +6,8 @@ A multi-tenant CRM sold per seat to Israeli small and mid-size businesses. Hebre
 Every customer ("organization") signs up alone, picks a plan and adds employees under it.
 
 - Full product spec (Hebrew): `docs/SPEC.md`
+- Everything still missing, with a requirement id each and six build waves (Hebrew):
+  `docs/SPEC-ADDITIONS.md`. Where it and `SPEC.md` disagree, the additions file is newer and wins.
 - What is built and what comes next: `docs/BACKLOG.md`
 - Decisions and open questions: `docs/DECISIONS.md`
 - Full QA plan (Hebrew): `docs/QA-PLAN.md` — a separate phase that starts only after the whole
