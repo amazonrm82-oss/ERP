@@ -9,7 +9,7 @@ import { PlusIcon, SearchIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
-import { CUSTOM_PREFIX } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { getOrgContext } from "@/features/shell/queries";
@@ -41,17 +41,23 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
   const sortKeys = [...Object.keys(CONTACT_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof CONTACT_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
-  const [tags, views, { contacts, hasMore }] = await Promise.all([
+  const [tags, viewData, { contacts, hasMore }] = await Promise.all([
     listTags(orgId),
     viewChips(orgId, "contact", context),
     listContacts(orgId, { search, tagId, page, sort }),
   ]);
+
+  const views = viewData.chips;
+  // a saved view in use (LST-04): its columns replace the user's own while it is open
+  const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
+  const shownColumns = activeView?.config.columns ? resolveColumns("contact", activeView.config.columns, listColumns.catalog) : listColumns.columns;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
     if (search) next.set("q", search);
     if (tagId) next.set("tag", tagId);
     if (sortParam !== sortValue(CONTACT_DEFAULT_SORT)) next.set("sort", sortParam);
+    if (activeView) next.set("sv", activeView.id);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
     return suffix ? `${paths.contacts(orgId)}?${suffix}` : paths.contacts(orgId);
@@ -76,13 +82,21 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         objectType="contact"
         listPath={paths.contacts(orgId)}
         views={views}
+        activeViewId={activeView?.id ?? null}
         current={{ q: search || undefined, tag: tagId ?? undefined }}
+        currentSort={sortValue(sort)}
+        currentColumns={shownColumns}
+        teams={viewData.teams}
         canSave={context.role !== "viewer"}
         canShare={context.role === "owner" || context.role === "admin"}
       />
 
       <div className="mb-3 flex justify-end">
-        <ColumnsPanel orgId={orgId} object="contact" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+        {activeView?.config.columns ? (
+          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+        ) : (
+          <ColumnsPanel orgId={orgId} object="contact" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+        )}
       </div>
       <Form action={paths.contacts(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField
@@ -114,7 +128,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         <ContactsTable
           orgId={orgId}
           contacts={contacts}
-          columns={listColumns.columns}
+          columns={shownColumns}
           catalog={listColumns.catalog}
           fields={listColumns.fields}
           sort={sort}

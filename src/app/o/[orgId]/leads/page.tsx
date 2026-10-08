@@ -10,7 +10,7 @@ import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { LeadsTable } from "@/features/leads/components/leads-table";
 import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
-import { CUSTOM_PREFIX } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { getOrgContext } from "@/features/shell/queries";
@@ -47,7 +47,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof LEAD_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
-  const [lookups, tags, views, list, board] = await Promise.all([
+  const [lookups, tags, viewData, list, board] = await Promise.all([
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
@@ -69,12 +69,18 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     const suffix = next.toString();
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
   };
+  const views = viewData.chips;
+  // a saved view in use (LST-04): its columns replace the user's own while it is open
+  const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
+  const shownColumns = activeView?.config.columns ? resolveColumns("lead", activeView.config.columns, listColumns.catalog) : listColumns.columns;
+
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
     if (search) next.set("q", search);
     if (statusId) next.set("status", statusId);
     if (tagId) next.set("tag", tagId);
     if (sortParam !== sortValue(LEAD_DEFAULT_SORT)) next.set("sort", sortParam);
+    if (activeView) next.set("sv", activeView.id);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
@@ -98,12 +104,18 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         objectType="lead"
         listPath={paths.leads(orgId)}
         views={views}
+        activeViewId={activeView?.id ?? null}
         current={{ q: search || undefined, status: statusId ?? undefined, tag: tagId ?? undefined }}
+        currentSort={sortValue(sort)}
+        currentColumns={shownColumns}
+        teams={viewData.teams}
         canSave={context.role !== "viewer"}
         canShare={context.role === "owner" || context.role === "admin"}
       />
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {boardView ? null : (
+        {boardView ? null : activeView?.config.columns ? (
+          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+        ) : (
           <ColumnsPanel orgId={orgId} object="lead" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
         )}
         <nav aria-label="תצוגה" className="flex gap-1 rounded-md border border-line bg-surface p-1">
@@ -138,7 +150,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
           leads={leads}
           statuses={lookups.statuses}
           sources={lookups.sources}
-          columns={listColumns.columns}
+          columns={shownColumns}
           catalog={listColumns.catalog}
           fields={listColumns.fields}
           sort={sort}

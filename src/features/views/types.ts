@@ -1,4 +1,7 @@
-// Lists that support saved views, and the URL filters a view stores.
+import type { ColumnChoice } from "@/features/list-columns/columns";
+
+// Lists that support saved views, and what a view stores: the URL filters, the
+// sort and the columns (LST-04).
 export const VIEW_OBJECTS = ["lead", "contact", "company"] as const;
 export type ViewObject = (typeof VIEW_OBJECTS)[number];
 
@@ -24,4 +27,20 @@ export function filtersQuery(filters: ViewFilters): string {
   }
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+// the sort as in the URL ("name", "-created", "cf:f_x"); checked again by the list that applies it
+export const VIEW_SORT_RE = /^-?(?:[a-z_]{1,30}|cf:[a-z][a-z0-9_]{0,39})$/;
+
+export type ViewConfig = { filters: ViewFilters; sort: string | null; columns: ColumnChoice[] | null };
+
+/** A view's address: its filters and sort, and `sv` so the list knows to use the view's columns. */
+export function viewHref(listPath: string, viewId: string, config: ViewConfig): string {
+  const params = new URLSearchParams();
+  for (const key of VIEW_FILTER_KEYS) {
+    if (config.filters[key]) params.set(key, config.filters[key]);
+  }
+  if (config.sort) params.set("sort", config.sort);
+  params.set("sv", viewId);
+  return `${listPath}?${params.toString()}`;
 }

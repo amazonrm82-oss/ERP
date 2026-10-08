@@ -662,7 +662,7 @@ try {
   const rows = await ownerDesk.locator("tbody tr").count();
   console.log("leads tagged VIP:", rows);
   if (rows !== 1) throw new Error("tag filter should leave exactly one lead");
-  await ownerDesk.getByRole("button", { name: "שמירת הסינון כתצוגה" }).click();
+  await ownerDesk.getByRole("button", { name: "שמירת התצוגה" }).click();
   await ownerDesk.getByLabel("שם התצוגה").fill("לקוחות VIP");
   await ownerDesk.getByLabel("למי").selectOption("org");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
@@ -674,6 +674,28 @@ try {
   await invitee.getByRole("link", { name: /לקוחות VIP/ }).click();
   await invitee.waitForURL(/tag=/);
   await expectText(invitee, "לא נמצאו לידים");
+
+  step("saved views keep the sort and the columns, and can be shared with a team");
+  await ownerDesk.goto(`${orgUrl}/leads?sort=-name`);
+  await ownerDesk.getByRole("button", { name: "שמירת התצוגה" }).click();
+  await ownerDesk.getByLabel("שם התצוגה").fill("לפי שם, לצוות");
+  await ownerDesk.getByLabel("למי").selectOption("team");
+  await ownerDesk.getByLabel("איזה צוות").selectOption({ label: "צוות מכירות" });
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await ownerDesk.getByRole("link", { name: /לפי שם, לצוות/ }).waitFor({ timeout: 15000 });
+  const [teamView] = await sql("select scope, team_id is not null as has_team, config from public.saved_views where name = 'לפי שם, לצוות'");
+  if (teamView.scope !== "team" || !teamView.has_team || teamView.config.sort !== "-name" || !Array.isArray(teamView.config.columns) || teamView.config.columns.length === 0)
+    throw new Error(`the team view was not saved as expected: ${JSON.stringify(teamView)}`);
+  // opening the view brings its sort back
+  await ownerDesk.goto(`${orgUrl}/leads`);
+  await ownerDesk.getByRole("link", { name: /לפי שם, לצוות/ }).click();
+  await ownerDesk.waitForURL(/sv=/);
+  if ((await ownerDesk.getByRole("columnheader", { name: /^שם/ }).getAttribute("aria-sort")) !== "descending") throw new Error("the view's sort was not applied");
+  // Dana is in the sales team: she sees the view, and its columns replace hers
+  await invitee.goto(`${orgUrl}/leads`);
+  await invitee.getByRole("link", { name: /לפי שם, לצוות/ }).click();
+  await invitee.waitForURL(/sv=/);
+  await expectText(invitee, "העמודות לפי התצוגה");
   await ownerDesk.goto(leadUrl);
 
   // ---------------------------------------------------------------- section 4: lead intake
