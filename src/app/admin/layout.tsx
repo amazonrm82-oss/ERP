@@ -20,6 +20,7 @@ const NAV = [
   { href: paths.adminPlans, label: "חבילות" },
   { href: paths.adminStaff, label: "צוות" },
   { href: paths.adminLog, label: "יומן" },
+  { href: paths.adminDesign, label: "עיצוב" },
 ];
 
 // The platform owner's panel. To everyone who is not platform staff it does not exist (404).
