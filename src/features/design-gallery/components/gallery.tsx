@@ -264,8 +264,19 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
 
       <Section title="מצב ריק וטעינה">
         <Card>
-          <EmptyState title="עוד אין לידים" description="לידים מטפסים, מייבוא או מהוספה ידנית יופיעו כאן." action={<Button>הוספת ליד</Button>} />
+          <EmptyState icon={<Icons.InboxIcon />} title="עוד אין לידים" description="לידים מטפסים, מייבוא או מהוספה ידנית יופיעו כאן." action={<Button>הוספת ליד</Button>} />
         </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card>
+            <EmptyState compact kind="search" title="לא נמצאו לידים" description="נסו מילה אחרת או נקו את הסינון." />
+          </Card>
+          <Card>
+            <EmptyState compact kind="locked" title="אין גישה" description="המסך הזה פתוח למנהלים." />
+          </Card>
+          <Card>
+            <EmptyState compact kind="done" title="אין משימות פתוחות להיום" />
+          </Card>
+        </div>
         <Skeleton className="h-6 w-40" />
         <ListSkeleton rows={2} />
       </Section>

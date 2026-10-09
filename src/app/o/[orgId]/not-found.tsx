@@ -6,7 +6,7 @@ export default function OrgNotFound() {
   return (
     <div className="rounded-lg border border-line bg-surface">
       <h1 className="sr-only">הרשומה לא נמצאה</h1>
-      <EmptyState
+      <EmptyState kind="search"
         title="הרשומה לא נמצאה"
         description="ייתכן שהקישור שגוי, שהרשומה הועברה לסל המחזור, או שאין לך גישה אליה."
       />

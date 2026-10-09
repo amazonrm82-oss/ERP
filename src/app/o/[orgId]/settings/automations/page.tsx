@@ -5,6 +5,7 @@ import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { BoltIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { createFromTemplateAction } from "@/features/automations/actions";
 import { describeRule } from "@/features/automations/describe";
@@ -24,7 +25,7 @@ export default async function AutomationsPage({ params }: Props) {
   if (!isAdminRole(role)) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState title="אין גישה" description="אוטומציות מנוהלות על ידי הבעלים ומנהלי המערכת." />
+        <EmptyState kind="locked" title="אין גישה" description="אוטומציות מנוהלות על ידי הבעלים ומנהלי המערכת." />
       </div>
     );
   }
@@ -44,7 +45,7 @@ export default async function AutomationsPage({ params }: Props) {
       <Card aria-labelledby="automations-title">
         <CardHeader id="automations-title" title="האוטומציות שלכם" />
         {automations.length === 0 ? (
-          <EmptyState title="עוד אין אוטומציות" description="אפשר להתחיל מתבנית מוכנה למטה, או לבנות אחת חדשה." />
+          <EmptyState icon={<BoltIcon />} title="עוד אין אוטומציות" description="אפשר להתחיל מתבנית מוכנה למטה, או לבנות אחת חדשה." />
         ) : (
           <ul className="divide-y divide-line">
             {automations.map((automation) => {

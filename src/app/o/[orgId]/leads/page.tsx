@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
-import { PlusIcon } from "@/components/ui/icons";
+import { PlusIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
@@ -187,7 +187,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (
-            <EmptyState
+            <EmptyState kind="search"
               title="לא נמצאו לידים"
               description="אין לידים שמתאימים לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
               action={
@@ -197,7 +197,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               }
             />
           ) : (
-            <EmptyState
+            <EmptyState icon={<InboxIcon />}
               title="עוד אין לידים"
               description="כאן יופיעו כל הפניות החדשות, עם מקור, סטטוס ובעלים. אפשר להתחיל בהוספת הליד הראשון."
               action={newLeadButton}

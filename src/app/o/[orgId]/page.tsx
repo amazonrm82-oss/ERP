@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getMyDay } from "@/features/home/queries";
 import { leadDisplayName } from "@/features/leads/display";
@@ -66,7 +68,7 @@ export default async function HomePage({ params }: Props) {
               </div>
             ) : null}
             {day.tasks.length === 0 ? (
-              <p className="text-md text-ink-soft">אין משימות פתוחות להיום. משימה שתוסיפו עם תאריך של היום תופיע כאן.</p>
+              <EmptyState compact kind="done" title="אין משימות פתוחות להיום" description="משימה שתוסיפו עם תאריך של היום תופיע כאן." />
             ) : (
               <ul className="divide-y divide-line">
                 {day.tasks.map((task) => (
@@ -98,7 +100,7 @@ export default async function HomePage({ params }: Props) {
           />
           <CardBody>
             {day.newLeads.length === 0 ? (
-              <p className="text-md text-ink-soft">אין לידים חדשים שמשויכים אליך. ליד חדש שיוקצה לך יופיע כאן עד שהסטטוס שלו ישתנה.</p>
+              <EmptyState compact icon={<InboxIcon />} title="אין לידים חדשים שמשויכים אליך" description="ליד חדש שיוקצה לך יופיע כאן עד שהסטטוס שלו ישתנה." />
             ) : (
               <>
                 <ul className="divide-y divide-line">

@@ -35,6 +35,8 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["accent", "surface"],
   ["accent", "canvas"],
   ["accent-strong", "accent-soft"],
+  // empty-state drawings (DSN-10)
+  ["accent", "accent-soft"],
   ["accent-strong", "surface"],
   ["on-accent", "accent"],
   ["on-accent", "accent-strong"],

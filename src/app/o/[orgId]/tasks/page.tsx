@@ -7,7 +7,7 @@ import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
-import { SearchIcon } from "@/components/ui/icons";
+import { SearchIcon, CheckSquareIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { resolveColumns } from "@/features/list-columns/columns";
@@ -164,7 +164,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
           ) : null}
           {openCount === 0 ? (
             <div className="rounded-lg border border-line bg-surface">
-              <EmptyState title="אין משימות פתוחות" description="משימה חדשה מוסיפים בטופס שבצד. אפשר להטיל משימה גם על חבר צוות." />
+              <EmptyState icon={<CheckSquareIcon />} title="אין משימות פתוחות" description="משימה חדשה מוסיפים בטופס שבצד. אפשר להטיל משימה גם על חבר צוות." />
             </div>
           ) : (
             sections
@@ -317,7 +317,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (
-            <EmptyState
+            <EmptyState kind="search"
               title="לא נמצאו משימות"
               description="אין משימות שמתאימות לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
               action={
@@ -327,7 +327,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
               }
             />
           ) : (
-            <EmptyState title="אין משימות" description="משימה חדשה מוסיפים בתצוגת הרשימה, או בכרטיס של ליד, איש קשר או עסקה." />
+            <EmptyState icon={<CheckSquareIcon />} title="אין משימות" description="משימה חדשה מוסיפים בתצוגת הרשימה, או בכרטיס של ליד, איש קשר או עסקה." />
           )}
         </div>
       )}

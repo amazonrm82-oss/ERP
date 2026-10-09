@@ -250,3 +250,47 @@ export function SpinnerIcon({ className, ...props }: IconProps) {
     </Icon>
   );
 }
+
+export function LockIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="10.5" width="14" height="9.5" rx="1.5" />
+      <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    </Icon>
+  );
+}
+
+export function TagIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5.5V11l8.5 8.5a1.5 1.5 0 0 0 2.1 0l4.9-4.9a1.5 1.5 0 0 0 0-2.1L11 4H5.5A1.5 1.5 0 0 0 4 5.5z" />
+      <circle cx="8.5" cy="8.5" r="1.25" />
+    </Icon>
+  );
+}
+
+export function BoltIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13 3.5 5.5 13.5H12l-1 7 7.5-10H12z" />
+    </Icon>
+  );
+}
+
+export function UploadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 15V4.5M7.5 9 12 4.5 16.5 9" />
+      <path d="M4.5 14.5V18a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.5" />
+    </Icon>
+  );
+}
+
+export function FormIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="3.5" width="14" height="17" rx="1.5" />
+      <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
+    </Icon>
+  );
+}

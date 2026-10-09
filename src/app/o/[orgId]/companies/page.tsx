@@ -5,7 +5,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
-import { PlusIcon, SearchIcon } from "@/components/ui/icons";
+import { PlusIcon, SearchIcon, BuildingIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
@@ -159,7 +159,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
-            <EmptyState
+            <EmptyState kind="search"
               title="לא נמצאו חברות"
               description="אין חברות שמתאימות לחיפוש. נסו מילה אחרת."
               action={
@@ -169,7 +169,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               }
             />
           ) : (
-            <EmptyState title="עוד אין חברות" description="חברה נוצרת כשממירים ליד עם שם חברה, או ידנית מכאן." action={newCompanyButton} />
+            <EmptyState icon={<BuildingIcon />} title="עוד אין חברות" description="חברה נוצרת כשממירים ליד עם שם חברה, או ידנית מכאן." action={newCompanyButton} />
           )}
         </div>
       )}

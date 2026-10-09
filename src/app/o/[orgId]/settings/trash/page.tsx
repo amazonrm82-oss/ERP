@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
+import { TrashIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
@@ -32,7 +33,7 @@ export default async function TrashPage({ params }: Props) {
   if (!canDelete) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState title="אין גישה לסל המחזור" description="סל המחזור פתוח לבעלים, למנהלי מערכת ולמנהלי צוות." />
+        <EmptyState kind="locked" title="אין גישה לסל המחזור" description="סל המחזור פתוח לבעלים, למנהלי מערכת ולמנהלי צוות." />
       </div>
     );
   }
@@ -43,7 +44,7 @@ export default async function TrashPage({ params }: Props) {
     <Card aria-labelledby="trash-title">
       <CardHeader id="trash-title" title={`סל מחזור (${records.length})`} />
       {records.length === 0 ? (
-        <EmptyState title="סל המחזור ריק" description="רשומות שמעבירים לסל המחזור מופיעות כאן, ואפשר לשחזר אותן." />
+        <EmptyState icon={<TrashIcon />} title="סל המחזור ריק" description="רשומות שמעבירים לסל המחזור מופיעות כאן, ואפשר לשחזר אותן." />
       ) : (
         <>
           <p className="border-b border-line px-4 py-2.5 text-sm text-ink-soft sm:px-5">

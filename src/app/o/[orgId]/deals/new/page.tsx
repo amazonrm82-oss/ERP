@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody } from "@/components/ui/card";
+import { BoardIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
@@ -64,7 +65,7 @@ export default async function NewDealPage({ params, searchParams }: Props) {
             />
           </CardBody>
         ) : (
-          <EmptyState
+          <EmptyState icon={<BoardIcon />}
             title="אין שלבים בפייפליין"
             description="כדי ליצור עסקה צריך פייפליין עם שלב אחד לפחות. מנהל המערכת יכול להוסיף בהגדרות."
           />

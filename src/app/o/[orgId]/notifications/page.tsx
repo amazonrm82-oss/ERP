@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { BellIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { markNotificationsReadAction } from "@/features/notifications/actions";
@@ -39,7 +40,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
         <Card aria-labelledby="notifications-list">
           <CardHeader id="notifications-list" title="אחרונות" />
           {items.length === 0 ? (
-            <EmptyState title="אין התראות" description="כשליד או משימה יוקצו לך, או כשתגיע תזכורת, זה יופיע כאן." />
+            <EmptyState icon={<BellIcon />} title="אין התראות" description="כשליד או משימה יוקצו לך, או כשתגיע תזכורת, זה יופיע כאן." />
           ) : (
             // key: a fresh list after "mark all read"
             <NotificationList key={items.map((item) => `${item.id}${item.read ? 1 : 0}`).join()} orgId={orgId} items={items} />

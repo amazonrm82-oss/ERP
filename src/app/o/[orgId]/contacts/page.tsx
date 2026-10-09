@@ -5,7 +5,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
-import { PlusIcon, SearchIcon } from "@/components/ui/icons";
+import { PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
@@ -159,7 +159,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
-            <EmptyState
+            <EmptyState kind="search"
               title="לא נמצאו אנשי קשר"
               description="אין אנשי קשר שמתאימים לחיפוש. נסו מילה אחרת."
               action={
@@ -169,7 +169,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               }
             />
           ) : (
-            <EmptyState
+            <EmptyState icon={<UsersIcon />}
               title="עוד אין אנשי קשר"
               description="אנשי קשר נוצרים כשממירים ליד, או ידנית מכאן. לכל אחד יש ציר זמן עם כל ההערות והפעילות."
               action={newContactButton}

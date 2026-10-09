@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { ForwardIcon } from "@/components/ui/icons";
+import { ForwardIcon, FormIcon } from "@/components/ui/icons";
 import { CreateIntakeForm } from "@/features/intake/components/intake-editor";
 import { listIntakes } from "@/features/intake/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -21,7 +21,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
   if (!isAdminRole(role)) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState title="אין גישה" description="קליטת לידים מנוהלת על ידי הבעלים ומנהלי המערכת." />
+        <EmptyState kind="locked" title="אין גישה" description="קליטת לידים מנוהלת על ידי הבעלים ומנהלי המערכת." />
       </div>
     );
   }
@@ -44,7 +44,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
       <Card aria-labelledby="intakes-title">
         <CardHeader id="intakes-title" title="ערוצי קליטה" />
         {intakes.length === 0 ? (
-          <EmptyState title="עוד אין טפסים" description="צרו טופס, הטמיעו אותו באתר, וכל פנייה תיכנס כאן כליד." />
+          <EmptyState icon={<FormIcon />} title="עוד אין טפסים" description="צרו טופס, הטמיעו אותו באתר, וכל פנייה תיכנס כאן כליד." />
         ) : (
           <ul className="divide-y divide-line">
             {intakes.map((intake) => (

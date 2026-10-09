@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { PencilIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { CreateFieldForm, FieldList } from "@/features/custom-fields/components/field-editor";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
@@ -51,7 +52,7 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
       <Card aria-labelledby="fields-title">
         <CardHeader id="fields-title" title={`שדות של ${FIELD_OBJECT_LABELS[objectType]}`} />
         {fields.length === 0 ? (
-          <EmptyState title="עוד אין שדות" description="שדה חדש מוסיפים בטופס שלמטה." />
+          <EmptyState icon={<PencilIcon />} title="עוד אין שדות" description="שדה חדש מוסיפים בטופס שלמטה." />
         ) : (
           <FieldList orgId={orgId} fields={fields} editable={editable} />
         )}

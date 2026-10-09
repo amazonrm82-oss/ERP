@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { UploadIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { undoImportAction } from "@/features/imports/actions";
 import { IMPORT_ENTITIES } from "@/features/imports/fields";
@@ -36,7 +37,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
       <Card aria-labelledby="import-title">
         <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
         {jobs.length === 0 ? (
-          <EmptyState title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר או חברות מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
+          <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר או חברות מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
         ) : (
           <ul className="divide-y divide-line">
             {jobs.map((job) => {

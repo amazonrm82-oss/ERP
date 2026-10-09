@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { ForwardIcon } from "@/components/ui/icons";
+import { ForwardIcon, UsersIcon } from "@/components/ui/icons";
 import { CreateTeamForm } from "@/features/settings/components/team-forms";
 import { isAdminRole } from "@/features/settings/permissions";
 import { listTeams } from "@/features/settings/queries";
@@ -34,7 +34,7 @@ export default async function TeamsSettingsPage({ params }: Props) {
       <Card aria-labelledby="teams-title">
         <CardHeader id="teams-title" title="צוותים" />
         {teams.length === 0 ? (
-          <EmptyState
+          <EmptyState icon={<UsersIcon />}
             title="אין עדיין צוותים"
             description="צוותים מאפשרים למנהל צוות לראות ולערוך את הרשומות של אנשי הצוות שלו."
           />

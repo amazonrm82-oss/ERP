@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { CheckIcon, LockIcon, SearchIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 /** Error message for a form or an action. Announced immediately by screen readers. */
@@ -26,15 +27,57 @@ export function FormNotice({ message, className }: { message?: string | null; cl
   );
 }
 
-type EmptyStateProps = { title: string; description?: string; action?: ReactNode; className?: string };
+export type EmptyKind = "start" | "search" | "locked" | "done";
 
-/** What a screen without data says: what belongs here and the first thing to do. */
-export function EmptyState({ title, description, action, className }: EmptyStateProps) {
+type EmptyStateProps = {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  // what the screen holds (InboxIcon for leads); search, locked and done have their own
+  icon?: ReactNode;
+  // start: nothing here yet; search: nothing matches; locked: no access; done: all clear
+  kind?: EmptyKind;
+  // inside a card on a busy screen: smaller and without the big padding
+  compact?: boolean;
+  className?: string;
+};
+
+const art: Record<EmptyKind, string> = {
+  start: "bg-accent-soft text-accent",
+  search: "bg-canvas text-ink-soft",
+  locked: "bg-canvas text-ink-soft",
+  done: "bg-success-soft text-success",
+};
+
+const kindIcon: Record<Exclude<EmptyKind, "start">, ReactNode> = {
+  search: <SearchIcon />,
+  locked: <LockIcon />,
+  done: <CheckIcon />,
+};
+
+/**
+ * What a screen without data says (USR-05, DSN-10): a small drawing in one style
+ * (an icon of the set in a soft circle), what belongs here, and the first thing to do.
+ */
+export function EmptyState({ title, description, action, icon, kind = "start", compact, className }: EmptyStateProps) {
+  const drawing = kind === "start" ? icon : kindIcon[kind];
   return (
-    <div className={cn("flex flex-col items-center px-4 py-12 text-center", className)}>
-      <p className="text-base font-semibold">{title}</p>
-      {description ? <p className="mt-1 max-w-md text-md text-ink-soft">{description}</p> : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+    <div className={cn("flex flex-col items-center text-center", compact ? "px-3 py-6" : "px-4 py-12", className)}>
+      {drawing ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "mb-4 flex items-center justify-center rounded-full [&>svg]:size-1/2",
+            compact ? "mb-3 size-12" : "size-16",
+            art[kind],
+          )}
+        >
+          {drawing}
+        </span>
+      ) : null}
+      <p className={cn("font-semibold", compact ? "text-md" : "text-base")}>{title}</p>
+      {description ? <p className={cn("mt-1 max-w-md text-ink-soft", compact ? "text-sm" : "text-md")}>{description}</p> : null}
+      {action ? <div className={compact ? "mt-3" : "mt-5"}>{action}</div> : null}
     </div>
   );
 }

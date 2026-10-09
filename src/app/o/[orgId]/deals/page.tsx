@@ -6,7 +6,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
-import { PlusIcon, SearchIcon } from "@/components/ui/icons";
+import { PlusIcon, SearchIcon, BoardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DealsBoard } from "@/features/deals/components/deals-board";
 import { DealsTable } from "@/features/deals/components/deals-table";
@@ -41,7 +41,7 @@ const NO_PIPELINE = (
   <>
     <PageHeader title="עסקאות" />
     <div className="rounded-lg border border-line bg-surface">
-      <EmptyState title="אין פייפליין מכירות" description="כדי לנהל עסקאות צריך פייפליין עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות." />
+      <EmptyState icon={<BoardIcon />} title="אין פייפליין מכירות" description="כדי לנהל עסקאות צריך פייפליין עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות." />
     </div>
   </>
 );
@@ -159,7 +159,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
 
       {!anyDeals ? (
         <div className="mb-5 rounded-lg border border-line bg-surface">
-          <EmptyState
+          <EmptyState icon={<BoardIcon />}
             title="עוד אין עסקאות"
             description="עסקה נוצרת כשממירים ליד, או ידנית מכאן. בלוח רואים בכל רגע כמה כסף נמצא בכל שלב."
             action={newDealButton}
@@ -294,7 +294,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (
-            <EmptyState
+            <EmptyState kind="search"
               title="לא נמצאו עסקאות"
               description="אין עסקאות שמתאימות לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
               action={
@@ -304,7 +304,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
               }
             />
           ) : (
-            <EmptyState title="עוד אין עסקאות בפייפליין הזה" description="עסקה נוצרת כשממירים ליד, או ידנית מכאן." action={newDealButton} />
+            <EmptyState icon={<BoardIcon />} title="עוד אין עסקאות בפייפליין הזה" description="עסקה נוצרת כשממירים ליד, או ידנית מכאן." action={newDealButton} />
           )}
         </div>
       )}

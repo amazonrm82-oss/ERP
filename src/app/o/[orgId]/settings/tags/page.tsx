@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { TagIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
@@ -24,7 +25,7 @@ export default async function TagsSettingsPage({ params }: Props) {
         תגיות מסמנות רשומות לפי מה שחשוב לעסק, למשל &quot;VIP&quot; או &quot;תערוכה 2026&quot;. מוסיפים תגית לרשומה בכרטיס שלה, ומסננים לפיה ברשימות.
       </CardBody>
       {tags.length === 0 ? (
-        <EmptyState title="עוד אין תגיות" />
+        <EmptyState icon={<TagIcon />} title="עוד אין תגיות" description={editable ? "תגית חדשה יוצרים בטופס שלמטה, או ישר בכרטיס של רשומה." : "תגית חדשה יוצרים ישר בכרטיס של רשומה."} />
       ) : (
         <div className="mt-3 border-t border-line">
           <TagList orgId={orgId} tags={tags} editable={editable} />
