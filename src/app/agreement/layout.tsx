@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Wordmark } from "@/components/wordmark";
+import { AccessibilityLink } from "@/components/accessibility-link";
 
 export default function AgreementLayout({ children }: { children: ReactNode }) {
   return (
@@ -8,7 +9,10 @@ export default function AgreementLayout({ children }: { children: ReactNode }) {
       <header className="border-b border-line px-4 py-3 sm:px-6 print:hidden">
         <Wordmark className="h-7" />
       </header>
-      <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+        {children}
+        <AccessibilityLink className="print:hidden" />
+      </main>
     </div>
   );
 }

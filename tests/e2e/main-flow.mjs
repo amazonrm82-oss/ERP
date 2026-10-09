@@ -1015,6 +1015,8 @@ try {
   const visitor = await newPage(360);
   await visitor.goto(`${publicUrl}?embed=1`);
   await visitor.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
+  // FXA-06: the accessibility statement is one tap away, in a new tab when embedded
+  if ((await visitor.getByRole("link", { name: /הצהרת נגישות/ }).getAttribute("target")) !== "_blank") throw new Error("no accessibility link on the public form");
   // FXA-02: an empty send marks the wrong field, says why next to it, and puts focus there
   await visitor.getByRole("button", { name: "שליחה" }).click();
   await visitor.locator('[aria-invalid="true"]').first().waitFor();

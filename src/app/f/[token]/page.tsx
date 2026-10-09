@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
 import { getPublicForm } from "@/features/intake/public-form";
+import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = { title: "טופס פנייה", robots: { index: false, follow: false } };
@@ -32,6 +33,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
           </div>
         </>
       )}
+      <AccessibilityLink newTab={embed} />
     </main>
   );
 }

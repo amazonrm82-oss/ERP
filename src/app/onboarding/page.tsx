@@ -6,6 +6,7 @@ import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { OrganizationForm } from "@/features/onboarding/components/organization-form";
 import { listMyOrganizations } from "@/features/onboarding/queries";
 import { Wordmark } from "@/components/wordmark";
+import { AccessibilityLink } from "@/components/accessibility-link";
 import { requireAgreement } from "@/features/legal/queries";
 import { requireUser } from "@/lib/auth";
 import { paths } from "@/lib/paths";
@@ -44,6 +45,7 @@ export default async function OnboardingPage({ searchParams }: Props) {
             </Link>
           </p>
         ) : null}
+        <AccessibilityLink />
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AccessibilityLink } from "@/components/accessibility-link";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { AcceptInvitationForm } from "@/features/invitations/components/accept-invitation-form";
@@ -84,6 +85,7 @@ export default async function InvitePage({ params }: Props) {
             )}
           </>
         )}
+        <AccessibilityLink />
       </main>
     </div>
   );
