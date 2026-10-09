@@ -533,6 +533,11 @@ try {
   if (!firstToday.includes("עדיפות גבוהה") || !firstToday.includes("משימה דחופה")) throw new Error(`first task today: ${firstToday}`);
   await ownerDesk.getByRole("button", { name: /^בוצע.*משימה דחופה/ }).click();
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "הושלמו לאחרונה" }) }).getByRole("button", { name: /החזרה לפתוחות.*משימה דחופה/ }).waitFor({ timeout: 15000 });
+  // what came of it, written on the completed task (TASK-03)
+  await ownerDesk.getByRole("button", { name: /הוספת תוצאה.*משימה דחופה/ }).click();
+  await ownerDesk.getByLabel("תוצאה: משימה דחופה").fill("הלקוח אישר בטלפון");
+  await ownerDesk.getByRole("button", { name: "שמירת התוצאה" }).click();
+  await expectText(ownerDesk, "תוצאה: הלקוח אישר בטלפון");
 
   step("tasks: put off to next week and hand over, straight from the list (TASK-05)");
   const taskOrg = orgUrl.split("/").pop();

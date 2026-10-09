@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
@@ -225,6 +226,36 @@ export async function snoozeTaskAction(orgId: string, taskId: string, when: Snoo
     .select("id");
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לדחות את המשימה. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateTasks(orgId);
+  return ok();
+}
+
+const outcomeSchema = z.string().trim().max(500, { error: "התוצאה ארוכה מדי (עד 500 תווים)." });
+
+/** What came of a completed task, in a line (TASK-03). Empty clears it. */
+export async function setTaskOutcomeAction(orgId: string, taskId: string, outcome: string): Promise<ActionResult> {
+  const parsed = outcomeSchema.safeParse(outcome);
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? INVALID_ARGS);
+  }
+  const context = await actionContext(orgId, taskId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("tasks")
+    .update({ outcome: parsed.data || null })
+    .eq("organization_id", orgId)
+    .eq("id", taskId)
+    .eq("status", "done")
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את התוצאה. נסו שוב."));
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);

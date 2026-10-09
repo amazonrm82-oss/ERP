@@ -5,7 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/field";
+import { Input, Select } from "@/components/ui/field";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 
 import { inlineEditAction } from "@/features/inline-edit/actions";
 
-import { completeTaskAction, reopenTaskAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
+import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
 export type TaskRowView = {
@@ -33,6 +33,7 @@ export type TaskRowView = {
   taskType: string;
   // 1 high, 2 normal, 3 low (TASK-01)
   priority: number;
+  outcome: string | null;
   related: { href: string; label: string } | null;
 };
 
@@ -98,6 +99,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
             </Link>
           ) : null}
         </p>
+        {task.done && canEdit ? <TaskOutcome orgId={orgId} task={task} /> : task.done && task.outcome ? <p className="mt-1 text-sm">תוצאה: {task.outcome}</p> : null}
         {error ? (
           <p role="alert" className="mt-1 text-sm text-danger">
             {error}
@@ -184,6 +186,62 @@ function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
           ביטול
         </Button>
       </div>
+    </form>
+  );
+}
+
+/** What came of a completed task (TASK-03): shown in a line, written in place. */
+function TaskOutcome({ orgId, task }: { orgId: string; task: TaskRowView }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(task.outcome ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!editing) {
+    return (
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm">
+        {task.outcome ? <span>תוצאה: {task.outcome}</span> : null}
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          {task.outcome ? "שינוי התוצאה" : "הוספת תוצאה"}
+          <span className="sr-only">: {task.title}</span>
+        </Button>
+      </p>
+    );
+  }
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setError(null);
+        startTransition(async () => {
+          const result = await setTaskOutcomeAction(orgId, task.id, text);
+          if (result.ok) setEditing(false);
+          else setError(result.message);
+        });
+      }}
+    >
+      <Input
+        aria-label={`תוצאה: ${task.title}`}
+        controlSize="sm"
+        className="min-w-0 flex-1"
+        value={text}
+        maxLength={500}
+        placeholder="למשל: נשלחה הצעה, מחכים לתשובה"
+        onChange={(event) => setText(event.target.value)}
+        autoFocus
+      />
+      <Button type="submit" size="sm" loading={pending}>
+        שמירת התוצאה
+      </Button>
+      <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+        ביטול
+      </Button>
+      {error ? (
+        <p role="alert" className="w-full text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }
