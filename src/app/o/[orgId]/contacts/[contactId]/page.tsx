@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { ShareSummary } from "@/features/share/components/share-summary";
+import { recordSummary } from "@/features/share/summary";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -59,6 +61,16 @@ export default async function ContactPage({ params }: Props) {
       />
       <div className="mb-5">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)} />
+        <div className="mt-2">
+          <ShareSummary
+            text={recordSummary(name, [
+              ["טלפון", contact.phone],
+              ["אימייל", contact.email],
+              ["חברה", contact.companyName],
+              ["תפקיד", contact.job_title],
+            ])}
+          />
+        </div>
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "contact", id: contact.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 

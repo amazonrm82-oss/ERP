@@ -1789,6 +1789,10 @@ try {
   if (!vcard.ok() || !(vcard.headers()["content-type"] ?? "").startsWith("text/vcard")) throw new Error(`vcard: ${vcard.status()}`);
   const vcardText = await vcard.text();
   if (!vcardText.includes("FN:כפול שני") || !vcardText.includes("TEL;TYPE=CELL:054-9998877")) throw new Error(`vcard body: ${vcardText}`);
+  // a summary to send outside the system: text only, no link into it (GAP-04)
+  const summaryHref = await lost.getByRole("link", { name: /שליחת הסיכום ב-WhatsApp/ }).getAttribute("href");
+  const summaryText = decodeURIComponent(new URL(summaryHref).searchParams.get("text") ?? "");
+  if (summaryText !== "*כפול שני*\nטלפון: 054-9998877" || summaryText.includes("http")) throw new Error(`summary: ${summaryText}`);
   await lost.getByRole("heading", { name: "כפילויות אפשריות" }).waitFor();
   await lost.getByRole("link", { name: /מיזוג.*כפול ראשון/ }).click();
   await lost.waitForURL(/\/merge\?/);

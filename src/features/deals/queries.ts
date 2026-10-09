@@ -231,6 +231,7 @@ export async function getDeal(orgId: string, dealId: string) {
     stages: (stages.data ?? []) as StageOption[],
     pipelineName: pipeline.data?.name ?? null,
     contactName: contact.data ? contact.data.full_name || contact.data.email || contact.data.phone || "איש קשר ללא שם" : null,
+    contactPhone: contact.data?.phone ?? null,
     companyName: company.data?.name ?? null,
     ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
   };

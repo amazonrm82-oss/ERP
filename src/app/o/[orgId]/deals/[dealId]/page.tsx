@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { ShareSummary } from "@/features/share/components/share-summary";
+import { recordSummary } from "@/features/share/summary";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
@@ -55,6 +57,19 @@ export default async function DealPage({ params }: Props) {
         back={{ href: paths.deals(orgId), label: "עסקאות" }}
         actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />
+
+      <div className="mb-5">
+        <ShareSummary
+          text={recordSummary(deal.name, [
+            ["איש קשר", deal.contactName],
+            ["טלפון", deal.contactPhone],
+            ["חברה", deal.companyName],
+            ["שלב", stage?.name],
+            ["סכום", amount ? formatMoney(amount) : null],
+            ["תאריך סגירה צפוי", deal.expected_close_date ? formatDate(deal.expected_close_date) : null],
+          ])}
+        />
+      </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}

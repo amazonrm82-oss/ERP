@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { ShareSummary } from "@/features/share/components/share-summary";
+import { recordSummary } from "@/features/share/summary";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +64,17 @@ export default async function LeadPage({ params }: Props) {
       />
       <div className="mb-5">
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)} />
+        <div className="mt-2">
+          <ShareSummary
+            text={recordSummary(name, [
+              ["טלפון", lead.phone],
+              ["אימייל", lead.email],
+              ["חברה", lead.company_name],
+              ["תפקיד", lead.job_title],
+              ["פנייה", lead.message],
+            ])}
+          />
+        </div>
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "lead", id: lead.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 
