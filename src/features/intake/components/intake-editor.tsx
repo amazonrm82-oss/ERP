@@ -2,9 +2,9 @@
 
 import { useActionState, useId, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { Label, SelectField, Textarea, TextareaField, TextField } from "@/components/ui/field";
+import { Input, Label, SelectField, Textarea, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
@@ -86,7 +86,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
             </div>
           </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחה" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
+            <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
             <TextField
               label="מעבר לדף אחרי שליחה (לא חובה)"
               name="redirect_url"
@@ -220,6 +220,51 @@ export function CopyBlock({ label, value }: { label: string; value: string }) {
         {copied ? "הועתק" : "העתקה"}
         <span className="sr-only">: {label}</span>
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The form's public link, first on the sharing screen (FXU-11): most businesses
+ * share it in WhatsApp, a post or an ad, and have no website to embed it in.
+ */
+export function ShareLink({ url, title }: { url: string; title: string }) {
+  const [copied, setCopied] = useState(false);
+  const id = useId();
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>קישור לשיתוף</Label>
+      <Input id={id} value={url} readOnly dir="ltr" className="font-mono text-sm" onFocus={(event) => event.currentTarget.select()} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(url);
+              setCopied(true);
+            } catch {
+              // clipboard blocked: the link is selectable in the field
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? "הקישור הועתק" : "העתקת הקישור"}
+        </Button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(`${title}\n${url}`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClasses("secondary", "sm")}
+        >
+          שליחה ב-WhatsApp
+        </a>
+        <a href={url} target="_blank" rel="noopener" className={buttonClasses("secondary", "sm")}>
+          פתיחת הטופס
+        </a>
+      </div>
+      <span aria-live="polite" className="sr-only">
+        {copied ? "הקישור הועתק" : ""}
+      </span>
     </div>
   );
 }

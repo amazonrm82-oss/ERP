@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { BackIcon } from "@/components/ui/icons";
 import { deleteIntakeAction } from "@/features/intake/actions";
-import { CopyBlock, IntakeSettingsForm } from "@/features/intake/components/intake-editor";
+import { CopyBlock, IntakeSettingsForm, ShareLink } from "@/features/intake/components/intake-editor";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -17,7 +17,7 @@ import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 
-export const metadata: Metadata = { title: "ערוץ קליטה" };
+export const metadata: Metadata = { title: "טופס או חיבור" };
 
 type Props = { params: Promise<{ orgId: string; formId: string }> };
 
@@ -52,7 +52,7 @@ export default async function IntakeItemPage({ params }: Props) {
       <div>
         <Link href={paths.settingsIntake(orgId)} className="mb-2 inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
           <BackIcon className="size-4" />
-          כל ערוצי הקליטה
+          כל הטפסים והחיבורים
         </Link>
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold break-words">
           {intake.name}
@@ -62,18 +62,21 @@ export default async function IntakeItemPage({ params }: Props) {
       </div>
 
       {intake.kind === "form" ? (
-        <Card aria-labelledby="embed-title">
-          <CardHeader id="embed-title" title="איך מחברים לאתר" />
+        <Card aria-labelledby="share-title">
+          <CardHeader id="share-title" title="שיתוף הטופס" />
           <CardBody className="space-y-5">
-            <p className="text-md text-ink-soft">
-              הדרך הפשוטה: להדביק את הקוד הזה באתר במקום שבו הטופס צריך להופיע. אפשר גם לשלוח את הקישור ישירות, למשל ב-WhatsApp
-              או במודעה.
-            </p>
-            <CopyBlock
-              label="קוד להטמעה באתר"
-              value={`<iframe src="${pageUrl}?embed=1" title="${(intake.title ?? intake.name).replace(/"/g, "&quot;")}" style="width:100%;max-width:480px;height:560px;border:0" loading="lazy"></iframe>`}
-            />
-            <CopyBlock label="קישור ישיר לטופס" value={pageUrl} />
+            <p className="text-md text-ink-soft">שולחים את הקישור ב-WhatsApp, בפוסט או במודעה. כל מי שממלא את הטופס נכנס כליד.</p>
+            <ShareLink url={pageUrl} title={intake.title ?? intake.name} />
+            <details className="text-md">
+              <summary className="cursor-pointer font-medium">יש לכם אתר? קוד להטמעה</summary>
+              <div className="mt-3 space-y-3">
+                <p className="text-ink-soft">מדביקים את הקוד באתר, במקום שבו הטופס צריך להופיע.</p>
+                <CopyBlock
+                  label="קוד להטמעה באתר"
+                  value={`<iframe src="${pageUrl}?embed=1" title="${(intake.title ?? intake.name).replace(/"/g, "&quot;")}" style="width:100%;max-width:480px;height:560px;border:0" loading="lazy"></iframe>`}
+                />
+              </div>
+            </details>
             <details className="text-md">
               <summary className="cursor-pointer font-medium">לבוני אתרים: שליחה מטופס קיים</summary>
               <div className="mt-3 space-y-3">

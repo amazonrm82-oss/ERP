@@ -1041,7 +1041,7 @@ try {
   await ownerDesk.getByLabel("מקור הליד").selectOption({ label: "טופס באתר" });
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "נשמר.");
-  const publicUrl = await ownerDesk.getByLabel("קישור ישיר לטופס").inputValue();
+  const publicUrl = await ownerDesk.getByLabel("קישור לשיתוף").inputValue();
   await shot(ownerDesk, "40-intake-form-1280");
 
   step("intake: a visitor (signed out, phone) fills the public form");
@@ -1054,7 +1054,7 @@ try {
   // FXA-06: the accessibility statement is one tap away, in a new tab when embedded
   if ((await visitor.getByRole("link", { name: /הצהרת נגישות/ }).getAttribute("target")) !== "_blank") throw new Error("no accessibility link on the public form");
   // FXA-02: an empty send marks the wrong field, says why next to it, and puts focus there
-  await visitor.getByRole("button", { name: "שליחה" }).click();
+  await visitor.getByRole("button", { name: "שליחת הפרטים" }).click();
   await visitor.locator('[aria-invalid="true"]').first().waitFor();
   const focused = await visitor.evaluate(() => {
     const el = document.activeElement;
@@ -1067,7 +1067,7 @@ try {
   await visitor.getByLabel("טלפון").fill("054-7778899");
   await visitor.getByLabel("חברה").fill("גלית עיצובים");
   await visitor.waitForTimeout(2200); // a person takes a moment; faster than 2 seconds counts as a bot
-  await visitor.getByRole("button", { name: "שליחה" }).click();
+  await visitor.getByRole("button", { name: "שליחת הפרטים" }).click();
   await expectText(visitor, "תודה! קיבלנו את הפרטים");
   await shot(visitor, "41-public-form-360");
 
@@ -1257,7 +1257,7 @@ try {
   console.log("bell after assignment:", await inviteeBell.getAttribute("aria-label"));
   await inviteeBell.click();
   await shot(invitee, "70-bell-open");
-  await invitee.getByRole("link", { name: /משימה חדשה הוקצתה לך/ }).first().click();
+  await invitee.getByRole("link", { name: /משימה חדשה הוקצתה (לך|לכם)/ }).first().click();
   await invitee.waitForURL(/\/tasks$/);
   await expectText(invitee, "משימה חיה לדנה");
 

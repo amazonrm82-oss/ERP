@@ -31,7 +31,7 @@ export async function getPublicForm(token: string): Promise<PublicForm | null | 
   return {
     title: data.title || data.name,
     intro: data.intro,
-    submitLabel: data.submit_label || "שליחה",
+    submitLabel: data.submit_label || "שליחת הפרטים",
     fields: parseFieldsConfig(data.fields),
   };
 }
