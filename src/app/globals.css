@@ -151,6 +151,33 @@ body {
   unicode-bidi: isolate;
 }
 
+/* Motion (DSN-12): short, and only where it tells something (a window opened,
+   a message arrived). The reduced-motion rule below turns all of it off. */
+@keyframes mx-fade {
+  from { opacity: 0; }
+}
+@keyframes mx-pop {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+}
+@keyframes mx-rise {
+  from { transform: translateY(100%); }
+}
+dialog[open] {
+  animation: mx-pop 160ms ease-out;
+}
+dialog[open]::backdrop {
+  animation: mx-fade 160ms ease-out;
+}
+/* the phone sheet slides up from the bottom edge */
+@media (max-width: 39.99rem) {
+  dialog.mx-sheet[open] {
+    animation: mx-rise 200ms ease-out;
+  }
+}
+.mx-toast {
+  animation: mx-pop 160ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

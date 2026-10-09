@@ -60,7 +60,7 @@ export function ToastView({ message, tone, onClose }: { message: string; tone: T
     <div
       role={tone === "error" ? "alert" : undefined}
       className={cn(
-        "pointer-events-auto flex w-full max-w-sm items-center gap-2 rounded-lg border bg-surface ps-4 pe-1 text-md shadow-lg",
+        "mx-toast pointer-events-auto flex w-full max-w-sm items-center gap-2 rounded-lg border bg-surface ps-4 pe-1 text-md shadow-lg",
         tone === "error" ? "border-danger text-danger" : "border-line text-ink",
       )}
     >

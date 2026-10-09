@@ -54,7 +54,7 @@ export function Dialog({ open, onClose, title, description, children, footer, va
       }}
       className={cn(
         "m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-brand/60",
-        variant === "sheet" && "max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]",
+        variant === "sheet" && "mx-sheet max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]",
         className,
       )}
     >
