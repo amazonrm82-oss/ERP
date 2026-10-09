@@ -7,7 +7,7 @@ import { ChevronDownIcon } from "@/components/ui/icons";
 
 import { InstallApp } from "./install-app";
 
-type MenuLink = { href: string; label: string; mobileOnly?: boolean };
+type MenuLink = { href: string; label: string };
 
 type Props = {
   name: string;
@@ -84,7 +84,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
           </div>
           <ul className="py-1.5">
             {links.map((link) => (
-              <li key={link.href} className={link.mobileOnly ? "md:hidden" : undefined}>
+              <li key={link.href}>
                 <Link
                   href={link.href}
                   onClick={() => setOpen(false)}

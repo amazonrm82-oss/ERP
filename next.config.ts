@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The dev-only "N" badge sits in the bottom corner, over the phone bottom bar
+  // (and the e2e clicks there). Errors are still shown in development.
+  devIndicators: false,
   async headers() {
     return [
       {

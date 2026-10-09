@@ -27,10 +27,10 @@ export async function setRequireMfaAction(orgId: string, required: boolean): Pro
   if (!context.ok) return context;
   const { data, error } = await context.supabase.from("organizations").update({ require_mfa: required }).eq("id", orgId).select("id");
   if (error) {
-    return fail(error.hint === "mfa:self_first" ? "קודם הפעילו אימות דו-שלבי בחשבון שלכם (בלשונית \"החשבון שלי\"), ואז אפשר לחייב את כולם." : dbErrorMessage(error, "לא הצלחנו לשמור."));
+    return fail(error.hint === "mfa:self_first" ? "קודם הפעילו אימות דו-שלבי בחשבון שלכם (ב\"החשבון שלי\" שבתפריט המשתמש), ואז אפשר לחייב את כולם." : dbErrorMessage(error, "לא הצלחנו לשמור."));
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-  revalidatePath(paths.settings(orgId));
+  revalidatePath(paths.settingsBusiness(orgId));
   return ok();
 }
 

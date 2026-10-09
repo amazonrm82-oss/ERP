@@ -20,7 +20,7 @@ export async function grantSupportAccessAction(orgId: string, hours: number): Pr
   if (error) {
     return fail(error.code === "42501" ? "רק בעלים ומנהלי מערכת יכולים לאשר גישת תמיכה." : dbErrorMessage(error, "לא הצלחנו לאשר את הגישה."));
   }
-  revalidatePath(paths.settings(orgId));
+  revalidatePath(paths.settingsBusiness(orgId));
   return ok();
 }
 
@@ -36,6 +36,6 @@ export async function revokeSupportAccessAction(orgId: string): Promise<ActionRe
     .select("id");
   if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הגישה."));
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-  revalidatePath(paths.settings(orgId));
+  revalidatePath(paths.settingsBusiness(orgId));
   return ok();
 }

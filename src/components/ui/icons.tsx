@@ -294,3 +294,14 @@ export function FormIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** "עוד": three dots in a row. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="6" cy="12" r="1.25" />
+      <circle cx="12" cy="12" r="1.25" />
+      <circle cx="18" cy="12" r="1.25" />
+    </Icon>
+  );
+}

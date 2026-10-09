@@ -74,9 +74,7 @@ export default async function OrgLayout({ children, params }: Props) {
             email={user.email}
             roleLabel={ROLE_LABELS[context.role]}
             links={[
-              { href: paths.companies(org.id), label: "חברות", mobileOnly: true },
-              { href: paths.reports(org.id), label: "דוחות", mobileOnly: true },
-              { href: paths.settings(org.id), label: "הגדרות", mobileOnly: true },
+              { href: paths.settingsAccount(org.id), label: "החשבון שלי" },
               { href: paths.home, label: "החלפת עסק" },
               { href: paths.help, label: "מרכז עזרה" },
             ]}
@@ -111,7 +109,14 @@ export default async function OrgLayout({ children, params }: Props) {
         {children}
       </main>
 
-      <BottomNav orgId={org.id} />
+      <BottomNav
+        orgId={org.id}
+        extra={[
+          { href: paths.notifications(org.id), label: "התראות" },
+          { href: paths.help, label: "מרכז עזרה" },
+          { href: paths.home, label: "החלפת עסק" },
+        ]}
+      />
     </div>
   );
 }

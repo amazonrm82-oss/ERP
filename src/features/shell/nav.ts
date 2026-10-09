@@ -19,7 +19,7 @@ export type NavItem = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   // matches the exact path only (the home item), not everything below it
   exact?: boolean;
-  // shown in the five-item bottom bar on phones
+  // one of the four destinations of the phone bottom bar; the rest are under "עוד"
   mobile: boolean;
 };
 
@@ -27,7 +27,7 @@ export function navItems(orgId: string): NavItem[] {
   return [
     { key: "home", label: "בית", href: paths.org(orgId), icon: HomeIcon, exact: true, mobile: true },
     { key: "leads", label: "לידים", href: paths.leads(orgId), icon: InboxIcon, mobile: true },
-    { key: "contacts", label: "אנשי קשר", href: paths.contacts(orgId), icon: UsersIcon, mobile: true },
+    { key: "contacts", label: "אנשי קשר", href: paths.contacts(orgId), icon: UsersIcon, mobile: false },
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
     { key: "deals", label: "עסקאות", href: paths.deals(orgId), icon: BoardIcon, mobile: true },
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },

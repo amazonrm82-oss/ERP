@@ -310,6 +310,10 @@ that back.
   is added to the gallery `/admin/design` (`src/features/design-gallery/`), which the e2e photographs.
   Icons only from `src/components/ui/icons.tsx`; direction arrows are `BackIcon` / `ForwardIcon` (they flip with
   the reading direction), never a hand-rotated chevron.
+- App shell (DSN-11, FXU-13): `src/features/shell/nav.ts` lists the destinations; four have `mobile: true` and the
+  rest sit under "עוד" (a sheet) in the phone bottom bar. Settings sections are listed once in
+  `src/features/settings/sections.ts` (settings page, computer side list, section titles); a new settings page is
+  added there. Business details live at `/settings/business`; `/settings` is the grouped list.
 - RTL: logical properties only (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`, `text-start`). Phones
   and emails render with `dir="ltr"`. Every screen must work at 360px width.
 - Accessibility target: WCAG 2.0 AA (Israeli standard IS 5568). Labels on inputs, visible focus,

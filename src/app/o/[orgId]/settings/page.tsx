@@ -1,60 +1,58 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import Link from "next/link";
 
-import { Detail, DetailList } from "@/components/detail-list";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { INDUSTRIES, TEAM_SIZES } from "@/features/onboarding/options";
-import { OrgSecurityCard } from "@/features/account/components/org-security-card";
-import { OrganizationSettingsForm } from "@/features/settings/components/organization-settings-form";
-import { isAdminRole, VISIBILITY_OPTIONS } from "@/features/settings/permissions";
-import { getOrganizationSettings } from "@/features/settings/queries";
+import { ForwardIcon } from "@/components/ui/icons";
+import { PageHeader } from "@/components/ui/page-header";
+import { isAdminRole } from "@/features/settings/permissions";
+import { settingsGroups } from "@/features/settings/sections";
 import { getOrgContext } from "@/features/shell/queries";
-import { SupportAccessCard } from "@/features/support/components/support-access-card";
-import { getOpenSupportGrant } from "@/features/support/queries";
+import { paths } from "@/lib/paths";
 
-export const metadata: Metadata = { title: "פרטי העסק" };
+export const metadata: Metadata = { title: "הגדרות" };
 
 type Props = { params: Promise<{ orgId: string }> };
 
-export default async function OrganizationSettingsPage({ params }: Props) {
+// FXU-13: the settings as one list in groups, instead of a row of tabs.
+export default async function SettingsPage({ params }: Props) {
   const { orgId } = await params;
-  const { role, canWrite } = await getOrgContext(orgId);
-  const settings = await getOrganizationSettings(orgId);
-  if (!settings) {
-    notFound();
-  }
+  const { canDelete, canWrite, role } = await getOrgContext(orgId);
+  const admin = isAdminRole(role);
+  const groups = settingsGroups(orgId, { admin, canImport: canWrite && (admin || role === "manager"), canDelete });
 
-  // the database lets admins edit even a read-only organization's profile,
-  // but the screen follows the general rule: nothing changes while read-only
-  if (isAdminRole(role) && canWrite) {
-    const grant = await getOpenSupportGrant(orgId);
-    return (
-      <>
-        <OrganizationSettingsForm orgId={orgId} settings={settings} />
-        <OrgSecurityCard orgId={orgId} requireMfa={settings.requireMfa} />
-        <SupportAccessCard orgId={orgId} grant={grant} />
-      </>
-    );
-  }
-
-  // support may be needed most when the account is read-only, so admins can always open it
-  const grant = isAdminRole(role) ? await getOpenSupportGrant(orgId) : null;
   return (
     <>
-      <Card aria-labelledby="org-details-title">
-        <CardHeader id="org-details-title" title="פרטי העסק" />
-        <CardBody>
-          <DetailList>
-            <Detail label="שם העסק" value={settings.name} />
-            <Detail label="ענף" value={INDUSTRIES.find((o) => o.value === settings.industry)?.label} />
-            <Detail label="גודל צוות" value={TEAM_SIZES.find((o) => o.value === settings.teamSize)?.label} />
-            <Detail label="טלפון" value={settings.phone} ltr />
-            <Detail label="מי רואה רשומות" value={VISIBILITY_OPTIONS.find((o) => o.value === settings.recordVisibility)?.label} />
-          </DetailList>
-          {isAdminRole(role) ? null : <p className="mt-4 text-sm text-ink-soft">רק בעלים ומנהלי מערכת יכולים לשנות את הפרטים.</p>}
-        </CardBody>
-      </Card>
-      {isAdminRole(role) ? <SupportAccessCard orgId={orgId} grant={grant} /> : null}
+      <PageHeader title="הגדרות" description="הגדרות העסק. ההגדרות האישיות שלכם נמצאות ב&quot;החשבון שלי&quot; בתפריט המשתמש." />
+      <div className="grid gap-6 lg:grid-cols-2">
+        {groups.map((group) => (
+          <section key={group.label} aria-labelledby={`group-${group.label}`}>
+            <h2 id={`group-${group.label}`} className="mb-2 text-lead font-semibold">
+              {group.label}
+            </h2>
+            <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+              {group.sections.map((section) => (
+                <li key={section.href}>
+                  <Link href={section.href} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-canvas">
+                    <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
+                      <section.icon className="size-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-ink">{section.label}</span>
+                      <span className="block text-sm text-ink-soft">{section.description}</span>
+                    </span>
+                    <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <p className="mt-6 text-sm text-ink-soft">
+        <Link href={paths.settingsAccount(orgId)} className="text-accent underline underline-offset-4">
+          החשבון שלי
+        </Link>
+        : סיסמה, אימות דו-שלבי, התראות ומכשירים מחוברים.
+      </p>
     </>
   );
 }

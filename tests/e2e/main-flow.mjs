@@ -221,8 +221,21 @@ try {
   await expectText(owner, "12,500");
   await shot(owner, "04-deals-360");
 
+  step("phone: 'עוד' in the bottom bar reaches every screen; settings are one list in groups (DSN-11, FXU-13)");
+  await owner.getByRole("navigation", { name: "ניווט ראשי" }).getByRole("button", { name: "עוד" }).click();
+  const more = owner.getByRole("dialog", { name: "עוד" });
+  for (const label of ["אנשי קשר", "חברות", "דוחות", "הגדרות", "התראות"]) await more.getByRole("link", { name: label }).waitFor();
+  await shot(owner, "04a-more-360");
+  await more.getByRole("link", { name: "הגדרות" }).click();
+  await owner.waitForURL(/\/settings$/);
+  for (const group of ["העסק", "התאמה אישית", "לידים ואוטומציות", "נתונים"]) await owner.getByRole("heading", { name: group }).waitFor();
+  await shot(owner, "04b-settings-list-360");
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("settings list scrolls sideways at 360px");
+
   step("settings: business details");
-  await owner.goto(`${orgUrl}/settings`);
+  await owner.getByRole("link", { name: /פרטי העסק/ }).click();
+  await owner.waitForURL(/\/settings\/business$/);
+  await owner.getByRole("link", { name: "הגדרות" }).first().waitFor();
   await owner.getByLabel("טלפון העסק").fill("03-5551234");
   await owner.getByText("לפי צוות").click();
   await owner.getByRole("button", { name: "שמירה" }).click();
@@ -1371,7 +1384,7 @@ try {
   await staff.getByRole("link", { name: /שיפוצים/ }).first().click();
   await expectText(staff, "הלקוח לא אישר גישת תמיכה");
   // the customer lets support in for an hour
-  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.goto(`${orgUrl}/settings/business`);
   await ownerDesk.getByRole("button", { name: "לשעה" }).click();
   await expectText(ownerDesk, "גישת תמיכה פתוחה עד");
   await staff.reload();
@@ -1397,7 +1410,7 @@ try {
   await shot(staff, "102-admin-org-1280");
 
   // the customer closes the door: support is out at once
-  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.goto(`${orgUrl}/settings/business`);
   await ownerDesk.getByRole("button", { name: "סגירת הגישה עכשיו" }).click();
   await ownerDesk.getByRole("button", { name: "לשעה" }).waitFor({ timeout: 15000 });
   const afterRevoke = await staff.goto(`${orgUrl}/leads`);
@@ -1523,7 +1536,7 @@ try {
   await ownerDesk.getByRole("button", { name: "אימות", exact: true }).click();
   await expectText(ownerDesk, "אימות דו-שלבי פעיל בחשבון שלך");
   await shot(ownerDesk, "110-account-1280");
-  await ownerDesk.goto(`${orgUrl}/settings`);
+  await ownerDesk.goto(`${orgUrl}/settings/business`);
   await ownerDesk.getByRole("button", { name: "חיוב אימות דו-שלבי לכולם" }).click();
   await ownerDesk.getByRole("button", { name: "כן" }).click();
   await expectText(ownerDesk, "כל המשתמשים בעסק חייבים אימות דו-שלבי");
