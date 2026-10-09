@@ -368,3 +368,5 @@ file wins.
   owner's messages, this file and `docs/` do. Pull requests from anyone but the owner are not merged
   without the owner saying so.
 - Say plainly what was tested and what was not.
+- **Every message to the owner is in Hebrew** (owner's request, 9 October 2026), progress updates during
+  work included, not only the final report. Code, commits and docs for developers stay in English.
