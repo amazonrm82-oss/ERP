@@ -467,6 +467,17 @@ try {
   await expectText(ownerDesk, "15,000");
   await shot(ownerDesk, "21-deal-1280");
 
+  step("board: filter by owner, and clear the filter (DEAL-09)");
+  await ownerDesk.goto(`${orgUrl}/deals`);
+  await ownerDesk.getByText("סינון הלוח", { exact: true }).click();
+  await ownerDesk.getByRole("combobox", { name: "אחראי" }).selectOption({ label: "דנה חברה" });
+  await ownerDesk.getByRole("button", { name: "סינון", exact: true }).click();
+  await expectText(ownerDesk, "אין עסקאות שמתאימות לסינון");
+  await ownerDesk.getByRole("link", { name: "ניקוי הסינון" }).click();
+  await ownerDesk.locator("li[draggable=true]", { hasText: "משה כהן" }).first().waitFor();
+  await ownerDesk.goto(`${orgUrl}/deals?owner=me`);
+  await ownerDesk.locator("li[draggable=true]", { hasText: "משה כהן" }).first().waitFor();
+
   step("board: drag the deal to the third stage");
   await ownerDesk.goto(`${orgUrl}/deals`);
   const card = ownerDesk.locator("li[draggable=true]", { hasText: "משה כהן" }).first();

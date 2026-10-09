@@ -8,10 +8,13 @@ import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, BoardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { BoardFilters } from "@/features/deals/components/board-filters";
 import { DealsBoard } from "@/features/deals/components/deals-board";
+import { listMembers, listTeams } from "@/features/settings/queries";
+import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
 import { DealsTable } from "@/features/deals/components/deals-table";
-import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getBoard, getPipeline, listDeals, listPipelines } from "@/features/deals/queries";
+import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getBoard, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
@@ -114,7 +117,25 @@ export default async function DealsPage({ params, searchParams }: Props) {
   const requested = firstParam(query.pipeline);
   const showClosed = firstParam(query.closed) === "1";
   const fullStage = firstParam(query.stage);
-  const [board, pipelines] = await Promise.all([getBoard(orgId, requested, { showClosed, fullStage }), listPipelines(orgId)]);
+  // DEAL-09: owner ("me" or a user), team, tag and expected close date range, all from the address
+  const idParam = (value: string | undefined) => (value && isUuid(value) ? value : null);
+  const dayParam = (value: string | undefined) => (value && isCalendarDate(value) ? value : null);
+  const ownerParam = firstParam(query.owner) === "me" ? "me" : idParam(firstParam(query.owner));
+  const filter = {
+    owner: ownerParam,
+    ownerId: ownerParam === "me" ? context.user.id : ownerParam,
+    teamId: idParam(firstParam(query.team)),
+    tagId: idParam(firstParam(query.tag)),
+    closeFrom: dayParam(firstParam(query.close_from)),
+    closeTo: dayParam(firstParam(query.close_to)),
+  };
+  const [board, pipelines, members, teams, tags] = await Promise.all([
+    getBoard(orgId, requested, { showClosed, fullStage, filter }),
+    listPipelines(orgId),
+    listMembers(orgId),
+    listTeams(orgId),
+    listTags(orgId),
+  ]);
 
   if (!board) {
     return NO_PIPELINE;
@@ -128,7 +149,17 @@ export default async function DealsPage({ params, searchParams }: Props) {
   // the board's address with one setting changed, keeping the others
   const boardHref = (change: Record<string, string | null>) => {
     const params = new URLSearchParams();
-    const current: Record<string, string | null> = { pipeline: requested ?? null, closed: showClosed ? "1" : null, stage: fullStage ?? null, ...change };
+    const current: Record<string, string | null> = {
+      pipeline: requested ?? null,
+      closed: showClosed ? "1" : null,
+      stage: fullStage ?? null,
+      owner: filter.owner,
+      team: filter.teamId,
+      tag: filter.tagId,
+      close_from: filter.closeFrom,
+      close_to: filter.closeTo,
+      ...change,
+    };
     for (const [key, value] of Object.entries(current)) if (value) params.set(key, value);
     const qs = params.toString();
     return qs ? `${paths.deals(orgId)}?${qs}` : paths.deals(orgId);
@@ -159,7 +190,22 @@ export default async function DealsPage({ params, searchParams }: Props) {
         </Link>
       </p>
 
-      {!anyDeals ? (
+      <BoardFilters
+        action={paths.deals(orgId)}
+        keep={Object.fromEntries(Object.entries({ pipeline: requested ?? null, closed: showClosed ? "1" : null }).filter((e): e is [string, string] => e[1] !== null))}
+        filter={filter}
+        owners={members.filter((m) => m.status === "active").map((m) => ({ value: m.userId, label: m.name }))}
+        teams={teams.map((t) => ({ value: t.id, label: t.name }))}
+        tags={tags.map((t) => ({ value: t.id, label: t.name }))}
+        clearHref={filter.owner || filter.teamId || filter.tagId || filter.closeFrom || filter.closeTo ? boardHref({ owner: null, team: null, tag: null, close_from: null, close_to: null }) : null}
+        timeZone={context.org.timeZone}
+      />
+
+      {!anyDeals && isBoardFiltered(filter) ? (
+        <div className="mb-5 rounded-lg border border-line bg-surface">
+          <EmptyState kind="search" title="אין עסקאות שמתאימות לסינון" description="נסו לשנות את הסינון או לנקות אותו." />
+        </div>
+      ) : !anyDeals ? (
         <div className="mb-5 rounded-lg border border-line bg-surface">
           <EmptyState icon={<BoardIcon />}
             title="עוד אין עסקאות"

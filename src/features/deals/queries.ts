@@ -31,9 +31,18 @@ export type Board = {
   showClosed: boolean;
 };
 
+/** Board filters (DEAL-09). Ids are checked by the page; dates are YYYY-MM-DD. */
+export type BoardFilter = { ownerId?: string | null; teamId?: string | null; tagId?: string | null; closeFrom?: string | null; closeTo?: string | null };
+
+export function isBoardFiltered(filter: BoardFilter): boolean {
+  return Boolean(filter.ownerId || filter.teamId || filter.tagId || filter.closeFrom || filter.closeTo);
+}
+
 // Cards loaded per stage: the most recently moved first. One stage can be opened in full.
 export const STAGE_LIMIT = 50;
 export const STAGE_FULL_LIMIT = 500;
+// a filtered board sums its deals itself, up to this many
+const FILTERED_TOTALS_LIMIT = 5000;
 
 export type PipelineOption = { id: string; name: string; isDefault: boolean };
 
@@ -84,7 +93,7 @@ export async function getPipeline(
 export async function getBoard(
   orgId: string,
   pipelineId?: string | null,
-  options: { showClosed?: boolean; fullStage?: string | null } = {},
+  options: { showClosed?: boolean; fullStage?: string | null; filter?: BoardFilter } = {},
 ): Promise<Board | null> {
   const pipeline = await getPipeline(orgId, pipelineId);
   if (!pipeline) {
@@ -93,22 +102,45 @@ export async function getBoard(
   const supabase = await createClient();
   const showClosed = options.showClosed === true;
   const loadedStages = pipeline.stages.filter((stage) => showClosed || stage.kind === "open").map((stage) => stage.id);
+  const filter = options.filter ?? {};
+  const filtered = isBoardFiltered(filter);
+
+  // the same conditions on the cards and, when filtered, on the totals
+  const narrow = <Q extends { eq: (column: string, value: string) => Q; gte: (column: string, value: string) => Q; lte: (column: string, value: string) => Q; contains: (column: string, value: string[]) => Q }>(query: Q): Q => {
+    let q = query;
+    if (filter.ownerId) q = q.eq("owner_id", filter.ownerId);
+    if (filter.teamId) q = q.eq("team_id", filter.teamId);
+    if (filter.tagId) q = q.contains("tag_ids", [filter.tagId]);
+    if (filter.closeFrom) q = q.gte("expected_close_date", filter.closeFrom);
+    if (filter.closeTo) q = q.lte("expected_close_date", filter.closeTo);
+    return q;
+  };
 
   const [totalsResult, ...stageResults] = await Promise.all([
-    supabase.rpc("deal_stage_totals", { p_org: orgId, p_pipeline: pipeline.id }),
+    filtered
+      ? // the totals function has no filters: count the filtered deals themselves (amounts only)
+        narrow(
+          supabase.from("deals").select("stage_id, amount_agorot").eq("organization_id", orgId).eq("pipeline_id", pipeline.id).is("deleted_at", null),
+        ).limit(FILTERED_TOTALS_LIMIT)
+      : supabase.rpc("deal_stage_totals", { p_org: orgId, p_pipeline: pipeline.id }),
     ...loadedStages.map((stageId) =>
-      supabase
-        .from("deals")
-        .select("id, name, amount_agorot, stage_id, contact_id")
-        .eq("organization_id", orgId)
-        .eq("pipeline_id", pipeline.id)
-        .eq("stage_id", stageId)
-        .is("deleted_at", null)
+      narrow(
+        supabase
+          .from("deals")
+          .select("id, name, amount_agorot, stage_id, contact_id")
+          .eq("organization_id", orgId)
+          .eq("pipeline_id", pipeline.id)
+          .eq("stage_id", stageId)
+          .is("deleted_at", null),
+      )
         .order("stage_entered_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(options.fullStage === stageId ? STAGE_FULL_LIMIT : STAGE_LIMIT),
     ),
   ]);
+  if (totalsResult.error) {
+    throw new Error(`deal totals query failed: ${totalsResult.error.message}`);
+  }
   for (const result of stageResults) {
     if (result.error) {
       throw new Error(`deals query failed: ${result.error.message}`);
@@ -117,8 +149,16 @@ export async function getBoard(
   const rows = stageResults.flatMap((result) => result.data ?? []);
 
   const totals: Record<string, StageTotal> = {};
-  for (const t of (Array.isArray(totalsResult.data) ? totalsResult.data : []) as Array<{ stage_id: string; count: number; amount_agorot: number }>) {
-    totals[t.stage_id] = { count: Number(t.count), amountAgorot: Number(t.amount_agorot) };
+  if (filtered) {
+    for (const row of (totalsResult.data ?? []) as Array<{ stage_id: string; amount_agorot: number }>) {
+      const t = (totals[row.stage_id] ??= { count: 0, amountAgorot: 0 });
+      t.count += 1;
+      t.amountAgorot += Number(row.amount_agorot);
+    }
+  } else {
+    for (const t of (Array.isArray(totalsResult.data) ? totalsResult.data : []) as Array<{ stage_id: string; count: number; amount_agorot: number }>) {
+      totals[t.stage_id] = { count: Number(t.count), amountAgorot: Number(t.amount_agorot) };
+    }
   }
 
   const contactIds = [...new Set(rows.map((row) => row.contact_id).filter((id): id is string => Boolean(id)))];
