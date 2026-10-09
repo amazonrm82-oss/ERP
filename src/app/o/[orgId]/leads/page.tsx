@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ListTools } from "@/components/list-tools";
 import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { inlineEditing } from "@/features/inline-edit/server";
+import { LeadCards } from "@/features/leads/components/lead-cards";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { LeadsTable } from "@/features/leads/components/leads-table";
@@ -112,78 +114,85 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   return (
     <>
       <PageHeader title="לידים" description="פניות שעוד לא סוננו. ליד מתאים ממירים לאיש קשר ועסקה." actions={newLeadButton} />
-      <SavedViewsBar
-        orgId={orgId}
-        objectType="lead"
-        listPath={paths.leads(orgId)}
-        views={views}
-        activeViewId={activeView?.id ?? null}
-        current={{ q: search || undefined, f: filterParam ?? undefined, status: statusId ?? undefined, tag: tagId ?? undefined }}
-        currentSort={sortValue(sort)}
-        currentColumns={shownColumns}
-        teams={viewData.teams}
-        canSave={context.role !== "viewer"}
-        canShare={context.role === "owner" || context.role === "admin"}
-      />
-      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {canExport(context.role) ? <ExportMenu href={exportHref(paths.leads(orgId), listHref(1, sortValue(sort)))} /> : null}
-        <AdvancedFilter
-          fields={filter.fields}
-          current={filter.tree}
-          skipped={filter.skipped}
+      <ListTools active={(filter.tree ? 1 : 0) + (statusId ? 1 : 0) + (tagId ? 1 : 0)}>
+        <SavedViewsBar
+          orgId={orgId}
+          objectType="lead"
           listPath={paths.leads(orgId)}
-          keep={Object.fromEntries(
-            Object.entries({ q: search, status: boardView ? "" : (statusId ?? ""), tag: tagId ?? "", view: boardView ? "board" : "" }).filter(([, v]) => v),
-          )}
+          views={views}
+          activeViewId={activeView?.id ?? null}
+          current={{ q: search || undefined, f: filterParam ?? undefined, status: statusId ?? undefined, tag: tagId ?? undefined }}
+          currentSort={sortValue(sort)}
+          currentColumns={shownColumns}
+          teams={viewData.teams}
+          canSave={context.role !== "viewer"}
+          canShare={context.role === "owner" || context.role === "admin"}
         />
-        {boardView ? null : activeView?.config.columns ? (
-          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
-        ) : (
-          <ColumnsPanel orgId={orgId} object="lead" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
-        )}
-        <nav aria-label="תצוגה" className="flex gap-1 rounded-md border border-line bg-surface p-1">
-          {(
-            [
-              { key: "table", label: "טבלה" },
-              { key: "board", label: "לוח" },
-            ] as const
-          ).map((option) => {
-            const active = (option.key === "board") === boardView;
-            return (
-              <Link
-                key={option.key}
-                href={viewHref(option.key)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "rounded px-3 py-1.5 text-md",
-                  active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas",
-                )}
-              >
-                {option.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {canExport(context.role) ? <ExportMenu href={exportHref(paths.leads(orgId), listHref(1, sortValue(sort)))} /> : null}
+          <AdvancedFilter
+            fields={filter.fields}
+            current={filter.tree}
+            skipped={filter.skipped}
+            listPath={paths.leads(orgId)}
+            keep={Object.fromEntries(
+              Object.entries({ q: search, status: boardView ? "" : (statusId ?? ""), tag: tagId ?? "", view: boardView ? "board" : "" }).filter(([, v]) => v),
+            )}
+          />
+          {boardView ? null : activeView?.config.columns ? (
+            <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+          ) : (
+            <ColumnsPanel orgId={orgId} object="lead" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+          )}
+          <nav aria-label="תצוגה" className="flex gap-1 rounded-md border border-line bg-surface p-1">
+            {(
+              [
+                { key: "table", label: "טבלה" },
+                { key: "board", label: "לוח" },
+              ] as const
+            ).map((option) => {
+              const active = (option.key === "board") === boardView;
+              return (
+                <Link
+                  key={option.key}
+                  href={viewHref(option.key)}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded px-3 py-1.5 text-md",
+                    active ? "bg-accent-soft font-semibold text-accent-strong" : "text-ink-soft hover:bg-canvas",
+                  )}
+                >
+                  {option.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </ListTools>
 
       <LeadFilters orgId={orgId} statuses={lookups.statuses} tags={tags} search={search} statusId={statusId ?? ""} tagId={tagId ?? ""} board={boardView} />
 
       {board ? (
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} />
       ) : leads.length > 0 ? (
-        <LeadsTable
-          orgId={orgId}
-          leads={leads}
-          statuses={lookups.statuses}
-          sources={lookups.sources}
-          columns={shownColumns}
-          catalog={listColumns.catalog}
-          fields={listColumns.fields}
-          sort={sort}
-          sortHref={sortHref}
-          editing={editing}
-          tags={tags}
-        />
+        <>
+          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} className="md:hidden" />
+          <div className="hidden md:block">
+            <LeadsTable
+              orgId={orgId}
+              leads={leads}
+              statuses={lookups.statuses}
+              sources={lookups.sources}
+              columns={shownColumns}
+              catalog={listColumns.catalog}
+              fields={listColumns.fields}
+              sort={sort}
+              sortHref={sortHref}
+              editing={editing}
+              tags={tags}
+            />
+          </div>
+        </>
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-import { FormError } from "@/components/ui/feedback";
+import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
@@ -25,6 +25,8 @@ export function TaskForm({ orgId, assignees, myUserId, today }: Props) {
         defaultOwnerId={myUserId}
       />
       <SubmitButton pendingText="מוסיף…">הוספת משימה</SubmitButton>
+      {/* FXU-10: say that it worked; the form has cleared itself */}
+      <FormNotice message={state?.ok ? "המשימה נוספה." : null} />
     </form>
   );
 }

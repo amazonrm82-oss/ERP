@@ -77,7 +77,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
         role="region"
         aria-label={`לוח עסקאות: ${board.pipeline.name}`}
         tabIndex={0}
-        className="relative -mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6"
+        className="relative -mx-4 snap-x scroll-px-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:scroll-px-6 sm:px-6 md:snap-none"
       >
         <ol className="flex min-w-max items-start gap-3">
           {board.stages.map((stage) => {
@@ -92,7 +92,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
             const hidden = count - stageDeals.length;
             const headingId = `stage-${stage.id}`;
             return (
-              <li key={stage.id} className="w-[17.5rem] shrink-0">
+              <li key={stage.id} className="w-[17.5rem] shrink-0 snap-start">
                 <section
                   aria-labelledby={headingId}
                   onDragOver={
@@ -164,7 +164,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
                             >
                               {deal.name}
                             </Link>
-                            <p className="mt-0.5 text-md">{formatMoney(deal.amountAgorot)}</p>
+                            <p className="mt-0.5 text-md font-semibold tabular-nums">{formatMoney(deal.amountAgorot)}</p>
                             {deal.contactId && deal.contactName ? (
                               <p className="mt-0.5 text-sm">
                                 <Link

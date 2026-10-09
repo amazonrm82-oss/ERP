@@ -19,6 +19,7 @@ import { prepareListFilter } from "@/features/list-filters/prepare";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
+import { NewTaskPanel } from "@/features/tasks/components/new-task-panel";
 import { TaskForm } from "@/features/tasks/components/task-form";
 import { remindOption } from "@/features/tasks/components/task-fields";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
@@ -164,7 +165,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
           ) : null}
           {openCount === 0 ? (
             <div className="rounded-lg border border-line bg-surface">
-              <EmptyState icon={<CheckSquareIcon />} title="אין משימות פתוחות" description="משימה חדשה מוסיפים בטופס שבצד. אפשר להטיל משימה גם על חבר צוות." />
+              <EmptyState icon={<CheckSquareIcon />} title="אין משימות פתוחות" description="משימה חדשה מוסיפים בכפתור &quot;משימה חדשה&quot;. אפשר להטיל משימה גם על חבר צוות." />
             </div>
           ) : (
             sections
@@ -208,12 +209,17 @@ export default async function TasksPage({ params, searchParams }: Props) {
         </div>
 
         {canWrite ? (
-          <Card aria-labelledby="new-task-title" className="lg:sticky lg:top-20">
-            <CardHeader id="new-task-title" title="משימה חדשה" />
-            <CardBody>
-              <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={zoneDate(new Date())} />
-            </CardBody>
-          </Card>
+          // first on a phone, beside the list on a computer
+          <div className="order-first lg:sticky lg:top-20 lg:order-none">
+            <NewTaskPanel>
+              <Card aria-labelledby="new-task-title">
+                <CardHeader id="new-task-title" title="משימה חדשה" />
+                <CardBody>
+                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={zoneDate(new Date(), context.org.timeZone)} />
+                </CardBody>
+              </Card>
+            </NewTaskPanel>
+          </div>
         ) : null}
       </div>
     </>
