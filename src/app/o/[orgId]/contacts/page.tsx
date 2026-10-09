@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 
+import { ListTools } from "@/components/list-tools";
+import { contactDisplayName } from "@/features/contacts/display";
+import { RecordCards } from "@/components/record-cards";
 import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
@@ -89,35 +92,37 @@ export default async function ContactsPage({ params, searchParams }: Props) {
     <>
       <PageHeader title="אנשי קשר" description="הלקוחות והאנשים שהעסק עובד איתם." actions={newContactButton} />
 
-      <SavedViewsBar
-        orgId={orgId}
-        objectType="contact"
-        listPath={paths.contacts(orgId)}
-        views={views}
-        activeViewId={activeView?.id ?? null}
-        current={{ q: search || undefined, f: filterParam ?? undefined, tag: tagId ?? undefined }}
-        currentSort={sortValue(sort)}
-        currentColumns={shownColumns}
-        teams={viewData.teams}
-        canSave={context.role !== "viewer"}
-        canShare={context.role === "owner" || context.role === "admin"}
-      />
-
-      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {canExport(context.role) ? <ExportMenu href={exportHref(paths.contacts(orgId), listHref(1, sortValue(sort)))} /> : null}
-        <AdvancedFilter
-          fields={filter.fields}
-          current={filter.tree}
-          skipped={filter.skipped}
+      <ListTools active={(filter.tree ? 1 : 0) + (tagId ? 1 : 0)}>
+        <SavedViewsBar
+          orgId={orgId}
+          objectType="contact"
           listPath={paths.contacts(orgId)}
-          keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
+          views={views}
+          activeViewId={activeView?.id ?? null}
+          current={{ q: search || undefined, f: filterParam ?? undefined, tag: tagId ?? undefined }}
+          currentSort={sortValue(sort)}
+          currentColumns={shownColumns}
+          teams={viewData.teams}
+          canSave={context.role !== "viewer"}
+          canShare={context.role === "owner" || context.role === "admin"}
         />
-        {activeView?.config.columns ? (
-          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
-        ) : (
-          <ColumnsPanel orgId={orgId} object="contact" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
-        )}
-      </div>
+
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {canExport(context.role) ? <ExportMenu href={exportHref(paths.contacts(orgId), listHref(1, sortValue(sort)))} /> : null}
+          <AdvancedFilter
+            fields={filter.fields}
+            current={filter.tree}
+            skipped={filter.skipped}
+            listPath={paths.contacts(orgId)}
+            keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
+          />
+          {activeView?.config.columns ? (
+            <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+          ) : (
+            <ColumnsPanel orgId={orgId} object="contact" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+          )}
+        </div>
+      </ListTools>
       <Form action={paths.contacts(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField
           label="חיפוש אנשי קשר"
@@ -145,17 +150,33 @@ export default async function ContactsPage({ params, searchParams }: Props) {
       </Form>
 
       {contacts.length > 0 ? (
-        <ContactsTable
-          orgId={orgId}
-          contacts={contacts}
-          columns={shownColumns}
-          catalog={listColumns.catalog}
-          fields={listColumns.fields}
-          sort={sort}
-          sortHref={sortHref}
-          editing={editing}
-          tags={tags}
-        />
+        <>
+          <RecordCards
+            label="אנשי קשר"
+            className="md:hidden"
+            cards={contacts.map((contact) => ({
+              id: contact.id,
+              href: paths.contact(orgId, contact.id),
+              title: contactDisplayName(contact),
+              details: [contact.companyName, contact.jobTitle, contact.ownerName ? `אחראי: ${contact.ownerName}` : null],
+              phone: contact.phone,
+              phoneE164: contact.phoneE164,
+            }))}
+          />
+          <div className="hidden md:block">
+            <ContactsTable
+              orgId={orgId}
+              contacts={contacts}
+              columns={shownColumns}
+              catalog={listColumns.catalog}
+              fields={listColumns.fields}
+              sort={sort}
+              sortHref={sortHref}
+              editing={editing}
+              tags={tags}
+            />
+          </div>
+        </>
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (

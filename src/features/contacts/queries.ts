@@ -14,6 +14,7 @@ export type ContactListItem = {
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
+  phoneE164: string | null;
   email: string | null;
   jobTitle: string | null;
   companyName: string | null;
@@ -64,7 +65,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, email, job_title, company_id, owner_id, created_at, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -108,6 +109,7 @@ export async function listContacts(
       firstName: row.first_name,
       lastName: row.last_name,
       phone: row.phone,
+      phoneE164: row.phone_e164,
       email: row.email,
       jobTitle: row.job_title,
       companyName: row.company_id ? (companies.get(row.company_id) ?? null) : null,

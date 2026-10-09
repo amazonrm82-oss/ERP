@@ -11,6 +11,7 @@ export type CompanyListItem = {
   id: string;
   name: string;
   phone: string | null;
+  phoneE164: string | null;
   city: string | null;
   website: string | null;
   ownerId: string | null;
@@ -37,7 +38,7 @@ export async function listCompanies(
 
   let query = supabase
     .from("companies")
-    .select("id, name, phone, city, website, owner_id, created_at, custom_fields")
+    .select("id, name, phone, phone_e164, city, website, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   const searchFilter = personSearchFilter(["name", "tax_id", "city"], options.search);
@@ -71,6 +72,7 @@ export async function listCompanies(
       id: row.id,
       name: row.name,
       phone: row.phone,
+      phoneE164: row.phone_e164,
       city: row.city,
       website: row.website,
       ownerId: row.owner_id,

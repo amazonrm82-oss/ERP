@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 
+import { ListTools } from "@/components/list-tools";
+import { RecordCards } from "@/components/record-cards";
 import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
@@ -89,35 +91,37 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
     <>
       <PageHeader title="חברות" description="הארגונים שהעסק עובד איתם, ואנשי הקשר והעסקאות של כל אחד." actions={newCompanyButton} />
 
-      <SavedViewsBar
-        orgId={orgId}
-        objectType="company"
-        listPath={paths.companies(orgId)}
-        views={views}
-        activeViewId={activeView?.id ?? null}
-        current={{ q: search || undefined, f: filterParam ?? undefined, tag: tagId ?? undefined }}
-        currentSort={sortValue(sort)}
-        currentColumns={shownColumns}
-        teams={viewData.teams}
-        canSave={context.role !== "viewer"}
-        canShare={context.role === "owner" || context.role === "admin"}
-      />
-
-      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {canExport(context.role) ? <ExportMenu href={exportHref(paths.companies(orgId), listHref(1, sortValue(sort)))} /> : null}
-        <AdvancedFilter
-          fields={filter.fields}
-          current={filter.tree}
-          skipped={filter.skipped}
+      <ListTools active={(filter.tree ? 1 : 0) + (tagId ? 1 : 0)}>
+        <SavedViewsBar
+          orgId={orgId}
+          objectType="company"
           listPath={paths.companies(orgId)}
-          keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
+          views={views}
+          activeViewId={activeView?.id ?? null}
+          current={{ q: search || undefined, f: filterParam ?? undefined, tag: tagId ?? undefined }}
+          currentSort={sortValue(sort)}
+          currentColumns={shownColumns}
+          teams={viewData.teams}
+          canSave={context.role !== "viewer"}
+          canShare={context.role === "owner" || context.role === "admin"}
         />
-        {activeView?.config.columns ? (
-          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
-        ) : (
-          <ColumnsPanel orgId={orgId} object="company" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
-        )}
-      </div>
+
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {canExport(context.role) ? <ExportMenu href={exportHref(paths.companies(orgId), listHref(1, sortValue(sort)))} /> : null}
+          <AdvancedFilter
+            fields={filter.fields}
+            current={filter.tree}
+            skipped={filter.skipped}
+            listPath={paths.companies(orgId)}
+            keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
+          />
+          {activeView?.config.columns ? (
+            <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+          ) : (
+            <ColumnsPanel orgId={orgId} object="company" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+          )}
+        </div>
+      </ListTools>
       <Form action={paths.companies(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField
           label="חיפוש חברות"
@@ -145,17 +149,33 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
       </Form>
 
       {companies.length > 0 ? (
-        <CompaniesTable
-          orgId={orgId}
-          companies={companies}
-          columns={shownColumns}
-          catalog={listColumns.catalog}
-          fields={listColumns.fields}
-          sort={sort}
-          sortHref={sortHref}
-          editing={editing}
-          tags={tags}
-        />
+        <>
+          <RecordCards
+            label="חברות"
+            className="md:hidden"
+            cards={companies.map((company) => ({
+              id: company.id,
+              href: paths.company(orgId, company.id),
+              title: company.name,
+              details: [company.city, company.ownerName ? `אחראי: ${company.ownerName}` : null],
+              phone: company.phone,
+              phoneE164: company.phoneE164,
+            }))}
+          />
+          <div className="hidden md:block">
+            <CompaniesTable
+              orgId={orgId}
+              companies={companies}
+              columns={shownColumns}
+              catalog={listColumns.catalog}
+              fields={listColumns.fields}
+              sort={sort}
+              sortHref={sortHref}
+              editing={editing}
+              tags={tags}
+            />
+          </div>
+        </>
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
