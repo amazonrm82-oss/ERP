@@ -1015,6 +1015,16 @@ try {
   const visitor = await newPage(360);
   await visitor.goto(`${publicUrl}?embed=1`);
   await visitor.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
+  // FXA-02: an empty send marks the wrong field, says why next to it, and puts focus there
+  await visitor.getByRole("button", { name: "שליחה" }).click();
+  await visitor.locator('[aria-invalid="true"]').first().waitFor();
+  const focused = await visitor.evaluate(() => {
+    const el = document.activeElement;
+    const said = el?.getAttribute("aria-describedby");
+    return { invalid: el?.getAttribute("aria-invalid"), message: said ? document.getElementById(said)?.textContent : null };
+  });
+  console.log("public form after an empty send:", focused);
+  if (focused.invalid !== "true" || !focused.message) throw new Error("the public form did not point at the wrong field");
   await visitor.getByLabel("שם מלא").fill("גלית מהאתר");
   await visitor.getByLabel("טלפון").fill("054-7778899");
   await visitor.getByLabel("חברה").fill("גלית עיצובים");

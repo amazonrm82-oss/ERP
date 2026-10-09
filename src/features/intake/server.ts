@@ -6,6 +6,7 @@ import type { Json } from "@/lib/database.types";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
+import { wrongField } from "./public-validate";
 
 export type IntakeKind = "form" | "webhook";
 
@@ -119,7 +120,8 @@ function clientIp(request: Request): string | null {
   return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || null;
 }
 
-type Reply = { ok: boolean; message: string; redirectUrl?: string | null };
+// field: which form field was wrong, so the hosted form can mark it (FXA-02)
+type Reply = { ok: boolean; message: string; redirectUrl?: string | null; field?: string };
 
 const MESSAGES = {
   notConfigured: "קליטת הלידים עוד לא הוגדרה במערכת.",
@@ -185,7 +187,7 @@ export async function handleIntake(request: Request, token: string, kind: Intake
 
   if (error) {
     if (error.code === "P0002") return respond(404, { ok: false, message: MESSAGES.notFound });
-    if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid });
+    if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid, field: wrongField(error.message) });
     if (error.code === "P0001" && error.hint === "rate_limited") return respond(429, { ok: false, message: MESSAGES.rateLimited });
     if (error.code === "P0001") return respond(403, { ok: false, message: MESSAGES.unavailable });
     console.error("intake_submit failed", error.code, error.message);
