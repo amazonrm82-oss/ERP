@@ -9,8 +9,11 @@ import { ConfigMissing } from "@/components/config-missing";
 import { ServiceWorker } from "@/components/service-worker";
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 import { getSupabaseEnv } from "@/lib/env";
+import { configuredSiteUrl } from "@/lib/site-origin";
 
 export const metadata: Metadata = {
+  // absolute links for the share image (src/app/opengraph-image.png)
+  metadataBase: configuredSiteUrl(),
   title: { default: APP_NAME, template: `%s | ${APP_NAME}` },
   description: APP_DESCRIPTION,
   applicationName: APP_NAME,

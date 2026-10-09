@@ -17,7 +17,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
-    background_color: "#f5f6f7",
+    // the light canvas of the design system: the splash screen an installed app opens on
+    background_color: "#f4f6f8",
     theme_color: THEME_COLOR,
     categories: ["business", "productivity"],
     icons: [

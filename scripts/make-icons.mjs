@@ -1,6 +1,7 @@
 // Brand assets from the owner's logo (docs/brand/mexuz-logo-original.png):
 // - src/assets/mexuz-logo.png: the wordmark, trimmed, for the app header
 // - public/icons/*: app icons with the logo's "M", redrawn as vector so it stays sharp
+// - src/app/opengraph-image.png: the picture beside a shared link (WhatsApp, Google), 1200 x 630 (DSN-15)
 // Run after the logo changes: node scripts/make-icons.mjs
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
@@ -49,4 +50,20 @@ await writeFile(path("public/icons/icon.svg"), icon(64, { rounded: false, scale:
 
 // the wordmark for the header: trimmed, 160px tall (sharp at 3x for a ~32px logo)
 await sharp(path("docs/brand/mexuz-logo-original.png")).trim({ threshold: 20 }).resize({ height: 160 }).png({ compressionLevel: 9 }).toFile(path("src/assets/mexuz-logo.png"));
+// the share image: the full logo on the app's light canvas, a thin brand line under it.
+// The page title and description travel as text beside it, so the image carries no text.
+{
+  const W = 1200;
+  const H = 630;
+  const logo = await sharp(path("docs/brand/mexuz-logo-original.png")).trim({ threshold: 20 }).resize({ width: 640 }).png().toBuffer();
+  const meta = await sharp(logo).metadata();
+  const bg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#f4f6f8"/>` +
+      `<rect x="${(W - 160) / 2}" y="${(H + meta.height) / 2 + 48}" width="160" height="8" rx="4" fill="#1e56d6"/></svg>`,
+  );
+  await sharp(bg)
+    .composite([{ input: logo, left: Math.round((W - meta.width) / 2), top: Math.round((H - meta.height) / 2) - 16 }])
+    .png({ compressionLevel: 9 })
+    .toFile(path("src/app/opengraph-image.png"));
+}
 console.log("brand assets written");
