@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
-import { SearchIcon } from "@/components/ui/icons";
+import { IconButton } from "@/components/ui/button";
+import { CloseIcon, SearchIcon } from "@/components/ui/icons";
 
 import { searchAction, type SearchGroup, type SearchHit } from "../actions";
 
@@ -29,6 +30,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const listId = useId();
   const titleId = useId();
 
@@ -49,9 +51,22 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // a real modal (FXA-04): the browser keeps focus inside and makes the page behind inert
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      dialog.showModal();
+      inputRef.current?.focus();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
   }, [open]);
+
+  // the highlighted result stays in view while the arrows move it (FXA-04)
+  useEffect(() => {
+    if (open) document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [active, open, listId]);
 
   // search as the user types, a moment after they stop
   useEffect(() => {
@@ -102,9 +117,18 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
         </kbd>
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 px-3 pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-          <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-xl overflow-hidden rounded-lg bg-surface shadow-[0_16px_48px_rgb(23_32_43/0.25)]">
+      <dialog
+        ref={dialogRef}
+        aria-labelledby={titleId}
+        onCancel={(e) => {
+          e.preventDefault();
+          close();
+        }}
+        onMouseDown={(e) => e.target === e.currentTarget && close()}
+        className="mx-auto mt-[10vh] w-[calc(100%-1.5rem)] max-w-xl overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-xl backdrop:bg-brand/60"
+      >
+        {open ? (
+          <div>
             <h2 id={titleId} className="sr-only">
               חיפוש בכל המערכת
             </h2>
@@ -138,6 +162,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                 }}
                 className="min-h-14 w-full bg-transparent text-base outline-none"
               />
+              <IconButton label="סגירת החיפוש" icon={<CloseIcon className="size-5" />} onClick={close} className="-me-1" />
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
               {query.trim().length < 2 ? (
@@ -163,8 +188,15 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                             onClick={() => go(hit)}
                             className={`cursor-pointer px-4 py-2.5 ${index === active ? "bg-accent-soft ring-2 ring-accent ring-inset" : ""}`}
                           >
-                            <span className="block truncate font-medium">{hit.title}</span>
-                            {hit.subtitle ? <span className="block truncate text-sm text-ink-soft">{hit.subtitle}</span> : null}
+                            <span className="block truncate font-medium">
+                              <bdi>{hit.title}</bdi>
+                            </span>
+                            {hit.subtitle ? (
+                              // FXA-07: a phone or email keeps its own direction; a leading + stays in front
+                              <span className="block truncate text-sm text-ink-soft">
+                                <bdi>{hit.subtitle}</bdi>
+                              </span>
+                            ) : null}
                           </li>
                         ) : null,
                       )}
@@ -177,8 +209,8 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
               חצים לבחירה · Enter לפתיחה · Esc לסגירה
             </p>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </dialog>
     </>
   );
 }

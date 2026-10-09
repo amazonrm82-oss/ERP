@@ -49,8 +49,14 @@ export function MergePicker({ orgId, type, keepId }: { orgId: string; type: Merg
           return (
             <li key={hit.key}>
               <Link href={paths.merge(orgId, type, keepId, id)} className="block px-1 py-2.5 hover:bg-canvas">
-                <span className="block font-medium text-accent-strong">{hit.title}</span>
-                {hit.subtitle ? <span className="block text-sm text-ink-soft">{hit.subtitle}</span> : null}
+                <span className="block font-medium text-accent-strong">
+                  <bdi>{hit.title}</bdi>
+                </span>
+                {hit.subtitle ? (
+                  <span className="block text-sm text-ink-soft">
+                    <bdi>{hit.subtitle}</bdi>
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

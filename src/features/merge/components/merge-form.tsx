@@ -39,7 +39,7 @@ export function MergeForm({ orgId, type, keep, dup }: Props) {
                     <label key={choice} className="flex min-h-11 cursor-pointer items-start gap-2 rounded-md border border-line px-3 py-2 has-checked:border-accent has-checked:bg-accent-soft">
                       <input type="radio" name={key} value={choice} defaultChecked={checked} className="mt-1 size-4 shrink-0" />
                       <span className="min-w-0 break-words">
-                        <span className={value ? undefined : "text-ink-soft"}>{value ?? "(ריק)"}</span>
+                        <span className={value ? undefined : "text-ink-soft"}>{value ? <bdi>{value}</bdi> : "(ריק)"}</span>
                         <span className="block text-xs text-ink-soft">מתוך {choice === "keep" ? keep.title : dup.title}</span>
                       </span>
                     </label>

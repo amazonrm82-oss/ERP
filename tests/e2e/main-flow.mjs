@@ -1691,7 +1691,15 @@ try {
   await lost.keyboard.press("/");
   await searchBox.fill("0000000000xyz");
   await expectText(lost, "לא נמצא דבר");
+  // FXA-04: a real modal: Tab stays inside, a close button is on a phone screen too
+  const closeSearch = lost.getByRole("button", { name: "סגירת החיפוש" });
+  if (!(await closeSearch.isVisible())) throw new Error("no visible close button in the search window at 360px");
+  for (let i = 0; i < 4; i++) await lost.keyboard.press("Tab");
+  const inside = await lost.evaluate(() => Boolean(document.activeElement?.closest("dialog[open]")));
+  if (!inside) throw new Error("Tab left the search window");
+  await searchBox.focus();
   await searchBox.press("Escape");
+  await searchBox.waitFor({ state: "hidden" });
 
   step("signed agreement: the owner sees the signed copy with the drawn signature");
   await lost.goto(`${APP}/agreement/signed`);
