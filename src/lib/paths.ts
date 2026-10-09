@@ -28,6 +28,7 @@ export const paths = {
   deals: (orgId: string) => `/o/${orgId}/deals`,
   dealNew: (orgId: string) => `/o/${orgId}/deals/new`,
   deal: (orgId: string, dealId: string) => `/o/${orgId}/deals/${dealId}`,
+  vcard: (orgId: string, kind: "lead" | "contact", id: string) => `/o/${orgId}/vcard/${kind}/${id}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
   notifications: (orgId: string) => `/o/${orgId}/notifications`,
   file: (orgId: string, fileId: string) => `/o/${orgId}/files/${fileId}`,

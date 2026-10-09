@@ -61,7 +61,7 @@ export default async function LeadPage({ params }: Props) {
         actions={<Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>}
       />
       <div className="mb-5">
-        <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} />
+        <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)} />
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "lead", id: lead.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 

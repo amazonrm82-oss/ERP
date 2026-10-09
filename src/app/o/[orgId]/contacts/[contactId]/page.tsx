@@ -58,7 +58,7 @@ export default async function ContactPage({ params }: Props) {
         back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
       />
       <div className="mb-5">
-        <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} />
+        <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)} />
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "contact", id: contact.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 

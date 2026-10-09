@@ -1783,6 +1783,12 @@ try {
   };
   const firstDupUrl = await makeLead("כפול ראשון", false);
   const secondDupUrl = await makeLead("כפול שני", true);
+  // the record page offers the person's card for the phone's contacts (GAP-02)
+  const vcardHref = await lost.getByRole("link", { name: "שמירה באנשי הקשר בטלפון" }).getAttribute("href");
+  const vcard = await lost.request.get(`${APP}${vcardHref}`);
+  if (!vcard.ok() || !(vcard.headers()["content-type"] ?? "").startsWith("text/vcard")) throw new Error(`vcard: ${vcard.status()}`);
+  const vcardText = await vcard.text();
+  if (!vcardText.includes("FN:כפול שני") || !vcardText.includes("TEL;TYPE=CELL:054-9998877")) throw new Error(`vcard body: ${vcardText}`);
   await lost.getByRole("heading", { name: "כפילויות אפשריות" }).waitFor();
   await lost.getByRole("link", { name: /מיזוג.*כפול ראשון/ }).click();
   await lost.waitForURL(/\/merge\?/);

@@ -1,5 +1,5 @@
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
-import { ChatIcon, MailIcon, PhoneIcon } from "@/components/ui/icons";
+import { ChatIcon, MailIcon, PhoneIcon, UsersIcon } from "@/components/ui/icons";
 import { telUrl, whatsappUrl } from "@/lib/format";
 
 type Props = {
@@ -8,10 +8,12 @@ type Props = {
   email: string | null;
   // in a list row: call and WhatsApp as icon buttons, named after the person
   compact?: { name: string };
+  // a record page: download the person's card into the phone's contacts (GAP-02)
+  saveHref?: string;
 };
 
 /** One-tap ways to reach a person: call, WhatsApp, email. Renders nothing when there is no way. */
-export function ContactActions({ phone, phoneE164, email, compact }: Props) {
+export function ContactActions({ phone, phoneE164, email, compact, saveHref }: Props) {
   const tel = telUrl(phoneE164, phone);
   const whatsapp = whatsappUrl(phoneE164);
   if (compact) {
@@ -59,6 +61,14 @@ export function ContactActions({ phone, phoneE164, email, compact }: Props) {
           <a href={`mailto:${email}`} className={buttonClasses("secondary", "sm")}>
             <MailIcon className="size-4.5 text-accent" />
             אימייל
+          </a>
+        </li>
+      ) : null}
+      {saveHref && (tel || email) ? (
+        <li>
+          <a href={saveHref} download className={buttonClasses("secondary", "sm")}>
+            <UsersIcon className="size-4.5 text-accent" />
+            שמירה באנשי הקשר בטלפון
           </a>
         </li>
       ) : null}
