@@ -9,7 +9,12 @@ import { dbErrorMessage, NOT_FOUND } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { noteSchema, subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "./schema";
+import { addDays } from "@/lib/calendar-grid";
+import { zoneDate, zonedIso } from "@/lib/format";
+import { recordPage } from "@/lib/record-types";
+import type { TaskInsert } from "@/lib/database.types";
+
+import { CALL_OUTCOME_LABEL, callLogSchema, noteSchema, subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "./schema";
 
 function subjectPath(orgId: string, subject: TimelineSubject): string | null {
   switch (subject.kind) {
@@ -55,5 +60,57 @@ export async function addNoteAction(
   if (path) {
     revalidatePath(path);
   }
+  return ok();
+}
+
+const NEXT_DAYS = { tomorrow: 1, week: 7 } as const;
+
+/**
+ * A call logged in one step (TASK-02): how it ended, a note, and the next step
+ * as a task on the same record (at the start of the working day). With the
+ * user's session; the call counts as contact with the customer, like any call.
+ */
+export async function logCallAction(orgId: string, subject: TimelineSubject, recordName: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const parsedSubject = subjectSchema.safeParse(subject);
+  if (!parsedSubject.success || typeof recordName !== "string") {
+    return fail(NOT_FOUND);
+  }
+  const context = await actionContext(orgId, parsedSubject.data.id);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = callLogSchema.safeParse(pick(formData, ["outcome", "body", "next", "next_title"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const column = SUBJECT_COLUMN[parsedSubject.data.kind];
+
+  const activity: ActivityInsert = { organization_id: orgId, type: "call", body: parsed.data.body, metadata: { outcome: parsed.data.outcome } };
+  activity[column] = parsedSubject.data.id;
+  const { error } = await context.supabase.from("activities").insert(activity);
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את השיחה. נסו שוב."), { values: formValues(formData) });
+  }
+
+  if (parsed.data.next !== "none") {
+    const name = recordName.trim().slice(0, 200);
+    const title = parsed.data.next_title ?? (parsed.data.outcome === "answered" ? `המשך טיפול: ${name}` : `לחזור אל ${name}`);
+    const task: TaskInsert = {
+      organization_id: orgId,
+      title,
+      task_type: "call",
+      due_at: zonedIso(addDays(zoneDate(new Date()), NEXT_DAYS[parsed.data.next]), "09:00:00"),
+    };
+    task[column] = parsedSubject.data.id;
+    const { error: taskError } = await context.supabase.from("tasks").insert(task);
+    if (taskError) {
+      // the call is saved; say so, and that the task is missing
+      return fail(`השיחה נשמרה, אבל לא הצלחנו ליצור את המשימה (${CALL_OUTCOME_LABEL[parsed.data.outcome]}). אפשר להוסיף אותה בכרטיס המשימות.`);
+    }
+    revalidatePath(paths.tasks(orgId));
+    revalidatePath(paths.org(orgId));
+  }
+
+  revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
   return ok();
 }

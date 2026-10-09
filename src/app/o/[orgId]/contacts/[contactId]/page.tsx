@@ -60,7 +60,9 @@ export default async function ContactPage({ params }: Props) {
         back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
       />
       <div className="mb-5">
-        <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)} />
+        <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}
+          callLog={context.canWrite ? { orgId, subject: { kind: "contact", id: contact.id }, name } : undefined}
+        />
         <div className="mt-2">
           <ShareSummary
             text={recordSummary(name, [

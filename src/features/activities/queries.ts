@@ -4,7 +4,7 @@ import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-import { SUBJECT_COLUMN, type TimelineSubject } from "./schema";
+import { CALL_OUTCOME_LABEL, SUBJECT_COLUMN, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
   id: string;
@@ -99,6 +99,10 @@ export async function getTimeline(orgId: string, subject: TimelineSubject): Prom
       const channel = metaString(activity.metadata, "form_name");
       text = [`פנייה נוספת${channel ? ` דרך "${channel}"` : ""}${who ? `: ${who}` : ""}.`, body].filter(Boolean).join("\n");
       isUserContent = false;
+    } else if (activity.type === "call" && metaString(activity.metadata, "outcome")) {
+      // TASK-02: how the call ended, then the note
+      const outcome = CALL_OUTCOME_LABEL[metaString(activity.metadata, "outcome") ?? ""];
+      if (outcome) text = body ? `${outcome}. ${body}` : `${outcome}.`;
     } else if (activity.type === "conversion") {
       text = "הליד הומר לאיש קשר.";
       isUserContent = false;

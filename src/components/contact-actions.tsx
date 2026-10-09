@@ -1,5 +1,7 @@
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { ChatIcon, MailIcon, PhoneIcon, UsersIcon } from "@/components/ui/icons";
+import { CallLogButton } from "@/features/activities/components/call-log-button";
+import type { TimelineSubject } from "@/features/activities/schema";
 import { telUrl, whatsappUrl } from "@/lib/format";
 
 type Props = {
@@ -10,10 +12,12 @@ type Props = {
   compact?: { name: string };
   // a record page: download the person's card into the phone's contacts (GAP-02)
   saveHref?: string;
+  // a record page: after dialling, offer to log the call (TASK-02)
+  callLog?: { orgId: string; subject: TimelineSubject; name: string };
 };
 
 /** One-tap ways to reach a person: call, WhatsApp, email. Renders nothing when there is no way. */
-export function ContactActions({ phone, phoneE164, email, compact, saveHref }: Props) {
+export function ContactActions({ phone, phoneE164, email, compact, saveHref, callLog }: Props) {
   const tel = telUrl(phoneE164, phone);
   const whatsapp = whatsappUrl(phoneE164);
   if (compact) {
@@ -41,10 +45,14 @@ export function ContactActions({ phone, phoneE164, email, compact, saveHref }: P
     <ul className="flex flex-wrap gap-2" aria-label="יצירת קשר">
       {tel ? (
         <li>
-          <a href={tel} className={buttonClasses("secondary", "sm")}>
-            <PhoneIcon className="size-4.5 text-accent" />
-            חיוג
-          </a>
+          {callLog ? (
+            <CallLogButton tel={tel} {...callLog} />
+          ) : (
+            <a href={tel} className={buttonClasses("secondary", "sm")}>
+              <PhoneIcon className="size-4.5 text-accent" />
+              חיוג
+            </a>
+          )}
         </li>
       ) : null}
       {whatsapp ? (

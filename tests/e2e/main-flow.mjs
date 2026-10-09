@@ -1850,11 +1850,20 @@ try {
   await lost.getByRole("link", { name: "כפול שני", exact: true }).waitFor();
   await expectText(lost, "ממתין");
   await shot(lost, "116a-waiting-leads-360");
+  // the call is logged in one step after "חיוג": how it ended, a note, the next step (TASK-02)
   await lost.goto(secondDupUrl);
-  await lost.getByLabel("סוג הפעילות").selectOption({ label: "שיחה" });
-  await lost.getByLabel("תיעוד").fill("דיברנו, יחזור אלינו");
-  await lost.getByRole("button", { name: "הוספה לציר הזמן" }).click();
-  await expectText(lost, "דיברנו, יחזור אלינו");
+  // a real tel: link opens the system's "open app?" prompt, which swallows the test's mouse; the button's own handler still runs
+  await lost.evaluate(() => document.addEventListener("click", (e) => e.target instanceof Element && e.target.closest('a[href^="tel:"]') && e.preventDefault(), true));
+  await lost.getByRole("link", { name: "חיוג", exact: true }).click();
+  const callLog = lost.getByRole("dialog", { name: "תיעוד השיחה" });
+  await callLog.getByLabel("לא ענה").check();
+  await callLog.getByLabel("מה סוכם (לא חובה)").fill("נשאיר הודעה מחר");
+  await callLog.getByLabel("משימה למחר").check();
+  await shot(lost, "116b-call-log-360");
+  await callLog.getByRole("button", { name: "שמירת השיחה" }).click();
+  await callLog.waitFor({ state: "hidden", timeout: 15000 });
+  await expectText(lost, "לא ענה. נשאיר הודעה מחר");
+  await expectText(lost, "לחזור אל כפול שני");
   await lost.goto(`${orgUrl}/leads/waiting?who=all`);
   await lost.getByRole("heading", { name: "לידים שמחכים", level: 1 }).waitFor();
   if (await lost.getByRole("link", { name: "כפול שני", exact: true }).count()) throw new Error("an answered lead still waits");
