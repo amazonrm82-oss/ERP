@@ -23,7 +23,10 @@ export type BulkChange =
   | { kind: "stage"; stageId: string }
   | { kind: "tag"; tagId: string }
   | { kind: "trash" };
-export type BulkOutcome = { done: number; skipped: number };
+// what each changed row was before, so the change can be undone (FXU-06)
+export type BulkUndoRow = { id: string; owner?: string | null; status?: string; reason?: string | null; stage?: string; tag?: string };
+export type BulkUndo = { kind: BulkChange["kind"]; rows: BulkUndoRow[] };
+export type BulkOutcome = { done: number; skipped: number; undo: BulkUndo };
 
 const TASK_STATUSES = ["open", "done", "cancelled"] as const;
 // one page of a list; more than that is not picked at once
@@ -31,14 +34,34 @@ const MAX_IDS = 100;
 // rows changed at the same time
 const PARALLEL = 8;
 
-async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): Promise<number> {
-  let done = 0;
+// the items whose change went through
+async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): Promise<T[]> {
+  const done: T[] = [];
   for (let i = 0; i < items.length; i += PARALLEL) {
-    const results = await Promise.all(items.slice(i, i + PARALLEL).map(run));
-    done += results.filter(Boolean).length;
+    const slice = items.slice(i, i + PARALLEL);
+    const results = await Promise.all(slice.map(run));
+    slice.forEach((item, k) => results[k] && done.push(item));
   }
   return done;
 }
+
+// the columns a change may need to put back
+const BEFORE_COLUMNS: Record<BulkObject, string> = {
+  lead: "id, tag_ids, owner_id, status_id, disqualify_reason",
+  contact: "id, tag_ids, owner_id",
+  company: "id, tag_ids, owner_id",
+  deal: "id, tag_ids, owner_id, stage_id",
+  task: "id, owner_id, status",
+};
+type BeforeRow = {
+  id: string;
+  tag_ids?: string[];
+  owner_id?: string | null;
+  status_id?: string;
+  disqualify_reason?: string | null;
+  stage_id?: string;
+  status?: string;
+};
 
 // the shape of BulkChange, checked at runtime (FXC-08)
 const changeSchema = z.discriminatedUnion("kind", [
@@ -69,16 +92,17 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
 
   // the picked rows the user can see; the rest are counted as skipped
   // tasks have no tags
-  const { data: rows, error } = await supabase
+  const { data, error } = await supabase
     .from(table as "leads")
-    .select((object === "task" ? "id" : "id, tag_ids") as "id, tag_ids")
+    .select(BEFORE_COLUMNS[object] as "id")
     .eq("organization_id", orgId)
     .in("id", unique)
     .is("deleted_at", null);
   if (error) {
     return fail(dbErrorMessage(error));
   }
-  let live: Array<{ id: string; tag_ids?: string[] }> = rows;
+  const rows = data as unknown as BeforeRow[];
+  let live: BeforeRow[] = rows;
   if (object === "lead" && change.kind === "status") {
     // a converted lead keeps its status
     const { data: open, error: openError } = await supabase.from("leads").select("id").eq("organization_id", orgId).in("id", unique).is("converted_at", null);
@@ -87,11 +111,12 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
     live = rows.filter((row) => openIds.has(row.id));
   }
 
-  let done = 0;
+  let changed: BeforeRow[] = [];
+  let undoRows: BulkUndoRow[] = [];
   switch (change.kind) {
     case "owner": {
       if (change.ownerId !== null && !isUuid(change.ownerId)) return fail("יש לבחור בעלים.");
-      done = await eachLimited(live, async (row) => {
+      changed = await eachLimited(live, async (row) => {
         // a row that fails or that the user may not change is counted as skipped
         const { data, error: rowError } = await supabase
           .from(table as "leads")
@@ -102,6 +127,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
           .select("id");
         return !rowError && data.length > 0;
       });
+      undoRows = changed.map((row) => ({ id: row.id, owner: row.owner_id ?? null }));
       break;
     }
     case "status": {
@@ -109,10 +135,11 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
         const status = TASK_STATUSES.find((s) => s === change.statusId);
         if (!status) return fail("יש לבחור מצב.");
         // completed_at is stamped (and cleared) by the database from the status
-        done = await eachLimited(live, async (row) => {
+        changed = await eachLimited(live, async (row) => {
           const { data, error: rowError } = await supabase.from("tasks").update({ status }).eq("organization_id", orgId).eq("id", row.id).is("deleted_at", null).select("id");
           return !rowError && data.length > 0;
         });
+        undoRows = changed.map((row) => ({ id: row.id, status: row.status }));
         break;
       }
       if (object !== "lead") return fail("לרשומות האלה אין סטטוס.");
@@ -124,14 +151,15 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       if (!status) return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
       if (status.kind === "converted") return fail('כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.');
       if (status.kind === "disqualified" && !reason) return fail("יש לציין למה הלידים לא רלוונטיים.");
-      done = await eachLimited(live, async (row) => (await setLeadStatus(supabase, orgId, row.id, change.statusId, reason)).ok);
+      changed = await eachLimited(live, async (row) => (await setLeadStatus(supabase, orgId, row.id, change.statusId, reason)).ok);
+      undoRows = changed.map((row) => ({ id: row.id, status: row.status_id, reason: row.disqualify_reason ?? null }));
       break;
     }
     case "stage": {
       if (object !== "deal") return fail("לרשומות האלה אין שלב.");
       if (!isUuid(change.stageId)) return fail("יש לבחור שלב.");
       // a stage of another pipeline is refused by the (pipeline_id, stage_id) foreign key, and that deal is skipped
-      done = await eachLimited(live, async (row) => {
+      changed = await eachLimited(live, async (row) => {
         const { data, error: rowError } = await supabase
           .from("deals")
           .update({ stage_id: change.stageId })
@@ -141,6 +169,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
           .select("id");
         return !rowError && data.length > 0;
       });
+      undoRows = changed.map((row) => ({ id: row.id, stage: row.stage_id }));
       break;
     }
     case "tag": {
@@ -150,15 +179,18 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       if (tagError) return fail(dbErrorMessage(tagError));
       if (!tag) return fail("התגית כבר לא קיימת. רעננו את הדף ונסו שוב.");
       // added in the database, so a tag someone else added meanwhile stays (FXD-04)
-      done = await eachLimited(live, async (row) => {
+      changed = await eachLimited(live, async (row) => {
         const { data, error: rowError } = await supabase.rpc("change_record_tags", { p_table: table, p_org: orgId, p_id: row.id, p_add: [tag.id], p_remove: [] });
         return !rowError && data === true;
       });
+      // undo takes the tag off only where this action put it
+      undoRows = changed.filter((row) => !(row.tag_ids ?? []).includes(tag.id)).map((row) => ({ id: row.id, tag: tag.id }));
       break;
     }
     case "trash": {
       if (object === "task") return fail("משימות לא עוברות לסל המחזור.");
-      done = await eachLimited(live, async (row) => (await setTrashed(supabase, table as TrashableTable, orgId, row.id, true)).ok);
+      changed = await eachLimited(live, async (row) => (await setTrashed(supabase, table as TrashableTable, orgId, row.id, true)).ok);
+      undoRows = changed.map((row) => ({ id: row.id }));
       break;
     }
     default:
@@ -166,5 +198,83 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   }
 
   revalidatePath(RECORD_TYPES[object].list(orgId));
-  return ok({ done, skipped: unique.length - done });
+  return ok({ done: changed.length, skipped: unique.length - changed.length, undo: { kind: change.kind, rows: undoRows } });
+}
+
+const undoSchema = z.object({
+  kind: z.enum(["owner", "status", "stage", "tag", "trash"]),
+  rows: z
+    .array(
+      z.object({
+        id: z.guid(),
+        owner: z.guid().nullish(),
+        status: z.string().max(40).optional(),
+        reason: z.string().max(500).nullish(),
+        stage: z.guid().optional(),
+        tag: z.guid().optional(),
+      }),
+    )
+    .max(MAX_IDS),
+});
+
+/**
+ * Puts back what a bulk action changed (FXU-06), row by row with the user's
+ * session: the same rules as any change, so nothing the user may not do.
+ */
+export async function undoBulkAction(orgId: string, object: BulkObject, undo: BulkUndo): Promise<ActionResult<{ done: number }>> {
+  if (!isRecordType(object) || !validArg(undoSchema, undo)) {
+    return fail(INVALID_ARGS);
+  }
+  if (undo.rows.length === 0) return ok({ done: 0 });
+  const context = await actionContext(orgId, ...undo.rows.map((row) => row.id));
+  if (!context.ok) {
+    return context;
+  }
+  const { supabase } = context;
+  const table = RECORD_TYPES[object].table;
+  // one column of one row; the table differs by object, the column is checked by the database
+  const update = async (id: string, values: { owner_id?: string | null; stage_id?: string; status?: (typeof TASK_STATUSES)[number] }) => {
+    const { data, error } = await supabase
+      .from(table as "leads")
+      .update(values as never)
+      .eq("organization_id", orgId)
+      .eq("id", id)
+      .is("deleted_at", null)
+      .select("id");
+    return !error && data.length > 0;
+  };
+
+  let undone: BulkUndoRow[] = [];
+  switch (undo.kind) {
+    case "owner":
+      undone = await eachLimited(undo.rows, (row) => update(row.id, { owner_id: row.owner ?? null }));
+      break;
+    case "status":
+      if (object === "task") {
+        undone = await eachLimited(undo.rows, async (row) => {
+          const status = TASK_STATUSES.find((s) => s === row.status);
+          return status ? update(row.id, { status }) : false;
+        });
+      } else if (object === "lead") {
+        undone = await eachLimited(undo.rows, async (row) => (row.status ? (await setLeadStatus(supabase, orgId, row.id, row.status, row.reason ?? null)).ok : false));
+      }
+      break;
+    case "stage":
+      if (object === "deal") undone = await eachLimited(undo.rows, (row) => (row.stage ? update(row.id, { stage_id: row.stage }) : Promise.resolve(false)));
+      break;
+    case "tag":
+      if (object !== "task") {
+        undone = await eachLimited(undo.rows, async (row) => {
+          if (!row.tag) return false;
+          const { data, error } = await supabase.rpc("change_record_tags", { p_table: table, p_org: orgId, p_id: row.id, p_add: [], p_remove: [row.tag] });
+          return !error && data === true;
+        });
+      }
+      break;
+    case "trash":
+      if (object !== "task") undone = await eachLimited(undo.rows, async (row) => (await setTrashed(supabase, table as TrashableTable, orgId, row.id, false)).ok);
+      break;
+  }
+  revalidatePath(RECORD_TYPES[object].list(orgId));
+  return ok({ done: undone.length });
 }

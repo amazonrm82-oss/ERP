@@ -899,22 +899,31 @@ try {
   await bar.getByLabel("פעולה", { exact: true }).selectOption("tag");
   await bar.getByLabel("תגית", { exact: true }).selectOption(bulkTag);
   await shot(ownerDesk, "35-bulk-actions-1280");
-  await bar.getByRole("button", { name: "ביצוע על 2" }).click();
+  // FXU-06: the button says what will happen, the page asks, and the change can be undone
+  await bar.getByRole("button", { name: /הוספת התגית "VIP" ל-2 לידים/ }).click();
+  await bar.getByRole("group", { name: "אישור הפעולה" }).getByRole("button", { name: "כן, לבצע" }).click();
   await bar.getByText("2 רשומות עודכנו.").waitFor({ timeout: 15000 });
   const tagged = await sql("select count(*)::int as n from public.leads where id = any($1) and $2 = any(tag_ids)", [bulkLeads.map((l) => l.id), bulkTag]);
   if (tagged[0].n !== 2) throw new Error("bulk: the tag was not added to both leads");
+  await bar.getByRole("button", { name: "ביטול", exact: true }).click();
+  await bar.getByText("הפעולה בוטלה.").waitFor({ timeout: 15000 });
+  // undo takes the tag off only where the action put it; a lead that had it keeps it
+  const hadTag = bulkLeads.filter((l) => (l.tag_ids ?? []).includes(bulkTag)).length;
+  const untagged = await sql("select count(*)::int as n from public.leads where id = any($1) and $2 = any(tag_ids)", [bulkLeads.map((l) => l.id), bulkTag]);
+  if (untagged[0].n !== hadTag) throw new Error(`bulk: after undo ${untagged[0].n} leads have the tag, expected ${hadTag}`);
   for (const lead of bulkLeads) await ownerDesk.getByRole("checkbox", { name: `בחירה: ${lead.full_name}`, exact: true }).check();
   await bar.getByLabel("פעולה", { exact: true }).selectOption("status");
   await bar.getByLabel("סטטוס חדש").selectOption(otherStatus);
-  await bar.getByRole("button", { name: "ביצוע על 2" }).click();
+  await bar.getByRole("button", { name: /שינוי הסטטוס של 2 לידים/ }).click();
+  await bar.getByRole("button", { name: "כן, לבצע" }).click();
   await bar.getByText("2 רשומות עודכנו.").waitFor({ timeout: 15000 });
   const moved = await sql("select count(*)::int as n from public.leads where id = any($1) and status_id = $2", [bulkLeads.map((l) => l.id), otherStatus]);
   if (moved[0].n !== 2) throw new Error("bulk: the status did not change on both leads");
-  // the bin asks first
-  ownerDesk.once("dialog", (dialog) => dialog.accept());
+  // the bin asks first, in the page
   await ownerDesk.getByRole("checkbox", { name: `בחירה: ${bulkLeads[0].full_name}`, exact: true }).check();
   await bar.getByLabel("פעולה", { exact: true }).selectOption("trash");
-  await bar.getByRole("button", { name: "ביצוע על 1" }).click();
+  await bar.getByRole("button", { name: "העברת ליד אחד לסל המחזור" }).click();
+  await bar.getByRole("button", { name: "כן, לבצע" }).click();
   await bar.getByText("רשומה אחת עודכנה.").waitFor({ timeout: 15000 });
   const [{ trashed }] = await sql("select deleted_at is not null as trashed from public.leads where id = $1", [bulkLeads[0].id]);
   if (!trashed) throw new Error("bulk: the lead did not go to the bin");
@@ -946,7 +955,7 @@ try {
   for (const lead of bulkLeads) await ownerDesk.getByRole("checkbox", { name: `בחירה: ${lead.full_name}`, exact: true }).check();
   await bar.getByLabel("פעולה", { exact: true }).selectOption("export");
   await bar.getByLabel("סוג הקובץ").selectOption("csv");
-  const [pickedDownload] = await Promise.all([ownerDesk.waitForEvent("download"), bar.getByRole("button", { name: "ביצוע על 2" }).click()]);
+  const [pickedDownload] = await Promise.all([ownerDesk.waitForEvent("download"), bar.getByRole("button", { name: /ייצוא 2 לידים/ }).click()]);
   const pickedLines = (await readFile(await pickedDownload.path(), "utf8")).trim().split("\r\n");
   if (pickedLines.length !== 3) throw new Error(`export picked: ${pickedLines.length - 1} rows`);
   const exportsLogged = await sql(
@@ -1010,7 +1019,8 @@ try {
   await taskBar.getByLabel("פעולה", { exact: true }).selectOption("status");
   await taskBar.getByLabel("מצב חדש").selectOption("done");
   await shot(ownerDesk, "37-tasks-table-1280");
-  await taskBar.getByRole("button", { name: "ביצוע על 1" }).click();
+  await taskBar.getByRole("button", { name: /שינוי המצב של משימה אחת/ }).click();
+  await taskBar.getByRole("button", { name: "כן, לבצע" }).click();
   await taskBar.getByText("רשומה אחת עודכנה.").waitFor({ timeout: 15000 });
   const [doneTask] = await sql("select status, completed_at is not null as stamped from public.tasks where id = $1", [tableTask.id]);
   if (doneTask.status !== "done" || !doneTask.stamped) throw new Error(`tasks table: ${JSON.stringify(doneTask)}`);

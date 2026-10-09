@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 
-import { bulkAction, type BulkChange, type BulkObject } from "../actions";
+import { RECORD_TYPES } from "@/lib/record-types";
+
+import { bulkAction, undoBulkAction, type BulkChange, type BulkObject, type BulkUndo } from "../actions";
 
 type Option = { value: string; label: string; needsReason?: boolean };
 
@@ -82,6 +84,9 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // FXU-06: asked in the page before it runs, and undoable after
+  const [confirming, setConfirming] = useState(false);
+  const [lastUndo, setLastUndo] = useState<BulkUndo | null>(null);
   const [pending, startTransition] = useTransition();
 
   // rows that left the page (another page, a filter, a refresh) drop out of the selection
@@ -111,6 +116,26 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   const needsReason = kind === "status" && options.find((o) => o.value === value)?.needsReason;
   const ready = kind === "trash" || (kind !== "" && value !== "");
 
+  // what the button says: the action, how many, and to what (FXU-06)
+  const plural = RECORD_TYPES[object].plural;
+  const feminine = object === "company" || object === "deal" || object === "task";
+  const many = count === 1 ? `${RECORD_TYPES[object].singular} ${feminine ? "אחת" : "אחד"}` : `${count} ${plural}`;
+  const chosen = value === NO_OWNER ? "ללא בעלים" : (options.find((o) => o.value === value)?.label ?? "");
+  const actionText =
+    kind === "owner"
+      ? `העברת ${many} ל${chosen}`
+      : kind === "status"
+        ? `שינוי ${object === "task" ? "המצב" : "הסטטוס"} של ${many} ל"${chosen}"`
+        : kind === "stage"
+          ? `העברת ${many} לשלב "${chosen}"`
+          : kind === "tag"
+            ? `הוספת התגית "${chosen}" ל${count === 1 ? many : `-${many}`}`
+            : kind === "trash"
+              ? `העברת ${many} לסל המחזור`
+              : kind === "export"
+                ? `ייצוא ${many} לקובץ ${chosen}`
+                : "";
+
   function run() {
     if (!kind) return;
     if (kind === "export") {
@@ -133,24 +158,42 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             : kind === "tag"
               ? { kind, tagId: value }
               : { kind: "trash" };
-    if (kind === "trash" && !window.confirm(`להעביר ${count} רשומות לסל המחזור? אפשר לשחזר משם במשך 30 יום.`)) return;
+    setConfirming(false);
     setError(null);
     setNotice(null);
+    setLastUndo(null);
     startTransition(async () => {
       const result = await bulkAction(orgId, object, [...shown], change);
       if (!result.ok) {
         setError(result.message);
         return;
       }
-      const { done, skipped } = result.data!;
+      const { done, skipped, undo } = result.data!;
       setNotice(
         (done === 1 ? "רשומה אחת עודכנה." : `${done} רשומות עודכנו.`) +
           (skipped > 0 ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : ""),
       );
+      setLastUndo(undo.rows.length > 0 ? undo : null);
       setPicked(new Set());
       setKind("");
       setValue("");
       setReason("");
+    });
+  }
+
+  function undoLast() {
+    if (!lastUndo) return;
+    const undo = lastUndo;
+    setError(null);
+    startTransition(async () => {
+      const result = await undoBulkAction(orgId, object, undo);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setLastUndo(null);
+      const back = result.data!.done;
+      setNotice(back === undo.rows.length ? "הפעולה בוטלה." : `הפעולה בוטלה ב-${back} מתוך ${undo.rows.length}. השאר כבר השתנו מאז או שאין הרשאה.`);
     });
   }
 
@@ -190,6 +233,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                   setKind(e.target.value as Kind | "");
                   setValue("");
                   setError(null);
+                  setConfirming(false);
                 }}
               >
                 <option value="">בחירת פעולה</option>
@@ -220,7 +264,10 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                   }
                   controlSize="sm"
                   value={value}
-                  onChange={(e) => setValue(e.target.value)}
+                  onChange={(e) => {
+                    setValue(e.target.value);
+                    setConfirming(false);
+                  }}
                 >
                   <option value="">בחירה</option>
                   {kind === "owner" ? <option value={NO_OWNER}>ללא בעלים</option> : null}
@@ -244,9 +291,16 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 />
               </div>
             ) : null}
-            {kind ? (
-              <Button size="sm" variant={kind === "trash" ? "danger" : "primary"} disabled={pending || !ready} aria-busy={pending || undefined} onClick={run}>
-                {pending ? "מעדכן…" : `ביצוע על ${count}`}
+            {kind && !confirming ? (
+              <Button
+                size="sm"
+                variant={kind === "trash" ? "danger" : "primary"}
+                disabled={pending || !ready}
+                aria-busy={pending || undefined}
+                // export changes nothing, so it runs at once; every change is asked first
+                onClick={() => (kind === "export" ? run() : setConfirming(true))}
+              >
+                {pending ? "מעדכן…" : actionText || `ביצוע על ${count}`}
               </Button>
             ) : null}
             <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPicked(new Set())}>
@@ -254,8 +308,30 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             </Button>
           </>
         ) : null}
+        {confirming && kind && kind !== "export" ? (
+          <div role="group" aria-label="אישור הפעולה" className="flex w-full flex-wrap items-center gap-2 rounded-md bg-canvas px-3 py-2">
+            <span className="text-md">
+              {actionText}?{kind === "trash" ? " אפשר לשחזר מסל המחזור במשך 30 יום." : " אפשר לבטל מיד אחרי."}
+            </span>
+            <Button size="sm" variant={kind === "trash" ? "danger" : "primary"} onClick={run} loading={pending}>
+              כן, לבצע
+            </Button>
+            <Button size="sm" variant="secondary" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
+              לא עכשיו
+            </Button>
+          </div>
+        ) : null}
         <FormError message={error} className="w-full" />
-        <FormNotice message={notice} className="w-full" />
+        {notice ? (
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <FormNotice message={notice} className="flex-1" />
+            {lastUndo ? (
+              <Button size="sm" variant="secondary" onClick={undoLast} loading={pending}>
+                ביטול
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {children}
     </SelectionContext.Provider>
