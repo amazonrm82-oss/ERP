@@ -9,6 +9,7 @@ import { TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, BoardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DealsBoard } from "@/features/deals/components/deals-board";
+import { getStuckDeals } from "@/features/deals/stuck";
 import { DealsTable } from "@/features/deals/components/deals-table";
 import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getBoard, getPipeline, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
@@ -119,6 +120,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
     return NO_PIPELINE;
   }
 
+  const stuck = await getStuckDeals(orgId, board.pipeline.id);
   const openStages = board.stages.filter((stage) => stage.kind === "open");
   const openCount = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.count ?? 0), 0);
   const openTotal = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.amountAgorot ?? 0), 0);
@@ -171,6 +173,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
         orgId={orgId}
         board={board}
         canWrite={canWrite}
+        stuck={stuck}
         hrefs={{
           showClosed: boardHref({ closed: "1" }),
           ...Object.fromEntries(board.stages.map((stage) => [stage.id, boardHref({ stage: stage.id })])),

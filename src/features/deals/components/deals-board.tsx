@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import type { StageKind } from "@/lib/database.types";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -22,14 +23,15 @@ const columnRule: Record<StageKind, string> = {
 const DRAG_TYPE = "application/x-deal-id";
 
 // links built by the page: "showClosed", and one per stage id that opens that stage in full
-type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string> };
+// stuck: open deal id -> why it is stuck (DEAL-02)
+type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string>; stuck: Record<string, string> };
 
 /**
  * Kanban board: one column per stage, in pipeline order (first stage on the start side).
  * With a mouse, cards are dragged between columns; the stage menu on every card
  * does the same with a keyboard or a touch screen.
  */
-export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
+export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
   const [deals, moveOptimistic] = useOptimistic(board.deals, (current: BoardDeal[], move: { dealId: string; stageId: string }) =>
     current.map((deal) => (deal.id === move.dealId ? { ...deal, stageId: move.stageId } : deal)),
   );
@@ -165,6 +167,12 @@ export function DealsBoard({ orgId, board, canWrite, hrefs }: Props) {
                               {deal.name}
                             </Link>
                             <p className="mt-0.5 text-md font-semibold tabular-nums">{formatMoney(deal.amountAgorot)}</p>
+                            {stuck[deal.id] ? (
+                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
+                                <Badge tone="warning">תקועה</Badge>
+                                <span>{stuck[deal.id]}</span>
+                              </p>
+                            ) : null}
                             {deal.contactId && deal.contactName ? (
                               <p className="mt-0.5 text-sm">
                                 <Link

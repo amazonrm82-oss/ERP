@@ -18,6 +18,7 @@ import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
+import { getStuckDeals } from "@/features/deals/stuck";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
@@ -45,6 +46,7 @@ export default async function DealPage({ params }: Props) {
   const [contacts, companies] = canEdit
     ? await Promise.all([listContactOptions(orgId), listCompanyOptions(orgId)])
     : [[], []];
+  const stuckReason = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
   const amount = deal.amount_agorot;
@@ -58,6 +60,13 @@ export default async function DealPage({ params }: Props) {
         actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />
 
+      {stuckReason ? (
+        <p role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          <span className="font-semibold">העסקה תקועה:</span>
+          <span>{stuckReason}.</span>
+          <span>כדאי לקבוע משימה הבאה או לתעד מה קרה.</span>
+        </p>
+      ) : null}
       <div className="mb-5">
         <ShareSummary
           text={recordSummary(deal.name, [

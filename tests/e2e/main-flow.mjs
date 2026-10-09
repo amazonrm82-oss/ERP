@@ -244,6 +244,8 @@ try {
   step("deal board");
   await owner.goto(`${orgUrl}/deals`);
   await expectText(owner, "12,500");
+  // a new deal with no open task is marked stuck, in words and not only in colour (DEAL-02)
+  await expectText(owner, "אין משימה פתוחה");
   await shot(owner, "04-deals-360");
 
   step("phone: 'עוד' in the bottom bar reaches every screen; settings are one list in groups (DSN-11, FXU-13)");
@@ -458,6 +460,7 @@ try {
   await ownerDesk.getByRole("link", { name: "משה כהן" }).first().click();
   await ownerDesk.waitForURL(/\/deals\/[0-9a-f-]{36}$/);
   const dealUrl = ownerDesk.url();
+  await expectText(ownerDesk, "העסקה תקועה");
   await ownerDesk.getByRole("button", { name: "עריכה" }).click();
   await ownerDesk.getByLabel("שווי (₪)").fill("15,000");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
