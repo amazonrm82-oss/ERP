@@ -5,6 +5,7 @@ import type { TaskStatus } from "@/lib/database.types";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { ilikeAny, PAGE_SIZE } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
+import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 export type TaskItem = {
@@ -174,12 +175,40 @@ export async function listTasks(
   }
   const rows = data.slice(0, size);
 
-  // the names of the records the tasks belong to, one query per kind
-  const idsOf = (column: "lead_id" | "contact_id" | "company_id" | "deal_id") => [...new Set(rows.map((row) => row[column]).filter((id): id is string => Boolean(id)))];
+  const [owners, related] = await Promise.all([getUserNames(rows.map((row) => row.owner_id)), relatedRecords(orgId, rows)]);
+
+  return {
+    hasMore: data.length > size,
+    tasks: rows.map((row) => {
+      return {
+        id: row.id,
+        title: row.title,
+        taskType: row.task_type,
+        status: row.status,
+        priority: row.priority,
+        dueAt: row.due_at,
+        ownerId: row.owner_id,
+        ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+        related: related(row),
+        createdAt: row.created_at,
+      };
+    }),
+  };
+}
+
+type LinkColumns = { lead_id: string | null; contact_id: string | null; company_id: string | null; deal_id: string | null };
+export type RelatedRecord = { kind: "lead" | "contact" | "company" | "deal"; id: string; name: string | null };
+
+/**
+ * The record each task belongs to, with its name (one query per kind, read
+ * with the user's rights). A record the user may not see comes back without a name.
+ */
+export async function relatedRecords(orgId: string, rows: LinkColumns[]): Promise<(row: LinkColumns) => RelatedRecord | null> {
+  const supabase = await createClient();
+  const idsOf = (column: keyof LinkColumns) => [...new Set(rows.map((row) => row[column]).filter((id): id is string => Boolean(id)))];
   const [leadIds, contactIds, companyIds, dealIds] = [idsOf("lead_id"), idsOf("contact_id"), idsOf("company_id"), idsOf("deal_id")];
-  const none = Promise.resolve({ data: [] as Array<Record<string, string | null>> });
-  const [owners, leads, contacts, companies, deals] = await Promise.all([
-    getUserNames(rows.map((row) => row.owner_id)),
+  const none = Promise.resolve({ data: [] as Array<Record<string, string | null>>, error: null });
+  const [leads, contacts, companies, deals] = await Promise.all([
     leadIds.length > 0 ? supabase.from("leads").select("id, full_name, email, phone").eq("organization_id", orgId).in("id", leadIds) : none,
     contactIds.length > 0 ? supabase.from("contacts").select("id, full_name, email, phone").eq("organization_id", orgId).in("id", contactIds) : none,
     companyIds.length > 0 ? supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", companyIds) : none,
@@ -192,31 +221,46 @@ export async function listTasks(
   for (const row of [...(companies.data ?? []), ...(deals.data ?? [])] as Array<{ id: string; name: string }>) {
     names.set(row.id, row.name);
   }
-
-  return {
-    hasMore: data.length > size,
-    tasks: rows.map((row) => {
-      const related = row.deal_id
-        ? { kind: "deal" as const, id: row.deal_id }
-        : row.lead_id
-          ? { kind: "lead" as const, id: row.lead_id }
-          : row.contact_id
-            ? { kind: "contact" as const, id: row.contact_id }
-            : row.company_id
-              ? { kind: "company" as const, id: row.company_id }
-              : null;
-      return {
-        id: row.id,
-        title: row.title,
-        taskType: row.task_type,
-        status: row.status,
-        priority: row.priority,
-        dueAt: row.due_at,
-        ownerId: row.owner_id,
-        ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
-        related: related ? { ...related, name: names.get(related.id) ?? null } : null,
-        createdAt: row.created_at,
-      };
-    }),
+  return (row) => {
+    const link = row.deal_id
+      ? { kind: "deal" as const, id: row.deal_id }
+      : row.lead_id
+        ? { kind: "lead" as const, id: row.lead_id }
+        : row.contact_id
+          ? { kind: "contact" as const, id: row.contact_id }
+          : row.company_id
+            ? { kind: "company" as const, id: row.company_id }
+            : null;
+    return link ? { ...link, name: names.get(link.id) ?? null } : null;
   };
+}
+
+export type RecordTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean; ownerName: string | null };
+
+/** The open tasks of one record (FXU-01), nearest due first; tasks without a date last. */
+export async function listRecordTasks(orgId: string, column: keyof LinkColumns, recordId: string): Promise<RecordTask[]> {
+  const supabase = await createClient();
+  const data = must(
+    await supabase
+      .from("tasks")
+      .select("id, title, due_at, owner_id")
+      .eq("organization_id", orgId)
+      .eq(column, recordId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })
+      .limit(50),
+    "record tasks",
+  );
+  const owners = await getUserNames(data.map((row) => row.owner_id));
+  // "באיחור" means from a day before today, as in "היום שלי"
+  const startOfToday = Date.parse(zonedIso(zoneDate(new Date()), "00:00:00"));
+  return data.map((row) => ({
+    id: row.id,
+    title: row.title,
+    dueAt: row.due_at,
+    isOverdue: row.due_at !== null && Date.parse(row.due_at) < startOfToday,
+    ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+  }));
 }

@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
-import type { TaskStatus } from "@/lib/database.types";
+import type { TaskInsert, TaskStatus } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { zonedIso } from "@/lib/format";
+import { zoneDate, zonedIso } from "@/lib/format";
+import { addDays } from "@/lib/calendar-grid";
+import { recordPage } from "@/lib/record-types";
+import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
@@ -110,7 +113,7 @@ async function setTaskStatus(orgId: string, taskId: string, status: TaskStatus):
     .eq("organization_id", orgId)
     .eq("id", taskId)
     .is("deleted_at", null)
-    .select("id");
+    .select("id, lead_id, contact_id, company_id, deal_id");
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את המשימה. נסו שוב."));
   }
@@ -118,6 +121,18 @@ async function setTaskStatus(orgId: string, taskId: string, status: TaskStatus):
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidateTasks(orgId);
+  // the record's own "משימות" card shows it too (FXU-01)
+  const row = data[0];
+  const linked = row.deal_id
+    ? recordPage("deal", orgId, row.deal_id)
+    : row.lead_id
+      ? recordPage("lead", orgId, row.lead_id)
+      : row.contact_id
+        ? recordPage("contact", orgId, row.contact_id)
+        : row.company_id
+          ? recordPage("company", orgId, row.company_id)
+          : null;
+  if (linked) revalidatePath(linked);
   return ok();
 }
 
@@ -127,4 +142,40 @@ export async function completeTaskAction(orgId: string, taskId: string): Promise
 
 export async function reopenTaskAction(orgId: string, taskId: string): Promise<ActionResult> {
   return setTaskStatus(orgId, taskId, "open");
+}
+
+const QUICK_WHEN = { none: null, tomorrow: 1, week: 7 } as const;
+
+/**
+ * A task on a record, from the record's own card (FXU-01): one line, and
+ * "מחר" or "בעוד שבוע" set the date (at the start of the working day). The task
+ * is the creator's and is linked to the record, so it appears on both.
+ */
+export async function addRecordTaskAction(orgId: string, subject: TimelineSubject, _prev: FormState, formData: FormData): Promise<FormState> {
+  const parsedSubject = subjectSchema.safeParse(subject);
+  if (!parsedSubject.success) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  const context = await actionContext(orgId, parsedSubject.data.id);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = taskSchema.safeParse({ title: formData.get("title"), due_date: null, due_time: null, owner_id: null, task_type: null, remind: null });
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const whenKey = String(formData.get("when") ?? "none");
+  const days = whenKey in QUICK_WHEN ? QUICK_WHEN[whenKey as keyof typeof QUICK_WHEN] : null;
+  const due = days === null ? null : dueAt(addDays(zoneDate(new Date()), days), null);
+
+  const row: TaskInsert = { organization_id: orgId, title: parsed.data.title, task_type: "todo", due_at: due };
+  row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
+  // RLS: the user can write in the organization and can see the record (composite keys keep it inside)
+  const { error } = await context.supabase.from("tasks").insert(row);
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את המשימה. נסו שוב."), { values: formValues(formData) });
+  }
+  revalidateTasks(orgId);
+  revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
+  return ok();
 }

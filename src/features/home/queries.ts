@@ -3,8 +3,10 @@ import "server-only";
 import { endOfToday, zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
+import { relatedRecords, type RelatedRecord } from "@/features/tasks/queries";
 
-export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean };
+// related: the record the task belongs to, when it has one (FXU-01)
+export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean; related: RelatedRecord | null };
 export type MyNewLead = {
   id: string;
   fullName: string | null;
@@ -46,7 +48,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
   const [tasks, leads, deals] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, due_at")
+      .select("id, title, due_at, lead_id, contact_id, company_id, deal_id")
       .eq("organization_id", orgId)
       .eq("owner_id", userId)
       .eq("status", "open")
@@ -85,6 +87,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     throw new Error(`my deals query failed: ${deals.error.message}`);
   }
 
+  const related = await relatedRecords(orgId, tasks.data);
   return {
     today,
     tasks: tasks.data.map((task) => ({
@@ -93,6 +96,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
       dueAt: task.due_at,
       // compared as numbers: PostgREST writes "+00:00", toISOString() writes "Z"
       isOverdue: task.due_at !== null && Date.parse(task.due_at) < Date.parse(startOfToday),
+      related: related(task),
     })),
     newLeads: (leads.data ?? []).map((lead) => ({
       id: lead.id,

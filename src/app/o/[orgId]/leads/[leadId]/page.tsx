@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
@@ -74,6 +75,8 @@ export default async function LeadPage({ params }: Props) {
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
+
+          <RecordTasks orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} />
           {isConverted ? (
             <Card aria-labelledby="converted-title">
               <CardHeader id="converted-title" title="הליד הומר" />

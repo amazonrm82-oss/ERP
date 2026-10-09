@@ -6,6 +6,7 @@ import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
@@ -71,6 +72,8 @@ export default async function ContactPage({ params }: Props) {
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
+
+          <RecordTasks orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
           <ContactDetailsCard
             orgId={orgId}
             canEdit={canEdit}

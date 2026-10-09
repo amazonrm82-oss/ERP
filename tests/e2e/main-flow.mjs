@@ -219,6 +219,18 @@ try {
   await owner.getByRole("button", { name: "הוספה לציר הזמן" }).click();
   await expectText(owner, "דיברנו בטלפון, מעוניין בהצעה");
 
+  step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
+  const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
+  await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");
+  await recordTasks.getByRole("button", { name: "מחר", exact: true }).click();
+  await recordTasks.getByText("להתקשר עם הצעת מחיר", { exact: true }).waitFor();
+  await expectText(owner, "המשימה נוספה");
+  const leadIdNow = owner.url().split("/leads/")[1];
+  const [{ n: linkedTasks }] = await sql("select count(*)::int as n from public.tasks where title = 'להתקשר עם הצעת מחיר' and lead_id = $1 and due_at > now()", [leadIdNow]);
+  if (linkedTasks !== 1) throw new Error(`the record task was not saved on the lead for tomorrow (${linkedTasks})`);
+  await recordTasks.getByRole("button", { name: /בוצע.*להתקשר עם הצעת מחיר/ }).click();
+  await recordTasks.getByText("אין משימות פתוחות לרשומה הזו").waitFor();
+
   step("convert lead");
   await owner.getByRole("button", { name: "המר לאיש קשר ועסקה" }).click();
   await owner.getByLabel("שווי העסקה (₪)").fill("12,500");

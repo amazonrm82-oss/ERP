@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
+import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
@@ -64,6 +65,8 @@ export default async function DealPage({ params }: Props) {
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
+
+          <RecordTasks orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} />
           <Card aria-labelledby="deal-stage-title">
             <CardHeader id="deal-stage-title" title="שלב" />
             <CardBody>

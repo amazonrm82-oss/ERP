@@ -15,6 +15,7 @@ import { CompleteTaskButton } from "@/features/tasks/components/complete-task-bu
 import { TaskQuickAdd } from "@/features/tasks/components/task-quick-add";
 import { formatDate, formatMoney, formatNumber, zoneTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { RECORD_TYPES, recordPage } from "@/lib/record-types";
 
 type Props = { params: Promise<{ orgId: string }> };
 
@@ -111,6 +112,11 @@ export default async function HomePage({ params }: Props) {
                           <time dateTime={task.dueAt} className="tabular-nums">
                             {task.isOverdue ? formatDate(task.dueAt) : `היום, ${zoneTime(new Date(task.dueAt), org.timeZone)}`}
                           </time>
+                        ) : null}
+                        {task.related ? (
+                          <Link href={recordPage(task.related.kind, orgId, task.related.id)} className="text-accent-strong underline-offset-4 hover:underline">
+                            {RECORD_TYPES[task.related.kind].singular}: <bdi>{task.related.name ?? "ללא שם"}</bdi>
+                          </Link>
                         ) : null}
                       </span>
                     </span>
