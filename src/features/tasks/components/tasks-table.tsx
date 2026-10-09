@@ -12,7 +12,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import type { TaskListItem } from "../queries";
-import { TASK_TYPE_OPTIONS } from "./task-fields";
+import { PRIORITY_LABEL, TASK_TYPE_OPTIONS } from "./task-fields";
 
 type Props = {
   orgId: string;
@@ -31,7 +31,6 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; tone: BadgeTone }>
   done: { label: "הושלמה", tone: "success" },
   cancelled: { label: "בוטלה", tone: "neutral" },
 };
-const PRIORITY: Record<number, string> = { 1: "גבוהה", 2: "רגילה", 3: "נמוכה" };
 const TYPE_LABEL = new Map<string, string>(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
 const relatedHref = (orgId: string, related: NonNullable<TaskListItem["related"]>) =>
@@ -104,7 +103,7 @@ export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, edi
             case "status":
               return <Badge tone={TASK_STATUS[task.status].tone}>{TASK_STATUS[task.status].label}</Badge>;
             case "priority":
-              return PRIORITY[task.priority] ?? null;
+              return PRIORITY_LABEL[task.priority] ?? null;
             case "related":
               return task.related ? (
                 <Link href={relatedHref(orgId, task.related)} className="underline-offset-4 hover:underline">

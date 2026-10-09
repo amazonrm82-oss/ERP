@@ -521,6 +521,19 @@ try {
   await invitee.goto(`${orgUrl}/tasks`);
   await expectText(invitee, "משימה לדנה");
 
+  step("tasks: a high-priority task comes first in its group (TASK-01)");
+  await ownerDesk.goto(`${orgUrl}/tasks`);
+  await ownerDesk.getByLabel("מה צריך לעשות").fill("משימה דחופה");
+  await ownerDesk.getByLabel("שעה").fill("23:30");
+  await ownerDesk.getByLabel("עדיפות").selectOption({ label: "גבוהה" });
+  await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+  const todayCard = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: /^היום/ }) });
+  await todayCard.getByRole("button", { name: /^בוצע.*משימה דחופה/ }).waitFor({ timeout: 15000 });
+  const firstToday = await todayCard.locator("ul > li").first().innerText();
+  if (!firstToday.includes("עדיפות גבוהה") || !firstToday.includes("משימה דחופה")) throw new Error(`first task today: ${firstToday}`);
+  await ownerDesk.getByRole("button", { name: /^בוצע.*משימה דחופה/ }).click();
+  await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "הושלמו לאחרונה" }) }).getByRole("button", { name: /החזרה לפתוחות.*משימה דחופה/ }).waitFor({ timeout: 15000 });
+
   step("tasks: put off to next week and hand over, straight from the list (TASK-05)");
   const taskOrg = orgUrl.split("/").pop();
   const quoteTask = () =>

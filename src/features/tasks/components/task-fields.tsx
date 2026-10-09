@@ -2,7 +2,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 
 export type AssigneeOption = { userId: string; name: string };
 
-export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null; remind?: string | null };
+export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null; remind?: string | null; priority?: string | null };
 
 export const TASK_TYPE_OPTIONS = [
   { value: "todo", label: "משימה" },
@@ -10,6 +10,14 @@ export const TASK_TYPE_OPTIONS = [
   { value: "meeting", label: "פגישה" },
   { value: "follow_up", label: "מעקב" },
 ] as const;
+
+// TASK-01: the stored number is the sort order, high first
+export const PRIORITY_OPTIONS = [
+  { value: "1", label: "גבוהה" },
+  { value: "2", label: "רגילה" },
+  { value: "3", label: "נמוכה" },
+] as const;
+export const PRIORITY_LABEL: Record<number, string> = { 1: "גבוהה", 2: "רגילה", 3: "נמוכה" };
 
 export const REMIND_OPTIONS = [
   { value: "", label: "בלי תזכורת" },
@@ -55,6 +63,13 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props)
           error={errors.due_time}
         />
       </div>
+      <SelectField key={`priority-${values.priority ?? "2"}`} label="עדיפות" name="priority" defaultValue={values.priority ?? "2"} error={errors.priority}>
+        {PRIORITY_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
       {/* key: a select only takes defaultValue on mount */}
       <SelectField key={`type-${values.task_type ?? "todo"}`} label="סוג" name="task_type" defaultValue={values.task_type ?? "todo"} error={errors.task_type}>
         {TASK_TYPE_OPTIONS.map((option) => (

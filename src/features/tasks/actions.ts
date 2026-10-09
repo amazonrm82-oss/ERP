@@ -53,6 +53,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
     organization_id: orgId,
     title: parsed.data.title,
     task_type: parsed.data.task_type,
+    priority: parsed.data.priority,
     ...schedule(parsed.data),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
   });
@@ -84,6 +85,7 @@ export async function updateTaskAction(
     .update({
       title: parsed.data.title,
       task_type: parsed.data.task_type,
+      priority: parsed.data.priority,
       ...schedule(parsed.data),
       ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
     })
@@ -161,7 +163,7 @@ export async function addRecordTaskAction(orgId: string, subject: TimelineSubjec
   if (!context.ok) {
     return context;
   }
-  const parsed = taskSchema.safeParse({ title: formData.get("title"), due_date: null, due_time: null, owner_id: null, task_type: null, remind: null });
+  const parsed = taskSchema.safeParse({ title: formData.get("title"), due_date: null, due_time: null, owner_id: null, task_type: null, remind: null, priority: null });
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }

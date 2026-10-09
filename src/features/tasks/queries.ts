@@ -16,6 +16,7 @@ export type TaskItem = {
   ownerId: string | null;
   ownerName: string | null;
   taskType: string;
+  priority: number;
   completedAt: string | null;
   // the record the task belongs to, when there is one
   related: { kind: "lead" | "contact" | "company" | "deal"; id: string } | null;
@@ -41,7 +42,7 @@ const DONE_SHOWN = 20;
  */
 export async function listTaskGroups(orgId: string, ownerId: string | null): Promise<TaskGroups> {
   const supabase = await createClient();
-  const columns = "id, title, task_type, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+  const columns = "id, title, task_type, priority, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
 
   let open = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "open").is("deleted_at", null);
   let done = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "done").is("deleted_at", null);
@@ -71,6 +72,7 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
     ownerId: row.owner_id,
     ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
     taskType: row.task_type,
+    priority: row.priority,
     completedAt: row.completed_at,
     related: row.deal_id
       ? { kind: "deal", id: row.deal_id }
@@ -97,6 +99,8 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
     else groups.upcoming.push(item);
   }
   groups.done = doneResult.data.map(toItem);
+  // TASK-01: within a group, high priority first; the due order stays among equals (a stable sort)
+  for (const key of ["overdue", "today", "upcoming", "undated"] as const) groups[key].sort((a, b) => a.priority - b.priority);
   return groups;
 }
 

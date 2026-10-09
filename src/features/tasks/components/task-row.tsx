@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
 import { FormError } from "@/components/ui/feedback";
@@ -30,6 +31,8 @@ export type TaskRowView = {
   ownerId: string | null;
   ownerName: string | null;
   taskType: string;
+  // 1 high, 2 normal, 3 low (TASK-01)
+  priority: number;
   related: { href: string; label: string } | null;
 };
 
@@ -74,12 +77,20 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
   return (
     <li className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
       <div className="min-w-0 flex-1">
-        <p className={cn("break-words font-medium", task.done && "text-ink-soft line-through")}>{task.title}</p>
+        <p className={cn("break-words font-medium", task.done && "text-ink-soft line-through")}>
+          {!task.done && task.priority === 1 ? (
+            <Badge tone="danger" className="me-1.5 align-middle">
+              עדיפות גבוהה
+            </Badge>
+          ) : null}
+          {task.title}
+        </p>
         <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
           {task.done && task.completedText ? <span>הושלמה {task.completedText}</span> : null}
           {!task.done && task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
           {!task.done && task.remind !== "" ? <span>תזכורת {REMIND_OPTIONS.find((o) => o.value === task.remind)?.label}</span> : null}
           {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
+          {!task.done && task.priority === 3 ? <span>עדיפות נמוכה</span> : null}
           {showOwner && task.ownerName ? <span>באחריות {task.ownerName}</span> : null}
           {task.related ? (
             <Link href={task.related.href} className="underline underline-offset-4 hover:text-ink">
@@ -162,7 +173,7 @@ function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
     <form action={formAction} className="space-y-4" noValidate aria-label={`עריכת המשימה ${task.title}`}>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <TaskFields
-        values={failure?.values ?? { title: task.title, due_date: task.dueDate, due_time: task.dueTime, owner_id: task.ownerId, task_type: task.taskType, remind: task.remind }}
+        values={failure?.values ?? { title: task.title, due_date: task.dueDate, due_time: task.dueTime, owner_id: task.ownerId, task_type: task.taskType, remind: task.remind, priority: String(task.priority) }}
         errors={failure?.fieldErrors ?? {}}
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}

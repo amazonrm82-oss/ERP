@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { optionalDate, optionalId, optionalText, requiredText } from "@/lib/validation";
 
-export const TASK_FIELD_NAMES = ["title", "due_date", "due_time", "owner_id", "task_type", "remind"] as const;
+export const TASK_FIELD_NAMES = ["title", "due_date", "due_time", "owner_id", "task_type", "remind", "priority"] as const;
 
 export const TASK_TYPE_VALUES = ["todo", "call", "meeting", "follow_up"] as const;
 
@@ -24,6 +24,8 @@ export const taskSchema = z
     task_type: z.preprocess((value) => (value === null || value === "" ? "todo" : value), z.enum(TASK_TYPE_VALUES, { error: "יש לבחור סוג." })),
     // the quick-add does not send it either
     remind: z.preprocess((value) => value ?? "", z.enum(REMIND_VALUES, { error: "יש לבחור תזכורת." })),
+    // 1 high, 2 normal, 3 low (TASK-01); forms without the field keep "normal"
+    priority: z.preprocess((value) => (value === null || value === undefined || value === "" ? "2" : value), z.enum(["1", "2", "3"], { error: "יש לבחור עדיפות." })).transform(Number),
   })
   .refine((task) => task.due_time === null || task.due_date !== null, {
     path: ["due_date"],
