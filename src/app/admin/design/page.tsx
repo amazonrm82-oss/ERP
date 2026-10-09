@@ -38,7 +38,8 @@ export default async function AdminDesignPage({ searchParams }: { searchParams: 
             <h3 className="text-lead font-semibold">לשוניות ודפדוף</h3>
             <Tabs label={`לשוניות לדוגמה (${theme})`} items={tabs} />
             <Pagination page={current} pageCount={5} hrefFor={(n) => `${paths.adminDesign}?page=${n}`} />
-            <Pagination page={1} pageCount={1} hrefFor={() => ""} />
+            <Pagination page={1} hasMore={false} hrefFor={() => ""} />
+            <Pagination page={3} hasMore hrefFor={(n) => `${paths.adminDesign}?page=${n}`} />
           </div>
           <DesignGallery theme={theme} />
         </section>

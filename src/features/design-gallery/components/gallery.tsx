@@ -10,6 +10,7 @@ import { Calendar, DateField } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState, FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, Switch, TextareaField, TextField } from "@/components/ui/field";
+import * as Icons from "@/components/ui/icons";
 import { BellIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { Popover } from "@/components/ui/popover";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
@@ -62,6 +63,20 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
 
   return (
     <div className="flex flex-col gap-8">
+      <Section title="אייקונים">
+        <p className="text-sm text-ink-soft">קו אחד בעובי 1.75. &quot;חזרה&quot; ו&quot;קדימה&quot; מתהפכים לבד לפי כיוון הקריאה.</p>
+        <ul className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {Object.entries(Icons).map(([name, Icon]) => (
+            <li key={name} className="flex flex-col items-center gap-1 rounded-md border border-line bg-surface p-2 text-center">
+              <Icon className="size-6" />
+              <span dir="ltr" className="text-2xs text-ink-soft break-all">
+                {name.replace(/Icon$/, "")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
       <Section title="כפתורים">
         <Row>
           <Button>ראשי</Button>

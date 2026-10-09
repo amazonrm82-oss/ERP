@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Pagination } from "@/components/pagination";
+import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { Button, IconButton } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { CalendarIcon, ChevronIcon } from "@/components/ui/icons";
+import { CalendarIcon, BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { addDays, addMonths, longDay, monthGrid, monthTitle, shortDay, startOfWeek, WEEKDAYS_LONG, WEEKDAYS_SHORT } from "@/lib/calendar-grid";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { cn } from "@/lib/cn";
@@ -161,11 +161,11 @@ export function Calendar({ selected, today, min, max, onPick, onClear, autoFocus
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <IconButton label="החודש הקודם" icon={<ChevronIcon className="size-5 rotate-180" />} onClick={() => setFocus(addMonths(focus, -1))} />
+        <IconButton label="החודש הקודם" icon={<BackIcon className="size-5" />} onClick={() => setFocus(addMonths(focus, -1))} />
         <h3 aria-live="polite" className="font-semibold">
           {monthTitle(focus)}
         </h3>
-        <IconButton label="החודש הבא" icon={<ChevronIcon className="size-5" />} onClick={() => setFocus(addMonths(focus, 1))} />
+        <IconButton label="החודש הבא" icon={<ForwardIcon className="size-5" />} onClick={() => setFocus(addMonths(focus, 1))} />
       </div>
       <table ref={gridRef} role="grid" aria-label={monthTitle(focus)} onKeyDown={onKey} className="mt-2 w-full table-fixed border-collapse text-center">
         <thead>

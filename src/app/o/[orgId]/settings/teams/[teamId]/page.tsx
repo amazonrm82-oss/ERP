@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 import {
   AddTeamMemberForm,
   DeleteTeamButton,
@@ -39,7 +39,7 @@ export default async function TeamSettingsPage({ params }: Props) {
     <div className="space-y-5">
       <div>
         <Link href={paths.settingsTeams(orgId)} className="mb-2 inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-          <ChevronIcon className="size-4 rtl:rotate-180" />
+          <BackIcon className="size-4" />
           כל הצוותים
         </Link>
         <h2 className="text-xl font-semibold break-words">{team.name}</h2>

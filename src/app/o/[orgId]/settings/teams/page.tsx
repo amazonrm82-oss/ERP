@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { ChevronIcon } from "@/components/ui/icons";
+import { ForwardIcon } from "@/components/ui/icons";
 import { CreateTeamForm } from "@/features/settings/components/team-forms";
 import { isAdminRole } from "@/features/settings/permissions";
 import { listTeams } from "@/features/settings/queries";
@@ -53,7 +53,7 @@ export default async function TeamsSettingsPage({ params }: Props) {
                       {team.managerNames.length > 0 ? ` · ניהול: ${team.managerNames.join(", ")}` : ""}
                     </span>
                   </span>
-                  <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+                  <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
                 </Link>
               </li>
             ))}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 
-import { Pagination } from "@/components/pagination";
+import { Pagination } from "@/components/ui/pagination";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";

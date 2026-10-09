@@ -6,7 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 import { deleteAutomationAction, setAutomationActiveAction } from "@/features/automations/actions";
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
@@ -47,7 +47,7 @@ export default async function AutomationPage({ params }: Props) {
     <div className="space-y-5">
       <div>
         <Link href={paths.settingsAutomations(orgId)} className="mb-2 inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-          <ChevronIcon className="size-4 rtl:rotate-180" />
+          <BackIcon className="size-4" />
           כל האוטומציות
         </Link>
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold break-words">

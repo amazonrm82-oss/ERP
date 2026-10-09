@@ -129,13 +129,25 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
-/** Points left: "forward" in RTL. For "back", add rtl:rotate-180 (and ltr:rotate-180 for "forward"). */
-export function ChevronIcon(props: IconProps) {
+// Drawn pointing left; screens use BackIcon / ForwardIcon, which turn with the reading direction (DSN-09).
+function ChevronLeft(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="m14.5 6-6 6 6 6" />
     </Icon>
   );
+}
+
+const joinClass = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(" ");
+
+/** "Back" / "previous": points right in Hebrew, left in a left-to-right page. */
+export function BackIcon({ className, ...props }: IconProps) {
+  return <ChevronLeft className={joinClass("rtl:rotate-180", className)} {...props} />;
+}
+
+/** "Forward" / "next" / "open": points left in Hebrew, right in a left-to-right page. */
+export function ForwardIcon({ className, ...props }: IconProps) {
+  return <ChevronLeft className={joinClass("ltr:rotate-180", className)} {...props} />;
 }
 
 export function ChevronDownIcon(props: IconProps) {
@@ -233,7 +245,7 @@ export function CheckIcon(props: IconProps) {
 /** Turning circle for "loading"; it stops when the user asked for reduced motion (globals.css). */
 export function SpinnerIcon({ className, ...props }: IconProps) {
   return (
-    <Icon className={["animate-spin", className].filter(Boolean).join(" ")} {...props}>
+    <Icon className={joinClass("animate-spin", className)} {...props}>
       <path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5" />
     </Icon>
   );

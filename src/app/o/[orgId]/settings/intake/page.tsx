@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { ChevronIcon } from "@/components/ui/icons";
+import { ForwardIcon } from "@/components/ui/icons";
 import { CreateIntakeForm } from "@/features/intake/components/intake-editor";
 import { listIntakes } from "@/features/intake/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -63,7 +63,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
                       {intake.submissions30d === 1 ? "ליד אחד" : `${intake.submissions30d} לידים`} ב-30 הימים האחרונים
                     </span>
                   </span>
-                  <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+                  <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
                 </Link>
               </li>
             ))}

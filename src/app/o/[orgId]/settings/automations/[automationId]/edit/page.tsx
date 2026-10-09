@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 import { RuleBuilder } from "@/features/automations/components/rule-builder";
 import { fromDbRule } from "@/features/automations/convert";
 import { getAutomation, getLookups } from "@/features/automations/queries";
@@ -28,7 +28,7 @@ export default async function EditAutomationPage({ params }: Props) {
   return (
     <div className="max-w-3xl space-y-4">
       <Link href={paths.settingsAutomation(orgId, automation.id)} className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-        <ChevronIcon className="size-4 rtl:rotate-180" />
+        <BackIcon className="size-4" />
         חזרה לאוטומציה
       </Link>
       <h2 className="text-xl font-semibold break-words">עריכת אוטומציה: {automation.name}</h2>

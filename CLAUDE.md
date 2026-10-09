@@ -306,8 +306,10 @@ that back.
   `text-[…]` sizes. A new text/background pair goes into `tests/unit/design-tokens.test.ts` (4.5:1, both themes).
 - Components (DSN-07/08): use `src/components/ui/` (Dialog/sheet on native `<dialog>`, Popover pinned to the
   screen edges below `sm`, ConfirmButton instead of `window.confirm`, Toast via `ToastProvider`/`useToast`,
-  Tabs, Pagination, ReorderButtons, DateField with `src/lib/calendar-grid.ts`). A new or changed component
+  Tabs, Pagination (`pageCount` or `hasMore`), ReorderButtons, DateField with `src/lib/calendar-grid.ts`). A new or changed component
   is added to the gallery `/admin/design` (`src/features/design-gallery/`), which the e2e photographs.
+  Icons only from `src/components/ui/icons.tsx`; direction arrows are `BackIcon` / `ForwardIcon` (they flip with
+  the reading direction), never a hand-rotated chevron.
 - RTL: logical properties only (`ps-`, `pe-`, `ms-`, `me-`, `start-`, `end-`, `text-start`). Phones
   and emails render with `dir="ltr"`. Every screen must work at 360px width.
 - Accessibility target: WCAG 2.0 AA (Israeli standard IS 5568). Labels on inputs, visible focus,

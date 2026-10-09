@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 import { RuleBuilder } from "@/features/automations/components/rule-builder";
 import { getLookups } from "@/features/automations/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -23,7 +23,7 @@ export default async function NewAutomationPage({ params }: Props) {
   return (
     <div className="max-w-3xl space-y-4">
       <Link href={paths.settingsAutomations(orgId)} className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-        <ChevronIcon className="size-4 rtl:rotate-180" />
+        <BackIcon className="size-4" />
         כל האוטומציות
       </Link>
       <h2 className="text-xl font-semibold">אוטומציה חדשה</h2>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 
 type PageHeaderProps = {
   title: string;
@@ -17,7 +17,7 @@ export function PageHeader({ title, description, back, actions }: PageHeaderProp
       {back ? (
         <Link href={back.href} className="mb-2 inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
           {/* "back" points against the reading direction: right in RTL */}
-          <ChevronIcon className="size-4 rtl:rotate-180" />
+          <BackIcon className="size-4" />
           {back.label}
         </Link>
       ) : null}

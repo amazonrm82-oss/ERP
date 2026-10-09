@@ -1,50 +1,51 @@
-import Link from "next/link";
-
-import { ChevronIcon } from "@/components/ui/icons";
+import { ButtonLink, buttonClasses } from "@/components/ui/button";
+import { BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 type Props = {
   page: number;
-  pageCount: number;
-  // the link of a page number, with the list's other params kept
+  // builds the URL of a page, keeping the list's other params
   hrefFor: (page: number) => string;
   className?: string;
-};
+} & (
+  | { pageCount: number; hasMore?: never }
+  // lists that do not count their rows know only whether one more page exists
+  | { hasMore: boolean; pageCount?: never }
+);
 
-const step = "inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-md";
-
-/** Previous / next with "page x of y". Links, so the back button and a shared link keep the page. */
-export function Pagination({ page, pageCount, hrefFor, className }: Props) {
-  if (pageCount <= 1) {
+/**
+ * The one previous / next (FXU-14). Links, so the back button and a shared link
+ * keep the page. Renders nothing when everything fits on one page.
+ */
+export function Pagination({ page, hrefFor, className, ...rest }: Props) {
+  const hasNext = rest.pageCount !== undefined ? page < rest.pageCount : rest.hasMore;
+  if (page <= 1 && !hasNext) {
     return null;
   }
-  const prev = page > 1 ? hrefFor(page - 1) : null;
-  const next = page < pageCount ? hrefFor(page + 1) : null;
+  const off = cn(buttonClasses("secondary", "sm"), "pointer-events-none");
   return (
-    <nav aria-label="דפדוף" className={cn("flex items-center justify-between gap-3", className)}>
-      {prev ? (
-        <Link href={prev} rel="prev" className={cn(step, "text-ink hover:bg-canvas")}>
-          <ChevronIcon className="size-4 rotate-180" />
+    <nav aria-label="דפדוף" className={cn("mt-4 flex items-center justify-between gap-3", className)}>
+      {page > 1 ? (
+        <ButtonLink href={hrefFor(page - 1)} rel="prev" variant="secondary" size="sm">
+          <BackIcon className="size-4" />
           הקודם
-        </Link>
+        </ButtonLink>
       ) : (
-        <span aria-disabled="true" className={cn(step, "text-ink-soft opacity-60")}>
-          <ChevronIcon className="size-4 rotate-180" />
+        <span aria-disabled="true" className={off}>
+          <BackIcon className="size-4" />
           הקודם
         </span>
       )}
-      <span className="text-sm text-ink-soft tabular-nums" aria-current="page">
-        עמוד {page} מתוך {pageCount}
-      </span>
-      {next ? (
-        <Link href={next} rel="next" className={cn(step, "text-ink hover:bg-canvas")}>
+      <p className="text-sm text-ink-soft tabular-nums">{rest.pageCount !== undefined ? `עמוד ${page} מתוך ${rest.pageCount}` : `עמוד ${page}`}</p>
+      {hasNext ? (
+        <ButtonLink href={hrefFor(page + 1)} rel="next" variant="secondary" size="sm">
           הבא
-          <ChevronIcon className="size-4" />
-        </Link>
+          <ForwardIcon className="size-4" />
+        </ButtonLink>
       ) : (
-        <span aria-disabled="true" className={cn(step, "text-ink-soft opacity-60")}>
+        <span aria-disabled="true" className={off}>
           הבא
-          <ChevronIcon className="size-4" />
+          <ForwardIcon className="size-4" />
         </span>
       )}
     </nav>

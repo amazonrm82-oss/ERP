@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ChevronIcon } from "@/components/ui/icons";
+import { BackIcon } from "@/components/ui/icons";
 import { deleteIntakeAction } from "@/features/intake/actions";
 import { CopyBlock, IntakeSettingsForm } from "@/features/intake/components/intake-editor";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
@@ -51,7 +51,7 @@ export default async function IntakeItemPage({ params }: Props) {
     <div className="space-y-5">
       <div>
         <Link href={paths.settingsIntake(orgId)} className="mb-2 inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-          <ChevronIcon className="size-4 rtl:rotate-180" />
+          <BackIcon className="size-4" />
           כל ערוצי הקליטה
         </Link>
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold break-words">

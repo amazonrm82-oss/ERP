@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { ChevronIcon } from "@/components/ui/icons";
+import { ForwardIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { listMfaBlockedOrganizations, listMyOrganizations } from "@/features/onboarding/queries";
@@ -56,7 +56,7 @@ export default async function RootPage() {
                   <span className="block truncate font-medium">{org.name}</span>
                   <span className="block text-sm text-ink-soft">{ROLE_LABELS[org.role]}</span>
                 </span>
-                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+                <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
               </Link>
             </li>
           ))}
@@ -67,7 +67,7 @@ export default async function RootPage() {
                   <span className="block truncate font-medium">{org.name}</span>
                   <span className="block text-sm text-ink-soft">העסק דורש אימות דו-שלבי</span>
                 </span>
-                <ChevronIcon className="size-5 shrink-0 text-ink-soft ltr:rotate-180" />
+                <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
               </Link>
             </li>
           ))}
