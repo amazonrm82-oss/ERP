@@ -60,7 +60,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       }
       const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: APP_NAME, friendlyName: `${APP_NAME} ${Date.now()}` });
       if (enrollError?.code === "mfa_totp_enroll_not_enabled") {
-        if (!cancelled) setError("אימות דו-שלבי כבוי בפרויקט Supabase. יש להפעיל אותו ב-Authentication ← Multi-Factor (TOTP).");
+        if (!cancelled) setError("אימות דו-שלבי לא זמין כרגע. נסו שוב מאוחר יותר.");
         return;
       }
       if (enrollError) throw enrollError;

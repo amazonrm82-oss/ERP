@@ -27,7 +27,7 @@ async function importContext(orgId: string, entity: ImportEntityKey, mode: Dupli
   const definitions = await listFieldDefinitions(orgId, entity);
   const allowed = new Set([...IMPORT_TARGETS[entity].map((t) => t.key), ...definitions.map((d) => `${CUSTOM_PREFIX}${d.key}`), ""]);
   if (!mapping.every((target) => allowed.has(target))) {
-    return fail("המיפוי אינו תקין. נסו לבחור שוב את השדות.");
+    return fail("בחירת השדות לא נשמרה. בחרו שוב לאיזה שדה כל עמודה נכנסת.");
   }
   if (!mapping.some(Boolean)) {
     return fail("יש לבחור לפחות עמודה אחת לייבוא.");

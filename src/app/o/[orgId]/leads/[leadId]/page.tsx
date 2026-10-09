@@ -89,8 +89,8 @@ export default async function LeadPage({ params }: Props) {
                     </Link>
                   ) : null}
                   {lead.converted_deal_id ? (
-                    <Link href={paths.deals(orgId)} className={linkClass}>
-                      לעסקה בלוח העסקאות
+                    <Link href={paths.deal(orgId, lead.converted_deal_id)} className={linkClass}>
+                      לעסקה
                     </Link>
                   ) : null}
                 </p>

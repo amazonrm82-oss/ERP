@@ -2,6 +2,7 @@ import "server-only";
 
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { ListObject } from "@/features/list-columns/columns";
+import { INDUSTRIES } from "@/features/onboarding/options";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
@@ -67,7 +68,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("phone", "טלפון", "phone"),
       text("email", "אימייל", "email"),
       text("city", "עיר", "city"),
-      text("industry", "ענף", "industry"),
+      // the stored value is an English key, so it is picked from the list (FXU-12)
+      { key: "industry", label: "ענף", kind: "select", column: "industry", plain: true, options: INDUSTRIES.map((o) => ({ value: o.value, label: o.label })) },
       text("tax_id", "ח.פ.", "tax_id"),
       text("website", "אתר", "website"),
       owner,

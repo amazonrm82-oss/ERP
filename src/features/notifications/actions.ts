@@ -54,7 +54,7 @@ export async function savePushSubscriptionAction(orgId: string, subscription: un
   }
   const parsed = subscriptionSchema.safeParse(subscription);
   if (!parsed.success) {
-    return fail("הדפדפן החזיר מינוי לא תקין. נסו שוב.");
+    return fail("לא הצלחנו להפעיל התראות בדפדפן הזה. נסו שוב.");
   }
   const { endpoint, keys } = parsed.data;
   // the same browser subscribing again: replace the old row (it may hold stale keys)

@@ -28,7 +28,7 @@ export async function searchAction(orgId: string, query: string): Promise<Search
       if (hit) hits.push({ key: `${group}:${String(r.id)}`, group, ...hit });
     }
   };
-  add("leads", result.leads, (r) => ({ title: str(r.title) ?? "ליד בלי שם", subtitle: str(r.subtitle), href: paths.lead(orgId, String(r.id)) }));
+  add("leads", result.leads, (r) => ({ title: str(r.title) ?? "ליד ללא שם", subtitle: str(r.subtitle), href: paths.lead(orgId, String(r.id)) }));
   add("contacts", result.contacts, (r) => ({ title: str(r.title) ?? "איש קשר בלי שם", subtitle: str(r.subtitle), href: paths.contact(orgId, String(r.id)) }));
   add("companies", result.companies, (r) => ({ title: str(r.title) ?? "חברה", subtitle: str(r.subtitle), href: paths.company(orgId, String(r.id)) }));
   add("deals", result.deals, (r) => ({ title: str(r.title) ?? "עסקה", subtitle: formatMoney(Number(r.amount_agorot ?? 0)), href: paths.deal(orgId, String(r.id)) }));

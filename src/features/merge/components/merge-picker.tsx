@@ -14,7 +14,9 @@ import { type MergeType } from "../fields";
 export function MergePicker({ orgId, type, keepId }: { orgId: string; type: MergeType; keepId: string }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
-  const [, startTransition] = useTransition();
+  // the query the hits answer, so "not found" is said only about a finished search (FXU-12)
+  const [answered, setAnswered] = useState("");
+  const [pending, startTransition] = useTransition();
   const inputId = useId();
 
   useEffect(() => {
@@ -24,12 +26,15 @@ export function MergePicker({ orgId, type, keepId }: { orgId: string; type: Merg
       startTransition(async () => {
         const found = await searchAction(orgId, q);
         setHits(found.filter((h) => h.group === RECORD_TYPES[type].table && !h.key.endsWith(keepId)));
+        setAnswered(q);
       });
     }, 200);
     return () => clearTimeout(timer);
   }, [query, orgId, type, keepId]);
 
-  const shown = query.trim().length >= 2 ? hits : [];
+  const q = query.trim();
+  const shown = q.length >= 2 ? hits : [];
+  const notFound = q.length >= 2 && !pending && answered === q && hits.length === 0;
   return (
     <div>
       <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium">
@@ -43,7 +48,10 @@ export function MergePicker({ orgId, type, keepId }: { orgId: string; type: Merg
         placeholder="שם, טלפון או אימייל"
         className="block min-h-11 w-full rounded-md border border-line-control bg-surface px-3"
       />
-      <ul className="mt-2 divide-y divide-line">
+      <p aria-live="polite" className="mt-2 text-sm text-ink-soft">
+        {notFound ? "לא נמצאה רשומה מתאימה. נסו שם, טלפון או אימייל אחר." : ""}
+      </p>
+      <ul className="divide-y divide-line">
         {shown.map((hit) => {
           const id = hit.key.split(":")[1];
           return (

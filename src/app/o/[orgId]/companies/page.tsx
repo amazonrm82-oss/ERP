@@ -181,10 +181,10 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
             <EmptyState kind="search"
               title="לא נמצאו חברות"
-              description="אין חברות שמתאימות לחיפוש. נסו מילה אחרת."
+              description="אין חברות שמתאימות לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
               action={
                 <ButtonLink href={paths.companies(orgId)} variant="secondary">
-                  ניקוי החיפוש
+                  ניקוי הסינון
                 </ButtonLink>
               }
             />

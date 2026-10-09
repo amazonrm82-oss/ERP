@@ -1794,6 +1794,11 @@ try {
   await expectText(lost, "מוזג עם רשומה כפולה");
   await lost.goto(firstDupUrl);
   await expectText(lost, "הרשומה לא נמצאה");
+  // the picker says when a search found nothing (FXU-12)
+  const keptId = secondDupUrl.split("/").pop();
+  await lost.goto(`${orgUrl}/merge?type=lead&keep=${keptId}`);
+  await lost.getByLabel("חיפוש הרשומה הכפולה").fill("אין-כזה-שם-בכלל");
+  await expectText(lost, "לא נמצאה רשומה מתאימה");
 
   step("files: a deleted row's stored file is removed at night (database -> pg_net -> app -> Storage)");
   const [{ path: orphanPath }] = await sql("delete from public.files where name = 'תמונה.png' returning storage_path as path");

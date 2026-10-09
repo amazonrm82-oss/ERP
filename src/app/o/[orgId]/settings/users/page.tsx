@@ -26,7 +26,6 @@ export default async function UsersSettingsPage({ params }: Props) {
     isAdmin ? listMembersWithMfa(orgId) : Promise.resolve([]),
   ]);
   const roles = assignableRoles(role, hasViewSeats);
-  const activeCount = members.filter((member) => member.status === "active").length;
   const transferCandidates = members
     .filter((member) => member.userId !== user.id && member.status === "active" && member.seatType === "full")
     .map((member) => ({ userId: member.userId, name: member.name }));
@@ -59,7 +58,7 @@ export default async function UsersSettingsPage({ params }: Props) {
       ) : null}
 
       <Card aria-labelledby="members-title">
-        <CardHeader id="members-title" title={`משתמשים פעילים (${activeCount})`} />
+        <CardHeader id="members-title" title={`משתמשים (${members.length})`} />
         <MembersList orgId={orgId} myUserId={user.id} myRole={role} roles={roles} canWrite={canWrite} members={members} mfaUserIds={mfaUserIds} />
       </Card>
 

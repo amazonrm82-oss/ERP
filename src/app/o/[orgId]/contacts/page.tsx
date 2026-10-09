@@ -182,10 +182,10 @@ export default async function ContactsPage({ params, searchParams }: Props) {
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
             <EmptyState kind="search"
               title="לא נמצאו אנשי קשר"
-              description="אין אנשי קשר שמתאימים לחיפוש. נסו מילה אחרת."
+              description="אין אנשי קשר שמתאימים לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
               action={
                 <ButtonLink href={paths.contacts(orgId)} variant="secondary">
-                  ניקוי החיפוש
+                  ניקוי הסינון
                 </ButtonLink>
               }
             />

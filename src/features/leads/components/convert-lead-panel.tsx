@@ -37,8 +37,8 @@ export function ConvertLeadPanel({ orgId, leadId, defaultDealName, hasCompany }:
             לאיש הקשר שנוצר
           </Link>
           {state.data.dealId ? (
-            <Link href={paths.deals(orgId)} className={linkClass}>
-              לעסקה בלוח העסקאות
+            <Link href={paths.deal(orgId, state.data.dealId)} className={linkClass}>
+              לעסקה שנוצרה
             </Link>
           ) : null}
         </p>
