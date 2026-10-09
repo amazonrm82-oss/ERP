@@ -161,7 +161,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                             aria-selected={index === active}
                             onMouseEnter={() => setActive(index)}
                             onClick={() => go(hit)}
-                            className={`cursor-pointer px-4 py-2.5 ${index === active ? "bg-accent-soft" : ""}`}
+                            className={`cursor-pointer px-4 py-2.5 ${index === active ? "bg-accent-soft ring-2 ring-accent ring-inset" : ""}`}
                           >
                             <span className="block truncate font-medium">{hit.title}</span>
                             {hit.subtitle ? <span className="block truncate text-sm text-ink-soft">{hit.subtitle}</span> : null}

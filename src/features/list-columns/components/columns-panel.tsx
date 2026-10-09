@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useCallback, useId, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useEscapeToClose } from "@/components/ui/use-escape";
 import { FormError } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/field";
 
@@ -21,6 +22,8 @@ type Props = { orgId: string; object: ListObject; catalog: CatalogColumn[]; colu
 export function ColumnsPanel({ orgId, object, catalog, columns, saved }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEscapeToClose(open, useCallback(() => setOpen(false), []), triggerRef);
   const initial = (): Row[] => {
     const label = new Map(catalog.map((column) => [column.key, column.label]));
     const shown = columns.map((choice) => ({ key: choice.key, label: label.get(choice.key) ?? choice.key, visible: true, width: choice.width }));
@@ -66,6 +69,7 @@ export function ColumnsPanel({ orgId, object, catalog, columns, saved }: Props) 
   return (
     <div className="relative">
       <Button
+        ref={triggerRef}
         variant="secondary"
         aria-expanded={open}
         aria-controls={panelId}
@@ -81,7 +85,7 @@ export function ColumnsPanel({ orgId, object, catalog, columns, saved }: Props) 
           id={panelId}
           role="group"
           aria-label="בחירת עמודות"
-          className="absolute end-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-3 shadow-lg"
+          className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:mt-0 max-sm:w-auto max-sm:max-h-[calc(100dvh-10rem)] max-sm:overflow-y-auto sm:absolute sm:end-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-3 shadow-lg"
         >
           <p className="mb-2 text-sm text-ink-soft">השם תמיד מוצג ראשון. מסמנים מה להציג, ומסדרים בחצים.</p>
           <ul className="max-h-[60vh] space-y-1 overflow-y-auto">

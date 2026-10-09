@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useEscapeToClose } from "@/components/ui/use-escape";
 import { Input, Select } from "@/components/ui/field";
 
 import { conditionCount, OP_LABELS, OPS_BY_KIND, valueKind, type FilterCondition, type FilterField, type FilterGroup, type FilterTree } from "../model";
@@ -29,6 +30,8 @@ export function AdvancedFilter({ fields, current, listPath, keep, skipped }: Pro
   const router = useRouter();
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEscapeToClose(open, useCallback(() => setOpen(false), []), triggerRef);
   const blankCondition = (): FilterCondition => ({ field: fields[0]?.key ?? "", op: OPS_BY_KIND[fields[0]?.kind ?? "text"][0], value: "" });
   const blankTree = (): FilterTree => ({ match: "all", groups: [{ match: "all", conditions: [blankCondition()] }] });
   const [tree, setTree] = useState<FilterTree>(current ?? blankTree());
@@ -51,7 +54,7 @@ export function AdvancedFilter({ fields, current, listPath, keep, skipped }: Pro
 
   return (
     <div className="relative">
-      <Button variant={count > 0 ? "primary" : "secondary"} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
+      <Button ref={triggerRef} variant={count > 0 ? "primary" : "secondary"} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
         {count > 0 ? `סינון מתקדם (${count})` : "סינון מתקדם"}
       </Button>
       {skipped > 0 && !open ? (
@@ -64,7 +67,7 @@ export function AdvancedFilter({ fields, current, listPath, keep, skipped }: Pro
           id={panelId}
           role="group"
           aria-label="סינון מתקדם"
-          className="absolute end-0 z-20 mt-2 w-[min(40rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-line bg-surface p-3 shadow-lg"
+          className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:mt-0 max-sm:w-auto max-sm:max-h-[calc(100dvh-10rem)] max-sm:overflow-y-auto sm:absolute sm:end-0 z-20 mt-2 w-[min(40rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-line bg-surface p-3 shadow-lg"
         >
           {tree.groups.length > 1 ? (
             <label className="flex items-center gap-2 text-sm">

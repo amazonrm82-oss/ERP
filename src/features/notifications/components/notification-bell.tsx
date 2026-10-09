@@ -139,7 +139,7 @@ export function NotificationBell({ orgId, userId, initial, unread: initialUnread
       {open ? (
         <div
           id={panelId}
-          className="absolute end-0 top-full z-40 mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface shadow-[0_8px_24px_rgb(23_32_43/0.12)]"
+          className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:mt-0 max-sm:w-auto max-sm:max-h-[calc(100dvh-10rem)] max-sm:overflow-y-auto sm:absolute sm:end-0 sm:top-full z-40 mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface shadow-[0_8px_24px_rgb(23_32_43/0.12)]"
         >
           <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
             <h2 className="font-semibold">התראות</h2>

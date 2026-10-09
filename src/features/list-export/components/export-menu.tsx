@@ -10,7 +10,7 @@ export function ExportMenu({ href }: Props) {
   return (
     <details className="relative">
       <summary className={buttonClasses("secondary", "md", "cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>ייצוא</summary>
-      <div className="absolute end-0 z-20 mt-2 w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
+      <div className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:mt-0 max-sm:w-auto max-sm:max-h-[calc(100dvh-10rem)] max-sm:overflow-y-auto sm:absolute sm:end-0 z-20 mt-2 w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
         <p className="px-3 py-1.5 text-sm text-ink-soft">הרשימה לפי הסינון, בעמודות שבטבלה.</p>
         <a href={href("xlsx")} download className="block rounded-md px-3 py-2 hover:bg-canvas focus-visible:bg-canvas">
           קובץ Excel

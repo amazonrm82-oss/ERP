@@ -83,7 +83,7 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
             setValue(initial);
             setEditing(true);
           }}
-          className="shrink-0 rounded p-0.5 text-ink-soft opacity-60 hover:bg-canvas hover:text-ink hover:opacity-100 focus-visible:opacity-100"
+          className="shrink-0 rounded p-0.5 text-ink-soft hover:bg-canvas hover:text-ink"
         >
           <PencilIcon className="size-4" />
         </button>

@@ -232,6 +232,35 @@ try {
   await shot(owner, "04b-settings-list-360");
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("settings list scrolls sideways at 360px");
 
+  step("phone: every panel that opens from a button stays inside a 360px screen (FXA-01)");
+  // the panel is the element the button controls (aria-controls)
+  const panelInside = async (button, name) => {
+    await button.click();
+    const id = await button.getAttribute("aria-controls");
+    const box = await owner.locator(`[id="${id}"]`).boundingBox();
+    console.log(`${name} at 360px:`, box && { x: Math.round(box.x), width: Math.round(box.width) });
+    if (!box || box.x < 0 || box.x + box.width > 360) throw new Error(`${name} runs off a 360px screen`);
+    // Escape closes it and focus is back on the button
+    await owner.keyboard.press("Escape");
+    if ((await button.getAttribute("aria-expanded")) !== "false") throw new Error(`Escape did not close ${name}`);
+  };
+  await owner.goto(`${orgUrl}/leads`);
+  await panelInside(owner.getByRole("button", { name: /התראות/ }).first(), "bell");
+  await owner.getByRole("button", { name: "סינון ותצוגה" }).click();
+  await panelInside(owner.getByRole("button", { name: "סינון מתקדם", exact: true }), "advanced filter");
+  await panelInside(owner.getByRole("button", { name: "עמודות", exact: true }), "columns");
+  {
+    // export is a <details>: its panel is the element after the summary
+    const exportMenu = owner.locator("details", { has: owner.getByText("ייצוא", { exact: true }) }).first();
+    await exportMenu.locator("summary").click();
+    const box = await exportMenu.locator("summary + div").boundingBox();
+    console.log("export at 360px:", box && { x: Math.round(box.x), width: Math.round(box.width) });
+    if (!box || box.x < 0 || box.x + box.width > 360) throw new Error("export runs off a 360px screen");
+    await exportMenu.locator("summary").click();
+  }
+  await panelInside(owner.getByRole("button", { name: /רונית בעלים/ }), "user menu");
+  await owner.goto(`${orgUrl}/settings`);
+
   step("settings: business details");
   await owner.getByRole("link", { name: /פרטי העסק/ }).click();
   await owner.waitForURL(/\/settings\/business$/);

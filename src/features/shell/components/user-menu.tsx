@@ -71,7 +71,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
       {open ? (
         <div
           id={panelId}
-          className="absolute end-0 top-full z-40 mt-1.5 w-64 rounded-lg border border-line bg-surface py-1.5 shadow-[0_8px_24px_rgb(23_32_43/0.12)]"
+          className="max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:mt-0 max-sm:w-auto max-sm:max-h-[calc(100dvh-10rem)] max-sm:overflow-y-auto sm:absolute sm:end-0 sm:top-full z-40 mt-1.5 w-64 rounded-lg border border-line bg-surface py-1.5 shadow-[0_8px_24px_rgb(23_32_43/0.12)]"
         >
           <div className="border-b border-line px-4 pt-1.5 pb-3">
             <p className="truncate font-medium">{name}</p>
