@@ -41,7 +41,7 @@ const NO_PIPELINE = (
   <>
     <PageHeader title="עסקאות" />
     <div className="rounded-lg border border-line bg-surface">
-      <EmptyState icon={<BoardIcon />} title="אין פייפליין מכירות" description="כדי לנהל עסקאות צריך פייפליין עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות." />
+      <EmptyState icon={<BoardIcon />} title="אין תהליך מכירה" description="כדי לנהל עסקאות צריך תהליך מכירה עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות." />
     </div>
   </>
 );
@@ -59,7 +59,7 @@ function ViewNav({ orgId, pipelineId, pipelines, table }: { orgId: string; pipel
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
       {pipelines.length > 1 ? (
-        <nav aria-label="פייפליינים" className="flex flex-wrap gap-2">
+        <nav aria-label="תהליכי מכירה" className="flex flex-wrap gap-2">
           {pipelines.map((pipeline) => {
             const active = pipeline.id === pipelineId;
             return (
@@ -144,7 +144,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
       <PageHeader
         title="עסקאות"
         description={
-          anyDeals ? `פייפליין ${board.pipeline.name}: ${formatNumber(openCount)} עסקאות פתוחות בשווי ${formatMoney(openTotal)}.` : `פייפליין ${board.pipeline.name}`
+          anyDeals ? `תהליך המכירה "${board.pipeline.name}": ${formatNumber(openCount)} עסקאות פתוחות בשווי ${formatMoney(openTotal)}.` : `תהליך המכירה "${board.pipeline.name}"`
         }
         actions={newDealButton}
       />
@@ -237,7 +237,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
 
   return (
     <>
-      <PageHeader title="עסקאות" description={`פייפליין ${pipeline.name}`} actions={newDealButton} />
+      <PageHeader title="עסקאות" description={`תהליך המכירה "${pipeline.name}"`} actions={newDealButton} />
       <ViewNav orgId={orgId} pipelineId={pipeline.id} pipelines={pipelines} table />
       <SavedViewsBar
         orgId={orgId}
@@ -304,7 +304,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
               }
             />
           ) : (
-            <EmptyState icon={<BoardIcon />} title="עוד אין עסקאות בפייפליין הזה" description="עסקה נוצרת כשממירים ליד, או ידנית מכאן." action={newDealButton} />
+            <EmptyState icon={<BoardIcon />} title="עוד אין עסקאות בתהליך המכירה הזה" description="עסקה נוצרת כשממירים ליד, או ידנית מכאן." action={newDealButton} />
           )}
         </div>
       )}

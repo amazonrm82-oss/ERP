@@ -165,7 +165,7 @@ function TeamMemberRow({
             disabled={pending}
             onClick={() => run(() => setTeamManagerAction(orgId, teamId, member.userId, !member.isManager))}
           >
-            {member.isManager ? "ביטול ניהול" : "מינוי למנהל"}
+            {member.isManager ? "ביטול ניהול" : "מינוי למנהל הצוות"}
             <span className="sr-only">: {member.name}</span>
           </Button>
           <Button
@@ -214,7 +214,7 @@ export function DeleteTeamButton({ orgId, teamId, teamName }: { orgId: string; t
         למחוק את הצוות &quot;{teamName}&quot;?
       </p>
       <p className="mt-1 text-sm text-ink-soft">
-        המשתמשים לא נמחקים, והרשומות נשארות אצל הבעלים שלהן בלי שיוך לצוות. אי אפשר לבטל את המחיקה.
+        המשתמשים לא נמחקים, והרשומות נשארות אצל האחראים שלהן בלי שיוך לצוות. אי אפשר לבטל את המחיקה.
       </p>
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">

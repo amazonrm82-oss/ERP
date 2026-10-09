@@ -12,7 +12,7 @@ const FOOTER_DOCS = LEGAL_DOCUMENTS.filter((doc) => ["terms", "privacy", "access
 // The path a lead takes through the product. It is a real sequence, so it is
 // drawn as one: an ordered list with a connecting line.
 const JOURNEY = [
-  { title: "ליד נכנס", text: "נרשם עם מקור, סטטוס ובעלים." },
+  { title: "ליד נכנס", text: "נרשם עם מקור, סטטוס ואחראי." },
   { title: "נוצר קשר", text: "כל שיחה והערה נשמרות בציר הזמן." },
   { title: "המרה לעסקה", text: "איש קשר ועסקה נוצרים בלחיצה אחת." },
   { title: "נסגר בהצלחה", text: "העסקה מתקדמת בלוח עד הסגירה." },

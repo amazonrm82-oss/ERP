@@ -85,7 +85,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
               הורדת ייצוא מלא
             </a>
           ) : (
-            <p className="text-sm text-ink-soft">ייצוא מלא זמין לבעל החשבון בלבד. ייצוא של דוח בודד נמצא במסך הדוחות.</p>
+            <p className="text-sm text-ink-soft">ייצוא מלא זמין לבעלים של העסק בלבד. ייצוא של דוח בודד נמצא במסך הדוחות.</p>
           )}
         </CardBody>
       </Card>

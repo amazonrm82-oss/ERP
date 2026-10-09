@@ -66,7 +66,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     patch = { stage_id: value.id! };
   } else if (field === "owner") {
     const owner = value.id ?? null;
-    if (owner !== null && !isUuid(owner)) return fail("יש לבחור בעלים.");
+    if (owner !== null && !isUuid(owner)) return fail("יש לבחור אחראי.");
     patch = { owner_id: owner };
   } else if (object === "contact") {
     const first = text(100).safeParse(value.first ?? "");
@@ -96,7 +96,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     if (error.code === "23514") return fail("צריך להשאיר לליד שם, טלפון או אימייל.");
     if (error.code === "23503" && field === "stage") return fail("השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
     // the new owner is outside what the user may manage (a manager hands a record out of their teams)
-    if (error.code === "42501" && field === "owner") return fail("אין לכם הרשאה להעביר את הרשומה לבעלים הזה.");
+    if (error.code === "42501" && field === "owner") return fail("אין לכם הרשאה להעביר את הרשומה לאחראי הזה.");
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."));
   }
   if (data.length === 0) {

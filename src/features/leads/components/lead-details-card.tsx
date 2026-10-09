@@ -64,7 +64,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
           <Detail label="אימייל" value={lead.email} ltr />
           <Detail label="חברה" value={lead.companyName} />
           <Detail label="מקור" value={sourceName} />
-          <Detail label="בעלים" value={lead.ownerName} />
+          <Detail label="אחראי" value={lead.ownerName} />
           <Detail label="נוצר" value={lead.createdAtText} />
           {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
           <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} />

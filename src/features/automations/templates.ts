@@ -17,7 +17,7 @@ export const TEMPLATES: Template[] = [
   {
     key: "new_lead_callback",
     title: "ליד חדש: לחזור תוך 15 דקות",
-    description: "כל ליד חדש מקבל משימת שיחה לבעלים, עם מועד בעוד 15 דקות, והבעלים מקבל התראה. (שליחת WhatsApp אוטומטית תתווסף כשיחובר WhatsApp.)",
+    description: "כל ליד חדש מקבל משימת שיחה לאחראי, עם מועד בעוד 15 דקות, והאחראי מקבל התראה. (שליחת WhatsApp אוטומטית תתווסף כשיחובר WhatsApp.)",
     build: () => ({
       name: "ליד חדש: לחזור תוך 15 דקות",
       trigger: "lead:created",
@@ -49,7 +49,7 @@ export const TEMPLATES: Template[] = [
   {
     key: "stuck_deal",
     title: "עסקה תקועה: התראה למנהל",
-    description: "עסקה פתוחה שלא זזה שלב 14 ימים: התראה לבעלים ולמנהלי המערכת.",
+    description: "עסקה פתוחה שלא זזה שלב 14 ימים: התראה לאחראי ולמנהלי המערכת.",
     build: () => ({
       name: "עסקה תקועה 14 ימים",
       trigger: "deal:stuck",
@@ -76,7 +76,7 @@ export const TEMPLATES: Template[] = [
   {
     key: "birthday",
     title: "ברכת יום הולדת",
-    description: "ביום ההולדת של איש קשר נוצרת משימה לבעלים לשלוח ברכה. (שליחה אוטומטית תתווסף כשיחובר WhatsApp או אימייל.)",
+    description: "ביום ההולדת של איש קשר נוצרת משימה לאחראי לשלוח ברכה. (שליחה אוטומטית תתווסף כשיחובר WhatsApp או אימייל.)",
     build: () => ({
       name: "ברכת יום הולדת",
       trigger: "contact:birthday",
@@ -87,7 +87,7 @@ export const TEMPLATES: Template[] = [
   {
     key: "review_after_won",
     title: "בקשת חוות דעת אחרי סגירה",
-    description: "שלושה ימים אחרי שעסקה נסגרה בהצלחה, משימה לבעלים לבקש חוות דעת מהלקוח.",
+    description: "שלושה ימים אחרי שעסקה נסגרה בהצלחה, משימה לאחראי לבקש חוות דעת מהלקוח.",
     build: () => ({
       name: "בקשת חוות דעת אחרי סגירה",
       trigger: "deal:won",

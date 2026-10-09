@@ -149,7 +149,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             note: "\"נוצר מגע\": נרשמה לליד שיחה, פגישה, הודעה או הערה, או שהליד הומר.",
           },
           {
-            title: "שלבי הפייפליין (עסקאות שנפתחו בתקופה)",
+            title: "שלבי תהליך המכירה (עסקאות שנפתחו בתקופה)",
             columns: [
               { key: "name", label: "שלב", kind: "text" },
               { key: "reached", label: "הגיעו לשלב", kind: "number" },
@@ -184,9 +184,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         ],
         sections: [
           {
-            title: "לפי נציג",
+            title: "לפי חבר צוות",
             columns: [
-              { key: "owner", label: "נציג", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "leads", label: "לידים", kind: "number" },
               { key: "contacted", label: "נוצר מגע", kind: "number" },
               { key: "avg", label: "ממוצע", kind: "minutes" },
@@ -218,17 +218,17 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         kpis: [
           { label: "עסקאות שנסגרו", value: formatNumber(won) },
           { label: "סכום שנסגר", value: formatMoney(amount) },
-          { label: "אחוז זכייה", value: won + lost ? `${pct(won, won + lost)}%` : "—" },
+          { label: "אחוז סגירה בהצלחה", value: won + lost ? `${pct(won, won + lost)}%` : "—" },
         ],
         sections: [
           {
-            title: "לפי נציג",
+            title: "לפי חבר צוות",
             columns: [
-              { key: "owner", label: "נציג", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "won", label: "נסגרו", kind: "number" },
               { key: "won_amount", label: "סכום", kind: "money" },
               { key: "lost", label: "אבדו", kind: "number" },
-              { key: "win_rate", label: "אחוז זכייה", kind: "percent" },
+              { key: "win_rate", label: "אחוז סגירה בהצלחה", kind: "percent" },
               { key: "avg_deal", label: "עסקה ממוצעת", kind: "money" },
               { key: "open_count", label: "פתוחות עכשיו", kind: "number" },
               { key: "open_amount", label: "שווי פתוחות", kind: "money" },
@@ -245,7 +245,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             })),
             bar: "won_amount",
             empty: "אין עסקאות בתקופה הזו.",
-            note: "עמידה ביעד תתווסף כשיהיה מסך יעדים לנציגים.",
+            note: "עמידה ביעד תתווסף כשיהיה מסך יעדים לחברי הצוות.",
           },
         ],
       };
@@ -265,9 +265,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         ],
         sections: [
           {
-            title: "לפי נציג",
+            title: "לפי חבר צוות",
             columns: [
-              { key: "user", label: "נציג", kind: "text" },
+              { key: "user", label: "חבר צוות", kind: "text" },
               { key: "call", label: "שיחות", kind: "number" },
               { key: "meeting", label: "פגישות", kind: "number" },
               { key: "messages", label: "הודעות", kind: "number" },
@@ -370,9 +370,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             empty: "לא אבדו עסקאות בתקופה הזו.",
           },
           {
-            title: "לפי נציג",
+            title: "לפי חבר צוות",
             columns: [
-              { key: "owner", label: "נציג", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "deals", label: "עסקאות", kind: "number" },
               { key: "amount", label: "שווי", kind: "money" },
             ],
@@ -424,7 +424,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             columns: [
               { key: "name", label: "עסקה", kind: "text" },
               { key: "stage", label: "שלב", kind: "text" },
-              { key: "owner", label: "נציג", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "amount", label: "סכום", kind: "money" },
               { key: "idle_days", label: "ימים בלי פעילות", kind: "number" },
               { key: "days_in_stage", label: "ימים בשלב", kind: "number" },
@@ -476,9 +476,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             empty: "לא נסגרו עסקאות בתקופה הזו.",
           },
           {
-            title: "לפי נציג",
+            title: "לפי חבר צוות",
             columns: [
-              { key: "owner", label: "נציג", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "deals", label: "עסקאות", kind: "number" },
               { key: "amount", label: "הכנסה", kind: "money" },
             ],

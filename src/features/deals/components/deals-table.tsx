@@ -116,10 +116,10 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
                   id={deal.id}
                   field="owner"
                   kind="select"
-                  label={`בעלים: ${deal.name}`}
+                  label={`אחראי: ${deal.name}`}
                   initial={{ id: deal.ownerId }}
                   options={editing.owners}
-                  emptyOption="ללא בעלים"
+                  emptyOption="ללא אחראי"
                   canEdit={editing.canReassign(deal.ownerId)}
                 >
                   {deal.ownerName}

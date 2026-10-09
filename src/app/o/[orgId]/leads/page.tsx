@@ -208,7 +208,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
           ) : (
             <EmptyState icon={<InboxIcon />}
               title="עוד אין לידים"
-              description="כאן יופיעו כל הפניות החדשות, עם מקור, סטטוס ובעלים. אפשר להתחיל בהוספת הליד הראשון."
+              description="כאן יופיעו כל הפניות החדשות, עם מקור, סטטוס ואחראי. אפשר להתחיל בהוספת הליד הראשון."
               action={newLeadButton}
             />
           )}

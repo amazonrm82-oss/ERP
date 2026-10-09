@@ -31,7 +31,7 @@ export function CreatePipelineForm({ orgId }: { orgId: string }) {
     <form action={formAction} className="space-y-3" noValidate>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <TextField
-          label="שם הפייפליין"
+          label="שם תהליך המכירה"
           name="name"
           required
           maxLength={80}
@@ -42,7 +42,7 @@ export function CreatePipelineForm({ orgId }: { orgId: string }) {
           error={failure?.fieldErrors?.name}
         />
         <SubmitButton className="sm:mt-6.5" pendingText="יוצר…">
-          יצירת פייפליין
+          יצירת תהליך מכירה
         </SubmitButton>
       </div>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
@@ -77,9 +77,9 @@ export function PipelineCard({ orgId, pipeline, editable, isOnly }: CardProps) {
                 action={deletePipelineAction.bind(null, orgId, pipeline.id)}
                 pendingText="מוחק…"
                 variant="danger-ghost"
-                confirm={`למחוק את הפייפליין "${pipeline.name}"?`}
+                confirm={`למחוק את תהליך המכירה "${pipeline.name}"?`}
               >
-                מחיקת הפייפליין
+                מחיקת תהליך המכירה
               </ActionButton>
             )}
           </div>

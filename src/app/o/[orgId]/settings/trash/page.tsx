@@ -70,7 +70,7 @@ export default async function TrashPage({ params }: Props) {
                   </p>
                   <p className="text-sm text-ink-soft">
                     {`הועבר לסל ${formatDateTime(record.deletedAt)} · יימחק ב-${formatDate(purgeDate(record.deletedAt))}`}
-                    {record.ownerName ? `, בעלים: ${record.ownerName}` : ""}
+                    {record.ownerName ? `, אחראי: ${record.ownerName}` : ""}
                   </p>
                 </div>
                 <span className="flex flex-wrap items-start gap-2">

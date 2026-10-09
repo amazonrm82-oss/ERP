@@ -601,10 +601,10 @@ try {
   for (const [path, header, param] of [
     ["leads", "סטטוס", "status"],
     ["leads", "מקור", "source"],
-    ["leads", "בעלים", "owner"],
+    ["leads", "אחראי", "owner"],
     ["contacts", "חברה", "company"],
-    ["contacts", "בעלים", "owner"],
-    ["companies", "בעלים", "owner"],
+    ["contacts", "אחראי", "owner"],
+    ["companies", "אחראי", "owner"],
   ]) {
     await ownerDesk.goto(`${orgUrl}/${path}?sort=${param}`);
     const column = ownerDesk.getByRole("columnheader", { name: new RegExp(`^${header}`) });
@@ -657,9 +657,9 @@ try {
   // ---------------------------------------------------------------- section 3: customization
   step("pipelines: create, add a stage, switch on the board");
   await ownerDesk.goto(`${orgUrl}/settings/pipelines`);
-  await ownerDesk.getByLabel("שם הפייפליין").fill("השכרות");
-  await ownerDesk.getByRole("button", { name: "יצירת פייפליין" }).click();
-  await expectText(ownerDesk, "הפייפליין נוצר");
+  await ownerDesk.getByLabel("שם תהליך המכירה").fill("השכרות");
+  await ownerDesk.getByRole("button", { name: "יצירת תהליך מכירה" }).click();
+  await expectText(ownerDesk, "תהליך המכירה נוצר");
   const rentals = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "השכרות" }) });
   await rentals.getByLabel("שם השלב החדש").fill("סיור בנכס");
   await rentals.getByRole("button", { name: "הוספת שלב" }).click();
@@ -869,13 +869,13 @@ try {
   await pollLead(inlineLead.id, (r) => r.status_id === otherStatus, "status");
   await row2().getByText(otherStatusName).waitFor({ timeout: 15000 });
   // the owner: to Dana, and back
-  await row2().getByRole("button", { name: `עריכת בעלים: ${renamed}` }).click();
-  await row2().getByRole("combobox", { name: `בעלים: ${renamed}` }).selectOption(danaId);
+  await row2().getByRole("button", { name: `עריכת אחראי: ${renamed}` }).click();
+  await row2().getByRole("combobox", { name: `אחראי: ${renamed}` }).selectOption(danaId);
   await row2().getByRole("button", { name: "שמירה" }).click();
   await pollLead(inlineLead.id, (r) => r.owner_id === danaId, "owner");
   await row2().getByText("דנה חברה").waitFor({ timeout: 15000 });
-  await row2().getByRole("button", { name: `עריכת בעלים: ${renamed}` }).click();
-  await row2().getByRole("combobox", { name: `בעלים: ${renamed}` }).selectOption(inlineLead.owner_id);
+  await row2().getByRole("button", { name: `עריכת אחראי: ${renamed}` }).click();
+  await row2().getByRole("combobox", { name: `אחראי: ${renamed}` }).selectOption(inlineLead.owner_id);
   await row2().getByRole("button", { name: "שמירה" }).click();
   await pollLead(inlineLead.id, (r) => r.owner_id === inlineLead.owner_id, "owner back");
   // and the name back, so later steps find the lead as before
@@ -1140,7 +1140,7 @@ try {
 
   step("round robin: leads alternate, and an unavailable rep is skipped");
   await ownerDesk.goto(hookAdminUrl);
-  await ownerDesk.getByLabel("בסבב בין הנציגים הזמינים").check();
+  await ownerDesk.getByLabel("בסבב בין חברי הצוות הזמינים").check();
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "נשמר.");
   const sendLead = async (name, phone) => {
@@ -1151,7 +1151,7 @@ try {
     await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent(name)}`);
     await ownerDesk.getByRole("link", { name }).click();
     await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
-    return (await ownerDesk.locator("dt", { hasText: "בעלים" }).locator("xpath=following-sibling::dd[1]").innerText()).trim();
+    return (await ownerDesk.locator("dt", { hasText: "אחראי" }).locator("xpath=following-sibling::dd[1]").innerText()).trim();
   };
   await sendLead("סבב אחד", "058-1000001");
   await sendLead("סבב שתיים", "058-1000002");
@@ -1186,7 +1186,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/automations`);
   await ownerDesk.getByRole("button", { name: /הוספה.*ליד חדש: לחזור תוך 15 דקות/ }).click();
   await ownerDesk.waitForURL(/\/settings\/automations\/[0-9a-f-]{36}$/);
-  await expectText(ownerDesk, "יצירת משימה: \"להתקשר ל{{name}}\", בעוד 15 דקות, לבעלים");
+  await expectText(ownerDesk, "יצירת משימה: \"להתקשר ל{{name}}\", בעוד 15 דקות, לאחראי");
   await sendLead("אוטו ליד", "058-2000001");
   let autoTask = false;
   for (let i = 0; i < 24 && !autoTask; i++) {

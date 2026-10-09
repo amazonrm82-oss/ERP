@@ -20,7 +20,7 @@ export const MERGE_FIELDS: Record<MergeType, Array<{ key: string; label: string 
     { key: "campaign", label: "קמפיין" },
     { key: "budget_agorot", label: "תקציב" },
     { key: "message", label: "הודעה" },
-    { key: "owner_id", label: "בעלים" },
+    { key: "owner_id", label: "אחראי" },
   ],
   contact: [
     { key: "first_name", label: "שם פרטי" },
@@ -33,7 +33,7 @@ export const MERGE_FIELDS: Record<MergeType, Array<{ key: string; label: string 
     { key: "birth_date", label: "יום הולדת" },
     { key: "address_line", label: "כתובת" },
     { key: "city", label: "עיר" },
-    { key: "owner_id", label: "בעלים" },
+    { key: "owner_id", label: "אחראי" },
   ],
   company: [
     { key: "name", label: "שם החברה" },
@@ -44,7 +44,7 @@ export const MERGE_FIELDS: Record<MergeType, Array<{ key: string; label: string 
     { key: "industry", label: "ענף" },
     { key: "address_line", label: "כתובת" },
     { key: "city", label: "עיר" },
-    { key: "owner_id", label: "בעלים" },
+    { key: "owner_id", label: "אחראי" },
   ],
 };
 

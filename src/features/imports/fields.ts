@@ -51,7 +51,7 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "email", label: "אימייל", synonyms: EMAIL },
     { key: "job_title", label: "תפקיד", synonyms: JOB },
     { key: "company", label: "חברה (לפי שם, תיווצר אם חסרה)", synonyms: COMPANY },
-    { key: "birth_date", label: "תאריך לידה", synonyms: ["תאריך לידה", "יום הולדת", "birthday", "birth date", "date of birth", "dob"] },
+    { key: "birth_date", label: "יום הולדת", synonyms: ["תאריך לידה", "יום הולדת", "birthday", "birth date", "date of birth", "dob"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
   ],
   company: [

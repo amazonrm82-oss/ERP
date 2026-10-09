@@ -40,7 +40,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
 // P0001 raised without a hint: recognised by the (stable) English message.
 const RAISED_MESSAGES: Array<[RegExp, string]> = [
   [/already converted/i, "הליד כבר הומר."],
-  [/no open stage/i, "אין בפייפליין שלב פתוח לשים בו את העסקה. יש להוסיף שלב בהגדרות."],
+  [/no open stage/i, "אין בתהליך המכירה שלב פתוח לשים בו את העסקה. יש להוסיף שלב בהגדרות."],
 ];
 
 // Exceptions our own functions and triggers raise with other codes, recognised

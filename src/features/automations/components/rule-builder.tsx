@@ -298,7 +298,7 @@ function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
             ))}
           </SelectField>
           <SelectField label="באחריות" value={action.assign} onChange={(e) => onChange({ assign: e.target.value })} controlSize="sm">
-            <option value="owner">בעלי הרשומה</option>
+            <option value="owner">האחראי על הרשומה</option>
             <option value="user">משתמש מסוים</option>
           </SelectField>
           {action.assign === "user" ? memberSelect("משתמש") : null}
@@ -309,7 +309,7 @@ function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField label={`נוסח ההתראה (פעולה ${n})`} value={action.title} onChange={(e) => onChange({ title: e.target.value })} maxLength={200} className="sm:col-span-2" controlSize="sm" />
           <SelectField label="למי" value={action.to} onChange={(e) => onChange({ to: e.target.value })} controlSize="sm">
-            <option value="owner">בעלי הרשומה</option>
+            <option value="owner">האחראי על הרשומה</option>
             <option value="admins">מנהלי המערכת</option>
             <option value="user">משתמש מסוים</option>
           </SelectField>

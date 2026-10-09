@@ -92,7 +92,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, canEdit }: P
           <Detail label="סגירה צפויה" value={deal.expectedCloseText} />
           {deal.closedAtText ? <Detail label="נסגרה" value={deal.closedAtText} /> : null}
           {deal.status === "lost" ? <Detail label="סיבת הפסד" value={deal.lostReason} /> : null}
-          <Detail label="בעלים" value={deal.ownerName} />
+          <Detail label="אחראי" value={deal.ownerName} />
           <Detail label="נוצרה" value={deal.createdAtText} />
           <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} />
         </DetailList>

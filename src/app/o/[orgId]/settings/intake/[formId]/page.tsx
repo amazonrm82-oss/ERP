@@ -114,7 +114,7 @@ export default async function IntakeItemPage({ params }: Props) {
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
             />
           ) : (
-            <p className="text-md text-ink-soft">החשבון במצב קריאה בלבד.</p>
+            <p className="text-md text-ink-soft">העסק במצב קריאה בלבד.</p>
           )}
         </CardBody>
       </Card>

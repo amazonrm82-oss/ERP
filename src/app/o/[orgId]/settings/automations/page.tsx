@@ -92,7 +92,7 @@ export default async function AutomationsPage({ params }: Props) {
           ))}
         </ul>
         <CardBody className="border-t border-line text-sm text-ink-soft">
-          שליחת WhatsApp, אימייל ו-SMS אוטומטית תתווסף כשיחוברו הערוצים. עד אז התבניות יוצרות משימה לנציג.
+          שליחת WhatsApp, אימייל ו-SMS אוטומטית תתווסף כשיחוברו הערוצים. עד אז התבניות יוצרות משימה לאחראי.
         </CardBody>
       </Card>
     </div>

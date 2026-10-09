@@ -44,8 +44,8 @@ export function ReportFilters({ filters, period, ownerId, owners, pipelineId, pi
         </>
       ) : null}
       {filters.includes("owner") ? (
-        <SelectField label="נציג" name="owner" defaultValue={ownerId} className="w-44">
-          <option value="">כל הנציגים</option>
+        <SelectField label="אחראי" name="owner" defaultValue={ownerId} className="w-44">
+          <option value="">כל חברי הצוות</option>
           {owners.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -54,7 +54,7 @@ export function ReportFilters({ filters, period, ownerId, owners, pipelineId, pi
         </SelectField>
       ) : null}
       {filters.includes("pipeline") && pipelines.length > 1 ? (
-        <SelectField label="פייפליין" name="pipeline" defaultValue={pipelineId} className="w-44">
+        <SelectField label="תהליך מכירה" name="pipeline" defaultValue={pipelineId} className="w-44">
           <option value="">{pipelineEmptyLabel}</option>
           {pipelines.map((option) => (
             <option key={option.value} value={option.value}>

@@ -50,7 +50,7 @@ export default async function NewDealPage({ params, searchParams }: Props) {
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="עסקה חדשה" back={back} description={pipeline ? `פייפליין ${pipeline.name}` : undefined} />
+      <PageHeader title="עסקה חדשה" back={back} description={pipeline ? `תהליך המכירה "${pipeline.name}"` : undefined} />
       <Card>
         {pipeline && pipeline.stages.length > 0 ? (
           <CardBody>
@@ -66,8 +66,8 @@ export default async function NewDealPage({ params, searchParams }: Props) {
           </CardBody>
         ) : (
           <EmptyState icon={<BoardIcon />}
-            title="אין שלבים בפייפליין"
-            description="כדי ליצור עסקה צריך פייפליין עם שלב אחד לפחות. מנהל המערכת יכול להוסיף בהגדרות."
+            title="אין שלבים בתהליך המכירה"
+            description="כדי ליצור עסקה צריך תהליך מכירה עם שלב אחד לפחות. מנהל המערכת יכול להוסיף בהגדרות."
           />
         )}
       </Card>

@@ -62,7 +62,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   // the deals table shows one pipeline; tasks are the user's own unless "who=all"
   const pipeline = object === "deal" ? await getPipeline(orgId, params.get("pipeline")) : null;
   if (object === "deal" && !pipeline) {
-    return text("אין פייפליין מכירות.", 404);
+    return text("אין תהליך מכירה.", 404);
   }
   const taskOwner = object === "task" && params.get("who") !== "all" ? context.user.id : null;
   const filter = await prepareListFilter(orgId, object, params.get("f") ?? "", context.user.id, listColumns.fields, { stages: pipeline?.stages });

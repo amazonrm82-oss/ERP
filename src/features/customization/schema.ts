@@ -6,7 +6,7 @@ export const STAGE_KINDS = ["open", "won", "lost"] as const;
 export const STATUS_KINDS = ["open", "converted", "disqualified"] as const;
 
 export const pipelineNameSchema = z.object({
-  name: requiredText(80, "יש להזין שם לפייפליין.", "השם ארוך מדי (עד 80 תווים)."),
+  name: requiredText(80, "יש להזין שם לתהליך המכירה.", "השם ארוך מדי (עד 80 תווים)."),
 });
 
 const probability = z.preprocess(

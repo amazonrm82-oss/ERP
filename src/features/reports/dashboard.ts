@@ -61,14 +61,14 @@ export async function getDashboard(orgId: string): Promise<Dashboard> {
     { label: "לידים חדשים החודש", value: formatNumber(num(s.leads)), ...compare(num(s.leads), num(s.leads_prev), formatNumber) },
     { label: "הכנסה שנסגרה החודש", value: formatMoney(num(s.won_amount)), ...compare(num(s.won_amount), num(s.won_amount_prev), formatMoney) },
     {
-      label: "אחוז זכייה החודש",
+      label: "אחוז סגירה בהצלחה החודש",
       value: num(s.won) + num(s.lost) > 0 ? percentText(winRate(num(s.won), num(s.lost))) : "—",
       ...(num(s.won) + num(s.lost) + num(s.won_prev) + num(s.lost_prev) > 0
         ? compare(winRate(num(s.won), num(s.lost)), winRate(num(s.won_prev), num(s.lost_prev)), percentText)
         : { change: "עוד לא נסגרו או אבדו עסקאות", trend: null }),
     },
     { label: "עסקאות פתוחות", value: formatNumber(num(s.open)), change: `שווי ${formatMoney(num(s.open_amount))}`, trend: null },
-    { label: "שווי משוקלל בפייפליין", value: formatMoney(num(s.weighted_amount)), change: "סכום כפול סיכויי הסגירה", trend: null },
+    { label: "שווי משוקלל בתהליך המכירה", value: formatMoney(num(s.weighted_amount)), change: "סכום כפול סיכויי הסגירה", trend: null },
     { label: "משימות באיחור", value: formatNumber(num(s.overdue_tasks)), change: null, trend: null },
   ];
 

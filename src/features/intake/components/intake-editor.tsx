@@ -131,7 +131,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
               onChange={() => setMode("owner")}
               className="mt-1 size-4 accent-accent"
             />
-            <span>לנציג קבוע</span>
+            <span>לחבר צוות קבוע</span>
           </label>
           <label className="flex items-start gap-2.5 text-md">
             <input
@@ -143,7 +143,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
               className="mt-1 size-4 accent-accent"
             />
             <span>
-              בסבב בין הנציגים הזמינים
+              בסבב בין חברי הצוות הזמינים
               <span className="block text-sm text-ink-soft">כל ליד הולך למי שקיבל ליד הכי מזמן. מי שסימן שהוא לא זמין מדולג.</span>
             </span>
           </label>
@@ -163,13 +163,13 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
           )}
           <SelectField
             key={`owner-${ownerValue}`}
-            label={mode === "round_robin" ? "אם אף אחד לא זמין" : "הנציג"}
+            label={mode === "round_robin" ? "אם אף אחד לא זמין" : "חבר הצוות"}
             name="owner_id"
             defaultValue={ownerValue}
             error={errors.owner_id}
-            hint="בלי בעלים: רק מנהלים יראו את הליד, אלא אם כולם רואים הכול."
+            hint="בלי אחראי: רק הבעלים ומנהלי המערכת יראו את הליד, אלא אם כולם רואים הכול."
           >
-            <option value="">ללא בעלים</option>
+            <option value="">ללא אחראי</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.name}

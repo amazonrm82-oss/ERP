@@ -11,7 +11,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
-export const metadata: Metadata = { title: "קליטת לידים" };
+export const metadata: Metadata = { title: "טפסים וחיבורים" };
 
 type Props = { params: Promise<{ orgId: string }> };
 
@@ -21,7 +21,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
   if (!isAdminRole(role)) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState kind="locked" title="אין גישה" description="קליטת לידים מנוהלת על ידי הבעלים ומנהלי המערכת." />
+        <EmptyState kind="locked" title="אין גישה" description="טפסים וחיבורים מנוהלים על ידי הבעלים ומנהלי המערכת." />
       </div>
     );
   }
@@ -31,7 +31,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
     <div className="space-y-5">
       <p className="text-md text-ink-soft">
         לידים נכנסים מעצמם: מטופס שמטמיעים באתר, או מ-webhook שמחברים למערכת אחרת (Zapier, Make, תוסף לאתר). כל פנייה הופכת לליד עם
-        המקור והבעלים שבחרתם.
+        המקור והאחראי שבחרתם.
       </p>
       {canWrite ? (
         <Card aria-labelledby="new-intake-title">
@@ -42,7 +42,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
         </Card>
       ) : null}
       <Card aria-labelledby="intakes-title">
-        <CardHeader id="intakes-title" title="ערוצי קליטה" />
+        <CardHeader id="intakes-title" title="טפסים וחיבורים" />
         {intakes.length === 0 ? (
           <EmptyState icon={<FormIcon />} title="עוד אין טפסים" description="צרו טופס, הטמיעו אותו באתר, וכל פנייה תיכנס כאן כליד." />
         ) : (

@@ -87,7 +87,7 @@ function toCsv(rows: Row[], names: Map<string, string>, tagNames: Map<string, st
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-const README = `ייצוא מלא של נתוני הארגון.
+const README = `ייצוא מלא של נתוני העסק.
 
 כל קובץ CSV הוא טבלה אחת, ונפתח ב-Excel עם עברית תקינה.
 עמודות id מקשרות בין הקבצים (למשל company_id באנשי קשר הוא id בקובץ companies.csv).

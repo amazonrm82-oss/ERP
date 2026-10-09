@@ -96,10 +96,10 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
                   id={company.id}
                   field="owner"
                   kind="select"
-                  label={`בעלים: ${company.name}`}
+                  label={`אחראי: ${company.name}`}
                   initial={{ id: company.ownerId }}
                   options={editing.owners}
-                  emptyOption="ללא בעלים"
+                  emptyOption="ללא אחראי"
                   canEdit={editing.canReassign(company.ownerId)}
                 >
                   {company.ownerName}

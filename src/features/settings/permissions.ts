@@ -17,7 +17,7 @@ export const ROLE_DESCRIPTIONS: Record<MembershipRole, string> = {
 };
 
 export const VISIBILITY_OPTIONS: ReadonlyArray<{ value: RecordVisibility; label: string; description: string }> = [
-  { value: "org", label: "כל הארגון", description: "כל המשתמשים רואים את כל הרשומות." },
+  { value: "org", label: "כל העסק", description: "כל המשתמשים רואים את כל הרשומות." },
   { value: "team", label: "לפי צוות", description: "כל משתמש רואה את הרשומות שלו ושל הצוותים שלו." },
   { value: "own", label: "רק שלי", description: "כל משתמש רואה רק את הרשומות שלו. מנהלי צוות רואים גם את רשומות הצוות." },
 ];

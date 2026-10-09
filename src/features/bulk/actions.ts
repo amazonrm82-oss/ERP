@@ -115,7 +115,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   let undoRows: BulkUndoRow[] = [];
   switch (change.kind) {
     case "owner": {
-      if (change.ownerId !== null && !isUuid(change.ownerId)) return fail("יש לבחור בעלים.");
+      if (change.ownerId !== null && !isUuid(change.ownerId)) return fail("יש לבחור אחראי.");
       changed = await eachLimited(live, async (row) => {
         // a row that fails or that the user may not change is counted as skipped
         const { data, error: rowError } = await supabase

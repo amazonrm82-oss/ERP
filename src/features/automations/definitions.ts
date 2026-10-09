@@ -57,9 +57,9 @@ export const CONDITIONS: ConditionOption[] = [
   { key: "source", label: "המקור הוא", entities: ["lead", "contact", "deal"], field: "source_id", op: "eq", input: "source" },
   { key: "status", label: "הסטטוס הוא", entities: ["lead"], field: "status_id", op: "eq", input: "status" },
   { key: "tag", label: "יש תגית", entities: ["lead", "contact", "company", "deal"], field: "tag_ids", op: "has_tag", input: "tag" },
-  { key: "pipeline", label: "בפייפליין", entities: ["deal"], field: "pipeline_id", op: "eq", input: "pipeline" },
+  { key: "pipeline", label: "בתהליך המכירה", entities: ["deal"], field: "pipeline_id", op: "eq", input: "pipeline" },
   { key: "amount", label: "השווי לפחות (₪)", entities: ["deal"], field: "amount_agorot", op: "gte", input: "shekels" },
-  { key: "no_owner", label: "אין בעלים", entities: ["lead", "contact", "company", "deal", "task"], field: "owner_id", op: "empty", input: "none" },
+  { key: "no_owner", label: "אין אחראי", entities: ["lead", "contact", "company", "deal", "task"], field: "owner_id", op: "empty", input: "none" },
   { key: "task_type", label: "סוג המשימה הוא", entities: ["task"], field: "task_type", op: "eq", input: "task_type" },
 ];
 
@@ -68,7 +68,7 @@ export type ActionType = "create_task" | "notify" | "assign_owner" | "add_tag" |
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
   notify: "התראה במערכת",
-  assign_owner: "הקצאת בעלים",
+  assign_owner: "הקצאת אחראי",
   add_tag: "הוספת תגית",
   set_lead_status: "שינוי סטטוס ליד",
   move_deal_stage: "העברת עסקה לשלב",

@@ -105,10 +105,10 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
                   id={contact.id}
                   field="owner"
                   kind="select"
-                  label={`בעלים: ${contactDisplayName(contact)}`}
+                  label={`אחראי: ${contactDisplayName(contact)}`}
                   initial={{ id: contact.ownerId }}
                   options={editing.owners}
-                  emptyOption="ללא בעלים"
+                  emptyOption="ללא אחראי"
                   canEdit={editing.canReassign(contact.ownerId)}
                 >
                   {contact.ownerName}

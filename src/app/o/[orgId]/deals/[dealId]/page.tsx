@@ -51,7 +51,7 @@ export default async function DealPage({ params }: Props) {
     <>
       <PageHeader
         title={deal.name}
-        description={deal.pipelineName ? `פייפליין ${deal.pipelineName}` : undefined}
+        description={deal.pipelineName ? `תהליך המכירה "${deal.pipelineName}"` : undefined}
         back={{ href: paths.deals(orgId), label: "עסקאות" }}
         actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />

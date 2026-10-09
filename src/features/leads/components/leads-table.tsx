@@ -135,10 +135,10 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
                   id={lead.id}
                   field="owner"
                   kind="select"
-                  label={`בעלים: ${leadDisplayName(lead)}`}
+                  label={`אחראי: ${leadDisplayName(lead)}`}
                   initial={{ id: lead.ownerId }}
                   options={editing.owners}
-                  emptyOption="ללא בעלים"
+                  emptyOption="ללא אחראי"
                   canEdit={editing.canReassign(lead.ownerId)}
                 >
                   {lead.ownerName}

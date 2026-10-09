@@ -47,11 +47,11 @@ export function describeRule(
     switch (a.type) {
       case "create_task": {
         const due = a.due_in_minutes ? `, בעוד ${a.due_in_minutes} דקות` : a.due_in_days ? `, בעוד ${a.due_in_days} ימים` : "";
-        const who = a.assign === "user" ? `, ל${nameIn(lookups.members, a.user_id)}` : ", לבעלים";
+        const who = a.assign === "user" ? `, ל${nameIn(lookups.members, a.user_id)}` : ", לאחראי";
         return `${label}: "${a.title}"${due}${who}`;
       }
       case "notify":
-        return `${label} ל${a.to === "admins" ? "מנהלי המערכת" : a.to === "user" ? nameIn(lookups.members, a.user_id) : "בעלים"}: "${a.title}"`;
+        return `${label} ל${a.to === "admins" ? "מנהלי המערכת" : a.to === "user" ? nameIn(lookups.members, a.user_id) : "האחראי"}: "${a.title}"`;
       case "assign_owner":
         return a.mode === "user"
           ? `${label}: ${nameIn(lookups.members, a.user_id)}`
@@ -71,12 +71,12 @@ export function describeRule(
 
 export const STEP_ERRORS: Record<string, string> = {
   "the record no longer exists": "הרשומה כבר לא קיימת",
-  "nobody to notify": "אין למי לשלוח התראה (לרשומה אין בעלים)",
-  "nobody is available": "אף נציג לא זמין לסבב",
+  "nobody to notify": "אין למי לשלוח התראה (לרשומה אין אחראי)",
+  "nobody is available": "אף חבר צוות לא זמין לסבב",
   "the user is not an active member": "המשתמש כבר לא פעיל",
   "the team no longer exists": "הצוות נמחק",
   "the tag no longer exists": "התגית נמחקה",
   "the status no longer exists": "הסטטוס נמחק",
-  "the stage is not in this deal's pipeline": "השלב לא שייך לפייפליין של העסקה",
+  "the stage is not in this deal's pipeline": "השלב לא שייך לתהליך המכירה של העסקה",
   "daily limit for this record reached": "הגיע למגבלה של 20 הרצות ביום לרשומה",
 };

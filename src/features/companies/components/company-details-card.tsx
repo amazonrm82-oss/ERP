@@ -68,7 +68,7 @@ export function CompanyDetailsCard({ orgId, company, canEdit }: Props) {
           />
           <Detail label="עיר" value={company.city} />
           <Detail label="כתובת" value={company.address_line} />
-          <Detail label="בעלים" value={company.ownerName} />
+          <Detail label="אחראי" value={company.ownerName} />
           <Detail label="נוצר" value={company.createdAtText} />
           <CustomFieldDetails definitions={company.custom.definitions} values={company.custom.values} />
         </DetailList>

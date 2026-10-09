@@ -67,7 +67,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
       label: "לידים ואוטומציות",
       sections: access.admin
         ? [
-            { href: paths.settingsIntake(orgId), label: "קליטת לידים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon },
+            { href: paths.settingsIntake(orgId), label: "טפסים וחיבורים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon },
             { href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon },
           ]
         : [],

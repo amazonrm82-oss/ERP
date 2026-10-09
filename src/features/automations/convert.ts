@@ -43,7 +43,7 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
     if (option.input === "source" && !has(lookups.sources, value)) return "המקור שנבחר כבר לא קיים.";
     if (option.input === "status" && !has(lookups.statuses, value)) return "הסטטוס שנבחר כבר לא קיים.";
     if (option.input === "tag" && !has(lookups.tags, value)) return "התגית שנבחרה כבר לא קיימת.";
-    if (option.input === "pipeline" && !has(lookups.pipelines, value)) return "הפייפליין שנבחר כבר לא קיים.";
+    if (option.input === "pipeline" && !has(lookups.pipelines, value)) return "תהליך המכירה שנבחר כבר לא קיים.";
     if (option.input === "shekels") {
       const shekels = Number(String(value).replace(/[,\s₪]/g, ""));
       if (!Number.isFinite(shekels) || shekels < 0) return "יש להזין סכום תקין בתנאי.";

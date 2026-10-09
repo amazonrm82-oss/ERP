@@ -47,7 +47,7 @@ export async function createPipelineAction(orgId: string, _prev: FormState, form
     .select("id")
     .single();
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את הפייפליין. נסו שוב."), { values: formValues(formData) });
+    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את תהליך המכירה. נסו שוב."), { values: formValues(formData) });
   }
 
   const { error: stagesError } = await context.supabase.from("stages").insert(
@@ -56,11 +56,11 @@ export async function createPipelineAction(orgId: string, _prev: FormState, form
   if (stagesError) {
     // without stages the pipeline is useless: take it back
     await context.supabase.from("pipelines").delete().eq("organization_id", orgId).eq("id", pipeline.id);
-    return fail(dbErrorMessage(stagesError, "לא הצלחנו ליצור את הפייפליין. נסו שוב."), { values: formValues(formData) });
+    return fail(dbErrorMessage(stagesError, "לא הצלחנו ליצור את תהליך המכירה. נסו שוב."), { values: formValues(formData) });
   }
 
   revalidatePipelines(orgId);
-  return { ok: true, message: "הפייפליין נוצר עם שלושה שלבים. אפשר לשנות ולהוסיף." };
+  return { ok: true, message: "תהליך המכירה נוצר עם שלושה שלבים. אפשר לשנות ולהוסיף." };
 }
 
 export async function renamePipelineAction(
@@ -146,10 +146,10 @@ export async function deletePipelineAction(orgId: string, pipelineId: string): P
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   if (pipeline.is_default) {
-    return fail("אי אפשר למחוק את פייפליין ברירת המחדל. קבעו קודם פייפליין אחר כברירת מחדל.");
+    return fail("אי אפשר למחוק את תהליך המכירה שמוגדר כברירת מחדל. קבעו קודם תהליך מכירה אחר כברירת מחדל.");
   }
   if ((count ?? 0) > 0) {
-    return fail("יש בפייפליין עסקאות. העבירו אותן או מחקו אותן לפני שמוחקים את הפייפליין.");
+    return fail("יש בתהליך המכירה עסקאות. העבירו אותן או מחקו אותן לפני שמוחקים את תהליך המכירה.");
   }
   const { data, error } = await context.supabase
     .from("pipelines")
@@ -239,7 +239,7 @@ async function stageWithCount(context: Extract<Awaited<ReturnType<typeof actionC
   return stage ? { ...stage, dealCount: count ?? 0 } : null;
 }
 
-const LAST_OPEN_STAGE = "בכל פייפליין צריך להישאר לפחות שלב פתוח אחד, כדי שיהיה לאן להכניס עסקאות חדשות.";
+const LAST_OPEN_STAGE = "בכל תהליך מכירה צריך להישאר לפחות שלב פתוח אחד, כדי שיהיה לאן להכניס עסקאות חדשות.";
 
 export async function updateStageAction(orgId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, stageId);

@@ -73,7 +73,7 @@ export function ContactDetailsCard({ orgId, contact, companies, canEdit }: Props
           />
           <Detail label="יום הולדת" value={contact.birthDateText} />
           <Detail label="מקור" value={contact.sourceName} />
-          <Detail label="בעלים" value={contact.ownerName} />
+          <Detail label="אחראי" value={contact.ownerName} />
           <Detail label="נוצר" value={contact.createdAtText} />
           <CustomFieldDetails definitions={contact.custom.definitions} values={contact.custom.values} />
         </DetailList>

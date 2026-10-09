@@ -7,7 +7,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ org
   const { orgId } = await params;
   const { role } = await getOrgContext(orgId);
   if (role !== "owner") {
-    return new Response("ייצוא מלא זמין לבעל החשבון בלבד.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    return new Response("ייצוא מלא זמין לבעלים של העסק בלבד.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
   const zip = await buildFullExport(orgId);
   return new Response(zip as unknown as BodyInit, {

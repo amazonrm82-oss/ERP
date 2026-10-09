@@ -12,14 +12,14 @@ export type ReportDefinition = {
 export const REPORTS: ReportDefinition[] = [
   { key: "sources", title: "לידים לפי מקור", description: "כמות, אחוז המרה והכנסה לכל מקור וקמפיין.", filters: ["period", "owner"] },
   { key: "funnel", title: "משפך המרה", description: "כמה עברו מכל שלב לשלב הבא, והיכן נושרים.", filters: ["period", "owner", "pipeline"] },
-  { key: "response", title: "זמן תגובה לליד", description: "זמן ממוצע עד מגע ראשון, לפי נציג.", filters: ["period", "owner"] },
-  { key: "reps", title: "ביצועי נציגים", description: "עסקאות שנסגרו, סכום ואחוז זכייה לכל נציג.", filters: ["period", "pipeline"] },
-  { key: "activity", title: "פעילות", description: "שיחות, פגישות, הודעות ומשימות לנציג וליום.", filters: ["period", "owner"] },
+  { key: "response", title: "זמן תגובה לליד", description: "זמן ממוצע עד מגע ראשון, לפי אחראי.", filters: ["period", "owner"] },
+  { key: "reps", title: "ביצועי חברי הצוות", description: "עסקאות שנסגרו, סכום ואחוז סגירה בהצלחה לכל חבר צוות.", filters: ["period", "pipeline"] },
+  { key: "activity", title: "פעילות", description: "שיחות, פגישות, הודעות ומשימות לחבר צוות וליום.", filters: ["period", "owner"] },
   { key: "forecast", title: "תחזית הכנסות", description: "שווי משוקלל של עסקאות פתוחות לפי חודש סגירה צפוי.", filters: ["owner", "pipeline"] },
   { key: "lost", title: "סיבות הפסד", description: "למה עסקאות אובדות, באיזה שלב ואצל מי.", filters: ["period", "owner", "pipeline"] },
   { key: "cycle", title: "אורך מחזור מכירה", description: "ימים מליד לסגירה, וימים בכל שלב.", filters: ["period", "owner", "pipeline"] },
   { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות בלי פעילות או בלי משימה הבאה.", filters: ["owner", "pipeline"] },
-  { key: "revenue", title: "הכנסות", description: "הכנסה שנסגרה לפי חודש, נציג ולקוח.", filters: ["period", "owner", "pipeline"] },
+  { key: "revenue", title: "הכנסות", description: "הכנסה שנסגרה לפי חודש, אחראי ולקוח.", filters: ["period", "owner", "pipeline"] },
 ];
 
 export function findReport(key: string): ReportDefinition | undefined {

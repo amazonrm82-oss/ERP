@@ -60,7 +60,7 @@ const FORMATS: Option[] = [
   { value: "csv", label: "CSV" },
 ];
 const KIND_LABELS: Record<Kind, string> = {
-  owner: "שינוי בעלים",
+  owner: "שינוי אחראי",
   status: "שינוי סטטוס",
   stage: "שינוי שלב",
   tag: "הוספת תגית",
@@ -120,7 +120,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   const plural = RECORD_TYPES[object].plural;
   const feminine = object === "company" || object === "deal" || object === "task";
   const many = count === 1 ? `${RECORD_TYPES[object].singular} ${feminine ? "אחת" : "אחד"}` : `${count} ${plural}`;
-  const chosen = value === NO_OWNER ? "ללא בעלים" : (options.find((o) => o.value === value)?.label ?? "");
+  const chosen = value === NO_OWNER ? "ללא אחראי" : (options.find((o) => o.value === value)?.label ?? "");
   const actionText =
     kind === "owner"
       ? `העברת ${many} ל${chosen}`
@@ -251,7 +251,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                     kind === "owner"
                       ? object === "task"
                         ? "אחראי חדש"
-                        : "בעלים חדש"
+                        : "אחראי חדש"
                       : kind === "status"
                         ? object === "task"
                           ? "מצב חדש"
@@ -270,7 +270,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                   }}
                 >
                   <option value="">בחירה</option>
-                  {kind === "owner" ? <option value={NO_OWNER}>ללא בעלים</option> : null}
+                  {kind === "owner" ? <option value={NO_OWNER}>ללא אחראי</option> : null}
                   {options.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}

@@ -28,7 +28,7 @@ type Lookups = {
 
 /** Every field a list can be filtered by, with the choices for list-like fields. */
 export function filterFields(object: FilterObject, lookups: Lookups): ServerField[] {
-  const owner: ServerField = { key: "owner", label: "בעלים", kind: "user", column: "owner_id", options: [{ value: "me", label: "אני" }, ...lookups.members] };
+  const owner: ServerField = { key: "owner", label: "אחראי", kind: "user", column: "owner_id", options: [{ value: "me", label: "אני" }, ...lookups.members] };
   const tag: ServerField = { key: "tag", label: "תגית", kind: "tag", column: "tag_ids", options: lookups.tags };
   const created: ServerField = { key: "created", label: "תאריך יצירה", kind: "date", column: "created_at" };
   const lastContact: ServerField = { key: "last_contact", label: "מגע אחרון", kind: "date", column: "last_contacted_at" };
@@ -58,7 +58,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
       owner,
       tag,
-      { key: "birthday", label: "תאריך לידה", kind: "day", column: "birth_date" },
+      { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
       created,
       lastContact,
     ],
@@ -67,7 +67,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("phone", "טלפון", "phone"),
       text("email", "אימייל", "email"),
       text("city", "עיר", "city"),
-      text("industry", "תחום", "industry"),
+      text("industry", "ענף", "industry"),
       text("tax_id", "ח.פ.", "tax_id"),
       text("website", "אתר", "website"),
       owner,
