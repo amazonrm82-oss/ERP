@@ -53,7 +53,7 @@ export default async function InvitePage({ params }: Props) {
           </p>
         ) : preview.alreadyMember ? (
           <p className="mt-4">
-            כבר יש לך גישה לעסק הזה.{" "}
+            כבר יש לכם גישה לעסק הזה.{" "}
             <Link href={paths.home} className="text-accent-strong underline underline-offset-4">
               כניסה לעסק
             </Link>

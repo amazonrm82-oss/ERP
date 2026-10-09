@@ -53,7 +53,7 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
                   {canWrite && (file.uploadedBy === userId || isAdmin) ? (
                     <ActionButton
                       action={deleteFileAction.bind(null, orgId, subject, file.id)}
-                      pendingText="מוחק…"
+                      pendingText="מוחקים…"
                       variant="danger-ghost"
                       srLabel={file.name}
                       confirm="למחוק את הקובץ? אי אפשר לשחזר."

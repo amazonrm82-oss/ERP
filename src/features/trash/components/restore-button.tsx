@@ -24,7 +24,7 @@ export function RestoreButton({ orgId, table, id, name }: { orgId: string; table
   return (
     <span className="flex shrink-0 flex-col items-end gap-1">
       <Button variant="secondary" size="sm" onClick={restore} disabled={pending} aria-busy={pending || undefined}>
-        {pending ? "משחזר…" : "שחזור"}
+        {pending ? "משחזרים…" : "שחזור"}
         <span className="sr-only">: {name}</span>
       </Button>
       {error ? (

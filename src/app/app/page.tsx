@@ -44,7 +44,7 @@ export default async function RootPage() {
       </header>
       <main className="mx-auto w-full max-w-md px-5 pt-6 pb-16 sm:pt-12">
         <h1 className="text-2xl font-semibold">לאיזה עסק להיכנס?</h1>
-        <p className="mt-1 mb-6 text-ink-soft">החשבון שלך משויך לכמה עסקים.</p>
+        <p className="mt-1 mb-6 text-ink-soft">החשבון שלכם משויך לכמה עסקים.</p>
         <ul className="divide-y divide-line rounded-lg border border-line">
           {organizations.map((org) => (
             <li key={org.id}>

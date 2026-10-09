@@ -86,7 +86,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
             </Button>
           )}
           <Button variant="secondary" size="sm" onClick={toggle} disabled={pending} aria-busy={pending || undefined}>
-            {pending ? "מעדכן…" : task.done ? "החזרה לפתוחות" : "בוצע"}
+            {pending ? "מעדכנים…" : task.done ? "החזרה לפתוחות" : "בוצע"}
             <span className="sr-only">: {task.title}</span>
           </Button>
         </div>

@@ -300,7 +300,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 // export changes nothing, so it runs at once; every change is asked first
                 onClick={() => (kind === "export" ? run() : setConfirming(true))}
               >
-                {pending ? "מעדכן…" : actionText || `ביצוע על ${count}`}
+                {pending ? "מעדכנים…" : actionText || `ביצוע על ${count}`}
               </Button>
             ) : null}
             <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPicked(new Set())}>

@@ -91,7 +91,7 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         <Row>
           <Button size="sm">קטן</Button>
           <Button disabled>מושבת</Button>
-          <Button loading>שומר…</Button>
+          <Button loading>שומרים…</Button>
           <Button variant="secondary" loading>
             טוען
           </Button>

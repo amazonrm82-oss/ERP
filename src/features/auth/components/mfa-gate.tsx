@@ -119,7 +119,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
   return (
     <div className="mx-auto max-w-md space-y-4 rounded-lg border border-line bg-surface p-5">
       <h1 className="text-xl font-semibold">אימות דו-שלבי</h1>
-      {step.kind === "loading" && !error ? <p role="status">טוען…</p> : null}
+      {step.kind === "loading" && !error ? <p role="status">טוענים…</p> : null}
       {step.kind === "enroll" ? (
         <>
           <p className="text-md">
@@ -165,7 +165,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
             required
           />
           <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
-            {busy ? "בודק…" : "כניסה עם קוד גיבוי"}
+            {busy ? "בודקים…" : "כניסה עם קוד גיבוי"}
           </Button>
         </form>
       ) : null}
@@ -189,7 +189,7 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
             required
           />
           <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
-            {busy ? "בודק…" : "אימות"}
+            {busy ? "בודקים…" : "אימות"}
           </Button>
         </form>
       ) : null}

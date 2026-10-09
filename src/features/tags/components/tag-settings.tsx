@@ -28,7 +28,7 @@ export function CreateTagForm({ orgId }: { orgId: string }) {
         defaultValue={failure?.values?.name}
         error={failure?.fieldErrors?.name ?? (failure && !failure.fieldErrors ? failure.message : undefined)}
       />
-      <SubmitButton size="sm" pendingText="מוסיף…">
+      <SubmitButton size="sm" pendingText="מוסיפים…">
         הוספת תגית
       </SubmitButton>
     </form>
@@ -73,7 +73,7 @@ function TagRow({ orgId, tag, editable }: { orgId: string; tag: TagOption; edita
       </form>
       <ActionButton
         action={deleteTagAction.bind(null, orgId, tag.id)}
-        pendingText="מוחק…"
+        pendingText="מוחקים…"
         variant="danger-ghost"
         confirm={`למחוק את התגית "${tag.name}"? היא תוסר מכל הרשומות.`}
       >

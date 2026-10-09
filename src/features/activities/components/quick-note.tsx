@@ -31,7 +31,7 @@ export function QuickNote({ orgId, subject, className }: { orgId: string; subjec
         error={failure?.fieldErrors?.body}
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <SubmitButton size="sm" pendingText="שומר…">
+        <SubmitButton size="sm" pendingText="שומרים…">
           שמירת ההערה
         </SubmitButton>
         <FormNotice message={state?.ok ? "ההערה נשמרה בציר הזמן." : null} className="py-1.5" />

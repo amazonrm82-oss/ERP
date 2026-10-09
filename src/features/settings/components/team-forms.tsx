@@ -35,7 +35,7 @@ export function CreateTeamForm({ orgId }: { orgId: string }) {
         defaultValue={failure?.values?.name}
         error={failure?.fieldErrors?.name ?? (failure && !failure.fieldErrors ? failure.message : undefined)}
       />
-      <SubmitButton className="sm:mt-6.5" pendingText="יוצר…">
+      <SubmitButton className="sm:mt-6.5" pendingText="יוצרים…">
         יצירת צוות
       </SubmitButton>
     </form>
@@ -93,7 +93,7 @@ export function AddTeamMemberForm({ orgId, teamId, candidates }: { orgId: string
         <input type="checkbox" name="is_manager" className="mt-1 size-4 accent-accent" />
         <span>מנהל הצוות (רואה ועורך את רשומות הצוות, אם התפקיד שלו &quot;מנהל צוות&quot;)</span>
       </label>
-      <SubmitButton size="sm" pendingText="מוסיף…">
+      <SubmitButton size="sm" pendingText="מוסיפים…">
         הוספה לצוות
       </SubmitButton>
     </form>
@@ -219,7 +219,7 @@ export function DeleteTeamButton({ orgId, teamId, teamName }: { orgId: string; t
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={confirm} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "מוחק…" : "מחיקת הצוות"}
+          {pending ? "מוחקים…" : "מחיקת הצוות"}
         </Button>
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
           לא עכשיו

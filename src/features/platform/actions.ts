@@ -18,7 +18,7 @@ const ORG_STATUSES = ["trial", "active", "past_due", "read_only", "suspended", "
 
 /** Errors of the platform functions in plain Hebrew. */
 function platformError(error: { code?: string; hint?: string; message?: string }): string {
-  if (error.code === "42501") return "אין לך הרשאה לפעולה הזו, או שהאימות הדו-שלבי פג. התחברו מחדש ונסו שוב.";
+  if (error.code === "42501") return "אין לכם הרשאה לפעולה הזו, או שהאימות הדו-שלבי פג. התחברו מחדש ונסו שוב.";
   if (error.hint === "platform:last_owner") return "אי אפשר להסיר את בעל הפלטפורמה האחרון.";
   if (error.code === "P0002") return error.message?.includes("email") ? "אין משתמש עם האימייל הזה. הוא צריך להירשם קודם." : "לא נמצא.";
   if (error.code === "22023") return "הנתונים אינם תקינים. בדקו את השדות ונסו שוב.";

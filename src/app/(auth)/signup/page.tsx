@@ -24,7 +24,7 @@ export default async function SignupPage({ searchParams }: Props) {
       </p>
       <SignupForm next={next} />
       <p className="mt-6 text-md text-ink-soft">
-        כבר יש לך חשבון?{" "}
+        כבר יש לכם חשבון?{" "}
         <Link href={loginHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
           כניסה
         </Link>

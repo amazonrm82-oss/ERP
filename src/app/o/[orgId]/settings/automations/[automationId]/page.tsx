@@ -66,7 +66,7 @@ export default async function AutomationPage({ params }: Props) {
                 <Link href={paths.settingsAutomationEdit(orgId, automation.id)} className={buttonClasses("secondary", "sm")}>
                   עריכה
                 </Link>
-                <ActionButton action={setAutomationActiveAction.bind(null, orgId, automation.id, !automation.isActive)} pendingText="מעדכן…">
+                <ActionButton action={setAutomationActiveAction.bind(null, orgId, automation.id, !automation.isActive)} pendingText="מעדכנים…">
                   {automation.isActive ? "כיבוי" : "הפעלה"}
                 </ActionButton>
               </span>
@@ -153,7 +153,7 @@ export default async function AutomationPage({ params }: Props) {
       {canWrite ? (
         <ActionButton
           action={deleteAutomationAction.bind(null, orgId, automation.id)}
-          pendingText="מוחק…"
+          pendingText="מוחקים…"
           variant="danger-ghost"
           confirm={`למחוק את האוטומציה "${automation.name}" ואת היומן שלה?`}
         >

@@ -25,7 +25,7 @@ export function ContactForm({ orgId, companies, fields }: { orgId: string; compa
       <ContactFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} companies={companies} />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} />
       <div className="flex flex-wrap gap-2 pt-1">
-        <SubmitButton pendingText="יוצר איש קשר…">יצירת איש קשר</SubmitButton>
+        <SubmitButton pendingText="יוצרים איש קשר…">יצירת איש קשר</SubmitButton>
         <ButtonLink href={paths.contacts(orgId)} variant="ghost">
           ביטול
         </ButtonLink>

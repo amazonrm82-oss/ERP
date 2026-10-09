@@ -37,7 +37,7 @@ export function AvailabilityToggle({ orgId, userId, available }: Props) {
           className="size-4.5 accent-accent"
         />
       </label>
-      {value ? null : <p className="mt-1 text-sm text-ink-soft">לידים חדשים בסבב לא יגיעו אליך.</p>}
+      {value ? null : <p className="mt-1 text-sm text-ink-soft">לידים חדשים בסבב לא יגיעו אליכם.</p>}
       {error ? (
         <p role="alert" className="mt-1 text-sm text-danger">
           {error}

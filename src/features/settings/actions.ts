@@ -219,7 +219,7 @@ export async function transferOwnershipAction(orgId: string, _prev: FormState, f
     return fail(dbErrorMessage(error, "לא הצלחנו להעביר את הבעלות. נסו שוב."));
   }
   revalidatePath(paths.org(orgId), "layout");
-  return { ok: true, message: "הבעלות הועברה. התפקיד שלך עכשיו: מנהל מערכת." };
+  return { ok: true, message: "הבעלות הועברה. התפקיד שלכם עכשיו: מנהל מערכת." };
 }
 
 // ---------------------------------------------------------------------------

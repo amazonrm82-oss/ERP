@@ -8,7 +8,7 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /** The one announcement for a loading screen, around its shape. */
-function Loading({ label = "טוען…", children }: { label?: string; children: ReactNode }) {
+function Loading({ label = "טוענים…", children }: { label?: string; children: ReactNode }) {
   return (
     <div role="status" aria-live="polite">
       <span className="sr-only">{label}</span>

@@ -89,21 +89,21 @@ function StatusRow({ orgId, status, editable, isFirst, isLast }: StatusRowProps)
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
         {status.isDefault ? <Badge tone="accent">ברירת מחדל לליד חדש</Badge> : null}
         <span>{status.leadCount === 1 ? "ליד אחד" : `${status.leadCount} לידים`}</span>
-        <ActionButton action={moveStatusAction.bind(null, orgId, status.id, "up")} pendingText="מזיז…" variant="ghost" srLabel={status.name} disabled={isFirst}>
+        <ActionButton action={moveStatusAction.bind(null, orgId, status.id, "up")} pendingText="מזיזים…" variant="ghost" srLabel={status.name} disabled={isFirst}>
           הזזה למעלה
         </ActionButton>
-        <ActionButton action={moveStatusAction.bind(null, orgId, status.id, "down")} pendingText="מזיז…" variant="ghost" srLabel={status.name} disabled={isLast}>
+        <ActionButton action={moveStatusAction.bind(null, orgId, status.id, "down")} pendingText="מזיזים…" variant="ghost" srLabel={status.name} disabled={isLast}>
           הזזה למטה
         </ActionButton>
         {status.isDefault || status.kind !== "open" ? null : (
-          <ActionButton action={setDefaultStatusAction.bind(null, orgId, status.id)} pendingText="מעדכן…" variant="ghost" srLabel={status.name}>
+          <ActionButton action={setDefaultStatusAction.bind(null, orgId, status.id)} pendingText="מעדכנים…" variant="ghost" srLabel={status.name}>
             קביעה כברירת מחדל
           </ActionButton>
         )}
         {status.isDefault ? null : (
           <ActionButton
             action={deleteStatusAction.bind(null, orgId, status.id)}
-            pendingText="מוחק…"
+            pendingText="מוחקים…"
             variant="danger-ghost"
             confirm={`למחוק את הסטטוס "${status.name}"?`}
           >
@@ -141,7 +141,7 @@ export function AddStatusForm({ orgId }: { orgId: string }) {
             </option>
           ))}
         </SelectField>
-        <SubmitButton size="sm" pendingText="מוסיף…">
+        <SubmitButton size="sm" pendingText="מוסיפים…">
           הוספת סטטוס
         </SubmitButton>
       </div>
@@ -195,7 +195,7 @@ function SourceRow({ orgId, source, editable }: { orgId: string; source: SourceS
       </form>
       <span className="flex items-center gap-2">
         {source.isActive ? null : <Badge>מוסתר</Badge>}
-        <ActionButton action={setSourceActiveAction.bind(null, orgId, source.id, !source.isActive)} pendingText="מעדכן…" variant="ghost" srLabel={source.name}>
+        <ActionButton action={setSourceActiveAction.bind(null, orgId, source.id, !source.isActive)} pendingText="מעדכנים…" variant="ghost" srLabel={source.name}>
           {source.isActive ? "הסתרה" : "הצגה"}
         </ActionButton>
       </span>
@@ -221,7 +221,7 @@ export function AddSourceForm({ orgId }: { orgId: string }) {
         defaultValue={failure?.values?.name}
         error={failure?.fieldErrors?.name ?? (failure && !failure.fieldErrors ? failure.message : undefined)}
       />
-      <SubmitButton size="sm" pendingText="מוסיף…">
+      <SubmitButton size="sm" pendingText="מוסיפים…">
         הוספת מקור
       </SubmitButton>
     </form>

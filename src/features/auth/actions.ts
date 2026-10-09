@@ -24,7 +24,7 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
-    return fail(authErrorMessage(error, "לא הצלחנו לחבר אותך. נסו שוב."), { values: formValues(formData) });
+    return fail(authErrorMessage(error, "לא הצלחנו לחבר אתכם. נסו שוב."), { values: formValues(formData) });
   }
 
   const next = safeNextPath(formData.get("next")?.toString());

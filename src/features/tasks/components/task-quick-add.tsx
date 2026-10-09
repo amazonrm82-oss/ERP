@@ -35,7 +35,7 @@ export function TaskQuickAdd({ orgId, today }: { orgId: string; today: string })
           defaultValue={failure?.values?.due_date ?? today}
           className="flex-[0_1_9.5rem]"
         />
-        <SubmitButton variant="secondary" pendingText="מוסיף…">
+        <SubmitButton variant="secondary" pendingText="מוסיפים…">
           הוספה
         </SubmitButton>
       </div>

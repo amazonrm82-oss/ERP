@@ -31,7 +31,7 @@ export function GoogleButton({ next }: { next: string }) {
           }
         }}
       >
-        {busy ? "מעביר ל-Google…" : "כניסה עם Google"}
+        {busy ? "מעבירים ל-Google…" : "כניסה עם Google"}
       </Button>
       {error ? (
         <p role="alert" className="text-sm text-danger">

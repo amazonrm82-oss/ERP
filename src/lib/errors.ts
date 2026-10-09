@@ -13,12 +13,12 @@ type ErrorLike = {
 
 export const GENERIC_ERROR = "משהו השתבש. נסו שוב בעוד רגע.";
 export const NETWORK_ERROR = "אין חיבור לשרת כרגע. בדקו את החיבור לאינטרנט ונסו שוב.";
-export const NO_PERMISSION = "אין לך הרשאה לבצע את הפעולה הזו.";
-export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לך גישה אליה.";
+export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו.";
+export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה.";
 export const SESSION_EXPIRED = "החיבור פג. יש להתחבר מחדש.";
 // An UPDATE that RLS filters out succeeds with zero rows, so "nothing changed"
 // means either "not found" or "not allowed"; the database does not say which.
-export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לך הרשאה לערוך אותה.";
+export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לכם הרשאה לערוך אותה.";
 
 const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_records": "הגעתם למספר הרשומות המרבי בחבילה. אפשר לפנות מקום, או לבקש מבעלי העסק חבילה גדולה יותר. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",

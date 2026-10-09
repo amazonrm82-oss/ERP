@@ -29,7 +29,7 @@ export function ForgotPasswordForm() {
         defaultValue={failure?.values?.email}
         error={failure?.fieldErrors?.email}
       />
-      <SubmitButton pendingText="שולח…" className="w-full">
+      <SubmitButton pendingText="שולחים…" className="w-full">
         שליחת קישור
       </SubmitButton>
     </form>

@@ -48,7 +48,7 @@ export const FEATURES: Feature[] = [
   // the three flags of chapter 18.2: shown only as "soon" until each one works
   { key: "whatsapp", status: "soon", icon: ChatIcon, title: "אף ליד לא מתפספס, והכול ב-WhatsApp", text: "מענה לליד חדש בתוך דקות, ועדכון המערכת מתוך WhatsApp." },
   { key: "ads", status: "soon", icon: ChartIcon, title: "הפרסום לומד מהמכירות", text: "החזרה לפייסבוק ולגוגל של מי מהלידים נסגר, כדי שהפרסום יביא עוד כאלה." },
-  { key: "money", status: "soon", icon: BoardIcon, title: "כמה כסף מחכה לך", text: "מספר אחד בשקלים כל בוקר, ולכל שורה בו פעולה אחת." },
+  { key: "money", status: "soon", icon: BoardIcon, title: "כמה כסף מחכה לכם", text: "מספר אחד בשקלים כל בוקר, ולכל שורה בו פעולה אחת." },
 ];
 
 export const LIVE_FEATURES = FEATURES.filter((feature) => feature.status === "live");

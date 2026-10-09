@@ -24,7 +24,7 @@ export function CompanyForm({ orgId, fields }: { orgId: string; fields: FieldDef
       <CompanyFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} />
       <div className="flex flex-wrap gap-2 pt-1">
-        <SubmitButton pendingText="יוצר חברה…">יצירת חברה</SubmitButton>
+        <SubmitButton pendingText="יוצרים חברה…">יצירת חברה</SubmitButton>
         <ButtonLink href={paths.companies(orgId)} variant="ghost">
           ביטול
         </ButtonLink>

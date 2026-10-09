@@ -14,7 +14,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <FormError message={failure?.message} />
-      <SubmitButton pendingText="מצטרף…" className="w-full">
+      <SubmitButton pendingText="מצטרפים…" className="w-full">
         הצטרפות לעסק
       </SubmitButton>
     </form>

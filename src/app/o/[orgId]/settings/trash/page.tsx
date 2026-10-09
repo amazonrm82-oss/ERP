@@ -77,7 +77,7 @@ export default async function TrashPage({ params }: Props) {
                   {canPurge ? (
                     <ActionButton
                       action={purgeRecordAction.bind(null, orgId, record.table, record.id)}
-                      pendingText="מוחק…"
+                      pendingText="מוחקים…"
                       variant="danger-ghost"
                       srLabel={record.name}
                       confirm="למחוק לצמיתות? אי אפשר לשחזר. הערות ומשימות שקשורות רק לרשומה הזו יימחקו איתה."

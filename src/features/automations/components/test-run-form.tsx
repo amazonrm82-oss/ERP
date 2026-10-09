@@ -31,7 +31,7 @@ export function TestRunForm({ orgId, automationId, records }: Props) {
             </option>
           ))}
         </SelectField>
-        <SubmitButton variant="secondary" pendingText="מריץ…">
+        <SubmitButton variant="secondary" pendingText="מריצים…">
           הרצה אמיתית על הרשומה
         </SubmitButton>
       </div>

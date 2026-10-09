@@ -62,7 +62,7 @@ export function MergeForm({ orgId, type, keep, dup }: Props) {
         <p className="mt-1 text-sm text-ink-soft">אי אפשר לבטל מיזוג. כל הפרטים של הרשומה שנמחקת נשמרים ביומן הביקורת.</p>
       </div>
       {/* FXU-07: it cannot be undone, so it looks like it */}
-      <SubmitButton variant="danger" pendingText="ממזג…">
+      <SubmitButton variant="danger" pendingText="ממזגים…">
         מיזוג הרשומות
       </SubmitButton>
     </form>

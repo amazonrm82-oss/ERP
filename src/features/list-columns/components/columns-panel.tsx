@@ -122,7 +122,7 @@ export function ColumnsPanel({ orgId, object, catalog, columns, saved }: Props) 
           <FormError message={error} className="mt-2" />
           <div className="mt-3 flex flex-wrap gap-2">
             <Button onClick={save} disabled={pending} aria-busy={pending || undefined}>
-              {pending ? "שומר…" : "שמירת העמודות"}
+              {pending ? "שומרים…" : "שמירת העמודות"}
             </Button>
             {saved ? (
               <Button variant="ghost" onClick={reset} disabled={pending}>

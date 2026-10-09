@@ -45,7 +45,7 @@ export function TransferRecordsForm({ orgId, fromUserId, fromName, total, candid
           </option>
         ))}
       </SelectField>
-      <SubmitButton pendingText="מעביר…">העברת כל הרשומות</SubmitButton>
+      <SubmitButton pendingText="מעבירים…">העברת כל הרשומות</SubmitButton>
     </form>
   );
 }

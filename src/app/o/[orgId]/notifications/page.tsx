@@ -30,7 +30,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
         description="הקצאות, פניות חוזרות, תזכורות למשימות והודעות מאוטומציות."
         actions={
           hasUnread ? (
-            <ActionButton action={markNotificationsReadAction.bind(null, orgId, null)} pendingText="מסמן…">
+            <ActionButton action={markNotificationsReadAction.bind(null, orgId, null)} pendingText="מסמנים…">
               סימון הכל כנקרא
             </ActionButton>
           ) : null
@@ -40,7 +40,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
         <Card aria-labelledby="notifications-list">
           <CardHeader id="notifications-list" title="אחרונות" />
           {items.length === 0 ? (
-            <EmptyState icon={<BellIcon />} title="אין התראות" description="כשליד או משימה יוקצו לך, או כשתגיע תזכורת, זה יופיע כאן." />
+            <EmptyState icon={<BellIcon />} title="אין התראות" description="כשליד או משימה יוקצו לכם, או כשתגיע תזכורת, זה יופיע כאן." />
           ) : (
             // key: a fresh list after "mark all read"
             <NotificationList key={items.map((item) => `${item.id}${item.read ? 1 : 0}`).join()} orgId={orgId} items={items} />

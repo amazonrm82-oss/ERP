@@ -37,9 +37,9 @@ export function NotificationSettingsForm({ orgId, settings }: { orgId: string; s
         ))}
       </div>
       <p className="text-sm text-ink-soft">
-        הבחירה חלה בכל העסקים שלך. התראות אבטחה (כמו איפוס אימות דו-שלבי) מגיעות תמיד. כדי לקבל התראות בטלפון צריך גם להפעיל אותן בדף ההתראות, בכל מכשיר.
+        הבחירה חלה בכל העסקים שלכם. התראות אבטחה (כמו איפוס אימות דו-שלבי) מגיעות תמיד. כדי לקבל התראות בטלפון צריך גם להפעיל אותן בדף ההתראות, בכל מכשיר.
       </p>
-      <SubmitButton pendingText="שומר…" pending={pending}>
+      <SubmitButton pendingText="שומרים…" pending={pending}>
         שמירת ההעדפות
       </SubmitButton>
     </form>

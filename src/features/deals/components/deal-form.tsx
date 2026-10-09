@@ -104,7 +104,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
       </div>
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
       <div className="flex flex-wrap gap-2 pt-1">
-        <SubmitButton pendingText="יוצר עסקה…">יצירת עסקה</SubmitButton>
+        <SubmitButton pendingText="יוצרים עסקה…">יצירת עסקה</SubmitButton>
         <ButtonLink href={paths.deals(orgId)} variant="ghost">
           ביטול
         </ButtonLink>

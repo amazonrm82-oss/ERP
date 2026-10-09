@@ -301,7 +301,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
           </fieldset>
           <div className="flex flex-wrap gap-2">
             <Button onClick={check} disabled={busy || mappedCount === 0} aria-busy={busy || undefined}>
-              {busy ? "בודק…" : "בדיקת 20 השורות הראשונות"}
+              {busy ? "בודקים…" : "בדיקת 20 השורות הראשונות"}
             </Button>
             <Button variant="ghost" onClick={reset}>
               קובץ אחר
@@ -350,7 +350,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
         <div className="space-y-4 rounded-lg border border-line bg-surface p-4 sm:p-5">
           <div>
             <p className="mb-1.5 text-md">
-              {step === "running" ? "מייבא… אל תסגרו את הדף עד הסוף." : stopped ? "הייבוא נעצר." : "הייבוא הסתיים."} {formatNumber(progress)} מתוך {formatNumber(sheet.rows.length)} שורות.
+              {step === "running" ? "מייבאים… אל תסגרו את הדף עד הסוף." : stopped ? "הייבוא נעצר." : "הייבוא הסתיים."} {formatNumber(progress)} מתוך {formatNumber(sheet.rows.length)} שורות.
             </p>
             <div role="progressbar" aria-label="התקדמות הייבוא" aria-valuemin={0} aria-valuemax={sheet.rows.length} aria-valuenow={progress} className="h-2.5 rounded-full bg-canvas">
               <div className="h-2.5 rounded-full bg-accent transition-[width]" style={{ width: `${(progress / sheet.rows.length) * 100}%` }} />

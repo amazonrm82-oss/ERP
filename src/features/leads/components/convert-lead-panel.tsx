@@ -96,7 +96,7 @@ export function ConvertLeadPanel({ orgId, leadId, defaultDealName, hasCompany }:
         </>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <SubmitButton size="sm" pending={pending} pendingText="ממיר…">
+        <SubmitButton size="sm" pending={pending} pendingText="ממירים…">
           המרה
         </SubmitButton>
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>

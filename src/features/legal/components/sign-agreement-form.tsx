@@ -57,7 +57,7 @@ export function SignAgreementForm({ next, defaultName }: { next: string; default
         <input type="checkbox" name="agree" className="mt-1 size-4 shrink-0" required />
         <span>קראתי את תנאי השימוש, מדיניות הפרטיות והסכם עיבוד המידע, ואני מסכים/ה להם. החתימה האלקטרונית שלי מחייבת כמו חתימה בכתב יד.</span>
       </label>
-      <SubmitButton pendingText="שומר…" className="w-full sm:w-auto">
+      <SubmitButton pendingText="שומרים…" className="w-full sm:w-auto">
         חתימה והמשך
       </SubmitButton>
     </form>

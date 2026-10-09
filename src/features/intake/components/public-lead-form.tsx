@@ -87,7 +87,7 @@ export function PublicLeadForm({ token, fields, submitLabel }: Props) {
           <input type="text" name={HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" />
         </label>
       </div>
-      <SubmitButton pending={pending} pendingText="שולח…" className="w-full">
+      <SubmitButton pending={pending} pendingText="שולחים…" className="w-full">
         {submitLabel}
       </SubmitButton>
     </form>

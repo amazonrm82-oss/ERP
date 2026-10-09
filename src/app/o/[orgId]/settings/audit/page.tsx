@@ -118,7 +118,7 @@ export default async function AuditPage({ params, searchParams }: Props) {
                     {canWrite ? (
                       <ActionButton
                         action={eraseFromAuditAction.bind(null, orgId, c.entityType, c.entityId)}
-                        pendingText="מוחק…"
+                        pendingText="מוחקים…"
                         variant="danger-ghost"
                         srLabel={c.name ?? undefined}
                         confirm="למחוק את הפרטים של הרשומה הזו מהיומן? אי אפשר לשחזר אותם."

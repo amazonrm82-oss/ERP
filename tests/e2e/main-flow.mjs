@@ -336,7 +336,7 @@ try {
 
   step("invite link opened again by the member -> already in");
   await invitee.goto(inviteLink);
-  await expectText(invitee, "כבר יש לך גישה לעסק הזה");
+  await expectText(invitee, "כבר יש לכם גישה לעסק הזה");
   if (await invitee.getByRole("button", { name: "הצטרפות לעסק" }).count()) throw new Error("a used invitation still offers to join");
 
   step("plan and usage: the owner sees the plan and each limit, a member is sent to the owner (FXU-04)");
@@ -1163,7 +1163,7 @@ try {
   await invitee.goto(orgUrl);
   await invitee.getByRole("button", { name: /דנה חברה/ }).click();
   await invitee.getByRole("switch", { name: "זמין לקבלת לידים" }).uncheck();
-  await expectText(invitee, "לידים חדשים בסבב לא יגיעו אליך");
+  await expectText(invitee, "לידים חדשים בסבב לא יגיעו אליכם");
   // the switch answers at once; wait until the server has saved it before sending leads
   for (let i = 0; i < 40; i++) {
     const [{ available }] = await sql(
@@ -1621,7 +1621,7 @@ try {
   const ownerSecret = (await ownerDesk.locator("code").first().innerText()).trim();
   await ownerDesk.getByLabel("קוד אימות").fill(await freshTotp(ownerSecret));
   await ownerDesk.getByRole("button", { name: "אימות", exact: true }).click();
-  await expectText(ownerDesk, "אימות דו-שלבי פעיל בחשבון שלך");
+  await expectText(ownerDesk, "אימות דו-שלבי פעיל בחשבון שלכם");
   await shot(ownerDesk, "110-account-1280");
   await ownerDesk.goto(`${orgUrl}/settings/business`);
   await ownerDesk.getByRole("button", { name: "חיוב אימות דו-שלבי לכולם" }).click();
@@ -1677,7 +1677,7 @@ try {
 
   step("security: backup codes; a lost phone gets in with one and sets up a new authenticator");
   await ownerDesk.goto(`${orgUrl}/settings/account`);
-  await expectText(ownerDesk, "אין לך קודי גיבוי");
+  await expectText(ownerDesk, "אין לכם קודי גיבוי");
   await ownerDesk.getByRole("button", { name: "יצירת קודי גיבוי" }).click();
   const codeList = ownerDesk.getByRole("list", { name: "קודי גיבוי" });
   await codeList.waitFor();
@@ -1707,8 +1707,8 @@ try {
   await lost.getByRole("button", { name: "אימות", exact: true }).click();
   await lost.waitForURL((url) => url.pathname.startsWith("/o/"), { timeout: 30000 });
   await lost.goto(`${orgUrl}/settings/account`);
-  await expectText(lost, "אימות דו-שלבי פעיל בחשבון שלך");
-  await expectText(lost, "אין לך קודי גיבוי");
+  await expectText(lost, "אימות דו-שלבי פעיל בחשבון שלכם");
+  await expectText(lost, "אין לכם קודי גיבוי");
   await lost.goto(`${orgUrl}/settings/audit?entity=memberships`);
   await expectText(lost, "כניסה עם קוד גיבוי");
   // using a code signs out every other device

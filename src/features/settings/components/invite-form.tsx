@@ -65,7 +65,7 @@ export function InviteForm({ orgId, orgName, roles }: Props) {
           </li>
         ))}
       </ul>
-      <SubmitButton pendingText="יוצר הזמנה…">יצירת קישור הזמנה</SubmitButton>
+      <SubmitButton pendingText="יוצרים הזמנה…">יצירת קישור הזמנה</SubmitButton>
     </form>
   );
 }

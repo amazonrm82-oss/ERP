@@ -60,7 +60,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-2 font-medium">
           <span className={suspended ? "text-ink-soft" : undefined}>{member.name}</span>
-          {isMe ? <span className="text-sm font-normal text-ink-soft">(החשבון שלך)</span> : null}
+          {isMe ? <span className="text-sm font-normal text-ink-soft">(החשבון שלכם)</span> : null}
           <Badge tone={member.role === "owner" ? "accent" : "neutral"}>{ROLE_LABELS[member.role]}</Badge>
           {suspended ? <Badge tone="warning">מושבת</Badge> : null}
           {!suspended && !member.isAvailable ? <Badge>לא זמין ללידים</Badge> : null}
@@ -78,7 +78,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
           {suspended || member.role === "viewer" ? null : (
             <ActionButton
               action={setAvailabilityAction.bind(null, orgId, member.userId, !member.isAvailable)}
-              pendingText="מעדכן…"
+              pendingText="מעדכנים…"
               variant="ghost"
               srLabel={member.name}
             >
@@ -88,7 +88,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
           {hasMfa && !suspended ? (
             <ActionButton
               action={resetMemberMfaAction.bind(null, orgId, member.userId)}
-              pendingText="מאפס…"
+              pendingText="מאפסים…"
               variant="ghost"
               srLabel={member.name}
               confirm={`לאפס את האימות הדו-שלבי של ${member.name}? עשו זאת רק אחרי שווידאתם בשיחה או פנים אל פנים שהבקשה באמת ממנו. המשתמש ינותק מכל המכשירים ויגדיר אימות מחדש בכניסה הבאה.`}
@@ -140,7 +140,7 @@ function RoleForm({ orgId, member, roles }: { orgId: string; member: Member; rol
           ))}
         </Select>
         {selected !== member.role ? (
-          <SubmitButton size="sm" pending={pending} pendingText="שומר…">
+          <SubmitButton size="sm" pending={pending} pendingText="שומרים…">
             שמירה
           </SubmitButton>
         ) : null}
@@ -171,7 +171,7 @@ function StatusButton({ orgId, member }: { orgId: string; member: Member }) {
     return (
       <div className="flex flex-col gap-1">
         <Button variant="secondary" size="sm" onClick={run} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "מחזיר…" : "החזרה לפעילות"}
+          {pending ? "מחזירים…" : "החזרה לפעילות"}
           <span className="sr-only">: {member.name}</span>
         </Button>
         <FormError message={error} className="max-w-72" />
@@ -198,7 +198,7 @@ function StatusButton({ orgId, member }: { orgId: string; member: Member }) {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={run} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "משבית…" : "השבתת המשתמש"}
+          {pending ? "משביתים…" : "השבתת המשתמש"}
         </Button>
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
           לא עכשיו

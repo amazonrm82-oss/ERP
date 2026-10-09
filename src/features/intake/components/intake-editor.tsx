@@ -35,7 +35,7 @@ export function CreateIntakeForm({ orgId }: { orgId: string }) {
           <option value="form">טופס לאתר</option>
           <option value="webhook">Webhook</option>
         </SelectField>
-        <SubmitButton className="sm:mt-6.5" pendingText="יוצר…">
+        <SubmitButton className="sm:mt-6.5" pendingText="יוצרים…">
           יצירה
         </SubmitButton>
       </div>
@@ -103,7 +103,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
             name="success_message"
             maxLength={300}
             autoComplete="off"
-            placeholder="תודה! קיבלנו את הפרטים ונחזור אליך בהקדם."
+            placeholder="תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם."
             defaultValue={values?.success_message ?? intake.successMessage ?? ""}
             error={errors.success_message}
           />

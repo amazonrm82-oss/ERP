@@ -33,9 +33,9 @@ export default async function OnboardingPage({ searchParams }: Props) {
         <SignOutButton />
       </header>
       <main className="mx-auto w-full max-w-md px-5 pt-6 pb-16 sm:pt-12">
-        <h1 className="text-2xl font-semibold">{organizations.length > 0 ? "הוספת עסק" : "נקים את העסק שלך"}</h1>
+        <h1 className="text-2xl font-semibold">{organizations.length > 0 ? "הוספת עסק" : "נקים את העסק שלכם"}</h1>
         <p className="mt-1 mb-6 text-ink-soft">
-          כמה פרטים, ונכין עבורך תהליך מכירה, סטטוסים ומקורות לידים. אפשר לשנות הכול אחר כך.
+          כמה פרטים, ונכין עבורכם תהליך מכירה, סטטוסים ומקורות לידים. אפשר לשנות הכול אחר כך.
         </p>
         <OrganizationForm />
         {organizations.length > 0 ? (

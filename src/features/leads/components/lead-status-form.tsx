@@ -56,7 +56,7 @@ export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses }: Pro
       ) : null}
       {failure && !failure.fieldErrors ? <FormError message={failure.message} /> : null}
       {changed ? (
-        <SubmitButton size="sm" pending={pending} pendingText="מעדכן…">
+        <SubmitButton size="sm" pending={pending} pendingText="מעדכנים…">
           עדכון סטטוס
         </SubmitButton>
       ) : null}

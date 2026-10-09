@@ -59,7 +59,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
                   {undoable ? (
                     <ActionButton
                       action={undoImportAction.bind(null, orgId, job.id)}
-                      pendingText="מבטל…"
+                      pendingText="מבטלים…"
                       variant="danger-ghost"
                       confirm={`להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`}
                       srLabel={job.file_name}

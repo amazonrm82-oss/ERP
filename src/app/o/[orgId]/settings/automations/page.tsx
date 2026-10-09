@@ -84,7 +84,7 @@ export default async function AutomationsPage({ params }: Props) {
               ) : used.has(template.key) ? (
                 <Badge tone="success">נוספה</Badge>
               ) : (
-                <ActionButton action={createFromTemplateAction.bind(null, orgId, template.key)} pendingText="מוסיף…" srLabel={template.title}>
+                <ActionButton action={createFromTemplateAction.bind(null, orgId, template.key)} pendingText="מוסיפים…" srLabel={template.title}>
                   הוספה
                 </ActionButton>
               )}

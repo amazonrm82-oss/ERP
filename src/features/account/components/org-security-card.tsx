@@ -15,11 +15,11 @@ export function OrgSecurityCard({ orgId, requireMfa }: { orgId: string; requireM
             : "אפשר לחייב את כל המשתמשים בעסק להיכנס עם אימות דו-שלבי (קוד מאפליקציה בטלפון, בנוסף לסיסמה)."}
         </p>
         {requireMfa ? (
-          <ActionButton action={setRequireMfaAction.bind(null, orgId, false)} pendingText="שומר…" variant="secondary" confirm="לבטל את החובה?">
+          <ActionButton action={setRequireMfaAction.bind(null, orgId, false)} pendingText="שומרים…" variant="secondary" confirm="לבטל את החובה?">
             ביטול החובה
           </ActionButton>
         ) : (
-          <ActionButton action={setRequireMfaAction.bind(null, orgId, true)} pendingText="שומר…" confirm="לחייב את כל המשתמשים באימות דו-שלבי?">
+          <ActionButton action={setRequireMfaAction.bind(null, orgId, true)} pendingText="שומרים…" confirm="לחייב את כל המשתמשים באימות דו-שלבי?">
             חיוב אימות דו-שלבי לכולם
           </ActionButton>
         )}

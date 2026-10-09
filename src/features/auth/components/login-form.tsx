@@ -52,7 +52,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
             שכחתי סיסמה
           </Link>
         </p>
-        <SubmitButton pendingText="מתחבר…" className="w-full">
+        <SubmitButton pendingText="מתחברים…" className="w-full">
           כניסה
         </SubmitButton>
       </form>

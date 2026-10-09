@@ -74,7 +74,7 @@ export function SignupForm({ next }: { next: string }) {
           hint={`לפחות ${PASSWORD_MIN} תווים.`}
           error={failure?.fieldErrors?.password}
         />
-        <SubmitButton pendingText="יוצר חשבון…" className="w-full">
+        <SubmitButton pendingText="יוצרים חשבון…" className="w-full">
           יצירת חשבון
         </SubmitButton>
       </form>

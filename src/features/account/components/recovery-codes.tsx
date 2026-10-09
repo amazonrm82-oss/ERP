@@ -57,7 +57,7 @@ export function RecoveryCodes({ left }: { left: number }) {
   if (codes) {
     return (
       <div className="space-y-3 rounded-md border border-line p-4">
-        <p className="font-medium">קודי הגיבוי החדשים שלך</p>
+        <p className="font-medium">קודי הגיבוי החדשים שלכם</p>
         <p className="text-sm text-ink-soft">
           אם תאבדו את הטלפון, כל קוד יכניס אתכם פעם אחת. שמרו אותם במקום בטוח שאינו הטלפון, למשל מודפסים או במנהל סיסמאות. הם לא יוצגו שוב.
         </p>
@@ -99,14 +99,14 @@ export function RecoveryCodes({ left }: { left: number }) {
         <p className="text-sm text-ink-soft">נשארו {left} קודי גיבוי. כל קוד מכניס פעם אחת, אם אין גישה לאפליקציית האימות.</p>
       ) : (
         <p role="status" className="text-sm text-warning">
-          אין לך קודי גיבוי. בלעדיהם, אם תאבדו את הטלפון, לא תוכלו להיכנס לחשבון. צרו אותם עכשיו ושמרו במקום בטוח.
+          אין לכם קודי גיבוי. בלעדיהם, אם תאבדו את הטלפון, לא תוכלו להיכנס לחשבון. צרו אותם עכשיו ושמרו במקום בטוח.
         </p>
       )}
       {confirming ? (
         <span role="group" aria-label="אישור יצירת קודים חדשים" className="flex flex-wrap items-center gap-2">
           <span className="text-sm">הקודים הקודמים יפסיקו לעבוד.</span>
           <Button size="sm" disabled={busy} onClick={() => void create()}>
-            {busy ? "יוצר…" : "יצירת קודים חדשים"}
+            {busy ? "יוצרים…" : "יצירת קודים חדשים"}
           </Button>
           <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)}>
             ביטול
@@ -114,7 +114,7 @@ export function RecoveryCodes({ left }: { left: number }) {
         </span>
       ) : (
         <Button variant={left > 0 ? "secondary" : "primary"} disabled={busy} onClick={() => (left > 0 ? setConfirming(true) : void create())}>
-          {busy ? "יוצר…" : left > 0 ? "יצירת קודים חדשים" : "יצירת קודי גיבוי"}
+          {busy ? "יוצרים…" : left > 0 ? "יצירת קודים חדשים" : "יצירת קודי גיבוי"}
         </Button>
       )}
       {error ? (

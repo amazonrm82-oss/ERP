@@ -23,7 +23,7 @@ export async function acceptInvitationAction(token: string): Promise<FormState> 
   const supabase = await createClient();
   const { data: orgId, error } = await supabase.rpc("accept_invitation", { p_token: token });
   if (error || !orgId) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לצרף אותך לעסק. נסו שוב."));
+    return fail(dbErrorMessage(error, "לא הצלחנו לצרף אתכם לעסק. נסו שוב."));
   }
   revalidatePath("/", "layout");
   redirect(paths.org(orgId));

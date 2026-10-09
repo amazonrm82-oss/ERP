@@ -44,7 +44,7 @@ export function DealStageForm({ orgId, dealId, dealName, currentStageId, stages 
           ))}
         </SelectField>
         {changed ? (
-          <SubmitButton size="sm" pending={pending} pendingText="מעביר…">
+          <SubmitButton size="sm" pending={pending} pendingText="מעבירים…">
             העברה
           </SubmitButton>
         ) : null}

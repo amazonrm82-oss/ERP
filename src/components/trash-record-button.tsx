@@ -51,7 +51,7 @@ export function TrashRecordButton({ noun, action }: Props) {
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={confirm} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "מעביר…" : "העברה לסל המחזור"}
+          {pending ? "מעבירים…" : "העברה לסל המחזור"}
         </Button>
         {/* focus lands on the safe choice */}
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>

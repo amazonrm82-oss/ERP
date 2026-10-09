@@ -51,7 +51,7 @@ export function LeadStatusMenu({ orgId, leadId, leadName, currentStatusId, statu
         </SelectField>
         {changed ? (
           <Button size="sm" onClick={save} disabled={pending || (needsReason && !reason.trim())} aria-busy={pending || undefined}>
-            {pending ? "מעביר…" : "העברה"}
+            {pending ? "מעבירים…" : "העברה"}
           </Button>
         ) : null}
       </div>

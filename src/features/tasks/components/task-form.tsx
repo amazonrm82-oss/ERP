@@ -24,7 +24,7 @@ export function TaskForm({ orgId, assignees, myUserId, today }: Props) {
         assignees={assignees}
         defaultOwnerId={myUserId}
       />
-      <SubmitButton pendingText="מוסיף…">הוספת משימה</SubmitButton>
+      <SubmitButton pendingText="מוסיפים…">הוספת משימה</SubmitButton>
       {/* FXU-10: say that it worked; the form has cleared itself */}
       <FormNotice message={state?.ok ? "המשימה נוספה." : null} />
     </form>

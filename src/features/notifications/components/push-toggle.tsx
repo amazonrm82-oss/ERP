@@ -102,7 +102,7 @@ export function PushToggle({ orgId }: { orgId: string }) {
   }
 
   const messages: Partial<Record<State, string>> = {
-    loading: "בודק…",
+    loading: "בודקים…",
     unsupported: "הדפדפן הזה לא תומך בהתראות. באייפון: יש להוסיף את האתר למסך הבית (שיתוף ← הוספה למסך הבית) ולפתוח אותו משם.",
     unconfigured: "התראות לנייד עוד לא הוגדרו במערכת.",
     denied: "ההתראות חסומות בדפדפן. אפשר לאשר אותן בהגדרות האתר בדפדפן ואז לחזור לכאן.",
@@ -117,12 +117,12 @@ export function PushToggle({ orgId }: { orgId: string }) {
       </p>
       {state === "off" ? (
         <Button size="sm" onClick={enable} disabled={busy} aria-busy={busy || undefined}>
-          {busy ? "מפעיל…" : "הפעלת התראות בדפדפן הזה"}
+          {busy ? "מפעילים…" : "הפעלת התראות בדפדפן הזה"}
         </Button>
       ) : null}
       {state === "on" ? (
         <Button variant="secondary" size="sm" onClick={disable} disabled={busy} aria-busy={busy || undefined}>
-          {busy ? "מבטל…" : "כיבוי התראות בדפדפן הזה"}
+          {busy ? "מבטלים…" : "כיבוי התראות בדפדפן הזה"}
         </Button>
       ) : null}
       {error ? (

@@ -49,7 +49,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
       </Card>
 
       <Card aria-labelledby="account-agreement">
-        <CardHeader id="account-agreement" title="ההסכם שלך" />
+        <CardHeader id="account-agreement" title="ההסכם שלכם" />
         <CardBody>
           <p className="text-md">
             {signedVersion ? `חתמת על תנאי השימוש, מדיניות הפרטיות והסכם עיבוד המידע (גרסה ${signedVersion}).` : "עוד לא חתמת על ההסכם."}
@@ -73,7 +73,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
           title="מכשירים מחוברים"
           action={
             sessions.length > 1 ? (
-              <ActionButton action={signOutOthersAction.bind(null, orgId)} pendingText="מנתק…" variant="danger-ghost" confirm="לנתק את כל המכשירים האחרים?">
+              <ActionButton action={signOutOthersAction.bind(null, orgId)} pendingText="מנתקים…" variant="danger-ghost" confirm="לנתק את כל המכשירים האחרים?">
                 ניתוק כל המכשירים האחרים
               </ActionButton>
             ) : null

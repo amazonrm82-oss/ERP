@@ -26,7 +26,7 @@ export function TransferOwnershipForm({ orgId, candidates }: Props) {
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <p className="text-md text-ink-soft">
-        הבעלים החדש יקבל את כל ההרשאות, כולל חיוב, והתפקיד שלך יהפוך ל&quot;מנהל מערכת&quot;. רק הבעלים החדש יוכל להחזיר את הבעלות.
+        הבעלים החדש יקבל את כל ההרשאות, כולל חיוב, והתפקיד שלכם יהפוך ל&quot;מנהל מערכת&quot;. רק הבעלים החדש יוכל להחזיר את הבעלות.
       </p>
       <FormError message={failure?.message} />
       <SelectField label="הבעלים החדש" name="user_id" defaultValue="" error={failure?.fieldErrors?.user_id}>
@@ -44,7 +44,7 @@ export function TransferOwnershipForm({ orgId, candidates }: Props) {
         <span>ידוע לי שהבעלות על העסק תעבור למשתמש שבחרתי</span>
       </label>
       {failure?.fieldErrors?.confirm ? <p className="text-sm text-danger">{failure.fieldErrors.confirm}</p> : null}
-      <SubmitButton variant="danger" pendingText="מעביר…">
+      <SubmitButton variant="danger" pendingText="מעבירים…">
         העברת הבעלות
       </SubmitButton>
     </form>

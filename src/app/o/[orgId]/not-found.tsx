@@ -8,7 +8,7 @@ export default function OrgNotFound() {
       <h1 className="sr-only">הרשומה לא נמצאה</h1>
       <EmptyState kind="search"
         title="הרשומה לא נמצאה"
-        description="ייתכן שהקישור שגוי, שהרשומה הועברה לסל המחזור, או שאין לך גישה אליה."
+        description="ייתכן שהקישור שגוי, שהרשומה הועברה לסל המחזור, או שאין לכם גישה אליה."
       />
     </div>
   );

@@ -145,7 +145,7 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
       <FormError message={error} />
       <div className="flex gap-1">
         <Button type="submit" size="sm" disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "שומר…" : "שמירה"}
+          {pending ? "שומרים…" : "שמירה"}
         </Button>
         <Button variant="ghost" size="sm" disabled={pending} onClick={close}>
           ביטול

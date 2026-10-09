@@ -85,7 +85,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
               <>
                 <p>הלקוח אישר גישת תמיכה עד {formatDateTime(supportUntil)}. הכניסה היא לצפייה בלבד, ונרשמת גם ביומן הביקורת של הלקוח.</p>
                 {canDo(me.role, ["support"]) ? (
-                  <ActionButton action={openSupportAction.bind(null, orgId)} pendingText="נכנס…" variant="primary">
+                  <ActionButton action={openSupportAction.bind(null, orgId)} pendingText="נכנסים…" variant="primary">
                     כניסה לארגון (צפייה)
                   </ActionButton>
                 ) : (

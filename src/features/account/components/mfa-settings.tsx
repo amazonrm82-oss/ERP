@@ -57,7 +57,7 @@ export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; 
     router.refresh();
   }
 
-  if (state.kind === "loading") return <p role="status">בודק…</p>;
+  if (state.kind === "loading") return <p role="status">בודקים…</p>;
   if (state.kind === "unknown") return <p role="alert">לא הצלחנו לבדוק את מצב האימות הדו-שלבי. רעננו את הדף.</p>;
   if (state.kind === "setup") {
     return (
@@ -72,7 +72,7 @@ export function MfaSettings({ orgRequires, codesLeft }: { orgRequires: boolean; 
   return (
     <div className="space-y-3">
       <p role="status" className="font-medium">
-        {state.kind === "on" ? "אימות דו-שלבי פעיל בחשבון שלך." : "אימות דו-שלבי כבוי."}
+        {state.kind === "on" ? "אימות דו-שלבי פעיל בחשבון שלכם." : "אימות דו-שלבי כבוי."}
       </p>
       <p className="text-sm text-ink-soft">
         בכל כניסה, אחרי הסיסמה, מזינים קוד מאפליקציית אימות בטלפון (Google Authenticator, Microsoft Authenticator או 1Password). כך סיסמה שדלפה לבדה לא מספיקה.

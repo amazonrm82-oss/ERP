@@ -2,7 +2,7 @@
 export function ReadOnlyNotice() {
   return (
     <p role="status" className="max-w-2xl rounded-lg border border-line bg-surface p-5 text-md">
-      יש לך הרשאת צפייה בלבד, ולכן אי אפשר להוסיף כאן רשומות. לשינוי ההרשאה יש לפנות למנהל המערכת בעסק.
+      יש לכם הרשאת צפייה בלבד, ולכן אי אפשר להוסיף כאן רשומות. לשינוי ההרשאה יש לפנות למנהל המערכת בעסק.
     </p>
   );
 }

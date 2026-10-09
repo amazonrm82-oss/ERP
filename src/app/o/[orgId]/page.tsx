@@ -140,7 +140,7 @@ export default async function HomePage({ params }: Props) {
           />
           <CardBody>
             {day.newLeads.length === 0 ? (
-              <EmptyState compact icon={<InboxIcon />} title="אין לידים חדשים שמשויכים אליך" description="ליד חדש שיוקצה לך יופיע כאן עד שהסטטוס שלו ישתנה." />
+              <EmptyState compact icon={<InboxIcon />} title="אין לידים חדשים שמשויכים אליכם" description="ליד חדש שיוקצה לכם יופיע כאן עד שהסטטוס שלו ישתנה." />
             ) : (
               <>
                 <ul className="divide-y divide-line">

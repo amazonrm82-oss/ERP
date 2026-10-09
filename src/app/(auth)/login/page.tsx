@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: Props) {
       </p>
       <LoginForm next={next} initialError={error} />
       <p className="mt-6 text-md text-ink-soft">
-        {invited ? "אין לכם חשבון?" : "עוד אין לך חשבון?"}{" "}
+        {invited ? "אין לכם חשבון?" : "עוד אין לכם חשבון?"}{" "}
         <Link href={signupHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
           הרשמה
         </Link>

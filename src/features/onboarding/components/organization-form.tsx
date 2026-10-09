@@ -61,7 +61,7 @@ export function OrganizationForm() {
         defaultValue={values.phone}
         error={errors.phone}
       />
-      <SubmitButton pendingText="מקים את העסק…" className="w-full">
+      <SubmitButton pendingText="מקימים את העסק…" className="w-full">
         יצירת העסק והמשך
       </SubmitButton>
     </form>

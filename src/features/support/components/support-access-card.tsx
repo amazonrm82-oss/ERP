@@ -21,19 +21,19 @@ export function SupportAccessCard({ orgId, grant }: Props) {
             <p role="status" className="font-medium">
               גישת תמיכה פתוחה עד {formatDateTime(grant.expiresAt)}.
             </p>
-            <ActionButton action={revokeSupportAccessAction.bind(null, orgId)} pendingText="סוגר…" variant="danger-ghost">
+            <ActionButton action={revokeSupportAccessAction.bind(null, orgId)} pendingText="סוגרים…" variant="danger-ghost">
               סגירת הגישה עכשיו
             </ActionButton>
           </>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 1)} pendingText="פותח…">
+            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 1)} pendingText="פותחים…">
               לשעה
             </ActionButton>
-            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 24)} pendingText="פותח…">
+            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 24)} pendingText="פותחים…">
               ליום
             </ActionButton>
-            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 72)} pendingText="פותח…">
+            <ActionButton action={grantSupportAccessAction.bind(null, orgId, 72)} pendingText="פותחים…">
               לשלושה ימים
             </ActionButton>
           </div>

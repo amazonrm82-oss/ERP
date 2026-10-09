@@ -59,7 +59,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
         <input type="checkbox" name="is_required" defaultChecked={values?.is_required === "on"} className="size-4.5 accent-accent" />
         שדה חובה
       </label>
-      <SubmitButton pendingText="מוסיף…">הוספת שדה</SubmitButton>
+      <SubmitButton pendingText="מוסיפים…">הוספת שדה</SubmitButton>
     </form>
   );
 }
@@ -103,13 +103,13 @@ function FieldRow({ orgId, field, editable, isFirst, isLast }: RowProps) {
               עריכה
               <span className="sr-only">: {field.label}</span>
             </Button>
-            <ActionButton action={moveFieldAction.bind(null, orgId, field.id, "up")} pendingText="מזיז…" variant="ghost" srLabel={field.label} disabled={isFirst}>
+            <ActionButton action={moveFieldAction.bind(null, orgId, field.id, "up")} pendingText="מזיזים…" variant="ghost" srLabel={field.label} disabled={isFirst}>
               למעלה
             </ActionButton>
-            <ActionButton action={moveFieldAction.bind(null, orgId, field.id, "down")} pendingText="מזיז…" variant="ghost" srLabel={field.label} disabled={isLast}>
+            <ActionButton action={moveFieldAction.bind(null, orgId, field.id, "down")} pendingText="מזיזים…" variant="ghost" srLabel={field.label} disabled={isLast}>
               למטה
             </ActionButton>
-            <ActionButton action={setFieldActiveAction.bind(null, orgId, field.id, !field.isActive)} pendingText="מעדכן…" variant="ghost" srLabel={field.label}>
+            <ActionButton action={setFieldActiveAction.bind(null, orgId, field.id, !field.isActive)} pendingText="מעדכנים…" variant="ghost" srLabel={field.label}>
               {field.isActive ? "הסתרה" : "הצגה"}
             </ActionButton>
           </span>

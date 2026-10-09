@@ -24,7 +24,7 @@ export function CompleteTaskButton({ orgId, taskId, title }: { orgId: string; ta
   return (
     <span className="flex shrink-0 flex-col items-end gap-1">
       <Button variant="secondary" size="sm" onClick={complete} disabled={pending} aria-busy={pending || undefined}>
-        {pending ? "מסמן…" : "בוצע"}
+        {pending ? "מסמנים…" : "בוצע"}
         <span className="sr-only">: {title}</span>
       </Button>
       {error ? (

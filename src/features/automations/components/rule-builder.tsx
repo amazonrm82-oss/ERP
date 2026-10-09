@@ -247,7 +247,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
         </CardBody>
       </Card>
 
-      <SubmitButton pendingText="שומר…">{edit ? "שמירת השינויים" : "שמירה והפעלה"}</SubmitButton>
+      <SubmitButton pendingText="שומרים…">{edit ? "שמירת השינויים" : "שמירה והפעלה"}</SubmitButton>
     </form>
   );
 }

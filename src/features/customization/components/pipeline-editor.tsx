@@ -41,7 +41,7 @@ export function CreatePipelineForm({ orgId }: { orgId: string }) {
           defaultValue={failure?.values?.name}
           error={failure?.fieldErrors?.name}
         />
-        <SubmitButton className="sm:mt-6.5" pendingText="יוצר…">
+        <SubmitButton className="sm:mt-6.5" pendingText="יוצרים…">
           יצירת תהליך מכירה
         </SubmitButton>
       </div>
@@ -68,14 +68,14 @@ export function PipelineCard({ orgId, pipeline, editable, isOnly }: CardProps) {
           <div className="flex flex-wrap items-end gap-3">
             <RenamePipelineForm key={pipeline.name} orgId={orgId} pipeline={pipeline} />
             {pipeline.isDefault ? null : (
-              <ActionButton action={setDefaultPipelineAction.bind(null, orgId, pipeline.id)} pendingText="מעדכן…" srLabel={pipeline.name}>
+              <ActionButton action={setDefaultPipelineAction.bind(null, orgId, pipeline.id)} pendingText="מעדכנים…" srLabel={pipeline.name}>
                 קביעה כברירת מחדל
               </ActionButton>
             )}
             {pipeline.isDefault || isOnly ? null : (
               <ActionButton
                 action={deletePipelineAction.bind(null, orgId, pipeline.id)}
-                pendingText="מוחק…"
+                pendingText="מוחקים…"
                 variant="danger-ghost"
                 confirm={`למחוק את תהליך המכירה "${pipeline.name}"?`}
               >
@@ -198,15 +198,15 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
         <span>{stage.dealCount === 1 ? "עסקה אחת" : `${stage.dealCount} עסקאות`}</span>
-        <ActionButton action={moveStageAction.bind(null, orgId, stage.id, "up")} pendingText="מזיז…" variant="ghost" srLabel={stage.name} disabled={isFirst}>
+        <ActionButton action={moveStageAction.bind(null, orgId, stage.id, "up")} pendingText="מזיזים…" variant="ghost" srLabel={stage.name} disabled={isFirst}>
           הזזה למעלה
         </ActionButton>
-        <ActionButton action={moveStageAction.bind(null, orgId, stage.id, "down")} pendingText="מזיז…" variant="ghost" srLabel={stage.name} disabled={isLast}>
+        <ActionButton action={moveStageAction.bind(null, orgId, stage.id, "down")} pendingText="מזיזים…" variant="ghost" srLabel={stage.name} disabled={isLast}>
           הזזה למטה
         </ActionButton>
         <ActionButton
           action={deleteStageAction.bind(null, orgId, stage.id)}
-          pendingText="מוחק…"
+          pendingText="מוחקים…"
           variant="danger-ghost"
           confirm={`למחוק את השלב "${stage.name}"?`}
         >
@@ -257,7 +257,7 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
           defaultValue={values?.probability ?? "20"}
           error={errors.probability}
         />
-        <SubmitButton size="sm" className="col-span-2 sm:col-span-1" pendingText="מוסיף…">
+        <SubmitButton size="sm" className="col-span-2 sm:col-span-1" pendingText="מוסיפים…">
           הוספת שלב
         </SubmitButton>
       </div>

@@ -116,7 +116,7 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
       />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
       <div className="flex flex-wrap gap-2 pt-1">
-        <SubmitButton pendingText="יוצר ליד…">יצירת ליד</SubmitButton>
+        <SubmitButton pendingText="יוצרים ליד…">יצירת ליד</SubmitButton>
         <ButtonLink href={paths.leads(orgId)} variant="ghost">
           ביטול
         </ButtonLink>

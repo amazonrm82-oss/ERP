@@ -55,7 +55,7 @@ function RevokeButton({ orgId, invitation }: { orgId: string; invitation: Pendin
   return (
     <span className="flex flex-col items-end gap-1">
       <Button variant="danger-ghost" size="sm" onClick={revoke} disabled={pending} aria-busy={pending || undefined}>
-        {pending ? "מבטל…" : "ביטול ההזמנה"}
+        {pending ? "מבטלים…" : "ביטול ההזמנה"}
         <span className="sr-only">: {invitation.email}</span>
       </Button>
       {error ? (

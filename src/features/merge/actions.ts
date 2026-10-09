@@ -23,7 +23,7 @@ export async function mergeRecordsAction(orgId: string, type: string, keepId: st
   const { error } = await context.supabase.rpc("merge_records", { p_org: orgId, p_type: type, p_keep: keepId, p_merge: mergeId, p_picks: picks });
   if (error) {
     if (error.hint === "merge:both_converted") return fail("שני הלידים כבר הומרו. אפשר למזג את אנשי הקשר שנוצרו מהם.");
-    if (error.code === "42501") return fail("אין לך הרשאה למזג את הרשומות האלה. מיזוג מותר למנהלי צוות ולמנהלי מערכת.");
+    if (error.code === "42501") return fail("אין לכם הרשאה למזג את הרשומות האלה. מיזוג מותר למנהלי צוות ולמנהלי מערכת.");
     return fail(dbErrorMessage(error, "המיזוג נכשל. נסו שוב."));
   }
   redirect(RECORD_PATH[type](orgId, keepId));

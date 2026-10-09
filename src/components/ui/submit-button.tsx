@@ -18,7 +18,7 @@ type Props = Omit<ComponentProps<typeof Button>, "type"> & {
  * so a screen reader reads its label and its error (FXA-03); every form that
  * uses this button gets it.
  */
-export function SubmitButton({ children, pendingText = "שומר…", pending, disabled, ...props }: Props) {
+export function SubmitButton({ children, pendingText = "שומרים…", pending, disabled, ...props }: Props) {
   const status = useFormStatus();
   const isPending = pending ?? status.pending;
   const ref = useRef<HTMLButtonElement>(null);

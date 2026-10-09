@@ -18,7 +18,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
 
   return (
     <>
-      <PageHeader title="דוחות" description="כל דוח מציג רק את הרשומות שמותר לך לראות." />
+      <PageHeader title="דוחות" description="כל דוח מציג רק את הרשומות שמותר לכם לראות." />
       {dashboard ? <ManagerDashboard dashboard={dashboard} /> : null}
       <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
