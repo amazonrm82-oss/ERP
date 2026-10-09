@@ -185,8 +185,18 @@ try {
     await visitor.goto(`${APP}/`);
     if (new URL(visitor.url()).pathname !== "/") throw new Error(`a visitor was sent away from the landing page: ${visitor.url()}`);
     await visitor.getByRole("link", { name: "כניסה", exact: true }).waitFor();
-    await visitor.getByRole("link", { name: "הרשמה", exact: true }).click();
+    // what the system does, from the catalog; only what works is listed as available (LND-03, LND-04)
+    await visitor.getByRole("heading", { name: "כל מה שיש במערכת" }).waitFor();
+    await visitor.getByRole("heading", { name: "בקרוב" }).waitFor();
+    // search engines: the landing page yes, the app and the sign-in screens no (LND-11)
+    if ((await visitor.locator('meta[name="robots"]').getAttribute("content")) !== "index, follow") throw new Error("the landing page is not open to search engines");
+    const robotsTxt = await (await visitor.context().request.get(`${APP}/robots.txt`)).text();
+    if (!robotsTxt.includes("Disallow: /o/") || !robotsTxt.includes("Disallow: /login")) throw new Error(`robots.txt: ${robotsTxt}`);
+    // the header (sign-in and sign-up) stays in view while scrolling on a phone (LND-05)
+    await visitor.mouse.wheel(0, 2000);
+    await visitor.getByRole("navigation", { name: "כניסה והרשמה" }).getByRole("link", { name: "הרשמה", exact: true }).click();
     await visitor.waitForURL(/\/signup/);
+    if ((await visitor.locator('meta[name="robots"]').getAttribute("content")) !== "noindex, nofollow") throw new Error("the sign-up screen is open to search engines");
     await visitor.close();
     await owner.goto(`${APP}/`);
     // one business: /app sends on to it

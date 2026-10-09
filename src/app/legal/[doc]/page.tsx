@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const doc = getLegalDocument((await params).doc);
   if (!doc) return {};
   // an interim text is not reviewed yet, so search engines do not index it
-  return { title: doc.title, description: doc.purpose, robots: doc.interim ? { index: false, follow: false } : undefined };
+  return { title: doc.title, description: doc.purpose, robots: doc.interim ? { index: false, follow: false } : { index: true, follow: true } };
 }
 
 export default async function LegalDocumentPage({ params }: Props) {

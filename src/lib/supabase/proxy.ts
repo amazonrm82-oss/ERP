@@ -14,7 +14,7 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
 // a secret), the file cleanup (same), the service worker, the offline page, the app manifest, the help
-// center and the legal documents.
+// center, the legal documents, and robots.txt / sitemap.xml for search engines (LND-11).
 const PUBLIC_PREFIXES = [
   "/auth/",
   "/f/",
@@ -25,6 +25,8 @@ const PUBLIC_PREFIXES = [
   "/sw.js",
   "/offline.html",
   "/manifest.webmanifest",
+  "/robots.txt",
+  "/sitemap.xml",
   "/help",
   "/legal/",
 ];

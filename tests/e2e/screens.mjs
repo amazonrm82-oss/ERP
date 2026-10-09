@@ -1,6 +1,7 @@
 // Screenshots of the main screens with sample data, at 360px and 1280px, for the
 // design pass (DSN-14: "before" and "after" of every screen). LOCAL ONLY.
 //   node tests/e2e/screens.mjs <out-dir> [screen ...]
+// E2E_SHOTS_VIEWPORT=1 photographs only the first screen (for the landing page, LND-02).
 // The first run signs up a sample business and fills it with data; its address
 // is kept in <out-dir>/../screens-state.json, so later runs photograph the same data.
 import { existsSync } from "node:fs";
@@ -195,7 +196,7 @@ for (const width of [360, 1280]) {
     if (name === "login") await page.context().clearCookies();
     await page.goto(`${APP}${path}`);
     await page.waitForLoadState("networkidle");
-    await page.screenshot({ path: join(outDir, `${name}-${width}.png`), fullPage: true, caret: "initial" });
+    await page.screenshot({ path: join(outDir, `${name}-${width}.png`), fullPage: !process.env.E2E_SHOTS_VIEWPORT, caret: "initial" });
     if (name === "login") await signIn(page, state.email);
   }
   await page.context().close();

@@ -27,6 +27,10 @@ export const metadata: Metadata = {
   // iPhone: opens full screen from the home screen
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
   formatDetection: { telephone: false },
+  // LND-11: not for search engines unless a page says otherwise; the app, the
+  // sign-in screens and the customers' forms stay out. Public pages opt in:
+  // the landing page, the help center and the final legal documents.
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
