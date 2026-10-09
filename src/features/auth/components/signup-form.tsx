@@ -1,25 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 
+import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
-import { signUpAction } from "../actions";
+import { resendConfirmationAction, signUpAction } from "../actions";
 import { GOOGLE_ENABLED, GoogleButton } from "./google-button";
 import { PASSWORD_MIN } from "../schema";
 
 export function SignupForm({ next }: { next: string }) {
   const [state, formAction] = useActionState<FormState, FormData>(signUpAction, null);
   const failure = state && !state.ok ? state : null;
+  // the address the confirmation went to, and whether the form is shown again to fix it (FXU-05)
+  const [sentTo, setSentTo] = useState<{ email: string; name: string } | null>(null);
+  const [editing, setEditing] = useState(false);
 
-  if (state?.ok) {
-    // waiting for the user to confirm their email address
-    return <FormNotice message={state.message} />;
+  if (state?.ok && sentTo && !editing) {
+    return <WaitingForConfirmation email={sentTo.email} next={next} message={state.message ?? ""} onBack={() => setEditing(true)} />;
   }
 
   return (
@@ -30,7 +33,15 @@ export function SignupForm({ next }: { next: string }) {
           <p className="text-center text-sm text-ink-soft">או עם אימייל וסיסמה</p>
         </div>
       ) : null}
-      <form action={formAction} className="space-y-4" noValidate>
+      <form
+        action={(formData) => {
+          setSentTo({ email: String(formData.get("email") ?? ""), name: String(formData.get("full_name") ?? "") });
+          setEditing(false);
+          formAction(formData);
+        }}
+        className="space-y-4"
+        noValidate
+      >
         <input type="hidden" name="next" value={next} />
         <FormError message={failure?.message} />
         <TextField
@@ -38,7 +49,7 @@ export function SignupForm({ next }: { next: string }) {
           name="full_name"
           autoComplete="name"
           required
-          defaultValue={failure?.values?.full_name}
+          defaultValue={failure?.values?.full_name ?? (editing ? sentTo?.name : undefined)}
           error={failure?.fieldErrors?.full_name}
         />
         <TextField
@@ -49,7 +60,7 @@ export function SignupForm({ next }: { next: string }) {
           autoComplete="email"
           inputMode="email"
           required
-          defaultValue={failure?.values?.email}
+          defaultValue={failure?.values?.email ?? (editing ? sentTo?.email : undefined)}
           error={failure?.fieldErrors?.email}
         />
         <TextField
@@ -72,6 +83,46 @@ export function SignupForm({ next }: { next: string }) {
         <TermsLink slug="dpa">הסכם עיבוד המידע</TermsLink>.
       </p>
     </>
+  );
+}
+
+const RESEND_WAIT_SECONDS = 60;
+
+/** After sign-up: the email is on its way; send it again, or go back and fix the address (FXU-05). */
+function WaitingForConfirmation({ email, next, message, onBack }: { email: string; next: string; message: string; onBack: () => void }) {
+  const [wait, setWait] = useState(RESEND_WAIT_SECONDS);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  function resend() {
+    setResult(null);
+    startTransition(async () => {
+      const reply = await resendConfirmationAction(email, next);
+      setResult(reply.ok ? { ok: true, text: "שלחנו שוב. בדקו גם בתיקיית הספאם." } : { ok: false, text: reply.message });
+      setWait(RESEND_WAIT_SECONDS);
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <FormNotice message={message} />
+      <p className="text-md text-ink-soft">ההודעה לא הגיעה? כדאי לבדוק בתיקיית הספאם, או לשלוח שוב.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={resend} loading={pending} disabled={wait > 0}>
+          {wait > 0 ? `שליחה חוזרת (בעוד ${wait})` : "שליחה חוזרת"}
+        </Button>
+        <Button variant="ghost" onClick={onBack}>
+          חזרה לטופס, לתיקון הכתובת
+        </Button>
+      </div>
+      {result ? result.ok ? <FormNotice message={result.text} /> : <FormError message={result.text} /> : null}
+    </div>
   );
 }
 

@@ -13,10 +13,15 @@ export default async function SignupPage({ searchParams }: Props) {
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
   const loginHref = next === "/" ? paths.login : `${paths.login}?next=${encodeURIComponent(next)}`;
 
+  // FXU-05: someone who came from an invitation joins a business; the trial is not theirs to start
+  const invited = next.startsWith("/invite/");
+
   return (
     <>
-      <h1 className="text-2xl font-semibold">יצירת חשבון</h1>
-      <p className="mt-1 mb-6 text-ink-soft">14 ימי ניסיון, בלי כרטיס אשראי.</p>
+      <h1 className="text-2xl font-semibold">{invited ? "הוזמנתם להצטרף לעסק" : "יצירת חשבון"}</h1>
+      <p className="mt-1 mb-6 text-ink-soft">
+        {invited ? "יוצרים חשבון אישי, ואחרי אימות האימייל מצטרפים לעסק שהזמין אתכם." : "14 ימי ניסיון, בלי כרטיס אשראי."}
+      </p>
       <SignupForm next={next} />
       <p className="mt-6 text-md text-ink-soft">
         כבר יש לך חשבון?{" "}

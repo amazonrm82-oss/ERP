@@ -10,6 +10,8 @@ import { paths, safeNextPath } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
+import { validArg } from "@/lib/action-args";
+import { z } from "zod";
 
 import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
 
@@ -104,6 +106,21 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
     ok: true,
     message: `שלחנו הודעת אימות אל ${parsed.data.email}. לחצו על הקישור שבה כדי להמשיך.`,
   };
+}
+
+const resendArgs = z.object({ email: z.email().max(254), next: z.string().max(500) });
+
+/** Sends the confirmation email again, to the address just signed up with (FXU-05). */
+export async function resendConfirmationAction(email: string, next: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!validArg(resendArgs, { email, next })) return fail("כתובת האימייל אינה תקינה.");
+  const target = safeNextPath(next);
+  const callback = target === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(target)}`;
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${await siteOrigin()}${callback}` } });
+  if (error) {
+    return fail(authErrorMessage(error, "לא הצלחנו לשלוח שוב. נסו בעוד דקה."));
+  }
+  return { ok: true };
 }
 
 export async function signOutAction(): Promise<void> {

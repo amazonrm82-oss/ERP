@@ -127,6 +127,9 @@ async function signUp(page, name, email, startUrl) {
   await page.getByLabel("סיסמה").fill(PASSWORD);
   await page.getByRole("button", { name: "יצירת חשבון" }).click();
   await expectText(page, "שלחנו הודעת אימות");
+  // FXU-05: a way to send again (after a minute) and to go back and fix the address
+  await page.getByRole("button", { name: /שליחה חוזרת/ }).waitFor();
+  await page.getByRole("button", { name: "חזרה לטופס, לתיקון הכתובת" }).waitFor();
   const link = await confirmationLink(email);
   await page.goto(link);
   await page.waitForLoadState("networkidle");
@@ -314,6 +317,8 @@ try {
   const invitee = await newPage(1280);
   await invitee.goto(inviteLink);
   console.log("signed-out invite goes to:", invitee.url().replace(/[0-9a-f]{64}/, "<token>"));
+  // FXU-05: the invited person is told they were invited, with no trial line
+  await invitee.getByRole("heading", { name: "הוזמנתם להצטרף לעסק" }).waitFor();
   await signUp(invitee, "דנה חברה", inviteeEmail, invitee.url());
   console.log("after confirm:", invitee.url().replace(/[0-9a-f]{64}/, "<token>"));
   await invitee.waitForURL(/\/invite\//, { timeout: 15000 });
