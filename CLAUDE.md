@@ -90,6 +90,7 @@ npm run test:unit      # unit tests of the app logic (no database, no browser)
 npm run db:test:stop
 npm run test:e2e       # browser flow; needs `npx supabase start` (Docker) + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy
+node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of the main screens with sample data (DSN-14)
 ```
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.

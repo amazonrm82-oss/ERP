@@ -5,7 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
 export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean };
-export type MyNewLead = { id: string; fullName: string | null; email: string | null; phone: string | null; companyName: string | null; createdAt: string };
+export type MyNewLead = {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  phoneE164: string | null;
+  companyName: string | null;
+  createdAt: string;
+};
 
 export type MyDay = {
   // YYYY-MM-DD in the organization's time zone
@@ -22,11 +30,11 @@ const NEW_LEADS_SHOWN = 8;
 const DEALS_SUM_LIMIT = 1000;
 
 /** "My day": the signed-in user's due tasks, new leads and open deals in one organization. */
-export async function getMyDay(orgId: string, userId: string): Promise<MyDay> {
+export async function getMyDay(orgId: string, userId: string, timeZone?: string): Promise<MyDay> {
   const supabase = await createClient();
   const now = new Date();
-  const today = zoneDate(now);
-  const startOfToday = zonedIso(today, "00:00:00");
+  const today = zoneDate(now, timeZone);
+  const startOfToday = zonedIso(today, "00:00:00", timeZone);
 
   const defaultStatus = must(await supabase
     .from("lead_statuses")
@@ -43,13 +51,13 @@ export async function getMyDay(orgId: string, userId: string): Promise<MyDay> {
       .eq("owner_id", userId)
       .eq("status", "open")
       .is("deleted_at", null)
-      .lte("due_at", endOfToday(now))
+      .lte("due_at", endOfToday(now, timeZone))
       .order("due_at", { ascending: true })
       .limit(TASK_LIMIT),
     defaultStatus
       ? supabase
           .from("leads")
-          .select("id, full_name, email, phone, company_name, created_at", { count: "exact" })
+          .select("id, full_name, email, phone, phone_e164, company_name, created_at", { count: "exact" })
           .eq("organization_id", orgId)
           .eq("owner_id", userId)
           .eq("status_id", defaultStatus.id)
@@ -91,6 +99,7 @@ export async function getMyDay(orgId: string, userId: string): Promise<MyDay> {
       fullName: lead.full_name,
       email: lead.email,
       phone: lead.phone,
+      phoneE164: lead.phone_e164,
       companyName: lead.company_name,
       createdAt: lead.created_at,
     })),

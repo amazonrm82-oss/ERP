@@ -1,13 +1,37 @@
-import { buttonClasses } from "@/components/ui/button";
+import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { ChatIcon, MailIcon, PhoneIcon } from "@/components/ui/icons";
 import { telUrl, whatsappUrl } from "@/lib/format";
 
-type Props = { phone: string | null; phoneE164: string | null; email: string | null };
+type Props = {
+  phone: string | null;
+  phoneE164: string | null;
+  email: string | null;
+  // in a list row: call and WhatsApp as icon buttons, named after the person
+  compact?: { name: string };
+};
 
 /** One-tap ways to reach a person: call, WhatsApp, email. Renders nothing when there is no way. */
-export function ContactActions({ phone, phoneE164, email }: Props) {
+export function ContactActions({ phone, phoneE164, email, compact }: Props) {
   const tel = telUrl(phoneE164, phone);
   const whatsapp = whatsappUrl(phoneE164);
+  if (compact) {
+    if (!tel && !whatsapp) return null;
+    const icon = iconButtonClasses("secondary");
+    return (
+      <span className="flex shrink-0 gap-1.5">
+        {tel ? (
+          <a href={tel} aria-label={`חיוג אל ${compact.name}`} title="חיוג" className={icon}>
+            <PhoneIcon className="size-5 text-accent" />
+          </a>
+        ) : null}
+        {whatsapp ? (
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp אל ${compact.name} (נפתח בחלון חדש)`} title="WhatsApp" className={icon}>
+            <ChatIcon className="size-5 text-accent" />
+          </a>
+        ) : null}
+      </span>
+    );
+  }
   if (!tel && !whatsapp && !email) {
     return null;
   }

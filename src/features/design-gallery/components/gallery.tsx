@@ -18,7 +18,7 @@ import { ListSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { ListCard, ListCards, Table, Td, Th, Tr } from "@/components/ui/table";
 import { TextLink } from "@/components/ui/text-link";
 import { ToastProvider, ToastView, useToast } from "@/components/ui/toast";
-import { buttonClasses } from "@/components/ui/button";
+import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -167,7 +167,7 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
             label="התראות"
             triggerLabel="התראות"
             trigger={<BellIcon className="size-5" />}
-            triggerClassName={buttonClasses("ghost", "md", "size-11 p-0")}
+            triggerClassName={iconButtonClasses("ghost")}
           >
             {(close) => (
               <div className="p-4">

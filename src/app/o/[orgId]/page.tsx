@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ContactActions } from "@/components/contact-actions";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { InboxIcon } from "@/components/ui/icons";
+import { BoardIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getMyDay } from "@/features/home/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
 import { TaskQuickAdd } from "@/features/tasks/components/task-quick-add";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, zoneTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 type Props = { params: Promise<{ orgId: string }> };
@@ -26,41 +27,70 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function HomePage({ params }: Props) {
   const { orgId } = await params;
-  const { user, canWrite } = await getOrgContext(orgId);
-  const day = await getMyDay(orgId, user.id);
+  const { user, canWrite, org } = await getOrgContext(orgId);
+  const day = await getMyDay(orgId, user.id, org.timeZone);
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
   const firstName = user.displayName.split(" ")[0];
 
+  // three tiles that lead to the full list; three in a row on a phone too
   const summary = [
     {
-      label: "משימות להיום ובאיחור",
+      label: "משימות להיום",
       value: formatNumber(day.tasks.length),
       note: overdueCount > 0 ? `${formatNumber(overdueCount)} באיחור` : null,
+      warn: overdueCount > 0,
+      href: paths.tasks(orgId),
+      icon: CheckSquareIcon,
     },
-    { label: "לידים חדשים שמחכים לי", value: formatNumber(day.newLeadsCount), note: null },
-    { label: "העסקאות הפתוחות שלי", value: formatNumber(day.openDealsCount), note: formatMoney(day.openDealsTotalAgorot) },
+    { label: "לידים חדשים", value: formatNumber(day.newLeadsCount), note: null, warn: false, href: paths.leads(orgId), icon: InboxIcon },
+    {
+      label: "עסקאות פתוחות",
+      value: formatNumber(day.openDealsCount),
+      note: day.openDealsCount > 0 ? formatMoney(day.openDealsTotalAgorot) : null,
+      warn: false,
+      href: paths.deals(orgId),
+      icon: BoardIcon,
+    },
   ];
 
   return (
     <>
       <PageHeader title="היום שלי" description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`} />
 
-      <dl className="mb-5 grid divide-y divide-line rounded-lg border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         {summary.map((item) => (
-          <div key={item.label} className="flex items-baseline justify-between gap-3 px-4 py-3 sm:block sm:px-5 sm:py-4">
-            <dt className="text-md text-ink-soft">{item.label}</dt>
-            <dd className="flex items-baseline gap-2 sm:mt-1">
-              <span className="text-2xl font-semibold leading-none">{item.value}</span>
-              {item.note ? <span className="text-sm text-ink-soft">{item.note}</span> : null}
-            </dd>
-          </div>
+          <li key={item.label}>
+            <Link
+              href={item.href}
+              className="flex h-full flex-col gap-1 rounded-lg border border-line bg-surface p-3 hover:border-line-strong hover:bg-canvas sm:flex-row sm:items-center sm:gap-4 sm:p-4"
+            >
+              <span aria-hidden="true" className="hidden size-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent sm:flex">
+                <item.icon className="size-5.5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-2xl font-semibold leading-tight tabular-nums">{item.value}</span>
+                <span className="block text-caption text-ink-soft sm:text-md">{item.label}</span>
+                {item.note ? (
+                  <span className={item.warn ? "block text-caption font-medium text-danger" : "block text-caption text-ink-soft"}>{item.note}</span>
+                ) : null}
+              </span>
+            </Link>
+          </li>
         ))}
-      </dl>
+      </ul>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card aria-labelledby="my-tasks-title">
-          <CardHeader id="my-tasks-title" title="משימות להיום ובאיחור" />
+          <CardHeader
+            id="my-tasks-title"
+            title="משימות להיום ובאיחור"
+            action={
+              <ButtonLink href={paths.tasks(orgId)} variant="ghost" size="sm">
+                לכל המשימות
+              </ButtonLink>
+            }
+          />
           <CardBody>
             {canWrite ? (
               <div className="mb-4">
@@ -76,8 +106,12 @@ export default async function HomePage({ params }: Props) {
                     <span className="min-w-0">
                       <span className="block break-words">{task.title}</span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
-                        {task.dueAt ? <time dateTime={task.dueAt}>{formatDate(task.dueAt)}</time> : null}
                         {task.isOverdue ? <Badge tone="danger">באיחור</Badge> : null}
+                        {task.dueAt ? (
+                          <time dateTime={task.dueAt} className="tabular-nums">
+                            {task.isOverdue ? formatDate(task.dueAt) : `היום, ${zoneTime(new Date(task.dueAt), org.timeZone)}`}
+                          </time>
+                        ) : null}
                       </span>
                     </span>
                     {canWrite ? <CompleteTaskButton orgId={orgId} taskId={task.id} title={task.title} /> : null}
@@ -105,14 +139,17 @@ export default async function HomePage({ params }: Props) {
               <>
                 <ul className="divide-y divide-line">
                   {day.newLeads.map((lead) => (
-                    <li key={lead.id} className="py-2.5 first:pt-0 last:pb-0">
-                      <Link href={paths.lead(orgId, lead.id)} className="font-medium underline-offset-4 hover:underline">
-                        {leadDisplayName(lead)}
-                      </Link>
-                      <span className="block text-sm text-ink-soft">
-                        {lead.companyName ? `${lead.companyName}, ` : ""}
-                        נוצר ב-<time dateTime={lead.createdAt}>{formatDate(lead.createdAt)}</time>
+                    <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                      <span className="min-w-0">
+                        <Link href={paths.lead(orgId, lead.id)} className="block truncate font-medium underline-offset-4 hover:underline">
+                          {leadDisplayName(lead)}
+                        </Link>
+                        <span className="block truncate text-sm text-ink-soft">
+                          {lead.companyName ? `${lead.companyName}, ` : ""}
+                          נוצר ב-<time dateTime={lead.createdAt}>{formatDate(lead.createdAt)}</time>
+                        </span>
                       </span>
+                      <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: leadDisplayName(lead) }} />
                     </li>
                   ))}
                 </ul>

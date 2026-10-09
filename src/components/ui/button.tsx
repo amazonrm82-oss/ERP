@@ -60,10 +60,15 @@ type IconButtonProps = Omit<ComponentProps<"button">, "children"> & {
   variant?: Extract<Variant, "ghost" | "secondary" | "danger-ghost">;
 };
 
+/** Classes of an icon-only control, for a link that looks like IconButton. */
+export function iconButtonClasses(variant: Variant = "ghost", className?: string): string {
+  return cn(base, variants[variant], "size-11 shrink-0 p-0", className);
+}
+
 /** A button that is only an icon (close, reorder, more). 44px square, the size of a fingertip. */
 export function IconButton({ label, icon, variant = "ghost", className, type = "button", ...props }: IconButtonProps) {
   return (
-    <button type={type} aria-label={label} title={label} className={cn(base, variants[variant], "size-11 shrink-0 p-0", className)} {...props}>
+    <button type={type} aria-label={label} title={label} className={iconButtonClasses(variant, className)} {...props}>
       {icon}
     </button>
   );
