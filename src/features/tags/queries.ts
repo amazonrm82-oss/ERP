@@ -2,12 +2,12 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-export type TagOption = { id: string; name: string };
+export type TagOption = { id: string; name: string; color: string | null };
 
 /** The organization's tags, by name. */
 export async function listTags(orgId: string): Promise<TagOption[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("tags").select("id, name").eq("organization_id", orgId).order("name", { ascending: true });
+  const { data, error } = await supabase.from("tags").select("id, name, color").eq("organization_id", orgId).order("name", { ascending: true });
   if (error) {
     throw new Error(`tags query failed: ${error.message}`);
   }

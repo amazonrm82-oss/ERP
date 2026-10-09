@@ -860,6 +860,20 @@ try {
   await ownerDesk.getByLabel("תגית חדשה").fill("VIP");
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByRole("button", { name: "שמירה" }).click();
   await ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP").waitFor({ timeout: 15000 });
+  // a tag gets a colour from the design system's tones, and records show it (FLD-02)
+  const tagRecordUrl = ownerDesk.url();
+  await ownerDesk.goto(`${orgUrl}/settings/tags`);
+  await ownerDesk.getByLabel("צבע: VIP").selectOption({ label: "ירוק" });
+  await ownerDesk.getByRole("button", { name: /^שמירה.*VIP/ }).click();
+  for (let i = 0; i < 60; i++) {
+    const [{ color }] = await sql("select color from public.tags where name = 'VIP' and organization_id = $1", [orgUrl.split("/").pop()]);
+    if (color === "success") break;
+    if (i === 59) throw new Error(`tag colour not saved: ${color}`);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  await ownerDesk.goto(tagRecordUrl);
+  const vipBadge = ownerDesk.locator("section", { has: ownerDesk.getByRole("heading", { name: "תגיות" }) }).getByText("VIP", { exact: true });
+  if (!((await vipBadge.getAttribute("class")) ?? "").includes("bg-success-soft")) throw new Error("the tag's colour is not shown on the record");
   await ownerDesk.goto(`${orgUrl}/leads`);
   await ownerDesk.getByRole("combobox", { name: "תגית" }).selectOption({ label: "VIP" });
   await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();

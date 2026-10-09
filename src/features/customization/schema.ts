@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TAG_COLOR_VALUES } from "@/features/tags/types";
+
 import { checkbox, requiredText } from "@/lib/validation";
 
 export const STAGE_KINDS = ["open", "won", "lost"] as const;
@@ -35,6 +37,8 @@ export const sourceSchema = z.object({
 
 export const tagSchema = z.object({
   name: requiredText(40, "יש להזין שם לתגית.", "השם ארוך מדי (עד 40 תווים)."),
+  // FLD-02; forms without it leave the colour as it is
+  color: z.preprocess((value) => (value === null || value === "" ? undefined : value), z.enum(TAG_COLOR_VALUES, { error: "יש לבחור צבע." }).optional()),
 });
 
 export const activeSchema = z.object({ is_active: checkbox });

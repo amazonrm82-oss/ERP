@@ -26,11 +26,11 @@ export async function createTagAction(orgId: string, _prev: FormState, formData:
   if (!context.ok) {
     return context;
   }
-  const parsed = tagSchema.safeParse(pick(formData, ["name"]));
+  const parsed = tagSchema.safeParse(pick(formData, ["name", "color"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const { error } = await context.supabase.from("tags").insert({ organization_id: orgId, name: parsed.data.name });
+  const { error } = await context.supabase.from("tags").insert({ organization_id: orgId, name: parsed.data.name, color: parsed.data.color ?? null });
   if (error) {
     return fail(error.code === "23505" ? DUPLICATE : dbErrorMessage(error, "לא הצלחנו ליצור את התגית. נסו שוב."), {
       values: formValues(formData),
@@ -46,13 +46,13 @@ export async function renameTagAction(orgId: string, tagId: string, _prev: FormS
   if (!context.ok) {
     return context;
   }
-  const parsed = tagSchema.safeParse(pick(formData, ["name"]));
+  const parsed = tagSchema.safeParse(pick(formData, ["name", "color"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
   const { data, error } = await context.supabase
     .from("tags")
-    .update({ name: parsed.data.name })
+    .update({ name: parsed.data.name, ...(parsed.data.color ? { color: parsed.data.color } : {}) })
     .eq("organization_id", orgId)
     .eq("id", tagId)
     .select("id");

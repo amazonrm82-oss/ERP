@@ -12,6 +12,7 @@ import type { FormState } from "@/lib/action-result";
 
 import { saveRecordTagsAction } from "../actions";
 import type { TagOption } from "../queries";
+import { tagTone } from "../types";
 import type { Taggable } from "../types";
 
 type Props = { orgId: string; kind: Taggable; recordId: string; allTags: TagOption[]; selectedIds: string[]; canEdit: boolean };
@@ -43,7 +44,7 @@ export function TagPicker({ orgId, kind, recordId, allTags, selectedIds, canEdit
           <ul className="flex flex-wrap gap-2">
             {selected.map((tag) => (
               <li key={tag.id}>
-                <Badge tone="accent">{tag.name}</Badge>
+                <Badge tone={tagTone(tag.color)}>{tag.name}</Badge>
               </li>
             ))}
           </ul>
