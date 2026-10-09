@@ -4,7 +4,7 @@ import { fail, FORM_INVALID, formValues } from "@/lib/action-result";
 import type { Json } from "@/lib/database.types";
 
 import { listFieldDefinitions } from "./queries";
-import type { FieldObject } from "./types";
+import { inputName, type FieldObject } from "./types";
 import { parseCustomFields } from "./values";
 
 /**
@@ -26,7 +26,12 @@ export async function customFieldsFromForm(
   }
   const { values, errors } = parseCustomFields(definitions, formData);
   if (Object.keys(errors).length > 0) {
-    return fail(FORM_INVALID, { fieldErrors: errors, values: formValues(formData) });
+    const typed = formValues(formData);
+    // a multiple choice sends one input per pick; keep them all for the form shown again
+    for (const field of definitions) {
+      if (field.type === "multi_select") typed[inputName(field.key)] = formData.getAll(inputName(field.key)).filter((v) => typeof v === "string").join("\n");
+    }
+    return fail(FORM_INVALID, { fieldErrors: errors, values: typed });
   }
 
   if (recordId) {

@@ -131,19 +131,37 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
     ],
   };
 
-  const custom = lookups.fields.map((field): ServerField => {
-    const kind: FilterKind =
-      field.type === "number" ? "number" : field.type === "checkbox" ? "checkbox" : field.type === "date" ? "day" : field.type === "select" ? "select" : "text";
-    // numbers and true/false compare as JSON; everything else as text
-    const column = kind === "number" || kind === "checkbox" ? `custom_fields->${field.key}` : `custom_fields->>${field.key}`;
-    return {
-      key: `cf:${field.key}`,
-      label: field.label,
-      kind,
-      column,
-      options: kind === "select" ? field.options.map((option) => ({ value: option, label: option })) : undefined,
-    };
-  });
+  // a multiple choice (a JSON array) and a date with time are not filterable yet
+  const custom = lookups.fields
+    .filter((field) => field.type !== "multi_select" && field.type !== "datetime")
+    .map((field): ServerField => {
+      const numeric = field.type === "number" || field.type === "currency" || field.type === "percent" || field.type === "rating";
+      const kind: FilterKind = numeric
+        ? "number"
+        : field.type === "checkbox"
+          ? "checkbox"
+          : field.type === "date"
+            ? "day"
+            : field.type === "select" || field.type === "user"
+              ? "select"
+              : "text";
+      // numbers and true/false compare as JSON; everything else as text
+      const column = kind === "number" || kind === "checkbox" ? `custom_fields->${field.key}` : `custom_fields->>${field.key}`;
+      return {
+        key: `cf:${field.key}`,
+        label: field.label,
+        kind,
+        column,
+        // a sum is typed in shekels and stored in agorot
+        ...(field.type === "currency" ? { scale: 100 } : {}),
+        options:
+          field.type === "user"
+            ? lookups.members
+            : kind === "select"
+              ? field.options.map((option) => ({ value: option, label: option }))
+              : undefined,
+      };
+    });
   return [...builtIn[object], ...custom];
 }
 

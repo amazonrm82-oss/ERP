@@ -12,6 +12,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { createFieldSchema, updateFieldSchema } from "./schema";
+import { TYPES_WITH_OPTIONS, type FieldType } from "./types";
 
 function revalidateFields(orgId: string) {
   // the fields show in the forms and cards of every record type
@@ -46,7 +47,7 @@ export async function createFieldAction(orgId: string, _prev: FormState, formDat
     key: newKey(),
     label: parsed.data.label,
     field_type: parsed.data.field_type,
-    options: parsed.data.field_type === "select" ? parsed.data.options : [],
+    options: TYPES_WITH_OPTIONS.includes(parsed.data.field_type) ? parsed.data.options : [],
     is_required: parsed.data.is_required,
     help_text: parsed.data.help_text,
     position: count ?? 0,
@@ -77,7 +78,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   if (!field) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  if (field.field_type === "select" && parsed.data.options.length === 0) {
+  if (TYPES_WITH_OPTIONS.includes(field.field_type as FieldType) && parsed.data.options.length === 0) {
     return fail("יש לכתוב לפחות אפשרות אחת, כל אחת בשורה.", {
       fieldErrors: { options: "יש לכתוב לפחות אפשרות אחת." },
       values: formValues(formData),
@@ -89,7 +90,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
       label: parsed.data.label,
       help_text: parsed.data.help_text,
       is_required: parsed.data.is_required,
-      ...(field.field_type === "select" ? { options: parsed.data.options } : {}),
+      ...(TYPES_WITH_OPTIONS.includes(field.field_type as FieldType) ? { options: parsed.data.options } : {}),
     })
     .eq("organization_id", orgId)
     .eq("id", fieldId)

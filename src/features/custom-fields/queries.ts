@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listMembers } from "@/features/settings/queries";
 import { createClient } from "@/lib/supabase/server";
 
 import { isFieldType, type FieldDefinition, type FieldObject } from "./types";
@@ -23,7 +24,7 @@ export async function listFieldDefinitions(
   if (error) {
     throw new Error(`field definitions query failed: ${error.message}`);
   }
-  return data
+  const definitions: FieldDefinition[] = data
     .filter((row) => isFieldType(row.field_type))
     .map((row) => ({
       id: row.id,
@@ -35,4 +36,11 @@ export async function listFieldDefinitions(
       isActive: row.is_active,
       helpText: row.help_text,
     }));
+  // a "user" field picks one of the business's members (FLD-01); a former member keeps their name
+  if (definitions.some((field) => field.type === "user")) {
+    const members = await listMembers(orgId);
+    const choices = members.map((m) => ({ value: m.userId, label: m.status === "active" ? m.name : `${m.name} (לא פעיל)` }));
+    for (const field of definitions) if (field.type === "user") field.choices = choices;
+  }
+  return definitions;
 }

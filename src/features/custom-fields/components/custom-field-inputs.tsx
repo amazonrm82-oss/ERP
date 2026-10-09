@@ -60,6 +60,66 @@ export function CustomFieldInputs({ definitions, stored = {}, submitted, errors 
                 {field.helpText ? <p className="text-sm text-ink-soft">{field.helpText}</p> : null}
               </div>
             );
+          case "multi_select": {
+            const picked = value.split("\n");
+            return (
+              <fieldset key={`${field.id}-${value}`} aria-describedby={errors[name] ? `${name}-error` : undefined}>
+                <legend className="mb-1.5 text-sm font-medium">
+                  {field.label}
+                  {field.isRequired ? (
+                    <span aria-hidden="true" className="ms-0.5 text-danger">
+                      *
+                    </span>
+                  ) : null}
+                </legend>
+                <div className="flex flex-wrap gap-x-4">
+                  {field.options.map((option) => (
+                    <label key={option} className="flex min-h-11 items-center gap-2 text-md">
+                      <input type="checkbox" name={name} value={option} defaultChecked={picked.includes(option)} className="size-4.5 accent-accent" />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+                {errors[name] ? (
+                  <p id={`${name}-error`} className="text-sm text-danger">
+                    {errors[name]}
+                  </p>
+                ) : null}
+                {field.helpText ? <p className="text-sm text-ink-soft">{field.helpText}</p> : null}
+              </fieldset>
+            );
+          }
+          case "rating":
+            return (
+              <SelectField key={`${field.id}-${value}`} {...common} defaultValue={value}>
+                <option value="">לא נבחר</option>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n} מתוך 5
+                  </option>
+                ))}
+              </SelectField>
+            );
+          case "user":
+            return (
+              <SelectField key={`${field.id}-${value}`} {...common} defaultValue={value}>
+                <option value="">לא נבחר</option>
+                {(field.choices ?? []).map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </SelectField>
+            );
+          case "currency":
+            return <TextField key={field.id} {...common} hint={field.helpText ?? "בשקלים"} dir="ltr" inputMode="decimal" autoComplete="off" defaultValue={value} />;
+          case "percent":
+            return <TextField key={field.id} {...common} hint={field.helpText ?? "באחוזים"} dir="ltr" inputMode="decimal" autoComplete="off" defaultValue={value} />;
+          case "datetime":
+            return <TextField key={field.id} {...common} type="datetime-local" defaultValue={value} />;
+          case "il_id":
+          case "il_company_id":
+            return <TextField key={field.id} {...common} dir="ltr" inputMode="numeric" maxLength={11} autoComplete="off" defaultValue={value} />;
           case "date":
             return <TextField key={field.id} {...common} type="date" defaultValue={value} />;
           case "number":

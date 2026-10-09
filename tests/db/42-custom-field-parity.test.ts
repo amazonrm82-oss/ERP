@@ -12,6 +12,8 @@ afterAll(closePool);
 // Whatever the app accepts and stores, the database must accept too, or a
 // valid-looking form fails with "custom_field:invalid" (FXC-01).
 const OPTIONS = ["קטן", "גדול"];
+const MEMBER = "11111111-1111-4111-8111-111111111111";
+const CHOICES = [{ value: MEMBER, label: "דנה" }];
 const CASES: Array<[FieldType, string]> = [
   ["text", "שלום"],
   ["text", "x".repeat(500)],
@@ -37,11 +39,26 @@ const CASES: Array<[FieldType, string]> = [
   ["url", "localhost"],
   ["checkbox", "on"],
   ["checkbox", ""],
+  // FLD-01
+  ["currency", "1,250.50"],
+  ["currency", "-5"],
+  ["percent", "12.5%"],
+  ["rating", "5"],
+  ["rating", "0"],
+  ["multi_select", "גדול, קטן"],
+  ["multi_select", "ענק"],
+  ["datetime", "2026-07-01T14:30"],
+  ["datetime", "2026-07-01 14:30"],
+  ["user", MEMBER],
+  ["user", "33333333-3333-4333-8333-333333333333"],
+  ["il_id", "123456782"],
+  ["il_id", "123456789"],
+  ["il_company_id", "51-428562-6"],
 ];
 
 describe("custom field values: the app and the database agree", () => {
   it.each(CASES)("%s %s", async (type, input) => {
-    const field: FieldDefinition = { id: "f", key: "f", label: "f", type, options: OPTIONS, isRequired: false, isActive: true, helpText: null };
+    const field: FieldDefinition = { id: "f", key: "f", label: "f", type, options: OPTIONS, choices: CHOICES, isRequired: false, isActive: true, helpText: null };
     const form = new FormData();
     form.set("cf_f", input);
     const { values, errors } = parseCustomFields([field], form);
@@ -62,7 +79,7 @@ describe("custom field values: the app and the database agree", () => {
     const outcomes = CASES.map(([type, input]) => {
       const form = new FormData();
       form.set("cf_f", input);
-      const field: FieldDefinition = { id: "f", key: "f", label: "f", type, options: OPTIONS, isRequired: false, isActive: true, helpText: null };
+      const field: FieldDefinition = { id: "f", key: "f", label: "f", type, options: OPTIONS, choices: CHOICES, isRequired: false, isActive: true, helpText: null };
       return Object.keys(parseCustomFields([field], form).errors).length === 0;
     });
     expect(outcomes).toContain(true);

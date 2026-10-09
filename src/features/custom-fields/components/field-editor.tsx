@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
-import { FIELD_TYPE_LABELS, FIELD_TYPES, type FieldDefinition, type FieldObject } from "../types";
+import { FIELD_TYPE_LABELS, FIELD_TYPES, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
 
 export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectType: FieldObject }) {
   const [state, formAction] = useActionState<FormState, FormData>(createFieldAction.bind(null, orgId), null);
@@ -44,7 +44,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
           ))}
         </SelectField>
       </div>
-      {type === "select" ? (
+      {TYPES_WITH_OPTIONS.includes(type as FieldType) ? (
         <TextareaField
           label="אפשרויות, כל אחת בשורה"
           name="options"
@@ -115,7 +115,7 @@ function FieldRow({ orgId, field, editable, isFirst, isLast }: RowProps) {
           </span>
         ) : null}
       </div>
-      {field.type === "select" && !editing ? <p className="text-sm text-ink-soft">אפשרויות: {field.options.join(", ")}</p> : null}
+      {TYPES_WITH_OPTIONS.includes(field.type) && !editing ? <p className="text-sm text-ink-soft">אפשרויות: {field.options.join(", ")}</p> : null}
       {editing ? <EditFieldForm orgId={orgId} field={field} onDone={() => setEditing(false)} /> : null}
     </li>
   );
@@ -137,7 +137,7 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
     <form action={formAction} className="space-y-3 rounded-md border border-line p-3" noValidate>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <TextField label="שם השדה" name="label" required maxLength={80} autoComplete="off" defaultValue={values?.label ?? field.label} error={errors.label} />
-      {field.type === "select" ? (
+      {TYPES_WITH_OPTIONS.includes(field.type) ? (
         <TextareaField
           label="אפשרויות, כל אחת בשורה"
           name="options"

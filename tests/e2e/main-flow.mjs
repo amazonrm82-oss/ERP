@@ -757,20 +757,39 @@ try {
   await ownerDesk.getByLabel("שדה חובה").check();
   await ownerDesk.getByRole("button", { name: "הוספת שדה" }).click();
   await ownerDesk.locator("li", { hasText: "תאריך פגישה" }).getByText("חובה").waitFor({ timeout: 15000 });
+  // two of the types that had no screen before (FLD-01)
+  await ownerDesk.getByLabel("שם השדה").fill("שירותים");
+  await ownerDesk.getByLabel("סוג השדה").selectOption("multi_select");
+  await ownerDesk.getByLabel("אפשרויות, כל אחת בשורה").fill("ייעוץ\nהתקנה\nתחזוקה");
+  await ownerDesk.getByRole("button", { name: "הוספת שדה" }).click();
+  await ownerDesk.locator("li", { hasText: "שירותים" }).waitFor({ timeout: 15000 });
+  await ownerDesk.getByLabel("שם השדה").fill("מקדמה");
+  await ownerDesk.getByLabel("סוג השדה").selectOption("currency");
+  await ownerDesk.getByRole("button", { name: "הוספת שדה" }).click();
+  await ownerDesk.locator("li", { hasText: "מקדמה" }).waitFor({ timeout: 15000 });
   await shot(ownerDesk, "32-fields-1280");
 
   await ownerDesk.goto(`${orgUrl}/leads/new`);
   await ownerDesk.getByLabel("שם מלא").fill("רחל לוי");
   await ownerDesk.getByLabel("תקציב").selectOption("10,000-50,000");
+  await ownerDesk.getByLabel("ייעוץ", { exact: true }).check();
+  await ownerDesk.getByLabel("תחזוקה", { exact: true }).check();
+  await ownerDesk.getByLabel("מקדמה").fill("1,500");
   const sourceOptions = await ownerDesk.getByLabel("מקור").locator("option").allTextContents();
   if (sourceOptions.includes("תערוכה")) throw new Error("a hidden source is offered in the form");
   await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
   await expectText(ownerDesk, "יש למלא את השדה");
+  // the multiple choice keeps every pick when the form comes back with an error
+  if (!(await ownerDesk.getByLabel("תחזוקה", { exact: true }).isChecked()) || !(await ownerDesk.getByLabel("ייעוץ", { exact: true }).isChecked())) {
+    throw new Error("multiple choice lost its picks after a failed save");
+  }
   await ownerDesk.getByLabel("תאריך פגישה").fill("2026-11-01");
   await ownerDesk.getByRole("button", { name: "יצירת ליד" }).click();
   await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 15000 });
   await expectText(ownerDesk, "10,000-50,000");
   await expectText(ownerDesk, "1 בנוב׳ 2026");
+  await expectText(ownerDesk, "ייעוץ, תחזוקה");
+  await expectText(ownerDesk, "1,500");
   const leadUrl = ownerDesk.url();
 
   step("list columns: hide one, add a custom field, move it, sort by it; back to the default");
