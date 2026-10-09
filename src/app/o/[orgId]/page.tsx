@@ -166,6 +166,11 @@ export default async function HomePage({ params }: Props) {
                 ) : null}
               </>
             )}
+            <p className="mt-3 text-sm">
+              <Link href={paths.leadsWaiting(orgId)} className="text-accent-strong underline underline-offset-4">
+                לידים שעוד לא קיבלו מענה
+              </Link>
+            </p>
           </CardBody>
         </Card>
       </div>

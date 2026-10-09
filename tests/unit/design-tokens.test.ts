@@ -45,6 +45,9 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["danger", "surface"],
   ["danger", "danger-soft"],
   ["warning", "warning-soft"],
+  // warning text on a card or the page (waiting clock, notices)
+  ["warning", "surface"],
+  ["warning", "canvas"],
   ["success", "success-soft"],
   ["on-brand", "brand"],
 ];

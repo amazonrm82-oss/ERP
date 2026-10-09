@@ -1827,6 +1827,20 @@ try {
   if (!vcard.ok() || !(vcard.headers()["content-type"] ?? "").startsWith("text/vcard")) throw new Error(`vcard: ${vcard.status()}`);
   const vcardText = await vcard.text();
   if (!vcardText.includes("FN:כפול שני") || !vcardText.includes("TEL;TYPE=CELL:054-9998877")) throw new Error(`vcard body: ${vcardText}`);
+  // a lead no one has answered waits on its own screen until someone logs contact (SPD-02)
+  await lost.goto(`${orgUrl}/leads/waiting?who=all`);
+  await lost.getByRole("link", { name: "כפול שני", exact: true }).waitFor();
+  await expectText(lost, "ממתין");
+  await shot(lost, "116a-waiting-leads-360");
+  await lost.goto(secondDupUrl);
+  await lost.getByLabel("סוג הפעילות").selectOption({ label: "שיחה" });
+  await lost.getByLabel("תיעוד").fill("דיברנו, יחזור אלינו");
+  await lost.getByRole("button", { name: "הוספה לציר הזמן" }).click();
+  await expectText(lost, "דיברנו, יחזור אלינו");
+  await lost.goto(`${orgUrl}/leads/waiting?who=all`);
+  await lost.getByRole("heading", { name: "לידים שמחכים", level: 1 }).waitFor();
+  if (await lost.getByRole("link", { name: "כפול שני", exact: true }).count()) throw new Error("an answered lead still waits");
+  await lost.goto(secondDupUrl);
   // a summary to send outside the system: text only, no link into it (GAP-04)
   const summaryHref = await lost.getByRole("link", { name: /שליחת הסיכום ב-WhatsApp/ }).getAttribute("href");
   const summaryText = decodeURIComponent(new URL(summaryHref).searchParams.get("text") ?? "");

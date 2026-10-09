@@ -17,6 +17,7 @@ export const paths = {
   agreementSigned: "/agreement/signed",
   org: (orgId: string) => `/o/${orgId}`,
   leads: (orgId: string) => `/o/${orgId}/leads`,
+  leadsWaiting: (orgId: string) => `/o/${orgId}/leads/waiting`,
   leadNew: (orgId: string) => `/o/${orgId}/leads/new`,
   lead: (orgId: string, leadId: string) => `/o/${orgId}/leads/${leadId}`,
   contacts: (orgId: string) => `/o/${orgId}/contacts`,

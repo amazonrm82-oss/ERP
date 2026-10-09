@@ -113,7 +113,18 @@ export default async function LeadsPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title="לידים" description="פניות שעוד לא סוננו. ליד מתאים ממירים לאיש קשר ועסקה." actions={newLeadButton} />
+      <PageHeader
+        title="לידים"
+        description="פניות שעוד לא סוננו. ליד מתאים ממירים לאיש קשר ועסקה."
+        actions={
+          <>
+            <ButtonLink href={paths.leadsWaiting(orgId)} variant="secondary">
+              לידים שמחכים
+            </ButtonLink>
+            {newLeadButton}
+          </>
+        }
+      />
       <ListTools active={(filter.tree ? 1 : 0) + (statusId ? 1 : 0) + (tagId ? 1 : 0)}>
         <SavedViewsBar
           orgId={orgId}
