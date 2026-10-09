@@ -1409,6 +1409,44 @@ try {
   await shot(staffPhone, "103-admin-orgs-360");
   if (await staffPhone.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("admin page scrolls sideways at 360px");
 
+  step("design gallery: every shared component, light and dark, 360px and 1280px (DSN-07, DSN-08)");
+  await staff.goto(`${APP}/admin/design`);
+  await expectText(staff, "כל הרכיבים המשותפים");
+  await shot(staff, "104-design-gallery-1280");
+  await staffPhone.goto(`${APP}/admin/design`);
+  await expectText(staffPhone, "כל הרכיבים המשותפים");
+  await shot(staffPhone, "105-design-gallery-360");
+  if (await staffPhone.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("design gallery scrolls sideways at 360px");
+  // FXA-01: a popover stays inside a 360px screen
+  const bell = staffPhone.getByRole("button", { name: "התראות" }).first();
+  await bell.click();
+  const panel = await staffPhone.getByRole("dialog", { name: "התראות" }).first().boundingBox();
+  console.log("popover at 360px:", panel);
+  if (!panel || panel.x < 0 || panel.x + panel.width > 360) throw new Error("popover runs off a 360px screen");
+  await staffPhone.keyboard.press("Escape");
+  if ((await bell.getAttribute("aria-expanded")) !== "false") throw new Error("Escape did not close the popover");
+  // the dialog: opens, Escape closes it
+  await staffPhone.getByRole("button", { name: "פתיחת מגירה" }).first().click();
+  await staffPhone.getByRole("dialog", { name: "מגירה תחתונה" }).waitFor();
+  await shot(staffPhone, "106-design-sheet-360");
+  await staffPhone.keyboard.press("Escape");
+  await staffPhone.getByRole("dialog", { name: "מגירה תחתונה" }).waitFor({ state: "hidden" });
+  // the date picker: weeks start on Sunday; the left arrow is the next day in Hebrew
+  await staffPhone.getByRole("button", { name: /תאריך יעד/ }).first().click();
+  const grid = staffPhone.getByRole("grid").first();
+  const firstHeader = await grid.locator("th").first().textContent();
+  if (firstHeader !== "א׳") throw new Error(`the week starts on ${firstHeader}, not Sunday`);
+  await staffPhone.getByRole("button", { name: "יום שישי, 9 באוקטובר 2026" }).first().focus();
+  await staffPhone.keyboard.press("ArrowLeft");
+  await staffPhone.keyboard.press("Enter");
+  await expectText(staffPhone, "10.10.2026");
+  // the confirm: a failed action keeps the window open with its message
+  await staffPhone.getByRole("button", { name: "אישור שנכשל" }).first().click();
+  await staffPhone.getByRole("button", { name: "כן, להעביר" }).click();
+  await expectText(staffPhone, "לא הצלחנו להעביר לסל");
+  await shot(staffPhone, "107-design-confirm-error-360");
+  await staffPhone.keyboard.press("Escape");
+
   step("phone width: tasks and deal card");
   await owner.goto(`${orgUrl}/tasks`);
   await expectText(owner, "משימות פתוחות");

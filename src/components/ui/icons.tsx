@@ -188,3 +188,53 @@ export function PencilIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 19V5M6 11l6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M6 13l6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="1.5" />
+      <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+    </Icon>
+  );
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </Icon>
+  );
+}
+
+/** Turning circle for "loading"; it stops when the user asked for reduced motion (globals.css). */
+export function SpinnerIcon({ className, ...props }: IconProps) {
+  return (
+    <Icon className={["animate-spin", className].filter(Boolean).join(" ")} {...props}>
+      <path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5" />
+    </Icon>
+  );
+}

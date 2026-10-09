@@ -17,7 +17,7 @@ function block(selector: string): Record<string, string> {
 
 const base = block(":root");
 const light = block("@theme");
-const dark = { ...light, ...block(':root[data-theme="dark"]') };
+const dark = { ...light, ...block('[data-theme="dark"]') };
 
 function resolve(vars: Record<string, string>, name: string): string {
   let value = vars[name] ?? base[name];

@@ -89,8 +89,11 @@
   --color-success-soft: var(--mx-green-50);
 }
 
-/* Dark mode (DSN-05): the same roles, other values. Opened to users in wave 2 (USR-07). */
-:root[data-theme="dark"] {
+/* Dark mode (DSN-05): the same roles, other values. Opened to users in wave 2 (USR-07).
+   Any element may carry data-theme="dark" (the design gallery shows both side by side);
+   :root keeps the higher specificity, so the color-scheme rule below does not undo it. */
+:root[data-theme="dark"],
+[data-theme="dark"] {
   color-scheme: dark;
   --color-canvas: var(--mx-night-900);
   --color-surface: var(--mx-night-800);
