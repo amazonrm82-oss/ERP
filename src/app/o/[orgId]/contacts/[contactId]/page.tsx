@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
@@ -57,11 +58,12 @@ export default async function ContactPage({ params }: Props) {
       />
       <div className="mb-5">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} />
+        {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "contact", id: contact.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
-        <div className="order-2 lg:order-1">
+        <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           {context.canDelete ? <DuplicatesCard orgId={orgId} type="contact" id={contact.id} /> : null}
@@ -90,10 +92,13 @@ export default async function ContactPage({ params }: Props) {
             emptyText="עוד אין עסקאות עם איש הקשר הזה."
           />
 
-          {context.canDelete ? (
-            <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
-          ) : null}
         </div>
+      </div>
+      {/* FXU-03: out of the way of the daily work, at the very end */}
+      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+        {context.canDelete ? (
+          <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
+        ) : null}
       </div>
     </>
   );

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -60,11 +61,12 @@ export default async function LeadPage({ params }: Props) {
       />
       <div className="mb-5">
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} />
+        {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "lead", id: lead.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
-        <div className="order-2 lg:order-1">
+        <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           {context.canDelete ? <DuplicatesCard orgId={orgId} type="lead" id={lead.id} /> : null}
@@ -142,8 +144,11 @@ export default async function LeadPage({ params }: Props) {
             canEdit={canEditRecordHint(context, lead.owner_id)}
           />
 
-          {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
         </div>
+      </div>
+      {/* FXU-03: out of the way of the daily work, at the very end */}
+      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+        {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
       </div>
     </>
   );

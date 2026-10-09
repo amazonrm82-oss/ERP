@@ -57,7 +57,7 @@ export default async function DealPage({ params }: Props) {
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
-        <div className="order-2 lg:order-1">
+        <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <RecordHistory orgId={orgId} entityType="deals" entityId={deal.id} />
@@ -111,8 +111,11 @@ export default async function DealPage({ params }: Props) {
 
           <TagPicker orgId={orgId} kind="deal" recordId={deal.id} allTags={tags} selectedIds={deal.tag_ids} canEdit={canEdit} />
 
-          {context.canDelete ? <TrashRecordButton noun="העסקה" action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
         </div>
+      </div>
+      {/* FXU-03: out of the way of the daily work, at the very end */}
+      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+        {context.canDelete ? <TrashRecordButton noun="העסקה" action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
       </div>
     </>
   );

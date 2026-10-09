@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -51,11 +52,12 @@ export default async function CompanyPage({ params }: Props) {
       <PageHeader title={company.name} back={{ href: paths.companies(orgId), label: "חברות" }} />
       <div className="mb-5">
         <ContactActions phone={company.phone} phoneE164={company.phone_e164} email={company.email} />
+        {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "company", id: company.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
-        <div className="order-2 lg:order-1">
+        <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
           <RecordFiles orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           {context.canDelete ? <DuplicatesCard orgId={orgId} type="company" id={company.id} /> : null}
@@ -109,10 +111,13 @@ export default async function CompanyPage({ params }: Props) {
             emptyText="עוד אין עסקאות עם החברה הזו."
           />
 
-          {context.canDelete ? (
-            <TrashRecordButton noun="החברה" action={trashCompanyAction.bind(null, orgId, company.id)} />
-          ) : null}
         </div>
+      </div>
+      {/* FXU-03: out of the way of the daily work, at the very end */}
+      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+        {context.canDelete ? (
+          <TrashRecordButton noun="החברה" action={trashCompanyAction.bind(null, orgId, company.id)} />
+        ) : null}
       </div>
     </>
   );

@@ -12,7 +12,7 @@ export async function RecordHistory({ orgId, entityType, entityId }: Props) {
   if (items.length === 0) return null;
   const names = await nameIds(orgId, idsInChanges(items));
   return (
-    <Card className="mt-5">
+    <Card>
       <details>
         <summary className="flex min-h-14 cursor-pointer items-center px-4 font-semibold sm:px-5">היסטוריית שינויים ({items.length})</summary>
         <div className="border-t border-line">
