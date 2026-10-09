@@ -198,10 +198,10 @@ function StatusButton({ orgId, member }: { orgId: string; member: Member }) {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={run} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "משבית…" : "כן, להשבית"}
+          {pending ? "משבית…" : "השבתת המשתמש"}
         </Button>
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
-          ביטול
+          לא עכשיו
         </Button>
       </div>
     </div>

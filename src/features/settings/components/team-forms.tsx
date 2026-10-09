@@ -219,10 +219,10 @@ export function DeleteTeamButton({ orgId, teamId, teamName }: { orgId: string; t
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={confirm} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "מוחק…" : "כן, למחוק"}
+          {pending ? "מוחק…" : "מחיקת הצוות"}
         </Button>
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
-          ביטול
+          לא עכשיו
         </Button>
       </div>
     </div>

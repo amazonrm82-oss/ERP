@@ -101,7 +101,7 @@ export default async function AutomationPage({ params }: Props) {
 
       {canWrite ? (
         <Card aria-labelledby="test-title">
-          <CardHeader id="test-title" title="בדיקה על רשומה אחת" />
+          <CardHeader id="test-title" title="הרצה על רשומה אחת" />
           <CardBody>
             <TestRunForm orgId={orgId} automationId={automation.id} records={records} />
           </CardBody>

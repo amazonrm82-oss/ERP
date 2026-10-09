@@ -46,16 +46,16 @@ export function TrashRecordButton({ noun, action }: Props) {
         להעביר את {noun} לסל המחזור?
       </p>
       <p className="mt-1 text-sm text-ink-soft">
-        הרשומה תוסר מהרשימות. מנהלים יכולים לשחזר אותה מסל המחזור שבהגדרות.
+        הרשומה תוסר מהרשימות. אפשר לשחזר מסל המחזור במשך 30 יום.
       </p>
       <FormError message={error} className="mt-3" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="danger" size="sm" onClick={confirm} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "מעביר…" : "כן, להעביר לסל"}
+          {pending ? "מעביר…" : "העברה לסל המחזור"}
         </Button>
         {/* focus lands on the safe choice */}
         <Button variant="secondary" size="sm" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
-          ביטול
+          לא עכשיו
         </Button>
       </div>
     </div>

@@ -413,7 +413,7 @@ try {
 
   await ownerDesk.goto(`${orgUrl}/settings/users`);
   await ownerDesk.getByRole("button", { name: /השבתה.*דנה חברה/ }).click();
-  await ownerDesk.getByRole("button", { name: "כן, להשבית" }).click();
+  await ownerDesk.getByRole("button", { name: "השבתת המשתמש", exact: true }).click();
   await ownerDesk.locator("span", { hasText: /^מושבת$/ }).first().waitFor({ timeout: 15000 });
   await shot(ownerDesk, "11-suspended-1280");
 
@@ -510,7 +510,7 @@ try {
   step("recycle bin: trash a contact, restore it");
   await ownerDesk.goto(contactUrl);
   await ownerDesk.getByRole("button", { name: "העברה לסל המחזור" }).click();
-  await ownerDesk.getByRole("button", { name: "כן, להעביר לסל" }).click();
+  await ownerDesk.getByRole("button", { name: "העברה לסל המחזור", exact: true }).click();
   await ownerDesk.waitForURL(/\/contacts$/);
   await ownerDesk.goto(`${orgUrl}/settings/trash`);
   await expectText(ownerDesk, "משה כהן");
@@ -527,11 +527,11 @@ try {
   await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
   const purgedLeadId = new URL(ownerDesk.url()).pathname.split("/").pop();
   await ownerDesk.getByRole("button", { name: "העברה לסל המחזור" }).click();
-  await ownerDesk.getByRole("button", { name: "כן, להעביר לסל" }).click();
+  await ownerDesk.getByRole("button", { name: "העברה לסל המחזור", exact: true }).click();
   await ownerDesk.waitForURL(/\/leads$/);
   await ownerDesk.goto(`${orgUrl}/settings/trash`);
   await ownerDesk.getByRole("button", { name: /מחיקה לצמיתות.*ליד למחיקה/ }).click();
-  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("group", { name: /למחוק לצמיתות/ }).getByRole("button", { name: "מחיקה לצמיתות", exact: true }).click();
   await expectText(ownerDesk, "סל המחזור ריק");
   const purgedLeft = await sql("select count(*)::int as n from public.leads where id = $1", [purgedLeadId]);
   if (purgedLeft[0].n !== 0) throw new Error("the purged lead is still in the database");
@@ -626,7 +626,7 @@ try {
   await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();
   await ownerDesk.getByRole("button", { name: /מחיקת הפרטים מהיומן.*ליד למחיקה/ }).click();
   await shot(ownerDesk, "23b-audit-erase-1280");
-  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("group", { name: /למחוק את הפרטים/ }).getByRole("button", { name: "מחיקת הפרטים מהיומן", exact: true }).click();
   await expectText(ownerDesk, "לא נמצאה ביומן רשומה שנמחקה לצמיתות");
   const leftInLog = await sql("select count(*)::int as n from public.audit_log where entity_id = $1 and changes::text like '%ליד למחיקה%'", [purgedLeadId]);
   if (leftInLog[0].n !== 0) throw new Error("the erased lead's name is still in the audit log");
@@ -648,7 +648,7 @@ try {
   const openedFile = await ownerDesk.request.get(`${APP}${imageHref}`);
   if (openedFile.status() !== 200 || !(openedFile.headers()["content-type"] ?? "").startsWith("image/png")) throw new Error(`file did not open: ${openedFile.status()}`);
   await ownerDesk.getByRole("button", { name: /מחיקה.*הצעת מחיר\.pdf/ }).click();
-  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("group", { name: /למחוק את הקובץ/ }).getByRole("button", { name: "מחיקה", exact: true }).click();
   await ownerDesk.getByRole("link", { name: "הצעת מחיר.pdf" }).waitFor({ state: "detached", timeout: 15000 });
   const objectsLeft = await sql("select count(*)::int as n from storage.objects o join public.files f on f.storage_path = o.name where f.name = 'הצעת מחיר.pdf'");
   if (objectsLeft[0].n !== 0) throw new Error("the deleted file is still in storage");
@@ -685,7 +685,7 @@ try {
   // the in-use status cannot be deleted
   const usedStatus = ownerDesk.locator("li", { has: ownerDesk.locator('input[name="name"][value="הומר"]') });
   await usedStatus.getByRole("button", { name: "מחיקה" }).click();
-  await usedStatus.getByRole("button", { name: "כן" }).click();
+  await usedStatus.getByRole("group", { name: /למחוק את הסטטוס/ }).getByRole("button", { name: "מחיקה", exact: true }).click();
   await usedStatus.getByText("יש לידים בסטטוס הזה").waitFor({ timeout: 15000 });
   await shot(ownerDesk, "31-lead-settings-1280");
 
@@ -1212,8 +1212,8 @@ try {
   await ownerDesk.waitForURL(/\/settings\/automations\/[0-9a-f-]{36}$/);
   const builtRuleUrl = ownerDesk.url();
   await expectText(ownerDesk, "השווי לפחות (₪) 10,000");
-  await ownerDesk.getByLabel("רשומה לבדיקה").selectOption({ label: "משה כהן" });
-  await ownerDesk.getByRole("button", { name: "הרצת בדיקה" }).click();
+  await ownerDesk.getByLabel("הרשומה להרצה").selectOption({ label: "משה כהן" });
+  await ownerDesk.getByRole("button", { name: "הרצה אמיתית על הרשומה" }).click();
   await expectText(ownerDesk, "הבדיקה הסתיימה: כל הפעולות בוצעו");
   await ownerDesk.locator("li", { hasText: "הצליחה" }).first().waitFor();
   await ownerDesk.goto(dealUrl);
@@ -1359,7 +1359,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/import`);
   await shot(ownerDesk, "91-import-history-1280");
   await ownerDesk.getByRole("button", { name: /^ביטול הייבוא/ }).first().click();
-  await ownerDesk.getByRole("button", { name: /^(כן|אישור)/ }).first().click();
+  await ownerDesk.getByRole("group", { name: /לסל המחזור/ }).getByRole("button", { name: "ביטול הייבוא", exact: true }).click();
   await expectText(ownerDesk, "בוטל");
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("יובל מהקובץ")}`);
   if ((await ownerDesk.getByRole("link", { name: "יובל מהקובץ" }).count()) > 0) throw new Error("undo did not remove the imported lead");
@@ -1425,7 +1425,7 @@ try {
   if ((await tempCompanies()) !== 2) throw new Error("the contacts import did not create its company or matched the wrong one");
   await ownerDesk.goto(`${orgUrl}/settings/import`);
   await ownerDesk.getByRole("button", { name: /^ביטול הייבוא/ }).first().click();
-  await ownerDesk.getByRole("button", { name: /^(כן|אישור)/ }).first().click();
+  await ownerDesk.getByRole("group", { name: /לסל המחזור/ }).getByRole("button", { name: "ביטול הייבוא", exact: true }).click();
   // "בוטל" is already on the page from the leads import: wait for the database instead
   for (let i = 0; i < 40 && (await tempCompanies()) !== 1; i++) await new Promise((r) => setTimeout(r, 250));
   const left = (await sql("select name from public.companies where organization_id = $1 and deleted_at is null and name in ('חברה זמנית', 'אקסל בע\"מ')", [orgUrl.split("/").pop()])).map((r) => r.name);
@@ -1625,7 +1625,7 @@ try {
   await shot(ownerDesk, "110-account-1280");
   await ownerDesk.goto(`${orgUrl}/settings/business`);
   await ownerDesk.getByRole("button", { name: "חיוב אימות דו-שלבי לכולם" }).click();
-  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("group", { name: /לחייב את כל המשתמשים/ }).getByRole("button", { name: "חיוב אימות דו-שלבי לכולם", exact: true }).click();
   await expectText(ownerDesk, "כל המשתמשים בעסק חייבים אימות דו-שלבי");
   // Dana has no authenticator yet: she is sent to set one up before she can open the business
   await invitee.goto(`${orgUrl}/leads`);
@@ -1657,7 +1657,7 @@ try {
   const devices = await ownerDesk.locator("#account-sessions").locator("xpath=ancestor::section[1]").locator("li").count();
   console.log("devices listed for the owner:", devices);
   await ownerDesk.getByRole("button", { name: "ניתוק כל המכשירים האחרים" }).click();
-  await ownerDesk.getByRole("button", { name: "כן" }).click();
+  await ownerDesk.getByRole("group", { name: /לנתק את כל המכשירים/ }).getByRole("button", { name: "ניתוק כל המכשירים האחרים", exact: true }).click();
   // the list is re-read after the action: one device left (this one)
   const deviceRows = ownerDesk.locator("#account-sessions").locator("xpath=ancestor::section[1]").locator("li");
   for (let i = 0; i < 30 && (await deviceRows.count()) > 1; i++) await ownerDesk.waitForTimeout(500);
@@ -1748,7 +1748,7 @@ try {
   step("security: an admin resets the two-step verification of a member who lost everything");
   await lost.goto(`${orgUrl}/settings/users`);
   await lost.getByRole("button", { name: /איפוס אימות דו-שלבי.*דנה חברה/ }).click();
-  await lost.getByRole("button", { name: "כן" }).click();
+  await lost.getByRole("group", { name: /לאפס את האימות/ }).getByRole("button", { name: "איפוס אימות דו-שלבי", exact: true }).click();
   // Dana is signed out everywhere, and sets up a new authenticator at the next sign-in
   for (let i = 0; i < 20; i++) {
     await invitee.goto(`${orgUrl}/leads`);
@@ -1788,7 +1788,7 @@ try {
   await lost.waitForURL(/\/merge\?/);
   await lost.getByRole("radiogroup", { name: "שם מלא" }).getByLabel(/כפול ראשון/).check();
   await shot(lost, "117-merge-360");
-  await lost.getByRole("button", { name: "מיזוג" }).click();
+  await lost.getByRole("button", { name: "מיזוג הרשומות" }).click();
   await lost.waitForURL((url) => url.href === secondDupUrl, { timeout: 15000 });
   await lost.getByRole("heading", { name: "כפול ראשון", level: 1 }).waitFor();
   await expectText(lost, "מוזג עם רשומה כפולה");

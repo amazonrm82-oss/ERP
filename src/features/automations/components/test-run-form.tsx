@@ -15,13 +15,13 @@ type Props = { orgId: string; automationId: string; records: Array<{ id: string;
 export function TestRunForm({ orgId, automationId, records }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(testRunAction.bind(null, orgId, automationId), null);
   if (records.length === 0) {
-    return <p className="text-md text-ink-soft">אין עדיין רשומות מהסוג הזה לבדיקה.</p>;
+    return <p className="text-md text-ink-soft">אין עדיין רשומות מהסוג הזה להרצה.</p>;
   }
   return (
     <form action={formAction} className="space-y-3" noValidate>
       <p className="text-sm text-ink-soft">הפעולות יבוצעו באמת על הרשומה שתבחרו (התנאים לא נבדקים). התוצאה מופיעה ביומן.</p>
       <div className="flex flex-wrap items-end gap-2">
-        <SelectField label="רשומה לבדיקה" name="entity_id" defaultValue="" className="min-w-0 flex-[1_1_14rem]">
+        <SelectField label="הרשומה להרצה" name="entity_id" defaultValue="" className="min-w-0 flex-[1_1_14rem]">
           <option value="" disabled>
             בחירה
           </option>
@@ -32,7 +32,7 @@ export function TestRunForm({ orgId, automationId, records }: Props) {
           ))}
         </SelectField>
         <SubmitButton variant="secondary" pendingText="מריץ…">
-          הרצת בדיקה
+          הרצה אמיתית על הרשומה
         </SubmitButton>
       </div>
       <FormError message={state && !state.ok ? state.message : null} />
