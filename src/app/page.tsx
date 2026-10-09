@@ -10,6 +10,7 @@ import { LIVE_FEATURES, SOON_FEATURES } from "@/features/landing/catalog";
 import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
+import { SUPPORT } from "@/lib/support";
 import desktopShot from "@/assets/landing/desktop.webp";
 import phoneShot from "@/assets/landing/phone.webp";
 
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 
 // "דברו איתנו" leads to Mexuz's own lead form, built in the system (LND-12).
 // The address is a setting; without it the button is not shown.
-const CONTACT_FORM_URL = process.env.NEXT_PUBLIC_CONTACT_FORM_URL?.trim() || null;
+const CONTACT_FORM_URL = SUPPORT.formUrl;
 
 // The public landing page (LND-01 to LND-05, LND-09 to LND-12). A signed-in
 // visitor never sees it: the proxy sends them into the app first (LND-06).

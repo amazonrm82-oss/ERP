@@ -334,6 +334,15 @@ try {
   await expectText(invitee, "כבר יש לך גישה לעסק הזה");
   if (await invitee.getByRole("button", { name: "הצטרפות לעסק" }).count()) throw new Error("a used invitation still offers to join");
 
+  step("plan and usage: the owner sees the plan and each limit, a member is sent to the owner (FXU-04)");
+  await owner.goto(`${orgUrl}/settings/plan`);
+  await expectText(owner, "שימוש מול מכסות החבילה");
+  await expectText(owner, "רשומות (לידים, אנשי קשר, חברות ועסקאות)");
+  await owner.getByRole("meter", { name: /רשומות/ }).waitFor();
+  await shot(owner, "05b-plan-usage-360");
+  await invitee.goto(`${orgUrl}/settings/plan`);
+  await expectText(invitee, "פנו לבעלים של העסק");
+
   // ---------------------------------------------------------------- owner manages, desktop
   step("owner: change role, team, suspend");
   const ownerDesk = await newPage(1280);

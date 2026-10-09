@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from "react";
 import {
   BoardIcon,
   BoltIcon,
+  ChartIcon,
   BuildingIcon,
   FormIcon,
   InboxIcon,
@@ -46,6 +47,9 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsBusiness(orgId), label: "פרטי העסק", description: "שם, ענף, טלפון, אבטחה וגישת תמיכה", icon: BuildingIcon },
         { href: paths.settingsUsers(orgId), label: "משתמשים", description: "הזמנת עובדים, תפקידים והרשאות", icon: UsersIcon },
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
+        ...(access.admin
+          ? [{ href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon }]
+          : []),
       ],
     },
     {

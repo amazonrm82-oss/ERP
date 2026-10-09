@@ -999,6 +999,8 @@ export type Database = {
       sort_contact: { Args: Record<string, never>; Returns: string | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
+      // plan, limits and usage of a business, members only (migration 0046, FXU-04)
+      org_plan_usage: { Args: { p_org: string }; Returns: Json };
       my_agreement: { Args: Record<string, never>; Returns: Json };
       // global search (migration 0017), security invoker: { leads, contacts, companies, deals, notes }
       search_records: { Args: { p_org: string; p_query: string; p_limit?: number }; Returns: Json };

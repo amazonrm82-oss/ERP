@@ -54,6 +54,7 @@ export const paths = {
   settingsAudit: (orgId: string) => `/o/${orgId}/settings/audit`,
   settingsAccount: (orgId: string) => `/o/${orgId}/settings/account`,
   settingsTrash: (orgId: string) => `/o/${orgId}/settings/trash`,
+  settingsPlan: (orgId: string) => `/o/${orgId}/settings/plan`,
   settingsTeams: (orgId: string) => `/o/${orgId}/settings/teams`,
   settingsTeam: (orgId: string, teamId: string) => `/o/${orgId}/settings/teams/${teamId}`,
   invite: (token: string) => `/invite/${token}`,

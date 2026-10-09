@@ -1,3 +1,5 @@
+import { SUPPORT_PHONE } from "@/lib/support-phone";
+
 // The legal documents. The current text is an interim one, written before a
 // lawyer has reviewed it, at the owner's request (7 October 2026, docs/DECISIONS.md).
 // Details only the owner can fill in are written as BLANK placeholders and shown
@@ -27,7 +29,7 @@ export const BLANK = {
 
 /** Details the owner has given (8 October 2026, docs/DECISIONS.md). */
 export const DETAILS = {
-  phone: "052-5621437",
+  phone: SUPPORT_PHONE,
   coordinator: "מתן זזון",
   email: "zazonmatan@gmail.com",
   // the same address for privacy requests, until the owner gives another

@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Wordmark } from "@/components/wordmark";
-import { DETAILS, LEGAL_DOCUMENTS } from "@/features/legal/documents";
-import { whatsappUrl } from "@/lib/format";
+import { LEGAL_DOCUMENTS } from "@/features/legal/documents";
+import { SUPPORT } from "@/lib/support";
 import { APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
 
@@ -32,9 +32,6 @@ export function PublicShell({ children }: { children: ReactNode }) {
   );
 }
 
-// the owner's phone and WhatsApp, in international form for the links
-const CONTACT_E164 = `+972${DETAILS.phone.replace(/\D/g, "").replace(/^0/, "")}`;
-
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-canvas">
@@ -58,10 +55,10 @@ export function SiteFooter() {
         {/* a way to reach us from every public page (LND-09) */}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>יצירת קשר:</span>
-          <a href={`tel:${CONTACT_E164}`} className="underline-offset-4 hover:underline">
-            <span dir="ltr">{DETAILS.phone}</span>
+          <a href={SUPPORT.telHref} className="underline-offset-4 hover:underline">
+            <span dir="ltr">{SUPPORT.phone}</span>
           </a>
-          <a href={whatsappUrl(CONTACT_E164) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">
+          <a href={SUPPORT.whatsappHref} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">
             <span dir="ltr">WhatsApp</span>
             <span className="sr-only">(נפתח בחלון חדש)</span>
           </a>

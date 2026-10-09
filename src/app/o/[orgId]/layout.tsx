@@ -12,6 +12,7 @@ import { AvailabilityToggle } from "@/features/shell/components/availability-tog
 import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
+import { isAdminRole } from "@/features/settings/permissions";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
 import { getOrgContext } from "@/features/shell/queries";
 import { daysUntil, formatDateTime } from "@/lib/format";
@@ -100,7 +101,15 @@ export default async function OrgLayout({ children, params }: Props) {
 
       {notice ? (
         <p role="status" className="border-b border-line bg-warning-soft px-4 py-2.5 text-sm text-warning sm:px-6">
-          {notice}
+          {notice}{" "}
+          {/* FXU-04: the next step, for who can take it */}
+          {isAdminRole(context.role) ? (
+            <Link href={paths.settingsPlan(org.id)} className="font-medium underline underline-offset-4">
+              לחבילה ושימוש
+            </Link>
+          ) : (
+            <span>לטיפול, פנו לבעלים של העסק.</span>
+          )}
         </p>
       ) : null}
 

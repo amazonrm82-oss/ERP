@@ -198,6 +198,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
+  returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
+  from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
