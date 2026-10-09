@@ -507,6 +507,30 @@ try {
   await invitee.goto(`${orgUrl}/tasks`);
   await expectText(invitee, "משימה לדנה");
 
+  step("tasks: put off to next week and hand over, straight from the list (TASK-05)");
+  const taskOrg = orgUrl.split("/").pop();
+  const quoteTask = () =>
+    sql(
+      "select to_char(due_at at time zone 'Asia/Jerusalem', 'YYYY-MM-DD HH24:MI') as due, (now() at time zone 'Asia/Jerusalem')::date + 7 as week, owner_id from public.tasks where title = 'לשלוח הצעת מחיר למשה' and organization_id = $1",
+      [taskOrg],
+    );
+  await ownerDesk.goto(`${orgUrl}/tasks?who=all`);
+  await ownerDesk.getByRole("button", { name: /^לעוד שבוע.*לשלוח הצעת מחיר למשה/ }).click();
+  let snoozed;
+  for (let i = 0; i < 60; i++) {
+    [snoozed] = await quoteTask();
+    if (snoozed.due.startsWith(new Date(snoozed.week).toISOString().slice(0, 10))) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (snoozed.due.slice(11) !== "16:30" || !snoozed.due.startsWith(new Date(snoozed.week).toISOString().slice(0, 10))) throw new Error(`snooze: ${JSON.stringify(snoozed)}`);
+  await ownerDesk.getByLabel("אחראי: לשלוח הצעת מחיר למשה").selectOption({ label: "דנה חברה" });
+  for (let i = 0; i < 60; i++) {
+    [snoozed] = await quoteTask();
+    if (snoozed.owner_id !== null && (await sql("select full_name from public.profiles where id = $1", [snoozed.owner_id]))[0]?.full_name === "דנה חברה") break;
+    await new Promise((r) => setTimeout(r, 250));
+    if (i === 59) throw new Error("reassign from the list did not save");
+  }
+
   step("recycle bin: trash a contact, restore it");
   await ownerDesk.goto(contactUrl);
   await ownerDesk.getByRole("button", { name: "העברה לסל המחזור" }).click();

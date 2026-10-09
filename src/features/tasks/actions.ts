@@ -6,7 +6,8 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { TaskInsert, TaskStatus } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { zoneDate, zonedIso } from "@/lib/format";
+import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
+import { INVALID_ARGS } from "@/lib/action-args";
 import { addDays } from "@/lib/calendar-grid";
 import { recordPage } from "@/lib/record-types";
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
@@ -177,5 +178,55 @@ export async function addRecordTaskAction(orgId: string, subject: TimelineSubjec
   }
   revalidateTasks(orgId);
   revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
+  return ok();
+}
+
+const SNOOZE_DAYS = { tomorrow: 1, week: 7 } as const;
+export type SnoozeWhen = keyof typeof SNOOZE_DAYS;
+
+/**
+ * Put a task off in one tap (TASK-05): to tomorrow or a week from today, at the
+ * time of day it had (the start of the working day if it had none). A reminder
+ * moves with it, the same time before.
+ */
+export async function snoozeTaskAction(orgId: string, taskId: string, when: SnoozeWhen): Promise<ActionResult> {
+  if (typeof when !== "string" || !(when in SNOOZE_DAYS)) {
+    return fail(INVALID_ARGS);
+  }
+  const context = await actionContext(orgId, taskId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data: task, error: readError } = await context.supabase
+    .from("tasks")
+    .select("due_at, remind_at")
+    .eq("organization_id", orgId)
+    .eq("id", taskId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (readError) {
+    return fail(dbErrorMessage(readError));
+  }
+  if (!task) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  const time = task.due_at ? zoneTime(new Date(task.due_at)) : DEFAULT_DUE_TIME;
+  const due = dueAt(addDays(zoneDate(new Date()), SNOOZE_DAYS[when]), time);
+  const remind = task.due_at && task.remind_at && due ? new Date(Date.parse(due) - (Date.parse(task.due_at) - Date.parse(task.remind_at))).toISOString() : null;
+
+  const { data, error } = await context.supabase
+    .from("tasks")
+    .update({ due_at: due, remind_at: remind })
+    .eq("organization_id", orgId)
+    .eq("id", taskId)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לדחות את המשימה. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateTasks(orgId);
   return ok();
 }

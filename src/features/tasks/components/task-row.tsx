@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/field";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { cn } from "@/lib/cn";
 
-import { completeTaskAction, reopenTaskAction, updateTaskAction } from "../actions";
+import { inlineEditAction } from "@/features/inline-edit/actions";
+
+import { completeTaskAction, reopenTaskAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
 export type TaskRowView = {
@@ -36,6 +39,19 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // TASK-05: put off in one tap, or hand over to someone else, without opening the form
+  function run(action: () => Promise<{ ok: boolean; message?: string }>) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) setError(result.message ?? null);
+    });
+  }
+  const snooze = (when: SnoozeWhen) => run(() => snoozeTaskAction(orgId, task.id, when));
+  const reassign = (ownerId: string) => run(() => inlineEditAction(orgId, "task", task.id, "owner", { id: ownerId }));
+  const owners =
+    task.ownerId && !assignees.some((a) => a.userId === task.ownerId) ? [{ userId: task.ownerId, name: task.ownerName ?? "משתמש" }, ...assignees] : assignees;
 
   function toggle() {
     setError(null);
@@ -89,6 +105,36 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
             {pending ? "מעדכנים…" : task.done ? "החזרה לפתוחות" : "בוצע"}
             <span className="sr-only">: {task.title}</span>
           </Button>
+        </div>
+      ) : null}
+      {canEdit && !task.done ? (
+        <div className="flex w-full flex-wrap items-center gap-2" role="group" aria-label={`פעולות מהירות: ${task.title}`}>
+          <span className="text-sm text-ink-soft">דחייה:</span>
+          <Button variant="ghost" size="sm" onClick={() => snooze("tomorrow")} disabled={pending}>
+            למחר
+            <span className="sr-only">: {task.title}</span>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => snooze("week")} disabled={pending}>
+            לעוד שבוע
+            <span className="sr-only">: {task.title}</span>
+          </Button>
+          {showOwner && owners.length > 1 ? (
+            <Select
+              controlSize="sm"
+              aria-label={`אחראי: ${task.title}`}
+              className="ms-auto w-auto max-w-48"
+              value={task.ownerId ?? ""}
+              disabled={pending}
+              onChange={(event) => reassign(event.target.value)}
+            >
+              {task.ownerId ? null : <option value="">ללא אחראי</option>}
+              {owners.map((a) => (
+                <option key={a.userId} value={a.userId}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
         </div>
       ) : null}
     </li>
