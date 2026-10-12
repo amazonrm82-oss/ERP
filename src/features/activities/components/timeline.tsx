@@ -7,8 +7,9 @@ import { formatDateTime } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
 
 import { getTimeline } from "../queries";
-import { canPinHint, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
+import { canPinHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
 import { NoteForm } from "./note-form";
+import { NoteText } from "./note-text";
 import { PinButton } from "./pin-button";
 
 type Props = {
@@ -82,7 +83,10 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                     <PinButton orgId={orgId} subject={subject} activityId={item.id} pinned={item.pinned} label={item.label} />
                   ) : null}
                 </div>
-                {item.text ? (
+                {item.text && isPinnableType(item.type) ? (
+                  // REC-04: what a person logged may carry basic formatting
+                  <NoteText text={item.text} className="mt-1" />
+                ) : item.text ? (
                   <p className={cn("mt-1 break-words whitespace-pre-wrap", !item.isUserContent && "text-ink-soft")}>
                     {item.text}
                   </p>

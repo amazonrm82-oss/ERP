@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { optionalText, requiredText } from "@/lib/validation";
 
+import { sanitizeNote } from "./markdown";
+
+// REC-04: what a person writes is stored as cleaned Markdown (see markdown.ts)
+const cleanNote = (value: unknown) => (typeof value === "string" ? sanitizeNote(value) : value);
+
 export const SUBJECT_KINDS = ["lead", "contact", "company", "deal"] as const;
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
 
@@ -80,7 +85,7 @@ export function timelineFilterHref(recordHref: string, key: TimelineFilterKey): 
 
 export const noteSchema = z.object({
   type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
-  body: requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים)."),
+  body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
 });
 
 export const SUBJECT_COLUMN = {
@@ -107,7 +112,7 @@ export const NEXT_STEPS = [
 
 export const callLogSchema = z.object({
   outcome: z.enum(["answered", "no_answer", "voicemail", "call_back"], { error: "יש לבחור איך הסתיימה השיחה." }),
-  body: optionalText(5000, "ההערה ארוכה מדי (עד 5,000 תווים)."),
+  body: z.preprocess(cleanNote, optionalText(5000, "ההערה ארוכה מדי (עד 5,000 תווים).")),
   next: z.preprocess((value) => value ?? "none", z.enum(["none", "tomorrow", "week"], { error: "יש לבחור מה הלאה." })),
   next_title: optionalText(300, "הכותרת ארוכה מדי (עד 300 תווים)."),
 });

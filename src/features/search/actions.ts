@@ -1,5 +1,6 @@
 "use server";
 
+import { notePlainText } from "@/features/activities/markdown";
 import { getSessionUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
@@ -42,7 +43,8 @@ export async function searchAction(orgId: string, query: string): Promise<Search
           : str(r.company_id)
             ? paths.company(orgId, String(r.company_id))
             : null;
-    return href ? { title: str(r.body) ?? "", subtitle: ACTIVITY_LABELS[String(r.type)] ?? null, href } : null;
+    // REC-04: a note's formatting marks are not shown in a one-line result
+    return href ? { title: notePlainText(str(r.body) ?? ""), subtitle: ACTIVITY_LABELS[String(r.type)] ?? null, href } : null;
   });
   return hits;
 }

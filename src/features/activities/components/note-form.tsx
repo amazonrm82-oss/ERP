@@ -3,12 +3,13 @@
 import { useActionState } from "react";
 
 import { FormError } from "@/components/ui/feedback";
-import { SelectField, TextareaField } from "@/components/ui/field";
+import { SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { addNoteAction } from "../actions";
 import { LOGGED_TYPES, type TimelineSubject } from "../schema";
+import { NoteEditor } from "./note-editor";
 
 export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineSubject }) {
   const [state, formAction] = useActionState<FormState, FormData>(addNoteAction.bind(null, orgId, subject), null);
@@ -24,7 +25,7 @@ export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineS
           </option>
         ))}
       </SelectField>
-      <TextareaField
+      <NoteEditor
         label="תיעוד"
         name="body"
         rows={3}

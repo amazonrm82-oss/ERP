@@ -255,6 +255,35 @@ try {
     await owner.goto(leadUrl);
   }
 
+  step("a note with bold, a list and a link; typed HTML stays text (REC-04)");
+  {
+    const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
+    const box = timeline.getByLabel("תיעוד");
+    await box.fill("מחיר סופי");
+    await box.selectText();
+    await timeline.getByRole("button", { name: /^מודגש/ }).click();
+    await box.press("End");
+    await box.pressSequentially("\nלשלוח הצעה\nלתאם פגישה <b>x</b>\n");
+    // the list button marks the line the caret is on
+    await box.press("ArrowUp");
+    await timeline.getByRole("button", { name: /^רשימה$/ }).click();
+    await box.press("ArrowUp");
+    await timeline.getByRole("button", { name: /^רשימה$/ }).click();
+    await box.press("Control+End");
+    await box.pressSequentially("[האתר](https://example.com) [רע](javascript:alert(1))");
+    await timeline.getByRole("button", { name: "הוספה לציר הזמן" }).click();
+    await timeline.locator("strong", { hasText: "מחיר סופי" }).waitFor({ timeout: 15000 });
+    await timeline.locator("ul > li", { hasText: "לשלוח הצעה" }).waitFor();
+    const link = timeline.getByRole("link", { name: /האתר/ });
+    if ((await link.getAttribute("href")) !== "https://example.com/") throw new Error("the note link has the wrong address");
+    if ((await link.getAttribute("rel")) !== "noopener noreferrer" || (await link.getAttribute("target")) !== "_blank") throw new Error("the note link is not isolated");
+    if ((await timeline.getByRole("link", { name: /^רע/ }).count()) !== 0) throw new Error("a javascript: link was rendered");
+    await timeline.getByText("<b>x</b>", { exact: false }).waitFor();
+    const leadIdMd = owner.url().split("/leads/")[1];
+    const [{ body }] = await sql("select body from public.activities where lead_id = $1 and body like '%מחיר סופי%'", [leadIdMd]);
+    if (!body.startsWith("**מחיר סופי**") || body.includes("javascript:")) throw new Error(`stored note: ${body}`);
+  }
+
   step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
   const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");
