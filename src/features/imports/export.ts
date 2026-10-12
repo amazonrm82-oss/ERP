@@ -23,6 +23,7 @@ const TABLES: Array<{ table: TableName; file: string }> = [
   { table: "stages", file: "stages.csv" },
   { table: "lead_statuses", file: "lead_statuses.csv" },
   { table: "lead_sources", file: "lead_sources.csv" },
+  { table: "disqualify_reasons", file: "disqualify_reasons.csv" },
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
   { table: "teams", file: "teams.csv" },

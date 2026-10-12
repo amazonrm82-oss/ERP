@@ -107,6 +107,7 @@ describe("tenant isolation", () => {
           [orgA],
         )
       ).rows[0].id;
+      await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'קנה אצל מתחרה')", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -143,6 +144,7 @@ describe("tenant isolation", () => {
     "list_preferences",
     "meetings",
     "meeting_participants",
+    "disqualify_reasons",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -251,6 +253,7 @@ describe("tenant isolation", () => {
       meetings: "title = title",
       // no update grant at all: a permission error is the expected outcome
       meeting_participants: "user_id = user_id",
+      disqualify_reasons: "name = name",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -319,6 +322,7 @@ describe("tenant isolation", () => {
       // no organizer: the policy, not the organizer trigger, has to refuse it
       ["insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour')", [orgA]],
       ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
+      ["insert into public.disqualify_reasons (organization_id, name) values ($1, 'x')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -371,6 +375,7 @@ describe("tenant isolation", () => {
       ["list_preferences", "columns = '[{\"key\": \"HACKED\"}]'", "columns::text like '%HACKED%'"],
       ["meetings", "outcome = 'HACKED'", "outcome = 'HACKED'"],
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
+      ["disqualify_reasons", "is_active = false", "not is_active"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

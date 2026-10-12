@@ -31,10 +31,12 @@ type Props = {
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
   tags: TagOption[];
+  // the organization's active "not relevant" reasons (LEAD-03)
+  reasons: string[];
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -57,6 +59,7 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
       canTrash={editing.bulk?.trash ?? false}
       exportPath={editing.bulk?.exportable ? `${paths.leads(orgId)}/export` : null}
       enabled={editing.bulk !== null}
+      reasons={reasons}
     >
       <ListTable
         label="טבלת לידים"
@@ -119,6 +122,7 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
                   label={`סטטוס: ${leadDisplayName(lead)}`}
                   initial={{ id: lead.statusId }}
                   options={statusOptions}
+                  reasons={reasons}
                   canEdit={status?.kind !== "converted" && editing.canEdit(lead.ownerId)}
                 >
                   <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>

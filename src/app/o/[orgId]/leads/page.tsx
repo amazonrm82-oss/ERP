@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { inlineEditing } from "@/features/inline-edit/server";
+import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadCards } from "@/features/leads/components/lead-cards";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
@@ -59,13 +60,14 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
-  const [editing, lookups, tags, viewData, list, board] = await Promise.all([
+  const [editing, lookups, tags, viewData, list, board, reasons] = await Promise.all([
     inlineEditing(orgId, context),
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
     boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort, filter: filter.logic }),
     boardView ? getLeadBoard(orgId, { search, tagId, filter: filter.logic }) : null,
+    canWrite ? activeReasonNames(orgId) : [],
   ]);
   const leads = list?.leads ?? [];
   const hasMore = list?.hasMore ?? false;
@@ -184,7 +186,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       <LeadFilters orgId={orgId} statuses={lookups.statuses} tags={tags} search={search} statusId={statusId ?? ""} tagId={tagId ?? ""} board={boardView} />
 
       {board ? (
-        <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} />
+        <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} />
       ) : leads.length > 0 ? (
         <>
           <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} className="md:hidden" />
@@ -201,6 +203,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               sortHref={sortHref}
               editing={editing}
               tags={tags}
+              reasons={reasons}
             />
           </div>
         </>

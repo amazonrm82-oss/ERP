@@ -43,6 +43,7 @@ export const paths = {
   transferRecords: (orgId: string, userId: string) => `/o/${orgId}/settings/users/${userId}/transfer`,
   settingsPipelines: (orgId: string) => `/o/${orgId}/settings/pipelines`,
   settingsLeads: (orgId: string) => `/o/${orgId}/settings/leads`,
+  settingsDisqualifyReasons: (orgId: string) => `/o/${orgId}/settings/lead-reasons`,
   settingsFields: (orgId: string) => `/o/${orgId}/settings/fields`,
   settingsTags: (orgId: string) => `/o/${orgId}/settings/tags`,
   settingsIntake: (orgId: string) => `/o/${orgId}/settings/intake`,

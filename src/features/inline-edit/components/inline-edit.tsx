@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 import { PencilIcon } from "@/components/ui/icons";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 
 import { inlineEditAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
 
@@ -27,6 +28,8 @@ type Props = {
   // a choice for "nothing" (no owner), shown first
   emptyOption?: string;
   canEdit: boolean;
+  // a choice that needs a reason: the organization's list (LEAD-03); empty: typed in freely
+  reasons?: string[];
 };
 
 /**
@@ -34,7 +37,7 @@ type Props = {
  * Enter saves and Escape cancels. The database decides whether the change is
  * allowed; the pencil is only a hint for who may edit.
  */
-export function InlineEdit({ orgId, object, id, field, children, label, kind, initial, options = [], emptyOption, canEdit }: Props) {
+export function InlineEdit({ orgId, object, id, field, children, label, kind, initial, options = [], emptyOption, canEdit, reasons = [] }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState<InlineValue>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -133,14 +136,7 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
         <Input aria-label={label} controlSize="sm" autoFocus maxLength={200} value={value.text ?? ""} onChange={(e) => setValue({ ...value, text: e.target.value })} />
       )}
       {chosen?.needsReason ? (
-        <Input
-          aria-label="סיבה"
-          placeholder="למה לא רלוונטי?"
-          controlSize="sm"
-          maxLength={500}
-          value={value.reason ?? ""}
-          onChange={(e) => setValue({ ...value, reason: e.target.value })}
-        />
+        <DisqualifyReasonField reasons={reasons} variant="bare" label="סיבה" controlSize="sm" value={value.reason ?? ""} onChange={(reason) => setValue({ ...value, reason })} />
       ) : null}
       <FormError message={error} />
       <div className="flex gap-1">

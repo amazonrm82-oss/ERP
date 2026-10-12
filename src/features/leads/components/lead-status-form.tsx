@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 
 import { FormError } from "@/components/ui/feedback";
-import { SelectField, TextField } from "@/components/ui/field";
+import { SelectField } from "@/components/ui/field";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { submitWith } from "@/lib/use-submit";
@@ -11,7 +12,8 @@ import { submitWith } from "@/lib/use-submit";
 import { changeLeadStatusAction } from "../actions";
 import type { LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; leadId: string; currentStatusId: string; statuses: LeadStatusOption[] };
+// reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
+type Props = { orgId: string; leadId: string; currentStatusId: string; statuses: LeadStatusOption[]; reasons: string[] };
 
 /**
  * Status picker of a lead. The change is saved with an explicit button (not on
@@ -19,8 +21,9 @@ type Props = { orgId: string; leadId: string; currentStatusId: string; statuses:
  * one. A "not relevant" status asks for the reason first.
  * The parent remounts this component (key) when the saved status changes.
  */
-export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses }: Props) {
+export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses, reasons }: Props) {
   const [selected, setSelected] = useState(currentStatusId);
+  const [reason, setReason] = useState("");
   const [state, dispatch, pending] = useActionState<FormState, FormData>(
     changeLeadStatusAction.bind(null, orgId, leadId),
     null,
@@ -44,13 +47,12 @@ export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses }: Pro
         ))}
       </SelectField>
       {changed && needsReason ? (
-        <TextField
+        <DisqualifyReasonField
+          reasons={reasons}
           label="למה הליד לא רלוונטי?"
           name="disqualify_reason"
-          required
-          maxLength={500}
-          autoComplete="off"
-          defaultValue={failure?.values?.disqualify_reason}
+          value={reason}
+          onChange={setReason}
           error={failure?.fieldErrors?.disqualify_reason}
         />
       ) : null}

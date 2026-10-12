@@ -4,7 +4,8 @@ import { createContext, useContext, useId, useState, useTransition, type ReactNo
 
 import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { Input, Select } from "@/components/ui/field";
+import { Select } from "@/components/ui/field";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 
 import { RECORD_TYPES } from "@/lib/record-types";
 
@@ -49,6 +50,8 @@ type Props = {
   exportPath: string | null;
   // false: the list is shown as is, without checkboxes (a viewer)
   enabled: boolean;
+  // leads: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
+  reasons?: string[];
   children: ReactNode;
 };
 
@@ -73,7 +76,7 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, children }: Props) {
+export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], children }: Props) {
   // a task has a "state" (מצב) rather than a status, and an assignee rather than an owner
   const labels: Record<Kind, string> =
     object === "task" ? { ...KIND_LABELS, status: "שינוי מצב", owner: "שינוי אחראי" } : KIND_LABELS;
@@ -114,7 +117,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   );
   const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
   const needsReason = kind === "status" && options.find((o) => o.value === value)?.needsReason;
-  const ready = kind === "trash" || (kind !== "" && value !== "");
+  const ready = kind === "trash" || (kind !== "" && value !== "" && (!needsReason || reason.trim() !== ""));
 
   // what the button says: the action, how many, and to what (FXU-06)
   const plural = RECORD_TYPES[object].plural;
@@ -281,14 +284,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             ) : null}
             {needsReason ? (
               <div className="w-56">
-                <Input
-                  aria-label="סיבה"
-                  placeholder="למה לא רלוונטי?"
-                  controlSize="sm"
-                  maxLength={500}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
+                <DisqualifyReasonField reasons={reasons} variant="bare" label="סיבה" controlSize="sm" value={reason} onChange={setReason} />
               </div>
             ) : null}
             {kind && !confirming ? (

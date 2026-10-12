@@ -808,6 +808,31 @@ try {
   const back = await boardStatus("חדש");
   if (back.reason !== null) throw new Error("the reason stayed after the lead was reopened");
 
+  step("'not relevant' reasons come from the organization's list once it has one (LEAD-03)");
+  await ownerDesk.goto(`${orgUrl}/settings/lead-reasons`);
+  await ownerDesk.getByRole("button", { name: /^הוספת הסיבות המוצעות/ }).click();
+  await ownerDesk.getByRole("textbox", { name: /^שם הסיבה קנה אצל מתחרה/ }).waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "25-lead-reasons-1280");
+  await ownerDesk.goto(`${orgUrl}/leads/${boardLeadId}`);
+  await ownerDesk.getByLabel(/^סטטוס$/).selectOption({ label: "לא רלוונטי" });
+  {
+    const reasonPicker = ownerDesk.getByRole("combobox", { name: /^למה הליד לא רלוונטי/ });
+    const offered = await reasonPicker.locator("option").allInnerTexts();
+    if (!offered.includes("המחיר גבוה מדי")) throw new Error(`the reasons list is not offered: ${offered.join(", ")}`);
+    await reasonPicker.selectOption({ label: "המחיר גבוה מדי" });
+  }
+  await ownerDesk.getByRole("button", { name: /^עדכון סטטוס/ }).click();
+  {
+    const listed = await boardStatus("לא רלוונטי");
+    if (listed.reason !== "המחיר גבוה מדי") throw new Error(`the reason from the list was not saved: ${listed.reason}`);
+  }
+  // back to an open status, so the later steps find the open leads they expect
+  // (a fresh page: the status form remounts after an update and would drop a quick pick)
+  await ownerDesk.reload();
+  await ownerDesk.getByLabel(/^סטטוס$/).selectOption({ label: "חדש" });
+  await ownerDesk.getByRole("button", { name: /^עדכון סטטוס/ }).click();
+  await boardStatus("חדש");
+
   step("lists: a click on a column header sorts by it, a second click reverses");
   await ownerDesk.goto(`${orgUrl}/leads`);
   const nameHeader = ownerDesk.getByRole("columnheader", { name: /^שם/ });

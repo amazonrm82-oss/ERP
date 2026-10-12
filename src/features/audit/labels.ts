@@ -16,6 +16,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   pipelines: "תהליך מכירה",
   stages: "שלב",
   field_definitions: "שדה מותאם",
+  // LEAD-03
+  disqualify_reasons: "סיבה לליד לא רלוונטי",
   subscriptions: "מנוי",
   support_access_grants: "גישת תמיכה",
   automations: "אוטומציה",

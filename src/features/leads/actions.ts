@@ -164,7 +164,7 @@ export async function changeLeadStatusAction(
   const result = await setLeadStatus(context.supabase, orgId, leadId, parsed.data.status_id, parsed.data.disqualify_reason ?? null);
   if (!result.ok) {
     return result.needsReason
-      ? fail(result.message, { fieldErrors: { disqualify_reason: "יש לציין סיבה." }, values: formValues(formData) })
+      ? fail(result.message, { fieldErrors: { disqualify_reason: result.message }, values: formValues(formData) })
       : fail(result.message);
   }
 

@@ -151,6 +151,12 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       if (!status) return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
       if (status.kind === "converted") return fail('כדי לסמן ליד כ"הומר" יש להשתמש בכפתור ההמרה.');
       if (status.kind === "disqualified" && !reason) return fail("יש לציין למה הלידים לא רלוונטיים.");
+      if (status.kind === "disqualified") {
+        // LEAD-03: from the organization's list when it keeps one (setLeadStatus checks each row again)
+        const { data: reasons, error: reasonsError } = await supabase.from("disqualify_reasons").select("name").eq("organization_id", orgId).eq("is_active", true);
+        if (reasonsError) return fail(dbErrorMessage(reasonsError));
+        if (reasons.length > 0 && !reasons.some((row) => row.name === reason)) return fail("יש לבחור סיבה מהרשימה.");
+      }
       changed = await eachLimited(live, async (row) => (await setLeadStatus(supabase, orgId, row.id, change.statusId, reason)).ok);
       undoRows = changed.map((row) => ({ id: row.id, status: row.status_id, reason: row.disqualify_reason ?? null }));
       break;

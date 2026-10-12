@@ -262,6 +262,17 @@ export type LeadSourceRow = {
   updated_at: string;
 };
 
+// LEAD-03: the reasons an organization offers for "not relevant" (migration disqualify_reasons)
+export type DisqualifyReasonRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TagRow = {
   id: string;
   organization_id: string;
@@ -853,6 +864,7 @@ export type Database = {
         LeadSourceRow,
         { organization_id: string; name: string; kind?: string; is_active?: boolean }
       >;
+      disqualify_reasons: Table<DisqualifyReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
       tags: Table<TagRow, { organization_id: string; name: string; color?: string | null }>;
       field_definitions: Table<
         FieldDefinitionRow,

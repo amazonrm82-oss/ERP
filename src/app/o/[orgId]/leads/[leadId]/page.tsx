@@ -19,6 +19,7 @@ import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
 import { attributionRows } from "@/features/intake/attribution";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
+import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
@@ -50,7 +51,12 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [lead, lookups, fields] = await Promise.all([getLead(orgId, leadId), getLeadLookups(orgId), listFieldDefinitions(orgId, "lead")]);
+  const [lead, lookups, fields, reasons] = await Promise.all([
+    getLead(orgId, leadId),
+    getLeadLookups(orgId),
+    listFieldDefinitions(orgId, "lead"),
+    activeReasonNames(orgId),
+  ]);
   const tags = await listTags(orgId);
   if (!lead) {
     notFound();
@@ -128,6 +134,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
                   leadId={lead.id}
                   currentStatusId={lead.status_id}
                   statuses={lookups.statuses}
+                  reasons={reasons}
                 />
                 <div className="border-t border-line pt-5">
                   <ConvertLeadPanel

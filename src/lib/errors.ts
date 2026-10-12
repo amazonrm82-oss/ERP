@@ -35,6 +35,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // not limits, but raised the same way (migrations 0026, 0027)
   "erase:exists": "הרשומה עדיין קיימת. קודם מעבירים אותה לסל המחזור ומוחקים משם לצמיתות.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
+  // LEAD-03 (migration disqualify_reasons)
+  "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
+  "reasons:max": "אפשר לשמור עד 50 סיבות. מחקו סיבה שלא בשימוש כדי להוסיף חדשה.",
 };
 
 // P0001 raised without a hint: recognised by the (stable) English message.

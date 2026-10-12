@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { TextField } from "@/components/ui/field";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import { cn } from "@/lib/cn";
 import type { LeadStatusKind } from "@/lib/database.types";
 import { formatNumber } from "@/lib/format";
@@ -22,14 +22,15 @@ const columnRule: Record<LeadStatusKind, string> = {
 
 const DRAG_TYPE = "application/x-lead-id";
 
-type Props = { orgId: string; board: LeadBoard; canWrite: boolean };
+// reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
+type Props = { orgId: string; board: LeadBoard; canWrite: boolean; reasons: string[] };
 
 /**
  * Leads by status, one column per status a lead can be moved to by hand.
  * Cards are dragged with a mouse; the status menu on every card does the same
  * with a keyboard or a touch screen. A drop on "not relevant" asks for the reason.
  */
-export function LeadsBoard({ orgId, board, canWrite }: Props) {
+export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
   const [cards, moveOptimistic] = useOptimistic(board.cards, (current: LeadBoardCard[], move: { leadId: string; statusId: string }) =>
     current.map((card) => (card.id === move.leadId ? { ...card, statusId: move.statusId } : card)),
   );
@@ -94,12 +95,11 @@ export function LeadsBoard({ orgId, board, canWrite }: Props) {
             setAsking(null);
           }}
         >
-          <TextField
+          <DisqualifyReasonField
+            reasons={reasons}
             label={`למה הליד ${nameOf(asking.card)} לא רלוונטי?`}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={500}
-            required
+            onChange={setReason}
             autoFocus
             className="min-w-56 flex-1"
           />
@@ -194,6 +194,7 @@ export function LeadsBoard({ orgId, board, canWrite }: Props) {
                                 leadName={nameOf(card)}
                                 currentStatusId={card.statusId}
                                 statuses={board.statuses}
+                                reasons={reasons}
                               />
                             ) : null}
                           </li>

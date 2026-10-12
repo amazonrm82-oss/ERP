@@ -4,19 +4,20 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
-import { SelectField, TextField } from "@/components/ui/field";
+import { SelectField } from "@/components/ui/field";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 
 import { dropLeadAction } from "../actions";
 import type { LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; leadId: string; leadName: string; currentStatusId: string; statuses: LeadStatusOption[] };
+type Props = { orgId: string; leadId: string; leadName: string; currentStatusId: string; statuses: LeadStatusOption[]; reasons: string[] };
 
 /**
  * Per-card status menu on the leads board: pick a status, then confirm. Works
  * with keyboard and touch alike. "Not relevant" asks for the reason first.
  * The board remounts the card (key) after a move.
  */
-export function LeadStatusMenu({ orgId, leadId, leadName, currentStatusId, statuses }: Props) {
+export function LeadStatusMenu({ orgId, leadId, leadName, currentStatusId, statuses, reasons }: Props) {
   const [selected, setSelected] = useState(currentStatusId);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,7 @@ export function LeadStatusMenu({ orgId, leadId, leadName, currentStatusId, statu
         ) : null}
       </div>
       {changed && needsReason ? (
-        <TextField label="למה הליד לא רלוונטי?" controlSize="sm" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} required />
+        <DisqualifyReasonField reasons={reasons} label={`למה הליד ${leadName} לא רלוונטי?`} controlSize="sm" value={reason} onChange={setReason} />
       ) : null}
       <FormError message={error} />
     </div>
