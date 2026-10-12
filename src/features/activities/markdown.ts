@@ -106,9 +106,10 @@ function readLink(line: string, start: number): { text: string; href: string; en
     }
   }
   if (i >= limit || line[i + 1] !== "(") return null;
-  const close = line.indexOf(")", i + 2);
-  if (close < 0 || close - (i + 2) > MAX_URL) return null;
-  return { text: line.slice(start + 1, i), href: line.slice(i + 2, close), end: close + 1 };
+  // the address is at most MAX_URL long, so the search for ")" stops there (RVW-3)
+  const close = line.slice(i + 2, i + 3 + MAX_URL).indexOf(")");
+  if (close < 0) return null;
+  return { text: line.slice(start + 1, i), href: line.slice(i + 2, i + 2 + close), end: i + 3 + close };
 }
 
 function parseInline(line: string, allowLinks: boolean, allowBold: boolean): Inline[] {
@@ -205,17 +206,42 @@ export function parseNote(text: string): Block[] {
  * address is not allowed reduced to its words. Everything else, marks included, stays as typed.
  */
 export function sanitizeNote(text: string): string {
-  const cleaned = cleanNoteText(text);
-  return cleaned
-    .split("\n")
-    .map((line) =>
-      line.replace(/\[([^\]\n]*)\]\(([^)\n]*)\)/g, (whole, words: string, address: string, offset: number) => {
-        // an escaped bracket is text, not a link
-        if (offset > 0 && line[offset - 1] === "\\") return whole;
-        return safeHref(address) ? whole : words;
-      }),
-    )
-    .join("\n");
+  return cleanNoteText(text).split("\n").map(sanitizeLine).join("\n");
+}
+
+/**
+ * One line of `sanitizeNote`. Same result as
+ * `line.replace(/\[([^\]\n]*)\]\(([^)\n]*)\)/g, …)`, but a single pass (RVW-3): that regex
+ * tried every "[" and ran to the next "]" from each one, so a line of "[[[[…" took quadratic time.
+ * A "[" can only pair with the first "]" after it, and that "]" with the first ")" after it, so
+ * when a "[" fails, every "[" before the same "]" fails too, and the scan jumps past it.
+ */
+function sanitizeLine(line: string): string {
+  let out = "";
+  let copied = 0;
+  let from = 0;
+  while (from < line.length) {
+    const open = line.indexOf("[", from);
+    if (open < 0) break;
+    const close = line.indexOf("]", open + 1);
+    // no "]" after this "[": none after any later one either
+    if (close < 0) break;
+    if (line[close + 1] !== "(") {
+      from = close + 1;
+      continue;
+    }
+    const end = line.indexOf(")", close + 2);
+    // no ")" after this "](": none after any later one either
+    if (end < 0) break;
+    // an escaped bracket is text, not a link
+    const escaped = open > 0 && line[open - 1] === "\\";
+    if (!escaped && !safeHref(line.slice(close + 2, end))) {
+      out += line.slice(copied, open) + line.slice(open + 1, close);
+      copied = end + 1;
+    }
+    from = end + 1;
+  }
+  return copied === 0 ? line : out + line.slice(copied);
 }
 
 /** The note as plain words, for a one-line preview (search results, notifications). */

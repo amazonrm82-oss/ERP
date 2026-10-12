@@ -5,7 +5,21 @@ import { checkbox, optionalText, requiredText } from "@/lib/validation";
 import { sanitizeNote } from "./markdown";
 
 // REC-04: what a person writes is stored as cleaned Markdown (see markdown.ts)
-const cleanNote = (value: unknown) => (typeof value === "string" ? sanitizeNote(value) : value);
+const NOTE_MAX = 5000;
+const NOTE_TOO_LONG = "ההערה ארוכה מדי (עד 5,000 תווים).";
+// RVW-3: anything longer than this is refused before any cleaning or parsing runs. Twice the
+// limit, because the cleaning still has to remove what the browser adds: a textarea sends each
+// line break as "\r\n" (two characters, one after cleaning), and the limit is checked after trimming.
+export const NOTE_RAW_MAX = NOTE_MAX * 2;
+
+const cleanNote = (value: unknown, ctx: z.RefinementCtx) => {
+  if (typeof value !== "string") return value;
+  if (value.length > NOTE_RAW_MAX) {
+    ctx.addIssue({ code: "custom", message: NOTE_TOO_LONG });
+    return z.NEVER;
+  }
+  return sanitizeNote(value);
+};
 
 export const SUBJECT_KINDS = ["lead", "contact", "company", "deal"] as const;
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
@@ -117,7 +131,7 @@ export const PRIVATE_ONLY_NOTE = "רק הערה יכולה להיות פרטית
 export const PRIVATE_NOTE_HINT = "תוצג רק לך ולמנהלי המערכת של העסק.";
 
 export const noteEditSchema = z.object({
-  body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
+  body: z.preprocess(cleanNote, requiredText(NOTE_MAX, "יש לכתוב את ההערה לפני השמירה.", NOTE_TOO_LONG)),
   // GAP-05: sent only by the edit box of a note; absent means "leave it as it is"
   private_field: z.preprocess((value) => value === "1", z.boolean()),
   private: checkbox,
@@ -157,7 +171,7 @@ export function timelineFilterHref(recordHref: string, key: TimelineFilterKey): 
 export const noteSchema = z
   .object({
     type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
-    body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
+    body: z.preprocess(cleanNote, requiredText(NOTE_MAX, "יש לכתוב את ההערה לפני השמירה.", NOTE_TOO_LONG)),
     // GAP-05: "me and the organization's admins"
     private: checkbox,
   })
@@ -187,7 +201,7 @@ export const NEXT_STEPS = [
 
 export const callLogSchema = z.object({
   outcome: z.enum(["answered", "no_answer", "voicemail", "call_back"], { error: "יש לבחור איך הסתיימה השיחה." }),
-  body: z.preprocess(cleanNote, optionalText(5000, "ההערה ארוכה מדי (עד 5,000 תווים).")),
+  body: z.preprocess(cleanNote, optionalText(NOTE_MAX, NOTE_TOO_LONG)),
   next: z.preprocess((value) => value ?? "none", z.enum(["none", "tomorrow", "week"], { error: "יש לבחור מה הלאה." })),
   next_title: optionalText(300, "הכותרת ארוכה מדי (עד 300 תווים)."),
 });
