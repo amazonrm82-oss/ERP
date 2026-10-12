@@ -128,8 +128,8 @@ export async function logCallAction(orgId: string, subject: TimelineSubject, rec
 
 /**
  * REC-01: pins an entry the user logged to the top of the record's timeline, or unpins it.
- * With the user's session: RLS lets the author or an owner/admin of a writable organization
- * change it. Zero rows back means deleted, not on this record, or not permitted.
+ * With the user's session: RLS lets the author, a manager of the record's team or an owner/admin
+ * of a writable organization change it. Zero rows back means deleted, not on this record, or not permitted.
  */
 export async function setActivityPinnedAction(
   orgId: string,

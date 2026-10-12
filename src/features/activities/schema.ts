@@ -41,7 +41,13 @@ export function isPinnableType(type: string): boolean {
 // REC-05: the author may edit or delete what they logged for 24 hours; after that only an owner or admin.
 export const NOTE_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-type Viewer = { userId: string; role: string; canWrite: boolean };
+type Viewer = {
+  userId: string;
+  role: string;
+  canWrite: boolean;
+  // REC-01: the viewer is a manager of the team of the record whose timeline this is
+  managesRecordTeam?: boolean;
+};
 
 /**
  * UI hint for editing and deleting an entry (REC-05), mirroring the database: the organization
@@ -49,11 +55,15 @@ type Viewer = { userId: string; role: string; canWrite: boolean };
  * ago (policy activities_delete, trigger activities_edit_window). The database still decides.
  */
 export function canEditNoteHint(item: { type: string; createdBy: string | null; createdAt: string }, viewer: Viewer, now: number): boolean {
-  if (!canPinHint(item, viewer)) {
+  if (!viewer.canWrite || !isPinnableType(item.type)) {
     return false;
   }
   if (viewer.role === "owner" || viewer.role === "admin") {
     return true;
+  }
+  // a team manager may pin a colleague's entry (canPinHint), never edit it
+  if (item.createdBy !== viewer.userId) {
+    return false;
   }
   const created = Date.parse(item.createdAt);
   return Number.isFinite(created) && now - created < NOTE_EDIT_WINDOW_MS;
@@ -61,14 +71,40 @@ export function canEditNoteHint(item: { type: string; createdBy: string | null; 
 
 /**
  * REC-01: who sees the pin button, mirroring the activities_update policy: the organization is
- * writable for the user, and the user wrote the entry or is an owner/admin. No time limit:
- * the 24 hours of REC-05 apply to what the entry says, not to pinning it.
+ * writable for the user, and the user wrote the entry, is an owner/admin, or is a manager of the
+ * record's team (owner's decision, 12 October 2026: pin and unpin only). No time limit: the 24
+ * hours of REC-05 apply to what the entry says, not to pinning it.
  */
 export function canPinHint(item: { type: string; createdBy: string | null }, viewer: Viewer): boolean {
   if (!viewer.canWrite || !isPinnableType(item.type)) {
     return false;
   }
-  return item.createdBy === viewer.userId || viewer.role === "owner" || viewer.role === "admin";
+  return (
+    item.createdBy === viewer.userId ||
+    viewer.role === "owner" ||
+    viewer.role === "admin" ||
+    (viewer.role === "manager" && viewer.managesRecordTeam === true)
+  );
+}
+
+/**
+ * REC-01: whether a user manages a team, mirroring app.manages_team(): they are a manager of the
+ * team itself or of one of its parent teams (at most 10 levels up, as in the database).
+ */
+export function managesTeamChain(
+  teamId: string | null,
+  teams: ReadonlyArray<{ id: string; parentTeamId: string | null }>,
+  managedTeamIds: ReadonlySet<string>,
+): boolean {
+  const parents = new Map(teams.map((team) => [team.id, team.parentTeamId]));
+  let current = teamId;
+  for (let depth = 0; current && depth < 10 && parents.has(current); depth += 1) {
+    if (managedTeamIds.has(current)) {
+      return true;
+    }
+    current = parents.get(current) ?? null;
+  }
+  return false;
 }
 
 // Said when an edit or a delete touched nothing.

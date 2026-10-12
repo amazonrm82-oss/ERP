@@ -60,6 +60,8 @@ const OWN_MESSAGES: Array<[RegExp, string]> = [
   [/invalid email address/i, "כתובת האימייל אינה תקינה."],
   // REC-05: trigger activities_edit_window (hint note:edit_window)
   [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק מנהל מערכת יכול לערוך אותה."],
+  // REC-01: trigger activities_edit_window (hint note:pin_only), a team manager on a colleague's entry
+  [/note pin only/i, "אפשר לנעוץ את הרשומה הזו, אבל רק מי שכתב אותה או מנהל מערכת יכולים לערוך אותה."],
   // CAL-01: trigger meetings_check_links
   [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה."],
   [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק."],

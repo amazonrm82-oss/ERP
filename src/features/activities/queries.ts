@@ -2,9 +2,11 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
+import { must } from "@/lib/db-read";
+import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
-import { CALL_OUTCOME_LABEL, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
+import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
   id: string;
@@ -141,4 +143,30 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       pinned: activity.is_pinned,
     };
   });
+}
+
+/**
+ * REC-01: whether the user manages the team of this record (its team or a parent team), so the
+ * timeline shows them the pin button on their team's entries. A hint only: the activities_update
+ * policy (app.manages_activity_subject) decides. Only asked for users with the manager role.
+ */
+export async function managesRecordTeam(orgId: string, subject: TimelineSubject, userId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const [record, teams, managed] = await Promise.all([
+    supabase
+      .from(RECORD_TYPES[subject.kind].table as "contacts")
+      .select("team_id")
+      .eq("organization_id", orgId)
+      .eq("id", subject.id)
+      .maybeSingle(),
+    supabase.from("teams").select("id, parent_team_id").eq("organization_id", orgId),
+    supabase.from("team_members").select("team_id").eq("organization_id", orgId).eq("user_id", userId).eq("is_manager", true),
+  ]);
+  const teamId = must(record, "record team")?.team_id ?? null;
+  const managedIds = new Set(must(managed, "managed teams").map((row) => row.team_id));
+  if (!teamId || managedIds.size === 0) {
+    return false;
+  }
+  const chain = must(teams, "teams").map((team) => ({ id: team.id, parentTeamId: team.parent_team_id }));
+  return managesTeamChain(teamId, chain, managedIds);
 }

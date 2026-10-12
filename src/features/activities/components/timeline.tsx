@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
 
-import { getTimeline } from "../queries";
+import { getTimeline, managesRecordTeam } from "../queries";
 import { canEditNoteHint, canPinHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
 import { NoteActions } from "./note-actions";
 import { NoteForm } from "./note-form";
@@ -29,11 +29,13 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
   const filter = parseTimelineFilter(filterParam);
   // getOrgContext is memoized per request: the page already loaded it
   const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
+  // REC-01: a team manager pins (only pins) the entries on their team's records
+  const managesRecord = context.role === "manager" ? await managesRecordTeam(orgId, subject, context.user.id) : false;
   const recordHref = recordPage(subject.kind, orgId, subject.id);
   // one clock for the whole list, read once per request on the server: who may still edit what (REC-05)
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
-  const viewer = { userId: context.user.id, role: context.role, canWrite: canWrite && context.canWrite };
+  const viewer = { userId: context.user.id, role: context.role, canWrite: canWrite && context.canWrite, managesRecordTeam: managesRecord };
 
   return (
     <Card aria-labelledby="timeline-title">
@@ -93,8 +95,8 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                   </p>
                 ) : null}
                 {canPinHint(item, viewer) ? (
-                  // REC-01 pin: the author at any time; REC-05 edit and delete: the author for 24 hours.
-                  // Owners and admins: everything, always.
+                  // REC-01 pin: the author at any time, and a manager of the record's team; REC-05 edit
+                  // and delete: the author for 24 hours. Owners and admins: everything, always.
                   <div className="mt-1 -ms-3 flex flex-wrap items-start gap-1">
                     <PinButton orgId={orgId} subject={subject} activityId={item.id} pinned={item.pinned} label={item.label} />
                     {canEditNoteHint(item, viewer, now) ? (
