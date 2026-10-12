@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
+import { RecordSummaryCard } from "@/features/record-summary/components/record-summary-card";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
@@ -72,6 +73,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
         <div className="order-1 space-y-5 lg:order-2">
 
+          <RecordSummaryCard orgId={orgId} type="company" id={company.id} currency={context.org.currency} timeZone={context.org.timeZone} />
           <RecordTasks orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
           <RecordMeetings orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
           <CompanyDetailsCard

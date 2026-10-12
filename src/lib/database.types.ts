@@ -1075,6 +1075,9 @@ export type Database = {
       search_records: { Args: { p_org: string; p_query: string; p_limit?: number }; Returns: Json };
       // deals board (migration 0022), security invoker: [{ stage_id, count, amount_agorot }]
       deal_stage_totals: { Args: { p_org: string; p_pipeline: string }; Returns: Json };
+      // contact / company card summary (REC-10), security invoker:
+      // { deals: [{ status, currency, count, sum }], last_touch, next_task, open_tasks }
+      record_summary: { Args: { p_org: string; p_type: string; p_id: string }; Returns: Json };
       // invitation page (migration 0023): null when the token matches nothing
       invitation_preview: { Args: { p_token: string }; Returns: Json };
       // handover (migration 0024): { leads, contacts, companies, deals, tasks } moved

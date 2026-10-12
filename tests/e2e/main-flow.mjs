@@ -297,13 +297,14 @@ try {
     const box = dialog.getByRole("textbox", { name: "הטקסט" });
     await box.fill("מחיר סופי מעודכן");
     await dialog.getByRole("button", { name: /שמירת השינוי/ }).click();
-    await timeline.getByText("מחיר סופי מעודכן").waitFor({ timeout: 15000 });
+    await dialog.waitFor({ state: "hidden", timeout: 15000 });
+    await timeline.getByRole("paragraph").filter({ hasText: "מחיר סופי מעודכן" }).waitFor({ timeout: 15000 });
     const leadIdEdit = owner.url().split("/leads/")[1];
     const [{ id: editedId }] = await sql("select id from public.activities where lead_id = $1 and body = 'מחיר סופי מעודכן'", [leadIdEdit]);
     const edited = timeline.locator("ol > li", { hasText: "מחיר סופי מעודכן" }).first();
     await edited.getByRole("button", { name: /^מחיקה/ }).click();
     await owner.getByRole("dialog", { name: /למחוק מציר הזמן/ }).getByRole("button", { name: /^מחיקה$/ }).click();
-    await timeline.getByText("מחיר סופי מעודכן").waitFor({ state: "detached", timeout: 15000 });
+    await timeline.getByRole("paragraph").filter({ hasText: "מחיר סופי מעודכן" }).waitFor({ state: "detached", timeout: 15000 });
     const logged = await sql("select action from public.audit_log where entity_type = 'activities' and entity_id = $1 order by id", [editedId]);
     if (logged.map((r) => r.action).join(",") !== "update,delete") throw new Error(`audit of the note: ${JSON.stringify(logged)}`);
   }
@@ -586,6 +587,38 @@ try {
   await ownerDesk.getByLabel("תפקיד").fill("מנכ\"ל");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
+
+  step("contact and company cards: an automatic summary of deals, last touch and next action (REC-10)");
+  {
+    const summaryCard = (page) => page.locator('section[aria-labelledby="record-summary-title"]').or(page.getByRole("region", { name: /^סיכום$/ })).first();
+    // the converted lead brought an open deal of 12,500 and its history (the note of REC-04 was deleted in REC-05, so the last touch is the call)
+    let card = summaryCard(ownerDesk);
+    await card.getByText(/עסקה אחת/).waitFor({ timeout: 15000 });
+    await card.getByText(/12,500/).waitFor();
+    await card.getByText(/^שיחה$/).waitFor();
+    await card.getByText(/היום/).first().waitFor();
+    await card.getByText(/אין משימה פתוחה/).waitFor();
+    // a new task on the contact becomes the next action
+    const contactTasks = ownerDesk.locator('section[aria-labelledby="record-tasks-title"]');
+    await contactTasks.getByLabel("משימה חדשה לרשומה הזו").fill("לשלוח חוזה");
+    await contactTasks.getByRole("button", { name: "מחר", exact: true }).click();
+    await contactTasks.getByText("לשלוח חוזה", { exact: true }).waitFor({ timeout: 15000 });
+    await ownerDesk.reload();
+    card = summaryCard(ownerDesk);
+    await card.getByText(/^לשלוח חוזה$/).waitFor({ timeout: 15000 });
+    // the company counts its contact's deal and task too
+    await ownerDesk.goto(`${orgUrl}/companies`);
+    await ownerDesk.getByRole("link", { name: "כהן ובניו" }).click();
+    await ownerDesk.waitForURL(/\/companies\/[0-9a-f-]{36}$/, { timeout: 15000 });
+    card = summaryCard(ownerDesk);
+    await card.getByText(/עסקה אחת/).waitFor({ timeout: 15000 });
+    await card.getByText(/12,500/).waitFor();
+    await card.getByText(/^לשלוח חוזה$/).waitFor();
+    // done, so the later task steps start as before
+    await ownerDesk.goto(contactUrl);
+    await ownerDesk.locator('section[aria-labelledby="record-tasks-title"]').getByRole("button", { name: /בוצע.*לשלוח חוזה/ }).click();
+    await ownerDesk.locator('section[aria-labelledby="record-tasks-title"]').getByText("אין משימות פתוחות לרשומה הזו").waitFor({ timeout: 15000 });
+  }
 
   step("deal card: open from board, edit amount");
   await ownerDesk.goto(`${orgUrl}/deals`);
