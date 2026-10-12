@@ -2,12 +2,25 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
+import { needsSecondStep } from "@/lib/errors";
 
 export type SessionItem = { id: string; createdAt: string; lastActiveAt: string; userAgent: string | null; ip: string | null; isCurrent: boolean };
 
-export async function listMySessions(): Promise<SessionItem[]> {
+/** The device list, or "second step needed" when this session has not passed it (RVW-13). */
+export type SessionsResult = { ok: true; sessions: SessionItem[] } | { ok: false; reason: "second_step" };
+
+export async function listMySessions(): Promise<SessionsResult> {
   const supabase = await createClient();
-  const data = must(await supabase.rpc("my_sessions"), "my_sessions");
+  const result = await supabase.rpc("my_sessions");
+  if (result.error && needsSecondStep(result.error)) {
+    return { ok: false, reason: "second_step" };
+  }
+  const data = must(result, "my_sessions");
+  return { ok: true, sessions: parseSessions(data) };
+}
+
+/** The rows of my_sessions(), shaped for the page. */
+export function parseSessions(data: unknown): SessionItem[] {
   const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
   return rows.map((r) => ({
     id: String(r.id),
@@ -30,7 +43,13 @@ export function describeDevice(userAgent: string | null): string {
 /** How many unused backup codes the signed-in user has left (0 without two-step verification). */
 export async function getRecoveryCodesLeft(): Promise<number> {
   const supabase = await createClient();
-  const data = must(await supabase.rpc("mfa_recovery_codes_status"), "mfa_recovery_codes_status");
+  const result = await supabase.rpc("mfa_recovery_codes_status");
+  // RVW-13: a session that has not passed the second step is not told; it has
+  // no codes to manage from here (the factor needs that step first anyway)
+  if (result.error && needsSecondStep(result.error)) {
+    return 0;
+  }
+  const data = must(result, "mfa_recovery_codes_status");
   const status = data && typeof data === "object" && !Array.isArray(data) ? data : {};
   return typeof status.remaining === "number" ? status.remaining : 0;
 }

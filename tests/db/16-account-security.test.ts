@@ -92,7 +92,8 @@ describe("backup codes for two-step verification", () => {
   const create = (userId: string) => asMfaUser(userId, async (q) => (await q<R<string[]>>("select public.mfa_recovery_codes_create() as r")).rows[0].r);
   const recover = (userId: string, code: string) =>
     asUser(userId, async (q) => (await q<R<{ ok: boolean; reason?: string }>>("select public.mfa_recover($1) as r", [code])).rows[0].r);
-  const status = (userId: string) => asUser(userId, async (q) => (await q<R<{ remaining: number }>>("select public.mfa_recovery_codes_status() as r")).rows[0].r);
+  // read in a verified session, as the account page does (RVW-13: a password-only session is refused, test 36)
+  const status = (userId: string) => asMfaUser(userId, async (q) => (await q<R<{ remaining: number }>>("select public.mfa_recovery_codes_status() as r")).rows[0].r);
   const factors = (userId: string) => asAdmin((q) => count(q, "select 1 from auth.mfa_factors where user_id = $1", [userId]));
 
   let user: U, org: string;

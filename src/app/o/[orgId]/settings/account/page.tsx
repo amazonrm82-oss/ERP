@@ -25,7 +25,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
   const { orgId } = await params;
   const { user, org: orgContext } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [profile, sessions, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
+  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
     getMyProfile(user.id),
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
@@ -33,6 +33,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
     getSignedVersion(),
     getNotificationSettings(),
   ]);
+  const sessions = sessionsResult.ok ? sessionsResult.sessions : [];
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-2">
@@ -116,7 +117,16 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
             </li>
           ))}
         </ul>
-        {sessions.length === 0 ? <p className="px-4 py-5 text-ink-soft sm:px-5">אין מידע על מכשירים.</p> : null}
+        {!sessionsResult.ok ? (
+          <p className="px-4 py-5 text-ink-soft sm:px-5">
+            כדי לראות את המכשירים המחוברים צריך להשלים את האימות הדו-שלבי בכניסה הזו.{" "}
+            <Link href={`${paths.loginMfa}?next=${encodeURIComponent(paths.settingsAccount(orgId))}`} className="text-accent-strong underline underline-offset-4">
+              לאימות
+            </Link>
+          </p>
+        ) : sessions.length === 0 ? (
+          <p className="px-4 py-5 text-ink-soft sm:px-5">אין מידע על מכשירים.</p>
+        ) : null}
       </Card>
     </div>
   );

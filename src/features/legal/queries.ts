@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { AGREEMENT_VERSION } from "./agreement";
 import { must } from "@/lib/db-read";
+import { needsSecondStep } from "@/lib/errors";
 
 /** The agreement version the signed-in user signed last, or null. Memoized per request. */
 export const getSignedVersion = cache(async (): Promise<string | null> => {
@@ -36,9 +37,18 @@ export type SignedAgreement = {
   signedAt: string;
 };
 
-export async function getMyAgreement(): Promise<SignedAgreement | null> {
+/**
+ * The caller's last signed copy, null when there is none, or "second_step" when
+ * this session has not passed the second step (RVW-13: the copy holds the IP
+ * address, browser and signature).
+ */
+export async function getMyAgreement(): Promise<SignedAgreement | null | "second_step"> {
   const supabase = await createClient();
-  const data = must(await supabase.rpc("my_agreement"), "my_agreement");
+  const result = await supabase.rpc("my_agreement");
+  if (result.error && needsSecondStep(result.error)) {
+    return "second_step";
+  }
+  const data = must(result, "my_agreement");
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const r = data as Record<string, unknown>;
   return {

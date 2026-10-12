@@ -16,6 +16,19 @@ export const NETWORK_ERROR = "אין חיבור לשרת כרגע. בדקו את
 export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו.";
 export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה.";
 export const SESSION_EXPIRED = "החיבור פג. יש להתחבר מחדש.";
+// RVW-13: functions on a user's own data (notification settings, devices, the
+// signed agreement, backup codes) refuse a session that has not passed the
+// second step (app.session_verified(): 42501, hint mfa:aal2_required).
+export const SECOND_STEP_HINT = "mfa:aal2_required";
+export const SECOND_STEP_REQUIRED = "כדי לשנות את זה צריך קודם להשלים את האימות הדו-שלבי בכניסה הזו.";
+
+/** True when the database refused because this session has not passed the second step. */
+export function needsSecondStep(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as ErrorLike;
+  return e.code === "42501" && (e.hint ?? "").trim() === SECOND_STEP_HINT;
+}
+
 // An UPDATE that RLS filters out succeeds with zero rows, so "nothing changed"
 // means either "not found" or "not allowed"; the database does not say which.
 export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לכם הרשאה לערוך אותה.";
@@ -146,6 +159,10 @@ export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR)
       }
     }
     return fallback;
+  }
+
+  if (needsSecondStep(e)) {
+    return SECOND_STEP_REQUIRED;
   }
 
   const ownMessage = OWN_MESSAGES.find(([pattern]) => pattern.test(e.message ?? ""));

@@ -12,6 +12,20 @@ export const metadata: Metadata = { title: "ההסכם החתום" };
 export default async function SignedAgreementPage() {
   await requireUser();
   const agreement = await getMyAgreement();
+  if (agreement === "second_step") {
+    return (
+      <>
+        <h1 className="text-2xl font-semibold">ההסכם החתום</h1>
+        <p className="mt-2">כדי לראות את העותק החתום צריך להשלים את האימות הדו-שלבי בכניסה הזו.</p>
+        <Link
+          href={`${paths.loginMfa}?next=${encodeURIComponent(paths.agreementSigned)}`}
+          className="mt-4 inline-block text-accent-strong underline underline-offset-4"
+        >
+          לאימות
+        </Link>
+      </>
+    );
+  }
   if (!agreement) {
     return (
       <>
