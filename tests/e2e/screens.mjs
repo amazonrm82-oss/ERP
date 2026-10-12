@@ -73,8 +73,9 @@ async function createSample() {
   await page.waitForURL(/\/onboarding/, { timeout: 15000 });
   await page.getByLabel("שם העסק").fill("לוי שיפוצים ובנייה");
   await page.getByRole("button", { name: "יצירת העסק והמשך" }).click();
-  await page.waitForURL(/\/o\/[0-9a-f-]{36}$/, { timeout: 20000 });
-  const orgId = page.url().split("/o/")[1];
+  // a new business opens the setup wizard (USR-03)
+  await page.waitForURL(/\/o\/[0-9a-f-]{36}\/setup$/, { timeout: 20000 });
+  const orgId = new URL(page.url()).pathname.split("/")[2];
   await page.context().close();
   await seed(orgId, email);
   return { email, orgId };
@@ -181,6 +182,7 @@ const SCREENS = {
   contacts: `${org}/contacts`,
   contact: `${org}/contacts/${firstContact}`,
   companies: `${org}/companies`,
+  setup: `${org}/setup?step=2`,
   settings: `${org}/settings`,
   "settings-business": `${org}/settings/business`,
   login: "/login",

@@ -9,6 +9,9 @@ import { EmptyState } from "@/components/ui/feedback";
 import { BoardIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getMyDay } from "@/features/home/queries";
+import { isAdminRole } from "@/features/settings/permissions";
+import { SetupResumeCard } from "@/features/setup/components/setup-resume-card";
+import { getSetupStep } from "@/features/setup/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
@@ -28,8 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function HomePage({ params }: Props) {
   const { orgId } = await params;
-  const { user, canWrite, org } = await getOrgContext(orgId);
-  const day = await getMyDay(orgId, user.id, org.timeZone);
+  const { user, canWrite, org, role } = await getOrgContext(orgId);
+  // owners and admins see where the setup wizard stopped (USR-03) until it is finished
+  const [day, setupStep] = await Promise.all([
+    getMyDay(orgId, user.id, org.timeZone),
+    isAdminRole(role) && canWrite ? getSetupStep(orgId) : Promise.resolve(null),
+  ]);
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
   const firstName = user.displayName.split(" ")[0];
@@ -58,6 +65,7 @@ export default async function HomePage({ params }: Props) {
   return (
     <>
       <PageHeader title="היום שלי" description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`} />
+      {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
 
       <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         {summary.map((item) => (

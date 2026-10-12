@@ -150,6 +150,8 @@ export type OrganizationRow = {
   status: OrgStatus;
   // members must pass two-step verification (enforced in app.membership_role)
   require_mfa: boolean;
+  // USR-03: next step of the setup wizard (1..4); null = finished, skipped, or an older organization
+  setup_step: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -861,6 +863,7 @@ export type Database = {
           currency?: string;
           record_visibility?: RecordVisibility;
           require_mfa?: boolean;
+          setup_step?: number | null;
         }
       >;
       profiles: Table<

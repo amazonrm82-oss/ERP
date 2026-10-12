@@ -181,8 +181,23 @@ try {
   step("create organization");
   await owner.getByLabel("שם העסק").fill("שיפוצים בע\"מ");
   await owner.getByRole("button", { name: "יצירת העסק והמשך" }).click();
-  await owner.waitForURL(/\/o\/[0-9a-f-]{36}$/, { timeout: 20000 });
+
+  step("setup wizard: every step can be skipped, left and resumed (USR-03)");
+  await owner.waitForURL(/\/o\/[0-9a-f-]{36}\/setup$/, { timeout: 20000 });
+  await owner.getByText("שלב 1 מתוך 4").waitFor();
+  await shot(owner, "02-setup-360");
+  await owner.getByRole("button", { name: "דילוג על השלב" }).click();
+  await owner.waitForURL(/\/setup\?step=2$/, { timeout: 15000 });
+  await owner.getByText("שלב 2 מתוך 4").waitFor();
+  await owner.getByRole("heading", { name: "מה כבר מוכן בשבילכם" }).waitFor();
+  await owner.getByRole("link", { name: "להמשיך אחר כך" }).click();
+  await owner.waitForURL(/\/o\/[0-9a-f-]{36}$/, { timeout: 15000 });
   const orgUrl = owner.url();
+  // the home page offers to resume where the wizard stopped
+  await owner.getByRole("heading", { name: "הקמת העסק עוד לא הסתיימה" }).waitFor();
+  await owner.getByText("שלב 2 מתוך 4", { exact: false }).waitFor();
+  await owner.getByRole("button", { name: "לא צריך, תודה" }).click();
+  await owner.getByRole("heading", { name: "הקמת העסק עוד לא הסתיימה" }).waitFor({ state: "detached", timeout: 15000 });
   console.log("org:", orgUrl);
   await shot(owner, "02-home-360");
 

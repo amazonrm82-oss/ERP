@@ -16,6 +16,8 @@ export const paths = {
   agreement: "/agreement",
   agreementSigned: "/agreement/signed",
   org: (orgId: string) => `/o/${orgId}`,
+  // the setup wizard after a business is created (USR-03); no step = where the business stopped
+  setup: (orgId: string, step?: number) => `/o/${orgId}/setup${step ? `?step=${step}` : ""}`,
   leads: (orgId: string) => `/o/${orgId}/leads`,
   leadsWaiting: (orgId: string) => `/o/${orgId}/leads/waiting`,
   leadNew: (orgId: string) => `/o/${orgId}/leads/new`,

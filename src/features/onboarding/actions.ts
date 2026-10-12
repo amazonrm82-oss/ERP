@@ -37,5 +37,6 @@ export async function createOrganizationAction(_prev: FormState, formData: FormD
   }
 
   revalidatePath("/", "layout");
-  redirect(paths.org(orgId));
+  // the new business starts at step 1 of the setup wizard (USR-03; every step can be skipped)
+  redirect(paths.setup(orgId));
 }

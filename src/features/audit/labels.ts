@@ -81,6 +81,7 @@ export const FIELD_LABELS: Record<string, string> = {
   role: "תפקיד",
   record_visibility: "מי רואה רשומות",
   require_mfa: "חובת אימות דו-שלבי",
+  setup_step: "שלב באשף ההקמה",
   expected_close_date: "תאריך סגירה צפוי",
   lost_reason: "סיבת הפסד",
   message: "הודעה",
