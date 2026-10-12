@@ -183,10 +183,11 @@ describe("a lead keeps where it came from (CAP-02, ADS-01)", () => {
         landing_url: `https://user:pass@shop.co.il/sale?token=secret&utm_source=fb&email=a%40b.co&gclid=G1&junk=${"j".repeat(3000)}#form`,
       },
     }, "webhook");
-    // other parameters and the fragment are gone (a long address made short by that is kept); the referrer is unchanged
+    // other parameters and the fragment are gone (a long address made short by that is kept);
+    // the referrer keeps only site and path
     expect(await leadAttr(r.lead_id!)).toMatchObject({
       landing_url: "https://shop.co.il/sale?utm_source=fb&gclid=G1",
-      referrer_url: "https://l.facebook.com/?u=1&h=2",
+      referrer_url: "https://l.facebook.com/",
     });
     // a repeat inquiry records the stripped address too
     await submit(webhook.token, { email: "attr-landing@example.com", attribution: { landing_url: "https://shop.co.il/?session=1#x" } }, "webhook");
@@ -223,6 +224,49 @@ describe("a lead keeps where it came from (CAP-02, ADS-01)", () => {
       const got = await asAdmin(async (q) => (await q<{ r: string | null }>("select app.campaign_only_url($1) as r", [input])).rows[0].r);
       expect(got, String(input)).toBe(expected);
     }
+  });
+
+  it("the referrer keeps only site and path, whoever calls the function (CAP-02)", async () => {
+    const r = await submit(webhook.token, {
+      email: "attr-referrer@example.com",
+      attribution: { referrer_url: " https://user:pass@www.google.com/search?q=secret&email=a%40b.co#top " },
+    }, "webhook");
+    expect((await leadAttr(r.lead_id!)).referrer_url).toBe("https://www.google.com/search");
+    // a repeat inquiry records the stripped address too
+    await submit(webhook.token, { email: "attr-referrer@example.com", attribution: { referrer: "x", referrer_url: "https://l.facebook.com/l.php?u=1" } }, "webhook");
+    const meta = await asAdmin(async (q) =>
+      (await q<{ metadata: Record<string, unknown> }>("select metadata from public.activities where lead_id = $1 and type = 'inquiry'", [r.lead_id])).rows[0].metadata,
+    );
+    expect(meta.attribution).toEqual({ referrer_url: "https://l.facebook.com/l.php" });
+    // a bad address is still dropped after the stripping
+    const bad = await submit(webhook.token, { email: "attr-referrer-bad@example.com", attribution: { referrer_url: "javascript:alert(1)?x=https://a.co" } }, "webhook");
+    expect((await leadAttr(bad.lead_id!)).referrer_url).toBeNull();
+  });
+
+  it("app.site_and_path_url() follows the same rules as the app's siteAndPathUrl()", async () => {
+    // the same cases as tests/unit/intake-attribution.test.ts
+    const cases: Array<[string | null, string | null]> = [
+      [null, null],
+      ["https://a.co", "https://a.co"],
+      ["https://a.co/", "https://a.co/"],
+      ["https://www.google.com/search?q=%D7%A9%D7%99%D7%A4%D7%95%D7%A6%D7%99%D7%9D&hl=he", "https://www.google.com/search"],
+      ["https://l.facebook.com/l.php?u=https%3A%2F%2Fshop.co.il&h=AT1#x", "https://l.facebook.com/l.php"],
+      ["https://a.co/p#h?x=1", "https://a.co/p"],
+      ["https://a.co/p?x=1#h", "https://a.co/p"],
+      ["https://a.co/p?", "https://a.co/p"],
+      ["https://a.co/p?utm_source=a&gclid=G", "https://a.co/p"],
+      ["https://user:pass@a.co/p?x=1", "https://a.co/p"],
+      ["https://a@b@a.co:8443/p/q", "https://a.co:8443/p/q"],
+      ["https://a.co/@x/y?next=https://u:p@b.co", "https://a.co/@x/y"],
+      ["https://a.co?next=https://u:p@b.co", "https://a.co"],
+      ["https://a.co#u:p@b.co", "https://a.co"],
+    ];
+    for (const [input, expected] of cases) {
+      const got = await asAdmin(async (q) => (await q<{ r: string | null }>("select app.site_and_path_url($1) as r", [input])).rows[0].r);
+      expect(got, String(input)).toBe(expected);
+    }
+    const e = await pgError(asService((q) => q("select app.site_and_path_url('https://a.co/?x=1')")));
+    expect(e.code).toBe("42501");
   });
 
   it("app.campaign_only_url() is not callable from the API roles", async () => {

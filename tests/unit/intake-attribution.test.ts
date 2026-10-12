@@ -3,7 +3,14 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { attributionRows, collectAttribution, EXTRA_CLICK_ID_KEYS, EXTRA_UTM_KEYS, parseAttribution } from "@/features/intake/attribution";
+import {
+  attributionRows,
+  collectAttribution,
+  EXTRA_CLICK_ID_KEYS,
+  EXTRA_UTM_KEYS,
+  parseAttribution,
+  siteAndPathUrl,
+} from "@/features/intake/attribution";
 
 describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
   it("keeps the known keys of a body and ignores the rest", () => {
@@ -105,7 +112,7 @@ describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
         landing_url: " https://shop.co.il/sale?token=secret&utm_source=fb&email=a%40b.co&fbclid=F1#form ",
         referrer_url: "https://l.facebook.com/?u=1",
       }),
-    ).toEqual({ landing_url: "https://shop.co.il/sale?utm_source=fb&fbclid=F1", referrer_url: "https://l.facebook.com/?u=1" });
+    ).toEqual({ landing_url: "https://shop.co.il/sale?utm_source=fb&fbclid=F1", referrer_url: "https://l.facebook.com/" });
     // the old name webhook senders use goes through the same rule
     expect(parseAttribution({ page_url: "https://a.co/p?x=1#y" })).toEqual({ landing_url: "https://a.co/p" });
     expect(parseAttribution({ landing_url: "https://user:pass@a.co/p?utm_source=x" })).toEqual({ landing_url: "https://a.co/p?utm_source=x" });
@@ -117,6 +124,43 @@ describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
     expect(collectAttribution(`https://crm.example/f/abc?embed=1&page_url=${encodeURIComponent(host)}`, "").landing_url).toBe(
       "https://shop.co.il/landing?utm_source=facebook",
     );
+  });
+
+  it("the referrer keeps only site and path, before it is sent and when it is received (CAP-02)", () => {
+    expect(parseAttribution({ referrer_url: " https://user:pass@www.google.com/search?q=secret&email=a%40b.co#top " })).toEqual({
+      referrer_url: "https://www.google.com/search",
+    });
+    // the other names webhook senders use go through the same rule; a bad address is still dropped
+    expect(parseAttribution({ referer: "https://a.co/p?x=1" })).toEqual({ referrer_url: "https://a.co/p" });
+    expect(parseAttribution({ referrer_url: "javascript:alert(1)?x=https://a.co" })).toEqual({});
+    // the hosted form, opened directly and embedded
+    expect(collectAttribution("https://crm.example/f/abc", "https://www.google.com/search?q=x").referrer_url).toBe("https://www.google.com/search");
+    expect(collectAttribution(`https://crm.example/f/abc?embed=1&ref=${encodeURIComponent("https://l.facebook.com/l.php?u=1")}`, "").referrer_url).toBe(
+      "https://l.facebook.com/l.php",
+    );
+  });
+
+  it("siteAndPathUrl() follows the same rules as app.site_and_path_url()", () => {
+    // the same cases as tests/db/50-intake-attribution.test.ts
+    const cases: Array<[string | null, string | null]> = [
+      [null, null],
+      ["https://a.co", "https://a.co"],
+      ["https://a.co/", "https://a.co/"],
+      ["https://www.google.com/search?q=%D7%A9%D7%99%D7%A4%D7%95%D7%A6%D7%99%D7%9D&hl=he", "https://www.google.com/search"],
+      ["https://l.facebook.com/l.php?u=https%3A%2F%2Fshop.co.il&h=AT1#x", "https://l.facebook.com/l.php"],
+      ["https://a.co/p#h?x=1", "https://a.co/p"],
+      ["https://a.co/p?x=1#h", "https://a.co/p"],
+      ["https://a.co/p?", "https://a.co/p"],
+      ["https://a.co/p?utm_source=a&gclid=G", "https://a.co/p"],
+      ["https://user:pass@a.co/p?x=1", "https://a.co/p"],
+      ["https://a@b@a.co:8443/p/q", "https://a.co:8443/p/q"],
+      ["https://a.co/@x/y?next=https://u:p@b.co", "https://a.co/@x/y"],
+      ["https://a.co?next=https://u:p@b.co", "https://a.co"],
+      ["https://a.co#u:p@b.co", "https://a.co"],
+    ];
+    for (const [input, expected] of cases) {
+      expect(siteAndPathUrl(input), String(input)).toBe(expected);
+    }
   });
 
   it("the hosted form sends its own address and the page the visitor came from", () => {

@@ -70,6 +70,20 @@ export function campaignOnlyUrl(value: string): string {
   return kept.length > 0 ? `${base.slice(0, q)}?${kept.join("&")}` : base.slice(0, q);
 }
 
+/**
+ * Where the visitor came from, kept as site and path only (CAP-02, owner 12 October 2026):
+ * the query, the fragment and any user info are removed. Plain text work like
+ * campaignOnlyUrl(); the database does the same in app.site_and_path_url()
+ * (migration referrer_site_and_path); keep the two in step.
+ */
+export function siteAndPathUrl(value: string): string;
+export function siteAndPathUrl(value: string | null): string | null;
+export function siteAndPathUrl(value: string | null): string | null {
+  // null stays null, like app.site_and_path_url(null)
+  if (value === null) return null;
+  return value.split("#")[0].split("?")[0].replace(USER_INFO, "$1");
+}
+
 // Other names webhook senders use for the same thing (the canonical key wins).
 const ALIASES: Partial<Record<AttributionKey, string[]>> = {
   utm_campaign: ["campaign"],
@@ -92,7 +106,8 @@ function cleanValue(key: AttributionKey, value: unknown): string | null {
   if (typeof value !== "string") return null;
   // the landing page keeps only its campaign parameters (CAP-02, owner 12 October 2026)
   if (key === "landing_url") return cleanUrl(campaignOnlyUrl(value.trim()));
-  if ((URL_KEYS as readonly string[]).includes(key)) return cleanUrl(value);
+  // the referrer keeps only site and path (CAP-02, owner 12 October 2026)
+  if (key === "referrer_url") return cleanUrl(siteAndPathUrl(value.trim()));
   if ((CLICK_ID_KEYS as readonly string[]).includes(key) || (EXTRA_CLICK_ID_KEYS as readonly string[]).includes(key)) {
     const trimmed = value.trim();
     return trimmed.length > 0 && trimmed.length <= CLICK_ID_MAX && CLICK_ID.test(trimmed) ? trimmed : null;
