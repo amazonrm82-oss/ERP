@@ -6,6 +6,10 @@ export const ENTITY_LABELS: Record<string, string> = {
   companies: "חברה",
   deals: "עסקה",
   tasks: "משימה",
+  // CAL-01
+  meetings: "פגישה",
+  meeting_participants: "משתתף בפגישה",
+  files: "קובץ",
   // REC-05: a note, call or meeting edited or deleted in a record's timeline
   activities: "רשומה בציר הזמן",
   organizations: "פרטי העסק",
@@ -106,4 +110,17 @@ export const FIELD_LABELS: Record<string, string> = {
   body: "טקסט",
   occurred_at: "מועד",
   metadata: "פרטים נוספים",
+  description: "תיאור",
+  // CAL-01: meetings and their participants
+  meeting_type: "סוג פגישה",
+  starts_at: "התחלה",
+  ends_at: "סיום",
+  location: "מיקום",
+  video_url: "קישור לשיחת הווידאו",
+  outcome: "תוצאה",
+  meeting_id: "פגישה",
+  user_id: "משתמש",
+  // team members (CAP-06: primary team)
+  is_manager: "מנהל הצוות",
+  is_primary: "צוות ראשי",
 };
