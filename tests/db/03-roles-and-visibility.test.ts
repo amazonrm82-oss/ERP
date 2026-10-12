@@ -491,7 +491,9 @@ describe("roles and record visibility", () => {
     expect(await seesMeeting(viewer.id, onLead.id)).toBe(false);
     expect(await seesMeeting(manager.id, onLead.id)).toBe(true); // manages the lead's team
     expect(await seesMeeting(admin.id, onLead.id)).toBe(true);
-    expect(await seesMeeting(manager.id, internal)).toBe(false); // no record, organizer is not in a team he manages
+    // no record, but the organizer is in the team he manages (owner's answer, 12 October 2026; 0093)
+    expect(await seesMeeting(manager.id, internal)).toBe(true);
+    expect(await seesMeeting(m2.id, internal)).toBe(false);
     expect(await seesMeeting(admin.id, internal)).toBe(true);
 
     // a meeting on a record one cannot see is refused
