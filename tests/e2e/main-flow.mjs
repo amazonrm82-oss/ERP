@@ -1034,9 +1034,14 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);
   await ownerDesk.getByLabel("שם, טלפון או אימייל").fill("ליד למחיקה");
   await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();
-  await ownerDesk.getByRole("button", { name: /מחיקת הפרטים מהיומן.*ליד למחיקה/ }).click();
+  const eraseConfirm = ownerDesk.getByRole("group", { name: /למחוק את הפרטים/ });
+  // the result list may still be hydrating: click again until the confirmation opens
+  for (let tries = 0; tries < 5 && !(await eraseConfirm.isVisible()); tries++) {
+    await ownerDesk.getByRole("button", { name: /מחיקת הפרטים מהיומן.*ליד למחיקה/ }).click();
+    await eraseConfirm.waitFor({ timeout: 3000 }).catch(() => {});
+  }
   await shot(ownerDesk, "23b-audit-erase-1280");
-  await ownerDesk.getByRole("group", { name: /למחוק את הפרטים/ }).getByRole("button", { name: "מחיקת הפרטים מהיומן", exact: true }).click();
+  await eraseConfirm.getByRole("button", { name: "מחיקת הפרטים מהיומן", exact: true }).click();
   await expectText(ownerDesk, "לא נמצאה ביומן רשומה שנמחקה לצמיתות");
   const leftInLog = await sql("select count(*)::int as n from public.audit_log where entity_id = $1 and changes::text like '%ליד למחיקה%'", [purgedLeadId]);
   if (leftInLog[0].n !== 0) throw new Error("the erased lead's name is still in the audit log");
