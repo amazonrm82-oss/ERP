@@ -35,6 +35,26 @@ export function safeText(value: string, max: number): string {
     .trim();
 }
 
+/** The query parameters a stored landing page address may keep (CAP-02, owner 12 October 2026). */
+export const CAMPAIGN_KEYS: readonly string[] = [...UTM_KEYS, ...CLICK_ID_KEYS];
+
+/**
+ * A page address with only its campaign parameters: the fragment and every other
+ * query parameter are removed, the kept ones stay exactly as written and in order.
+ * Plain text work, no URL parsing, so the embed script (embed-script.ts) and the
+ * database (app.campaign_only_url(), migration 0095) do exactly the same; keep the three in step.
+ */
+export function campaignOnlyUrl(value: string): string {
+  const base = value.split("#")[0];
+  const q = base.indexOf("?");
+  if (q < 0) return base;
+  const kept = base
+    .slice(q + 1)
+    .split("&")
+    .filter((part) => CAMPAIGN_KEYS.includes(part.split("=")[0]));
+  return kept.length > 0 ? `${base.slice(0, q)}?${kept.join("&")}` : base.slice(0, q);
+}
+
 // Other names webhook senders use for the same thing (the canonical key wins).
 const ALIASES: Partial<Record<AttributionKey, string[]>> = {
   utm_campaign: ["campaign"],
@@ -96,7 +116,8 @@ function paramsOf(href: string | null | undefined): URLSearchParams | null {
  * - Opened directly (/f/<token>?utm_source=...): the landing page is the form's
  *   own address and the referrer is the page the visitor came from.
  * - Embedded (?embed=1): the iframe cannot see the host page's address, so the
- *   embed code may pass it as `page_url` (and the host page's referrer as `ref`).
+ *   embed script (/f/embed.js, embed-script.ts) passes it as `page_url`, campaign
+ *   parameters only (a hand-written embed may also pass the host referrer as `ref`).
  *   UTMs and click ids are read from the iframe's own address first, then from
  *   page_url. Without page_url the landing page is document.referrer, which
  *   inside an iframe is the host page (often its origin only), and the

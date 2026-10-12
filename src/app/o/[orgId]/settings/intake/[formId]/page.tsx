@@ -53,6 +53,11 @@ export default async function IntakeItemPage({ params }: Props) {
   const pageUrl = `${origin}/f/${intake.token}`;
   const postUrl = `${origin}/api/forms/${intake.token}`;
   const hookUrl = `${origin}/api/in/${intake.token}`;
+  // CAP-02: the iframe alone still works; the script line adds the campaign details and the page address
+  const embedCode = [
+    `<iframe src="${pageUrl}?embed=1" title="${(intake.title ?? intake.name).replace(/"/g, "&quot;")}" style="width:100%;max-width:480px;height:560px;border:0" loading="lazy"></iframe>`,
+    `<script src="${origin}/f/embed.js" async></script>`,
+  ].join("\n");
 
   return (
     <div className="space-y-5">
@@ -84,10 +89,11 @@ export default async function IntakeItemPage({ params }: Props) {
               <summary className="cursor-pointer font-medium">יש לכם אתר? קוד להטמעה</summary>
               <div className="mt-3 space-y-3">
                 <p className="text-ink-soft">מדביקים את הקוד באתר, במקום שבו הטופס צריך להופיע.</p>
-                <CopyBlock
-                  label="קוד להטמעה באתר"
-                  value={`<iframe src="${pageUrl}?embed=1" title="${(intake.title ?? intake.name).replace(/"/g, "&quot;")}" style="width:100%;max-width:480px;height:560px;border:0" loading="lazy"></iframe>`}
-                />
+                <CopyBlock label="קוד להטמעה באתר" value={embedCode} />
+                <p className="text-ink-soft">
+                  שורת הסקריפט מעבירה לטופס רק את פרטי הקמפיין (utm ומזהי מודעות) ואת כתובת הדף שבו הטופס מוטמע, בלי עוגיות ובלי
+                  מעקב. כך רואים בליד מאיזו מודעה ומאיזה דף הוא הגיע. קוד הטמעה שכבר הודבק באתר, בלי השורה הזו, ממשיך לעבוד.
+                </p>
               </div>
             </details>
             <details className="text-md">
