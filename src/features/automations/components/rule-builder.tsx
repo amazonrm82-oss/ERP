@@ -36,7 +36,7 @@ function blankAction(type: ActionType): Draft {
     case "add_tag":
       return { type, tag_id: "" };
     case "set_lead_status":
-      return { type, status_id: "" };
+      return { type, status_id: "", reason_id: "" };
     case "move_deal_stage":
       return { type, stage_id: "" };
   }
@@ -328,8 +328,31 @@ function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
       );
     case "add_tag":
       return pick("תגית", "tag_id", lookups.tags);
-    case "set_lead_status":
-      return pick("סטטוס", "status_id", lookups.statuses.filter((s) => s.kind !== "converted"));
+    case "set_lead_status": {
+      // RVW-9: moving a lead to "not relevant" needs a reason from the organization's list
+      const disqualified = lookups.statuses.find((s) => s.id === action.status_id)?.kind === "disqualified";
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {pick("סטטוס", "status_id", lookups.statuses.filter((s) => s.kind !== "converted"))}
+          {disqualified ? (
+            lookups.reasons.length > 0 ? (
+              <SelectField label="סיבה" value={action.reason_id ?? ""} onChange={(e) => onChange({ reason_id: e.target.value })} controlSize="sm" required>
+                <option value="">בחירת סיבה</option>
+                {lookups.reasons.map((reason) => (
+                  <option key={reason.id} value={reason.id}>
+                    {reason.name}
+                  </option>
+                ))}
+              </SelectField>
+            ) : (
+              <p className="text-sm text-warning sm:self-end">
+                אין סיבות ברשימת &quot;לא רלוונטי&quot;. יש להוסיף סיבה בהגדרות, בעמוד &quot;סיבות לליד לא רלוונטי&quot;.
+              </p>
+            )
+          ) : null}
+        </div>
+      );
+    }
     case "move_deal_stage":
       return pick(
         "שלב",

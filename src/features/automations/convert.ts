@@ -2,6 +2,9 @@ import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 
+export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
+export const NO_REASONS_IN_LIST = "אין סיבות פעילות ברשימת \"לא רלוונטי\". יש להוסיף סיבה בהגדרות, בעמוד \"סיבות לליד לא רלוונטי\", ואז לשמור.";
+
 export type DbRule = {
   name: string;
   entity_type: Entity;
@@ -80,7 +83,15 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       if (entity !== "lead") return "שינוי סטטוס מתאים רק ללידים.";
       const status = lookups.statuses.find((s) => s.id === action.status_id);
       if (!status || status.kind === "converted") return "יש לבחור סטטוס שאינו 'הומר'.";
-      actions.push({ type: "set_lead_status", status_id: action.status_id });
+      if (status.kind === "disqualified") {
+        // RVW-9: a rule that makes a lead "not relevant" says why, from the organization's list
+        if (lookups.reasons.length === 0) return NO_REASONS_IN_LIST;
+        if (!action.reason_id) return REASON_REQUIRED;
+        if (!has(lookups.reasons, action.reason_id)) return "הסיבה שנבחרה כבר לא ברשימה. יש לבחור סיבה אחרת.";
+        actions.push({ type: "set_lead_status", status_id: action.status_id, reason_id: action.reason_id });
+      } else {
+        actions.push({ type: "set_lead_status", status_id: action.status_id });
+      }
     } else if (action.type === "move_deal_stage") {
       if (entity !== "deal") return "העברת שלב מתאימה רק לעסקאות.";
       if (!has(stages, action.stage_id)) return "השלב שנבחר כבר לא קיים.";
@@ -142,7 +153,7 @@ export function fromDbRule(rule: {
       case "add_tag":
         return [{ type: "add_tag", tag_id: str(a.tag_id) }];
       case "set_lead_status":
-        return [{ type: "set_lead_status", status_id: str(a.status_id) }];
+        return [{ type: "set_lead_status", status_id: str(a.status_id), reason_id: str(a.reason_id) }];
       case "move_deal_stage":
         return [{ type: "move_deal_stage", stage_id: str(a.stage_id) }];
       default:
@@ -157,4 +168,20 @@ export function fromDbRule(rule: {
     conditions,
     actions,
   };
+}
+
+/**
+ * RVW-9: the actions of a saved rule that make a lead "not relevant" without a
+ * usable reason: none was set (rules saved before the reason was required), or
+ * the reason is no longer an active one of the list. Such a rule still runs and
+ * leaves the reason empty; the screens remind the admin to complete it.
+ * Returns the 0-based positions of those actions.
+ */
+export function actionsMissingReason(actions: Array<Record<string, unknown>>, lookups: Pick<Lookups, "statuses" | "reasons">): number[] {
+  return actions.flatMap((action, index) => {
+    if (action.type !== "set_lead_status") return [];
+    const status = lookups.statuses.find((s) => s.id === action.status_id);
+    if (status?.kind !== "disqualified") return [];
+    return lookups.reasons.some((r) => r.id === action.reason_id) ? [] : [index];
+  });
 }

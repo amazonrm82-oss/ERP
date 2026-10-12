@@ -28,7 +28,8 @@ const actionSchema = z.discriminatedUnion("type", [
     team_id: id.optional(),
   }),
   z.object({ type: z.literal("add_tag"), tag_id: id }),
-  z.object({ type: z.literal("set_lead_status"), status_id: id }),
+  // reason_id: required when the status is "not relevant" (checked against the organization's list in toDbRule)
+  z.object({ type: z.literal("set_lead_status"), status_id: id, reason_id: id.optional() }),
   z.object({ type: z.literal("move_deal_stage"), stage_id: id }),
 ]);
 

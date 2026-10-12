@@ -58,8 +58,12 @@ export function describeRule(
           : `${label} בסבב${a.team_id ? ` בצוות ${nameIn(lookups.teams, a.team_id)}` : ""}`;
       case "add_tag":
         return `${label}: ${nameIn(lookups.tags, a.tag_id)}`;
-      case "set_lead_status":
-        return `${label}: ${nameIn(lookups.statuses, a.status_id)}`;
+      case "set_lead_status": {
+        const status = lookups.statuses.find((s) => s.id === a.status_id);
+        if (status?.kind !== "disqualified") return `${label}: ${nameIn(lookups.statuses, a.status_id)}`;
+        const reason = lookups.reasons.find((r) => r.id === a.reason_id)?.name;
+        return `${label}: ${status.name}, ${reason ? `סיבה: ${reason}` : "בלי סיבה"}`;
+      }
       case "move_deal_stage":
         return `${label}: ${nameIn(stages, a.stage_id)}`;
       default:
@@ -79,4 +83,10 @@ export const STEP_ERRORS: Record<string, string> = {
   "the status no longer exists": "הסטטוס נמחק",
   "the stage is not in this deal's pipeline": "השלב לא שייך לתהליך המכירה של העסקה",
   "daily limit for this record reached": "הגיע למגבלה של 20 הרצות ביום לרשומה",
+};
+
+/** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */
+export const STEP_WARNINGS: Record<string, string> = {
+  "no reason is set": "בוצע בלי סיבה: לאוטומציה לא נבחרה סיבה",
+  "the reason no longer exists": "בוצע בלי סיבה: הסיבה שנבחרה כבר לא ברשימה",
 };

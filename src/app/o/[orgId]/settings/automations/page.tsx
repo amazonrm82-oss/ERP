@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { BoltIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { createFromTemplateAction } from "@/features/automations/actions";
+import { actionsMissingReason } from "@/features/automations/convert";
 import { describeRule } from "@/features/automations/describe";
 import { getLookups, listAutomations } from "@/features/automations/queries";
 import { TEMPLATES } from "@/features/automations/templates";
@@ -57,6 +58,7 @@ export default async function AutomationsPage({ params }: Props) {
                       <span className="font-medium">{automation.name}</span>
                       {automation.isActive ? <Badge tone="success">פעילה</Badge> : <Badge>כבויה</Badge>}
                       {automation.failed7d > 0 ? <Badge tone="danger">{automation.failed7d} כשלים השבוע</Badge> : null}
+                      {actionsMissingReason(automation.actions, lookups).length > 0 ? <Badge tone="warning">חסרה סיבה ל&quot;לא רלוונטי&quot;</Badge> : null}
                     </span>
                     <span className="mt-0.5 block text-sm text-ink-soft">
                       כאשר {description.when}. {automation.runs7d} הרצות ב-7 הימים האחרונים.

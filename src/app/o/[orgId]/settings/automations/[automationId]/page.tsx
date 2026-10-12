@@ -10,7 +10,8 @@ import { BackIcon } from "@/components/ui/icons";
 import { deleteAutomationAction, setAutomationActiveAction } from "@/features/automations/actions";
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
-import { describeRule, STEP_ERRORS } from "@/features/automations/describe";
+import { actionsMissingReason } from "@/features/automations/convert";
+import { describeRule, STEP_ERRORS, STEP_WARNINGS } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
@@ -42,6 +43,7 @@ export default async function AutomationPage({ params }: Props) {
   }
   const [lookups, runs, records] = await Promise.all([getLookups(orgId), listRuns(orgId, automationId), listTestRecords(orgId, automation.entity)]);
   const description = describeRule(automation, lookups);
+  const missingReason = actionsMissingReason(automation.actions, lookups);
 
   return (
     <div className="space-y-5">
@@ -55,6 +57,17 @@ export default async function AutomationPage({ params }: Props) {
           {automation.isActive ? <Badge tone="success">פעילה</Badge> : <Badge>כבויה</Badge>}
         </h2>
       </div>
+
+      {missingReason.length > 0 ? (
+        <p role="note" className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          האוטומציה מעבירה ליד ל&quot;לא רלוונטי&quot; בלי סיבה מהרשימה. היא ממשיכה לרוץ והסיבה נשארת ריקה. כדאי להשלים סיבה.
+          {canWrite ? (
+            <Link href={paths.settingsAutomationEdit(orgId, automation.id)} className="font-medium underline underline-offset-4">
+              לבחירת סיבה
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
 
       <Card aria-labelledby="rule-title">
         <CardHeader
@@ -134,11 +147,16 @@ export default async function AutomationPage({ params }: Props) {
                       </Link>
                     ) : null}
                   </p>
-                  {run.steps.some((s) => s.status !== "ok") ? (
+                  {run.steps.some((s) => s.status !== "ok" || s.warning) ? (
                     <ul className="text-sm">
                       {run.steps.map((step, i) => (
-                        <li key={i} className={step.status === "ok" ? "text-ink-soft" : "text-danger"}>
-                          {ACTION_LABELS[step.action as ActionType] ?? "הרצה"}: {step.status === "ok" ? "בוצע" : (STEP_ERRORS[step.error ?? ""] ?? step.error ?? "נכשל")}
+                        <li key={i} className={step.status !== "ok" ? "text-danger" : step.warning ? "text-warning" : "text-ink-soft"}>
+                          {ACTION_LABELS[step.action as ActionType] ?? "הרצה"}:{" "}
+                          {step.status !== "ok"
+                            ? (STEP_ERRORS[step.error ?? ""] ?? step.error ?? "נכשל")
+                            : step.warning
+                              ? (STEP_WARNINGS[step.warning] ?? step.warning)
+                              : "בוצע"}
                         </li>
                       ))}
                     </ul>

@@ -10,7 +10,7 @@ import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors"
 import { isUuid, paths } from "@/lib/paths";
 
 import { toDbRule } from "./convert";
-import { getLookups } from "./queries";
+import { readLookups } from "./queries";
 import { ruleSchema } from "./schema";
 import { TEMPLATES } from "./templates";
 
@@ -30,7 +30,11 @@ async function insertRule(orgId: string, raw: unknown, templateKey: string | nul
   if (!parsed.success) {
     return fail(parsed.error.issues[0]?.message ?? "יש לבדוק את הפרטים.");
   }
-  const rule = toDbRule(parsed.data, await getLookups(orgId));
+  const lookups = await readLookups(orgId);
+  if (lookups.error) {
+    return fail(dbErrorMessage(lookups.error));
+  }
+  const rule = toDbRule(parsed.data, lookups.data);
   if (typeof rule === "string") {
     return fail(rule);
   }
@@ -77,7 +81,11 @@ export async function updateAutomationAction(orgId: string, id: string, _prev: F
   if (!parsed.success) {
     return fail(parsed.error.issues[0]?.message ?? "יש לבדוק את הפרטים.");
   }
-  const rule = toDbRule(parsed.data, await getLookups(orgId));
+  const lookups = await readLookups(orgId);
+  if (lookups.error) {
+    return fail(dbErrorMessage(lookups.error));
+  }
+  const rule = toDbRule(parsed.data, lookups.data);
   if (typeof rule === "string") {
     return fail(rule);
   }
@@ -111,7 +119,11 @@ export async function createFromTemplateAction(orgId: string, templateKey: strin
   if (!template?.build) {
     return fail(NOT_FOUND);
   }
-  const rule = template.build(await getLookups(orgId));
+  const lookups = await readLookups(orgId);
+  if (lookups.error) {
+    return fail(dbErrorMessage(lookups.error));
+  }
+  const rule = template.build(lookups.data);
   if (!rule) {
     return fail("התבנית צריכה סטטוס שלא קיים אצלכם (למשל \"לא ענה\"). אפשר לבנות אוטומציה דומה בעצמכם.");
   }

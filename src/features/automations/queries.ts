@@ -13,12 +13,20 @@ export type Lookups = {
   pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string }> }>;
   members: Array<{ id: string; name: string }>;
   teams: Array<{ id: string; name: string }>;
+  // the active "not relevant" reasons (RVW-9), in the admin's order
+  reasons: Array<{ id: string; name: string }>;
 };
 
-/** Everything a rule may point at, from the user's own organization (RLS). */
-export async function getLookups(orgId: string): Promise<Lookups> {
+type ReadFailure = { message: string; code?: string | null };
+
+/**
+ * Everything a rule may point at, from the user's own organization (RLS), for a
+ * Server Action: a failed read of the reasons comes back as `error` (FXC-05), so
+ * the action can answer with a message instead of throwing.
+ */
+export async function readLookups(orgId: string): Promise<{ data: Lookups; error: null } | { data: null; error: ReadFailure }> {
   const supabase = await createClient();
-  const [statuses, sources, pipelines, stages, tags, members, teams] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -26,19 +34,38 @@ export async function getLookups(orgId: string): Promise<Lookups> {
     listTags(orgId),
     listMembers(orgId),
     listTeams(orgId),
+    supabase
+      .from("disqualify_reasons")
+      .select("id, name")
+      .eq("organization_id", orgId)
+      .eq("is_active", true)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
+  if (reasons.error) {
+    return { data: null, error: reasons.error };
+  }
   return {
-    statuses: statuses.data ?? [],
-    sources: sources.data ?? [],
-    tags,
-    pipelines: (pipelines.data ?? []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      stages: (stages.data ?? []).filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name })),
-    })),
-    members: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ id: m.userId, name: m.name })),
-    teams: teams.map((t) => ({ id: t.id, name: t.name })),
+    data: {
+      statuses: statuses.data ?? [],
+      sources: sources.data ?? [],
+      tags,
+      pipelines: (pipelines.data ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        stages: (stages.data ?? []).filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name })),
+      })),
+      members: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ id: m.userId, name: m.name })),
+      teams: teams.map((t) => ({ id: t.id, name: t.name })),
+      reasons: reasons.data ?? [],
+    },
+    error: null,
   };
+}
+
+/** The same for a page: a failed read throws (FXC-05, error.tsx shows). */
+export async function getLookups(orgId: string): Promise<Lookups> {
+  return must(await readLookups(orgId), "automation lookups");
 }
 
 export type AutomationSummary = {
@@ -109,7 +136,7 @@ export type RunItem = {
   entityType: string;
   entityId: string;
   createdAt: string;
-  steps: Array<{ action: string | null; status: string; error?: string }>;
+  steps: Array<{ action: string | null; status: string; error?: string; warning?: string }>;
 };
 
 export async function listRuns(orgId: string, automationId: string): Promise<RunItem[]> {
@@ -134,6 +161,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
       action: typeof s.action === "string" ? s.action : null,
       status: String(s.status ?? ""),
       error: typeof s.error === "string" ? s.error : undefined,
+      warning: typeof s.warning === "string" ? s.warning : undefined,
     })),
   }));
 }
