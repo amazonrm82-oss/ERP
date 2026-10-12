@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { reasonSchema, SUGGESTED_REASONS } from "./schema";
+import { reasonSchema } from "./schema";
 
 // LEAD-03: owners and admins manage the list; RLS refuses everyone else (0 rows / 42501).
 
@@ -51,32 +51,6 @@ export async function addReasonAction(orgId: string, _prev: FormState, formData:
     return fail(error.code === "23505" ? "הסיבה הזו כבר ברשימה." : dbErrorMessage(error, "לא הצלחנו להוסיף את הסיבה. נסו שוב."), {
       values: formValues(formData),
     });
-  }
-  revalidateReasons(orgId);
-  return ok();
-}
-
-/** The suggested reasons, for an organization that starts from an empty list; names already there are skipped. */
-export async function addSuggestedReasonsAction(orgId: string): Promise<ActionResult> {
-  const context = await actionContext(orgId);
-  if (!context.ok) {
-    return context;
-  }
-  const existing = await reasonsOf(context, orgId);
-  if (existing.error) {
-    return fail(dbErrorMessage(existing.error));
-  }
-  const taken = new Set(existing.data.map((reason) => reason.name.toLowerCase()));
-  const rows = SUGGESTED_REASONS.filter((name) => !taken.has(name.toLowerCase())).map((name, index) => ({
-    organization_id: orgId,
-    name,
-    position: existing.data.length + index,
-  }));
-  if (rows.length > 0) {
-    const { error } = await context.supabase.from("disqualify_reasons").insert(rows);
-    if (error) {
-      return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את הסיבות. נסו שוב."));
-    }
   }
   revalidateReasons(orgId);
   return ok();

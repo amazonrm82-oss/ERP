@@ -108,8 +108,8 @@ describe("tenant isolation", () => {
           [orgA],
         )
       ).rows[0].id;
-      await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'קנה אצל מתחרה')", [orgA]);
-      await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'ספק')", [orgA]);
+      await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של א')", [orgA]);
+      await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),

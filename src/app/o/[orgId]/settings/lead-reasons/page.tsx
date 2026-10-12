@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 
-import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { addSuggestedReasonsAction } from "@/features/disqualify-reasons/actions";
 import { AddReasonForm, ReasonList } from "@/features/disqualify-reasons/components/reasons-editor";
 import { listDisqualifyReasons } from "@/features/disqualify-reasons/queries";
-import { REASONS_PER_ORG, SUGGESTED_REASONS } from "@/features/disqualify-reasons/schema";
+import { REASONS_PER_ORG } from "@/features/disqualify-reasons/schema";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 
@@ -32,18 +30,8 @@ export default async function DisqualifyReasonsPage({ params }: Props) {
           <ReasonList orgId={orgId} reasons={reasons} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 space-y-3 border-t border-line">
-          <p className="text-md text-ink-soft">
-            עוד אין סיבות ברשימה. עד שתוסיפו, כותבים את הסיבה בחופשיות.
-          </p>
-          {editable ? (
-            <div className="space-y-2">
-              <p className="text-sm text-ink-soft">אפשר להתחיל מהסיבות המוצעות: {SUGGESTED_REASONS.join(", ")}.</p>
-              <ActionButton action={addSuggestedReasonsAction.bind(null, orgId)} pendingText="מוסיפים…">
-                הוספת הסיבות המוצעות
-              </ActionButton>
-            </div>
-          ) : null}
+        <CardBody className="mt-3 border-t border-line">
+          <p className="text-md text-ink-soft">אין סיבות ברשימה. כל עוד היא ריקה, כותבים את הסיבה בחופשיות.</p>
         </CardBody>
       )}
       {editable && reasons.length < REASONS_PER_ORG ? (

@@ -707,9 +707,9 @@ try {
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
 
   step("a contact's type comes from the organization's list, and the contacts list filters by it (CON-02)");
+  // the lists start with the default types (migration 0098); there is no "add the suggested" button
   await ownerDesk.goto(`${orgUrl}/settings/record-types`);
-  await ownerDesk.getByRole("button", { name: /^הוספת הסוגים המוצעים.*סוגי אנשי קשר/ }).click();
-  await ownerDesk.getByRole("textbox", { name: /^שם הסוג ספק/ }).waitFor({ timeout: 15000 });
+  await ownerDesk.getByRole("textbox", { name: /^שם הסוג ספק/ }).first().waitFor({ timeout: 15000 });
   await shot(ownerDesk, "20b-record-types-1280");
   await ownerDesk.goto(contactUrl);
   await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
@@ -964,11 +964,12 @@ try {
     column.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: data }));
     column.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
   });
-  await ownerDesk.getByLabel("למה הליד ליד בלוח לא רלוונטי?").fill("כבר קנה אצל מתחרה");
+  // the organization starts with the default reasons (migration 0098), so the reason is picked from them
+  await ownerDesk.getByLabel("למה הליד ליד בלוח לא רלוונטי?").selectOption({ label: "קנה אצל מתחרה" });
   await shot(ownerDesk, "24-leads-board-1280");
   await ownerDesk.getByRole("form", { name: "סיבה לליד לא רלוונטי" }).getByRole("button", { name: "העברה" }).click();
   const disqualified = await boardStatus("לא רלוונטי");
-  if (disqualified.reason !== "כבר קנה אצל מתחרה") throw new Error("the reason was not saved");
+  if (disqualified.reason !== "קנה אצל מתחרה") throw new Error("the reason was not saved");
   await ownerDesk.reload();
   await statusColumn("לא רלוונטי").locator("li", { hasText: "ליד בלוח" }).first().waitFor();
   await ownerDesk.getByLabel("סטטוס של הליד ליד בלוח").selectOption({ label: "חדש" });
@@ -976,9 +977,8 @@ try {
   const back = await boardStatus("חדש");
   if (back.reason !== null) throw new Error("the reason stayed after the lead was reopened");
 
-  step("'not relevant' reasons come from the organization's list once it has one (LEAD-03)");
+  step("'not relevant' reasons come from the organization's list, which starts with the default reasons (LEAD-03)");
   await ownerDesk.goto(`${orgUrl}/settings/lead-reasons`);
-  await ownerDesk.getByRole("button", { name: /^הוספת הסיבות המוצעות/ }).click();
   await ownerDesk.getByRole("textbox", { name: /^שם הסיבה קנה אצל מתחרה/ }).waitFor({ timeout: 15000 });
   await shot(ownerDesk, "25-lead-reasons-1280");
   await ownerDesk.goto(`${orgUrl}/leads/${boardLeadId}`);

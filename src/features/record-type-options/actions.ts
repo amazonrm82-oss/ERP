@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { recordTypeObjectArg, SUGGESTED_TYPES, typeSchema, type RecordTypeObject } from "./schema";
+import { recordTypeObjectArg, typeSchema, type RecordTypeObject } from "./schema";
 
 // CON-02: owners and admins manage the lists; RLS refuses everyone else (0 rows / 42501).
 
@@ -54,34 +54,6 @@ export async function addTypeAction(orgId: string, object: RecordTypeObject, _pr
     .insert({ organization_id: orgId, object_type: object, name: parsed.data.name, position: existing.data.length });
   if (error) {
     return fail(error.code === "23505" ? TAKEN : dbErrorMessage(error, "לא הצלחנו להוסיף את הסוג. נסו שוב."), { values: formValues(formData) });
-  }
-  revalidateTypes(orgId);
-  return ok();
-}
-
-/** The suggested types, for an organization that starts from an empty list; names already there are skipped. */
-export async function addSuggestedTypesAction(orgId: string, object: RecordTypeObject): Promise<ActionResult> {
-  if (!validArg(recordTypeObjectArg, object)) return fail(INVALID_ARGS);
-  const context = await actionContext(orgId);
-  if (!context.ok) {
-    return context;
-  }
-  const existing = await typesOf(context, orgId, object);
-  if (existing.error) {
-    return fail(dbErrorMessage(existing.error));
-  }
-  const taken = new Set(existing.data.map((type) => type.name.toLowerCase()));
-  const rows = SUGGESTED_TYPES.filter((name) => !taken.has(name.toLowerCase())).map((name, index) => ({
-    organization_id: orgId,
-    object_type: object,
-    name,
-    position: existing.data.length + index,
-  }));
-  if (rows.length > 0) {
-    const { error } = await context.supabase.from("record_type_options").insert(rows);
-    if (error) {
-      return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את הסוגים. נסו שוב."));
-    }
   }
   revalidateTypes(orgId);
   return ok();

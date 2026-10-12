@@ -19,6 +19,8 @@ describe("disqualify reasons (LEAD-03)", () => {
     );
     disqualified = statuses.find((s) => s.kind === "disqualified")!.id;
     open = statuses.find((s) => s.kind === "open" && !s.is_default)!.id;
+    // the organization starts with the default reasons (0098); these tests start from a list the business emptied
+    await asUser(owner.id, (q) => q("delete from public.disqualify_reasons where organization_id = $1", [org]));
   });
 
   const setStatus = (user: U, lead: string, status: string, reason: string | null) =>
@@ -28,7 +30,7 @@ describe("disqualify reasons (LEAD-03)", () => {
       (await q<{ id: string }>("insert into public.disqualify_reasons (organization_id, name, is_active) values ($1, $2, $3) returning id", [org, name, active])).rows[0].id,
     );
 
-  it("with no reasons yet, any reason will do, but not none", async () => {
+  it("with an empty list, any reason will do, but not none", async () => {
     const lead = await insertLead(member.id, org);
     const error = await pgError(setStatus(member, lead, disqualified, "  "));
     expect(error.code).toBe("P0001");
@@ -69,6 +71,7 @@ describe("disqualify reasons (LEAD-03)", () => {
     expect((await pgError(addReason(" רווח "))).code).toBe("23514");
     const other = await createUser("dq-other");
     const otherOrg = await createOrg(other.id, "עסק אחר");
+    await asUser(other.id, (q) => q("delete from public.disqualify_reasons where organization_id = $1", [otherOrg]));
     // the same name in another organization is fine
     await asUser(other.id, (q) => q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'Spam')", [otherOrg]));
     await asUser(other.id, (q) =>

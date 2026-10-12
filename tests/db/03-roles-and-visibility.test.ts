@@ -209,8 +209,8 @@ describe("roles and record visibility", () => {
     await setVisibility("org");
     await asUser(admin.id, async (q) => {
       await q("insert into public.tags (organization_id, name) values ($1, 'תגית של מנהל')", [org]);
-      await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'המחיר גבוה')", [org]);
-      await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'שותף')", [org]);
+      await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של מנהל')", [org]);
+      await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'סוג של מנהל')", [org]);
       await q(
         "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'contact', 'hobby', 'תחביב', 'text')",
         [org],

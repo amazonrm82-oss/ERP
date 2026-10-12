@@ -12,5 +12,6 @@ export const reasonSchema = z.object({
   name: requiredText(REASON_MAX, "יש להזין סיבה.", `הסיבה ארוכה מדי (עד ${REASON_MAX} תווים).`),
 });
 
-// offered to an organization that has no reasons yet; the admin adds them with one click and edits freely
-export const SUGGESTED_REASONS = ["לא עונה", "המחיר גבוה מדי", "קנה אצל מתחרה", "לא מתאים לשירות", "פרטים לא נכונים", "אחר"] as const;
+// every organization starts with these and renames or deletes them freely; the database seeds them
+// (app.seed_list_defaults); tests/db/56-managed-list-defaults.test.ts keeps the two equal
+export const DEFAULT_REASONS = ["לא עונה", "המחיר גבוה מדי", "קנה אצל מתחרה", "לא מתאים לשירות", "פרטים לא נכונים", "אחר"] as const;

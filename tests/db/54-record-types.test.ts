@@ -33,6 +33,8 @@ describe("contact and company types (CON-02)", () => {
     owner = await createUser("rt-owner");
     org = await createOrg(owner.id);
     member = await addMember(org, owner.id, "member", "rt-member");
+    // the organization starts with the default types (0098); these tests start from lists the business emptied
+    await asUser(owner.id, (q) => q("delete from public.record_type_options where organization_id = $1", [org]));
     supplier = await addType("contact", "ספק");
     partner = await addType("contact", "שותף");
     hidden = await addType("contact", "ישן", false);
@@ -57,8 +59,9 @@ describe("contact and company types (CON-02)", () => {
   it("a type of another organization fails the composite foreign key", async () => {
     const other = await createUser("rt-other");
     const otherOrg = await createOrg(other.id, "עסק אחר");
+    // the other organization's own default "ספק"
     const foreign = await asUser(other.id, async (q) =>
-      (await q<{ id: string }>("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'ספק') returning id", [otherOrg])).rows[0].id,
+      (await q<{ id: string }>("select id from public.record_type_options where organization_id = $1 and object_type = 'contact' and name = 'ספק'", [otherOrg])).rows[0].id,
     );
     // checked by the trigger first, and by the foreign key for server writes
     expect((await pgError(newContact(member, foreign))).hint).toBe("record_type:invalid");

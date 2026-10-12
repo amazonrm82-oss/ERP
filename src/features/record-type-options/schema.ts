@@ -17,8 +17,9 @@ export const typeSchema = z.object({
   name: requiredText(TYPE_MAX, "יש להזין שם לסוג.", `השם ארוך מדי (עד ${TYPE_MAX} תווים).`),
 });
 
-// offered to an organization that has no types yet; the admin adds them with one click and edits freely
-export const SUGGESTED_TYPES = ["לקוח", "לקוח פוטנציאלי", "ספק", "שותף", "מתחרה", "אחר"] as const;
+// every organization starts with these, for contacts and for companies, and renames or deletes them freely;
+// the database seeds them (app.seed_list_defaults); tests/db/56-managed-list-defaults.test.ts keeps the two equal
+export const DEFAULT_TYPES = ["לקוח", "לקוח פוטנציאלי", "ספק", "שותף", "מתחרה", "אחר"] as const;
 
 export const TYPE_TEXTS: Record<RecordTypeObject, { title: string; placeholder: string; add: string }> = {
   contact: { title: "סוגי אנשי קשר", placeholder: "סוג חדש, למשל: ספק", add: "הוספת סוג" },
