@@ -10,6 +10,7 @@ import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import type { AttributionRow } from "@/features/intake/attribution";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 
@@ -30,6 +31,8 @@ export type LeadDetailsView = {
   createdAtText: string;
   // active custom fields and the values stored on the record
   custom: { definitions: FieldDefinition[]; values: CustomValues };
+  // CAP-02: campaign, UTM, pages and ad click ids the lead arrived with (first touch); only lines with a value
+  attribution?: AttributionRow[];
 };
 
 type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean };
@@ -74,6 +77,18 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
             <p className="text-sm text-ink-soft">הודעה</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-md">{lead.message}</p>
           </div>
+        ) : null}
+        {lead.attribution && lead.attribution.length > 0 ? (
+          <section aria-labelledby="lead-attribution-title" className="mt-4 border-t border-line pt-4">
+            <h3 id="lead-attribution-title" className="mb-3 text-sm text-ink-soft">
+              מאיפה הגיע הליד
+            </h3>
+            <DetailList>
+              {lead.attribution.map((row) => (
+                <Detail key={row.label} label={row.label} value={row.value} ltr={row.ltr} />
+              ))}
+            </DetailList>
+          </section>
         ) : null}
       </CardBody>
     </Card>

@@ -16,6 +16,7 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
+import { attributionRows } from "@/features/intake/attribution";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
@@ -150,6 +151,7 @@ export default async function LeadPage({ params }: Props) {
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
               createdAtText: formatDateTime(lead.created_at),
               custom: { definitions: fields, values: asCustomValues(lead.custom_fields) },
+              attribution: attributionRows(lead),
             }}
           />
 

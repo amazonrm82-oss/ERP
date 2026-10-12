@@ -6,6 +6,7 @@ import { FormError, FormNotice } from "@/components/ui/feedback";
 import { TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 
+import { collectAttribution } from "../attribution";
 import { HONEYPOT_FIELD, INTAKE_FIELD_LABELS, STARTED_AT_FIELD, type FormFieldConfig } from "../fields";
 import { validatePublicForm } from "../public-validate";
 
@@ -38,7 +39,8 @@ export function PublicLeadForm({ token, fields, submitLabel }: Props) {
       const res = await fetch(`/api/forms/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, [STARTED_AT_FIELD]: startedAt }),
+        // CAP-02: UTM, click ids, referrer and landing page, from this page's address
+        body: JSON.stringify({ ...collectAttribution(window.location.href, document.referrer), ...body, [STARTED_AT_FIELD]: startedAt }),
       });
       const reply = (await res.json()) as { ok: boolean; message: string; redirectUrl?: string | null; field?: string };
       if (!reply.ok && reply.field && fields.some((field) => field.key === reply.field)) {

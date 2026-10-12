@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import type { Json } from "@/lib/database.types";
 import { createServiceClient } from "@/lib/supabase/service";
 
+import { parseAttribution, safeText } from "./attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { wrongField } from "./public-validate";
 
@@ -110,7 +111,8 @@ export function normalize(body: Record<string, unknown>): Record<IntakeField, st
     out.full_name = `${out.full_name} ${last}`;
   }
   for (const field of Object.keys(out) as IntakeField[]) {
-    out[field] = out[field]?.slice(0, MAX_LENGTH[field]) ?? null;
+    // cut between characters and without control characters or half emoji, so the database never refuses the lead
+    out[field] = out[field] === null || out[field] === undefined ? null : safeText(out[field], MAX_LENGTH[field]) || null;
   }
   return out;
 }
@@ -179,7 +181,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
   const { data, error } = await service.rpc("intake_submit", {
     p_token: token,
     p_kind: kind,
-    p_payload: normalize(body) as unknown as Json,
+    // CAP-02: utm_*, click ids and page addresses ride along; the database keeps them on a new lead only
+    p_payload: { ...normalize(body), attribution: parseAttribution(body) } as unknown as Json,
     p_ip_hash: ipHash,
     p_user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
     p_is_spam: isSpam,

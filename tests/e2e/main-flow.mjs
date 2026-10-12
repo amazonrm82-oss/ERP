@@ -1154,7 +1154,8 @@ try {
   console.log("public form frame-ancestors:", frameHeaders);
   if (!frameHeaders?.includes("frame-ancestors *")) throw new Error("the public form must be embeddable");
   const visitor = await newPage(360);
-  await visitor.goto(`${publicUrl}?embed=1`);
+  // CAP-02: the embed passes UTMs and an ad click id in the iframe address; they land on the lead
+  await visitor.goto(`${publicUrl}?embed=1&utm_source=facebook&utm_medium=cpc&utm_campaign=${encodeURIComponent("מבצע חורף")}&fbclid=IwAR-e2e`);
   await visitor.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
   // FXA-06: the accessibility statement is one tap away, in a new tab when embedded
   if ((await visitor.getByRole("link", { name: /הצהרת נגישות/ }).getAttribute("target")) !== "_blank") throw new Error("no accessibility link on the public form");
@@ -1190,6 +1191,8 @@ try {
   await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
   await expectText(ownerDesk, "גלית עיצובים");
   await expectText(ownerDesk, "טופס באתר");
+  await expectText(ownerDesk, "מבצע חורף");
+  await expectText(ownerDesk, "facebook / cpc");
 
   step("intake: a webhook takes JSON with other field names");
   await ownerDesk.goto(`${orgUrl}/settings/intake`);

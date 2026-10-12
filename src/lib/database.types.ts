@@ -544,6 +544,13 @@ export type LeadRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // CAP-02 / ADS-01: set by the lead intake only (no client grant); first touch, never overwritten
+  referrer_url: string | null;
+  landing_url: string | null;
+  gclid: string | null;
+  fbclid: string | null;
+  ctwa_clid: string | null;
+  meta_lead_id: string | null;
 };
 
 export type LeadInsert = {
