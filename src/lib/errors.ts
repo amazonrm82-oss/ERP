@@ -57,6 +57,10 @@ const OWN_MESSAGES: Array<[RegExp, string]> = [
   [/invalid email address/i, "כתובת האימייל אינה תקינה."],
   // REC-05: trigger activities_edit_window (hint note:edit_window)
   [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק מנהל מערכת יכול לערוך אותה."],
+  // CAL-01: trigger meetings_check_links
+  [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה."],
+  [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק."],
+  [/not allowed to change the meeting organizer/i, "רק מי שמארגן את הפגישה, מי שקבע אותה, בעלי העסק ומנהלי המערכת יכולים לקבוע מי מארגן אותה."],
 ];
 
 const AUTH_MESSAGES: Record<string, string> = {

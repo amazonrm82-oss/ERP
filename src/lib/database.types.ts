@@ -43,6 +43,62 @@ export type ListPreferencesRow = {
   updated_at: string;
 };
 
+// CAL-01 (meetings migration): a meeting and its team participants
+export type MeetingType = "in_person" | "phone" | "video" | "other";
+export type MeetingStatus = "planned" | "held" | "cancelled" | "no_show";
+
+export type MeetingRow = {
+  id: string;
+  organization_id: string;
+  title: string;
+  meeting_type: string;
+  starts_at: string;
+  ends_at: string;
+  location: string | null;
+  video_url: string | null;
+  description: string | null;
+  status: string;
+  outcome: string | null;
+  owner_id: string | null;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MeetingInsert = {
+  organization_id: string;
+  title: string;
+  meeting_type?: MeetingType;
+  starts_at: string;
+  ends_at: string;
+  location?: string | null;
+  video_url?: string | null;
+  description?: string | null;
+  status?: MeetingStatus;
+  outcome?: string | null;
+  owner_id?: string | null;
+  lead_id?: string | null;
+  contact_id?: string | null;
+  company_id?: string | null;
+  deal_id?: string | null;
+};
+
+export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id">>;
+
+export type MeetingParticipantRow = {
+  id: string;
+  organization_id: string;
+  meeting_id: string;
+  user_id: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type NotificationSettingsRow = {
   user_id: string;
   muted: string[];
@@ -930,6 +986,8 @@ export type Database = {
       deals: Table<DealRow, DealInsert>;
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
       tasks: Table<TaskRow, TaskInsert>;
+      meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
+      meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
     };
     Views: { [_ in never]: never };
     Functions: {

@@ -12,6 +12,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
+import { RecordMeetings } from "@/features/meetings/components/record-meetings";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
@@ -97,6 +98,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
         <div className="order-1 space-y-5 lg:order-2">
 
           <RecordTasks orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} />
+          <RecordMeetings orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
           {isConverted ? (
             <Card aria-labelledby="converted-title">
               <CardHeader id="converted-title" title="הליד הומר" />

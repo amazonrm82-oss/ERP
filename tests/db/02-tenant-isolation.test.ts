@@ -93,6 +93,20 @@ describe("tenant isolation", () => {
       await q("insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'leads.csv', 'skip')", [orgA]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]);
       await q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '[{\"key\": \"phone\"}]')", [orgA]);
+      ids.meetingA = (
+        await q<{ id: string }>(
+          "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'פגישת היכרות', now() + interval '1 day', now() + interval '1 day 1 hour', $2) returning id",
+          [orgA, ids.leadA],
+        )
+      ).rows[0].id;
+      await q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA, a.id]);
+      // a second meeting with nobody on it yet: the target of the forged participant insert below
+      ids.meetingA2 = (
+        await q<{ id: string }>(
+          "insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'ישיבת צוות', now() + interval '2 days', now() + interval '2 days 1 hour') returning id",
+          [orgA],
+        )
+      ).rows[0].id;
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -127,6 +141,8 @@ describe("tenant isolation", () => {
     "support_access_grants",
     "files",
     "list_preferences",
+    "meetings",
+    "meeting_participants",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -151,7 +167,7 @@ describe("tenant isolation", () => {
       expect(await count(q, "select 1 from public.profiles where id = $1", [a.id])).toBe(0);
       expect(await count(q, "select 1 from public.notifications")).toBe(0);
       // unfiltered: bob's whole view of the business tables is his own (empty) org
-      for (const table of ["leads", "contacts", "companies", "deals", "tasks", "activities"]) {
+      for (const table of ["leads", "contacts", "companies", "deals", "tasks", "activities", "meetings", "meeting_participants"]) {
         expect(await count(q, `select 1 from public.${table}`), table).toBe(0);
       }
       expect(await count(q, "select 1 from public.organizations")).toBe(1);
@@ -232,6 +248,9 @@ describe("tenant isolation", () => {
       support_access_grants: "revoked_at = revoked_at",
       files: "name = name",
       list_preferences: "columns = columns",
+      meetings: "title = title",
+      // no update grant at all: a permission error is the expected outcome
+      meeting_participants: "user_id = user_id",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -297,6 +316,9 @@ describe("tenant isolation", () => {
       ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
       ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
+      // no organizer: the policy, not the organizer trigger, has to refuse it
+      ["insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour')", [orgA]],
+      ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -347,6 +369,8 @@ describe("tenant isolation", () => {
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
       ["files", "name = 'HACKED'", "name = 'HACKED'"],
       ["list_preferences", "columns = '[{\"key\": \"HACKED\"}]'", "columns::text like '%HACKED%'"],
+      ["meetings", "outcome = 'HACKED'", "outcome = 'HACKED'"],
+      ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>
@@ -456,6 +480,25 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaFile.code);
+
+    // a meeting in org B about org A's lead, and org A's colleague added to org B's meeting
+    const viaMeeting = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'x', now(), now() + interval '1 hour', $2)", [orgB, ids.leadA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaMeeting.code);
+    const meetingB = await asUser(b.id, async (q) =>
+      (await q<{ id: string }>("insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour') returning id", [orgB])).rows[0].id,
+    );
+    const viaParticipant = await pgError(
+      asUser(b.id, (q) => q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgB, meetingB, a.id])),
+    );
+    expect(viaParticipant.code).toBe("23503");
+    const viaForeignMeeting = await pgError(
+      asUser(b.id, (q) => q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgB, ids.meetingA, b.id])),
+    );
+    expect(["42501", "23503"]).toContain(viaForeignMeeting.code);
 
     // sanity: the same inserts work with org B's own ids
     await asUser(b.id, (q) =>

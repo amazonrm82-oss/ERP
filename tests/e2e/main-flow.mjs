@@ -316,6 +316,23 @@ try {
   await recordTasks.getByRole("button", { name: /בוצע.*להתקשר עם הצעת מחיר/ }).click();
   await recordTasks.getByText("אין משימות פתוחות לרשומה הזו").waitFor();
 
+  step("meetings: set a meeting on the lead, then record that the customer did not come (CAL-01)");
+  const recordMeetings = owner.locator('section[aria-labelledby="record-meetings-title"]');
+  await recordMeetings.getByRole("button", { name: "פגישה חדשה" }).click();
+  const meetingSheet = owner.getByRole("dialog", { name: "פגישה חדשה" });
+  await meetingSheet.getByLabel("כותרת").fill("פגישת היכרות");
+  await meetingSheet.getByLabel("מיקום (לא חובה)").fill("המשרד בתל אביב");
+  await meetingSheet.getByRole("button", { name: "קביעת הפגישה" }).click();
+  await recordMeetings.getByText("פגישת היכרות", { exact: true }).waitFor();
+  await expectText(owner, "הפגישה נקבעה");
+  const [{ n: linkedMeetings }] = await sql("select count(*)::int as n from public.meetings where title = 'פגישת היכרות' and lead_id = $1", [leadIdNow]);
+  if (linkedMeetings !== 1) throw new Error(`the meeting was not saved on the lead (${linkedMeetings})`);
+  await recordMeetings.getByRole("button", { name: "איך הייתה הפגישה?" }).click();
+  const statusSheet = owner.getByRole("dialog", { name: "סטטוס ותוצאה" });
+  await statusSheet.getByRole("radio", { name: "הלקוח לא הגיע" }).check();
+  await statusSheet.getByRole("button", { name: "שמירה", exact: true }).click();
+  await recordMeetings.getByText("הלקוח לא הגיע", { exact: true }).waitFor();
+
   step("convert lead");
   await owner.getByRole("button", { name: "המר לאיש קשר ועסקה" }).click();
   await owner.getByLabel("שווי העסקה (₪)").fill("12,500");

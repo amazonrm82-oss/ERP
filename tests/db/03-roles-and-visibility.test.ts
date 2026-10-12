@@ -424,6 +424,151 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("meetings follow the record they are about; organizer, creator and participants always see them (CAL-01)", async () => {
+    await setVisibility("own");
+    const lead = await insertLead(m1.id, org, { full_name: "ליד לפגישה", team_id: team });
+    const meetingSql =
+      "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, $2, now() + interval '1 day', now() + interval '1 day 1 hour', $3) returning id, owner_id";
+    const onLead = await asUser(m1.id, async (q) => (await q<{ id: string; owner_id: string }>(meetingSql, [org, "פגישה על ליד", lead])).rows[0]);
+    expect(onLead.owner_id).toBe(m1.id);
+    const internal = await asUser(m1.id, async (q) => (await q<{ id: string }>(meetingSql, [org, "פגישה פנימית", null])).rows[0].id);
+
+    const seesMeeting = (userId: string, id: string) =>
+      asUser(userId, async (q) => (await count(q, "select 1 from public.meetings where id = $1", [id])) === 1);
+    expect(await seesMeeting(m2.id, onLead.id)).toBe(false);
+    expect(await seesMeeting(viewer.id, onLead.id)).toBe(false);
+    expect(await seesMeeting(manager.id, onLead.id)).toBe(true); // manages the lead's team
+    expect(await seesMeeting(admin.id, onLead.id)).toBe(true);
+    expect(await seesMeeting(manager.id, internal)).toBe(false); // no record, organizer is not in a team he manages
+    expect(await seesMeeting(admin.id, internal)).toBe(true);
+
+    // a meeting on a record one cannot see is refused
+    const blocked = await pgError(asUser(m2.id, (q) => q(meetingSql, [org, "x", lead])));
+    expect(blocked.code).toBe("42501");
+    // a viewer sets up nothing
+    const byViewer = await pgError(asUser(viewer.id, (q) => q(meetingSql, [org, "x", null])));
+    expect(byViewer.code).toBe("42501");
+
+    // the record's editors edit its meetings; others do not
+    await asUser(manager.id, async (q) => {
+      expect((await q("update public.meetings set outcome = 'סוכם המשך' where id = $1", [onLead.id])).rowCount).toBe(1);
+      expect((await q("update public.meetings set outcome = 'x' where id = $1", [internal])).rowCount).toBe(0);
+    });
+    await asUser(m2.id, async (q) => {
+      expect((await q("update public.meetings set status = 'held' where id = $1", [onLead.id])).rowCount).toBe(0);
+    });
+
+    // adding a participant is editing the meeting: m2 may not, m1 may
+    const notEditor = await pgError(
+      asUser(m2.id, (q) => q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [org, onLead.id, m2.id])),
+    );
+    expect(notEditor.code).toBe("42501");
+    await asUser(m1.id, (q) =>
+      q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3), ($1, $4, $3)", [org, onLead.id, m2.id, internal]),
+    );
+    // a participant sees the meeting and who comes, and records how it went
+    expect(await seesMeeting(m2.id, onLead.id)).toBe(true);
+    expect(await seesMeeting(m2.id, internal)).toBe(true);
+    await asUser(m2.id, async (q) => {
+      expect(await count(q, "select 1 from public.meeting_participants where meeting_id = $1", [onLead.id])).toBe(1);
+      expect((await q("update public.meetings set status = 'held', outcome = 'נסגר' where id = $1", [onLead.id])).rowCount).toBe(1);
+      // ...but cannot delete what someone else set up
+      expect((await q("delete from public.meetings where id = $1", [onLead.id])).rowCount).toBe(0);
+    });
+    // a viewer participant sees it and still writes nothing
+    await asUser(m1.id, (q) =>
+      q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [org, internal, viewer.id]),
+    );
+    expect(await seesMeeting(viewer.id, internal)).toBe(true);
+    await asUser(viewer.id, async (q) => {
+      expect((await q("update public.meetings set status = 'cancelled' where id = $1", [internal])).rowCount).toBe(0);
+    });
+
+    // a member cannot move a meeting onto a record they cannot see
+    const hidden = await insertLead(admin.id, org, { full_name: "ליד של מנהלת" });
+    const moved = await pgError(asUser(m1.id, (q) => q("update public.meetings set lead_id = $1 where id = $2", [hidden, internal])));
+    expect(moved.code).toBe("42501");
+
+    // a read-only organization keeps its meetings readable and frozen
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    await asUser(m1.id, async (q) => {
+      expect(await count(q, "select 1 from public.meetings where id = $1", [onLead.id])).toBe(1);
+      expect((await q("update public.meetings set title = 'y' where id = $1", [onLead.id])).rowCount).toBe(0);
+      expect((await q("delete from public.meetings where id = $1", [internal])).rowCount).toBe(0);
+    });
+    await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+
+    // the creator removes a meeting set up by mistake; its participants go with it
+    await asUser(m1.id, async (q) => {
+      expect((await q("delete from public.meetings where id = $1", [internal])).rowCount).toBe(1);
+    });
+    expect(await asAdmin((q) => count(q, "select 1 from public.meeting_participants where meeting_id = $1", [internal]))).toBe(0);
+    await setVisibility("org");
+  });
+
+  it("a meeting's organizer changes only by the organizer, its creator or an owner/admin (CAL-01)", async () => {
+    const lead = await insertLead(m1.id, org, { full_name: "ליד להעברת פגישה", team_id: team });
+    const id = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'פגישה להעברה', now() + interval '1 day', now() + interval '1 day 1 hour', $2) returning id",
+          [org, lead],
+        )
+      ).rows[0].id,
+    );
+    await asUser(m1.id, (q) => q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [org, id, m2.id]));
+    const organizer = () => asAdmin(async (q) => (await q<{ owner_id: string }>("select owner_id from public.meetings where id = $1", [id])).rows[0].owner_id);
+
+    // a participant edits the meeting but cannot make themselves its organizer
+    const grab = await pgError(asUser(m2.id, (q) => q("update public.meetings set owner_id = $1 where id = $2", [m2.id, id])));
+    expect(grab.code).toBe("42501");
+    // the manager of the lead's team is neither organizer nor creator: he edits the meeting, but cannot take it
+    await asUser(manager.id, async (q) => {
+      expect((await q("update public.meetings set outcome = 'מנהל' where id = $1", [id])).rowCount).toBe(1);
+    });
+    const byManager = await pgError(asUser(manager.id, (q) => q("update public.meetings set owner_id = $1 where id = $2", [manager.id, id])));
+    expect(byManager.code).toBe("42501");
+    // not in two steps either: first linking it to a lead of their own, then taking it
+    const ownLead = await insertLead(m2.id, org, { full_name: "ליד של m2 לעקיפה" });
+    await asUser(m2.id, async (q) => {
+      expect((await q("update public.meetings set lead_id = $1 where id = $2", [ownLead, id])).rowCount).toBe(1);
+    });
+    const twoStep = await pgError(asUser(m2.id, (q) => q("update public.meetings set owner_id = $1, lead_id = null where id = $2", [m2.id, id])));
+    expect(twoStep.code).toBe("42501");
+    expect(await organizer()).toBe(m1.id);
+
+    // the organizer hands it over; nobody may leave it without one
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.meetings set owner_id = $1 where id = $2", [m2.id, id])).rowCount).toBe(1);
+    });
+    expect(await organizer()).toBe(m2.id);
+    const toNobody = await pgError(asUser(m2.id, (q) => q("update public.meetings set owner_id = null where id = $1", [id])));
+    expect(toNobody.code).toBe("23503");
+    // a viewer cannot be the organizer
+    const toViewer = await pgError(asUser(m2.id, (q) => q("update public.meetings set owner_id = $1 where id = $2", [viewer.id, id])));
+    expect(toViewer.code).toBe("23503");
+
+    // the creator takes it back, and an admin can move it too
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.meetings set owner_id = $1 where id = $2", [m1.id, id])).rowCount).toBe(1);
+    });
+    await asUser(admin.id, async (q) => {
+      expect((await q("update public.meetings set owner_id = $1 where id = $2", [manager.id, id])).rowCount).toBe(1);
+    });
+    expect(await organizer()).toBe(manager.id);
+
+    // on a new meeting a member is the organizer themself; an admin may name someone else
+    const insertFor = (actor: string, ownerId: string) =>
+      asUser(actor, (q) =>
+        q("insert into public.meetings (organization_id, title, starts_at, ends_at, owner_id) values ($1, 'x', now(), now() + interval '1 hour', $2)", [org, ownerId]),
+      );
+    expect((await pgError(insertFor(m1.id, m2.id))).code).toBe("42501");
+    expect((await insertFor(m1.id, m1.id)).rowCount).toBe(1);
+    expect((await insertFor(admin.id, m2.id)).rowCount).toBe(1);
+    expect((await pgError(insertFor(admin.id, viewer.id))).code).toBe("23503");
+  });
+
   it("ownership moves only through transfer_ownership, and only by the owner", async () => {
     const byAdmin = await pgError(asUser(admin.id, (q) => q("select public.transfer_ownership($1, $2)", [org, admin.id])));
     expect(byAdmin.code).toBe("42501");

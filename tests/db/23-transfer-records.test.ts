@@ -40,7 +40,7 @@ describe("handing records to someone else", () => {
     expect((await pgError(asUser(leaving.id, (q) => q("delete from public.memberships where organization_id = $1 and user_id = $2", [org, leaving.id])))).code).toBe("23503");
     const outboxBefore = await asAdmin((q) => count(q, "select 1 from public.outbox_events where organization_id = $1 and coalesce(payload ->> 'origin', '') <> 'automation'", [org]));
 
-    expect(await transfer(admin.id, leaving.id, taking.id)).toEqual({ leads: 2, contacts: 1, companies: 0, deals: 0, tasks: 2 });
+    expect(await transfer(admin.id, leaving.id, taking.id)).toEqual({ leads: 2, contacts: 1, companies: 0, deals: 0, tasks: 2, meetings: 0 });
 
     for (const table of ["leads", "contacts", "tasks"]) {
       expect(await asAdmin((q) => count(q, `select 1 from public.${table} where organization_id = $1 and owner_id = $2`, [org, leaving.id])), table).toBe(0);
