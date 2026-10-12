@@ -177,6 +177,8 @@ export type TeamMemberRow = {
   team_id: string;
   user_id: string;
   is_manager: boolean;
+  // CAP-06: the team the user's records join when they sit in several teams
+  is_primary: boolean;
   created_at: string;
 };
 
@@ -810,8 +812,8 @@ export type Database = {
       teams: Table<TeamRow, { organization_id: string; name: string; parent_team_id?: string | null }>;
       team_members: Table<
         TeamMemberRow,
-        { organization_id: string; team_id: string; user_id: string; is_manager?: boolean },
-        { is_manager?: boolean }
+        { organization_id: string; team_id: string; user_id: string; is_manager?: boolean; is_primary?: boolean },
+        { is_manager?: boolean; is_primary?: boolean }
       >;
       invitations: Table<
         InvitationRow,
@@ -1076,6 +1078,7 @@ export type Database = {
       // invitation page (migration 0023): null when the token matches nothing
       invitation_preview: { Args: { p_token: string }; Returns: Json };
       // handover (migration 0024): { leads, contacts, companies, deals, tasks } moved
+      set_primary_team: { Args: { p_org: string; p_team: string; p_user: string; p_primary: boolean }; Returns: undefined };
       transfer_records: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       // merging duplicates (migration 0020): picks = { column: "merge" }
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };

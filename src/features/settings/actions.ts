@@ -357,6 +357,40 @@ export async function setTeamManagerAction(
   return ok();
 }
 
+/**
+ * Marks (or unmarks) this team as the member's primary team: the team their new
+ * records join when they are in several teams (CAP-06). One step in the database,
+ * which clears the previous primary team; admins only (RLS).
+ */
+export async function setPrimaryTeamAction(
+  orgId: string,
+  teamId: string,
+  userId: string,
+  primary: boolean,
+): Promise<ActionResult> {
+  const context = await actionContext(orgId, teamId, userId);
+  if (!context.ok) {
+    return context;
+  }
+  if (!validArg(booleanArg, primary)) {
+    return fail(INVALID_ARGS);
+  }
+  const { error } = await context.supabase.rpc("set_primary_team", {
+    p_org: orgId,
+    p_team: teamId,
+    p_user: userId,
+    p_primary: primary,
+  });
+  if (error) {
+    // P0002: no row of this member in this team was changed (gone, or not permitted)
+    return fail(error.code === "P0002" ? NOT_FOUND_OR_FORBIDDEN : dbErrorMessage(error, "לא הצלחנו לעדכן את הצוות הראשי. נסו שוב."));
+  }
+  revalidatePath(paths.settingsTeams(orgId));
+  // the member's other team pages change too (the old primary team)
+  revalidatePath("/o/[orgId]/settings/teams/[teamId]", "page");
+  return ok();
+}
+
 export async function removeTeamMemberAction(orgId: string, teamId: string, userId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, teamId, userId);
   if (!context.ok) {

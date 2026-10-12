@@ -509,6 +509,35 @@ try {
   await ownerDesk.getByRole("button", { name: "הוספה לצוות" }).click();
   await expectText(ownerDesk, "חברי הצוות (1)");
   await shot(ownerDesk, "10-team-1280");
+  const salesTeamUrl = ownerDesk.url();
+
+  step("primary team for a user in two teams (CAP-06)");
+  await ownerDesk.goto(`${orgUrl}/settings/teams`);
+  await ownerDesk.getByLabel("שם הצוות").fill("צוות שירות");
+  await ownerDesk.getByRole("button", { name: "יצירת צוות" }).click();
+  await ownerDesk.waitForURL(/\/settings\/teams\/[0-9a-f-]{36}$/);
+  await ownerDesk.getByRole("combobox", { name: "משתמש" }).selectOption({ label: "דנה חברה" });
+  await ownerDesk.getByRole("button", { name: "הוספה לצוות" }).click();
+  await expectText(ownerDesk, "בלי צוות ראשי");
+  await ownerDesk.goto(salesTeamUrl);
+  await ownerDesk.getByRole("button", { name: /קביעה כצוות ראשי.*דנה חברה/ }).click();
+  await ownerDesk.locator("span", { hasText: /^צוות ראשי$/ }).first().waitFor({ timeout: 15000 });
+  const [primaryRow] = await sql(
+    // this run's business only: earlier runs left other users with the same name in the local database
+    "select t.name from public.team_members tm join public.teams t on t.id = tm.team_id join public.profiles p on p.id = tm.user_id where tm.is_primary and p.full_name = 'דנה חברה' and tm.organization_id = $1",
+    [orgUrl.split("/o/")[1].split("/")[0]],
+  );
+  if (primaryRow?.name !== "צוות מכירות") throw new Error(`primary team not saved: ${JSON.stringify(primaryRow)}`);
+  // the member sees it too
+  await invitee.goto(salesTeamUrl);
+  await invitee.locator("span", { hasText: /^צוות ראשי$/ }).first().waitFor({ timeout: 15000 });
+  // back to one team, as the rest of the flow expects
+  await ownerDesk.goto(`${orgUrl}/settings/teams`);
+  await ownerDesk.getByRole("link", { name: /צוות שירות/ }).click();
+  await ownerDesk.waitForURL(/\/settings\/teams\/[0-9a-f-]{36}$/);
+  await ownerDesk.getByRole("button", { name: /^מחיקת הצוות$/ }).click();
+  await ownerDesk.getByRole("group", { name: /למחוק את הצוות/ }).getByRole("button", { name: /^מחיקת הצוות$/ }).click();
+  await ownerDesk.waitForURL(/\/settings\/teams$/);
 
   // the manager now sees the team; members do not edit teams
   await invitee.goto(`${orgUrl}/settings/teams`);

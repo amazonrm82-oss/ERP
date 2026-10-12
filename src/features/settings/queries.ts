@@ -5,6 +5,8 @@ import type { MembershipRole, MembershipStatus, RecordVisibility, SeatType } fro
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import { primaryTeamState, type PrimaryTeamState } from "./primary-team";
+
 export type OrganizationSettings = {
   name: string;
   industry: string | null;
@@ -179,7 +181,7 @@ export async function listTeams(orgId: string): Promise<TeamSummary[]> {
 export type TeamDetails = {
   id: string;
   name: string;
-  members: Array<{ userId: string; name: string; email: string | null; isManager: boolean }>;
+  members: Array<{ userId: string; name: string; email: string | null; isManager: boolean; primary: PrimaryTeamState }>;
 };
 
 export async function getTeam(orgId: string, teamId: string): Promise<TeamDetails | null> {
@@ -201,6 +203,12 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
     .select("user_id, is_manager")
     .eq("organization_id", orgId)
     .eq("team_id", teamId), "team_members");
+  // every team of these members, to tell which team their records join (CAP-06)
+  const memberships = rows.length === 0 ? [] : must(await supabase
+    .from("team_members")
+    .select("team_id, user_id, is_primary")
+    .eq("organization_id", orgId)
+    .in("user_id", rows.map((row) => row.user_id)), "team_members");
   const profiles = must(await supabase
     .from("profiles")
     .select("id, full_name, email")
@@ -221,6 +229,7 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
           name: profile?.full_name?.trim() || profile?.email || "משתמש",
           email: profile?.email ?? null,
           isManager: row.is_manager,
+          primary: primaryTeamState(memberships, row.user_id, teamId),
         };
       })
       .sort((a, b) => Number(b.isManager) - Number(a.isManager) || a.name.localeCompare(b.name, "he")),

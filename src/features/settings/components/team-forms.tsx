@@ -16,6 +16,7 @@ import {
   deleteTeamAction,
   removeTeamMemberAction,
   renameTeamAction,
+  setPrimaryTeamAction,
   setTeamManagerAction,
 } from "../actions";
 import type { TeamDetails } from "../queries";
@@ -109,7 +110,7 @@ export function TeamMembersList({ orgId, teamId, members, editable }: MembersPro
   return (
     <ul className="divide-y divide-line">
       {members.map((member) => (
-        <TeamMemberRow key={`${member.userId}-${member.isManager}`} orgId={orgId} teamId={teamId} member={member} editable={editable} />
+        <TeamMemberRow key={`${member.userId}-${member.isManager}-${member.primary.isPrimary}`} orgId={orgId} teamId={teamId} member={member} editable={editable} />
       ))}
     </ul>
   );
@@ -145,10 +146,16 @@ function TeamMemberRow({
         <p className="flex flex-wrap items-center gap-2 font-medium">
           {member.name}
           {member.isManager ? <Badge tone="accent">מנהל הצוות</Badge> : null}
+          {member.primary.isPrimary ? <Badge>צוות ראשי</Badge> : null}
         </p>
         {member.email ? (
           <p dir="ltr" className="truncate text-end text-sm text-ink-soft sm:text-start">
             {member.email}
+          </p>
+        ) : null}
+        {member.primary.noRecordTeam ? (
+          <p className="mt-1 text-sm text-ink-soft">
+            {`חבר ב-${member.primary.teamCount} צוותים, בלי צוות ראשי. רשומות חדשות שלו לא משויכות לצוות.`}
           </p>
         ) : null}
         {error ? (
@@ -168,6 +175,17 @@ function TeamMemberRow({
             {member.isManager ? "ביטול ניהול" : "מינוי למנהל הצוות"}
             <span className="sr-only">: {member.name}</span>
           </Button>
+          {member.primary.teamCount > 1 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={pending}
+              onClick={() => run(() => setPrimaryTeamAction(orgId, teamId, member.userId, !member.primary.isPrimary))}
+            >
+              {member.primary.isPrimary ? "ביטול צוות ראשי" : "קביעה כצוות ראשי"}
+              <span className="sr-only">: {member.name}</span>
+            </Button>
+          ) : null}
           <Button
             variant="danger-ghost"
             size="sm"
