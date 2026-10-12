@@ -3,8 +3,12 @@ import { INDUSTRIES } from "@/features/onboarding/options";
 import { RecordTypeField } from "@/features/record-type-options/components/type-field";
 import type { RecordType } from "@/features/record-type-options/schema";
 
+import { CompanyNumberFields } from "./company-number-fields";
+
 export type CompanyValues = {
   name?: string | null;
+  // CON-04: ISO code, "IL" by default
+  country?: string | null;
   tax_id?: string | null;
   industry?: string | null;
   phone?: string | null;
@@ -38,28 +42,23 @@ export function CompanyFields({ values, errors, types, legacyType }: Props) {
         defaultValue={values.name ?? ""}
         error={errors.name}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="ח.פ. או עוסק מורשה"
-          name="tax_id"
-          hint="9 ספרות"
-          dir="ltr"
-          inputMode="numeric"
-          maxLength={20}
-          autoComplete="off"
-          defaultValue={values.tax_id ?? ""}
-          error={errors.tax_id}
-        />
-        {/* key: a select only takes defaultValue on mount */}
-        <SelectField key={`industry-${industry}`} label="ענף" name="industry" defaultValue={industry} error={errors.industry}>
-          <option value="">לא נבחר</option>
-          {INDUSTRIES.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </SelectField>
-      </div>
+      <CompanyNumberFields country={values.country} taxId={values.tax_id} errors={errors} />
+      {/* key: a select only takes defaultValue on mount */}
+      <SelectField
+        key={`industry-${industry}`}
+        label="ענף"
+        name="industry"
+        defaultValue={industry}
+        error={errors.industry}
+        className="sm:max-w-xs"
+      >
+        <option value="">לא נבחר</option>
+        {INDUSTRIES.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           label="טלפון"

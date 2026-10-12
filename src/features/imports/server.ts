@@ -193,8 +193,11 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
       address_line: raw.address_line,
     });
     if (!parsed.success) return firstIssue(parsed.error);
-    const { industry: _industry, ...rest } = parsed.data;
+    // the file has no country: an import never writes one, so an update keeps the
+    // company's country (CON-04) and a new company gets the database default (IL)
+    const { industry: _industry, country: _country, ...rest } = parsed.data;
     void _industry;
+    void _country;
     Object.assign(values, rest);
     name = parsed.data.name;
   }

@@ -53,6 +53,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "reasons:max": "אפשר לשמור עד 50 סיבות. מחקו סיבה שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)
   "tax_id:invalid": "מספר ח.פ. או עוסק מורשה אינו תקין. בדקו את 9 הספרות.",
+  // CON-04, a company outside Israel (migration foreign_company_number)
+  "tax_id:invalid_foreign": "מספר הרישום אינו תקין. אפשר 2 עד 30 תווים: אותיות באנגלית, ספרות, רווח, מקף, נקודה ולוכסן.",
   // CON-02 (migration record_types)
   "record_type:invalid": "יש לבחור סוג מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
   "record_types:max": "אפשר לשמור עד 50 סוגים. מחקו סוג שלא בשימוש כדי להוסיף חדש.",

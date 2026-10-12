@@ -15,6 +15,7 @@ import type { RecordType } from "@/features/record-type-options/schema";
 import type { FormState } from "@/lib/action-result";
 
 import { updateCompanyAction } from "../actions";
+import { countryName, ISRAEL } from "../countries";
 import { CompanyFields, type CompanyValues } from "./company-fields";
 
 export type CompanyDetailsView = CompanyValues & {
@@ -39,6 +40,7 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit }: Props) {
     // mounted only while editing, so every edit starts with a clean form state
     return <CompanyEditForm orgId={orgId} company={company} types={types} onDone={() => setEditing(false)} />;
   }
+  const israeli = (company.country ?? ISRAEL) === ISRAEL;
 
   return (
     <Card aria-labelledby="company-details-title">
@@ -56,7 +58,9 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit }: Props) {
       <CardBody>
         <DetailList>
           <Detail label="סוג" value={company.typeName ?? company.company_type} />
-          <Detail label="ח.פ." value={company.tax_id} ltr />
+          {/* CON-04: the country only when it is not Israel */}
+          {israeli ? null : <Detail label="מדינת הרישום" value={countryName(company.country)} />}
+          <Detail label={israeli ? "ח.פ." : "מספר רישום"} value={company.tax_id} ltr />
           <Detail label="ענף" value={INDUSTRIES.find((option) => option.value === company.industry)?.label} />
           <Detail label="טלפון" value={company.phone} ltr />
           <Detail label="אימייל" value={company.email} ltr />

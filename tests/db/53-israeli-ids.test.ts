@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { foreignCompanyNumber } from "@/features/companies/tax-id";
 import { israeliIdNumber } from "@/lib/israeli-id";
 
 import { asAdmin, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
@@ -59,11 +60,85 @@ describe("Israeli ID and company numbers (CON-04)", () => {
     expect(await asUser(owner.id, async (q) => (await q("update public.companies set tax_id = null where id = $1", [id])).rowCount)).toBe(1);
   });
 
-  it("a company outside Israel is not checked", async () => {
-    const taxId = await asUser(owner.id, async (q) =>
-      (await q<{ tax_id: string }>("insert into public.companies (organization_id, name, tax_id, country) values ($1, 'Foreign Ltd', 'GB123456', 'GB') returning tax_id", [org])).rows[0].tax_id,
+  // owner's decision, 12 October 2026: abroad only the shape is checked (migration foreign_company_number)
+  const insertIn = (country: string | null, taxId: string | null) =>
+    asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string; tax_id: string | null }>(
+          "insert into public.companies (organization_id, name, tax_id, country) values ($1, 'Foreign Ltd', $2, coalesce($3, 'IL')) returning id, tax_id",
+          [org, taxId, country],
+        )
+      ).rows[0],
     );
-    expect(taxId).toBe("GB123456");
+
+  it("a company outside Israel needs 2 to 30 Latin letters, digits, spaces, - . /, stored trimmed as typed", async () => {
+    expect((await insertIn("GB", "GB123456")).tax_id).toBe("GB123456");
+    expect((await insertIn("DE", "  HRB 12345 / B-1.2  ")).tax_id).toBe("HRB 12345 / B-1.2");
+    expect((await insertIn("US", "12")).tax_id).toBe("12");
+    // an Israeli number is not padded or checked abroad
+    expect((await insertIn("US", "12345")).tax_id).toBe("12345");
+    expect((await insertIn("FR", "x".repeat(30))).tax_id).toBe("x".repeat(30));
+    for (const bad of ["1", "x".repeat(31), "GB_123", "ח.פ. 123", "AB#12", "   ", "", "12\t34"]) {
+      const error = await pgError(insertIn("GB", bad));
+      expect(error.code, bad).toBe("P0001");
+      expect(error.hint, bad).toBe("tax_id:invalid_foreign");
+    }
+  });
+
+  it("the database and the app agree on foreign numbers", async () => {
+    const samples = ["GB123456", " AB-1 ", "1", "a/b.c d-e", "ABC_1", "שלום12", "x".repeat(30), "x".repeat(31), "Ünï123"];
+    for (const value of samples) {
+      const app = foreignCompanyNumber(value);
+      const db = await insertIn("GB", value).then(
+        (row) => row.tax_id,
+        () => null,
+      );
+      expect(db, value).toBe(app);
+    }
+  });
+
+  it("an empty number is allowed in Israel and abroad", async () => {
+    expect((await insertIn("IL", null)).tax_id).toBeNull();
+    expect((await insertIn("GB", null)).tax_id).toBeNull();
+  });
+
+  it("changing the country checks the number against the new country", async () => {
+    const israeli = await insertIn("IL", "514285626");
+    // Israel to abroad with an Israeli number keeps working
+    expect(await asUser(owner.id, async (q) => (await q("update public.companies set country = 'GB' where id = $1", [israeli.id])).rowCount)).toBe(1);
+    // and back
+    expect(await asUser(owner.id, async (q) => (await q("update public.companies set country = 'IL' where id = $1", [israeli.id])).rowCount)).toBe(1);
+
+    const foreign = await insertIn("GB", "GB123456");
+    expect((await pgError(asUser(owner.id, (q) => q("update public.companies set country = 'IL' where id = $1", [foreign.id])))).hint).toBe("tax_id:invalid");
+    // country and number together, as the form sends them
+    const both = await asUser(owner.id, async (q) =>
+      (await q<{ tax_id: string }>("update public.companies set country = 'IL', tax_id = '12345674' where id = $1 returning tax_id", [foreign.id])).rows[0].tax_id,
+    );
+    expect(both).toBe("012345674");
+    expect((await pgError(asUser(owner.id, (q) => q("update public.companies set country = 'GB', tax_id = 'GB#1' where id = $1", [foreign.id])))).hint).toBe("tax_id:invalid_foreign");
+  });
+
+  it("a foreign row with an old number that does not fit can still be changed", async () => {
+    const id = await asAdmin(async (q) =>
+      (await q<{ id: string }>("insert into public.companies (organization_id, name, tax_id, country) values ($1, 'Old Ltd', 'ע.מ. #1', 'GB') returning id", [org])).rows[0].id,
+    );
+    expect(await asUser(owner.id, async (q) => (await q("update public.companies set name = 'Old Ltd 2' where id = $1", [id])).rowCount)).toBe(1);
+    // the form sends the same country and number back: unchanged, not checked
+    expect(await asUser(owner.id, async (q) => (await q("update public.companies set tax_id = 'ע.מ. #1', country = 'GB' where id = $1", [id])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("update public.companies set tax_id = 'ע.מ. #2' where id = $1", [id])))).hint).toBe("tax_id:invalid_foreign");
+  });
+
+  it("a country is two capital letters, so a lowercase 'il' cannot skip the Israeli check", async () => {
+    for (const country of ["il", "Il", "I", "1L"]) {
+      const error = await pgError(insertIn(country, "514285627"));
+      expect(error.code, country).toBe("23514");
+      expect(error.message, country).toContain("companies_country_code");
+    }
+    const validated = await asAdmin(async (q) =>
+      (await q<{ ok: boolean }>("select convalidated as ok from pg_constraint where conname = 'companies_country_code'")).rows[0].ok,
+    );
+    expect(validated).toBe(true);
   });
 
   it("custom fields of type il_id / il_company_id need a valid number", async () => {
