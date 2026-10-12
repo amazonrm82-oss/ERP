@@ -744,6 +744,8 @@ export type ActivityRow = {
   metadata: Json;
   occurred_at: string;
   is_pinned: boolean;
+  // GAP-05: a private note, seen only by its author and the organization's owners/admins
+  is_private: boolean;
   lead_id: string | null;
   contact_id: string | null;
   company_id: string | null;
@@ -760,6 +762,8 @@ export type ActivityInsert = {
   metadata?: Json;
   occurred_at?: string;
   is_pinned?: boolean;
+  // only on a note (check activities_private_note)
+  is_private?: boolean;
   lead_id?: string | null;
   contact_id?: string | null;
   company_id?: string | null;
@@ -772,6 +776,7 @@ export type ActivityUpdate = {
   metadata?: Json;
   occurred_at?: string;
   is_pinned?: boolean;
+  is_private?: boolean;
 };
 
 export type TaskRow = {

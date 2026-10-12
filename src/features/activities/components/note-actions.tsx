@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
+import { Checkbox } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { deleteNoteAction, updateNoteAction } from "../actions";
-import type { TimelineSubject } from "../schema";
+import { PRIVATE_NOTE_HINT, PRIVATE_NOTE_TYPE, type TimelineSubject } from "../schema";
 import { NoteEditor } from "./note-editor";
 
 type Props = {
@@ -21,13 +22,16 @@ type Props = {
   label: string;
   // the stored text, for the edit box
   body: string;
+  // GAP-05: a note can be made private or public in the edit box
+  type: string;
+  isPrivate: boolean;
 };
 
 /**
  * REC-05: edit or delete an entry a person logged. Shown to its author for 24 hours and to
  * owners/admins; the database enforces the same rule and writes the change to the audit log.
  */
-export function NoteActions({ orgId, subject, activityId, label, body }: Props) {
+export function NoteActions({ orgId, subject, activityId, label, body, type, isPrivate }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -36,7 +40,14 @@ export function NoteActions({ orgId, subject, activityId, label, body }: Props) 
         <span className="sr-only">: {label}</span>
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} title={`עריכה: ${label}`} variant="sheet">
-        {open ? <EditNoteForm orgId={orgId} subject={subject} activityId={activityId} body={body} onDone={() => setOpen(false)} /> : null}
+        {open ? <EditNoteForm
+            orgId={orgId}
+            subject={subject}
+            activityId={activityId}
+            body={body}
+            privacy={type === PRIVATE_NOTE_TYPE ? isPrivate : null}
+            onDone={() => setOpen(false)}
+          /> : null}
       </Dialog>
       <ConfirmButton
         title="למחוק מציר הזמן?"
@@ -51,7 +62,17 @@ export function NoteActions({ orgId, subject, activityId, label, body }: Props) 
   );
 }
 
-function EditNoteForm({ orgId, subject, activityId, body, onDone }: { orgId: string; subject: TimelineSubject; activityId: string; body: string; onDone: () => void }) {
+type EditProps = {
+  orgId: string;
+  subject: TimelineSubject;
+  activityId: string;
+  body: string;
+  // GAP-05: whether the note is private now; null for an entry that cannot be private (a call, a meeting)
+  privacy: boolean | null;
+  onDone: () => void;
+};
+
+function EditNoteForm({ orgId, subject, activityId, body, privacy, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateNoteAction.bind(null, orgId, subject, activityId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -70,6 +91,17 @@ function EditNoteForm({ orgId, subject, activityId, body, onDone }: { orgId: str
         error={failure?.fieldErrors?.body}
         autoFocus
       />
+      {privacy !== null ? (
+        <>
+          <input type="hidden" name="private_field" value="1" />
+          <Checkbox
+            name="private"
+            label="הערה פרטית"
+            hint={PRIVATE_NOTE_HINT}
+            defaultChecked={failure?.values ? failure.values.private === "on" : privacy}
+          />
+        </>
+      ) : null}
       {failure && !failure.fieldErrors ? <FormError message={failure.message} /> : null}
       <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="שומרים…">שמירת השינוי</SubmitButton>

@@ -318,6 +318,28 @@ try {
     if (logged.map((r) => r.action).join(",") !== "update,delete") throw new Error(`audit of the note: ${JSON.stringify(logged)}`);
   }
 
+  step("a private note carries a lock badge; made public in the edit box, then deleted (GAP-05)");
+  {
+    const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
+    await timeline.getByLabel("תיעוד").fill("הערה פרטית לבדיקה");
+    await timeline.getByRole("checkbox", { name: /^הערה פרטית$/ }).check();
+    await timeline.getByRole("button", { name: "הוספה לציר הזמן" }).click();
+    const entry = timeline.locator("ol > li", { hasText: "הערה פרטית לבדיקה" }).first();
+    await entry.getByText(/^פרטית/).waitFor({ timeout: 15000 });
+    const leadIdPrivate = owner.url().split("/leads/")[1];
+    const [{ p }] = await sql("select is_private as p from public.activities where lead_id = $1 and body = 'הערה פרטית לבדיקה'", [leadIdPrivate]);
+    if (p !== true) throw new Error("the note was not saved as private");
+    await entry.getByRole("button", { name: /^עריכה/ }).click();
+    const dialog = owner.getByRole("dialog", { name: /עריכה/ });
+    await dialog.getByRole("checkbox", { name: /^הערה פרטית$/ }).uncheck();
+    await dialog.getByRole("button", { name: /שמירת השינוי/ }).click();
+    await dialog.waitFor({ state: "hidden", timeout: 15000 });
+    await entry.getByText(/^פרטית/).waitFor({ state: "detached", timeout: 15000 });
+    await entry.getByRole("button", { name: /^מחיקה/ }).click();
+    await owner.getByRole("dialog", { name: /למחוק מציר הזמן/ }).getByRole("button", { name: /^מחיקה$/ }).click();
+    await timeline.getByRole("paragraph").filter({ hasText: "הערה פרטית לבדיקה" }).waitFor({ state: "detached", timeout: 15000 });
+  }
+
   step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
   const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");

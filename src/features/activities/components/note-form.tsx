@@ -3,12 +3,12 @@
 import { useActionState } from "react";
 
 import { FormError } from "@/components/ui/feedback";
-import { SelectField } from "@/components/ui/field";
+import { Checkbox, SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { addNoteAction } from "../actions";
-import { LOGGED_TYPES, type TimelineSubject } from "../schema";
+import { LOGGED_TYPES, PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
 import { NoteEditor } from "./note-editor";
 
 export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineSubject }) {
@@ -34,6 +34,15 @@ export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineS
         defaultValue={failure?.values?.body}
         error={failure?.fieldErrors?.body}
       />
+      {/* GAP-05: a note only; the database refuses a private call or meeting */}
+      <Checkbox
+        key={`private-${failure?.values?.private ?? ""}`}
+        name="private"
+        label="הערה פרטית"
+        hint={PRIVATE_NOTE_HINT}
+        defaultChecked={failure?.values?.private === "on"}
+      />
+      {failure?.fieldErrors?.private ? <FormError message={failure.fieldErrors.private} /> : null}
       {failure && !failure.fieldErrors ? <FormError message={failure.message} /> : null}
       <SubmitButton size="sm">הוספה לציר הזמן</SubmitButton>
     </form>

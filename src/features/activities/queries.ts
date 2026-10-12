@@ -25,6 +25,8 @@ export type TimelineItem = {
   createdAt: string;
   // REC-01: pinned to the top of the timeline
   pinned: boolean;
+  // GAP-05: seen only by its author and the owners/admins (the database hides it from everyone else)
+  isPrivate: boolean;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -61,7 +63,7 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
 
   let query = supabase
     .from("activities")
-    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned")
+    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned, is_private")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id);
   // the type lists are constants (TIMELINE_FILTERS), never text from the URL
@@ -141,6 +143,7 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       createdBy: activity.created_by,
       createdAt: activity.created_at,
       pinned: activity.is_pinned,
+      isPrivate: activity.is_private,
     };
   });
 }

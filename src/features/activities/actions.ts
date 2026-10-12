@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, invalid, formValues, ok, type ActionResult, type FormState } from "@/lib/action-result";
-import type { ActivityInsert } from "@/lib/database.types";
+import type { ActivityInsert, ActivityUpdate } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
@@ -22,6 +22,7 @@ import {
   noteEditSchema,
   noteSchema,
   PINNABLE_TYPES,
+  PRIVATE_NOTE_TYPE,
   subjectSchema,
   SUBJECT_COLUMN,
   type TimelineSubject,
@@ -54,13 +55,14 @@ export async function addNoteAction(
     return context;
   }
 
-  const parsed = noteSchema.safeParse(pick(formData, ["type", "body"]));
+  const parsed = noteSchema.safeParse(pick(formData, ["type", "body", "private"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
 
   // RLS: allowed when the user can write in the organization and can see the record.
-  const row: ActivityInsert = { organization_id: orgId, type: parsed.data.type, body: parsed.data.body };
+  // GAP-05: a private note is seen by its author and the owners/admins only (activities_select).
+  const row: ActivityInsert = { organization_id: orgId, type: parsed.data.type, body: parsed.data.body, is_private: parsed.data.private };
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
   const { error } = await context.supabase.from("activities").insert(row);
   if (error) {
@@ -172,6 +174,8 @@ export async function setActivityPinnedAction(
  * REC-05: edits the text of an entry a person logged. With the user's session: RLS lets the
  * author change it for 24 hours, and an owner/admin at any time; the database writes the
  * change to the audit log. Zero rows back means deleted, not on this record, or not permitted.
+ * GAP-05: the edit box of a note also says whether it is private (same rule: the author for
+ * 24 hours, an owner/admin always); only a note is touched then.
  */
 export async function updateNoteAction(
   orgId: string,
@@ -188,18 +192,22 @@ export async function updateNoteAction(
   if (!context.ok) {
     return context;
   }
-  const parsed = noteEditSchema.safeParse(pick(formData, ["body"]));
+  const parsed = noteEditSchema.safeParse(pick(formData, ["body", "private_field", "private"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
 
+  const change: ActivityUpdate = { body: parsed.data.body };
+  if (parsed.data.private_field) {
+    change.is_private = parsed.data.private;
+  }
   const { data, error } = await context.supabase
     .from("activities")
-    .update({ body: parsed.data.body })
+    .update(change)
     .eq("organization_id", orgId)
     .eq("id", activityId)
     .eq(SUBJECT_COLUMN[parsedSubject.data.kind], parsedSubject.data.id)
-    .in("type", [...PINNABLE_TYPES])
+    .in("type", parsed.data.private_field ? [PRIVATE_NOTE_TYPE] : [...PINNABLE_TYPES])
     .select("id");
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את השינוי. נסו שוב."), { values: formValues(formData) });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { optionalText, requiredText } from "@/lib/validation";
+import { checkbox, optionalText, requiredText } from "@/lib/validation";
 
 import { sanitizeNote } from "./markdown";
 
@@ -110,8 +110,17 @@ export function managesTeamChain(
 // Said when an edit or a delete touched nothing.
 export const NOTE_LOCKED = "לא ניתן לשנות את הרשומה הזו. ייתכן שנמחקה, או שעברו 24 שעות מאז שנכתבה (אחרי זה רק מנהל מערכת יכול לשנות או למחוק אותה).";
 
+// GAP-05: only a note can be private (check activities_private_note in the database)
+export const PRIVATE_NOTE_TYPE = "note";
+export const PRIVATE_ONLY_NOTE = "רק הערה יכולה להיות פרטית. שיחות, פגישות והודעות גלויות לכל מי שרואה את הרשומה.";
+// the hint next to the checkbox: who will see the note
+export const PRIVATE_NOTE_HINT = "תוצג רק לך ולמנהלי המערכת של העסק.";
+
 export const noteEditSchema = z.object({
   body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
+  // GAP-05: sent only by the edit box of a note; absent means "leave it as it is"
+  private_field: z.preprocess((value) => value === "1", z.boolean()),
+  private: checkbox,
 });
 
 // REC-06: the timeline can show one kind of activity. The key travels in the record page's URL
@@ -145,10 +154,14 @@ export function timelineFilterHref(recordHref: string, key: TimelineFilterKey): 
   return key === "all" ? `${recordHref}#timeline-title` : `${recordHref}?tl=${key}#timeline-title`;
 }
 
-export const noteSchema = z.object({
-  type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
-  body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
-});
+export const noteSchema = z
+  .object({
+    type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
+    body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
+    // GAP-05: "me and the organization's admins"
+    private: checkbox,
+  })
+  .refine((note) => !note.private || note.type === PRIVATE_NOTE_TYPE, { path: ["private"], message: PRIVATE_ONLY_NOTE });
 
 export const SUBJECT_COLUMN = {
   lead: "lead_id",

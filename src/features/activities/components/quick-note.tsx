@@ -3,12 +3,12 @@
 import { useActionState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { TextareaField } from "@/components/ui/field";
+import { Checkbox, TextareaField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { addNoteAction } from "../actions";
-import type { TimelineSubject } from "../schema";
+import { PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
 
 /**
  * A short note right under the call buttons (FXU-03): after a call on the
@@ -29,6 +29,15 @@ export function QuickNote({ orgId, subject, className }: { orgId: string; subjec
         placeholder="מה סוכם בשיחה?"
         defaultValue={failure?.values?.body}
         error={failure?.fieldErrors?.body}
+      />
+      {/* GAP-05 */}
+      <Checkbox
+        key={`private-${failure?.values?.private ?? ""}`}
+        name="private"
+        label="הערה פרטית"
+        hint={PRIVATE_NOTE_HINT}
+        defaultChecked={failure?.values?.private === "on"}
+        className="mt-2"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <SubmitButton size="sm" pendingText="שומרים…">

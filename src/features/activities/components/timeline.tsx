@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { getOrgContext } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
@@ -78,6 +79,14 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                 <div>
                   <p className="min-w-0 text-sm text-ink-soft">
                     {item.pinned ? <Badge tone="accent" className="me-2">נעוץ</Badge> : null}
+                    {item.isPrivate ? (
+                      // GAP-05: only the author and the owners/admins see this entry
+                      <Badge tone="warning" className="me-2 gap-1">
+                        <LockIcon className="size-3.5" />
+                        פרטית
+                        <span className="sr-only">: גלויה רק למי שכתב אותה ולמנהלי המערכת</span>
+                      </Badge>
+                    ) : null}
                     <span className="font-medium text-ink">{item.label}</span>
                     {item.authorName ? <>, {item.authorName}</> : null}
                     <span className="mx-1.5" aria-hidden="true">
@@ -100,7 +109,15 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                   <div className="mt-1 -ms-3 flex flex-wrap items-start gap-1">
                     <PinButton orgId={orgId} subject={subject} activityId={item.id} pinned={item.pinned} label={item.label} />
                     {canEditNoteHint(item, viewer, now) ? (
-                      <NoteActions orgId={orgId} subject={subject} activityId={item.id} label={item.label} body={item.body} />
+                      <NoteActions
+                        orgId={orgId}
+                        subject={subject}
+                        activityId={item.id}
+                        label={item.label}
+                        body={item.body}
+                        type={item.type}
+                        isPrivate={item.isPrivate}
+                      />
                     ) : null}
                   </div>
                 ) : null}

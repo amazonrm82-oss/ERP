@@ -111,6 +111,23 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("a private note is seen by its author and the owners/admins only, at every visibility (GAP-05)", async () => {
+    await setVisibility("org");
+    const id = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.activities (organization_id, type, body, lead_id, is_private) values ($1, 'note', 'פרטית', $2, true) returning id",
+          [org, leadM1],
+        )
+      ).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.activities where id = $1", [id]));
+    for (const u of [m1, owner, admin]) expect(await seen(u), u.email).toBe(1);
+    // the manager of the lead's team, a colleague who sees the lead, and a viewer do not
+    for (const u of [manager, m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await asAdmin((q) => q("delete from public.activities where id = $1", [id]));
+  });
+
   it("a viewer cannot create or change anything", async () => {
     await setVisibility("org");
     const insert = await pgError(insertLead(viewer.id, org));
