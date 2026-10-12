@@ -1809,7 +1809,7 @@ try {
     "_rels/.rels": strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
     "xl/workbook.xml": strToU8('<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="חברות" sheetId="1" r:id="rId1"/></sheets></workbook>'),
     "xl/_rels/workbook.xml.rels": strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'),
-    "xl/worksheets/sheet1.xml": strToU8(sheetXml([["שם החברה", "ח.פ.", "עיר", "טלפון"], ["אקסל בע\"מ", 515151515, "חיפה", 48001122]])),
+    "xl/worksheets/sheet1.xml": strToU8(sheetXml([["שם החברה", "ח.פ.", "עיר", "טלפון"], ["אקסל בע\"מ", 515151512, "חיפה", 48001122]])),
   });
   await ownerDesk.goto(`${orgUrl}/settings/import/new`);
   await ownerDesk.getByLabel("חברות", { exact: true }).check();
@@ -1820,7 +1820,7 @@ try {
   await expectText(ownerDesk, "הייבוא הסתיים");
   await ownerDesk.goto(`${orgUrl}/companies?q=${encodeURIComponent("אקסל")}`);
   await ownerDesk.getByRole("link", { name: /אקסל בע"מ/ }).click();
-  await expectText(ownerDesk, "515151515");
+  await expectText(ownerDesk, "515151512");
   await expectText(ownerDesk, "חיפה");
 
   step("import: undoing a contacts import removes the company it created, not one that was there (FXC-02)");

@@ -25,7 +25,7 @@ describe("global search", () => {
     await insertLead(outsider.id, otherOrg, { full_name: "אברהם כהן" });
     await asUser(owner.id, async (q) => {
       await q("insert into public.contacts (organization_id, first_name, last_name, email) values ($1, 'משה', 'פרץ', 'moshe@example.test')", [org]);
-      await q("insert into public.companies (organization_id, name, tax_id) values ($1, 'מאפיית השכונה', '514000000')", [org]);
+      await q("insert into public.companies (organization_id, name, tax_id) values ($1, 'מאפיית השכונה', '514000009')", [org]);
       await q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'note', 'הלקוח ביקש הצעת מחיר למטבח', $2)", [org, ownerLead]);
     });
   });
@@ -40,7 +40,7 @@ describe("global search", () => {
     }
     expect((await search(owner.id, org, "שיפוצים")).leads.map((l) => l.id)).toEqual([ownerLead]);
     expect((await search(owner.id, org, "moshe@")).contacts.map((c) => c.title)).toEqual(["משה פרץ"]);
-    expect((await search(owner.id, org, "514000000")).companies.map((c) => c.title)).toEqual(["מאפיית השכונה"]);
+    expect((await search(owner.id, org, "514000009")).companies.map((c) => c.title)).toEqual(["מאפיית השכונה"]);
     expect((await search(owner.id, org, "מטבח")).notes.map((n) => n.body)).toEqual(["הלקוח ביקש הצעת מחיר למטבח"]);
     // one letter is not a search
     expect((await search(owner.id, org, "כ")).leads).toEqual([]);

@@ -32,6 +32,7 @@ export function CompanyFields({ values, errors }: Props) {
         <TextField
           label="ח.פ. או עוסק מורשה"
           name="tax_id"
+          hint="9 ספרות"
           dir="ltr"
           inputMode="numeric"
           maxLength={20}

@@ -2,26 +2,13 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, parseMoneyToAgor
 
 import { inputName, type CustomValues, type FieldDefinition } from "./types";
 import { isCalendarDate } from "@/lib/calendar-date";
+import { israeliIdNumber } from "@/lib/israeli-id";
+
+export { israeliIdNumber };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_RE = /^\+?[\d\s\-().*]{3,24}$/;
 const DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/;
-
-/**
- * An Israeli ID or company number (9 digits; shorter ones are padded with
- * zeros) with a valid check digit. Returns the 9 digits, or null.
- */
-export function israeliIdNumber(text: string): string | null {
-  const digits = text.replace(/[\s-]/g, "");
-  if (!/^\d{5,9}$/.test(digits)) return null;
-  const padded = digits.padStart(9, "0");
-  let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    const step = Number(padded[i]) * ((i % 2) + 1);
-    sum += step > 9 ? step - 9 : step;
-  }
-  return sum % 10 === 0 ? padded : null;
-}
 
 /** Picked values of a multiple choice: several inputs, or one text with commas (imports). */
 function multiValues(formData: FormData, name: string): string[] {
