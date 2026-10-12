@@ -10,6 +10,10 @@ import { NewPasswordForm } from "@/features/auth/components/new-password-form";
 import { getSignedVersion } from "@/features/legal/queries";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
 import { getNotificationSettings } from "@/features/notifications/queries";
+import { AvatarPicker } from "@/features/profile/components/avatar-picker";
+import { ProfileForm } from "@/features/profile/components/profile-form";
+import { getMyProfile } from "@/features/profile/queries";
+import { timeZones } from "@/features/profile/working-hours";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -19,9 +23,10 @@ export const metadata: Metadata = { title: "החשבון שלי" };
 
 export default async function AccountPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { user } = await getOrgContext(orgId);
+  const { user, org: orgContext } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [sessions, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
+  const [profile, sessions, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
+    getMyProfile(user.id),
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
     getRecoveryCodesLeft(),
@@ -31,6 +36,19 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-2">
+      <Card aria-labelledby="account-profile" className="lg:col-span-2">
+        <CardHeader id="account-profile" title="פרטים אישיים" />
+        <CardBody className="space-y-6">
+          <AvatarPicker orgId={orgId} userId={user.id} name={profile.fullName} url={profile.avatarUrl} />
+          <ProfileForm
+            orgId={orgId}
+            profile={profile}
+            orgTimeZone={orgContext.timeZone}
+            timeZones={[...timeZones()].sort()}
+          />
+        </CardBody>
+      </Card>
+
       <Card aria-labelledby="account-mfa">
         <CardHeader id="account-mfa" title="אימות דו-שלבי" />
         <CardBody>

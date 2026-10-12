@@ -158,6 +158,11 @@ export type ProfileRow = {
   phone: string | null;
   avatar_url: string | null;
   locale: string;
+  phone_e164: string | null;
+  timezone: string | null;
+  // USR-01: {"sun": {"start": "09:00", "end": "17:00"}, ...}; see src/features/profile/working-hours.ts
+  working_hours: Json | null;
+  signature: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -850,7 +855,15 @@ export type Database = {
       profiles: Table<
         ProfileRow,
         Record<string, never>,
-        { full_name?: string | null; phone?: string | null; avatar_url?: string | null; locale?: string }
+        {
+          full_name?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          locale?: string;
+          timezone?: string | null;
+          working_hours?: Json | null;
+          signature?: string | null;
+        }
       >;
       memberships: Table<
         MembershipRow,

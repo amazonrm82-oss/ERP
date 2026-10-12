@@ -440,6 +440,38 @@ try {
   console.log("visibility after reload:", checked);
   if (checked !== "team") throw new Error("record_visibility not saved");
 
+  step("my account: phone, time zone, working hours and signature are saved, then put back (USR-01)");
+  await owner.goto(`${orgUrl}/settings/account`);
+  await owner.getByRole("heading", { name: /פרטים אישיים/ }).waitFor();
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("account page scrolls sideways at 360px");
+  await owner.getByLabel(/^טלפון/).fill("052-7654321");
+  await owner.getByLabel(/^אזור זמן/).selectOption("Europe/London");
+  await owner.getByRole("checkbox", { name: /^שישי$/ }).check();
+  await owner.getByLabel(/שעת סיום ביום שישי/).fill("13:00");
+  await owner.getByLabel(/^חתימה להודעות/).fill("רונית\nבעלת העסק");
+  await owner.getByRole("button", { name: /שמירת הפרטים/ }).click();
+  await expectText(owner, "הפרטים נשמרו");
+  await shot(owner, "05b-account-profile-360");
+  await owner.reload();
+  if ((await owner.getByLabel(/^אזור זמן/).inputValue()) !== "Europe/London") throw new Error("profile time zone not saved");
+  if ((await owner.getByLabel(/שעת סיום ביום שישי/).inputValue()) !== "13:00") throw new Error("profile working hours not saved");
+  {
+    const [row] = await sql("select p.phone_e164, p.working_hours from public.profiles p join auth.users u on u.id = p.id where u.email = $1", [ownerEmail]);
+    if (row?.phone_e164 !== "+972527654321") throw new Error(`profile phone_e164 is ${row?.phone_e164}`);
+    if (row?.working_hours?.fri?.end !== "13:00") throw new Error("profile working_hours not stored");
+  }
+  // put everything back as it was: no phone, the business's time zone, no hours, no signature
+  await owner.getByLabel(/^טלפון/).fill("");
+  await owner.getByLabel(/^אזור זמן/).selectOption("");
+  for (const day of ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"]) await owner.getByRole("checkbox", { name: new RegExp(`^${day}$`) }).uncheck();
+  await owner.getByLabel(/^חתימה להודעות/).fill("");
+  await owner.getByRole("button", { name: /שמירת הפרטים/ }).click();
+  await expectText(owner, "הפרטים נשמרו");
+  {
+    const [row] = await sql("select p.phone, p.timezone, p.working_hours, p.signature from public.profiles p join auth.users u on u.id = p.id where u.email = $1", [ownerEmail]);
+    if (row?.phone || row?.timezone || row?.working_hours || row?.signature) throw new Error("profile not put back");
+  }
+
   step("settings: invite");
   await owner.goto(`${orgUrl}/settings/users`);
   await owner.getByLabel("אימייל").fill(inviteeEmail);

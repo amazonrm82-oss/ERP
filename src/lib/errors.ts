@@ -43,6 +43,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-02 (migration record_types)
   "record_type:invalid": "יש לבחור סוג מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
   "record_types:max": "אפשר לשמור עד 50 סוגים. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
+  // USR-01 (migration profile_fields, trigger profiles_check)
+  "profile:full_name": "השם ארוך מדי. אפשר עד 120 תווים.",
+  "profile:phone": "מספר הטלפון אינו תקין.",
+  "profile:locale": "השפה שנבחרה אינה נתמכת.",
+  "profile:timezone": "אזור הזמן הזה אינו נתמך. בחרו עיר אחרת באותו אזור זמן.",
+  "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
 };
 
 // P0001 raised without a hint: recognised by the (stable) English message.
