@@ -235,6 +235,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
+- Schema app (RVW-15, migration 0089): every table in schema `app` has RLS enabled, with no policies and not forced;
+  clients have no grants, and the security definer functions owned by the table owner bypass it. A new app table enables
+  RLS too, and no security invoker function may read an app table (`tests/db/01-schema-guards.test.ts` enforces both).
+- "Not relevant" reason (RVW-9, migration 0090): trigger `leads_disqualify_reason` (insert and update, every writer)
+  clears `disqualify_reason` when the status is not `disqualified`; a server move into it leaves the reason empty; a
+  person's insert or update into it needs a reason from the active list; running-import rows get none. In a merge the
+  reason travels with `status_id` (`MERGE_COMPANIONS` in `src/features/merge/fields.ts`; `MERGE_FIELDS` + companions
+  must equal `app.merge_columns()`, test 61). App rule: `checkStatusChoice()` in `src/features/leads/status.ts`.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).
