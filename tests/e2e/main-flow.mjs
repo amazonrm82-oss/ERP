@@ -1346,7 +1346,7 @@ try {
   console.log("bell after assignment:", await inviteeBell.getAttribute("aria-label"));
   await inviteeBell.click();
   await shot(invitee, "70-bell-open");
-  await invitee.getByRole("link", { name: /משימה חדשה הוקצתה (לך|לכם)/ }).first().click();
+  await invitee.getByRole("link", { name: /משימה חדשה הוקצתה לכם/ }).first().click();
   await invitee.waitForURL(/\/tasks$/);
   await expectText(invitee, "משימה חיה לדנה");
 
