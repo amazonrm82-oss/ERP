@@ -142,6 +142,8 @@ export type MeetingDetails = {
   description: string | null;
   status: string;
   outcome: string | null;
+  // CAL-06: minutes before the start; null = no reminder
+  reminderMinutes: number | null;
   participants: { userId: string; name: string }[];
   // the record it is on, for refreshing that record's page after a change; null = an internal meeting
   subject: TimelineSubject | null;
@@ -160,7 +162,7 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
   const { supabase } = context;
   const { data: row, error } = await supabase
     .from("meetings")
-    .select("id, title, meeting_type, starts_at, ends_at, location, video_url, description, status, outcome, lead_id, contact_id, company_id, deal_id")
+    .select("id, title, meeting_type, starts_at, ends_at, location, video_url, description, status, outcome, reminder_minutes, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .eq("id", meetingId)
     .maybeSingle();
@@ -200,6 +202,7 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
       description: row.description,
       status: row.status,
       outcome: row.outcome,
+      reminderMinutes: row.reminder_minutes,
       participants: ids.map((id) => ({ userId: id, name: names.get(id) ?? "משתמש" })),
       subject: subjectOf(row),
     },

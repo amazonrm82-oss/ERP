@@ -27,7 +27,36 @@ export const MEETING_STATUS_OPTIONS: { value: MeetingStatus; label: string }[] =
 export const MEETING_TYPE_LABEL: Record<string, string> = Object.fromEntries(MEETING_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 export const MEETING_STATUS_LABEL: Record<string, string> = Object.fromEntries(MEETING_STATUS_OPTIONS.map((o) => [o.value, o.label]));
 
-export const MEETING_FIELD_NAMES = ["title", "meeting_type", "date", "start_time", "end_time", "location", "video_url", "description"] as const;
+// CAL-06: how long before the start the team is reminded, in the bell and by push; "none" = no reminder
+export const MEETING_REMINDER_OPTIONS = [
+  { value: "none", label: "בלי תזכורת" },
+  { value: "5", label: "5 דקות לפני" },
+  { value: "15", label: "15 דקות לפני" },
+  { value: "30", label: "30 דקות לפני" },
+  { value: "60", label: "שעה לפני" },
+  { value: "1440", label: "יום לפני" },
+] as const;
+export type MeetingReminderValue = (typeof MEETING_REMINDER_OPTIONS)[number]["value"];
+export const DEFAULT_MEETING_REMINDER: MeetingReminderValue = "15";
+const REMINDER_VALUES = MEETING_REMINDER_OPTIONS.map((o) => o.value) as [MeetingReminderValue, ...MeetingReminderValue[]];
+
+/** The form's choice for a stored reminder (minutes, or null for none); an unknown value shows the default. */
+export function reminderChoice(minutes: number | null): MeetingReminderValue {
+  if (minutes === null) return "none";
+  return REMINDER_VALUES.find((value) => value === String(minutes)) ?? DEFAULT_MEETING_REMINDER;
+}
+
+export const MEETING_FIELD_NAMES = [
+  "title",
+  "meeting_type",
+  "date",
+  "start_time",
+  "end_time",
+  "location",
+  "video_url",
+  "description",
+  "reminder_minutes",
+] as const;
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const requiredTime = (missing: string) =>
@@ -56,6 +85,10 @@ export const meetingSchema = z
     location: optionalText(500, "המיקום ארוך מדי (עד 500 תווים)."),
     video_url: httpUrl,
     description: optionalText(5000, "התיאור ארוך מדי (עד 5,000 תווים)."),
+    // a form without the field keeps the default
+    reminder_minutes: z
+      .preprocess((value) => (typeof value === "string" && value !== "" ? value : DEFAULT_MEETING_REMINDER), z.enum(REMINDER_VALUES, { error: "יש לבחור מתי להזכיר." }))
+      .transform((value) => (value === "none" ? null : Number(value))),
   })
   // "HH:MM" strings compare in time order
   .refine((m) => m.end_time > m.start_time, { path: ["end_time"], error: "שעת הסיום צריכה להיות אחרי שעת ההתחלה." });

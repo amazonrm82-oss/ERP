@@ -16,6 +16,8 @@ export type MeetingItem = {
   description: string | null;
   status: string;
   outcome: string | null;
+  // CAL-06: minutes before the start; null = no reminder
+  reminderMinutes: number | null;
   ownerId: string | null;
   ownerName: string | null;
   participants: { userId: string; name: string }[];
@@ -30,7 +32,7 @@ export async function listRecordMeetings(orgId: string, subject: TimelineSubject
   const rows = must(
     await supabase
       .from("meetings")
-      .select("id, title, meeting_type, starts_at, ends_at, location, video_url, description, status, outcome, owner_id")
+      .select("id, title, meeting_type, starts_at, ends_at, location, video_url, description, status, outcome, owner_id, reminder_minutes")
       .eq("organization_id", orgId)
       .eq(SUBJECT_COLUMN[subject.kind], subject.id)
       .order("starts_at", { ascending: false })
@@ -63,6 +65,7 @@ export async function listRecordMeetings(orgId: string, subject: TimelineSubject
     description: row.description,
     status: row.status,
     outcome: row.outcome,
+    reminderMinutes: row.reminder_minutes,
     ownerId: row.owner_id,
     ownerName: row.owner_id ? (names.get(row.owner_id) ?? null) : null,
     participants: participants

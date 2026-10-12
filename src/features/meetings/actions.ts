@@ -105,6 +105,7 @@ async function parseMeeting(supabase: Client, orgId: string, formData: FormData)
       location: data.location,
       video_url: data.video_url,
       description: data.description,
+      reminder_minutes: data.reminder_minutes,
     },
   };
 }

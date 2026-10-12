@@ -6,7 +6,7 @@ import { zoneDate } from "@/lib/format";
 
 import { formatMeetingWhen, meetingFormTimes, MEETING_STATUS_TONE } from "../display";
 import { listRecordMeetings, type MeetingItem } from "../queries";
-import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, splitMeetings } from "../schema";
+import { DEFAULT_MEETING_REMINDER, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, reminderChoice, splitMeetings } from "../schema";
 import { MeetingItemButtons, NewMeetingButton } from "./meeting-buttons";
 import type { MeetingFormValues, MemberOption } from "./meeting-form";
 
@@ -41,6 +41,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
     video_url: "",
     description: "",
     participant_ids: [userId],
+    reminder_minutes: DEFAULT_MEETING_REMINDER,
   };
 
   const item = (meeting: MeetingItem) => (
@@ -95,6 +96,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
             video_url: meeting.videoUrl ?? "",
             description: meeting.description ?? "",
             participant_ids: meeting.participants.map((p) => p.userId),
+            reminder_minutes: reminderChoice(meeting.reminderMinutes),
           }}
         />
       ) : null}

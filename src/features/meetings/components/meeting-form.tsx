@@ -11,7 +11,7 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { TimelineSubject } from "@/features/activities/schema";
 
 import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
-import { MEETING_TYPE_OPTIONS } from "../schema";
+import { MEETING_REMINDER_OPTIONS, MEETING_TYPE_OPTIONS, type MeetingReminderValue } from "../schema";
 import { ConflictWarning } from "./conflict-warning";
 
 export type MemberOption = { userId: string; name: string };
@@ -26,6 +26,8 @@ export type MeetingFormValues = {
   video_url: string;
   description: string;
   participant_ids: string[];
+  // CAL-06: "none" or minutes before the start
+  reminder_minutes: MeetingReminderValue;
 };
 
 type Props = {
@@ -138,6 +140,19 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
             error={errors.location}
           />
       )}
+      <SelectField
+        label="תזכורת לצוות"
+        name="reminder_minutes"
+        defaultValue={values?.reminder_minutes ?? initial.reminder_minutes}
+        hint="למארגן ולמשתתפים, בפעמון ובהתראה לטלפון."
+        error={errors.reminder_minutes}
+      >
+        {MEETING_REMINDER_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
       {members.length > 0 ? (
         <fieldset>
           <legend className="mb-1.5 text-sm font-medium">משתתפים מהצוות</legend>

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { formatMeetingWhen, meetingFormTimes } from "@/features/meetings/display";
-import { meetingSchema, meetingStatusSchema, meetingTimes, participantIdsSchema, splitMeetings } from "@/features/meetings/schema";
+import {
+  MEETING_REMINDER_OPTIONS,
+  meetingSchema,
+  meetingStatusSchema,
+  meetingTimes,
+  participantIdsSchema,
+  reminderChoice,
+  splitMeetings,
+} from "@/features/meetings/schema";
 
 const TZ = "Asia/Jerusalem";
 
@@ -101,5 +109,33 @@ describe("meeting errors from the database (CAL-01)", () => {
     expect(inactive).toBe("מארגן הפגישה צריך להיות משתמש פעיל בעסק.");
     expect(hidden).toBe("אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה.");
     for (const text of [organizer, inactive, hidden]) expect(text).not.toBe(NO_PERMISSION);
+  });
+});
+
+describe("meeting reminder (CAL-06)", () => {
+  const base = { title: "פגישה", meeting_type: "in_person", date: "2026-11-01", start_time: "10:00", end_time: "11:00" };
+  const reminder = (value?: string) => meetingSchema.safeParse({ ...base, reminder_minutes: value });
+
+  it("stores minutes, null for none, and 15 when the form does not send the field", () => {
+    expect(reminder("5").data?.reminder_minutes).toBe(5);
+    expect(reminder("60").data?.reminder_minutes).toBe(60);
+    expect(reminder("1440").data?.reminder_minutes).toBe(1440);
+    expect(reminder("none").data?.reminder_minutes).toBeNull();
+    expect(reminder(undefined).data?.reminder_minutes).toBe(15);
+    expect(reminder("").data?.reminder_minutes).toBe(15);
+  });
+
+  it("refuses any other value, matching the database check (5, 15, 30, 60, 1440)", () => {
+    expect(reminder("10").error?.issues[0]?.path[0]).toBe("reminder_minutes");
+    expect(reminder("-1").success).toBe(false);
+    const minutes = MEETING_REMINDER_OPTIONS.filter((o) => o.value !== "none").map((o) => Number(o.value));
+    expect(minutes).toEqual([5, 15, 30, 60, 1440]);
+  });
+
+  it("shows the stored value in the form, and none for null", () => {
+    expect(reminderChoice(null)).toBe("none");
+    expect(reminderChoice(30)).toBe("30");
+    expect(reminderChoice(1440)).toBe("1440");
+    expect(reminderChoice(7)).toBe("15");
   });
 });

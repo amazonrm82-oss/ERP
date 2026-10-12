@@ -79,6 +79,8 @@ export type MeetingRow = {
   contact_id: string | null;
   company_id: string | null;
   deal_id: string | null;
+  // CAL-06: minutes before the start that the team is reminded (5, 15, 30, 60, 1440); null = no reminder
+  reminder_minutes: number | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -101,6 +103,7 @@ export type MeetingInsert = {
   contact_id?: string | null;
   company_id?: string | null;
   deal_id?: string | null;
+  reminder_minutes?: number | null;
 };
 
 export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id">>;

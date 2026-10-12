@@ -25,6 +25,7 @@ import { ConflictWarning } from "@/features/meetings/components/conflict-warning
 import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
 import type { MemberOption } from "@/features/meetings/components/meeting-form";
 import { meetingFormTimes } from "@/features/meetings/display";
+import { MEETING_REMINDER_OPTIONS, reminderChoice } from "@/features/meetings/schema";
 import type { ConflictReport, Span } from "@/features/meetings/conflicts";
 import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
@@ -881,6 +882,12 @@ function ItemDetails({
             <dd className="break-words">{item.location}</dd>
           </>
         ) : null}
+        {meeting ? (
+          <>
+            <dt className="text-ink-soft">תזכורת</dt>
+            <dd>{MEETING_REMINDER_OPTIONS.find((o) => o.value === reminderChoice(meeting.reminderMinutes))?.label}</dd>
+          </>
+        ) : null}
         {meeting && meeting.participants.length > 0 ? (
           <>
             <dt className="text-ink-soft">משתתפים</dt>
@@ -938,6 +945,7 @@ function ItemDetails({
             video_url: meeting.videoUrl ?? "",
             description: meeting.description ?? "",
             participant_ids: meeting.participants.map((p) => p.userId),
+            reminder_minutes: reminderChoice(meeting.reminderMinutes),
           }}
           onChanged={onChanged}
         />

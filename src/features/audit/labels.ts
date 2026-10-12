@@ -119,6 +119,8 @@ export const FIELD_LABELS: Record<string, string> = {
   location: "מיקום",
   video_url: "קישור לשיחת הווידאו",
   outcome: "תוצאה",
+  // CAL-06
+  reminder_minutes: "תזכורת (דקות לפני הפגישה)",
   meeting_id: "פגישה",
   user_id: "משתמש",
   // team members (CAP-06: primary team)
