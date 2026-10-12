@@ -20,8 +20,11 @@
 import { addDays, weekday } from "@/lib/calendar-grid";
 import { isCalendarDate } from "@/lib/calendar-date";
 
-/** rest = a day off by law; erev = the day before a main holiday (work usually ends early); observance = marked, a work day. */
-export type HolidayKind = "rest" | "erev" | "observance";
+/**
+ * rest = a day off by law; erev = the day before a main holiday (work usually ends early);
+ * short = a shortened working day of its own, outside the eves rule (Yom HaZikaron); observance = marked, a work day.
+ */
+export type HolidayKind = "rest" | "erev" | "short" | "observance";
 
 export type Holiday = {
   date: string;
@@ -61,8 +64,10 @@ export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
  * with the kind it is marked as. The key is stored in
  * org_calendar_settings.rest_occasions when a business chooses the occasion as
  * a rest day of its own, so a key never changes once released.
- * Yom HaZikaron is marked as an eve (of Yom HaAtzmaut), and stays a memorial
- * day (owner's answer, 12 October 2026).
+ * Yom HaZikaron is a shortened working day of its own (kind "short"), not an
+ * eve: the "eves are rest days" switch does not close it, a business closes it
+ * by choosing it in the list like any other occasion; it stays a memorial day
+ * (owner's answer, 12 October 2026).
  */
 export const OCCASIONS = [
   { key: "rosh_hashana", name: "ראש השנה", kind: "rest" },
@@ -84,7 +89,7 @@ export const OCCASIONS = [
   { key: "pesach_7", name: "שביעי של פסח", kind: "rest" },
   { key: "mimouna", name: "מימונה", kind: "observance" },
   { key: "yom_hashoah", name: "יום השואה", kind: "observance" },
-  { key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev" },
+  { key: "yom_hazikaron", name: "יום הזיכרון", kind: "short" },
   { key: "yom_haatzmaut", name: "יום העצמאות", kind: "rest" },
   { key: "lag_baomer", name: "ל״ג בעומר", kind: "observance" },
   { key: "yom_yerushalayim", name: "יום ירושלים", kind: "observance" },
@@ -290,12 +295,12 @@ export function holidaysOn(day: string): Holiday[] {
       // Yom HaAtzmaut is 5 Iyar, moved back to Thursday when 5 Iyar is a Friday
       // or Shabbat, and to Tuesday when it is a Monday (so the memorial day
       // before it does not touch Shabbat). Yom HaZikaron is the day before:
-      // marked as its eve, and a memorial day.
+      // a shortened working day (not an eve) and a memorial day.
       if ((d === 5 && w === 3) || (d === 4 && w === 4) || (d === 3 && w === 4) || (d === 6 && w === 2)) {
         add("yom_haatzmaut", "יום העצמאות", "rest");
       }
       if ((d === 4 && w === 2) || (d === 3 && w === 3) || (d === 2 && w === 3) || (d === 5 && w === 1)) {
-        add("yom_hazikaron", "יום הזיכרון", "erev", true);
+        add("yom_hazikaron", "יום הזיכרון", "short", true);
       }
       if (d === 18) add("lag_baomer", "ל״ג בעומר", "observance");
       if (d === 28) add("yom_yerushalayim", "יום ירושלים", "observance");
@@ -380,7 +385,7 @@ export function restOccasions(values: readonly unknown[] | null | undefined): Oc
   return OCCASION_KEYS.filter((key) => chosen.has(key));
 }
 
-/** Is an occasion a day off for the business: by its kind (holidays, eves) or chosen one by one. */
+/** Is an occasion a day off for the business: by its kind (holidays, eves) or chosen one by one. A shortened day closes only when chosen. */
 export function occasionClosed(occasion: Pick<Holiday, "key" | "kind">, settings: CalendarSettings): boolean {
   return (
     (occasion.kind === "rest" && settings.holidaysRest) ||
@@ -419,9 +424,10 @@ export function isRestDay(day: string, settings: CalendarSettings = DEFAULT_CALE
   return restReason(day, settings) !== null;
 }
 
-/** Hebrew labels of the three kinds, for a legend and for screen readers. */
+/** Hebrew labels of the kinds, for a legend and for screen readers. */
 export const HOLIDAY_KIND_LABELS: Record<HolidayKind, string> = {
   rest: "חג",
   erev: "ערב חג",
+  short: "יום עבודה מקוצר",
   observance: "מועד",
 };

@@ -54,6 +54,22 @@ describe("the occasion checklist (CAL-03: any occasion, holidays included)", () 
     expect(boxes.filter((b) => b.disabled).map((b) => b.key)).toEqual(EVES);
   });
 
+  it("Yom HaZikaron is not an eve: never locked by the eves switch, picked on its own (CAL-03)", () => {
+    expect(EVES).not.toContain("yom_hazikaron");
+    for (const [holidaysRest, evesRest] of [
+      [true, true],
+      [false, true],
+    ] as const) {
+      const box = occasionBoxes(holidaysRest, evesRest, new Set()).find((b) => b.key === "yom_hazikaron");
+      expect(box).toEqual({ key: "yom_hazikaron", name: "יום הזיכרון", checked: false, disabled: false, note: null });
+    }
+    const { boxes, value } = inputs(render(true, true, ["yom_hazikaron"]));
+    const box = boxes.find((t) => value(t) === "yom_hazikaron") ?? "";
+    expect(box).toContain(' checked=""');
+    expect(box).toContain('name="rest_occasions"');
+    expect(box).not.toContain(' disabled=""');
+  });
+
   it("with the switch off, each holiday is picked on its own and sent", () => {
     const boxes = occasionBoxes(false, false, new Set<OccasionKey>(["yom_kippur", "rosh_hashana"]));
     expect(boxes.filter((b) => b.checked).map((b) => b.key)).toEqual(["rosh_hashana", "yom_kippur"]);

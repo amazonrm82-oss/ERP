@@ -6,6 +6,7 @@ import {
   hebrewDate,
   hebrewDayLabel,
   hebrewNumeral,
+  HOLIDAY_KIND_LABELS,
   holidaysByDay,
   holidaysInRange,
   holidaysOn,
@@ -118,8 +119,8 @@ describe("Israeli holidays 2026-2028 (CAL-03)", () => {
     expect(on("2026-09-21")).toEqual(["יום כיפור:rest"]);
     expect(on("2026-10-03")).toEqual(["שמחת תורה:rest"]);
     expect(on("2026-04-22")).toEqual(["יום העצמאות:rest"]);
-    // Yom HaZikaron is the eve of Yom HaAtzmaut (owner's answer, 12 October 2026)
-    expect(on("2026-04-21")).toEqual(["יום הזיכרון:erev"]);
+    // Yom HaZikaron is a shortened working day of its own, not an eve (owner's answer, 12 October 2026)
+    expect(on("2026-04-21")).toEqual(["יום הזיכרון:short"]);
     expect(on("2026-03-03")).toEqual(["פורים:observance"]);
     expect(on("2026-12-05")).toEqual(["חנוכה:observance"]);
     expect(on("2026-10-14")).toEqual([]);
@@ -128,8 +129,8 @@ describe("Israeli holidays 2026-2028 (CAL-03)", () => {
   it("marks the days of remembrance", () => {
     const memorial = holidaysInRange("2026-01-01", "2026-12-31").filter((h) => h.memorial).map((h) => h.name);
     expect(memorial).toEqual(["יום השואה", "יום הזיכרון", "תשעה באב"]);
-    // an eve that keeps its memorial mark
-    expect(holidaysOn("2026-04-21")).toEqual([{ date: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev", memorial: true }]);
+    // a shortened working day that keeps its memorial mark
+    expect(holidaysOn("2026-04-21")).toEqual([{ date: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "short", memorial: true }]);
   });
 
   it("Mimouna is the day after Pesach, moved to Sunday when that is Shabbat", () => {
@@ -361,10 +362,28 @@ describe("the organization's rest days", () => {
     expect(restReason("2026-09-12", open)).toEqual({ kind: "weekly" });
   });
 
-  it("erev days can be days off, Yom HaZikaron with them", () => {
+  it("erev days can be days off", () => {
     expect(isRestDay("2026-09-20", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true })).toBe(true);
     expect(isRestDay("2026-09-20", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true, holidaysRest: false })).toBe(true);
-    expect(isRestDay("2026-04-21", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true })).toBe(true);
+  });
+
+  it("Yom HaZikaron is a shortened working day: outside the eves rule, a rest day only when chosen", () => {
+    // Tuesday 21 April 2026; Yom HaZikaron 2027 is Tuesday 11 May
+    const eves = { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true };
+    for (const day of ["2026-04-21", "2027-05-11"]) {
+      expect(holidaysOn(day).map((h) => `${h.key}:${h.kind}`), day).toEqual(["yom_hazikaron:short"]);
+      expect(isRestDay(day), day).toBe(false);
+      expect(isRestDay(day, eves), day).toBe(false);
+    }
+    expect(occasionClosed({ key: "yom_hazikaron", kind: "short" }, { ...eves, holidaysRest: true })).toBe(false);
+    const chosen = { ...DEFAULT_CALENDAR_SETTINGS, restOccasions: restOccasions(["yom_hazikaron"]) };
+    expect(restReason("2026-04-21", chosen)).toEqual({ kind: "holiday", holiday: holidaysOn("2026-04-21")[0] });
+    // choosing it closes no eve, and the eves switch still closes the real eves
+    expect(isRestDay("2026-09-20", chosen)).toBe(false);
+    expect(isRestDay("2026-09-20", eves)).toBe(true);
+    // no other occasion is a shortened day
+    expect(OCCASIONS.filter((o) => o.kind === "short").map((o) => o.key)).toEqual(["yom_hazikaron"]);
+    expect(HOLIDAY_KIND_LABELS.short).toBe("יום עבודה מקוצר");
   });
 
   it("any occasion can be chosen as a rest day; none is by default", () => {
@@ -443,7 +462,7 @@ describe("holiday spans for a list", () => {
 
   it("keeps the memorial mark", () => {
     expect(holidaySpans(holidaysInRange("2026-04-21", "2026-04-22"))).toEqual([
-      { from: "2026-04-21", to: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev", memorial: true },
+      { from: "2026-04-21", to: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "short", memorial: true },
       { from: "2026-04-22", to: "2026-04-22", key: "yom_haatzmaut", name: "יום העצמאות", kind: "rest" },
     ]);
   });

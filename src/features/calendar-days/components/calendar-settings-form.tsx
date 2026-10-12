@@ -65,7 +65,7 @@ export function CalendarSettingsForm({ orgId, settings }: Props) {
           <Checkbox
             name="holiday_eves_rest"
             label="גם ערבי החגים הם ימי מנוחה"
-            hint="ערב ראש השנה, ערב יום כיפור, ערב סוכות, הושענא רבה, ערב פסח, ערב שביעי של פסח, יום הזיכרון (ערב יום העצמאות) וערב שבועות."
+            hint="ערב ראש השנה, ערב יום כיפור, ערב סוכות, הושענא רבה, ערב פסח, ערב שביעי של פסח וערב שבועות. יום הזיכרון הוא יום עבודה מקוצר, ואפשר לבחור אותו ברשימה שלמטה."
             checked={holidayEvesRest}
             onChange={(event) => setHolidayEvesRest(event.currentTarget.checked)}
           />

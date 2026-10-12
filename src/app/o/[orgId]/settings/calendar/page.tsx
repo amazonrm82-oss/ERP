@@ -23,7 +23,7 @@ export const metadata: Metadata = { title: "ימי מנוחה וחגים" };
 
 type Props = { params: Promise<{ orgId: string }> };
 
-const KIND_TONES: Record<HolidayKind, BadgeTone> = { rest: "accent", erev: "warning", observance: "neutral" };
+const KIND_TONES: Record<HolidayKind, BadgeTone> = { rest: "accent", erev: "warning", short: "warning", observance: "neutral" };
 
 function dayText(day: string): string {
   return `יום ${WEEKDAYS_LONG[weekday(day)]}, ${shortDay(day)}`;

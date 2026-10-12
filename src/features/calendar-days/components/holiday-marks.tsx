@@ -5,6 +5,8 @@ import { HOLIDAY_KIND_LABELS, type Holiday, type HolidayKind } from "../holidays
 const TONES: Record<HolidayKind, string> = {
   rest: "bg-accent-soft text-accent-strong",
   erev: "bg-warning-soft text-warning",
+  // a shortened working day, like an eve: the same colour (one legend entry)
+  short: "bg-warning-soft text-warning",
   observance: "bg-canvas text-ink-soft",
 };
 
@@ -29,14 +31,22 @@ export function HolidayMarks({ holidays, compact, className }: Props) {
         <li
           key={holiday.name}
           title={`${HOLIDAY_KIND_LABELS[holiday.kind]}: ${holiday.name}${holiday.memorial ? ` (${MEMORIAL_LABEL})` : ""}`}
+          // relative: keeps the sr-only spans inside the clipped mark (a long compact name pushed them past a 360px screen)
           className={cn(
-            "min-w-0 rounded-sm px-1 text-caption font-medium leading-5",
+            "relative min-w-0 rounded-sm px-1 text-caption font-medium leading-5",
             compact ? "truncate" : "break-words",
             TONES[holiday.kind],
           )}
         >
-          <span className="sr-only">{HOLIDAY_KIND_LABELS[holiday.kind]}: </span>
+          {/* a shortened day says so in sight: its name alone does not tell (CAL-03, Yom HaZikaron) */}
+          {holiday.kind === "short" ? null : <span className="sr-only">{HOLIDAY_KIND_LABELS[holiday.kind]}: </span>}
           {holiday.name}
+          {holiday.kind === "short" ? (
+            <>
+              <span aria-hidden="true"> · </span>
+              {HOLIDAY_KIND_LABELS.short}
+            </>
+          ) : null}
           {holiday.memorial ? <span className="sr-only"> ({MEMORIAL_LABEL})</span> : null}
         </li>
       ))}
@@ -44,15 +54,21 @@ export function HolidayMarks({ holidays, compact, className }: Props) {
   );
 }
 
+/** The legend entries: one per colour (an eve and a shortened day share one). */
+const LEGEND: { kind: HolidayKind; label: string }[] = [
+  { kind: "rest", label: HOLIDAY_KIND_LABELS.rest },
+  { kind: "erev", label: `${HOLIDAY_KIND_LABELS.erev} או ${HOLIDAY_KIND_LABELS.short}` },
+  { kind: "observance", label: HOLIDAY_KIND_LABELS.observance },
+];
+
 /** What the three colours mean, for under a calendar. */
 export function HolidayLegend({ className }: { className?: string }) {
-  const kinds: HolidayKind[] = ["rest", "erev", "observance"];
   return (
     <ul aria-label="מקרא חגים" className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft", className)}>
-      {kinds.map((kind) => (
+      {LEGEND.map(({ kind, label }) => (
         <li key={kind} className="flex items-center gap-1.5">
           <span aria-hidden="true" className={cn("inline-block size-3 rounded-sm border border-line", TONES[kind])} />
-          {HOLIDAY_KIND_LABELS[kind]}
+          {label}
         </li>
       ))}
     </ul>
