@@ -74,7 +74,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
       {kept.length > 0 ? (
         <Card aria-labelledby="kept-submissions-title">
           <CardHeader id="kept-submissions-title" title="פניות מטפסים שנמחקו" />
-          <p className="px-4 pt-3 text-md text-ink-soft sm:px-5">הטופס נמחק, אבל הפניות שהגיעו ממנו נשמרות כאן.</p>
+          <p className="px-4 pt-3 text-md text-ink-soft sm:px-5">הטופס נמחק, אבל הפניות שהגיעו ממנו נשמרות כאן 12 חודשים מיום המחיקה. הלידים שנוצרו מהן נשארים.</p>
           <SubmissionList orgId={orgId} submissions={kept} />
         </Card>
       ) : null}

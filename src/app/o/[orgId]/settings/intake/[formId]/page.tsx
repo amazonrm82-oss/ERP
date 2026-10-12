@@ -153,7 +153,7 @@ export default async function IntakeItemPage({ params }: Props) {
           action={deleteIntakeAction.bind(null, orgId, intake.id)}
           pendingText="מוחקים…"
           variant="danger-ghost"
-          confirm={`למחוק את "${intake.name}"? הכתובת תפסיק לעבוד מייד. הלידים שכבר נוצרו ויומן הפניות נשארים.`}
+          confirm={`למחוק את "${intake.name}"? הכתובת תפסיק לעבוד מייד. הלידים שכבר נוצרו נשארים, ויומן הפניות נשמר 12 חודשים.`}
         >
           מחיקה
         </ActionButton>

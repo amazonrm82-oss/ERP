@@ -375,6 +375,7 @@ export type FormSubmissionRow = {
   organization_id: string;
   form_id: string | null;
   form_name: string | null;
+  form_deleted_at: string | null;
   status: string;
   lead_id: string | null;
   payload: Json;
