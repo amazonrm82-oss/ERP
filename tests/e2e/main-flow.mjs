@@ -347,6 +347,31 @@ try {
   await statusSheet.getByRole("button", { name: "שמירה", exact: true }).click();
   await recordMeetings.getByText("הלקוח לא הגיע", { exact: true }).waitFor();
 
+  step("calendar: the meeting is on today's day view and moves to 12:30 with the 'move' form, keeping its hour (CAL-02)");
+  const leadUrlForCalendar = owner.url();
+  await owner.goto(`${orgUrl}/calendar?view=day`);
+  await owner.getByRole("heading", { name: /^יומן$/ }).waitFor();
+  await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^יום$/ }).waitFor();
+  const moveSheet = owner.getByRole("dialog", { name: /פגישת היכרות/ });
+  // the board may still be hydrating on a cold dev server: click again until the sheet opens
+  for (let tries = 0; tries < 5 && !(await moveSheet.isVisible()); tries++) {
+    await owner.getByRole("button", { name: /פגישה: .*פגישת היכרות/ }).click();
+    await moveSheet.waitFor({ timeout: 3000 }).catch(() => {});
+  }
+  await moveSheet.getByLabel(/^שעה/).fill("12:30");
+  await moveSheet.getByRole("button", { name: /^העברה$/ }).click();
+  await owner.getByText(/"פגישת היכרות" הועברה ל/).waitFor({ timeout: 15000 });
+  const [calMoved] = await sql(
+    "select to_char(starts_at at time zone 'Asia/Jerusalem', 'HH24:MI') as at, extract(epoch from ends_at - starts_at)::int as secs from public.meetings where title = 'פגישת היכרות' and lead_id = $1",
+    [leadIdNow],
+  );
+  if (calMoved.at !== "12:30" || calMoved.secs !== 3600) throw new Error(`the meeting did not move to 12:30 keeping an hour: ${JSON.stringify(calMoved)}`);
+  await owner.goto(`${orgUrl}/calendar?view=agenda`);
+  await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the calendar scrolls sideways at 360px");
+  await shot(owner, "03a-calendar-agenda-360");
+  await owner.goto(leadUrlForCalendar);
+
   step("convert lead");
   await owner.getByRole("button", { name: "המר לאיש קשר ועסקה" }).click();
   await owner.getByLabel("שווי העסקה (₪)").fill("12,500");
@@ -364,7 +389,7 @@ try {
   step("phone: 'עוד' in the bottom bar reaches every screen; settings are one list in groups (DSN-11, FXU-13)");
   await owner.getByRole("navigation", { name: "ניווט ראשי" }).getByRole("button", { name: "עוד" }).click();
   const more = owner.getByRole("dialog", { name: "עוד" });
-  for (const label of ["אנשי קשר", "חברות", "דוחות", "הגדרות", "התראות"]) await more.getByRole("link", { name: label }).waitFor();
+  for (const label of ["אנשי קשר", "חברות", "יומן", "דוחות", "הגדרות", "התראות"]) await more.getByRole("link", { name: label }).waitFor();
   await shot(owner, "04a-more-360");
   await more.getByRole("link", { name: "הגדרות" }).click();
   await owner.waitForURL(/\/settings$/);

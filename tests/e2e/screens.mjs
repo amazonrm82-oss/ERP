@@ -177,6 +177,7 @@ const SCREENS = {
   deals: `${org}/deals`,
   deal: `${org}/deals/${firstDeal}`,
   tasks: `${org}/tasks`,
+  calendar: `${org}/calendar?view=week`,
   contacts: `${org}/contacts`,
   contact: `${org}/contacts/${firstContact}`,
   companies: `${org}/companies`,
