@@ -4,7 +4,7 @@ import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-import { CALL_OUTCOME_LABEL, SUBJECT_COLUMN, type TimelineSubject } from "./schema";
+import { CALL_OUTCOME_LABEL, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
   id: string;
@@ -46,15 +46,26 @@ function metaString(metadata: Json, key: string): string | null {
 
 const TIMELINE_LIMIT = 100;
 
-/** Timeline of a record: pinned entries first, then newest first (100 entries at most). */
-export async function getTimeline(orgId: string, subject: TimelineSubject): Promise<TimelineItem[]> {
+/**
+ * Timeline of a record: pinned entries first, then newest first (100 entries at most).
+ * REC-06: with a filter, only activities of those types (pinned ones still on top).
+ */
+export async function getTimeline(orgId: string, subject: TimelineSubject, filter?: TimelineFilter): Promise<TimelineItem[]> {
   const supabase = await createClient();
 
-  const { data: activities, error } = await supabase
+  let query = supabase
     .from("activities")
     .select("id, type, body, metadata, occurred_at, created_by, is_pinned")
     .eq("organization_id", orgId)
-    .eq(SUBJECT_COLUMN[subject.kind], subject.id)
+    .eq(SUBJECT_COLUMN[subject.kind], subject.id);
+  // the type lists are constants (TIMELINE_FILTERS), never text from the URL
+  if (filter?.types) {
+    query = query.in("type", [...filter.types]);
+  }
+  if (filter?.excludeTypes) {
+    query = query.not("type", "in", `(${filter.excludeTypes.join(",")})`);
+  }
+  const { data: activities, error } = await query
     .order("is_pinned", { ascending: false })
     .order("occurred_at", { ascending: false })
     .order("id", { ascending: false })

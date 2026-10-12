@@ -1,20 +1,33 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Tabs } from "@/components/ui/tabs";
 import { getOrgContext } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
+import { recordPage } from "@/lib/record-types";
 
 import { getTimeline } from "../queries";
-import { canPinHint, type TimelineSubject } from "../schema";
+import { canPinHint, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
 import { NoteForm } from "./note-form";
 import { PinButton } from "./pin-button";
 
-type Props = { orgId: string; subject: TimelineSubject; canWrite: boolean };
+type Props = {
+  orgId: string;
+  subject: TimelineSubject;
+  canWrite: boolean;
+  // REC-06: the `tl` value of the page's URL, checked here
+  filter?: string | string[];
+};
 
-/** Timeline card of a record: add-note form on top, then pinned entries (REC-01), then the rest, newest first. */
-export async function Timeline({ orgId, subject, canWrite }: Props) {
+/**
+ * Timeline card of a record: add-note form on top, a filter by kind of activity (REC-06),
+ * then pinned entries (REC-01), then the rest, newest first.
+ */
+export async function Timeline({ orgId, subject, canWrite, filter: filterParam }: Props) {
+  const filter = parseTimelineFilter(filterParam);
   // getOrgContext is memoized per request: the page already loaded it
-  const [items, context] = await Promise.all([getTimeline(orgId, subject), getOrgContext(orgId)]);
+  const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
+  const recordHref = recordPage(subject.kind, orgId, subject.id);
   const viewer = { userId: context.user.id, role: context.role, canWrite: canWrite && context.canWrite };
 
   return (
@@ -27,9 +40,21 @@ export async function Timeline({ orgId, subject, canWrite }: Props) {
           </div>
         ) : null}
 
+        <Tabs
+          label="סינון ציר הזמן לפי סוג"
+          className="mb-5"
+          items={TIMELINE_FILTERS.map((option) => ({
+            href: timelineFilterHref(recordHref, option.key),
+            label: option.label,
+            current: option.key === filter.key,
+          }))}
+        />
+
         {items.length === 0 ? (
           <p className="text-md text-ink-soft">
-            עוד אין כאן פעילות. הערות, שינויי סטטוס והמרות יופיעו כאן לפי הסדר.
+            {filter.key === "all"
+              ? "עוד אין כאן פעילות. הערות, שינויי סטטוס והמרות יופיעו כאן לפי הסדר."
+              : "אין כאן פעילות מהסוג הזה."}
           </p>
         ) : (
           <ol className="space-y-5">

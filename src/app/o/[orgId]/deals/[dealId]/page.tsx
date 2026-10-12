@@ -30,10 +30,14 @@ import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "עסקה" };
 
-type Props = { params: Promise<{ orgId: string; dealId: string }> };
+type Props = {
+  params: Promise<{ orgId: string; dealId: string }>;
+  // REC-06: tl = the timeline filter
+  searchParams: Promise<{ tl?: string | string[] }>;
+};
 
-export default async function DealPage({ params }: Props) {
-  const { orgId, dealId } = await params;
+export default async function DealPage({ params, searchParams }: Props) {
+  const [{ orgId, dealId }, { tl }] = await Promise.all([params, searchParams]);
   const context = await getOrgContext(orgId);
   if (!isUuid(dealId)) {
     notFound();
@@ -80,10 +84,10 @@ export default async function DealPage({ params }: Props) {
         />
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
-          <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} />
+          <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <RecordHistory orgId={orgId} entityType="deals" entityId={deal.id} />
         </div>

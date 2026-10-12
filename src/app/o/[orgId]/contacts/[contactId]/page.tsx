@@ -30,10 +30,14 @@ import { isAdminRole } from "@/features/settings/permissions";
 
 export const metadata: Metadata = { title: "איש קשר" };
 
-type Props = { params: Promise<{ orgId: string; contactId: string }> };
+type Props = {
+  params: Promise<{ orgId: string; contactId: string }>;
+  // REC-06: tl = the timeline filter
+  searchParams: Promise<{ tl?: string | string[] }>;
+};
 
-export default async function ContactPage({ params }: Props) {
-  const { orgId, contactId } = await params;
+export default async function ContactPage({ params, searchParams }: Props) {
+  const [{ orgId, contactId }, { tl }] = await Promise.all([params, searchParams]);
   const context = await getOrgContext(orgId);
   if (!isUuid(contactId)) {
     notFound();
@@ -76,10 +80,10 @@ export default async function ContactPage({ params }: Props) {
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "contact", id: contact.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
-          <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
+          <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} filter={tl} />
           <RecordFiles orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           {context.canDelete ? <DuplicatesCard orgId={orgId} type="contact" id={contact.id} /> : null}
           <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />

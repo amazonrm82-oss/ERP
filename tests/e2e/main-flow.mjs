@@ -238,6 +238,23 @@ try {
     if ((await timeline.getByText("נעוץ", { exact: true }).count()) !== 0) throw new Error("the call is still marked pinned");
   }
 
+  step("filter the timeline by kind of activity (REC-06)");
+  {
+    const leadUrl = owner.url();
+    const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
+    const filters = timeline.getByRole("navigation", { name: /סינון ציר הזמן/ });
+    await filters.getByRole("link", { name: /^פגישות$/ }).click();
+    await owner.waitForURL(/[?&]tl=meeting/, { timeout: 15000 });
+    await timeline.getByText(/אין כאן פעילות מהסוג הזה/).waitFor({ timeout: 15000 });
+    if ((await timeline.getByText("דיברנו בטלפון, מעוניין בהצעה").count()) !== 0) throw new Error("the meetings filter still shows the call");
+    await filters.getByRole("link", { name: /^שיחות$/ }).click();
+    await owner.waitForURL(/[?&]tl=call/, { timeout: 15000 });
+    await timeline.getByText("דיברנו בטלפון, מעוניין בהצעה").waitFor({ timeout: 15000 });
+    if ((await filters.getByRole("link", { name: /^שיחות$/ }).getAttribute("aria-current")) === null) throw new Error("the current filter is not marked");
+    // back to the plain record page, as the next steps expect
+    await owner.goto(leadUrl);
+  }
+
   step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
   const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");

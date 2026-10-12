@@ -47,6 +47,37 @@ export function canPinHint(
   return item.createdBy === viewer.userId || viewer.role === "owner" || viewer.role === "admin";
 }
 
+// REC-06: the timeline can show one kind of activity. The key travels in the record page's URL
+// (`?tl=call`), so a shared link and the back button keep the filter.
+export const TIMELINE_FILTERS = [
+  { key: "all", label: "הכול" },
+  { key: "note", label: "הערות", types: ["note"] },
+  { key: "call", label: "שיחות", types: ["call"] },
+  { key: "meeting", label: "פגישות", types: ["meeting"] },
+  { key: "message", label: "הודעות", types: ["whatsapp", "email", "sms"] },
+  // everything the system wrote: status and stage changes, conversions, repeat inquiries
+  { key: "system", label: "שינויים", excludeTypes: LOGGED_TYPE_VALUES },
+] as const satisfies ReadonlyArray<{ key: string; label: string; types?: readonly string[]; excludeTypes?: readonly string[] }>;
+
+export type TimelineFilterKey = (typeof TIMELINE_FILTERS)[number]["key"];
+export type TimelineFilter = { key: TimelineFilterKey; types: readonly string[] | null; excludeTypes: readonly string[] | null };
+
+/** The filter named in the URL; anything unknown (or repeated) means "all". */
+export function parseTimelineFilter(value: unknown): TimelineFilter {
+  const found = typeof value === "string" ? TIMELINE_FILTERS.find((f) => f.key === value) : undefined;
+  const filter = found ?? TIMELINE_FILTERS[0];
+  return {
+    key: filter.key,
+    types: "types" in filter ? filter.types : null,
+    excludeTypes: "excludeTypes" in filter ? filter.excludeTypes : null,
+  };
+}
+
+/** Link to a record page with the timeline filtered (none for "all"), landing on the timeline. */
+export function timelineFilterHref(recordHref: string, key: TimelineFilterKey): string {
+  return key === "all" ? `${recordHref}#timeline-title` : `${recordHref}?tl=${key}#timeline-title`;
+}
+
 export const noteSchema = z.object({
   type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
   body: requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים)."),
