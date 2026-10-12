@@ -8,10 +8,10 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { TimelineSubject } from "@/features/activities/schema";
-import type { FormState } from "@/lib/action-result";
 
-import { createMeetingAction, updateMeetingAction } from "../actions";
+import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
 import { MEETING_TYPE_OPTIONS } from "../schema";
+import { ConflictWarning } from "./conflict-warning";
 
 export type MemberOption = { userId: string; name: string };
 
@@ -49,10 +49,14 @@ function anHourLater(time: string): string {
 /** New or edited meeting (CAL-01): what, when, where, who comes. */
 export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZone, onDone }: Props) {
   const action = meetingId ? updateMeetingAction.bind(null, orgId, meetingId, subject) : createMeetingAction.bind(null, orgId, subject);
-  const [state, formAction] = useActionState<FormState, FormData>(action, null);
+  const [state, formAction] = useActionState<MeetingFormState, FormData>(action, null);
   const failure = state && !state.ok ? state : null;
   const errors = failure?.fieldErrors ?? {};
   const values = failure?.values;
+  const participantIds = failure?.participantIds ?? initial.participant_ids;
+  // CAL-05: the conflict warning holds until the user changes something in the form
+  const [changedAfter, setChangedAfter] = useState<MeetingFormState>(null);
+  const conflict = failure?.conflicts && failure.span && changedAfter !== state ? { report: failure.conflicts, span: failure.span } : null;
 
   const [type, setType] = useState(values?.meeting_type ?? initial.meeting_type);
   const [start, setStart] = useState(values?.start_time ?? initial.start_time);
@@ -63,8 +67,8 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
   }, [state, onDone]);
 
   return (
-    <form action={formAction} className="space-y-4" noValidate>
-      <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
+    <form action={formAction} onChange={() => setChangedAfter(state)} className="space-y-4" noValidate>
+      <FormError message={failure && !failure.fieldErrors && !failure.conflicts ? failure.message : null} />
       <TextField
         label="כותרת"
         name="title"
@@ -82,7 +86,15 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
           </option>
         ))}
       </SelectField>
-      <DateField label="תאריך" name="date" required defaultValue={values?.date ?? initial.date} timeZone={timeZone} error={errors.date} />
+      <DateField
+        label="תאריך"
+        name="date"
+        required
+        defaultValue={values?.date ?? initial.date}
+        timeZone={timeZone}
+        error={errors.date}
+        onChange={() => setChangedAfter(state)}
+      />
       <div className="grid grid-cols-2 gap-4">
         <TextField
           label="משעה"
@@ -131,7 +143,7 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
                 name="participant_ids"
                 value={member.userId}
                 label={member.name}
-                defaultChecked={initial.participant_ids.includes(member.userId)}
+                defaultChecked={participantIds.includes(member.userId)}
               />
             ))}
           </div>
@@ -145,8 +157,16 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
         defaultValue={values?.description ?? initial.description}
         error={errors.description}
       />
+      {conflict ? (
+        <ConflictWarning report={conflict.report} span={conflict.span} timeZone={timeZone}>
+          <SubmitButton name="conflicts_ok" value="1" size="sm" pendingText="שומרים…">
+            {meetingId ? "לשמור בכל זאת" : "לקבוע בכל זאת"}
+          </SubmitButton>
+        </ConflictWarning>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <SubmitButton pendingText="שומרים…">{meetingId ? "שמירת השינויים" : "קביעת הפגישה"}</SubmitButton>
+        {/* while the warning shows, saving goes through its button; changing the form brings this one back */}
+        {conflict ? null : <SubmitButton pendingText="שומרים…">{meetingId ? "שמירת השינויים" : "קביעת הפגישה"}</SubmitButton>}
         <Button variant="ghost" onClick={() => onDone()}>
           ביטול
         </Button>

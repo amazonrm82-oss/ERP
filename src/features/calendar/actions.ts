@@ -11,8 +11,14 @@ import { zonedIso } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { recordPage } from "@/lib/record-types";
 
-import { calendarPath, movedEnd } from "./range";
+import { CONFLICT_MESSAGE, type ConflictReport, type Span } from "@/features/meetings/conflicts";
+import { meetingConflicts } from "@/features/meetings/conflicts-server";
+
+import { calendarPath, HIDDEN_MEETING_STATUSES, movedEnd } from "./range";
 import { moveTargetSchema, type MoveTarget } from "./schema";
+
+/** A move's answer; on a conflict (CAL-05) nothing moved and the report says why. */
+export type MoveResult = ActionResult & { conflicts?: ConflictReport; span?: Span };
 
 type Linked = { lead_id: string | null; contact_id: string | null; company_id: string | null; deal_id: string | null };
 
@@ -31,7 +37,7 @@ function revalidateMoved(orgId: string, row: Linked) {
  * read in the organization's zone. Everything runs with the user's session:
  * RLS decides who may move what (0 rows back = not permitted or gone).
  */
-export async function moveCalendarItemAction(orgId: string, itemId: string, target: MoveTarget): Promise<ActionResult> {
+export async function moveCalendarItemAction(orgId: string, itemId: string, target: MoveTarget): Promise<MoveResult> {
   if (!validArg(moveTargetSchema, target)) {
     return fail(INVALID_ARGS);
   }
@@ -48,12 +54,13 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
   if (!org) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  const start = zonedIso(target.date, `${target.time}:00`, org.timezone || TIME_ZONE);
+  const timeZone = org.timezone || TIME_ZONE;
+  const start = zonedIso(target.date, `${target.time}:00`, timeZone);
 
   if (target.kind === "meeting") {
     const { data: meeting, error: readError } = await supabase
       .from("meetings")
-      .select("starts_at, ends_at, lead_id, contact_id, company_id, deal_id")
+      .select("starts_at, ends_at, status, owner_id, lead_id, contact_id, company_id, deal_id")
       .eq("organization_id", orgId)
       .eq("id", itemId)
       .maybeSingle();
@@ -63,9 +70,26 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
     if (!meeting) {
       return fail(NOT_FOUND_OR_FORBIDDEN);
     }
+    const span = { startsAt: start, endsAt: movedEnd(meeting.starts_at, meeting.ends_at, start) };
+    // CAL-05: warn before a meeting moves onto someone's other meeting or off their hours
+    if (!target.confirmed && !(HIDDEN_MEETING_STATUSES as readonly string[]).includes(meeting.status)) {
+      const { data: participants, error: participantsError } = await supabase
+        .from("meeting_participants")
+        .select("user_id")
+        .eq("organization_id", orgId)
+        .eq("meeting_id", itemId);
+      if (participantsError) {
+        return fail(dbErrorMessage(participantsError));
+      }
+      const userIds = [...(meeting.owner_id ? [meeting.owner_id] : []), ...participants.map((p) => p.user_id)];
+      const conflicts = await meetingConflicts(supabase, orgId, { span, userIds, excludeId: itemId, timeZone });
+      if (conflicts) {
+        return { ok: false, message: CONFLICT_MESSAGE, conflicts, span };
+      }
+    }
     const { data, error } = await supabase
       .from("meetings")
-      .update({ starts_at: start, ends_at: movedEnd(meeting.starts_at, meeting.ends_at, start) })
+      .update({ starts_at: span.startsAt, ends_at: span.endsAt })
       .eq("organization_id", orgId)
       .eq("id", itemId)
       .select("id");

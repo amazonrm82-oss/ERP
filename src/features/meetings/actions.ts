@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
+import { HIDDEN_MEETING_STATUSES } from "@/features/calendar/range";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
@@ -13,9 +14,37 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { recordPage } from "@/lib/record-types";
 import { pick } from "@/lib/validation";
 
+import { CONFLICT_MESSAGE, type ConflictReport, type Span } from "./conflicts";
+import { meetingConflicts } from "./conflicts-server";
 import { MEETING_FIELD_NAMES, meetingSchema, meetingStatusSchema, meetingTimes, participantIdsSchema } from "./schema";
 
 type Client = SupabaseClient<Database>;
+
+/**
+ * The meeting form's state. On a conflict (CAL-05) nothing is saved: the
+ * report comes back with the time it is about, and the form offers to save
+ * anyway (field `conflicts_ok`). A failed form also carries the participants
+ * that were picked, which `values` (one value per field) cannot.
+ */
+export type MeetingFormState = (ActionResult & { conflicts?: ConflictReport; span?: Span; participantIds?: string[] }) | null;
+
+/** The participants picked in the form, kept on a failed answer. */
+function keepParticipants(state: MeetingFormState, formData: FormData): MeetingFormState {
+  if (!state || state.ok || state.participantIds) return state;
+  return { ...state, participantIds: formData.getAll("participant_ids").map(String) };
+}
+
+/** The warning state when the time clashes for someone (CAL-05), else null. */
+async function conflictState(
+  supabase: Client,
+  orgId: string,
+  check: { span: Span; userIds: string[]; excludeId?: string; timeZone: string },
+  formData: FormData,
+): Promise<MeetingFormState> {
+  const conflicts = await meetingConflicts(supabase, orgId, check);
+  if (!conflicts) return null;
+  return { ok: false, message: CONFLICT_MESSAGE, values: formValues(formData), conflicts, span: check.span };
+}
 
 const PARTICIPANTS_FAILED = "הפגישה נשמרה, אבל המשתתפים לא נשמרו. פתחו את הפגישה לעריכה ובחרו אותם שוב.";
 
@@ -51,6 +80,9 @@ async function parseMeeting(supabase: Client, orgId: string, formData: FormData)
   return {
     ok: true as const,
     participants: participants.data,
+    timeZone,
+    // the user saw the conflict warning and saves anyway (CAL-05)
+    confirmed: formData.get("conflicts_ok") === "1",
     row: {
       title: data.title,
       meeting_type: data.meeting_type,
@@ -111,7 +143,11 @@ async function syncParticipants(supabase: Client, orgId: string, meetingId: stri
  * the user (set by the database). A meeting on a deal also carries the deal's
  * customer, so it shows on the contact's and the company's pages too.
  */
-export async function createMeetingAction(orgId: string, subject: TimelineSubject, _prev: FormState, formData: FormData): Promise<FormState> {
+export async function createMeetingAction(orgId: string, subject: TimelineSubject, _prev: MeetingFormState, formData: FormData): Promise<MeetingFormState> {
+  return keepParticipants(await createMeeting(orgId, subject, formData), formData);
+}
+
+async function createMeeting(orgId: string, subject: TimelineSubject, formData: FormData): Promise<MeetingFormState> {
   if (!validArg(subjectSchema, subject)) {
     return fail(INVALID_ARGS);
   }
@@ -123,6 +159,13 @@ export async function createMeetingAction(orgId: string, subject: TimelineSubjec
   const parsed = await parseMeeting(supabase, orgId, formData);
   if (!parsed.ok) {
     return parsed.state;
+  }
+
+  if (!parsed.confirmed) {
+    // the organizer is the user (meetings_default_owner)
+    const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
+    const warning = await conflictState(supabase, orgId, { span, userIds: [context.user.id, ...parsed.participants], timeZone: parsed.timeZone }, formData);
+    if (warning) return warning;
   }
 
   const row: MeetingInsert = { organization_id: orgId, ...parsed.row };
@@ -157,9 +200,13 @@ export async function updateMeetingAction(
   orgId: string,
   meetingId: string,
   subject: TimelineSubject,
-  _prev: FormState,
+  _prev: MeetingFormState,
   formData: FormData,
-): Promise<FormState> {
+): Promise<MeetingFormState> {
+  return keepParticipants(await updateMeeting(orgId, meetingId, subject, formData), formData);
+}
+
+async function updateMeeting(orgId: string, meetingId: string, subject: TimelineSubject, formData: FormData): Promise<MeetingFormState> {
   if (!validArg(subjectSchema, subject)) {
     return fail(INVALID_ARGS);
   }
@@ -171,6 +218,27 @@ export async function updateMeetingAction(
   const parsed = await parseMeeting(supabase, orgId, formData);
   if (!parsed.ok) {
     return parsed.state;
+  }
+  if (!parsed.confirmed) {
+    const { data: current, error: readError } = await supabase
+      .from("meetings")
+      .select("owner_id, status")
+      .eq("organization_id", orgId)
+      .eq("id", meetingId)
+      .maybeSingle();
+    if (readError) {
+      return fail(dbErrorMessage(readError), { values: formValues(formData) });
+    }
+    if (!current) {
+      return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
+    }
+    // a cancelled or no-show meeting clashes with nobody
+    if (!(HIDDEN_MEETING_STATUSES as readonly string[]).includes(current.status)) {
+      const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
+      const userIds = [...(current.owner_id ? [current.owner_id] : []), ...parsed.participants];
+      const warning = await conflictState(supabase, orgId, { span, userIds, excludeId: meetingId, timeZone: parsed.timeZone }, formData);
+      if (warning) return warning;
+    }
   }
   const { data, error } = await supabase.from("meetings").update(parsed.row).eq("organization_id", orgId).eq("id", meetingId).select("id");
   if (error) {

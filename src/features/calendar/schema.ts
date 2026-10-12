@@ -9,6 +9,8 @@ export const moveTargetSchema = z
     kind: z.enum(["meeting", "task"]),
     date: z.string().refine(isCalendarDate),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    // CAL-05: the user saw the conflict warning and moves the meeting anyway
+    confirmed: z.boolean().optional(),
   })
   .strict();
 

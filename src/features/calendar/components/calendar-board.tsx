@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { BackIcon, CalendarIcon, CheckSquareIcon, ForwardIcon } from "@/components/ui/icons";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
+import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
+import type { ConflictReport, Span } from "@/features/meetings/conflicts";
 import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
 import { cn } from "@/lib/cn";
@@ -152,6 +154,8 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
   );
   const [, startTransition] = useTransition();
   const [status, setStatus] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  // CAL-05: a move that clashes waits for "move anyway"
+  const [conflict, setConflict] = useState<{ item: CalendarEntry; date: string; time: string; report: ConflictReport; span: Span } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -166,15 +170,19 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
     }
   }, [autoView, focusDay, orgId, router, scope]);
 
-  function move(item: CalendarEntry, date: string, time: string) {
+  function move(item: CalendarEntry, date: string, time: string, confirmed = false) {
     const startsAt = zonedIso(date, `${time}:00`, timeZone);
     const endsAt = item.endsAt ? movedEnd(item.startsAt, item.endsAt, startsAt) : null;
     setStatus(null);
+    setConflict(null);
     startTransition(async () => {
       showMoved({ id: item.id, startsAt, endsAt });
-      const result = await moveCalendarItemAction(orgId, item.id, { kind: item.kind, date, time });
+      const result = await moveCalendarItemAction(orgId, item.id, { kind: item.kind, date, time, ...(confirmed ? { confirmed } : {}) });
       if (result.ok) {
         setStatus({ tone: "ok", text: `"${item.title}" הועברה ל${whenText({ ...item, startsAt, endsAt }, timeZone)}.` });
+      } else if (!result.ok && result.conflicts && result.span) {
+        // nothing moved: the item goes back until the user says "move anyway"
+        setConflict({ item, date, time, report: result.conflicts, span: result.span });
       } else {
         setStatus({ tone: "error", text: result.message });
       }
@@ -352,6 +360,23 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
           <p className={cn("mb-3 rounded-md px-3 py-2.5 text-sm", status.tone === "ok" ? "bg-success-soft text-success" : "bg-danger-soft text-danger")}>{status.text}</p>
         ) : null}
       </div>
+
+      {conflict ? (
+        <ConflictWarning
+          report={conflict.report}
+          span={conflict.span}
+          timeZone={timeZone}
+          heading={`שימו לב, במועד החדש של "${conflict.item.title}" יש התנגשות:`}
+          className="mb-3"
+        >
+          <Button size="sm" onClick={() => move(conflict.item, conflict.date, conflict.time, true)}>
+            להעביר בכל זאת
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setConflict(null)}>
+            לא להעביר
+          </Button>
+        </ConflictWarning>
+      ) : null}
 
       {view === "people" ? (
         <PeopleView day={focusDay} people={people} items={shown} timeZone={timeZone} drag={drag} itemButton={itemButton} holidays={holidays} dayHref={dayHref} onOpen={open} today={today} />

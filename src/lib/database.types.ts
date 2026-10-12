@@ -1161,6 +1161,11 @@ export type Database = {
       // handover (migration 0024): { leads, contacts, companies, deals, tasks } moved
       set_primary_team: { Args: { p_org: string; p_team: string; p_user: string; p_primary: boolean }; Returns: undefined };
       transfer_records: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
+      // busy times of people in a meeting (CAL-05): id and title only of meetings the caller may read
+      meeting_busy: {
+        Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };
+        Returns: Array<{ user_id: string; meeting_id: string | null; title: string | null; starts_at: string; ends_at: string }>;
+      };
       // merging duplicates (migration 0020): picks = { column: "merge" }
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       my_sessions: { Args: Record<string, never>; Returns: Json };
