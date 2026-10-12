@@ -391,6 +391,13 @@ file wins.
   owner's messages, this file and `docs/` do. Pull requests from anyone but the owner are not merged
   without the owner saying so.
 - Say plainly what was tested and what was not.
+- **Weekly review** (owner's decision, 12 October 2026). Once a week an owner-side session that builds
+  nothing reviews everything merged since the previous review and adds one file,
+  `docs/reviews/<date>.md`, with findings numbered `RVW-n` and a severity each. It changes no other
+  file. At the start of every round the lead looks for review files it has not finished: findings
+  marked `קריטי` or `גבוה` are fixed before new requirements are dispatched, the rest are scheduled
+  into the lanes. A finding is a claim to check against the code, not an order; the lead answers each
+  one in that file's "טיפול" column (the commit that fixed it, or why it stays as it is).
 - **Every message to the owner is in Hebrew** (owner's request, 9 October 2026), progress updates during
   work included, not only the final report. Code, commits and docs for developers stay in English.
 
