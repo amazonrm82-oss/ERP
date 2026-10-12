@@ -19,6 +19,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   automations: "אוטומציה",
   forms: "טופס",
   reports: "דוח",
+  full_export: "כל נתוני העסק",
 };
 
 export const ACTION_LABELS: Record<string, string> = {

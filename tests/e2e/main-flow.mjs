@@ -1534,7 +1534,7 @@ try {
   if (danaZip.status() !== 403) throw new Error("a team manager downloaded the full export");
   // every export is in the audit log: who, what and how many (IMP-02)
   const exportLog = await sql(
-    "select entity_type, changes->>'kind' as kind, changes->>'report' as report, (changes->>'rows')::int as rows from public.audit_log where organization_id = $1 and action = 'export' and entity_type in ('reports', 'organizations') order by id",
+    "select entity_type, changes->>'kind' as kind, changes->>'report' as report, (changes->>'rows')::int as rows from public.audit_log where organization_id = $1 and action = 'export' and entity_type in ('reports', 'full_export') order by id",
     [orgUrl.split("/").pop()],
   );
   console.log("export log:", JSON.stringify(exportLog));
