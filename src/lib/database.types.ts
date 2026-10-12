@@ -1025,6 +1025,7 @@ export type Database = {
         Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
       };
       // an exported list goes to the audit log (migration 0034)
+      log_export: { Args: { p_org: string; p_kind: string; p_report: string | null; p_rows: number }; Returns: undefined };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
       support_session_info: { Args: { p_org: string }; Returns: Json };

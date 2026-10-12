@@ -97,8 +97,8 @@ const README = `ייצוא מלא של נתוני העסק.
 הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;
 
-/** ZIP of every table, read with the user's session (RLS applies). */
-export async function buildFullExport(orgId: string): Promise<Uint8Array> {
+/** ZIP of every table, read with the user's session (RLS applies), and how many rows it holds. */
+export async function buildFullExport(orgId: string): Promise<{ zip: Uint8Array; rows: number }> {
   const data = await Promise.all(TABLES.map(async (t) => ({ ...t, rows: await fetchAll(t.table, orgId) })));
   const supabase = await createClient();
   const members = must(await supabase.from("memberships").select("user_id").eq("organization_id", orgId), "memberships");
@@ -146,5 +146,5 @@ export async function buildFullExport(orgId: string): Promise<Uint8Array> {
     ? `\nלא נכנסו לקובץ הזה ${skipped.length} קבצים (הגודל הכולל עובר 150 MB, או שהקובץ לא נמצא). אפשר להוריד אותם מהרשומות עצמן.\n`
     : "";
   files["README.txt"] = strToU8(README + note);
-  return zipSync(files, { level: 6 });
+  return { zip: zipSync(files, { level: 6 }), rows: data.reduce((sum, t) => sum + t.rows.length, 0) };
 }

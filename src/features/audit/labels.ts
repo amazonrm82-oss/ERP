@@ -18,6 +18,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   support_access_grants: "גישת תמיכה",
   automations: "אוטומציה",
   forms: "טופס",
+  reports: "דוח",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -30,7 +31,7 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_recovery: "כניסה עם קוד גיבוי (אפליקציית האימות הוסרה)",
   mfa_reset: "איפוס אימות דו-שלבי",
   erase: "מחיקת פרטים מהיומן (בקשת פרטיות)",
-  export: "ייצוא רשימה",
+  export: "ייצוא",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

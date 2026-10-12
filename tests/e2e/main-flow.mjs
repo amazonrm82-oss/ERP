@@ -1532,6 +1532,15 @@ try {
   const danaZip = await invitee.context().request.get(`${orgUrl}/settings/import/export`);
   console.log("manager full export status:", danaZip.status());
   if (danaZip.status() !== 403) throw new Error("a team manager downloaded the full export");
+  // every export is in the audit log: who, what and how many (IMP-02)
+  const exportLog = await sql(
+    "select entity_type, changes->>'kind' as kind, changes->>'report' as report, (changes->>'rows')::int as rows from public.audit_log where organization_id = $1 and action = 'export' and entity_type in ('reports', 'organizations') order by id",
+    [orgUrl.split("/").pop()],
+  );
+  console.log("export log:", JSON.stringify(exportLog));
+  if (!exportLog.some((e) => e.kind === "report" && e.report === "revenue") || !exportLog.some((e) => e.kind === "full" && e.rows > 0)) {
+    throw new Error("a report or full export is missing from the audit log");
+  }
   await owner.goto(`${orgUrl}/settings/import/new`);
   await shot(owner, "92-import-360");
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("import page scrolls sideways at 360px");
