@@ -83,6 +83,7 @@ export function parseCustomFields(
         break;
       }
       case "rating": {
+        // the database checks the same (app.custom_value_ok, RVW-14)
         const rating = Number(text);
         if (!Number.isInteger(rating) || rating < 1 || rating > 5) errors[name] = "יש לבחור דירוג בין 1 ל-5.";
         else values[field.key] = rating;
@@ -98,6 +99,7 @@ export function parseCustomFields(
         break;
       }
       case "user":
+        // any membership of the business, a suspended one included; the database checks the same (app.check_custom_fields, RVW-14)
         if (!(field.choices ?? []).some((choice) => choice.value === text)) errors[name] = "יש לבחור משתמש מהרשימה.";
         else values[field.key] = text;
         break;
