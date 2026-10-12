@@ -213,6 +213,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/leads/status.ts`), shared with the status form and the board.
 - Bulk actions (LST-07, no migration): `src/features/bulk/`. `bulkAction()` changes each picked row on its
   own with the user's session (owner, lead status, add tag, recycle bin) and returns `{done, skipped}`.
+- Team managers and meetings (CAL-01, migrations 0093, 0097): `app.manages_meeting_organizer()` lets the manager of the
+  organizer's team (or a parent team) see, edit, cancel, delete and change participants of that meeting
+  (`meetings_select`, `app.meeting_editable`, `meetings_delete`); changing the organizer stays with the organizer, the
+  creator or owner/admin (`app.meetings_check_owner`).
+- Campaign parameters (CAP-02, migrations 0092, 0098, 009810): `app.intake_attribution()` keeps a closed list of keys;
+  the newer ones (`EXTRA_UTM_KEYS`, `EXTRA_CLICK_ID_KEYS` in `src/features/intake/attribution.ts`) go to `leads.utm.extra`;
+  the landing URL keeps only campaign keys (`app.campaign_only_url`), the referrer only site and path
+  (`app.site_and_path_url`). TS and SQL lists must stay identical (a unit test reads the migration).
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
