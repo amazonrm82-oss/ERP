@@ -89,10 +89,15 @@ describe("private notes (GAP-05)", () => {
   });
 
   it("only a note can be private", async () => {
-    for (const type of ["call", "meeting", "email", "whatsapp", "sms", "status_change"]) {
+    for (const type of ["call", "meeting", "email", "whatsapp", "sms"]) {
       const error = await pgError(write(author, "x", { type }));
       expect(error.code, type).toBe("23514");
     }
+    // a client cannot write a system entry at all (RVW-11); the check holds for the server too
+    const system = await pgError(
+      asAdmin((q) => q("insert into public.activities (organization_id, type, body, lead_id, is_private) values ($1, 'status_change', 'x', $2, true)", [org, lead])),
+    );
+    expect(system.code).toBe("23514");
     const call = await write(author, "שיחה", { type: "call", private: false });
     const error = await pgError(asUser(author.id, (q) => q("update public.activities set is_private = true where id = $1", [call])));
     expect(error.code).toBe("23514");

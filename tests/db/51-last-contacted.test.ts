@@ -44,7 +44,7 @@ describe("last contact from the timeline (LEAD-02)", () => {
 
   it("other entry types and entries no person wrote do not count", async () => {
     const lead = await insertLead(author.id, org);
-    await log(author, lead, "status_change");
+    await asAdmin((q) => q("insert into public.activities (organization_id, type, body, lead_id, created_by) values ($1, 'status_change', 'x', $2, $3)", [org, lead, author.id]));
     await asAdmin((q) => q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'note', 'מערכת', $2)", [org, lead]));
     await asAdmin((q) => q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'inquiry', 'פנייה', $2)", [org, lead]));
     expect((await leadRow(lead)).last).toBeNull();

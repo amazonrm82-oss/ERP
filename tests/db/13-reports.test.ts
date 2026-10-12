@@ -160,8 +160,9 @@ describe("reports", () => {
     expect(err.code).toBe("42501");
   });
 
-  it("a malformed stage_change written by a client does not break the reports", async () => {
-    await asUser(member.id, (q) =>
+  it("a malformed stage_change does not break the reports", async () => {
+    // a client can no longer write a stage_change (RVW-11); the server stands in for an old or broken row
+    await asAdmin((q) =>
       q("insert into public.activities (organization_id, type, deal_id, metadata) values ($1, 'stage_change', $2, $3)", [
         org,
         lostDeal,

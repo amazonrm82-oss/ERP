@@ -95,7 +95,15 @@ describe("team managers pin their team's notes (REC-01)", () => {
   });
 
   it("a system event is not pinned by a manager", async () => {
-    const id = await note(memberA, leadA, "", "status_change");
+    // written by the server in the member's name (a client may log only the six contact types, RVW-11)
+    const id = await asAdmin(async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.activities (organization_id, type, body, lead_id, created_by) values ($1, 'status_change', '', $2, $3) returning id",
+          [org, leadA, memberA.id],
+        )
+      ).rows[0].id,
+    );
     expect(await pin(managerA, id)).toBe(0);
   });
 

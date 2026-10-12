@@ -172,7 +172,15 @@ describe("editing and deleting a note (REC-05)", () => {
   });
 
   it("system events stay: a member cannot delete one they caused, an admin can", async () => {
-    const id = await freshNote(author, "", "status_change");
+    // written by the server in the author's name (a client may log only the six contact types, RVW-11)
+    const id = await asAdmin(async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.activities (organization_id, type, body, lead_id, created_by) values ($1, 'status_change', '', $2, $3) returning id",
+          [org, lead, author.id],
+        )
+      ).rows[0].id,
+    );
     expect(await remove(author, id)).toBe(0);
     expect(await edit(author, id)).toBe(0);
     expect(await remove(admin, id)).toBe(1);

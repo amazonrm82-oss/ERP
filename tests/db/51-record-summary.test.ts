@@ -69,9 +69,8 @@ describe("record_summary: the contact / company card summary", () => {
       const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
       await activity("note", daysAgo(3), null, company);
       await activity("call", daysAgo(1), contactA, null);
-      // a meeting that has not happened yet, and a system event: not a touch
+      // a meeting that has not happened yet: not a touch (a system event, below, is not one either)
       await activity("meeting", daysAgo(-1), contactA, null);
-      await activity("stage_change", daysAgo(0), contactA, null);
 
       const task = (title: string, due: string | null, contactId: string | null, companyId: string | null, status = "open") =>
         one(
@@ -85,6 +84,10 @@ describe("record_summary: the contact / company card summary", () => {
     });
     // in the recycle bin: not counted
     await asAdmin((q) => q("update public.deals set deleted_at = now() where id = $1", [trashed]));
+    // a system event, written by the server (a client may log only the six contact types, RVW-11)
+    await asAdmin((q) =>
+      q("insert into public.activities (organization_id, type, body, occurred_at, contact_id, created_by) values ($1, 'stage_change', 'x', now(), $2, $3)", [org, contactA, owner.id]),
+    );
   });
 
   it("a contact: its own won and open deals, last real touch, next open task", async () => {
