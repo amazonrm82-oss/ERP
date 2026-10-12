@@ -723,7 +723,7 @@ try {
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
 
   step("a contact's type comes from the organization's list, and the contacts list filters by it (CON-02)");
-  // the lists start with the default types (migration 0098); there is no "add the suggested" button
+  // the lists start with the default types (migration 0076); there is no "add the suggested" button
   await ownerDesk.goto(`${orgUrl}/settings/record-types`);
   await ownerDesk.getByRole("textbox", { name: /^שם הסוג ספק/ }).first().waitFor({ timeout: 15000 });
   await shot(ownerDesk, "20b-record-types-1280");
@@ -980,7 +980,7 @@ try {
     column.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: data }));
     column.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
   });
-  // the organization starts with the default reasons (migration 0098), so the reason is picked from them
+  // the organization starts with the default reasons (migration 0076), so the reason is picked from them
   await ownerDesk.getByLabel("למה הליד ליד בלוח לא רלוונטי?").selectOption({ label: "קנה אצל מתחרה" });
   await shot(ownerDesk, "24-leads-board-1280");
   await ownerDesk.getByRole("form", { name: "סיבה לליד לא רלוונטי" }).getByRole("button", { name: "העברה" }).click();

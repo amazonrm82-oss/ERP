@@ -49,7 +49,7 @@ describe("free-text contact and company types become type_id (CON-02)", () => {
     const owner = await createUser("ft-owner");
     org = await createOrg(owner.id, "עסק עם סוגים ישנים");
     otherOrg = await createOrg(owner.id, "עסק אחר");
-    // the default types (0098) are there; one is hidden, and org has one type of its own
+    // the default types (0076) are there; one is hidden, and org has one type of its own
     await asUser(owner.id, (q) => q("update public.record_type_options set is_active = false where organization_id = $1 and object_type = 'contact' and name = 'שותף'", [org]));
     await asUser(owner.id, (q) => q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'VIP')", [org]));
     const rows = await asAdmin(async (q) =>

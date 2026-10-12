@@ -33,7 +33,7 @@ describe("contact and company types (CON-02)", () => {
     owner = await createUser("rt-owner");
     org = await createOrg(owner.id);
     member = await addMember(org, owner.id, "member", "rt-member");
-    // the organization starts with the default types (0098); these tests start from lists the business emptied
+    // the organization starts with the default types (0076); these tests start from lists the business emptied
     await asUser(owner.id, (q) => q("delete from public.record_type_options where organization_id = $1", [org]));
     supplier = await addType("contact", "ספק");
     partner = await addType("contact", "שותף");

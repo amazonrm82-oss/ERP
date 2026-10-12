@@ -19,7 +19,7 @@ describe("disqualify reasons (LEAD-03)", () => {
     );
     disqualified = statuses.find((s) => s.kind === "disqualified")!.id;
     open = statuses.find((s) => s.kind === "open" && !s.is_default)!.id;
-    // the organization starts with the default reasons (0098); these tests start from a list the business emptied
+    // the organization starts with the default reasons (0076); these tests start from a list the business emptied
     await asUser(owner.id, (q) => q("delete from public.disqualify_reasons where organization_id = $1", [org]));
   });
 
