@@ -1,4 +1,4 @@
-// Every kind of notification (USR-06, migration 0096). The database checks
+// Every kind of notification (USR-06, migration 0068). The database checks
 // notifications.type and notification_settings against the same list; keep
 // the two in step. 'system' (security notices) always arrives and is not listed.
 //
