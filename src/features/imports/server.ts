@@ -13,6 +13,7 @@ import { dbErrorMessage } from "@/lib/errors";
 import { normalizePhone } from "@/lib/phone";
 import { israeliIdNumber } from "@/lib/israeli-id";
 import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
+import { readAllPagesByIds } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
@@ -20,7 +21,8 @@ import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fi
 
 type Client = SupabaseClient<Database>;
 
-export type RowOutcome = { row: number; status: "created" | "updated" | "skipped" | "failed" | "ok"; message?: string };
+// warning: the row is imported, but something in it was not kept (shown in the preview and the summary)
+export type RowOutcome = { row: number; status: "created" | "updated" | "skipped" | "failed" | "ok"; message?: string; warning?: string };
 
 export type ImportContext = {
   supabase: Client;
@@ -38,7 +40,17 @@ type Lookups = {
   defaultStatus: string | null;
   sources: Map<string, string>;
   owners: Map<string, string>;
+  // leads: the ids of the "not relevant" statuses and the names of the active reasons (RVW-9)
+  disqualified?: Set<string>;
+  reasons?: Set<string>;
 };
+
+/** The reason a file gave is not on the list: the row is imported without it (RVW-9). */
+export const REASON_NOT_ON_LIST = (reason: string) => `הסיבה "${reason}" לא ברשימת הסיבות ולא נשמרה. השורה יובאה בלעדיה.`;
+export const REASON_NEEDED_TO_DISQUALIFY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה מרשימת הסיבות.';
+export const REASON_LIST_EMPTY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה, אבל רשימת הסיבות ריקה. אפשר להוסיף סיבות בהגדרות, בעמוד "סיבות לליד לא רלוונטי".';
+export const NO_PERMISSION_TO_UPDATE = "אין הרשאה לעדכן את הרשומה הקיימת.";
+export const REASONS_UNREADABLE = "לא הצלחנו לקרוא את רשימת הסיבות ללידים לא רלוונטיים. נסו שוב.";
 
 const key = (text: string) => text.trim().toLowerCase();
 
@@ -63,9 +75,10 @@ export function normalizeDate(value: string): string {
 
 async function loadLookups(ctx: ImportContext): Promise<Lookups> {
   const { supabase, orgId } = ctx;
-  const [statuses, sources, members] = await Promise.all([
-    ctx.entity === "lead" ? supabase.from("lead_statuses").select("id, name, is_default").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
+  const [statuses, sources, reasons, members] = await Promise.all([
+    ctx.entity === "lead" ? supabase.from("lead_statuses").select("id, name, is_default, kind").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
     ctx.entity === "lead" ? supabase.from("lead_sources").select("id, name").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
+    ctx.entity === "lead" ? supabase.from("disqualify_reasons").select("name").eq("organization_id", orgId).eq("is_active", true) : Promise.resolve({ data: [], error: null }),
     supabase.from("memberships").select("user_id").eq("organization_id", orgId).eq("status", "active").neq("role", "viewer"),
   ]);
   const ids = (members.data ?? []).map((m) => m.user_id);
@@ -75,8 +88,12 @@ async function loadLookups(ctx: ImportContext): Promise<Lookups> {
     if (p.email) owners.set(key(p.email), p.id);
     if (p.full_name) owners.set(key(p.full_name), p.id);
   }
-  const statusRows = (statuses.data ?? []) as Array<{ id: string; name: string; is_default?: boolean }>;
+  // without the list every reason would be dropped as "not on the list": stop rather than guess (FXC-02)
+  if (reasons.error) throw new ImportStopped(REASONS_UNREADABLE);
+  const statusRows = (statuses.data ?? []) as Array<{ id: string; name: string; is_default?: boolean; kind?: string }>;
   return {
+    disqualified: new Set(statusRows.filter((s) => s.kind === "disqualified").map((s) => s.id)),
+    reasons: new Set(((reasons.data ?? []) as Array<{ name: string }>).map((r) => r.name)),
     statuses: new Map(statusRows.map((s) => [key(s.name), s.id])),
     defaultStatus: statusRows.find((s) => s.is_default)?.id ?? statusRows[0]?.id ?? null,
     sources: new Map(((sources.data ?? []) as Array<{ id: string; name: string }>).map((s) => [key(s.name), s.id])),
@@ -129,6 +146,8 @@ type Prepared = {
   // companies with a number but no country in the file: checked once the country is
   // known (an existing company's own, otherwise Israel)
   pendingTaxId: string | null;
+  // something in the row that is not kept (the row is still imported)
+  warning: string | null;
 };
 
 /** Validates one row and turns it into column values. Returns a message when the row cannot be imported. */
@@ -151,6 +170,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
   let taxIds: string[] = [];
   let taxKeys: string[] = [];
   let pendingTaxId: string | null = null;
+  let warning: string | null = null;
 
   if (ctx.entity === "lead") {
     const parsed = leadRowSchema.safeParse({
@@ -173,6 +193,14 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
       const source = lookups.sources.get(key(raw.source));
       if (!source) return `אין מקור בשם "${raw.source}". אפשר להוסיף אותו בהגדרות ולייבא שוב.`;
       values.source_id = source;
+    }
+    // RVW-9: an optional reason. Kept when it is a name on the active list (after trimming);
+    // any other reason is dropped with a warning and the row is imported. A status that is
+    // not "not relevant" takes no reason, so there is nothing to keep or warn about.
+    const statusTakesReason = values.status_id === undefined || Boolean(lookups.disqualified?.has(values.status_id as string));
+    if (raw.disqualify_reason && statusTakesReason) {
+      if (lookups.reasons?.has(raw.disqualify_reason)) values.disqualify_reason = raw.disqualify_reason;
+      else warning = REASON_NOT_ON_LIST(raw.disqualify_reason);
     }
     name = parsed.data.full_name;
   } else if (ctx.entity === "contact") {
@@ -261,6 +289,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     name,
     companyName,
     pendingTaxId,
+    warning,
   };
 }
 
@@ -388,6 +417,32 @@ async function companyCountries(ctx: ImportContext, existing: Existing[]): Promi
   return countries;
 }
 
+/** The current status of each matched lead, read with the user's session; only when a row could move one into "not relevant". */
+async function leadStatuses(ctx: ImportContext, look: Lookups, existing: Existing[], prepared: Prepared[]): Promise<Map<string, string>> {
+  const statuses = new Map<string, string>();
+  const ids = present(existing.map((e) => e.id));
+  if (ctx.entity !== "lead" || ctx.mode !== "update" || ids.length === 0 || !prepared.some((row) => needsReasonCheck(look, row))) return statuses;
+  // paged with a stable order: a read returns at most 1,000 rows (RVW-2)
+  const rows = await readAllPagesByIds(ids, async (slice, from, to) => {
+    const { data, error } = await ctx.supabase
+      .from("leads")
+      .select("id, status_id")
+      .eq("organization_id", ctx.orgId)
+      .in("id", slice)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw new LookupFailed(error.message);
+    return data;
+  });
+  for (const l of rows) statuses.set(l.id, l.status_id);
+  return statuses;
+}
+
+/** A lead row in a "not relevant" status without a reason that is kept. */
+function needsReasonCheck(look: Lookups, row: Prepared): boolean {
+  return typeof row.values.status_id === "string" && Boolean(look.disqualified?.has(row.values.status_id)) && !row.values.disqualify_reason;
+}
+
 export const FOREIGN_HINT = "לחברה מחוץ לישראל הוסיפו עמודת מדינה.";
 
 /** Checks a number that waited for its company's country; sets it on the row, or returns the message. */
@@ -402,9 +457,13 @@ function settleTaxId(row: Prepared, country: string): string | null {
   return null;
 }
 
+const withWarning = (row: Prepared, status: "created" | "updated" | "ok"): RowOutcome =>
+  row.warning ? { row: row.row, status, warning: row.warning } : { row: row.row, status };
+
 async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[], outcomes: RowOutcome[], jobId: string | null): Promise<RowOutcome[]> {
   const existing = ctx.mode === "create" ? [] : await findExisting(ctx, ctx.entity, prepared);
   const countries = await companyCountries(ctx, existing);
+  const currentStatus = await leadStatuses(ctx, look, existing, prepared);
   const toInsert: Prepared[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
@@ -429,8 +488,22 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
       }
       // the same number spelled differently: the company keeps its stored spelling
       if (ctx.entity === "company" && taxMatch(row, match, matchCountry) === "key") delete row.values.tax_id;
+      // RVW-9: an update is a change like a person's (it carries no import job), so moving an
+      // existing lead into "not relevant" needs a reason from the list; said before writing
+      if (ctx.entity === "lead" && needsReasonCheck(look, row)) {
+        const current = currentStatus.get(match.id);
+        if (!current) {
+          // found as a duplicate but not readable now (deleted meanwhile, or no rights)
+          outcomes.push({ row: row.row, status: "failed", message: NO_PERMISSION_TO_UPDATE });
+          continue;
+        }
+        if (!look.disqualified?.has(current)) {
+          outcomes.push({ row: row.row, status: "failed", message: look.reasons?.size ? REASON_NEEDED_TO_DISQUALIFY : REASON_LIST_EMPTY });
+          continue;
+        }
+      }
       if (!jobId) {
-        outcomes.push({ row: row.row, status: "updated" });
+        outcomes.push(withWarning(row, "updated"));
         continue;
       }
       const values = { ...row.values };
@@ -443,8 +516,8 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         else delete values.custom_fields;
       }
       const { data, error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
-      if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : "אין הרשאה לעדכן את הרשומה הקיימת." });
-      else outcomes.push({ row: row.row, status: "updated" });
+      if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : NO_PERMISSION_TO_UPDATE });
+      else outcomes.push(withWarning(row, "updated"));
     } else {
       // a new company without a country in the file gets the default, Israel
       const taxError = settleTaxId(row, ISRAEL);
@@ -454,7 +527,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   }
 
   if (!jobId) {
-    for (const row of toInsert) outcomes.push({ row: row.row, status: "ok" });
+    for (const row of toInsert) outcomes.push(withWarning(row, "ok"));
     return outcomes.sort((a, b) => a.row - b.row);
   }
 
@@ -470,7 +543,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   if (toInsert.length) {
     const { error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(toInsert.map(insertRow) as never);
     if (!error) {
-      for (const row of toInsert) outcomes.push({ row: row.row, status: "created" });
+      for (const row of toInsert) outcomes.push(withWarning(row, "created"));
     } else if (error.code === "P0001") {
       // a plan limit: stop the whole import, nothing after this will fit either
       throw new ImportStopped(dbErrorMessage(error, "הגעתם למגבלת החבילה."));
@@ -479,7 +552,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
       for (const row of toInsert) {
         const { error: rowError } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(insertRow(row) as never);
         if (rowError?.code === "P0001") throw new ImportStopped(dbErrorMessage(rowError, "הגעתם למגבלת החבילה."));
-        outcomes.push(rowError ? { row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") } : { row: row.row, status: "created" });
+        outcomes.push(rowError ? { row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") } : withWarning(row, "created"));
       }
     }
   }

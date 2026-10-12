@@ -51,7 +51,13 @@ export async function previewImportAction(
   }
   const prepared = await importContext(orgId, entity.data, mode.data, mapping.data);
   if (!prepared.ok) return prepared;
-  return ok(await processChunk(prepared.ctx, null, rows.data, 1, null));
+  try {
+    return ok(await processChunk(prepared.ctx, null, rows.data, 1, null));
+  } catch (error) {
+    // a lookup the check cannot do without (the list of reasons)
+    if (error instanceof ImportStopped) return fail(error.message);
+    throw error;
+  }
 }
 
 /** Creates the import job; the browser then sends the rows chunk by chunk. */

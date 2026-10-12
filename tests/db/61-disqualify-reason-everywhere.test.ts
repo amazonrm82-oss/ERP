@@ -157,7 +157,7 @@ describe("the not-relevant reason follows the status everywhere (RVW-9)", () => 
       expect(await lead(id)).toEqual({ status_id: open, disqualify_reason: null });
     });
 
-    it("an imported row is not checked (an import file has no reason)", async () => {
+    it("an imported row is not refused without a reason, and gets no free-text reason (see 62 for the list)", async () => {
       const job = await asUser(owner.id, async (q) =>
         (
           await q<{ id: string }>(

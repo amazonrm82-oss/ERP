@@ -42,6 +42,12 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "campaign", label: "קמפיין", synonyms: ["קמפיין", "campaign", "utm_campaign"] },
     { key: "message", label: "הודעה / הערות", synonyms: ["הודעה", "הערות", "הערה", "message", "notes", "note", "comments", "תיאור"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+    // RVW-9: kept only when it is a name on the business's list of reasons
+    {
+      key: "disqualify_reason",
+      label: 'סיבה ל"לא רלוונטי" (לפי שם מהרשימה)',
+      synonyms: ["סיבה", "סיבת פסילה", "סיבה ללא רלוונטי", "סיבת אי רלוונטיות", "למה לא רלוונטי", "disqualify reason", "disqualification reason", "lost reason", "reason"],
+    },
   ],
   contact: [
     { key: "full_name", label: "שם מלא (יפוצל לפרטי ומשפחה)", synonyms: NAME },

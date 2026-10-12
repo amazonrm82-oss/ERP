@@ -25,6 +25,7 @@ import {
   type ImportEntityKey,
 } from "../fields";
 import type { RowOutcome } from "../server";
+import { moreRowsText, warnedRowsTitle } from "../wording";
 
 type CustomField = { key: string; label: string };
 type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]> };
@@ -34,6 +35,7 @@ type Step = "file" | "map" | "preview" | "running" | "done";
 type Totals = { created: number; updated: number; skipped: number; failed: number };
 
 const PREVIEW_ROWS = 20;
+const WARNINGS_SHOWN = 10;
 
 function cellText(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -100,6 +102,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
   const [progress, setProgress] = useState(0);
   const [totals, setTotals] = useState<Totals>({ created: 0, updated: 0, skipped: 0, failed: 0 });
   const [failures, setFailures] = useState<RowOutcome[]>([]);
+  const [warnings, setWarnings] = useState<RowOutcome[]>([]);
   const [stopped, setStopped] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileId = useId();
@@ -151,6 +154,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
     setStep("running");
     const sum: Totals = { created: 0, updated: 0, skipped: 0, failed: 0 };
     const failed: RowOutcome[] = [];
+    const warned: RowOutcome[] = [];
     let stop: string | null = null;
     for (let offset = 0; offset < sheet.rows.length && !stop; offset += CHUNK_SIZE) {
       const result = await importChunkAction(orgId, jobId, { mapping, rows: sheet.rows.slice(offset, offset + CHUNK_SIZE), firstRow: offset + 1 }).catch(() => null);
@@ -160,6 +164,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
       }
       stop = result.data.stopped;
       for (const outcome of result.data.outcomes) {
+        if (outcome.warning && outcome.status !== "failed") warned.push(outcome);
         if (outcome.status === "created") sum.created += 1;
         else if (outcome.status === "updated") sum.updated += 1;
         else if (outcome.status === "skipped") sum.skipped += 1;
@@ -173,6 +178,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
     }
     await finishImportAction(orgId, jobId, { updated: sum.updated, skipped: sum.skipped, failed: sum.failed, stopped: Boolean(stop) });
     setFailures(failed);
+    setWarnings(warned);
     setStopped(stop);
     setStep("done");
   }
@@ -198,6 +204,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
     setProgress(0);
     setTotals({ created: 0, updated: 0, skipped: 0, failed: 0 });
     setFailures([]);
+    setWarnings([]);
     setStopped(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -330,6 +337,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
                     <td className={cn("px-3 py-2", outcome.status === "failed" ? "text-danger" : "text-ink-soft")}>
                       {OUTCOME_LABEL[outcome.status]}
                       {outcome.status === "failed" && outcome.message ? `: ${outcome.message}` : ""}
+                      {outcome.status !== "failed" && outcome.warning ? `. ${outcome.warning}` : ""}
                     </td>
                   </tr>
                 ))}
@@ -370,6 +378,19 @@ export function ImportWizard({ orgId, customFields }: Props) {
             ))}
           </dl>
           {stopped ? <p role="alert" className="text-danger">{stopped}</p> : null}
+          {warnings.length > 0 ? (
+            <div className="text-md">
+              <p className="font-medium">{warnedRowsTitle(warnings.length)}</p>
+              <ul className="mt-1 list-disc space-y-0.5 ps-5 text-ink-soft">
+                {warnings.slice(0, WARNINGS_SHOWN).map((w) => (
+                  <li key={w.row}>
+                    שורה {formatNumber(w.row + 1)}: {w.warning}
+                  </li>
+                ))}
+              </ul>
+              {warnings.length > WARNINGS_SHOWN ? <p className="mt-1 text-sm text-ink-soft">{moreRowsText(warnings.length - WARNINGS_SHOWN)}</p> : null}
+            </div>
+          ) : null}
           {step === "done" ? (
             <div className="flex flex-wrap gap-2">
               <Link href={RECORD_TYPES[entity].list(orgId)} className={buttonClasses("primary", "md")}>
