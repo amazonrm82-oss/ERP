@@ -9,6 +9,7 @@ import { fail, formValues, invalid, type ActionResult, type FormState } from "@/
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
+import { typeIdFromForm } from "@/features/record-type-options/schema";
 import { pick } from "@/lib/validation";
 
 import { CONTACT_FIELD_NAMES, contactSchema } from "./schema";
@@ -34,12 +35,17 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
   if (!custom.ok) {
     return custom;
   }
+  // CON-02: only when the form has the field (the organization has types)
+  const type = typeIdFromForm(formData);
+  if (!type.ok) {
+    return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
 
   // owner_id is left out: the database assigns the contact to its creator.
   // A company id from another organization fails the composite foreign key.
   const { data, error } = await context.supabase
     .from("contacts")
-    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -69,10 +75,15 @@ export async function updateContactAction(
   if (!custom.ok) {
     return custom;
   }
+  // CON-02: only when the form has the field (the organization has types)
+  const type = typeIdFromForm(formData);
+  if (!type.ok) {
+    return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("contacts")
-    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

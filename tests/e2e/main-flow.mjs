@@ -622,6 +622,32 @@ try {
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
 
+  step("a contact's type comes from the organization's list, and the contacts list filters by it (CON-02)");
+  await ownerDesk.goto(`${orgUrl}/settings/record-types`);
+  await ownerDesk.getByRole("button", { name: /^הוספת הסוגים המוצעים.*סוגי אנשי קשר/ }).click();
+  await ownerDesk.getByRole("textbox", { name: /^שם הסוג ספק/ }).waitFor({ timeout: 15000 });
+  await shot(ownerDesk, "20b-record-types-1280");
+  await ownerDesk.goto(contactUrl);
+  await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
+  await ownerDesk.getByRole("combobox", { name: /^סוג איש קשר/ }).selectOption({ label: "לקוח" });
+  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).waitFor({ timeout: 15000 });
+  {
+    const orgId = orgUrl.split("/").pop();
+    const [{ id: customerType }] = await sql("select id from public.record_type_options where organization_id = $1 and object_type = 'contact' and name = 'לקוח'", [orgId]);
+    const [{ type_id: saved }] = await sql("select type_id from public.contacts where id = $1", [contactUrl.split("/").pop()]);
+    if (saved !== customerType) throw new Error("the contact's type was not saved");
+    const byType = (value) => JSON.stringify({ match: "all", groups: [{ match: "all", conditions: [{ field: "type", op: "is", value }] }] });
+    await ownerDesk.goto(`${orgUrl}/contacts?f=${encodeURIComponent(byType(customerType))}`);
+    await ownerDesk.getByRole("heading", { name: /^אנשי קשר$/ }).waitFor();
+    if ((await ownerDesk.locator("tbody tr", { hasText: "משה כהן" }).count()) !== 1) throw new Error("filtering contacts by type does not list the customer");
+    const [{ id: supplierType }] = await sql("select id from public.record_type_options where organization_id = $1 and object_type = 'contact' and name = 'ספק'", [orgId]);
+    await ownerDesk.goto(`${orgUrl}/contacts?f=${encodeURIComponent(byType(supplierType))}`);
+    await ownerDesk.getByRole("heading", { name: /^אנשי קשר$/ }).waitFor();
+    if ((await ownerDesk.locator("tbody tr", { hasText: "משה כהן" }).count()) !== 0) throw new Error("filtering contacts by another type still lists the customer");
+  }
+  await ownerDesk.goto(contactUrl);
+
   step("contact and company cards: an automatic summary of deals, last touch and next action (REC-10)");
   {
     const summaryCard = (page) => page.locator('section[aria-labelledby="record-summary-title"]').or(page.getByRole("region", { name: /^סיכום$/ })).first();

@@ -9,6 +9,7 @@ import { fail, formValues, invalid, type ActionResult, type FormState } from "@/
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
+import { typeIdFromForm } from "@/features/record-type-options/schema";
 import { pick } from "@/lib/validation";
 
 import { COMPANY_FIELD_NAMES, companySchema } from "./schema";
@@ -34,11 +35,16 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   if (!custom.ok) {
     return custom;
   }
+  // CON-02: only when the form has the field (the organization has types)
+  const type = typeIdFromForm(formData);
+  if (!type.ok) {
+    return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
 
   // owner_id is left out: the database assigns the company to its creator.
   const { data, error } = await context.supabase
     .from("companies")
-    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -68,10 +74,15 @@ export async function updateCompanyAction(
   if (!custom.ok) {
     return custom;
   }
+  // CON-02: only when the form has the field (the organization has types)
+  const type = typeIdFromForm(formData);
+  if (!type.ok) {
+    return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("companies")
-    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)

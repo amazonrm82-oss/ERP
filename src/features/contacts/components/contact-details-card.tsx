@@ -12,6 +12,7 @@ import type { CompanyOption } from "@/features/companies/queries";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
+import type { RecordType } from "@/features/record-type-options/schema";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
@@ -23,6 +24,9 @@ export type ContactDetailsView = ContactValues & {
   full_name: string | null;
   companyName: string | null;
   sourceName: string | null;
+  // CON-02: the type from the list, and the older free-text type
+  typeName: string | null;
+  contact_type: string | null;
   ownerName: string | null;
   birthDateText: string | null;
   // formatted on the server so server and browser output cannot differ
@@ -31,15 +35,15 @@ export type ContactDetailsView = ContactValues & {
   custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
-type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; canEdit: boolean };
+type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; canEdit: boolean };
 
 /** Contact details that switch in place between reading and editing. */
-export function ContactDetailsCard({ orgId, contact, companies, canEdit }: Props) {
+export function ContactDetailsCard({ orgId, contact, companies, types, canEdit }: Props) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
     // mounted only while editing, so every edit starts with a clean form state
-    return <ContactEditForm orgId={orgId} contact={contact} companies={companies} onDone={() => setEditing(false)} />;
+    return <ContactEditForm orgId={orgId} contact={contact} companies={companies} types={types} onDone={() => setEditing(false)} />;
   }
 
   return (
@@ -71,6 +75,7 @@ export function ContactDetailsCard({ orgId, contact, companies, canEdit }: Props
               ) : null
             }
           />
+          <Detail label="סוג" value={contact.typeName ?? contact.contact_type} />
           <Detail label="יום הולדת" value={contact.birthDateText} />
           <Detail label="מקור" value={contact.sourceName} />
           <Detail label="אחראי" value={contact.ownerName} />
@@ -82,9 +87,9 @@ export function ContactDetailsCard({ orgId, contact, companies, canEdit }: Props
   );
 }
 
-type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; onDone: () => void };
+type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; onDone: () => void };
 
-function ContactEditForm({ orgId, contact, companies, onDone }: EditProps) {
+function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateContactAction(orgId, contact.id, prev, formData);
     if (result?.ok) {
@@ -100,7 +105,10 @@ function ContactEditForm({ orgId, contact, companies, onDone }: EditProps) {
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
           <FormError message={failure?.message} />
-          <ContactFields values={failure?.values ?? contact} errors={failure?.fieldErrors ?? {}} companies={companies} />
+          <ContactFields values={failure?.values ?? contact} errors={failure?.fieldErrors ?? {}} companies={companies}
+            types={types}
+            legacyType={contact.contact_type}
+          />
           <CustomFieldInputs
             definitions={contact.custom.definitions}
             stored={contact.custom.values}

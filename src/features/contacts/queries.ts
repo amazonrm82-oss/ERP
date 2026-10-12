@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Json } from "@/lib/database.types";
 
+import { recordTypeNames } from "@/features/record-type-options/queries";
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
@@ -18,6 +19,9 @@ export type ContactListItem = {
   email: string | null;
   jobTitle: string | null;
   companyName: string | null;
+  // CON-02: the type from the list, else the older free-text type
+  typeId: string | null;
+  typeName: string | null;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
@@ -47,6 +51,8 @@ export const CONTACT_SORT_COLUMNS = {
   email: "email",
   job_title: "job_title",
   company: "sort_company",
+  // the type's position in the settings (CON-02)
+  type: "sort_type",
   owner: "sort_owner",
   created: "created_at",
 } as const;
@@ -65,7 +71,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, owner_id, created_at, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -93,12 +99,13 @@ export async function listContacts(
   }
 
   const rows = data.slice(0, size);
-  const [owners, companies] = await Promise.all([
+  const [owners, companies, types] = await Promise.all([
     getUserNames(rows.map((row) => row.owner_id)),
     getCompanyNames(
       orgId,
       rows.map((row) => row.company_id),
     ),
+    recordTypeNames(orgId, "contact"),
   ]);
 
   return {
@@ -113,6 +120,8 @@ export async function listContacts(
       email: row.email,
       jobTitle: row.job_title,
       companyName: row.company_id ? (companies.get(row.company_id) ?? null) : null,
+      typeId: row.type_id,
+      typeName: (row.type_id ? types.get(row.type_id) : null) ?? row.contact_type,
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
@@ -126,7 +135,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, email, job_title, company_id, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)
@@ -138,9 +147,10 @@ export async function getContact(orgId: string, contactId: string) {
     return null;
   }
 
-  const [owners, companies, source] = await Promise.all([
+  const [owners, companies, types, source] = await Promise.all([
     getUserNames([data.owner_id]),
     getCompanyNames(orgId, [data.company_id]),
+    recordTypeNames(orgId, "contact"),
     data.source_id
       ? supabase.from("lead_sources").select("name").eq("organization_id", orgId).eq("id", data.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -151,6 +161,7 @@ export async function getContact(orgId: string, contactId: string) {
     ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
     companyName: data.company_id ? (companies.get(data.company_id) ?? null) : null,
     sourceName: source.data?.name ?? null,
+    typeName: data.type_id ? (types.get(data.type_id) ?? null) : null,
   };
 }
 

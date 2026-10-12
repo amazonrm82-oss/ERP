@@ -22,6 +22,8 @@ type Lookups = {
   sources?: Option[];
   // the deals table: the stages of the pipeline on screen
   stages?: Option[];
+  // contacts and companies: the organization's types (CON-02)
+  types?: Option[];
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -36,6 +38,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
   // LEAD-02: "no contact for X days"; a record never contacted counts from the day it was created
   const noContact: ServerField = { key: "no_contact", label: "ימים בלי מגע", kind: "idle", column: "last_contacted_at" };
   const text = (key: string, label: string, column: string): ServerField => ({ key, label, kind: "text", column });
+  const type: ServerField = { key: "type", label: "סוג", kind: "select", column: "type_id", options: lookups.types ?? [] };
 
   const builtIn: Record<FilterObject, ServerField[]> = {
     lead: [
@@ -60,6 +63,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("job_title", "תפקיד", "job_title"),
       text("city", "עיר", "city"),
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
+      type,
       owner,
       tag,
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
@@ -76,6 +80,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "industry", label: "ענף", kind: "select", column: "industry", plain: true, options: INDUSTRIES.map((o) => ({ value: o.value, label: o.label })) },
       text("tax_id", "ח.פ.", "tax_id"),
       text("website", "אתר", "website"),
+      type,
       owner,
       tag,
       created,

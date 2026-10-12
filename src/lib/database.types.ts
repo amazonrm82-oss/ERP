@@ -286,6 +286,20 @@ export type DisqualifyReasonRow = {
   updated_at: string;
 };
 
+// CON-02: the contact and company types an organization offers (migration record_types)
+export type RecordTypeObject = "contact" | "company";
+export type RecordTypeOptionRow = {
+  id: string;
+  organization_id: string;
+  // text with a check constraint: 'contact' | 'company' (RecordTypeObject)
+  object_type: string;
+  name: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TagRow = {
   id: string;
   organization_id: string;
@@ -491,6 +505,8 @@ export type CompanyRow = {
   name: string;
   tax_id: string | null;
   company_type: string | null;
+  // CON-02: from record_type_options; company_type is the older free text
+  type_id: string | null;
   industry: string | null;
   size: string | null;
   website: string | null;
@@ -521,6 +537,7 @@ export type CompanyInsert = {
   name: string;
   tax_id?: string | null;
   company_type?: string | null;
+  type_id?: string | null;
   industry?: string | null;
   size?: string | null;
   website?: string | null;
@@ -550,6 +567,8 @@ export type ContactRow = {
   phone_e164: string | null;
   job_title: string | null;
   contact_type: string | null;
+  // CON-02: from record_type_options; contact_type is the older free text
+  type_id: string | null;
   company_id: string | null;
   source_id: string | null;
   address_line: string | null;
@@ -579,6 +598,7 @@ export type ContactInsert = {
   phone?: string | null;
   job_title?: string | null;
   contact_type?: string | null;
+  type_id?: string | null;
   company_id?: string | null;
   source_id?: string | null;
   address_line?: string | null;
@@ -884,6 +904,12 @@ export type Database = {
         { organization_id: string; name: string; kind?: string; is_active?: boolean }
       >;
       disqualify_reasons: Table<DisqualifyReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // organization and object type are fixed (column-level update grant)
+      record_type_options: Table<
+        RecordTypeOptionRow,
+        { organization_id: string; object_type: RecordTypeObject; name: string; position?: number; is_active?: boolean },
+        { name?: string; position?: number; is_active?: boolean }
+      >;
       tags: Table<TagRow, { organization_id: string; name: string; color?: string | null }>;
       field_definitions: Table<
         FieldDefinitionRow,
@@ -1098,6 +1124,8 @@ export type Database = {
       // deals and tasks lists (migration 0035)
       sort_stage: { Args: Record<string, never>; Returns: number | null };
       sort_contact: { Args: Record<string, never>; Returns: string | null };
+      // contacts and companies by type (CON-02)
+      sort_type: { Args: Record<string, never>; Returns: number | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

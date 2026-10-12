@@ -24,6 +24,7 @@ const TABLES: Array<{ table: TableName; file: string }> = [
   { table: "lead_statuses", file: "lead_statuses.csv" },
   { table: "lead_sources", file: "lead_sources.csv" },
   { table: "disqualify_reasons", file: "disqualify_reasons.csv" },
+  { table: "record_type_options", file: "record_types.csv" },
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
   { table: "teams", file: "teams.csv" },
@@ -45,6 +46,7 @@ const LOOKUPS: Record<string, string> = {
   company_id: "company",
   contact_id: "contact",
   team_id: "team",
+  type_id: "type",
 };
 
 type Row = Record<string, unknown>;
@@ -115,7 +117,7 @@ export async function buildFullExport(orgId: string): Promise<{ zip: Uint8Array;
       const id = r.id as string | undefined;
       if (!id) continue;
       if (t.table === "tags") tagNames.set(id, String(r.name ?? ""));
-      if (["lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams"].includes(t.table)) names.set(id, String(r.name ?? ""));
+      if (["lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams", "record_type_options"].includes(t.table)) names.set(id, String(r.name ?? ""));
       if (t.table === "contacts") names.set(id, String(r.full_name ?? r.email ?? ""));
     }
   }

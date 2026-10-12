@@ -158,7 +158,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               id: contact.id,
               href: paths.contact(orgId, contact.id),
               title: contactDisplayName(contact),
-              details: [contact.companyName, contact.jobTitle, contact.ownerName ? `אחראי: ${contact.ownerName}` : null],
+              details: [contact.typeName, contact.companyName, contact.jobTitle, contact.ownerName ? `אחראי: ${contact.ownerName}` : null],
               phone: contact.phone,
               phoneE164: contact.phoneE164,
             }))}

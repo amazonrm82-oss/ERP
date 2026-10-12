@@ -44,6 +44,7 @@ export const paths = {
   settingsPipelines: (orgId: string) => `/o/${orgId}/settings/pipelines`,
   settingsLeads: (orgId: string) => `/o/${orgId}/settings/leads`,
   settingsDisqualifyReasons: (orgId: string) => `/o/${orgId}/settings/lead-reasons`,
+  settingsRecordTypes: (orgId: string) => `/o/${orgId}/settings/record-types`,
   settingsFields: (orgId: string) => `/o/${orgId}/settings/fields`,
   settingsTags: (orgId: string) => `/o/${orgId}/settings/tags`,
   settingsIntake: (orgId: string) => `/o/${orgId}/settings/intake`,

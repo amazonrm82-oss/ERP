@@ -16,6 +16,7 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
 import { getCompany, listContactsOfCompany } from "@/features/companies/queries";
+import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -43,12 +44,13 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals, fields, tags] = await Promise.all([
+  const [company, contacts, deals, fields, tags, types] = await Promise.all([
     getCompany(orgId, companyId),
     listContactsOfCompany(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
     listFieldDefinitions(orgId, "company"),
     listTags(orgId),
+    listRecordTypes(orgId, "company"),
   ]);
   if (!company) {
     notFound();
@@ -79,6 +81,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <CompanyDetailsCard
             orgId={orgId}
             canEdit={canEditRecordHint(context, company.owner_id)}
+            types={types}
             company={{
               ...company,
               createdAtText: formatDateTime(company.created_at),

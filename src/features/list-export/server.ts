@@ -124,6 +124,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             email: contact.email,
             job_title: contact.jobTitle,
             company: contact.companyName,
+            type: contact.typeName,
             owner: contact.ownerName,
             created: created(contact.createdAt),
           },
@@ -173,7 +174,14 @@ export async function exportList(request: Request, orgId: string, object: ListOb
         rows.push({
           name: company.name,
           customFields: company.customFields,
-          cells: { phone: company.phone, city: company.city, website: company.website, owner: company.ownerName, created: created(company.createdAt) },
+          cells: {
+            phone: company.phone,
+            city: company.city,
+            website: company.website,
+            type: company.typeName,
+            owner: company.ownerName,
+            created: created(company.createdAt),
+          },
         });
       }
     }

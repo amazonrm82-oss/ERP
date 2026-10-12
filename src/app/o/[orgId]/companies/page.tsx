@@ -157,7 +157,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               id: company.id,
               href: paths.company(orgId, company.id),
               title: company.name,
-              details: [company.city, company.ownerName ? `אחראי: ${company.ownerName}` : null],
+              details: [company.typeName, company.city, company.ownerName ? `אחראי: ${company.ownerName}` : null],
               phone: company.phone,
               phoneE164: company.phoneE164,
             }))}

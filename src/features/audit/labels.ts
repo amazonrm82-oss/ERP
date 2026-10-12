@@ -18,6 +18,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   field_definitions: "שדה מותאם",
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
+  // CON-02
+  record_type_options: "סוג איש קשר או חברה",
   subscriptions: "מנוי",
   support_access_grants: "גישת תמיכה",
   automations: "אוטומציה",
@@ -96,6 +98,7 @@ export const FIELD_LABELS: Record<string, string> = {
   website: "אתר",
   city: "עיר",
   tax_id: "ח.פ.",
+  type_id: "סוג",
   birth_date: "יום הולדת",
   disqualify_reason: "סיבת פסילה",
   first_contacted_at: "מגע ראשון",

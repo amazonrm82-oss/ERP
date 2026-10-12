@@ -30,6 +30,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "email", label: "אימייל" },
       { key: "job_title", label: "תפקיד" },
       { key: "company", label: "חברה" },
+      // CON-02
+      { key: "type", label: "סוג" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
     ],
@@ -40,6 +42,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "phone", label: "טלפון" },
       { key: "city", label: "עיר" },
       { key: "website", label: "אתר" },
+      // CON-02
+      { key: "type", label: "סוג" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
     ],

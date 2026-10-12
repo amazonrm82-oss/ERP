@@ -109,6 +109,7 @@ describe("tenant isolation", () => {
         )
       ).rows[0].id;
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'קנה אצל מתחרה')", [orgA]);
+      await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'ספק')", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -147,6 +148,7 @@ describe("tenant isolation", () => {
     "meeting_participants",
     "disqualify_reasons",
     "org_calendar_settings",
+    "record_type_options",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -257,6 +259,7 @@ describe("tenant isolation", () => {
       meeting_participants: "user_id = user_id",
       disqualify_reasons: "name = name",
       org_calendar_settings: "holidays_rest = holidays_rest",
+      record_type_options: "name = name",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -327,6 +330,7 @@ describe("tenant isolation", () => {
       ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
       ["insert into public.disqualify_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [orgA]],
+      ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -381,6 +385,7 @@ describe("tenant isolation", () => {
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["disqualify_reasons", "is_active = false", "not is_active"],
       ["org_calendar_settings", "holiday_eves_rest = true", "holiday_eves_rest"],
+      ["record_type_options", "is_active = false", "not is_active"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

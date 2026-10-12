@@ -2,6 +2,7 @@ import "server-only";
 
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { getLeadLookups } from "@/features/leads/queries";
+import { listRecordTypes } from "@/features/record-type-options/queries";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
@@ -23,17 +24,20 @@ export async function prepareListFilter(
   // the deals table: the stages of the pipeline on screen
   extra: { stages?: Array<{ id: string; name: string }> } = {},
 ): Promise<PreparedFilter> {
-  const [context, lookups, members, tags] = await Promise.all([
+  const [context, lookups, members, tags, types] = await Promise.all([
     // memoized per request: the page has already read it
     getOrgContext(orgId),
     object === "lead" || object === "contact" ? getLeadLookups(orgId) : null,
     listMembers(orgId),
     object === "task" ? [] : listTags(orgId),
+    object === "contact" || object === "company" ? listRecordTypes(orgId, object) : [],
   ]);
   const fields = filterFields(object, {
     statuses: object === "lead" ? lookups?.statuses.map((s) => ({ value: s.id, label: s.name })) : undefined,
     sources: lookups?.sources.map((s) => ({ value: s.id, label: s.name })),
     stages: extra.stages?.map((s) => ({ value: s.id, label: s.name })),
+    // hidden types too: records may still have them
+    types: types.map((t) => ({ value: t.id, label: t.isActive ? t.name : `${t.name} (מוסתר)` })),
     members: members.map((m) => ({ value: m.userId, label: m.name })),
     tags: tags.map((t) => ({ value: t.id, label: t.name })),
     fields: customFields,

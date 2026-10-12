@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Json } from "@/lib/database.types";
 
+import { recordTypeNames } from "@/features/record-type-options/queries";
 import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
@@ -14,6 +15,9 @@ export type CompanyListItem = {
   phoneE164: string | null;
   city: string | null;
   website: string | null;
+  // CON-02: the type from the list, else the older free-text type
+  typeId: string | null;
+  typeName: string | null;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
@@ -21,8 +25,16 @@ export type CompanyListItem = {
 };
 
 // columns the company table can be sorted by (LST-02)
-// owner is a computed field (migration 0032)
-export const COMPANY_SORT_COLUMNS = { name: "name", phone: "phone", city: "city", website: "website", owner: "sort_owner", created: "created_at" } as const;
+// owner and type are computed fields (migration 0032, record_types)
+export const COMPANY_SORT_COLUMNS = {
+  name: "name",
+  phone: "phone",
+  city: "city",
+  website: "website",
+  type: "sort_type",
+  owner: "sort_owner",
+  created: "created_at",
+} as const;
 export type CompanySortKey = keyof typeof COMPANY_SORT_COLUMNS;
 export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascending: true };
 
@@ -38,7 +50,7 @@ export async function listCompanies(
 
   let query = supabase
     .from("companies")
-    .select("id, name, phone, phone_e164, city, website, owner_id, created_at, custom_fields")
+    .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   const searchFilter = personSearchFilter(["name", "tax_id", "city"], options.search);
@@ -64,7 +76,7 @@ export async function listCompanies(
     throw new Error(`companies query failed: ${error.message}`);
   }
   const rows = data.slice(0, size);
-  const owners = await getUserNames(rows.map((row) => row.owner_id));
+  const [owners, types] = await Promise.all([getUserNames(rows.map((row) => row.owner_id)), recordTypeNames(orgId, "company")]);
 
   return {
     hasMore: data.length > size,
@@ -75,6 +87,8 @@ export async function listCompanies(
       phoneE164: row.phone_e164,
       city: row.city,
       website: row.website,
+      typeId: row.type_id,
+      typeName: (row.type_id ? types.get(row.type_id) : null) ?? row.company_type,
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
@@ -88,7 +102,7 @@ export async function getCompany(orgId: string, companyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("companies")
-    .select("id, name, tax_id, industry, phone, phone_e164, email, website, city, address_line, owner_id, created_at, custom_fields, tag_ids")
+    .select("id, name, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)
@@ -99,8 +113,12 @@ export async function getCompany(orgId: string, companyId: string) {
   if (!data) {
     return null;
   }
-  const owners = await getUserNames([data.owner_id]);
-  return { ...data, ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null };
+  const [owners, types] = await Promise.all([getUserNames([data.owner_id]), recordTypeNames(orgId, "company")]);
+  return {
+    ...data,
+    ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
+    typeName: data.type_id ? (types.get(data.type_id) ?? null) : null,
+  };
 }
 
 export type CompanyOption = { id: string; name: string };

@@ -1,5 +1,7 @@
 import { SelectField, TextField } from "@/components/ui/field";
 import { INDUSTRIES } from "@/features/onboarding/options";
+import { RecordTypeField } from "@/features/record-type-options/components/type-field";
+import type { RecordType } from "@/features/record-type-options/schema";
 
 export type CompanyValues = {
   name?: string | null;
@@ -10,12 +12,20 @@ export type CompanyValues = {
   website?: string | null;
   city?: string | null;
   address_line?: string | null;
+  // CON-02
+  type_id?: string | null;
 };
 
-type Props = { values: CompanyValues; errors: Record<string, string> };
+type Props = {
+  values: CompanyValues;
+  errors: Record<string, string>;
+  // the organization's company types, and the older free-text type of the company
+  types: RecordType[];
+  legacyType?: string | null;
+};
 
 /** The fields of a company, shared by the create form and the edit form. */
-export function CompanyFields({ values, errors }: Props) {
+export function CompanyFields({ values, errors, types, legacyType }: Props) {
   const industry = values.industry ?? "";
   return (
     <>
@@ -72,6 +82,7 @@ export function CompanyFields({ values, errors }: Props) {
           error={errors.email}
         />
       </div>
+      <RecordTypeField types={types} value={values.type_id} legacy={legacyType} label="סוג חברה" error={errors.type_id} className="sm:max-w-xs" />
       <TextField
         label="אתר"
         name="website"

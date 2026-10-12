@@ -18,6 +18,7 @@ import { trashContactAction } from "@/features/contacts/actions";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
 import { contactDisplayName } from "@/features/contacts/display";
 import { getContact } from "@/features/contacts/queries";
+import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -55,7 +56,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, contact.owner_id);
-  const companies = canEdit ? await listCompanyOptions(orgId) : [];
+  const [companies, types] = canEdit ? await Promise.all([listCompanyOptions(orgId), listRecordTypes(orgId, "contact")]) : [[], []];
   const name = contactDisplayName({ fullName: contact.full_name, email: contact.email, phone: contact.phone });
 
   return (
@@ -100,6 +101,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
             orgId={orgId}
             canEdit={canEdit}
             companies={companies}
+            types={types}
             contact={{
               ...contact,
               createdAtText: formatDateTime(contact.created_at),

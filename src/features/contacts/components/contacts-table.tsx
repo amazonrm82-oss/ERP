@@ -97,6 +97,8 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
               return contact.jobTitle;
             case "company":
               return contact.companyName;
+            case "type":
+              return contact.typeName;
             case "owner":
               return (
                 <InlineEdit

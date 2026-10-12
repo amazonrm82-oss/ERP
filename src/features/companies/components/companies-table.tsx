@@ -88,6 +88,8 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
                   {company.website}
                 </span>
               ) : null;
+            case "type":
+              return company.typeName;
             case "owner":
               return (
                 <InlineEdit

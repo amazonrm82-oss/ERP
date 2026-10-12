@@ -11,6 +11,7 @@ import { INDUSTRIES } from "@/features/onboarding/options";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
+import type { RecordType } from "@/features/record-type-options/schema";
 import type { FormState } from "@/lib/action-result";
 
 import { updateCompanyAction } from "../actions";
@@ -19,21 +20,24 @@ import { CompanyFields, type CompanyValues } from "./company-fields";
 export type CompanyDetailsView = CompanyValues & {
   id: string;
   ownerName: string | null;
+  // CON-02: the type from the list, and the older free-text type
+  typeName: string | null;
+  company_type: string | null;
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
   // active custom fields and the values stored on the record
   custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
-type Props = { orgId: string; company: CompanyDetailsView; canEdit: boolean };
+type Props = { orgId: string; company: CompanyDetailsView; types: RecordType[]; canEdit: boolean };
 
 /** Company details that switch in place between reading and editing. */
-export function CompanyDetailsCard({ orgId, company, canEdit }: Props) {
+export function CompanyDetailsCard({ orgId, company, types, canEdit }: Props) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
     // mounted only while editing, so every edit starts with a clean form state
-    return <CompanyEditForm orgId={orgId} company={company} onDone={() => setEditing(false)} />;
+    return <CompanyEditForm orgId={orgId} company={company} types={types} onDone={() => setEditing(false)} />;
   }
 
   return (
@@ -51,6 +55,7 @@ export function CompanyDetailsCard({ orgId, company, canEdit }: Props) {
       />
       <CardBody>
         <DetailList>
+          <Detail label="סוג" value={company.typeName ?? company.company_type} />
           <Detail label="ח.פ." value={company.tax_id} ltr />
           <Detail label="ענף" value={INDUSTRIES.find((option) => option.value === company.industry)?.label} />
           <Detail label="טלפון" value={company.phone} ltr />
@@ -77,7 +82,7 @@ export function CompanyDetailsCard({ orgId, company, canEdit }: Props) {
   );
 }
 
-function CompanyEditForm({ orgId, company, onDone }: { orgId: string; company: CompanyDetailsView; onDone: () => void }) {
+function CompanyEditForm({ orgId, company, types, onDone }: { orgId: string; company: CompanyDetailsView; types: RecordType[]; onDone: () => void }) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateCompanyAction(orgId, company.id, prev, formData);
     if (result?.ok) {
@@ -93,7 +98,7 @@ function CompanyEditForm({ orgId, company, onDone }: { orgId: string; company: C
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
           <FormError message={failure?.message} />
-          <CompanyFields values={failure?.values ?? company} errors={failure?.fieldErrors ?? {}} />
+          <CompanyFields values={failure?.values ?? company} errors={failure?.fieldErrors ?? {}} types={types} legacyType={company.company_type} />
           <CustomFieldInputs
             definitions={company.custom.definitions}
             stored={company.custom.values}
