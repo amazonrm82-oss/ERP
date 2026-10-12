@@ -2,7 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
-import { getOrgContext } from "@/features/shell/queries";
+import { getMentionCandidates } from "@/features/mentions/queries";
+import { mentionIds } from "@/features/mentions/token";
+import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
@@ -30,13 +32,20 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
   const filter = parseTimelineFilter(filterParam);
   // getOrgContext is memoized per request: the page already loaded it
   const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
+  const writable = canWrite && context.canWrite;
+  // REC-02: who may be mentioned here, and the current names of those mentioned in the entries shown
+  const [mentions, mentionedNames] = await Promise.all([
+    writable ? getMentionCandidates(orgId, subject) : Promise.resolve(undefined),
+    getUserNames(items.filter((item) => isPinnableType(item.type)).flatMap((item) => mentionIds(item.body))),
+  ]);
+  const names = Object.fromEntries(mentionedNames);
   // REC-01: a team manager pins (only pins) the entries on their team's records
   const managesRecord = context.role === "manager" ? await managesRecordTeam(orgId, subject, context.user.id) : false;
   const recordHref = recordPage(subject.kind, orgId, subject.id);
   // one clock for the whole list, read once per request on the server: who may still edit what (REC-05)
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
-  const viewer = { userId: context.user.id, role: context.role, canWrite: canWrite && context.canWrite, managesRecordTeam: managesRecord };
+  const viewer = { userId: context.user.id, role: context.role, canWrite: writable, managesRecordTeam: managesRecord };
 
   return (
     <Card aria-labelledby="timeline-title">
@@ -44,7 +53,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
       <CardBody>
         {canWrite ? (
           <div className="mb-6">
-            <NoteForm orgId={orgId} subject={subject} />
+            <NoteForm orgId={orgId} subject={subject} mentions={mentions} />
           </div>
         ) : null}
 
@@ -97,7 +106,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                 </div>
                 {item.text && isPinnableType(item.type) ? (
                   // REC-04: what a person logged may carry basic formatting
-                  <NoteText text={item.text} className="mt-1" />
+                  <NoteText text={item.text} names={names} className="mt-1" />
                 ) : item.text ? (
                   <p className={cn("mt-1 break-words whitespace-pre-wrap", !item.isUserContent && "text-ink-soft")}>
                     {item.text}
@@ -117,6 +126,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                         body={item.body}
                         type={item.type}
                         isPrivate={item.isPrivate}
+                        mentions={mentions}
                       />
                     ) : null}
                   </div>

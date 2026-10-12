@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { checkbox, optionalText, requiredText } from "@/lib/validation";
 
+import { MENTION_MAX, mentionIds } from "@/features/mentions/token";
+
 import { sanitizeNote } from "./markdown";
 
 // REC-04: what a person writes is stored as cleaned Markdown (see markdown.ts)
@@ -130,12 +132,25 @@ export const PRIVATE_ONLY_NOTE = "רק הערה יכולה להיות פרטית
 // the hint next to the checkbox: who will see the note
 export const PRIVATE_NOTE_HINT = "תוצג רק לך ולמנהלי המערכת של העסק.";
 
-export const noteEditSchema = z.object({
-  body: z.preprocess(cleanNote, requiredText(NOTE_MAX, "יש לכתוב את ההערה לפני השמירה.", NOTE_TOO_LONG)),
-  // GAP-05: sent only by the edit box of a note; absent means "leave it as it is"
-  private_field: z.preprocess((value) => value === "1", z.boolean()),
-  private: checkbox,
-});
+// REC-02: a private note is seen by its author and the admins only, so it tells nobody;
+// the app refuses a mention there instead of saving one that goes nowhere
+export const PRIVATE_NO_MENTIONS = "אי אפשר לאזכר אנשים בהערה פרטית. הסירו את האזכור או בטלו את הסימון.";
+export const TOO_MANY_MENTIONS = `אפשר לאזכר עד ${MENTION_MAX} אנשים בהערה אחת.`;
+
+const fewMentions = (body: string) => mentionIds(body).length <= MENTION_MAX;
+
+export const noteEditSchema = z
+  .object({
+    body: z.preprocess(cleanNote, requiredText(NOTE_MAX, "יש לכתוב את ההערה לפני השמירה.", NOTE_TOO_LONG)),
+    // GAP-05: sent only by the edit box of a note; absent means "leave it as it is"
+    private_field: z.preprocess((value) => value === "1", z.boolean()),
+    private: checkbox,
+  })
+  .refine((note) => fewMentions(note.body), { path: ["body"], message: TOO_MANY_MENTIONS })
+  .refine((note) => !(note.private_field && note.private) || mentionIds(note.body).length === 0, {
+    path: ["private"],
+    message: PRIVATE_NO_MENTIONS,
+  });
 
 // REC-06: the timeline can show one kind of activity. The key travels in the record page's URL
 // (`?tl=call`), so a shared link and the back button keep the filter.
@@ -175,7 +190,9 @@ export const noteSchema = z
     // GAP-05: "me and the organization's admins"
     private: checkbox,
   })
-  .refine((note) => !note.private || note.type === PRIVATE_NOTE_TYPE, { path: ["private"], message: PRIVATE_ONLY_NOTE });
+  .refine((note) => !note.private || note.type === PRIVATE_NOTE_TYPE, { path: ["private"], message: PRIVATE_ONLY_NOTE })
+  .refine((note) => fewMentions(note.body), { path: ["body"], message: TOO_MANY_MENTIONS })
+  .refine((note) => !note.private || mentionIds(note.body).length === 0, { path: ["private"], message: PRIVATE_NO_MENTIONS });
 
 export const SUBJECT_COLUMN = {
   lead: "lead_id",

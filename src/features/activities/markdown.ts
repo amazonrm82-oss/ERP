@@ -6,14 +6,18 @@
  *   1. item             a numbered list
  *   [text](https://…)   a link; only http(s), mailto: and tel: addresses
  *   \*                  a backslash keeps the next mark character as it is
+ *   @[Name](user:<id>)  a mention of a colleague (REC-02, src/features/mentions/token.ts)
  *
  * Nothing here produces HTML. `parseNote()` builds a small tree that React renders as
  * elements, so any tag a person types is shown as text. A link whose address is not
  * allowed stays plain text, both when saving (`sanitizeNote`) and when showing.
  */
 
+import { isMentionLink, mentionAt } from "@/features/mentions/token";
+
 export type Inline =
   | { kind: "text"; text: string }
+  | { kind: "mention"; userId: string; name: string }
   | { kind: "bold"; children: Inline[] }
   | { kind: "link"; href: string; children: Inline[] };
 
@@ -123,6 +127,14 @@ function parseInline(line: string, allowLinks: boolean, allowBold: boolean): Inl
       pushText(out, line[i + 1]);
       i += 2;
       continue;
+    }
+    if (ch === "@" && line[i + 1] === "[") {
+      const mention = mentionAt(line, i);
+      if (mention) {
+        out.push({ kind: "mention", userId: mention.userId, name: mention.name });
+        i += mention.length;
+        continue;
+      }
     }
     if (boldPossible && ch === "*" && line[i + 1] === "*") {
       const end = findBoldEnd(line, i + 2);
@@ -235,7 +247,10 @@ function sanitizeLine(line: string): string {
     if (end < 0) break;
     // an escaped bracket is text, not a link
     const escaped = open > 0 && line[open - 1] === "\\";
-    if (!escaped && !safeHref(line.slice(close + 2, end))) {
+    const href = line.slice(close + 2, end);
+    // REC-02: "@[name](user:<id>)" is a mention, kept as it is
+    const mention = open > 0 && line[open - 1] === "@" && isMentionLink(line.slice(open + 1, close), href);
+    if (!escaped && !mention && !safeHref(href)) {
       out += line.slice(copied, open) + line.slice(open + 1, close);
       copied = end + 1;
     }
@@ -257,5 +272,7 @@ export function notePlainText(text: string): string {
 }
 
 function plainInline(nodes: Inline[]): string {
-  return nodes.map((node) => (node.kind === "text" ? node.text : plainInline(node.children))).join("");
+  return nodes
+    .map((node) => (node.kind === "text" ? node.text : node.kind === "mention" ? `@${node.name}` : plainInline(node.children)))
+    .join("");
 }

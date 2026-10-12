@@ -1169,6 +1169,8 @@ export type Database = {
         Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };
         Returns: Array<{ user_id: string; meeting_id: string | null; title: string | null; starts_at: string; ends_at: string }>;
       };
+      // REC-02: who a note on this record may mention (active members who may see it, not the caller)
+      mention_candidates: { Args: { p_org: string; p_kind: string; p_id: string }; Returns: Array<{ user_id: string; name: string }> };
       // merging duplicates (migration 0020): picks = { column: "merge" }
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       my_sessions: { Args: Record<string, never>; Returns: Json };

@@ -8,6 +8,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { Checkbox } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import type { MentionCandidate } from "@/features/mentions/token";
 import type { FormState } from "@/lib/action-result";
 
 import { deleteNoteAction, updateNoteAction } from "../actions";
@@ -25,13 +26,15 @@ type Props = {
   // GAP-05: a note can be made private or public in the edit box
   type: string;
   isPrivate: boolean;
+  // REC-02: who may be mentioned in the edit box
+  mentions?: MentionCandidate[];
 };
 
 /**
  * REC-05: edit or delete an entry a person logged. Shown to its author for 24 hours and to
  * owners/admins; the database enforces the same rule and writes the change to the audit log.
  */
-export function NoteActions({ orgId, subject, activityId, label, body, type, isPrivate }: Props) {
+export function NoteActions({ orgId, subject, activityId, label, body, type, isPrivate, mentions }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -46,6 +49,7 @@ export function NoteActions({ orgId, subject, activityId, label, body, type, isP
             activityId={activityId}
             body={body}
             privacy={type === PRIVATE_NOTE_TYPE ? isPrivate : null}
+            mentions={mentions}
             onDone={() => setOpen(false)}
           /> : null}
       </Dialog>
@@ -69,10 +73,11 @@ type EditProps = {
   body: string;
   // GAP-05: whether the note is private now; null for an entry that cannot be private (a call, a meeting)
   privacy: boolean | null;
+  mentions?: MentionCandidate[];
   onDone: () => void;
 };
 
-function EditNoteForm({ orgId, subject, activityId, body, privacy, onDone }: EditProps) {
+function EditNoteForm({ orgId, subject, activityId, body, privacy, mentions, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateNoteAction.bind(null, orgId, subject, activityId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -90,6 +95,7 @@ function EditNoteForm({ orgId, subject, activityId, body, privacy, onDone }: Edi
         defaultValue={failure?.values?.body ?? body}
         error={failure?.fieldErrors?.body}
         autoFocus
+        mentions={mentions}
       />
       {privacy !== null ? (
         <>
@@ -102,6 +108,7 @@ function EditNoteForm({ orgId, subject, activityId, body, privacy, onDone }: Edi
           />
         </>
       ) : null}
+      {failure?.fieldErrors?.private ? <FormError message={failure.fieldErrors.private} /> : null}
       {failure && !failure.fieldErrors ? <FormError message={failure.message} /> : null}
       <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="שומרים…">שמירת השינוי</SubmitButton>

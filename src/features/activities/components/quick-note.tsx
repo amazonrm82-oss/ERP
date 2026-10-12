@@ -45,6 +45,7 @@ export function QuickNote({ orgId, subject, className }: { orgId: string; subjec
         </SubmitButton>
         <FormNotice message={state?.ok ? "ההערה נשמרה בציר הזמן." : null} className="py-1.5" />
       </div>
+      {failure?.fieldErrors?.private ? <FormError message={failure.fieldErrors.private} className="mt-2" /> : null}
       {failure && !failure.fieldErrors ? <FormError message={failure.message} className="mt-2" /> : null}
     </form>
   );

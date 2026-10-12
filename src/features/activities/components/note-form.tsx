@@ -5,13 +5,14 @@ import { useActionState } from "react";
 import { FormError } from "@/components/ui/feedback";
 import { Checkbox, SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import type { MentionCandidate } from "@/features/mentions/token";
 import type { FormState } from "@/lib/action-result";
 
 import { addNoteAction } from "../actions";
 import { LOGGED_TYPES, PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
 import { NoteEditor } from "./note-editor";
 
-export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineSubject }) {
+export function NoteForm({ orgId, subject, mentions }: { orgId: string; subject: TimelineSubject; mentions?: MentionCandidate[] }) {
   const [state, formAction] = useActionState<FormState, FormData>(addNoteAction.bind(null, orgId, subject), null);
   const failure = state && !state.ok ? state : null;
 
@@ -33,6 +34,7 @@ export function NoteForm({ orgId, subject }: { orgId: string; subject: TimelineS
         placeholder="מה סוכם? מה הצעד הבא?"
         defaultValue={failure?.values?.body}
         error={failure?.fieldErrors?.body}
+        mentions={mentions}
       />
       {/* GAP-05: a note only; the database refuses a private call or meeting */}
       <Checkbox

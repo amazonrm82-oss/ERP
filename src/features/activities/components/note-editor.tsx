@@ -3,6 +3,8 @@
 import { useId, useRef, type KeyboardEvent } from "react";
 
 import { Label, Textarea } from "@/components/ui/field";
+import { MentionPicker } from "@/features/mentions/components/mention-picker";
+import { mentionToken, type MentionCandidate } from "@/features/mentions/token";
 import { cn } from "@/lib/cn";
 
 import { applyFormat, type FormatKind } from "../note-format";
@@ -14,6 +16,8 @@ const BUTTONS: Array<{ kind: FormatKind; label: string; shortcut?: string; textC
   { kind: "link", label: "קישור", shortcut: "Control+K", textClass: "underline underline-offset-4" },
 ];
 
+const BUTTON_CLASS = "min-h-9 rounded-md border border-line px-2.5 text-sm text-ink hover:bg-canvas";
+
 type Props = {
   label: string;
   name: string;
@@ -23,6 +27,8 @@ type Props = {
   defaultValue?: string;
   error?: string;
   autoFocus?: boolean;
+  // REC-02: colleagues who may be mentioned; no "אזכור" button without them
+  mentions?: MentionCandidate[];
 };
 
 /**
@@ -30,7 +36,7 @@ type Props = {
  * Markdown into the text itself, so the text stays plain and safe. The buttons are ordinary
  * buttons in the tab order; Ctrl+B and Ctrl+K work inside the box.
  */
-export function NoteEditor({ label, name, rows = 3, maxLength = 5000, placeholder, defaultValue, error, autoFocus }: Props) {
+export function NoteEditor({ label, name, rows = 3, maxLength = 5000, placeholder, defaultValue, error, autoFocus, mentions }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const id = useId();
 
@@ -46,6 +52,22 @@ export function NoteEditor({ label, name, rows = 3, maxLength = 5000, placeholde
       box.value = edit.value;
     }
     box.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+  }
+
+  // REC-02: writes the mention where the cursor was (a text box keeps its selection while closed)
+  function mention(candidate: MentionCandidate) {
+    const box = ref.current;
+    if (!box) return;
+    const start = box.selectionStart;
+    const end = box.selectionEnd;
+    const before = box.value.slice(0, start);
+    const text = `${before === "" || /\s$/.test(before) ? "" : " "}${mentionToken(candidate.id, candidate.name)} `;
+    if (box.value.length - (end - start) + text.length > maxLength) return;
+    box.focus();
+    box.setSelectionRange(start, end);
+    if (!document.execCommand?.("insertText", false, text)) {
+      box.setRangeText(text, start, end, "end");
+    }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -75,11 +97,12 @@ export function NoteEditor({ label, name, rows = 3, maxLength = 5000, placeholde
             // keep the selection in the text box while the button is pressed
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => format(button.kind)}
-            className={cn("min-h-9 rounded-md border border-line px-2.5 text-sm text-ink hover:bg-canvas", button.textClass)}
+            className={cn(BUTTON_CLASS, button.textClass)}
           >
             {button.label}
           </button>
         ))}
+        {mentions ? <MentionPicker candidates={mentions} onPick={mention} triggerClassName={BUTTON_CLASS} /> : null}
       </div>
       <Textarea
         ref={ref}
@@ -101,6 +124,7 @@ export function NoteEditor({ label, name, rows = 3, maxLength = 5000, placeholde
       ) : (
         <p id={`${id}-hint`} className="mt-1.5 text-sm text-ink-soft">
           אפשר גם להקליד: **מודגש**, שורה שמתחילה ב-&quot;- &quot; לרשימה, [טקסט](https://…) לקישור.
+          {mentions ? " כדי לאזכר מישהו מהצוות, לחצו על \"אזכור\"." : null}
         </p>
       )}
     </div>
