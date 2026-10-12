@@ -7,7 +7,8 @@ import { formatDateTime } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
 
 import { getTimeline } from "../queries";
-import { canPinHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
+import { canEditNoteHint, canPinHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
+import { NoteActions } from "./note-actions";
 import { NoteForm } from "./note-form";
 import { NoteText } from "./note-text";
 import { PinButton } from "./pin-button";
@@ -29,6 +30,9 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
   // getOrgContext is memoized per request: the page already loaded it
   const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
   const recordHref = recordPage(subject.kind, orgId, subject.id);
+  // one clock for the whole list, read once per request on the server: who may still edit what (REC-05)
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
   const viewer = { userId: context.user.id, role: context.role, canWrite: canWrite && context.canWrite };
 
   return (
@@ -69,7 +73,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                     item.isUserContent ? "bg-accent" : "bg-line-strong",
                   )}
                 />
-                <div className="flex items-start justify-between gap-2">
+                <div>
                   <p className="min-w-0 text-sm text-ink-soft">
                     {item.pinned ? <Badge tone="accent" className="me-2">נעוץ</Badge> : null}
                     <span className="font-medium text-ink">{item.label}</span>
@@ -79,9 +83,6 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                     </span>
                     <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
                   </p>
-                  {canPinHint(item, viewer) ? (
-                    <PinButton orgId={orgId} subject={subject} activityId={item.id} pinned={item.pinned} label={item.label} />
-                  ) : null}
                 </div>
                 {item.text && isPinnableType(item.type) ? (
                   // REC-04: what a person logged may carry basic formatting
@@ -90,6 +91,16 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                   <p className={cn("mt-1 break-words whitespace-pre-wrap", !item.isUserContent && "text-ink-soft")}>
                     {item.text}
                   </p>
+                ) : null}
+                {canPinHint(item, viewer) ? (
+                  // REC-01 pin: the author at any time; REC-05 edit and delete: the author for 24 hours.
+                  // Owners and admins: everything, always.
+                  <div className="mt-1 -ms-3 flex flex-wrap items-start gap-1">
+                    <PinButton orgId={orgId} subject={subject} activityId={item.id} pinned={item.pinned} label={item.label} />
+                    {canEditNoteHint(item, viewer, now) ? (
+                      <NoteActions orgId={orgId} subject={subject} activityId={item.id} label={item.label} body={item.body} />
+                    ) : null}
+                  </div>
                 ) : null}
               </li>
             ))}

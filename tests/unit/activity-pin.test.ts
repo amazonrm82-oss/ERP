@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canPinHint, isPinnableType, LOGGED_TYPES, PINNABLE_TYPES } from "@/features/activities/schema";
+import { canEditNoteHint, canPinHint, isPinnableType, LOGGED_TYPES, PINNABLE_TYPES } from "@/features/activities/schema";
 
 // REC-01: who sees the pin button. It mirrors the activities_update policy
 // (author, or owner/admin, in a writable organization); the database still decides.
@@ -37,5 +37,24 @@ describe("pinning a timeline entry (REC-01)", () => {
   it("nothing is pinnable when the organization is read-only, or for system events", () => {
     expect(canPinHint({ type: "note", createdBy: me }, { userId: me, role: "owner", canWrite: false })).toBe(false);
     expect(canPinHint({ type: "status_change", createdBy: me }, { userId: me, role: "owner", canWrite: true })).toBe(false);
+  });
+
+  // REC-05: the author may change what an entry says for 24 hours; pinning has no time limit
+  it("editing: the author for 24 hours, owners and admins at any time; pinning stays open to the author", () => {
+    const NOW = Date.parse("2026-10-12T12:00:00Z");
+    const at = (ms: number) => new Date(NOW - ms).toISOString();
+    const hour = 3_600_000;
+    const author = { userId: me, role: "member", canWrite: true };
+    expect(canEditNoteHint({ type: "note", createdBy: me, createdAt: at(23 * hour) }, author, NOW)).toBe(true);
+    expect(canEditNoteHint({ type: "note", createdBy: me, createdAt: at(24 * hour) }, author, NOW)).toBe(false);
+    expect(canEditNoteHint({ type: "note", createdBy: me, createdAt: at(30 * 24 * hour) }, author, NOW)).toBe(false);
+    expect(canEditNoteHint({ type: "note", createdBy: me, createdAt: "not a date" }, author, NOW)).toBe(false);
+    expect(canPinHint({ type: "note", createdBy: me }, author)).toBe(true);
+    for (const role of ["owner", "admin"]) {
+      expect(canEditNoteHint({ type: "call", createdBy: other, createdAt: at(30 * 24 * hour) }, { userId: me, role, canWrite: true }, NOW)).toBe(true);
+    }
+    expect(canEditNoteHint({ type: "note", createdBy: other, createdAt: at(hour) }, { userId: me, role: "manager", canWrite: true }, NOW)).toBe(false);
+    expect(canEditNoteHint({ type: "status_change", createdBy: me, createdAt: at(hour) }, author, NOW)).toBe(false);
+    expect(canEditNoteHint({ type: "note", createdBy: me, createdAt: at(hour) }, { ...author, canWrite: false }, NOW)).toBe(false);
   });
 });

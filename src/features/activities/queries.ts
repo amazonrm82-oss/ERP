@@ -14,9 +14,13 @@ export type TimelineItem = {
   // user-written text (notes) or a generated sentence (system events)
   text: string;
   isUserContent: boolean;
+  // REC-05: the stored text alone, for the edit box
+  body: string;
   occurredAt: string;
   authorName: string | null;
   createdBy: string | null;
+  // REC-05: the edit window counts from here (set by the database)
+  createdAt: string;
   // REC-01: pinned to the top of the timeline
   pinned: boolean;
 };
@@ -55,7 +59,7 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
 
   let query = supabase
     .from("activities")
-    .select("id, type, body, metadata, occurred_at, created_by, is_pinned")
+    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id);
   // the type lists are constants (TIMELINE_FILTERS), never text from the URL
@@ -129,9 +133,11 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       label: TYPE_LABELS[activity.type] ?? "פעילות",
       text,
       isUserContent,
+      body: activity.body ?? "",
       occurredAt: activity.occurred_at,
       authorName: activity.created_by ? (authors.get(activity.created_by) ?? null) : null,
       createdBy: activity.created_by,
+      createdAt: activity.created_at,
       pinned: activity.is_pinned,
     };
   });

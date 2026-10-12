@@ -31,9 +31,11 @@ function toChanges(action: string, changes: Json): AuditChange[] {
   if (isErased(changes)) return [];
   if (action !== "update" && action !== "trash" && action !== "restore") return [];
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) return [];
-  return Object.entries(changes).map(([field, value]) => {
-    const pair = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json>) : {};
-    return { field, old: pair.old ?? null, new: pair.new ?? null };
+  return Object.entries(changes).flatMap(([field, value]) => {
+    // only {old, new} pairs are changes; a plain value is context (REC-05: which record a note was on)
+    if (!value || typeof value !== "object" || Array.isArray(value) || !("old" in value || "new" in value)) return [];
+    const pair = value as Record<string, Json>;
+    return [{ field, old: pair.old ?? null, new: pair.new ?? null }];
   });
 }
 

@@ -284,6 +284,26 @@ try {
     if (!body.startsWith("**מחיר סופי**") || body.includes("javascript:")) throw new Error(`stored note: ${body}`);
   }
 
+  step("edit a note, then delete it; both are in the audit log (REC-05)");
+  {
+    const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
+    const entry = timeline.locator("ol > li", { hasText: "מחיר סופי" }).first();
+    await entry.getByRole("button", { name: /^עריכה/ }).click();
+    const dialog = owner.getByRole("dialog", { name: /עריכה/ });
+    const box = dialog.getByRole("textbox", { name: "הטקסט" });
+    await box.fill("מחיר סופי מעודכן");
+    await dialog.getByRole("button", { name: /שמירת השינוי/ }).click();
+    await timeline.getByText("מחיר סופי מעודכן").waitFor({ timeout: 15000 });
+    const leadIdEdit = owner.url().split("/leads/")[1];
+    const [{ id: editedId }] = await sql("select id from public.activities where lead_id = $1 and body = 'מחיר סופי מעודכן'", [leadIdEdit]);
+    const edited = timeline.locator("ol > li", { hasText: "מחיר סופי מעודכן" }).first();
+    await edited.getByRole("button", { name: /^מחיקה/ }).click();
+    await owner.getByRole("dialog", { name: /למחוק מציר הזמן/ }).getByRole("button", { name: /^מחיקה$/ }).click();
+    await timeline.getByText("מחיר סופי מעודכן").waitFor({ state: "detached", timeout: 15000 });
+    const logged = await sql("select action from public.audit_log where entity_type = 'activities' and entity_id = $1 order by id", [editedId]);
+    if (logged.map((r) => r.action).join(",") !== "update,delete") throw new Error(`audit of the note: ${JSON.stringify(logged)}`);
+  }
+
   step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
   const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");
@@ -501,7 +521,7 @@ try {
   await ownerDesk.getByRole("link", { name: "כהן ובניו" }).click();
   await ownerDesk.waitForURL(/\/companies\/[0-9a-f-]{36}$/);
   await expectText(ownerDesk, "משה כהן");
-  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
   await ownerDesk.getByLabel("עיר").fill("חיפה");
   await ownerDesk.getByLabel("אתר").fill("cohen.co.il");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
@@ -512,7 +532,7 @@ try {
   await ownerDesk.getByRole("link", { name: "משה כהן" }).first().click();
   await ownerDesk.waitForURL(/\/contacts\/[0-9a-f-]{36}$/);
   const contactUrl = ownerDesk.url();
-  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
   await ownerDesk.getByLabel("תפקיד").fill("מנכ\"ל");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
@@ -523,7 +543,7 @@ try {
   await ownerDesk.waitForURL(/\/deals\/[0-9a-f-]{36}$/);
   const dealUrl = ownerDesk.url();
   await expectText(ownerDesk, "העסקה תקועה");
-  await ownerDesk.getByRole("button", { name: "עריכה" }).click();
+  await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
   await ownerDesk.getByLabel("שווי (₪)").fill("15,000");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "15,000");

@@ -6,6 +6,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   companies: "חברה",
   deals: "עסקה",
   tasks: "משימה",
+  // REC-05: a note, call or meeting edited or deleted in a record's timeline
+  activities: "רשומה בציר הזמן",
   organizations: "פרטי העסק",
   memberships: "משתמש",
   invitations: "הזמנה",
@@ -95,4 +97,7 @@ export const FIELD_LABELS: Record<string, string> = {
   disqualify_reason: "סיבת פסילה",
   first_contacted_at: "מגע ראשון",
   last_contacted_at: "מגע אחרון",
+  body: "טקסט",
+  occurred_at: "מועד",
+  metadata: "פרטים נוספים",
 };

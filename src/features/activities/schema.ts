@@ -38,19 +38,45 @@ export function isPinnableType(type: string): boolean {
   return (PINNABLE_TYPES as readonly string[]).includes(type);
 }
 
+// REC-05: the author may edit or delete what they logged for 24 hours; after that only an owner or admin.
+export const NOTE_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+type Viewer = { userId: string; role: string; canWrite: boolean };
+
 /**
- * UI hint for the pin button, mirroring the activities_update policy: the organization is writable
- * for the user, and the user wrote the entry or is an owner/admin. The database still decides.
+ * UI hint for editing and deleting an entry (REC-05), mirroring the database: the organization
+ * is writable for the user, and the user is an owner/admin, or wrote the entry less than 24 hours
+ * ago (policy activities_delete, trigger activities_edit_window). The database still decides.
  */
-export function canPinHint(
-  item: { type: string; createdBy: string | null },
-  viewer: { userId: string; role: string; canWrite: boolean },
-): boolean {
+export function canEditNoteHint(item: { type: string; createdBy: string | null; createdAt: string }, viewer: Viewer, now: number): boolean {
+  if (!canPinHint(item, viewer)) {
+    return false;
+  }
+  if (viewer.role === "owner" || viewer.role === "admin") {
+    return true;
+  }
+  const created = Date.parse(item.createdAt);
+  return Number.isFinite(created) && now - created < NOTE_EDIT_WINDOW_MS;
+}
+
+/**
+ * REC-01: who sees the pin button, mirroring the activities_update policy: the organization is
+ * writable for the user, and the user wrote the entry or is an owner/admin. No time limit:
+ * the 24 hours of REC-05 apply to what the entry says, not to pinning it.
+ */
+export function canPinHint(item: { type: string; createdBy: string | null }, viewer: Viewer): boolean {
   if (!viewer.canWrite || !isPinnableType(item.type)) {
     return false;
   }
   return item.createdBy === viewer.userId || viewer.role === "owner" || viewer.role === "admin";
 }
+
+// Said when an edit or a delete touched nothing.
+export const NOTE_LOCKED = "לא ניתן לשנות את הרשומה הזו. ייתכן שנמחקה, או שעברו 24 שעות מאז שנכתבה (אחרי זה רק מנהל מערכת יכול לשנות או למחוק אותה).";
+
+export const noteEditSchema = z.object({
+  body: z.preprocess(cleanNote, requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים).")),
+});
 
 // REC-06: the timeline can show one kind of activity. The key travels in the record page's URL
 // (`?tl=call`), so a shared link and the back button keep the filter.

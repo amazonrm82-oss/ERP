@@ -55,6 +55,8 @@ const OWN_MESSAGES: Array<[RegExp, string]> = [
   [/invitation was sent to a different email/i, "ההזמנה נשלחה לכתובת אימייל אחרת. התחברו עם החשבון של הכתובת שאליה נשלחה ההזמנה."],
   [/new owner must be an active member/i, "הבעלים החדש צריך להיות משתמש פעיל עם מושב מלא."],
   [/invalid email address/i, "כתובת האימייל אינה תקינה."],
+  // REC-05: trigger activities_edit_window (hint note:edit_window)
+  [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק מנהל מערכת יכול לערוך אותה."],
 ];
 
 const AUTH_MESSAGES: Record<string, string> = {
