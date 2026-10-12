@@ -76,6 +76,7 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingI
       <Button size="sm" variant="ghost" onClick={() => setOpen("edit")}>
         <PencilIcon className="size-4" />
         עריכה
+        <span className="sr-only">: {title}</span>
       </Button>
       <Dialog open={open === "status"} onClose={close} title="סטטוס ותוצאה" description={title} variant="sheet">
         {open === "status" ? (
