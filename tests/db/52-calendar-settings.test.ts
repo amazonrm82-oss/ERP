@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asAdmin, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
 
@@ -79,5 +79,87 @@ describe("the organization's rest days", () => {
       expect((await q("delete from public.org_calendar_settings where organization_id = $1", [org])).rowCount).toBe(0);
     });
     await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [org]));
+  });
+});
+
+/** CAL-03 (owner's answers, 12 October 2026): any occasion can be a rest day; a business may have none at all. */
+describe("occasions chosen as rest days", () => {
+  let owner: { id: string };
+  let member: { id: string };
+  let org: string;
+  const occasionsOf = () =>
+    asUser(owner.id, async (q) =>
+      (await q<{ rest_occasions: string[] }>("select rest_occasions from public.org_calendar_settings where organization_id = $1", [org])).rows[0]
+        .rest_occasions,
+    );
+
+  beforeAll(async () => {
+    owner = await createUser("occasion-owner");
+    org = await createOrg(owner.id);
+    member = await addMember(org, owner.id, "member", "occasion-member");
+    await asUser(owner.id, (q) => q("insert into public.org_calendar_settings (organization_id) values ($1)", [org]));
+  });
+
+  it("none by default", async () => {
+    expect(await occasionsOf()).toEqual([]);
+  });
+
+  it("an owner saves occasions like chol hamoed, Mimouna and Purim; a member cannot", async () => {
+    await asUser(owner.id, async (q) => {
+      const res = await q("update public.org_calendar_settings set rest_occasions = $2 where organization_id = $1", [
+        org,
+        ["chol_hamoed_pesach", "mimouna", "purim"],
+      ]);
+      expect(res.rowCount).toBe(1);
+    });
+    expect(await occasionsOf()).toEqual(["chol_hamoed_pesach", "mimouna", "purim"]);
+    await asUser(member.id, async (q) => {
+      expect((await q("update public.org_calendar_settings set rest_occasions = '{}' where organization_id = $1", [org])).rowCount).toBe(0);
+    });
+    expect(await occasionsOf()).toEqual(["chol_hamoed_pesach", "mimouna", "purim"]);
+  });
+
+  it("set on insert too (the first save)", async () => {
+    const fresh = await createOrg(owner.id, "עסק חדש");
+    const saved = await asUser(owner.id, async (q) =>
+      (
+        await q<{ rest_occasions: string[] }>(
+          "insert into public.org_calendar_settings (organization_id, rest_occasions) values ($1, $2) returning rest_occasions",
+          [fresh, ["chanukah"]],
+        )
+      ).rows[0].rest_occasions,
+    );
+    expect(saved).toEqual(["chanukah"]);
+  });
+
+  it("refuses a value that is not a list of keys", async () => {
+    const tooMany = Array.from({ length: 61 }, (_, i) => `k${i}`);
+    for (const value of [["Purim"], ["purim", ""], [""], ["a b"], ["purim", null], ["x".repeat(41)], tooMany]) {
+      const err = await pgError(
+        asUser(owner.id, (q) => q("update public.org_calendar_settings set rest_occasions = $2 where organization_id = $1", [org, value])),
+      );
+      expect(err.code, JSON.stringify(value).slice(0, 40)).toBe("23514");
+    }
+    const nullList = await pgError(
+      asUser(owner.id, (q) => q("update public.org_calendar_settings set rest_occasions = null where organization_id = $1", [org])),
+    );
+    expect(nullList.code).toBe("23502");
+  });
+
+  it("a business with no rest day at all is allowed", async () => {
+    await asUser(owner.id, async (q) => {
+      const res = await q(
+        "update public.org_calendar_settings set rest_weekdays = '{}', holidays_rest = false, holiday_eves_rest = false, rest_occasions = '{}' where organization_id = $1 returning id",
+        [org],
+      );
+      expect(res.rowCount).toBe(1);
+    });
+  });
+
+  it("changes are audited", async () => {
+    const n = await asAdmin((q) =>
+      count(q, "select 1 from public.audit_log where organization_id = $1 and entity_type = 'org_calendar_settings' and action = 'update'", [org]),
+    );
+    expect(n).toBe(2);
   });
 });

@@ -17,7 +17,7 @@ import { zonedIso } from "@/lib/format";
 
 const TZ = "Asia/Jerusalem";
 // every day a work day, so rest days stay out of the tests that are not about them
-const NO_REST: CalendarSettings = { restWeekdays: [], holidaysRest: false, holidayEvesRest: false };
+const NO_REST: CalendarSettings = { restWeekdays: [], holidaysRest: false, holidayEvesRest: false, restOccasions: [] };
 
 const at = (day: string, time: string, zone = TZ) => zonedIso(day, `${time}:00`, zone);
 const span = (day: string, from: string, to: string, endDay = day): Span => ({ startsAt: at(day, from), endsAt: at(endDay, to) });

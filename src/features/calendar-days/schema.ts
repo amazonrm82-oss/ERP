@@ -1,8 +1,13 @@
 import { z } from "zod";
 
-export const CALENDAR_SETTINGS_FIELDS = ["rest_weekdays", "holidays_rest", "holiday_eves_rest"] as const;
+import { OCCASION_KEYS, restOccasions } from "./holidays";
 
-/** The settings form: weekly days as checkboxes (0 = Sunday … 6 = Saturday), two on/off choices. */
+export const CALENDAR_SETTINGS_FIELDS = ["rest_weekdays", "holidays_rest", "holiday_eves_rest", "rest_occasions"] as const;
+
+/**
+ * The settings form: weekly days as checkboxes (0 = Sunday … 6 = Saturday), two on/off choices,
+ * and the occasions chosen one by one. No rest day at all is allowed (owner's answer, 12 October 2026).
+ */
 export const calendarSettingsSchema = z.object({
   rest_weekdays: z
     .array(z.coerce.number().int().min(0).max(6))
@@ -11,6 +16,10 @@ export const calendarSettingsSchema = z.object({
     .refine((days) => days.length < 7, "העסק צריך לעבוד לפחות יום אחד בשבוע."),
   holidays_rest: z.boolean(),
   holiday_eves_rest: z.boolean(),
+  rest_occasions: z
+    .array(z.enum(OCCASION_KEYS, { message: "אחד המועדים שנבחרו לא מוכר. רעננו את הדף ונסו שוב." }))
+    .max(OCCASION_KEYS.length * 2)
+    .transform((keys) => restOccasions(keys)),
 });
 
 export type CalendarSettingsInput = z.infer<typeof calendarSettingsSchema>;
@@ -21,5 +30,6 @@ export function calendarSettingsFromForm(formData: FormData) {
     rest_weekdays: formData.getAll("rest_weekdays").filter((value) => typeof value === "string"),
     holidays_rest: formData.get("holidays_rest") === "on",
     holiday_eves_rest: formData.get("holiday_eves_rest") === "on",
+    rest_occasions: formData.getAll("rest_occasions").filter((value) => typeof value === "string"),
   };
 }

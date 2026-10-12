@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
@@ -11,13 +11,17 @@ import { WEEKDAYS_LONG } from "@/lib/calendar-grid";
 
 import { saveCalendarSettingsAction } from "../actions";
 import type { CalendarSettings } from "../holidays";
+import { OccasionChecklist } from "./occasion-checklist";
 
 type Props = { orgId: string; settings: CalendarSettings };
 
-/** The organization's weekly rest days and whether holidays and their eves are days off (owners and admins). */
+/** The organization's weekly rest days, whether holidays and their eves are days off, and more occasions one by one (owners and admins). */
 export function CalendarSettingsForm({ orgId, settings }: Props) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveCalendarSettingsAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
+  // the occasion list locks the boxes these two switches already close
+  const [holidaysRest, setHolidaysRest] = useState(settings.holidaysRest);
+  const [holidayEvesRest, setHolidayEvesRest] = useState(settings.holidayEvesRest);
 
   // submitted by hand rather than through `action`, so the boxes keep what the
   // user ticked (a form action resets an uncontrolled form, even after a failure)
@@ -55,14 +59,29 @@ export function CalendarSettingsForm({ orgId, settings }: Props) {
             name="holidays_rest"
             label="החגים הם ימי מנוחה"
             hint="ראש השנה, יום כיפור, סוכות, שמחת תורה, פסח (היום הראשון והשביעי), יום העצמאות ושבועות."
-            defaultChecked={settings.holidaysRest}
+            checked={holidaysRest}
+            onChange={(event) => setHolidaysRest(event.currentTarget.checked)}
           />
           <Checkbox
             name="holiday_eves_rest"
             label="גם ערבי החגים הם ימי מנוחה"
-            hint="ערב ראש השנה, ערב יום כיפור, ערב סוכות, הושענא רבה, ערב פסח, ערב שביעי של פסח וערב שבועות."
-            defaultChecked={settings.holidayEvesRest}
+            hint="ערב ראש השנה, ערב יום כיפור, ערב סוכות, הושענא רבה, ערב פסח, ערב שביעי של פסח, יום הזיכרון (ערב יום העצמאות) וערב שבועות."
+            checked={holidayEvesRest}
+            onChange={(event) => setHolidayEvesRest(event.currentTarget.checked)}
           />
+        </CardBody>
+      </Card>
+
+      <Card aria-labelledby="rest-occasions-title">
+        <CardHeader id="rest-occasions-title" title="מועדים נוספים" />
+        <CardBody>
+          <fieldset aria-describedby="rest-occasions-note">
+            <legend className="sr-only">מועדים נוספים שהעסק לא עובד בהם</legend>
+            <p id="rest-occasions-note" className="mb-3 text-sm text-ink-soft">
+              סמנו כל מועד שהעסק לא עובד בו, גם חג או ערב חג אחד בלבד. כשהבחירה למעלה סוגרת את כל החגים או את כל ערבי החג, הם מסומנים כאן ונעולים.
+            </p>
+            <OccasionChecklist holidaysRest={holidaysRest} holidayEvesRest={holidayEvesRest} initial={settings.restOccasions} />
+          </fieldset>
         </CardBody>
       </Card>
 

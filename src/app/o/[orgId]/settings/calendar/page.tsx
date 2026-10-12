@@ -9,9 +9,9 @@ import {
   hebrewDayLabel,
   holidaySpans,
   holidaysInRange,
-  type CalendarSettings,
+  OCCASIONS,
+  occasionClosed,
   type HolidayKind,
-  type HolidaySpan,
 } from "@/features/calendar-days/holidays";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -25,10 +25,6 @@ type Props = { params: Promise<{ orgId: string }> };
 
 const KIND_TONES: Record<HolidayKind, BadgeTone> = { rest: "accent", erev: "warning", observance: "neutral" };
 
-function closed(span: HolidaySpan, settings: CalendarSettings): boolean {
-  return (span.kind === "rest" && settings.holidaysRest) || (span.kind === "erev" && settings.holidayEvesRest);
-}
-
 function dayText(day: string): string {
   return `יום ${WEEKDAYS_LONG[weekday(day)]}, ${shortDay(day)}`;
 }
@@ -41,6 +37,7 @@ export default async function CalendarSettingsPage({ params }: Props) {
   const today = zoneDate(new Date(), org.timeZone);
   const spans = holidaySpans(holidaysInRange(today, addDays(today, 364)));
   const restNames = settings.restWeekdays.map((day) => WEEKDAYS_LONG[day]);
+  const occasionNames = OCCASIONS.filter((occasion) => settings.restOccasions.includes(occasion.key)).map((occasion) => occasion.name);
 
   return (
     <div className="space-y-5">
@@ -54,6 +51,7 @@ export default async function CalendarSettingsPage({ params }: Props) {
               <Detail label="בשבוע" value={restNames.length > 0 ? restNames.join(", ") : "העסק עובד כל השבוע"} />
               <Detail label="חגים" value={settings.holidaysRest ? "ימי מנוחה" : "ימי עבודה"} />
               <Detail label="ערבי חג" value={settings.holidayEvesRest ? "ימי מנוחה" : "ימי עבודה"} />
+              <Detail label="מועדים נוספים" value={occasionNames.length > 0 ? occasionNames.join(", ") : "אין"} />
             </DetailList>
             <p className="mt-4 text-sm text-ink-soft">
               {isAdminRole(role) ? "העסק במצב קריאה בלבד, ולכן אי אפשר לשנות כרגע." : "רק בעלים ומנהלי מערכת יכולים לשנות את ימי המנוחה."}
@@ -77,7 +75,8 @@ export default async function CalendarSettingsPage({ params }: Props) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={KIND_TONES[span.kind]}>{HOLIDAY_KIND_LABELS[span.kind]}</Badge>
-                {closed(span, settings) ? <Badge tone="neutral">העסק סגור</Badge> : null}
+                {span.memorial ? <Badge tone="neutral">יום זיכרון</Badge> : null}
+                {occasionClosed(span, settings) ? <Badge tone="neutral">העסק סגור</Badge> : null}
               </div>
             </li>
           ))}

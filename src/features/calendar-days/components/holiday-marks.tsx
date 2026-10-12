@@ -8,6 +8,8 @@ const TONES: Record<HolidayKind, string> = {
   observance: "bg-canvas text-ink-soft",
 };
 
+const MEMORIAL_LABEL = "יום זיכרון";
+
 type Props = {
   holidays: Holiday[];
   /** a month cell: one short line that cuts with an ellipsis; the full name stays in the tooltip and for screen readers */
@@ -26,7 +28,7 @@ export function HolidayMarks({ holidays, compact, className }: Props) {
       {holidays.map((holiday) => (
         <li
           key={holiday.name}
-          title={`${HOLIDAY_KIND_LABELS[holiday.kind]}: ${holiday.name}`}
+          title={`${HOLIDAY_KIND_LABELS[holiday.kind]}: ${holiday.name}${holiday.memorial ? ` (${MEMORIAL_LABEL})` : ""}`}
           className={cn(
             "min-w-0 rounded-sm px-1 text-caption font-medium leading-5",
             compact ? "truncate" : "break-words",
@@ -35,6 +37,7 @@ export function HolidayMarks({ holidays, compact, className }: Props) {
         >
           <span className="sr-only">{HOLIDAY_KIND_LABELS[holiday.kind]}: </span>
           {holiday.name}
+          {holiday.memorial ? <span className="sr-only"> ({MEMORIAL_LABEL})</span> : null}
         </li>
       ))}
     </ul>

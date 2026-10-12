@@ -25,6 +25,8 @@ export type HolidayKind = "rest" | "erev" | "observance";
 
 export type Holiday = {
   date: string;
+  /** which occasion of OCCASIONS it is (a business may choose it as a rest day) */
+  key: OccasionKey;
   /** Hebrew, short enough for a day cell */
   name: string;
   kind: HolidayKind;
@@ -42,14 +44,63 @@ export type CalendarSettings = {
   holidaysRest: boolean;
   /** the erev days of the main holidays are days off too */
   holidayEvesRest: boolean;
+  /** more occasions the business does not work on, one by one (chol hamoed, Mimouna, Purim …); none by default */
+  restOccasions: OccasionKey[];
 };
 
-/** Friday and Saturday off, holidays off, erev days are work days. */
+/** Friday and Saturday off, holidays off, erev days are work days, no other occasion off. */
 export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
   restWeekdays: [5, 6],
   holidaysRest: true,
   holidayEvesRest: false,
+  restOccasions: [],
 };
+
+/**
+ * Every occasion the calendar marks, in the order of the year from Tishrei,
+ * with the kind it is marked as. The key is stored in
+ * org_calendar_settings.rest_occasions when a business chooses the occasion as
+ * a rest day of its own, so a key never changes once released.
+ * Yom HaZikaron is marked as an eve (of Yom HaAtzmaut), and stays a memorial
+ * day (owner's answer, 12 October 2026).
+ */
+export const OCCASIONS = [
+  { key: "rosh_hashana", name: "ראש השנה", kind: "rest" },
+  { key: "yom_kippur_eve", name: "ערב יום כיפור", kind: "erev" },
+  { key: "yom_kippur", name: "יום כיפור", kind: "rest" },
+  { key: "sukkot_eve", name: "ערב סוכות", kind: "erev" },
+  { key: "sukkot", name: "סוכות", kind: "rest" },
+  { key: "chol_hamoed_sukkot", name: "חול המועד סוכות", kind: "observance" },
+  { key: "hoshana_raba", name: "הושענא רבה", kind: "erev" },
+  { key: "simchat_torah", name: "שמחת תורה", kind: "rest" },
+  { key: "chanukah", name: "חנוכה", kind: "observance" },
+  { key: "tu_bishvat", name: "ט״ו בשבט", kind: "observance" },
+  { key: "purim", name: "פורים", kind: "observance" },
+  { key: "shushan_purim", name: "שושן פורים (בירושלים)", kind: "observance" },
+  { key: "pesach_eve", name: "ערב פסח", kind: "erev" },
+  { key: "pesach", name: "פסח", kind: "rest" },
+  { key: "chol_hamoed_pesach", name: "חול המועד פסח", kind: "observance" },
+  { key: "pesach_7_eve", name: "ערב שביעי של פסח", kind: "erev" },
+  { key: "pesach_7", name: "שביעי של פסח", kind: "rest" },
+  { key: "mimouna", name: "מימונה", kind: "observance" },
+  { key: "yom_hashoah", name: "יום השואה", kind: "observance" },
+  { key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev" },
+  { key: "yom_haatzmaut", name: "יום העצמאות", kind: "rest" },
+  { key: "lag_baomer", name: "ל״ג בעומר", kind: "observance" },
+  { key: "yom_yerushalayim", name: "יום ירושלים", kind: "observance" },
+  { key: "shavuot_eve", name: "ערב שבועות", kind: "erev" },
+  { key: "shavuot", name: "שבועות", kind: "rest" },
+  { key: "tisha_bav", name: "תשעה באב", kind: "observance" },
+  { key: "rosh_hashana_eve", name: "ערב ראש השנה", kind: "erev" },
+] as const satisfies readonly { key: string; name: string; kind: HolidayKind }[];
+
+export type OccasionKey = (typeof OCCASIONS)[number]["key"];
+
+export const OCCASION_KEYS = OCCASIONS.map((occasion) => occasion.key) as [OccasionKey, ...OccasionKey[]];
+
+export function isOccasionKey(value: unknown): value is OccasionKey {
+  return typeof value === "string" && (OCCASION_KEYS as readonly string[]).includes(value);
+}
 
 /** The longest range one call computes: a year view and its edges, with room to spare. */
 export const MAX_RANGE_DAYS = 800;
@@ -189,74 +240,77 @@ export function holidaysOn(day: string): Holiday[] {
   if (!date) return [];
   const w = weekday(day);
   const found: Holiday[] = [];
-  const add = (name: string, kind: HolidayKind, memorial = false) =>
-    found.push(memorial ? { date: day, name, kind, memorial } : { date: day, name, kind });
+  const add = (key: OccasionKey, name: string, kind: HolidayKind, memorial = false) =>
+    found.push(memorial ? { date: day, key, name, kind, memorial } : { date: day, key, name, kind });
   const { month, day: d } = date;
 
   switch (month) {
     case TISHREI:
-      if (d === 1 || d === 2) add("ראש השנה", "rest");
-      else if (d === 9) add("ערב יום כיפור", "erev");
-      else if (d === 10) add("יום כיפור", "rest");
-      else if (d === 14) add("ערב סוכות", "erev");
-      else if (d === 15) add("סוכות", "rest");
-      else if (d >= 16 && d <= 20) add("חול המועד סוכות", "observance");
+      if (d === 1 || d === 2) add("rosh_hashana", "ראש השנה", "rest");
+      else if (d === 9) add("yom_kippur_eve", "ערב יום כיפור", "erev");
+      else if (d === 10) add("yom_kippur", "יום כיפור", "rest");
+      else if (d === 14) add("sukkot_eve", "ערב סוכות", "erev");
+      else if (d === 15) add("sukkot", "סוכות", "rest");
+      else if (d >= 16 && d <= 20) add("chol_hamoed_sukkot", "חול המועד סוכות", "observance");
       // the eve of Shemini Atzeret
-      else if (d === 21) add("הושענא רבה", "erev");
+      else if (d === 21) add("hoshana_raba", "הושענא רבה", "erev");
       // in Israel one day: Shemini Atzeret and Simchat Torah together
-      else if (d === 22) add("שמחת תורה", "rest");
+      else if (d === 22) add("simchat_torah", "שמחת תורה", "rest");
       break;
     case KISLEV:
-      if (d >= 25) add("חנוכה", "observance");
+      if (d >= 25) add("chanukah", "חנוכה", "observance");
       break;
     case TEVET: {
       // eight days from 25 Kislev: to 2 Tevet after a 30-day Kislev, to 3 Tevet after a 29-day one
       const kislevLength = hebrewDate(addDays(day, -d))?.day ?? 30;
-      if (kislevLength - 24 + d <= 8) add("חנוכה", "observance");
+      if (kislevLength - 24 + d <= 8) add("chanukah", "חנוכה", "observance");
       break;
     }
     case SHEVAT:
-      if (d === 15) add("ט״ו בשבט", "observance");
+      if (d === 15) add("tu_bishvat", "ט״ו בשבט", "observance");
       break;
     case ADAR:
-      if (d === 14) add("פורים", "observance");
-      else if (d === 15) add("שושן פורים (בירושלים)", "observance");
+      if (d === 14) add("purim", "פורים", "observance");
+      else if (d === 15) add("shushan_purim", "שושן פורים (בירושלים)", "observance");
       break;
     case NISAN:
-      if (d === 14) add("ערב פסח", "erev");
-      else if (d === 15) add("פסח", "rest");
-      else if (d >= 16 && d <= 19) add("חול המועד פסח", "observance");
-      else if (d === 20) add("ערב שביעי של פסח", "erev");
-      else if (d === 21) add("שביעי של פסח", "rest");
+      if (d === 14) add("pesach_eve", "ערב פסח", "erev");
+      else if (d === 15) add("pesach", "פסח", "rest");
+      else if (d >= 16 && d <= 19) add("chol_hamoed_pesach", "חול המועד פסח", "observance");
+      else if (d === 20) add("pesach_7_eve", "ערב שביעי של פסח", "erev");
+      else if (d === 21) add("pesach_7", "שביעי של פסח", "rest");
+      // the day after Pesach; when that is Shabbat (Pesach ended on Friday) it moves to Sunday
+      else if ((d === 22 && w !== 6) || (d === 23 && w === 0)) add("mimouna", "מימונה", "observance");
       // 27 Nisan; moved to Thursday when it falls on Friday, to Monday when on Sunday
       if ((d === 27 && w !== 5 && w !== 0) || (d === 26 && w === 4) || (d === 28 && w === 1)) {
-        add("יום השואה", "observance", true);
+        add("yom_hashoah", "יום השואה", "observance", true);
       }
       break;
     case IYAR:
       // Yom HaAtzmaut is 5 Iyar, moved back to Thursday when 5 Iyar is a Friday
       // or Shabbat, and to Tuesday when it is a Monday (so the memorial day
-      // before it does not touch Shabbat). Yom HaZikaron is the day before.
+      // before it does not touch Shabbat). Yom HaZikaron is the day before:
+      // marked as its eve, and a memorial day.
       if ((d === 5 && w === 3) || (d === 4 && w === 4) || (d === 3 && w === 4) || (d === 6 && w === 2)) {
-        add("יום העצמאות", "rest");
+        add("yom_haatzmaut", "יום העצמאות", "rest");
       }
       if ((d === 4 && w === 2) || (d === 3 && w === 3) || (d === 2 && w === 3) || (d === 5 && w === 1)) {
-        add("יום הזיכרון", "observance", true);
+        add("yom_hazikaron", "יום הזיכרון", "erev", true);
       }
-      if (d === 18) add("ל״ג בעומר", "observance");
-      if (d === 28) add("יום ירושלים", "observance");
+      if (d === 18) add("lag_baomer", "ל״ג בעומר", "observance");
+      if (d === 28) add("yom_yerushalayim", "יום ירושלים", "observance");
       break;
     case SIVAN:
-      if (d === 5) add("ערב שבועות", "erev");
-      else if (d === 6) add("שבועות", "rest");
+      if (d === 5) add("shavuot_eve", "ערב שבועות", "erev");
+      else if (d === 6) add("shavuot", "שבועות", "rest");
       break;
     case AV:
       // a fast is not held on Shabbat: then it is on Sunday, 10 Av
-      if (d === 9 && w !== 6) add("תשעה באב", "observance", true);
-      else if (d === 10 && w === 0) add("תשעה באב (נדחה)", "observance", true);
+      if (d === 9 && w !== 6) add("tisha_bav", "תשעה באב", "observance", true);
+      else if (d === 10 && w === 0) add("tisha_bav", "תשעה באב (נדחה)", "observance", true);
       break;
     case ELUL:
-      if (d === 29) add("ערב ראש השנה", "erev");
+      if (d === 29) add("rosh_hashana_eve", "ערב ראש השנה", "erev");
       break;
   }
   return found;
@@ -285,7 +339,7 @@ export function holidaysByDay(from: string, to: string): Map<string, Holiday[]> 
   return map;
 }
 
-export type HolidaySpan = { from: string; to: string; name: string; kind: HolidayKind; memorial?: boolean };
+export type HolidaySpan = { from: string; to: string; key: OccasionKey; name: string; kind: HolidayKind; memorial?: boolean };
 
 /** Runs of the same holiday on consecutive days (Rosh Hashana, chol hamoed, Chanukah) as one entry, for a list. */
 export function holidaySpans(holidays: Holiday[]): HolidaySpan[] {
@@ -295,7 +349,14 @@ export function holidaySpans(holidays: Holiday[]): HolidaySpan[] {
     if (last && last.name === holiday.name && addDays(last.to, 1) === holiday.date) {
       last.to = holiday.date;
     } else {
-      spans.push({ from: holiday.date, to: holiday.date, name: holiday.name, kind: holiday.kind, ...(holiday.memorial ? { memorial: true } : {}) });
+      spans.push({
+        from: holiday.date,
+        to: holiday.date,
+        key: holiday.key,
+        name: holiday.name,
+        kind: holiday.kind,
+        ...(holiday.memorial ? { memorial: true } : {}),
+      });
     }
   }
   return spans;
@@ -313,13 +374,41 @@ export function restDays(settings: Pick<CalendarSettings, "restWeekdays">): Week
   return days.length === 7 ? DEFAULT_CALENDAR_SETTINGS.restWeekdays : days;
 }
 
+/** The occasions chosen as rest days, cleaned: known keys only, no repeats, in the order of OCCASIONS. */
+export function restOccasions(values: readonly unknown[] | null | undefined): OccasionKey[] {
+  const chosen = new Set((values ?? []).filter(isOccasionKey));
+  return OCCASION_KEYS.filter((key) => chosen.has(key));
+}
+
+/** Is an occasion a day off for the business: by its kind (holidays, eves) or chosen one by one. */
+export function occasionClosed(occasion: Pick<Holiday, "key" | "kind">, settings: CalendarSettings): boolean {
+  return (
+    (occasion.kind === "rest" && settings.holidaysRest) ||
+    (occasion.kind === "erev" && settings.holidayEvesRest) ||
+    settings.restOccasions.includes(occasion.key)
+  );
+}
+
+/** A row of org_calendar_settings (or none) as settings; unknown values are dropped, a missing row is the defaults. */
+export function calendarSettingsFromRow(
+  row: { rest_weekdays: number[]; holidays_rest: boolean; holiday_eves_rest: boolean; rest_occasions?: string[] | null } | null,
+): CalendarSettings {
+  if (!row) return DEFAULT_CALENDAR_SETTINGS;
+  return {
+    restWeekdays: restDays({ restWeekdays: row.rest_weekdays as Weekday[] }),
+    holidaysRest: row.holidays_rest,
+    holidayEvesRest: row.holiday_eves_rest,
+    restOccasions: restOccasions(row.rest_occasions),
+  };
+}
+
 export type RestReason = { kind: "weekly" } | { kind: "holiday"; holiday: Holiday };
 
 /** Why the business does not work on a day, or null when it does. */
 export function restReason(day: string, settings: CalendarSettings = DEFAULT_CALENDAR_SETTINGS): RestReason | null {
   if (!isCalendarDate(day)) return null;
   for (const holiday of holidaysOn(day)) {
-    if ((holiday.kind === "rest" && settings.holidaysRest) || (holiday.kind === "erev" && settings.holidayEvesRest)) {
+    if (occasionClosed(holiday, settings)) {
       return { kind: "holiday", holiday };
     }
   }

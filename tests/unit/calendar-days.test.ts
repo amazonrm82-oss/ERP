@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calendarSettingsFromRow,
   DEFAULT_CALENDAR_SETTINGS,
   hebrewDate,
   hebrewDayLabel,
@@ -11,7 +12,11 @@ import {
   holidaySpans,
   isRestDay,
   MAX_RANGE_DAYS,
+  OCCASION_KEYS,
+  OCCASIONS,
+  occasionClosed,
   restDays,
+  restOccasions,
   restReason,
   type CalendarSettings,
 } from "@/features/calendar-days/holidays";
@@ -113,6 +118,8 @@ describe("Israeli holidays 2026-2028 (CAL-03)", () => {
     expect(on("2026-09-21")).toEqual(["יום כיפור:rest"]);
     expect(on("2026-10-03")).toEqual(["שמחת תורה:rest"]);
     expect(on("2026-04-22")).toEqual(["יום העצמאות:rest"]);
+    // Yom HaZikaron is the eve of Yom HaAtzmaut (owner's answer, 12 October 2026)
+    expect(on("2026-04-21")).toEqual(["יום הזיכרון:erev"]);
     expect(on("2026-03-03")).toEqual(["פורים:observance"]);
     expect(on("2026-12-05")).toEqual(["חנוכה:observance"]);
     expect(on("2026-10-14")).toEqual([]);
@@ -121,6 +128,16 @@ describe("Israeli holidays 2026-2028 (CAL-03)", () => {
   it("marks the days of remembrance", () => {
     const memorial = holidaysInRange("2026-01-01", "2026-12-31").filter((h) => h.memorial).map((h) => h.name);
     expect(memorial).toEqual(["יום השואה", "יום הזיכרון", "תשעה באב"]);
+    // an eve that keeps its memorial mark
+    expect(holidaysOn("2026-04-21")).toEqual([{ date: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev", memorial: true }]);
+  });
+
+  it("Mimouna is the day after Pesach, moved to Sunday when that is Shabbat", () => {
+    expect(daysOf("מימונה", 2026)).toEqual(["2026-04-09"]);
+    expect(daysOf("מימונה", 2025)).toEqual(["2025-04-20"]);
+    // 2018: Pesach ended on Friday 6 April, so not on Shabbat 7 April but on Sunday 8 April
+    expect(daysOf("מימונה", 2018)).toEqual(["2018-04-08"]);
+    expect(on("2026-04-09")).toEqual(["מימונה:observance"]);
   });
 
   it("Sukkot in Israel: one holy day, five days of chol hamoed, one day of Shemini Atzeret", () => {
@@ -139,8 +156,30 @@ describe("Israeli holidays 2026-2028 (CAL-03)", () => {
   });
 
   it("Pesach in Israel: seven days, the first and the seventh are rest days", () => {
-    const pesach = holidaysInRange("2027-04-21", "2027-04-29").map((h) => h.kind);
+    const pesach = holidaysInRange("2027-04-21", "2027-04-28").map((h) => h.kind);
     expect(pesach).toEqual(["erev", "rest", "observance", "observance", "observance", "observance", "erev", "rest"]);
+  });
+});
+
+describe("the list of occasions", () => {
+  it("has one entry per key, and every day's holiday is in it with the same kind and name", () => {
+    expect(new Set(OCCASION_KEYS).size).toBe(OCCASIONS.length);
+    const byKey = new Map(OCCASIONS.map((o) => [o.key as string, o]));
+    for (const holiday of holidaysInRange("2025-09-01", "2027-09-30")) {
+      const occasion = byKey.get(holiday.key);
+      expect(occasion, holiday.key).toBeDefined();
+      expect(holiday.kind, holiday.key).toBe(occasion?.kind);
+      // the moved Tisha B'Av keeps its key with "(נדחה)" in its name
+      expect(holiday.name.startsWith(occasion?.name ?? "?"), holiday.key).toBe(true);
+    }
+  });
+
+  it("every occasion comes every year", () => {
+    for (const year of [2026, 2027, 2028, 2030, 2041]) {
+      // Rosh Hashana of one year to the eve of the next
+      const keys = new Set(holidaysInRange(`${year}-09-01`, `${year + 1}-09-01`).map((h) => h.key));
+      expect([...OCCASION_KEYS].filter((key) => !keys.has(key)), String(year)).toEqual([]);
+    }
   });
 });
 
@@ -291,7 +330,7 @@ describe("ranges", () => {
 });
 
 describe("the organization's rest days", () => {
-  const saturdayOnly: CalendarSettings = { restWeekdays: [6], holidaysRest: true, holidayEvesRest: false };
+  const saturdayOnly: CalendarSettings = { restWeekdays: [6], holidaysRest: true, holidayEvesRest: false, restOccasions: [] };
 
   it("defaults to Friday and Saturday, holidays off, erev days at work", () => {
     expect(restDays(DEFAULT_CALENDAR_SETTINGS)).toEqual([5, 6]);
@@ -322,9 +361,56 @@ describe("the organization's rest days", () => {
     expect(restReason("2026-09-12", open)).toEqual({ kind: "weekly" });
   });
 
-  it("erev days can be days off", () => {
+  it("erev days can be days off, Yom HaZikaron with them", () => {
     expect(isRestDay("2026-09-20", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true })).toBe(true);
     expect(isRestDay("2026-09-20", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true, holidaysRest: false })).toBe(true);
+    expect(isRestDay("2026-04-21", { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true })).toBe(true);
+  });
+
+  it("any occasion can be chosen as a rest day; none is by default", () => {
+    // Purim 2026 (Tuesday), chol hamoed Sukkot (Monday), Mimouna (Thursday): work days by default
+    for (const day of ["2026-03-03", "2026-09-28", "2026-04-09", "2026-04-05"]) {
+      expect(isRestDay(day), day).toBe(false);
+    }
+    const chosen = { ...DEFAULT_CALENDAR_SETTINGS, restOccasions: restOccasions(["purim", "chol_hamoed_sukkot", "mimouna"]) };
+    expect(restReason("2026-03-03", chosen)).toEqual({ kind: "holiday", holiday: holidaysOn("2026-03-03")[0] });
+    expect(isRestDay("2026-09-28", chosen)).toBe(true);
+    expect(isRestDay("2026-04-09", chosen)).toBe(true);
+    // chol hamoed Pesach was not chosen
+    expect(isRestDay("2026-04-05", chosen)).toBe(false);
+    // one eve without the others
+    const oneEve = { ...DEFAULT_CALENDAR_SETTINGS, restOccasions: restOccasions(["pesach_eve"]) };
+    expect(isRestDay("2026-04-01", oneEve)).toBe(true);
+    expect(isRestDay("2026-09-20", oneEve)).toBe(false);
+    // a holiday by law chosen alone, with the holidays switch off
+    const kippurOnly = { ...DEFAULT_CALENDAR_SETTINGS, holidaysRest: false, restOccasions: restOccasions(["yom_kippur"]) };
+    expect(isRestDay("2026-09-21", kippurOnly)).toBe(true);
+    expect(isRestDay("2026-04-22", kippurOnly)).toBe(false);
+    expect(occasionClosed({ key: "purim", kind: "observance" }, chosen)).toBe(true);
+    expect(occasionClosed({ key: "purim", kind: "observance" }, DEFAULT_CALENDAR_SETTINGS)).toBe(false);
+  });
+
+  it("a business may have no rest day at all", () => {
+    const never: CalendarSettings = { restWeekdays: [], holidaysRest: false, holidayEvesRest: false, restOccasions: [] };
+    let day = "2026-01-01";
+    for (let i = 0; i < 400; i++, day = addDays(day, 1)) {
+      expect(restReason(day, never), day).toBeNull();
+    }
+  });
+
+  it("reads the saved row: unknown and repeated occasions dropped, list order kept, no row is the defaults", () => {
+    expect(calendarSettingsFromRow(null)).toEqual(DEFAULT_CALENDAR_SETTINGS);
+    expect(DEFAULT_CALENDAR_SETTINGS.restOccasions).toEqual([]);
+    expect(
+      calendarSettingsFromRow({
+        rest_weekdays: [6, 6, 9],
+        holidays_rest: false,
+        holiday_eves_rest: true,
+        rest_occasions: ["mimouna", "no_such_day", "purim", "mimouna"],
+      }),
+    ).toEqual({ restWeekdays: [6], holidaysRest: false, holidayEvesRest: true, restOccasions: ["purim", "mimouna"] });
+    expect(calendarSettingsFromRow({ rest_weekdays: [], holidays_rest: false, holiday_eves_rest: false, rest_occasions: null }).restOccasions).toEqual([]);
+    expect(restOccasions([1, null, "chanukah"])).toEqual(["chanukah"]);
   });
 
   it("cleans the weekly days: no repeats, in order, never all seven", () => {
@@ -357,8 +443,8 @@ describe("holiday spans for a list", () => {
 
   it("keeps the memorial mark", () => {
     expect(holidaySpans(holidaysInRange("2026-04-21", "2026-04-22"))).toEqual([
-      { from: "2026-04-21", to: "2026-04-21", name: "יום הזיכרון", kind: "observance", memorial: true },
-      { from: "2026-04-22", to: "2026-04-22", name: "יום העצמאות", kind: "rest" },
+      { from: "2026-04-21", to: "2026-04-21", key: "yom_hazikaron", name: "יום הזיכרון", kind: "erev", memorial: true },
+      { from: "2026-04-22", to: "2026-04-22", key: "yom_haatzmaut", name: "יום העצמאות", kind: "rest" },
     ]);
   });
 });
@@ -372,12 +458,23 @@ describe("the settings form", () => {
 
   it("reads checked weekdays and the two switches", () => {
     const parsed = form([["rest_weekdays", "6"], ["rest_weekdays", "5"], ["holidays_rest", "on"]]);
-    expect(parsed.success && parsed.data).toEqual({ rest_weekdays: [5, 6], holidays_rest: true, holiday_eves_rest: false });
+    expect(parsed.success && parsed.data).toEqual({ rest_weekdays: [5, 6], holidays_rest: true, holiday_eves_rest: false, rest_occasions: [] });
+  });
+
+  it("reads the occasions chosen one by one, in list order, without repeats", () => {
+    const parsed = form([["rest_occasions", "mimouna"], ["rest_occasions", "purim"], ["rest_occasions", "mimouna"], ["rest_occasions", "chol_hamoed_pesach"]]);
+    expect(parsed.success && parsed.data.rest_occasions).toEqual(["purim", "chol_hamoed_pesach", "mimouna"]);
+  });
+
+  it("refuses an occasion it does not know", () => {
+    const parsed = form([["rest_occasions", "christmas"]]);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toMatch(/מועד/);
   });
 
   it("allows a business that works every day", () => {
     const parsed = form([]);
-    expect(parsed.success && parsed.data).toEqual({ rest_weekdays: [], holidays_rest: false, holiday_eves_rest: false });
+    expect(parsed.success && parsed.data).toEqual({ rest_weekdays: [], holidays_rest: false, holiday_eves_rest: false, rest_occasions: [] });
   });
 
   it("refuses all seven days and days out of range", () => {

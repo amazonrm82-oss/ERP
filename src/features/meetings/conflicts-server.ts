@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { DEFAULT_CALENDAR_SETTINGS, restDays, type CalendarSettings } from "@/features/calendar-days/holidays";
+import { calendarSettingsFromRow } from "@/features/calendar-days/holidays";
 import { isTimeZone, readWorkingHours } from "@/features/profile/working-hours";
 import type { Database } from "@/lib/database.types";
 
@@ -35,7 +35,7 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
   const [busyRead, profilesRead, settingsRead] = await Promise.all([
     supabase.rpc("meeting_busy", { p_org: orgId, p_users: ids, p_from: span.startsAt, p_to: span.endsAt, p_exclude: excludeId ?? null }),
     supabase.from("profiles").select("id, full_name, email, working_hours, timezone").in("id", ids),
-    supabase.from("org_calendar_settings").select("rest_weekdays, holidays_rest, holiday_eves_rest").eq("organization_id", orgId).maybeSingle(),
+    supabase.from("org_calendar_settings").select("rest_weekdays, holidays_rest, holiday_eves_rest, rest_occasions").eq("organization_id", orgId).maybeSingle(),
   ]);
   // advisory: a check that cannot be made must not block the save, but it must show in the logs
   const readError = busyRead.error ?? profilesRead.error ?? settingsRead.error;
@@ -56,14 +56,7 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
     };
   });
 
-  const row = settingsRead.data;
-  const settings: CalendarSettings = row
-    ? {
-        restWeekdays: restDays({ restWeekdays: row.rest_weekdays as CalendarSettings["restWeekdays"] }),
-        holidaysRest: row.holidays_rest,
-        holidayEvesRest: row.holiday_eves_rest,
-      }
-    : DEFAULT_CALENDAR_SETTINGS;
+  const settings = calendarSettingsFromRow(settingsRead.data);
 
   return conflictReport({
     span,

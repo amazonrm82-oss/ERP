@@ -50,11 +50,13 @@ export type OrgCalendarSettingsRow = {
   rest_weekdays: number[];
   holidays_rest: boolean;
   holiday_eves_rest: boolean;
+  // CAL-03 (migration 0094): occasions chosen as rest days one by one (keys of OCCASIONS)
+  rest_occasions: string[];
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
-type OrgCalendarSettingsWrite = { rest_weekdays?: number[]; holidays_rest?: boolean; holiday_eves_rest?: boolean };
+type OrgCalendarSettingsWrite = { rest_weekdays?: number[]; holidays_rest?: boolean; holiday_eves_rest?: boolean; rest_occasions?: string[] };
 
 // CAL-01 (meetings migration): a meeting and its team participants
 export type MeetingType = "in_person" | "phone" | "video" | "other";
