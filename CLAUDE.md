@@ -209,6 +209,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   use the same pieces (`ListTable`, columns, filters, views, inline edit, bulk, export) with object types
   `deal` and `task`. Sort fields `sort_stage|sort_contact|sort_company|sort_owner(deals)`, `sort_owner(tasks)`.
   Tasks have no tags, custom fields or recycle bin. A filter field with `plain` compares enum values, not ids.
+- Recurring tasks (TASK-04, migration 0063): completing a task with `recurrence` makes `app.spawn_recurring_task()`
+  (security definer, trigger) create the next one, once (`recurrence_source_id`, unique; clients may not write it).
+  Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
+  `grant insert, update (col) on public.tasks to authenticated`, or every client write that sends it fails with 42501.
+  `src/features/tasks/recurrence.ts` mirrors the date rules; keep the two in step.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
