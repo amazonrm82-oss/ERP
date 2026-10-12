@@ -15,7 +15,7 @@ import { israeliIdNumber } from "@/lib/israeli-id";
 import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
 import { RECORD_TYPES } from "@/lib/record-types";
 
-import { COUNTRY_UNKNOWN, importCountry } from "./country";
+import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fields";
 
 type Client = SupabaseClient<Database>;
@@ -118,8 +118,12 @@ type Prepared = {
   // for duplicate detection
   phoneE164: string | null;
   email: string | null;
-  // companies: the values the number may be stored as, for duplicate detection
+  // companies: the values the number may be stored as, and its foreign match keys
+  // ("GB:AB1234", or "*:AB1234" without a country), for duplicate detection
   taxIds: string[];
+  taxKeys: string[];
+  // companies: the country the file gave, or null (a number then matches in any country)
+  country: string | null;
   name: string | null;
   companyName: string | null;
   // companies with a number but no country in the file: checked once the country is
@@ -145,6 +149,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
   let name: string | null = null;
   let companyName: string | null = null;
   let taxIds: string[] = [];
+  let taxKeys: string[] = [];
   let pendingTaxId: string | null = null;
 
   if (ctx.entity === "lead") {
@@ -218,9 +223,12 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
       values.country = country;
       values.tax_id = taxId;
       if (taxId) taxIds = [taxId];
+      if (taxId && country !== ISRAEL) taxKeys = [`${country}:${foreignNumberKey(taxId)}`];
     } else if (raw.tax_id) {
       pendingTaxId = raw.tax_id;
-      taxIds = present([israeliIdNumber(raw.tax_id), foreignCompanyNumber(raw.tax_id)]);
+      const foreign = foreignCompanyNumber(raw.tax_id);
+      taxIds = present([israeliIdNumber(raw.tax_id), foreign]);
+      if (foreign) taxKeys = [`*:${foreignNumberKey(foreign)}`];
     }
     name = parsed.data.name;
   }
@@ -248,6 +256,8 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     phoneE164: normalizePhone(values.phone as string | null),
     email: (values.email as string | null) ?? null,
     taxIds,
+    taxKeys,
+    country: ctx.entity === "company" && typeof values.country === "string" ? values.country : null,
     name,
     companyName,
     pendingTaxId,
@@ -263,14 +273,14 @@ class LookupFailed extends Error {}
 const present = (values: Array<string | null>) => [...new Set(values.filter((v): v is string => Boolean(v)))];
 
 /** Records already in the organization (that the user can see) matching any row of the chunk; one query in the database. */
-async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: Array<Pick<Prepared, "phoneE164" | "email" | "taxIds" | "name">>): Promise<Existing[]> {
+async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: Array<Pick<Prepared, "phoneE164" | "email" | "taxIds" | "taxKeys" | "name">>): Promise<Existing[]> {
   if (rows.length === 0) return [];
   const { data, error } = await ctx.supabase.rpc("import_find_duplicates", {
     p_org: ctx.orgId,
     p_entity: entity,
     p_phones: present(rows.map((r) => r.phoneE164)),
     p_emails: present(rows.map((r) => r.email)),
-    p_tax_ids: entity === "company" ? present(rows.flatMap((r) => r.taxIds)) : [],
+    p_tax_ids: entity === "company" ? present(rows.flatMap((r) => [...r.taxIds, ...r.taxKeys])) : [],
     p_names: entity === "company" ? present(rows.map((r) => r.name)) : [],
   });
   if (error) throw new LookupFailed(error.message);
@@ -279,12 +289,37 @@ async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: A
 
 const same = (a: string | null | undefined, b: string | null | undefined) => Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 
-function matchExisting(entity: ImportEntityKey, existing: Existing[], row: Prepared): Existing | undefined {
+/**
+ * How a row's number matches a company: "equal" (the stored value), "key" (outside Israel,
+ * without case, spaces, '-', '.' and '/'), or null. A row with a country matches only
+ * companies of that country: an import never moves a company to another country because
+ * of a number (lead's decision); that stays a manual edit.
+ */
+function taxMatch(row: Prepared, e: Existing, country: string | undefined): "equal" | "key" | null {
+  if (e.tax_id === null || !country) return null;
+  if (row.country && row.country !== country) return null;
+  if (row.taxIds.includes(e.tax_id)) return "equal";
+  if (country === ISRAEL) return null;
+  const k = foreignNumberKey(e.tax_id);
+  return row.taxKeys.includes(`${country}:${k}`) || row.taxKeys.includes(`*:${k}`) ? "key" : null;
+}
+
+export const TAX_ID_AMBIGUOUS_COUNTRIES = "המספר מתאים לכמה חברות במדינות שונות. הוסיפו עמודת מדינה לקובץ.";
+export const TAX_ID_AMBIGUOUS = "המספר מתאים לכמה חברות קיימות. עדכנו אותן ידנית.";
+
+/** The message when a row's number matches more than one company: the import never picks one. */
+function ambiguousTaxId(existing: Existing[], row: Prepared, countries: Map<string, string>): string | null {
+  const hits = existing.filter((e) => taxMatch(row, e, countries.get(e.id)) !== null);
+  if (new Set(hits.map((e) => e.id)).size < 2) return null;
+  return new Set(hits.map((e) => countries.get(e.id))).size > 1 ? TAX_ID_AMBIGUOUS_COUNTRIES : TAX_ID_AMBIGUOUS;
+}
+
+function matchExisting(entity: ImportEntityKey, existing: Existing[], row: Prepared, countries: Map<string, string>): Existing | undefined {
   return existing.find(
     (e) =>
       (row.phoneE164 && e.phone_e164 === row.phoneE164) ||
       same(row.email, e.email) ||
-      (entity === "company" && ((e.tax_id !== null && row.taxIds.includes(e.tax_id)) || same(row.name, e.name))),
+      (entity === "company" && (taxMatch(row, e, countries.get(e.id)) !== null || same(row.name, e.name))),
   );
 }
 
@@ -296,7 +331,7 @@ async function resolveCompanies(ctx: ImportContext, rows: Prepared[], jobId: str
   const found = await findExisting(
     ctx,
     "company",
-    names.map((name) => ({ phoneE164: null, email: null, taxIds: [], name })),
+    names.map((name) => ({ phoneE164: null, email: null, taxIds: [], taxKeys: [], name })),
   );
   for (const c of found) if (c.name && names.some((n) => same(n, c.name))) ids.set(key(c.name), c.id);
   const missing = names.filter((n) => !ids.has(key(n)));
@@ -353,34 +388,47 @@ async function companyCountries(ctx: ImportContext, existing: Existing[]): Promi
   return countries;
 }
 
+export const FOREIGN_HINT = "לחברה מחוץ לישראל הוסיפו עמודת מדינה.";
+
 /** Checks a number that waited for its company's country; sets it on the row, or returns the message. */
 function settleTaxId(row: Prepared, country: string): string | null {
   if (row.pendingTaxId === null) return null;
   const taxId = companyTaxId(row.pendingTaxId, country);
-  if (!taxId.ok) return taxId.message;
+  if (!taxId.ok) {
+    // a file of foreign companies without a country column: say what to add
+    return country === ISRAEL && foreignCompanyNumber(row.pendingTaxId) ? `${taxId.message} ${FOREIGN_HINT}` : taxId.message;
+  }
   row.values.tax_id = taxId.value;
   return null;
 }
 
 async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[], outcomes: RowOutcome[], jobId: string | null): Promise<RowOutcome[]> {
   const existing = ctx.mode === "create" ? [] : await findExisting(ctx, ctx.entity, prepared);
-  const countries = ctx.mode === "update" ? await companyCountries(ctx, existing) : new Map<string, string>();
+  const countries = await companyCountries(ctx, existing);
   const toInsert: Prepared[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
     // a repeat of an earlier row in the same chunk counts as a duplicate too
     const earlier = ctx.mode === "create" ? undefined : seen.find((s) => (row.phoneE164 && s.phoneE164 === row.phoneE164) || same(row.email, s.email));
     seen.push(row);
-    const match = matchExisting(ctx.entity, existing, row);
+    const match = matchExisting(ctx.entity, existing, row, countries);
     if (earlier || (match && ctx.mode === "skip")) {
       outcomes.push({ row: row.row, status: "skipped", message: "כבר קיים" });
     } else if (match && ctx.mode === "update") {
+      const ambiguous = ctx.entity === "company" ? ambiguousTaxId(existing, row, countries) : null;
+      if (ambiguous) {
+        outcomes.push({ row: row.row, status: "failed", message: ambiguous });
+        continue;
+      }
       // an update keeps the company's country, so its number is checked against that one
-      const taxError = settleTaxId(row, countries.get(match.id) ?? ISRAEL);
+      const matchCountry = countries.get(match.id) ?? ISRAEL;
+      const taxError = settleTaxId(row, matchCountry);
       if (taxError) {
         outcomes.push({ row: row.row, status: "failed", message: taxError });
         continue;
       }
+      // the same number spelled differently: the company keeps its stored spelling
+      if (ctx.entity === "company" && taxMatch(row, match, matchCountry) === "key") delete row.values.tax_id;
       if (!jobId) {
         outcomes.push({ row: row.row, status: "updated" });
         continue;

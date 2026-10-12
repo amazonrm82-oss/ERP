@@ -73,3 +73,57 @@ describe("import duplicates are found in the database (FXC-02)", () => {
     expect(err.code).toBe("42501");
   });
 });
+
+describe("import duplicates by a foreign registration number (CON-04)", () => {
+  let owner: { id: string }, stranger: { id: string };
+  let org: string;
+  let gb: string, il: string, gbDigits: string;
+
+  const company = (name: string, country: string, taxId: string) =>
+    asAdmin(
+      async (q) =>
+        (await q<{ id: string }>("insert into public.companies (organization_id, name, country, tax_id) values ($1, $2, $3, $4) returning id", [org, name, country, taxId]))
+          .rows[0].id,
+    );
+  const byTax = async (userId: string, taxIds: string[]) => (await find(userId, org, "company", [], [], taxIds)).map((m) => m.id).sort();
+
+  beforeAll(async () => {
+    owner = await createUser("fdup-owner");
+    org = await createOrg(owner.id);
+    stranger = await createUser("fdup-stranger");
+    await createOrg(stranger.id);
+    gb = await company("Foreign Ltd", "GB", "AB 123/4");
+    il = await company("ישראלית", "IL", "512345679");
+    gbDigits = await company("Digits Ltd", "GB", "512-345-679");
+  });
+
+  it("a key matches a foreign number without case, spaces, '-', '.' and '/', in the same country", async () => {
+    expect(await byTax(owner.id, ["GB:AB1234"])).toEqual([gb]);
+    expect(await byTax(owner.id, ["FR:AB1234"])).toEqual([]);
+  });
+
+  it("a key without a country matches any country outside Israel", async () => {
+    expect(await byTax(owner.id, ["*:AB1234"])).toEqual([gb]);
+    expect(await byTax(owner.id, ["*:512345679"])).toEqual([gbDigits]);
+  });
+
+  it("a key never matches an Israeli company; equal stored values still do", async () => {
+    expect(await byTax(owner.id, ["IL:512345679"])).toEqual([]);
+    expect(await byTax(owner.id, ["512345679"])).toEqual([il]);
+    expect(await byTax(owner.id, ["AB 123/4"])).toEqual([gb]);
+    // a plain value is compared exactly, as before
+    expect(await byTax(owner.id, ["ab-1234"])).toEqual([]);
+  });
+
+  it("still reads with the caller's rights, as security invoker", async () => {
+    expect(await byTax(stranger.id, ["GB:AB1234", "*:AB1234"])).toEqual([]);
+    const fn = await asAdmin(
+      async (q) =>
+        (await q<{ prosecdef: boolean }>("select prosecdef from pg_catalog.pg_proc where oid = 'public.import_find_duplicates(uuid, text, text[], text[], text[], text[])'::regprocedure"))
+          .rows[0],
+    );
+    expect(fn.prosecdef).toBe(false);
+    const anon = await pgError(asAnon((q) => q("select * from public.import_find_duplicates($1, 'company', '{}', '{}', '{GB:AB1234}', '{}')", [org])));
+    expect(anon.code).toBe("42501");
+  });
+});

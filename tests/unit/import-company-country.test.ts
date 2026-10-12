@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { TAX_ID_INVALID, TAX_ID_INVALID_FOREIGN } from "@/features/companies/tax-id";
-import { COUNTRY_UNKNOWN, importCountry } from "@/features/imports/country";
-import { processChunk, type ImportContext } from "@/features/imports/server";
+import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "@/features/imports/country";
+import {
+  FOREIGN_HINT,
+  TAX_ID_AMBIGUOUS,
+  TAX_ID_AMBIGUOUS_COUNTRIES,
+  processChunk,
+  type ImportContext,
+} from "@/features/imports/server";
 
 type Existing = { id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null; country: string };
 
@@ -113,7 +119,7 @@ describe("company import with a country column", () => {
     );
     expect(outcomes).toEqual([
       { row: 1, status: "created" },
-      { row: 2, status: "failed", message: TAX_ID_INVALID },
+      { row: 2, status: "failed", message: `${TAX_ID_INVALID} ${FOREIGN_HINT}` },
     ]);
     expect(fake.inserts).toHaveLength(1);
     expect(fake.inserts[0]).toMatchObject({ tax_id: "512345679" });
@@ -144,7 +150,7 @@ describe("company import in update mode", () => {
   it("an Israeli company's number stays Israeli when the row has no country", async () => {
     const fake = fakeSupabase([IL_COMPANY]);
     const outcomes = await processChunk(context(fake.supabase, "update", ["name", "tax_id"]), lookups, [["חברה ישראלית", "AB123"]], 1, null);
-    expect(outcomes).toEqual([{ row: 1, status: "failed", message: TAX_ID_INVALID }]);
+    expect(outcomes).toEqual([{ row: 1, status: "failed", message: `${TAX_ID_INVALID} ${FOREIGN_HINT}` }]);
     expect(fake.updates).toEqual([]);
   });
 
@@ -159,5 +165,111 @@ describe("company import in update mode", () => {
     const fake = fakeSupabase([GB_COMPANY]);
     await processChunk(context(fake.supabase, "update", ["tax_id", "name"]), lookups, [["51-234567-9", "x"]], 1, null);
     expect(fake.rpcArgs[0].p_tax_ids).toEqual(expect.arrayContaining(["512345679", "51-234567-9"]));
+  });
+});
+
+describe("duplicates by a foreign registration number", () => {
+  const STORED: Existing = { id: "c9", phone_e164: null, email: null, tax_id: "AB 123/4", name: "Stored Ltd", country: "GB" };
+  const DIGITS: Existing = { id: "c8", phone_e164: null, email: null, tax_id: "512-345-679", name: "Digits Ltd", country: "GB" };
+  const run = async (existing: Existing[], cells: string[]) => {
+    const fake = fakeSupabase(existing);
+    const outcomes = await processChunk(context(fake.supabase, "skip", ["name", "country", "tax_id"]), lookups, [cells], 1, null);
+    return { outcomes, taxIds: fake.rpcArgs[0]?.p_tax_ids };
+  };
+
+  it("keys a number without case and without spaces, '-', '.' and '/'", () => {
+    expect(foreignNumberKey("ab 12-3./4")).toBe("AB1234");
+  });
+
+  it("finds the same number in the same country", async () => {
+    const { outcomes, taxIds } = await run([STORED], ["New name", "GB", "ab-1234"]);
+    expect(taxIds).toEqual(["ab-1234", "GB:AB1234"]);
+    expect(outcomes).toEqual([{ row: 1, status: "skipped", message: "כבר קיים" }]);
+  });
+
+  it("does not find it in another country", async () => {
+    const { outcomes } = await run([STORED], ["New name", "FR", "ab-1234"]);
+    expect(outcomes).toEqual([{ row: 1, status: "ok" }]);
+  });
+
+  it("a row without a country finds it in any country outside Israel", async () => {
+    const { outcomes, taxIds } = await run([STORED], ["New name", "", "ab.1234"]);
+    expect(taxIds).toEqual(["ab.1234", "*:AB1234"]);
+    expect(outcomes).toEqual([{ row: 1, status: "skipped", message: "כבר קיים" }]);
+  });
+
+  it("an Israeli row never meets a foreign company, even with an equal stored number", async () => {
+    expect((await run([DIGITS], ["New name", "IL", "512345679"])).outcomes).toEqual([{ row: 1, status: "ok" }]);
+    const equal = { ...DIGITS, tax_id: "512345679" };
+    expect((await run([equal], ["New name", "IL", "512345679"])).outcomes).toEqual([{ row: 1, status: "ok" }]);
+    // without a country in the file an equal stored number still matches, in any country
+    expect((await run([equal], ["New name", "", "512345679"])).outcomes).toEqual([{ row: 1, status: "skipped", message: "כבר קיים" }]);
+  });
+});
+
+describe("a number matches a company only within its country", () => {
+  const ALFA: Existing = { id: "il1", phone_e164: null, email: null, tax_id: "514713288", name: "אלפא", country: "IL" };
+  const GB_NUM: Existing = { id: "gb1", phone_e164: null, email: null, tax_id: "AB12", name: "Brit", country: "GB" };
+  const ACME: Existing = { id: "gb2", phone_e164: null, email: null, tax_id: "12-345", name: "Acme", country: "GB" };
+  const BETA: Existing = { id: "de1", phone_e164: null, email: null, tax_id: "12345", name: "Beta", country: "DE" };
+  const MAP = ["name", "country", "tax_id"];
+
+  it("update: a GB row does not take over an Israeli company with the same number", async () => {
+    const fake = fakeSupabase([ALFA]);
+    const outcomes = await processChunk(context(fake.supabase, "update", MAP), lookups, [["Alpha UK", "GB", "514713288"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "created" }]);
+    expect(fake.updates).toEqual([]);
+    expect(fake.inserts[0]).toMatchObject({ name: "Alpha UK", country: "GB", tax_id: "514713288" });
+  });
+
+  it("update and skip: a DE row does not match a GB company with the same number", async () => {
+    const update = fakeSupabase([GB_NUM]);
+    expect(await processChunk(context(update.supabase, "update", MAP), lookups, [["Deutsch", "DE", "AB12"]], 1, null)).toEqual([{ row: 1, status: "ok" }]);
+    const skip = fakeSupabase([GB_NUM]);
+    expect(await processChunk(context(skip.supabase, "skip", MAP), lookups, [["Deutsch", "DE", "AB12"]], 1, null)).toEqual([{ row: 1, status: "ok" }]);
+  });
+
+  it("update: a row without a country that matches companies in several countries fails, none is picked", async () => {
+    const fake = fakeSupabase([ACME, BETA]);
+    const outcomes = await processChunk(context(fake.supabase, "update", MAP), lookups, [["Beta GmbH", "", "12345"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "failed", message: TAX_ID_AMBIGUOUS_COUNTRIES }]);
+    expect(fake.updates).toEqual([]);
+    expect(fake.inserts).toEqual([]);
+  });
+
+  it("update: two companies of one country with the same number fail the row too", async () => {
+    const fake = fakeSupabase([ACME, { ...BETA, country: "GB" }]);
+    const outcomes = await processChunk(context(fake.supabase, "update", MAP), lookups, [["Beta GmbH", "GB", "12345"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "failed", message: TAX_ID_AMBIGUOUS }]);
+    expect(fake.updates).toEqual([]);
+  });
+
+  it("update: with a country the same file row finds the one company of that country", async () => {
+    const fake = fakeSupabase([ACME, BETA]);
+    const outcomes = await processChunk(context(fake.supabase, "update", MAP), lookups, [["Beta GmbH", "DE", "12345"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "updated" }]);
+    expect(fake.updates).toHaveLength(1);
+  });
+
+  it("skip: an ambiguous row exists either way and is skipped, nothing is written", async () => {
+    const fake = fakeSupabase([ACME, BETA]);
+    const outcomes = await processChunk(context(fake.supabase, "skip", MAP), lookups, [["Beta GmbH", "", "12345"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "skipped", message: "כבר קיים" }]);
+    expect(fake.updates).toEqual([]);
+    expect(fake.inserts).toEqual([]);
+  });
+
+  it("update matched by key keeps the stored spelling of the number", async () => {
+    const stored: Existing = { id: "c9", phone_e164: null, email: null, tax_id: "AB 123/4", name: "Stored Ltd", country: "GB" };
+    const fake = fakeSupabase([stored]);
+    const outcomes = await processChunk(context(fake.supabase, "update", ["name", "tax_id", "city"]), lookups, [["Stored Ltd", "ab-1234", "London"]], 1, "job");
+    expect(outcomes).toEqual([{ row: 1, status: "updated" }]);
+    expect(fake.updates[0]).toEqual({ name: "Stored Ltd", city: "London" });
+  });
+
+  it("a number that is neither Israeli nor foreign gets no hint", async () => {
+    const fake = fakeSupabase([]);
+    const outcomes = await processChunk(context(fake.supabase, "create", MAP), lookups, [["א", "", "מספר"]], 1, null);
+    expect(outcomes).toEqual([{ row: 1, status: "failed", message: TAX_ID_INVALID }]);
   });
 });

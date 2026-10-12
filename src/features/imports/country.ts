@@ -49,3 +49,13 @@ export function importCountry(text: string): string | null {
   }
   return names().get(hebrew(value)) ?? names().get(fold(value)) ?? null;
 }
+
+/**
+ * The duplicate-match key of a foreign registration number: without case and without
+ * spaces, '-', '.' and '/'. Sent to import_find_duplicates() as "<country>:<key>", or
+ * "*:<key>" for a row without a country (any country outside Israel). Mirrors the
+ * expression in migration 0083.
+ */
+export function foreignNumberKey(number: string): string {
+  return number.replace(/[ ./-]/g, "").toUpperCase();
+}
