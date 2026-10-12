@@ -10,6 +10,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { CalendarBoard, type CalendarEntry } from "@/features/calendar/components/calendar-board";
 import { CALENDAR_LIMIT, listCalendarItems, type CalendarItem } from "@/features/calendar/queries";
 import { calendarPath, CALENDAR_VIEWS, parseDay, parseView, rangeBounds, stepDay, viewDays, viewTitle, VIEW_LABEL } from "@/features/calendar/range";
+import { holidaysByDay } from "@/features/calendar-days/holidays";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
@@ -72,6 +73,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   const days = viewDays(view, day);
   const { items, truncated } = await listCalendarItems(orgId, rangeBounds(days, timeZone), userId);
   const entries = items.map((item) => entry(orgId, item));
+  const holidays = Object.fromEntries(holidaysByDay(days[0], days[days.length - 1]));
 
   const href = (target: { view?: typeof view; date?: string }) =>
     calendarPath(orgId, { view: target.view ?? (requestedView ?? undefined), date: target.date ?? (day === today ? undefined : day), who });
@@ -140,6 +142,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         canMove={context.canWrite}
         who={who}
         autoView={requestedView === null}
+        holidays={holidays}
       />
     </>
   );

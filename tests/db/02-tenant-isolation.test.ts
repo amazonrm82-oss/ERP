@@ -93,6 +93,7 @@ describe("tenant isolation", () => {
       await q("insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'leads.csv', 'skip')", [orgA]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]);
       await q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '[{\"key\": \"phone\"}]')", [orgA]);
+      await q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')", [orgA]);
       ids.meetingA = (
         await q<{ id: string }>(
           "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'פגישת היכרות', now() + interval '1 day', now() + interval '1 day 1 hour', $2) returning id",
@@ -145,6 +146,7 @@ describe("tenant isolation", () => {
     "meetings",
     "meeting_participants",
     "disqualify_reasons",
+    "org_calendar_settings",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -254,6 +256,7 @@ describe("tenant isolation", () => {
       // no update grant at all: a permission error is the expected outcome
       meeting_participants: "user_id = user_id",
       disqualify_reasons: "name = name",
+      org_calendar_settings: "holidays_rest = holidays_rest",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -323,6 +326,7 @@ describe("tenant isolation", () => {
       ["insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour')", [orgA]],
       ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
       ["insert into public.disqualify_reasons (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -376,6 +380,7 @@ describe("tenant isolation", () => {
       ["meetings", "outcome = 'HACKED'", "outcome = 'HACKED'"],
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["disqualify_reasons", "is_active = false", "not is_active"],
+      ["org_calendar_settings", "holiday_eves_rest = true", "holiday_eves_rest"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

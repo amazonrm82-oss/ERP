@@ -19,6 +19,8 @@ import { ListCard, ListCards, Table, Td, Th, Tr } from "@/components/ui/table";
 import { TextLink } from "@/components/ui/text-link";
 import { ToastProvider, ToastView, useToast } from "@/components/ui/toast";
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
+import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
+import { holidaysOn } from "@/features/calendar-days/holidays";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -209,6 +211,19 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         <Card className="max-w-sm p-4">
           <Calendar selected={day} today="2026-10-09" onPick={setDay} onClear={() => setDay("")} />
         </Card>
+      </Section>
+
+      <Section title="חגים ביומן">
+        <div className="grid max-w-md grid-cols-4 gap-1">
+          {["2026-09-12", "2026-09-20", "2026-12-05", "2026-04-21"].map((cell) => (
+            <div key={cell} className="min-h-16 min-w-0 rounded-md border border-line bg-surface p-1">
+              <p className="text-caption text-ink-soft">{Number(cell.slice(8, 10))}</p>
+              <HolidayMarks holidays={holidaysOn(cell)} compact />
+            </div>
+          ))}
+        </div>
+        <HolidayMarks holidays={holidaysOn("2026-04-22")} className="max-w-xs" />
+        <HolidayLegend />
       </Section>
 
       <Section title="כרטיס, טבלה וכרטיסי רשימה">

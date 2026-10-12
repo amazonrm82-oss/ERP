@@ -5,6 +5,7 @@ import {
   BoltIcon,
   ChartIcon,
   BuildingIcon,
+  CalendarIcon,
   FormIcon,
   InboxIcon,
   LockIcon,
@@ -14,6 +15,7 @@ import {
   UploadIcon,
   UsersIcon,
 } from "@/components/ui/icons";
+import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { paths } from "@/lib/paths";
 
 export type SettingsSection = {
@@ -47,6 +49,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsBusiness(orgId), label: "פרטי העסק", description: "שם, ענף, טלפון, אבטחה וגישת תמיכה", icon: BuildingIcon },
         { href: paths.settingsUsers(orgId), label: "משתמשים", description: "הזמנת עובדים, תפקידים והרשאות", icon: UsersIcon },
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
+        { href: calendarSettingsPath(orgId), label: "ימי מנוחה וחגים", description: "הימים שהעסק לא עובד בהם, והחגים של השנה", icon: CalendarIcon },
         ...(access.admin
           ? [{ href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon }]
           : []),

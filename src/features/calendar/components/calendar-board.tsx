@@ -20,6 +20,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { CalendarIcon, CheckSquareIcon } from "@/components/ui/icons";
+import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
+import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
 import { cn } from "@/lib/cn";
 import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
@@ -67,6 +69,8 @@ type Props = {
   who: string | undefined;
   // no view in the URL: a phone switches to the agenda
   autoView: boolean;
+  // Israeli holidays of the shown days, by day (CAL-03)
+  holidays: Record<string, Holiday[]>;
 };
 
 type DragMode = "time" | "month";
@@ -117,7 +121,7 @@ function itemClasses(item: CalendarEntry): string {
  * also a button that opens its details with a "move" form, so moving works from
  * the keyboard, on a touch screen and with a screen reader.
  */
-export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, who, autoView }: Props) {
+export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, who, autoView, holidays }: Props) {
   const router = useRouter();
   const [shown, showMoved] = useOptimistic(items, (state, moved: { id: string; startsAt: string; endsAt: string | null }) =>
     state.map((item) => (item.id === moved.id ? { ...item, startsAt: moved.startsAt, endsAt: moved.endsAt } : item)),
@@ -274,22 +278,24 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
       </div>
 
       {view === "month" ? (
-        <MonthGrid days={days} focusDay={focusDay} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} />
+        <MonthGrid days={days} focusDay={focusDay} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
       ) : view === "agenda" ? (
-        <AgendaList days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} onOpen={open} />
+        <AgendaList days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} onOpen={open} holidays={holidays} />
       ) : view === "week" ? (
         <>
           <div className="hidden sm:block">
-            <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} />
+            <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
           </div>
           {/* seven columns do not fit a phone: the week is a list there */}
           <div className="sm:hidden">
-            <AgendaList days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} onOpen={open} />
+            <AgendaList days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} onOpen={open} holidays={holidays} />
           </div>
         </>
       ) : (
-        <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} />
+        <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
       )}
+
+      {days.some((day) => holidays[day]?.length) ? <HolidayLegend className="mt-3" /> : null}
 
       {canMove ? (
         <p className="mt-3 text-sm text-ink-soft">אפשר לגרור פגישה או משימה למועד אחר, או ללחוץ עליה ולבחור &quot;העברה&quot;.</p>
@@ -327,6 +333,7 @@ type GridProps = {
   dayHref: (day: string) => string;
   drag: Drag | null;
   itemButton: ItemButton;
+  holidays: Record<string, Holiday[]>;
 };
 
 function DayHeading({ day, today, href, short }: { day: string; today: string; href: string; short?: boolean }) {
@@ -345,7 +352,7 @@ function DayHeading({ day, today, href, short }: { day: string; today: string; h
 }
 
 /** Day or week: one column per day, 24 rows of an hour, items placed by wall-clock time. */
-function TimeGrid({ days, today, items, timeZone, dayHref, drag, itemButton }: GridProps) {
+function TimeGrid({ days, today, items, timeZone, dayHref, drag, itemButton, holidays }: GridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const columns = { gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` };
   const segmentsByDay = days.map((day) => daySegments(items, day, timeZone));
@@ -368,6 +375,7 @@ function TimeGrid({ days, today, items, timeZone, dayHref, drag, itemButton }: G
         {days.map((day) => (
           <div key={day} className="border-s border-line p-1">
             <DayHeading day={day} today={today} href={dayHref(day)} short={days.length > 1} />
+            <HolidayMarks holidays={holidays[day] ?? []} compact={days.length > 1} className="mt-0.5" />
           </div>
         ))}
       </div>
@@ -425,7 +433,7 @@ function TimeGrid({ days, today, items, timeZone, dayHref, drag, itemButton }: G
 const MONTH_CELL_ITEMS = 3;
 
 /** A month: whole weeks from Sunday, a day's items in its cell, the day itself a link to its day view. */
-function MonthGrid({ days, focusDay, today, items, timeZone, dayHref, drag, itemButton }: GridProps & { focusDay: string }) {
+function MonthGrid({ days, focusDay, today, items, timeZone, dayHref, drag, itemButton, holidays }: GridProps & { focusDay: string }) {
   const month = focusDay.slice(0, 7);
   const weeks = Array.from({ length: days.length / 7 }, (_, i) => days.slice(i * 7, i * 7 + 7));
   return (
@@ -463,6 +471,7 @@ function MonthGrid({ days, focusDay, today, items, timeZone, dayHref, drag, item
                 >
                   {Number(day.slice(8, 10))}
                 </Link>
+                <HolidayMarks holidays={holidays[day] ?? []} compact className="mt-0.5" />
                 {onDay.length > 0 ? (
                   <span aria-hidden="true" className="mt-0.5 block text-center text-caption font-semibold text-accent sm:hidden">
                     {onDay.length}
@@ -499,6 +508,7 @@ function AgendaList({
   timeZone,
   dayHref,
   onOpen,
+  holidays,
 }: {
   days: string[];
   today: string;
@@ -506,6 +516,7 @@ function AgendaList({
   timeZone: string;
   dayHref: (day: string) => string;
   onOpen: (item: CalendarEntry) => void;
+  holidays: Record<string, Holiday[]>;
 }) {
   const filled = days.map((day) => ({ day, onDay: itemsOnDay(items, day, timeZone) })).filter((entry) => entry.onDay.length > 0);
   if (filled.length === 0) {
@@ -525,6 +536,7 @@ function AgendaList({
             </Link>
             {day === today ? <span className="ms-2 rounded-full bg-accent-soft px-2 py-0.5 text-caption text-accent-strong">היום</span> : null}
           </h2>
+          {holidays[day]?.length ? <HolidayMarks holidays={holidays[day]} className="px-4 pt-2" /> : null}
           <ul className="divide-y divide-line">
             {onDay.map((item) => (
               <li key={`${item.kind}-${item.id}`}>

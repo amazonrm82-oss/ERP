@@ -22,6 +22,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   support_access_grants: "גישת תמיכה",
   automations: "אוטומציה",
   forms: "טופס",
+  org_calendar_settings: "ימי מנוחה וחגים",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };

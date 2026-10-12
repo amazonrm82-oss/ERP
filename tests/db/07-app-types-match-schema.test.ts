@@ -71,7 +71,8 @@ function readAppTypes() {
 
 function expectedKind(dataType: string, udtName: string, enumLabels: Record<string, string[]>): string {
   if (dataType === "USER-DEFINED") return `enum:${[...(enumLabels[udtName] ?? [])].sort().join("|")}`;
-  if (dataType === "ARRAY") return "string[]";
+  // an array of numbers (udt _int2 / _int4 / _int8), else of text or uuids
+  if (dataType === "ARRAY") return /^_int[248]$/.test(udtName) ? "number[]" : "string[]";
   if (["uuid", "text", "character", "character varying", "date", "timestamp with time zone", "inet"].includes(dataType)) return "string";
   if (["integer", "smallint", "bigint", "numeric"].includes(dataType)) return "number";
   if (dataType === "boolean") return "boolean";

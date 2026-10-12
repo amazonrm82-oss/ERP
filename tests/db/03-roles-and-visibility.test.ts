@@ -427,6 +427,35 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("everyone reads the rest days; only owners and admins set them (CAL-03)", async () => {
+    const insert = "insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(insert, [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(insert, [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.org_calendar_settings where organization_id = $1", [org]), u.email).toBe(1);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.org_calendar_settings set holidays_rest = false where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("delete from public.org_calendar_settings where organization_id = $1", [org])).rowCount).toBe(0);
+      });
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.org_calendar_settings set rest_weekdays = '{5,6}' where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    const row = await asAdmin(async (q) =>
+      (await q<{ rest_weekdays: number[]; holidays_rest: boolean }>("select rest_weekdays, holidays_rest from public.org_calendar_settings where organization_id = $1", [org])).rows[0],
+    );
+    expect(row).toEqual({ rest_weekdays: [5, 6], holidays_rest: true });
+    await asUser(admin.id, async (q) => {
+      expect((await q("delete from public.org_calendar_settings where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+  });
+
   it("meetings follow the record they are about; organizer, creator and participants always see them (CAL-01)", async () => {
     await setVisibility("own");
     const lead = await insertLead(m1.id, org, { full_name: "ליד לפגישה", team_id: team });

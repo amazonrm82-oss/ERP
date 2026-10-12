@@ -43,6 +43,19 @@ export type ListPreferencesRow = {
   updated_at: string;
 };
 
+// CAL-03 (calendar settings migration): the organization's rest days; 0 = Sunday … 6 = Saturday
+export type OrgCalendarSettingsRow = {
+  id: string;
+  organization_id: string;
+  rest_weekdays: number[];
+  holidays_rest: boolean;
+  holiday_eves_rest: boolean;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type OrgCalendarSettingsWrite = { rest_weekdays?: number[]; holidays_rest?: boolean; holiday_eves_rest?: boolean };
+
 // CAL-01 (meetings migration): a meeting and its team participants
 export type MeetingType = "in_person" | "phone" | "video" | "other";
 export type MeetingStatus = "planned" | "held" | "cancelled" | "no_show";
@@ -1002,6 +1015,7 @@ export type Database = {
       tasks: Table<TaskRow, TaskInsert>;
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
+      org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
     };
     Views: { [_ in never]: never };
     Functions: {
