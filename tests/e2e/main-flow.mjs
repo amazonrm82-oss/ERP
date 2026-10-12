@@ -2103,6 +2103,12 @@ try {
 
   step("notifications: each user chooses which kinds to get, and where");
   await ownerDesk.goto(`${orgUrl}/settings/account`);
+  // USR-06: the kinds come in groups, new ones included
+  for (const name of ["לידים ורשומות", "משימות ופגישות", "אוטומציות"]) {
+    await ownerDesk.getByRole("group", { name, exact: true }).waitFor();
+  }
+  await ownerDesk.getByLabel("נקבעה לי פגישה", { exact: true }).waitFor();
+  await ownerDesk.getByLabel("אוטומציה נכשלה (למנהלים)", { exact: true }).waitFor();
   await ownerDesk.getByLabel("התראות מאוטומציות").selectOption("off");
   await ownerDesk.getByLabel("רשומה או משימה הוקצתה לי").selectOption("bell");
   await ownerDesk.getByRole("button", { name: "שמירת ההעדפות" }).click();

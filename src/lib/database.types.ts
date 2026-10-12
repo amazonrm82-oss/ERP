@@ -415,7 +415,7 @@ export type NotificationRow = {
   id: string;
   organization_id: string;
   user_id: string;
-  // assigned | inquiry | automation | task_reminder ...
+  // one of NOTIFICATION_KINDS (src/features/notifications/settings.ts) or system; checked by notifications_kinds
   type: string;
   title: string;
   body: string | null;

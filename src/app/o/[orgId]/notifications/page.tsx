@@ -27,7 +27,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
     <>
       <PageHeader
         title="התראות"
-        description="הקצאות, פניות חוזרות, תזכורות למשימות והודעות מאוטומציות."
+        description="הקצאות, פניות חוזרות, פגישות, תזכורות למשימות והודעות מאוטומציות."
         actions={
           hasUnread ? (
             <ActionButton action={markNotificationsReadAction.bind(null, orgId, null)} pendingText="מסמנים…">
