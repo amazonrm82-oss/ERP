@@ -156,6 +156,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `on delete set null (x_id)`; the `before delete` trigger `app.purge_links()` first deletes the ones
   that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
   (`app.purge_trash()`, 02:30 UTC) deletes what has been in the recycle bin for 30 days.
+- Form inquiry retention (CAP-04, migrations 0091 and 009110): `form_submissions.form_deleted_at` is stamped when the
+  form is deleted (`app.keep_form_submissions()`); pg_cron `crm-purge-submissions` (02:45 UTC) calls
+  `app.purge_old_form_submissions()` (009110, pasted by hand because it deletes), which removes kept inquiries older than
+  12 months. Their leads stay.
 - Files (migration 0019): `public.files` rows (one subject each; path `<org>/<file id>` and uploader set
   by trigger; plan cap `storage_gb`) and the private bucket `record-files`. The `storage.objects`
   policies look up `public.files` with the caller's rights; write `objects.name` there, never bare
