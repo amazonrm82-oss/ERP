@@ -27,6 +27,7 @@ import { cn } from "@/lib/cn";
 import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
 
 import { moveCalendarItemAction } from "../actions";
+import { LONG_PRESS_MS, pressDistance, pressOutcome } from "../long-press";
 import {
   calendarPath,
   daySegments,
@@ -90,6 +91,10 @@ type Drag = {
   originalMinutes: number;
   startX: number;
   startY: number;
+  // a finger: the drag starts after a long press (CAL-02), until then the page may scroll
+  touch: boolean;
+  // when the pointer came down (the event's timeStamp), for the long press
+  startedAt: number;
   active: boolean;
   // `column` is the grid column dropped on (a day, or a person on the side-by-side view)
   target: { day: string; column: string; minutes: number } | null;
@@ -98,6 +103,17 @@ type Drag = {
 // one hour on the time grid
 const HOUR_CLASS = "h-12";
 const FIRST_SHOWN_HOUR = 7;
+
+/** The grid cell under a point while dragging, and the time or day it stands for. */
+function targetAt(x: number, y: number, current: Drag): Drag["target"] {
+  const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-day]");
+  if (!cell || cell.dataset.calGrid !== current.mode || !cell.dataset.calDay) return null;
+  const column = cell.dataset.calColumn ?? cell.dataset.calDay;
+  if (current.mode === "month") return { day: cell.dataset.calDay, column, minutes: current.originalMinutes };
+  const rect = cell.getBoundingClientRect();
+  const offset = y - rect.top - (current.grabOffset / (24 * 60)) * rect.height;
+  return { day: cell.dataset.calDay, column, minutes: snapMinutes(offset, rect.height) };
+}
 
 function timeText(item: TimedItem, timeZone: string): string {
   const start = zoneTime(new Date(item.startsAt), timeZone);
@@ -124,9 +140,10 @@ function itemClasses(item: CalendarEntry): string {
 /**
  * The calendar (CAL-02): a time grid for a day or a week, a month grid, and an
  * agenda list. Dragging an item with a mouse or a pen moves it (a quarter-hour
- * grid; on the month grid the day changes and the time stays). Every item is
- * also a button that opens its details with a "move" form, so moving works from
- * the keyboard, on a touch screen and with a screen reader.
+ * grid; on the month grid the day changes and the time stays); a finger drags
+ * after a long press, so a swipe still scrolls and a tap still opens. Every
+ * item is also a button that opens its details with a "move" form, so moving
+ * works from the keyboard and with a screen reader.
  */
 export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays }: Props) {
   const router = useRouter();
@@ -139,6 +156,8 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
+  // the long-press timer of a finger on an item
+  const pressTimer = useRef<number | null>(null);
 
   // a phone opens on the agenda unless the URL asks for a view
   useEffect(() => {
@@ -162,7 +181,7 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
     });
   }
 
-  // --- dragging (mouse and pen; touch uses the "move" form) -------------------
+  // --- dragging (mouse and pen at once; a finger after a long press) ----------
 
   // the latest move(), for the window listeners below
   const moveRef = useRef(move);
@@ -174,17 +193,13 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
   useEffect(() => {
     if (!dragging) return;
 
-    function targetAt(x: number, y: number, current: Drag): Drag["target"] {
-      const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-day]");
-      if (!cell || cell.dataset.calGrid !== current.mode || !cell.dataset.calDay) return null;
-      const column = cell.dataset.calColumn ?? cell.dataset.calDay;
-      if (current.mode === "month") return { day: cell.dataset.calDay, column, minutes: current.originalMinutes };
-      const rect = cell.getBoundingClientRect();
-      const offset = y - rect.top - (current.grabOffset / (24 * 60)) * rect.height;
-      return { day: cell.dataset.calDay, column, minutes: snapMinutes(offset, rect.height) };
+    function clearPress() {
+      if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
     }
 
     function finish(current: Drag | null, drop: boolean) {
+      clearPress();
       dragRef.current = null;
       setDrag(null);
       if (!current?.active) return;
@@ -202,6 +217,12 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
     function onPointerMove(event: PointerEvent) {
       const current = dragRef.current;
       if (!current) return;
+      if (current.touch && !current.active) {
+        // a finger that moves before the long press is scrolling: let it
+        const distance = pressDistance({ x: current.startX, y: current.startY }, { x: event.clientX, y: event.clientY });
+        if (pressOutcome(distance, event.timeStamp - current.startedAt) === "cancel") finish(current, false);
+        return;
+      }
       if (!current.active && Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < 6) return;
       const next = { ...current, active: true, target: targetAt(event.clientX, event.clientY, current) };
       dragRef.current = next;
@@ -212,8 +233,13 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") finish(dragRef.current, false);
     };
+    // once lifted, the finger drags the item instead of scrolling the page
+    const onTouchMove = (event: TouchEvent) => {
+      if (dragRef.current?.touch && dragRef.current.active && event.cancelable) event.preventDefault();
+    };
 
     window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKeyDown);
@@ -222,11 +248,13 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onCancel);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("touchmove", onTouchMove);
+      clearPress();
     };
   }, [dragging, timeZone]);
 
   function startDrag(event: ReactPointerEvent<HTMLButtonElement>, item: CalendarEntry, mode: DragMode, segment?: Segment<CalendarEntry>) {
-    if (!canMove || event.button !== 0 || event.pointerType === "touch") return;
+    if (!canMove || event.button !== 0) return;
     // a long meeting is moved by its first day
     if (segment && !segment.startsHere) return;
     const originalMinutes = wallMinutes(new Date(item.startsAt), timeZone);
@@ -239,9 +267,34 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
       }
     }
     const length = segment ? segment.endMin - segment.startMin : 30;
-    const pending: Drag = { item, mode, grabOffset, length, originalMinutes, startX: event.clientX, startY: event.clientY, active: false, target: null };
+    const touch = event.pointerType === "touch";
+    const pending: Drag = {
+      item,
+      mode,
+      grabOffset,
+      length,
+      originalMinutes,
+      startX: event.clientX,
+      startY: event.clientY,
+      touch,
+      startedAt: event.timeStamp,
+      active: false,
+      target: null,
+    };
     dragRef.current = pending;
     setDrag(pending);
+    if (!touch) return;
+    // a finger lifts the item after resting on it (a tap opens it, a swipe scrolls)
+    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => {
+      pressTimer.current = null;
+      const current = dragRef.current;
+      if (current !== pending) return;
+      const lifted: Drag = { ...current, active: true, target: targetAt(current.startX, current.startY, current) };
+      dragRef.current = lifted;
+      setDrag(lifted);
+      if (typeof navigator.vibrate === "function") navigator.vibrate(15);
+    }, LONG_PRESS_MS);
   }
 
   function open(item: CalendarEntry) {
@@ -274,12 +327,14 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
       type="button"
       onClick={() => open(item)}
       onPointerDown={mode ? (event) => startDrag(event, item, mode, extra.segment) : undefined}
+      // a long press must not open the phone's own menu
+      onContextMenu={mode && canMove ? (event) => event.preventDefault() : undefined}
       style={extra.style}
       className={cn(
         "block w-full min-w-0 overflow-hidden rounded px-1.5 text-start text-caption leading-snug select-none",
         itemClasses(item),
-        canMove && mode && "cursor-grab",
-        drag?.active && drag.item.id === item.id && "opacity-60",
+        canMove && mode && "cursor-grab [-webkit-touch-callout:none]",
+        drag?.active && drag.item.id === item.id && (drag.touch ? "touch-none opacity-70 shadow-lg ring-2 ring-accent" : "opacity-60"),
         extra.className,
       )}
     >
@@ -321,7 +376,7 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
       {days.some((day) => holidays[day]?.length) ? <HolidayLegend className="mt-3" /> : null}
 
       {canMove ? (
-        <p className="mt-3 text-sm text-ink-soft">אפשר לגרור פגישה או משימה למועד אחר, או ללחוץ עליה ולבחור &quot;העברה&quot;.</p>
+        <p className="mt-3 text-sm text-ink-soft">אפשר לגרור פגישה או משימה למועד אחר (במסך מגע: לחיצה ארוכה ואז גרירה), או ללחוץ עליה ולבחור &quot;העברה&quot;.</p>
       ) : null}
 
       <Dialog open={opened !== null} onClose={() => setOpenId(null)} title={opened?.title ?? ""} description={opened?.kindLabel} variant="sheet">
