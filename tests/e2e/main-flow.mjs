@@ -370,6 +370,15 @@ try {
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the calendar scrolls sideways at 360px");
   await shot(owner, "03a-calendar-agenda-360");
+
+  step("team calendar: side by side on a phone is one person at a time, starting with me (CAL-04)");
+  await owner.goto(`${orgUrl}/calendar?view=people`);
+  await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^זה לצד זה$/ }).waitFor();
+  await owner.getByRole("combobox", { name: /^היומן של$/ }).waitFor();
+  await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
+  await owner.getByText(/^בחירת אנשים/).waitFor();
+  if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the side-by-side calendar scrolls sideways at 360px");
+  await shot(owner, "03b-calendar-people-360");
   await owner.goto(leadUrlForCalendar);
 
   step("convert lead");

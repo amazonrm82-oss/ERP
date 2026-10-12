@@ -14,12 +14,12 @@ import {
   type ReactNode,
 } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/feedback";
-import { TextField } from "@/components/ui/field";
-import { CalendarIcon, CheckSquareIcon } from "@/components/ui/icons";
+import { SelectField, TextField } from "@/components/ui/field";
+import { BackIcon, CalendarIcon, CheckSquareIcon, ForwardIcon } from "@/components/ui/icons";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
 import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
@@ -35,10 +35,12 @@ import {
   movedEnd,
   snapMinutes,
   wallMinutes,
+  type CalendarQuery,
   type CalendarView,
   type Segment,
   type TimedItem,
 } from "../range";
+import { itemsByPerson, type CalendarPerson } from "../team";
 
 /** One meeting or task as the screen shows it (labels made on the server). */
 export type CalendarEntry = TimedItem & {
@@ -52,6 +54,8 @@ export type CalendarEntry = TimedItem & {
   ownerName: string | null;
   location: string | null;
   related: { href: string; label: string } | null;
+  // CAL-04: the shown people it belongs to (side-by-side view)
+  people: string[];
 };
 
 type Props = {
@@ -65,8 +69,10 @@ type Props = {
   timeZone: string;
   // UI hint: the database decides who may move what
   canMove: boolean;
-  // the "who" of the URL, kept on links
-  who: string | undefined;
+  // whose calendar (the "who" and "team" of the URL), kept on links
+  scope: Pick<CalendarQuery, "who" | "team">;
+  // the side-by-side view: a column per person (CAL-04)
+  people: CalendarPerson[];
   // no view in the URL: a phone switches to the agenda
   autoView: boolean;
   // Israeli holidays of the shown days, by day (CAL-03)
@@ -85,7 +91,8 @@ type Drag = {
   startX: number;
   startY: number;
   active: boolean;
-  target: { day: string; minutes: number } | null;
+  // `column` is the grid column dropped on (a day, or a person on the side-by-side view)
+  target: { day: string; column: string; minutes: number } | null;
 };
 
 // one hour on the time grid
@@ -121,7 +128,7 @@ function itemClasses(item: CalendarEntry): string {
  * also a button that opens its details with a "move" form, so moving works from
  * the keyboard, on a touch screen and with a screen reader.
  */
-export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, who, autoView, holidays }: Props) {
+export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays }: Props) {
   const router = useRouter();
   const [shown, showMoved] = useOptimistic(items, (state, moved: { id: string; startsAt: string; endsAt: string | null }) =>
     state.map((item) => (item.id === moved.id ? { ...item, startsAt: moved.startsAt, endsAt: moved.endsAt } : item)),
@@ -136,9 +143,9 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
   // a phone opens on the agenda unless the URL asks for a view
   useEffect(() => {
     if (autoView && window.matchMedia("(max-width: 639px)").matches) {
-      router.replace(calendarPath(orgId, { view: "agenda", date: focusDay, who }));
+      router.replace(calendarPath(orgId, { view: "agenda", date: focusDay, ...scope }));
     }
-  }, [autoView, focusDay, orgId, router, who]);
+  }, [autoView, focusDay, orgId, router, scope]);
 
   function move(item: CalendarEntry, date: string, time: string) {
     const startsAt = zonedIso(date, `${time}:00`, timeZone);
@@ -170,10 +177,11 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
     function targetAt(x: number, y: number, current: Drag): Drag["target"] {
       const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-day]");
       if (!cell || cell.dataset.calGrid !== current.mode || !cell.dataset.calDay) return null;
-      if (current.mode === "month") return { day: cell.dataset.calDay, minutes: current.originalMinutes };
+      const column = cell.dataset.calColumn ?? cell.dataset.calDay;
+      if (current.mode === "month") return { day: cell.dataset.calDay, column, minutes: current.originalMinutes };
       const rect = cell.getBoundingClientRect();
       const offset = y - rect.top - (current.grabOffset / (24 * 60)) * rect.height;
-      return { day: cell.dataset.calDay, minutes: snapMinutes(offset, rect.height) };
+      return { day: cell.dataset.calDay, column, minutes: snapMinutes(offset, rect.height) };
     }
 
     function finish(current: Drag | null, drop: boolean) {
@@ -245,7 +253,20 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
   }
 
   const opened = shown.find((item) => item.id === openId) ?? null;
-  const dayHref = (day: string) => calendarPath(orgId, { view: "day", date: day, who });
+  const dayHref = (day: string) => calendarPath(orgId, { view: "day", date: day, ...scope });
+  const dayColumns = (): TimeColumn[] =>
+    days.map((day) => ({
+      key: day,
+      day,
+      label: longDay(day),
+      heading: (
+        <>
+          <DayHeading day={day} today={today} href={dayHref(day)} short={days.length > 1} />
+          <HolidayMarks holidays={holidays[day] ?? []} compact={days.length > 1} className="mt-0.5" />
+        </>
+      ),
+      items: shown,
+    }));
 
   const itemButton = (item: CalendarEntry, mode: DragMode | null, extra: { className?: string; style?: CSSProperties; segment?: Segment<CalendarEntry>; compact?: boolean }) => (
     <button
@@ -277,14 +298,16 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
         ) : null}
       </div>
 
-      {view === "month" ? (
+      {view === "people" ? (
+        <PeopleView day={focusDay} people={people} items={shown} timeZone={timeZone} drag={drag} itemButton={itemButton} holidays={holidays} dayHref={dayHref} onOpen={open} today={today} />
+      ) : view === "month" ? (
         <MonthGrid days={days} focusDay={focusDay} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
       ) : view === "agenda" ? (
         <AgendaList days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} onOpen={open} holidays={holidays} />
       ) : view === "week" ? (
         <>
           <div className="hidden sm:block">
-            <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
+            <TimeGrid columns={dayColumns()} timeZone={timeZone} drag={drag} itemButton={itemButton} />
           </div>
           {/* seven columns do not fit a phone: the week is a list there */}
           <div className="sm:hidden">
@@ -292,7 +315,7 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
           </div>
         </>
       ) : (
-        <TimeGrid days={days} today={today} items={shown} timeZone={timeZone} dayHref={dayHref} drag={drag} itemButton={itemButton} holidays={holidays} />
+        <TimeGrid columns={dayColumns()} timeZone={timeZone} drag={drag} itemButton={itemButton} />
       )}
 
       {days.some((day) => holidays[day]?.length) ? <HolidayLegend className="mt-3" /> : null}
@@ -351,81 +374,198 @@ function DayHeading({ day, today, href, short }: { day: string; today: string; h
   );
 }
 
-/** Day or week: one column per day, 24 rows of an hour, items placed by wall-clock time. */
-function TimeGrid({ days, today, items, timeZone, dayHref, drag, itemButton, holidays }: GridProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const columns = { gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` };
-  const segmentsByDay = days.map((day) => daySegments(items, day, timeZone));
-  const earliest = Math.min(FIRST_SHOWN_HOUR * 60, ...segmentsByDay.flat().map((s) => s.startMin));
+/** One column of the time grid: a day, or one person on one day (CAL-04). */
+type TimeColumn = {
+  key: string;
+  day: string;
+  // the column's name for a screen reader
+  label: string;
+  heading: ReactNode;
+  // the items to place; only the ones on `day` are shown
+  items: CalendarEntry[];
+};
 
-  const daysKey = days.join();
+/**
+ * Day, week or side by side: a column per day or per person, 24 rows of an
+ * hour, items placed by wall-clock time. `minColumn` keeps person columns
+ * readable; the grid then scrolls sideways inside its own box.
+ */
+function TimeGrid({ columns, timeZone, drag, itemButton, minColumn }: { columns: TimeColumn[]; timeZone: string; drag: Drag | null; itemButton: ItemButton; minColumn?: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const template = { gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(${minColumn ?? "0"}, 1fr))` };
+  const segmentsByColumn = columns.map((column) => daySegments(column.items, column.day, timeZone));
+  const earliest = Math.min(FIRST_SHOWN_HOUR * 60, ...segmentsByColumn.flat().map((s) => s.startMin));
+
+  const columnsKey = columns.map((column) => `${column.key}@${column.day}`).join();
   const scrolledFor = useRef<string | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
-    // once per set of days, not again when an item moves
-    if (!el || scrolledFor.current === daysKey) return;
-    scrolledFor.current = daysKey;
+    // once per set of columns, not again when an item moves
+    if (!el || scrolledFor.current === columnsKey) return;
+    scrolledFor.current = columnsKey;
     el.scrollTop = (el.scrollHeight * Math.max(0, earliest - 30)) / (24 * 60);
-  }, [daysKey, earliest]);
+  }, [columnsKey, earliest]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface">
-      <div className="grid border-b border-line" style={columns}>
-        <span aria-hidden="true" />
-        {days.map((day) => (
-          <div key={day} className="border-s border-line p-1">
-            <DayHeading day={day} today={today} href={dayHref(day)} short={days.length > 1} />
-            <HolidayMarks holidays={holidays[day] ?? []} compact={days.length > 1} className="mt-0.5" />
-          </div>
-        ))}
-      </div>
-      <div ref={scrollRef} className="max-h-[70dvh] overflow-y-auto">
-        <div className="grid" style={columns}>
-          <div aria-hidden="true">
-            {Array.from({ length: 24 }, (_, hour) => (
-              <div key={hour} className={cn(HOUR_CLASS, "pe-2 text-end text-caption text-ink-soft tabular-nums")}>
-                <span className="relative -top-2">{hour === 0 ? "" : `${String(hour).padStart(2, "0")}:00`}</span>
-              </div>
-            ))}
-          </div>
-          {days.map((day, index) => {
-            const preview = drag?.active && drag.mode === "time" && drag.target?.day === day ? { minutes: drag.target.minutes, length: drag.length } : null;
-            return (
-              <div key={day} data-cal-day={day} data-cal-grid="time" className="relative border-s border-line">
-                {Array.from({ length: 24 }, (_, hour) => (
-                  <div key={hour} aria-hidden="true" className={cn(HOUR_CLASS, "border-b border-line")} />
-                ))}
-                <ul aria-label={longDay(day)} className="absolute inset-0">
-                  {segmentsByDay[index].map((segment) => (
-                    <li
-                      key={`${segment.item.kind}-${segment.item.id}`}
-                      className="absolute p-px"
-                      style={{
-                        top: `${(segment.startMin / 1440) * 100}%`,
-                        height: `${((segment.endMin - segment.startMin) / 1440) * 100}%`,
-                        insetInlineStart: `${(segment.column / segment.columns) * 100}%`,
-                        width: `${100 / segment.columns}%`,
-                      }}
-                    >
-                      {itemButton(segment.item, "time", { className: "h-full py-0.5", segment, compact: segment.endMin - segment.startMin < 45 })}
-                    </li>
+    <div className={cn("rounded-lg border border-line bg-surface", minColumn ? "overflow-x-auto" : "overflow-hidden")}>
+      <div className={minColumn ? "min-w-max" : undefined}>
+        <div className="grid border-b border-line" style={template}>
+          <span aria-hidden="true" />
+          {columns.map((column) => (
+            <div key={column.key} className="min-w-0 border-s border-line p-1">
+              {column.heading}
+            </div>
+          ))}
+        </div>
+        <div ref={scrollRef} className="max-h-[70dvh] overflow-y-auto">
+          <div className="grid" style={template}>
+            <div aria-hidden="true">
+              {Array.from({ length: 24 }, (_, hour) => (
+                <div key={hour} className={cn(HOUR_CLASS, "pe-2 text-end text-caption text-ink-soft tabular-nums")}>
+                  <span className="relative -top-2">{hour === 0 ? "" : `${String(hour).padStart(2, "0")}:00`}</span>
+                </div>
+              ))}
+            </div>
+            {columns.map((column, index) => {
+              const preview =
+                drag?.active && drag.mode === "time" && drag.target?.column === column.key ? { minutes: drag.target.minutes, length: drag.length } : null;
+              return (
+                <div key={column.key} data-cal-day={column.day} data-cal-column={column.key} data-cal-grid="time" className="relative border-s border-line">
+                  {Array.from({ length: 24 }, (_, hour) => (
+                    <div key={hour} aria-hidden="true" className={cn(HOUR_CLASS, "border-b border-line")} />
                   ))}
-                </ul>
-                {preview ? (
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 rounded border-2 border-dashed border-accent bg-surface px-1 text-caption font-semibold text-accent-strong"
-                    style={{ top: `${(preview.minutes / 1440) * 100}%`, height: `${(Math.max(preview.length, 15) / 1440) * 100}%` }}
-                  >
-                    {minutesToTime(preview.minutes)}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+                  <ul aria-label={column.label} className="absolute inset-0">
+                    {segmentsByColumn[index].map((segment) => (
+                      <li
+                        key={`${segment.item.kind}-${segment.item.id}`}
+                        className="absolute p-px"
+                        style={{
+                          top: `${(segment.startMin / 1440) * 100}%`,
+                          height: `${((segment.endMin - segment.startMin) / 1440) * 100}%`,
+                          insetInlineStart: `${(segment.column / segment.columns) * 100}%`,
+                          width: `${100 / segment.columns}%`,
+                        }}
+                      >
+                        {itemButton(segment.item, "time", { className: "h-full py-0.5", segment, compact: segment.endMin - segment.startMin < 45 })}
+                      </li>
+                    ))}
+                  </ul>
+                  {preview ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 rounded border-2 border-dashed border-accent bg-surface px-1 text-caption font-semibold text-accent-strong"
+                      style={{ top: `${(preview.minutes / 1440) * 100}%`, height: `${(Math.max(preview.length, 15) / 1440) * 100}%` }}
+                    >
+                      {minutesToTime(preview.minutes)}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Side by side (CAL-04): one day, a column per person, with the items each one
+ * organizes, takes part in or is assigned. A phone shows one person at a time,
+ * with buttons and a list to move between them (spec 22.9).
+ */
+function PeopleView({
+  day,
+  today,
+  people,
+  items,
+  timeZone,
+  drag,
+  itemButton,
+  holidays,
+  dayHref,
+  onOpen,
+}: {
+  day: string;
+  today: string;
+  people: CalendarPerson[];
+  items: CalendarEntry[];
+  timeZone: string;
+  drag: Drag | null;
+  itemButton: ItemButton;
+  holidays: Record<string, Holiday[]>;
+  dayHref: (day: string) => string;
+  onOpen: (item: CalendarEntry) => void;
+}) {
+  const [current, setCurrent] = useState(0);
+  if (people.length === 0) {
+    return (
+      <div className="rounded-lg border border-line bg-surface">
+        <EmptyState icon={<CalendarIcon />} title="אין את מי להציג" description="בחרו אנשים או צוות אחר." />
+      </div>
+    );
+  }
+  const byPerson = itemsByPerson(items, people);
+  const countOnDay = (id: string) => itemsOnDay(byPerson.get(id) ?? [], day, timeZone).length;
+  const index = Math.min(current, people.length - 1);
+  const person = people[index];
+  const columns: TimeColumn[] = people.map((p) => {
+    const count = countOnDay(p.id);
+    return {
+      key: p.id,
+      day,
+      label: `${p.name}, ${longDay(day)}`,
+      heading: (
+        <div className="px-1 py-1.5 text-center">
+          <span className="block truncate text-sm font-semibold" title={p.name}>
+            {p.name}
+          </span>
+          <span className="block text-caption text-ink-soft tabular-nums">{count === 1 ? "פריט אחד" : `${count} פריטים`}</span>
+        </div>
+      ),
+      items: byPerson.get(p.id) ?? [],
+    };
+  });
+
+  return (
+    <>
+      {holidays[day]?.length ? <HolidayMarks holidays={holidays[day]} className="mb-2" /> : null}
+      <div className="hidden sm:block">
+        <TimeGrid columns={columns} timeZone={timeZone} drag={drag} itemButton={itemButton} minColumn="9rem" />
+      </div>
+      <div className="space-y-3 sm:hidden">
+        <div className="flex items-end gap-1">
+          <IconButton variant="secondary" label="האדם הקודם" icon={<BackIcon className="size-5" />} onClick={() => setCurrent(Math.max(0, index - 1))} disabled={index === 0} />
+          <SelectField label="היומן של" hideLabel value={person.id} onChange={(event) => setCurrent(Math.max(0, people.findIndex((p) => p.id === event.target.value)))} className="min-w-0 flex-1">
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({countOnDay(p.id)})
+              </option>
+            ))}
+          </SelectField>
+          <IconButton
+            variant="secondary"
+            label="האדם הבא"
+            icon={<ForwardIcon className="size-5" />}
+            onClick={() => setCurrent(Math.min(people.length - 1, index + 1))}
+            disabled={index === people.length - 1}
+          />
+        </div>
+        <p className="text-sm text-ink-soft" aria-live="polite">
+          {person.name}, {index + 1} מתוך {people.length}
+        </p>
+        <AgendaList
+          days={[day]}
+          today={today}
+          items={byPerson.get(person.id) ?? []}
+          timeZone={timeZone}
+          dayHref={dayHref}
+          onOpen={onOpen}
+          holidays={{}}
+          emptyTitle={`אין ל${person.name} פגישות או משימות ביום הזה`}
+        />
+      </div>
+    </>
   );
 }
 
@@ -509,6 +649,7 @@ function AgendaList({
   dayHref,
   onOpen,
   holidays,
+  emptyTitle,
 }: {
   days: string[];
   today: string;
@@ -517,12 +658,13 @@ function AgendaList({
   dayHref: (day: string) => string;
   onOpen: (item: CalendarEntry) => void;
   holidays: Record<string, Holiday[]>;
+  emptyTitle?: string;
 }) {
   const filled = days.map((day) => ({ day, onDay: itemsOnDay(items, day, timeZone) })).filter((entry) => entry.onDay.length > 0);
   if (filled.length === 0) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState icon={<CalendarIcon />} title="אין פגישות או משימות בימים האלה" description="פגישה קובעים מתוך הכרטיס של ליד, איש קשר, חברה או עסקה. משימה עם מועד מופיעה כאן לבד." />
+        <EmptyState icon={<CalendarIcon />} title={emptyTitle ?? "אין פגישות או משימות בימים האלה"} description="פגישה קובעים מתוך הכרטיס של ליד, איש קשר, חברה או עסקה. משימה עם מועד מופיעה כאן לבד." />
       </div>
     );
   }

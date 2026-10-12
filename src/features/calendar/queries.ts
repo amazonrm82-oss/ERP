@@ -6,6 +6,7 @@ import type { RecordType } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
 import type { TimedItem } from "./range";
+import type { CalendarTeam, TeamMembership } from "./team";
 
 export type CalendarItem = TimedItem & {
   title: string;
@@ -17,6 +18,8 @@ export type CalendarItem = TimedItem & {
   ownerName: string | null;
   // the record it is about, for a link
   related: { type: Extract<RecordType, "lead" | "contact" | "company" | "deal">; id: string } | null;
+  // which of the asked-for people it belongs to (organizer, participant or task owner); empty for "everyone"
+  people: string[];
 };
 
 // "everyone I can see" over a month of a busy organization: past this, the screen says so
@@ -36,15 +39,18 @@ function relatedOf(row: Linked): CalendarItem["related"] {
 
 /**
  * The meetings and timed tasks between two instants that the user may see
- * (RLS decides), for one person or for everyone (`userId` null). A meeting
- * belongs to a person when they organize it or take part in it; a task when it
- * is assigned to them. Cancelled tasks and tasks in the recycle bin are left out.
+ * (RLS decides), for some people (CAL-04: one, a team, or the side-by-side
+ * picks) or for everyone (`people` null). A meeting belongs to a person when
+ * they organize it or take part in it; a task when it is assigned to them.
+ * Each item says which of the people it belongs to. Cancelled tasks and tasks
+ * in the recycle bin are left out.
  */
 export async function listCalendarItems(
   orgId: string,
   range: { from: string; to: string },
-  userId: string | null,
+  people: string[] | null,
 ): Promise<{ items: CalendarItem[]; truncated: boolean }> {
+  if (people && people.length === 0) return { items: [], truncated: false };
   const supabase = await createClient();
 
   let taskQuery = supabase
@@ -55,7 +61,7 @@ export async function listCalendarItems(
     .neq("status", "cancelled")
     .gte("due_at", range.from)
     .lt("due_at", range.to);
-  if (userId) taskQuery = taskQuery.eq("owner_id", userId);
+  if (people) taskQuery = taskQuery.in("owner_id", people);
 
   const [meetingResult, taskResult] = await Promise.all([
     supabase
@@ -74,24 +80,28 @@ export async function listCalendarItems(
   let meetings = meetingRows.slice(0, CALENDAR_LIMIT);
   const tasks = taskRows.slice(0, CALENDAR_LIMIT);
 
-  if (userId && meetings.length > 0) {
-    // a person's meetings: the ones they organize, and the ones they take part in
-    const taking = new Set<string>();
-    const ids = meetings.filter((m) => m.owner_id !== userId).map((m) => m.id);
+  // a person's meetings: the ones they organize, and the ones they take part in
+  const meetingPeople = new Map<string, Set<string>>();
+  if (people && meetings.length > 0) {
+    const wanted = new Set(people);
+    for (const m of meetings) meetingPeople.set(m.id, new Set(m.owner_id && wanted.has(m.owner_id) ? [m.owner_id] : []));
+    const ids = meetings.map((m) => m.id);
     for (let i = 0; i < ids.length; i += PARTICIPANT_CHUNK) {
       const rows = must(
         await supabase
           .from("meeting_participants")
-          .select("meeting_id")
+          .select("meeting_id, user_id")
           .eq("organization_id", orgId)
-          .eq("user_id", userId)
+          .in("user_id", people)
           .in("meeting_id", ids.slice(i, i + PARTICIPANT_CHUNK)),
         "calendar participants",
       );
-      for (const row of rows) taking.add(row.meeting_id);
+      for (const row of rows) meetingPeople.get(row.meeting_id)?.add(row.user_id);
     }
-    meetings = meetings.filter((m) => m.owner_id === userId || taking.has(m.id));
+    meetings = meetings.filter((m) => (meetingPeople.get(m.id)?.size ?? 0) > 0);
   }
+  // in the order the people were asked for
+  const ordered = (found: Set<string> | undefined) => (people && found ? people.filter((id) => found.has(id)) : []);
 
   const names = await getUserNames([...meetings.map((m) => m.owner_id), ...tasks.map((t) => t.owner_id)]);
   const items: CalendarItem[] = [
@@ -106,6 +116,7 @@ export async function listCalendarItems(
       location: m.location,
       ownerName: m.owner_id ? (names.get(m.owner_id) ?? null) : null,
       related: relatedOf(m),
+      people: ordered(meetingPeople.get(m.id)),
     })),
     ...tasks
       .filter((t): t is typeof t & { due_at: string } => t.due_at !== null)
@@ -120,8 +131,24 @@ export async function listCalendarItems(
         location: null,
         ownerName: t.owner_id ? (names.get(t.owner_id) ?? null) : null,
         related: relatedOf(t),
+        people: people && t.owner_id && people.includes(t.owner_id) ? [t.owner_id] : [],
       })),
   ];
   items.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id.localeCompare(b.id));
   return { items, truncated };
+}
+
+/**
+ * The organization's teams and who sits in them, for the team filter (CAL-04).
+ * Members may read both (RLS); which teams are offered is `visibleTeams()`.
+ */
+export async function listCalendarTeams(orgId: string): Promise<{ teams: CalendarTeam[]; memberships: TeamMembership[] }> {
+  const supabase = await createClient();
+  const [teamResult, memberResult] = await Promise.all([
+    supabase.from("teams").select("id, name, parent_team_id").eq("organization_id", orgId),
+    supabase.from("team_members").select("team_id, user_id, is_manager").eq("organization_id", orgId),
+  ]);
+  const teams = must(teamResult, "calendar teams").map((t) => ({ id: t.id, name: t.name, parentId: t.parent_team_id }));
+  const memberships = must(memberResult, "calendar team members").map((m) => ({ teamId: m.team_id, userId: m.user_id, isManager: m.is_manager }));
+  return { teams, memberships };
 }

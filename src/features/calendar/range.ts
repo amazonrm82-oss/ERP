@@ -6,10 +6,11 @@ import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
 // organization's zone; instants are UTC ISO strings. Pure, so it is unit-tested
 // and runs the same on the server and in the browser.
 
-export const CALENDAR_VIEWS = ["day", "week", "month", "agenda"] as const;
+// "people" (CAL-04): one day, a column per person
+export const CALENDAR_VIEWS = ["day", "week", "month", "agenda", "people"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
-export const VIEW_LABEL: Record<CalendarView, string> = { day: "יום", week: "שבוע", month: "חודש", agenda: "סדר יום" };
+export const VIEW_LABEL: Record<CalendarView, string> = { day: "יום", week: "שבוע", month: "חודש", agenda: "סדר יום", people: "זה לצד זה" };
 
 // the agenda lists this many days from the chosen one
 export const AGENDA_DAYS = 14;
@@ -33,6 +34,7 @@ export function parseDay(value: string | undefined, today: string): string {
 export function viewDays(view: CalendarView, day: string): string[] {
   switch (view) {
     case "day":
+    case "people":
       return [day];
     case "week": {
       const first = startOfWeek(day);
@@ -49,6 +51,7 @@ export function viewDays(view: CalendarView, day: string): string[] {
 export function stepDay(view: CalendarView, day: string, direction: 1 | -1): string {
   switch (view) {
     case "day":
+    case "people":
       return addDays(day, direction);
     case "week":
       return addDays(day, 7 * direction);
@@ -81,7 +84,7 @@ export function spanTitle(first: string, last: string): string {
 
 /** The heading of a view. */
 export function viewTitle(view: CalendarView, day: string): string {
-  if (view === "day") return longDay(day);
+  if (view === "day" || view === "people") return longDay(day);
   if (view === "month") return monthTitle(day);
   const days = viewDays(view, day);
   return spanTitle(days[0], days[days.length - 1]);
@@ -211,14 +214,26 @@ export function movedEnd(startsAt: string, endsAt: string, newStart: string): st
 
 // --- Address -------------------------------------------------------------------
 
-/** The calendar screen; `view`, `date` and `who` travel in the query string. */
-export function calendarPath(orgId: string, query?: { view?: CalendarView; date?: string; who?: string }): string {
+export type CalendarQuery = {
+  view?: CalendarView;
+  date?: string;
+  // whose calendar: empty = mine, "all", or a member's user id
+  who?: string;
+  // CAL-04: a team id, and the people of the side-by-side view (repeated `p`)
+  team?: string;
+  people?: string[];
+};
+
+/** The calendar screen; the view, the day and whose calendar travel in the query string. */
+export function calendarPath(orgId: string, query?: CalendarQuery): string {
   const base = `/o/${orgId}/calendar`;
   if (!query) return base;
   const params = new URLSearchParams();
   if (query.view) params.set("view", query.view);
   if (query.date) params.set("date", query.date);
   if (query.who) params.set("who", query.who);
+  if (query.team) params.set("team", query.team);
+  for (const person of query.people ?? []) params.append("p", person);
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
 }
