@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 
 import { inlineEditAction } from "@/features/inline-edit/actions";
 
+import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
 import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
@@ -34,6 +35,8 @@ export type TaskRowView = {
   // 1 high, 2 normal, 3 low (TASK-01)
   priority: number;
   outcome: string | null;
+  // TASK-04: how it repeats; null = once
+  recurrence: Recurrence | null;
   related: { href: string; label: string } | null;
 };
 
@@ -84,11 +87,17 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
               עדיפות גבוהה
             </Badge>
           ) : null}
+          {!task.done && task.recurrence ? (
+            <Badge tone="accent" className="me-1.5 align-middle">
+              חוזרת
+            </Badge>
+          ) : null}
           {task.title}
         </p>
         <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
           {task.done && task.completedText ? <span>הושלמה {task.completedText}</span> : null}
           {!task.done && task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
+          {!task.done && task.recurrence ? <span>{describeRecurrence(task.recurrence)}</span> : null}
           {!task.done && task.remind !== "" ? <span>תזכורת {REMIND_OPTIONS.find((o) => o.value === task.remind)?.label}</span> : null}
           {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
           {!task.done && task.priority === 3 ? <span>עדיפות נמוכה</span> : null}
@@ -175,7 +184,18 @@ function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
     <form action={formAction} className="space-y-4" noValidate aria-label={`עריכת המשימה ${task.title}`}>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <TaskFields
-        values={failure?.values ?? { title: task.title, due_date: task.dueDate, due_time: task.dueTime, owner_id: task.ownerId, task_type: task.taskType, remind: task.remind, priority: String(task.priority) }}
+        values={
+          failure?.values ?? {
+            title: task.title,
+            due_date: task.dueDate,
+            due_time: task.dueTime,
+            owner_id: task.ownerId,
+            task_type: task.taskType,
+            remind: task.remind,
+            priority: String(task.priority),
+            ...repeatValues(task.recurrence),
+          }
+        }
         errors={failure?.fieldErrors ?? {}}
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}

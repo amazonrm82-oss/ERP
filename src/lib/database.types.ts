@@ -769,6 +769,10 @@ export type TaskRow = {
   contact_id: string | null;
   company_id: string | null;
   deal_id: string | null;
+  // TASK-04: how the task repeats (shape in src/features/tasks/recurrence.ts); null = once
+  recurrence: Json | null;
+  // the completed task this one was created from; written by the database only
+  recurrence_source_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -792,6 +796,7 @@ export type TaskInsert = {
   contact_id?: string | null;
   company_id?: string | null;
   deal_id?: string | null;
+  recurrence?: Json | null;
   deleted_at?: string | null;
 };
 

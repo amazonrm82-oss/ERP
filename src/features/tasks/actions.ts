@@ -15,6 +15,7 @@ import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
+import { REPEAT_FIELD_NAMES, repeatFormSchema } from "./recurrence";
 import { TASK_FIELD_NAMES, taskSchema } from "./schema";
 
 // A task with a date but no time is due at the start of the working day.
@@ -38,13 +39,24 @@ function schedule(data: { due_date: string | null; due_time: string | null; remi
   return { due_at: due, remind_at: remindAt(due, data.remind) };
 }
 
+/** The task form: its fields and its repeat rule (TASK-04), with the errors of both. */
+function parseTaskForm(formData: FormData) {
+  const input = pick(formData, [...TASK_FIELD_NAMES, ...REPEAT_FIELD_NAMES]);
+  const task = taskSchema.safeParse(input);
+  const repeat = repeatFormSchema.safeParse(input);
+  if (task.success && repeat.success) {
+    return { success: true as const, data: { ...task.data, recurrence: repeat.data } };
+  }
+  return { success: false as const, error: new z.ZodError([...(task.error?.issues ?? []), ...(repeat.error?.issues ?? [])]) };
+}
+
 /** New task. Without an assignee it is the creator's (the database assigns it). */
 export async function createTaskAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
   }
-  const parsed = taskSchema.safeParse(pick(formData, TASK_FIELD_NAMES));
+  const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
@@ -55,6 +67,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
     title: parsed.data.title,
     task_type: parsed.data.task_type,
     priority: parsed.data.priority,
+    recurrence: parsed.data.recurrence,
     ...schedule(parsed.data),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
   });
@@ -76,17 +89,19 @@ export async function updateTaskAction(
   if (!context.ok) {
     return context;
   }
-  const parsed = taskSchema.safeParse(pick(formData, TASK_FIELD_NAMES));
+  const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
 
+  // recurrence is always sent: "בלי חזרה" stops the series (TASK-04)
   const { data, error } = await context.supabase
     .from("tasks")
     .update({
       title: parsed.data.title,
       task_type: parsed.data.task_type,
       priority: parsed.data.priority,
+      recurrence: parsed.data.recurrence,
       ...schedule(parsed.data),
       ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
     })

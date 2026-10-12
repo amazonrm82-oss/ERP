@@ -1,8 +1,19 @@
 import { SelectField, TextField } from "@/components/ui/field";
 
+import type { RepeatValues } from "../recurrence";
+import { RecurrenceFields } from "./recurrence-fields";
+
 export type AssigneeOption = { userId: string; name: string };
 
-export type TaskValues = { title?: string | null; due_date?: string | null; due_time?: string | null; owner_id?: string | null; task_type?: string | null; remind?: string | null; priority?: string | null };
+export type TaskValues = {
+  title?: string | null;
+  due_date?: string | null;
+  due_time?: string | null;
+  owner_id?: string | null;
+  task_type?: string | null;
+  remind?: string | null;
+  priority?: string | null;
+} & RepeatValues;
 
 export const TASK_TYPE_OPTIONS = [
   { value: "todo", label: "משימה" },
@@ -38,7 +49,7 @@ export function remindOption(dueAt: string | null, remindAt: string | null): str
 
 type Props = { values: TaskValues; errors: Record<string, string>; assignees: AssigneeOption[]; defaultOwnerId: string };
 
-/** Title, due date and time, reminder, assignee. Shared by the new-task form and the edit form. */
+/** Title, due date and time, reminder, repeat, assignee. Shared by the new-task form and the edit form. */
 export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
@@ -85,6 +96,7 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props)
           </option>
         ))}
       </SelectField>
+      <RecurrenceFields values={values} errors={errors} />
       <SelectField key={`owner-${owner}`} label="באחריות" name="owner_id" defaultValue={owner} error={errors.owner_id}>
         {assignees.map((assignee) => (
           <option key={assignee.userId} value={assignee.userId}>

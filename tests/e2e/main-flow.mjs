@@ -738,6 +738,39 @@ try {
   await ownerDesk.getByRole("button", { name: "שמירת התוצאה" }).click();
   await expectText(ownerDesk, "תוצאה: הלקוח אישר בטלפון");
 
+  step("tasks: a weekly task comes back after it is done (TASK-04)");
+  {
+    const org = orgUrl.split("/").pop();
+    const title = "דוח שבועי לצוות";
+    await ownerDesk.goto(`${orgUrl}/tasks`);
+    await ownerDesk.getByLabel("מה צריך לעשות").fill(title);
+    await ownerDesk.getByLabel("חזרה", { exact: true }).selectOption({ label: "כל שבוע" });
+    await ownerDesk.getByLabel(/^ראשון$/).check();
+    await ownerDesk.getByLabel(/^רביעי$/).check();
+    await ownerDesk.getByLabel("סיום החזרה").selectOption({ label: "אחרי מספר פעמים" });
+    await ownerDesk.getByLabel("כמה פעמים עוד").fill("3");
+    await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
+    const row = ownerDesk.locator("li", { has: ownerDesk.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }) });
+    await row.getByText(/^חוזרת$/).waitFor({ timeout: 15000 });
+    await row.getByText(/כל שבוע בימים א׳, ד׳, עוד 3 פעמים/).waitFor();
+    await row.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }).click();
+    let next;
+    for (let i = 0; i < 60 && !next; i++) {
+      [next] = await sql(
+        `select extract(dow from n.due_at at time zone 'Asia/Jerusalem')::int as dow, to_char(n.due_at at time zone 'Asia/Jerusalem', 'HH24:MI') as time, n.recurrence
+           from public.tasks n join public.tasks t on t.id = n.recurrence_source_id
+          where t.organization_id = $1 and t.title = $2 and n.status = 'open'`,
+        [org, title],
+      );
+      if (!next) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!next || ![0, 3].includes(next.dow) || next.time !== "09:00" || next.recurrence?.left !== 2) throw new Error(`recurring task: ${JSON.stringify(next)}`);
+    // the next one is on the list, open, with its badge
+    await ownerDesk.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }).waitFor({ timeout: 15000 });
+    // leave the list as the later steps expect it: no open task of this series
+    await sql("update public.tasks set recurrence = null, status = 'done' where organization_id = $1 and title = $2 and status = 'open'", [org, title]);
+  }
+
   step("tasks: put off to next week and hand over, straight from the list (TASK-05)");
   const taskOrg = orgUrl.split("/").pop();
   const quoteTask = () =>

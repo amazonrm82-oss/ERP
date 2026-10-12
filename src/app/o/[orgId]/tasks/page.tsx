@@ -140,6 +140,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       taskType: task.taskType,
       priority: task.priority,
       outcome: task.outcome,
+      recurrence: task.recurrence,
       related: task.related ? { href: relatedHref(orgId, task.related), label: RELATED_LABEL[task.related.kind] } : null,
     };
   };

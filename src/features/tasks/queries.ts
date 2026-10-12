@@ -8,6 +8,8 @@ import { sortColumn, type Sort } from "@/lib/sort";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { parseRecurrence, type Recurrence } from "./recurrence";
+
 export type TaskItem = {
   id: string;
   title: string;
@@ -20,6 +22,8 @@ export type TaskItem = {
   completedAt: string | null;
   // what came of it, once done (TASK-03)
   outcome: string | null;
+  // how it repeats (TASK-04); null = once
+  recurrence: Recurrence | null;
   // the record the task belongs to, when there is one
   related: { kind: "lead" | "contact" | "company" | "deal"; id: string } | null;
 };
@@ -44,7 +48,7 @@ const DONE_SHOWN = 20;
  */
 export async function listTaskGroups(orgId: string, ownerId: string | null): Promise<TaskGroups> {
   const supabase = await createClient();
-  const columns = "id, title, task_type, priority, outcome, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+  const columns = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
 
   let open = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "open").is("deleted_at", null);
   let done = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "done").is("deleted_at", null);
@@ -77,6 +81,7 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
     priority: row.priority,
     completedAt: row.completed_at,
     outcome: row.outcome,
+    recurrence: parseRecurrence(row.recurrence),
     related: row.deal_id
       ? { kind: "deal", id: row.deal_id }
       : row.lead_id
