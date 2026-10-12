@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildVCard, vcardDisposition } from "@/lib/vcard";
+import { buildVCard, escapeVCardText, vcardDisposition } from "@/lib/vcard";
 
 describe("contact card for the phone (GAP-02)", () => {
   it("writes the person's details as vCard 3.0", () => {
@@ -21,10 +21,23 @@ describe("contact card for the phone (GAP-02)", () => {
   });
 
   it("leaves out what is missing and escapes special characters", () => {
-    const card = buildVCard({ name: "כהן, משה; בנו", phone: null, email: "" });
-    expect(card).toContain("FN:כהן\\, משה\; בנו");
+    const card = buildVCard({ name: "כהן, משה; בנו", phone: null, email: "", company: "א;ב" });
+    // RVW-18: in a JS string "\\;" is backslash + semicolon ("\;" would be a bare semicolon)
+    expect(card).toContain("FN:כהן\\, משה\\; בנו");
+    expect(card).toContain("N:כהן\\, משה\\; בנו;;;;");
+    expect(card).toContain("ORG:א\\;ב");
     expect(card).not.toContain("TEL");
     expect(card).not.toContain("EMAIL");
+  });
+
+  it("escapes backslash, comma, semicolon and every kind of line break", () => {
+    expect(escapeVCardText("a\\b")).toBe("a\\\\b");
+    expect(escapeVCardText("a,b;c")).toBe("a\\,b\\;c");
+    expect(escapeVCardText("1\r\n2\n3\r4")).toBe("1\\n2\\n3\\n4");
+    // a backslash already in the text stays text: it is escaped first, before the separators
+    expect(escapeVCardText("\\;")).toBe("\\\\\\;");
+    // a lone CR never reaches the card, where it could break a line
+    expect(buildVCard({ name: "שם\rשני" })).toContain("FN:שם\\nשני\r\n");
   });
 
   it("folds long lines without splitting a Hebrew letter", () => {
