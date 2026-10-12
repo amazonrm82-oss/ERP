@@ -58,13 +58,34 @@ describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
     expect(parseAttribution({ utm_campaign: "א", campaign: "ב" }).utm_campaign).toBe("א");
   });
 
+  it("the landing page address keeps only its campaign parameters, before it is sent and when it is received (CAP-02)", () => {
+    expect(
+      parseAttribution({
+        landing_url: " https://shop.co.il/sale?token=secret&utm_source=fb&email=a%40b.co&fbclid=F1#form ",
+        referrer_url: "https://l.facebook.com/?u=1",
+      }),
+    ).toEqual({ landing_url: "https://shop.co.il/sale?utm_source=fb&fbclid=F1", referrer_url: "https://l.facebook.com/?u=1" });
+    // the old name webhook senders use goes through the same rule
+    expect(parseAttribution({ page_url: "https://a.co/p?x=1#y" })).toEqual({ landing_url: "https://a.co/p" });
+    expect(parseAttribution({ landing_url: "https://user:pass@a.co/p?utm_source=x" })).toEqual({ landing_url: "https://a.co/p?utm_source=x" });
+    // a long address made short by the stripping is kept; a bad one is still dropped
+    expect(parseAttribution({ landing_url: `https://a.co/p?utm_source=x&junk=${"j".repeat(3000)}` })).toEqual({ landing_url: "https://a.co/p?utm_source=x" });
+    expect(parseAttribution({ landing_url: "javascript:alert(1)?utm_source=x" })).toEqual({});
+    // an embedded form: the page address from the embed code is stripped too
+    const host = "https://shop.co.il/landing?utm_source=facebook&session=abc#top";
+    expect(collectAttribution(`https://crm.example/f/abc?embed=1&page_url=${encodeURIComponent(host)}`, "").landing_url).toBe(
+      "https://shop.co.il/landing?utm_source=facebook",
+    );
+  });
+
   it("the hosted form sends its own address and the page the visitor came from", () => {
     const href = "https://crm.example/f/abc?utm_source=google&utm_medium=cpc&gclid=G1&other=1";
     expect(collectAttribution(href, "https://www.google.com/")).toEqual({
       utm_source: "google",
       utm_medium: "cpc",
       gclid: "G1",
-      landing_url: href,
+      // CAP-02: only the campaign parameters stay on the landing page address
+      landing_url: "https://crm.example/f/abc?utm_source=google&utm_medium=cpc&gclid=G1",
       referrer_url: "https://www.google.com/",
     });
     expect(collectAttribution("https://crm.example/f/abc", "")).toEqual({ landing_url: "https://crm.example/f/abc" });

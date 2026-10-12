@@ -35,17 +35,22 @@ export function safeText(value: string, max: number): string {
     .trim();
 }
 
+// "scheme://user:pass@" -> "scheme://" (greedy: up to the last @ before the path, query or fragment)
+const USER_INFO = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/?#]*@/;
+
 /** The query parameters a stored landing page address may keep (CAP-02, owner 12 October 2026). */
 export const CAMPAIGN_KEYS: readonly string[] = [...UTM_KEYS, ...CLICK_ID_KEYS];
 
 /**
- * A page address with only its campaign parameters: the fragment and every other
- * query parameter are removed, the kept ones stay exactly as written and in order.
+ * A page address with only its campaign parameters: the fragment, any user info
+ * (user:pass@ in the authority) and every other query parameter are removed; the
+ * kept ones stay exactly as written and in order.
  * Plain text work, no URL parsing, so the embed script (embed-script.ts) and the
- * database (app.campaign_only_url(), migration 0095) do exactly the same; keep the three in step.
+ * database (app.campaign_only_url(), migration landing_url_campaign_only) do exactly
+ * the same; keep the three in step.
  */
 export function campaignOnlyUrl(value: string): string {
-  const base = value.split("#")[0];
+  const base = value.split("#")[0].replace(USER_INFO, "$1");
   const q = base.indexOf("?");
   if (q < 0) return base;
   const kept = base
@@ -75,6 +80,8 @@ function cleanUrl(value: string): string | null {
 
 function cleanValue(key: AttributionKey, value: unknown): string | null {
   if (typeof value !== "string") return null;
+  // the landing page keeps only its campaign parameters (CAP-02, owner 12 October 2026)
+  if (key === "landing_url") return cleanUrl(campaignOnlyUrl(value.trim()));
   if ((URL_KEYS as readonly string[]).includes(key)) return cleanUrl(value);
   if ((CLICK_ID_KEYS as readonly string[]).includes(key)) {
     const trimmed = value.trim();

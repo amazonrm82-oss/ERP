@@ -28,7 +28,7 @@ export const EMBED_SCRIPT = `/* Lead form embed: passes only campaign parameters
   try { origin = new URL(me.src).origin; } catch (e) { return; }
 
   function campaignOnly(value) {
-    var base = value.split("#")[0];
+    var base = value.split("#")[0].replace(/^([A-Za-z][A-Za-z0-9+.-]*:\\/\\/)[^/?#]*@/, "$1");
     var q = base.indexOf("?");
     if (q < 0) return base;
     var kept = base.slice(q + 1).split("&").filter(function (part) {
@@ -48,7 +48,9 @@ export const EMBED_SCRIPT = `/* Lead form embed: passes only campaign parameters
       var value = host.get(key);
       if (value && !src.searchParams.has(key)) src.searchParams.set(key, value.slice(0, ${EMBED_VALUE_MAX}));
     });
-    var page = campaignOnly(window.location.href);
+    // origin + path + query: never the user info or the fragment of the host page's address
+    var loc = window.location;
+    var page = campaignOnly(loc.origin + loc.pathname + loc.search);
     if (/^https?:/i.test(page) && page.length <= ${EMBED_PAGE_URL_MAX} && !src.searchParams.has("page_url")) {
       src.searchParams.set("page_url", page);
     }

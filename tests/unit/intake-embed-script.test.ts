@@ -32,7 +32,7 @@ function runScript(pageHref: string, frames: FakeFrame[], scriptSrc = "https://c
   const context = {
     URL,
     URLSearchParams,
-    window: { location: { href: page.href, search: page.search } },
+    window: { location: { href: page.href, origin: page.origin, pathname: page.pathname, search: page.search } },
     document: {
       currentScript: { src: scriptSrc },
       baseURI: page.href,
@@ -85,6 +85,13 @@ describe("CAP-02: the embed script passes only campaign details and the page add
     expect(f.src).toBe(again);
   });
 
+  it("never passes the user info of the host page's address", () => {
+    const [f] = runScript("https://user:pass@shop.co.il/sale?utm_source=fb&x=1#top", [frame("https://crm.example/f/t?embed=1")]);
+    const pageUrl = new URL(f.src).searchParams.get("page_url");
+    expect(pageUrl).toBe("https://shop.co.il/sale?utm_source=fb");
+    expect(f.src).not.toContain("pass");
+  });
+
   it("cuts long values and skips a page address over the limit", () => {
     const long = "a".repeat(3000);
     const [f] = runScript(`https://shop.co.il/?utm_content=${long}`, [frame("https://crm.example/f/t?embed=1")]);
@@ -99,7 +106,7 @@ describe("CAP-02: the embed script passes only campaign details and the page add
     vm.runInNewContext(EMBED_SCRIPT, {
       URL,
       URLSearchParams,
-      window: { location: { href: page.href, search: page.search } },
+      window: { location: { href: page.href, origin: page.origin, pathname: page.pathname, search: page.search } },
       document: { currentScript: null, baseURI: page.href, getElementsByTagName: () => frames },
     });
     expect(frames[0].src).toBe("https://crm.example/f/t?embed=1");
@@ -114,10 +121,20 @@ describe("CAP-02: the embed script passes only campaign details and the page add
       "https://a.co/p#h?utm_source=a",
       "https://a.co/p?utm_source&ctwa_clid=C1&utm_sourcex=1",
       "https://a.co/p?UTM_SOURCE=a&utm_medium=b",
+      "https://user:pass@a.co/p?utm_source=a&x=1",
+      "https://user@a.co:8443/p?gclid=G",
     ];
     for (const href of cases) {
       const [f] = runScript(href, [frame("https://crm.example/f/t?embed=1")]);
       expect(new URL(f.src).searchParams.get("page_url"), href).toBe(campaignOnlyUrl(href));
+    }
+    // the script's own copy of the rule, on text a browser would never give it as location
+    const script = EMBED_SCRIPT.match(/function campaignOnly\(value\) \{[\s\S]*?\n  \}/)?.[0];
+    expect(script).toBeTruthy();
+    const KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid", "ctwa_clid"];
+    const scriptRule = vm.runInNewContext(`(${script!.replace("function campaignOnly", "function")})`, { KEYS }) as (v: string) => string;
+    for (const raw of ["https://u:p@a.co/p?utm_source=a&x=1#h", "https://a@b@a.co/?fbclid=F", "https://a.co/p?next=https://u:p@b.co", "https://a.co/@x?utm_term=t"]) {
+      expect(scriptRule(raw), raw).toBe(campaignOnlyUrl(raw));
     }
   });
 });
@@ -132,5 +149,10 @@ describe("campaignOnlyUrl()", () => {
       "https://a.co/p?utm_campaign=%D7%90+%D7%91&fbclid=F&ctwa_clid=C",
     );
     expect(campaignOnlyUrl("https://a.co/p?utm_source_x=1&Utm_source=2")).toBe("https://a.co/p");
+    // user info in the authority goes; an @ in the path or the query stays
+    expect(campaignOnlyUrl("https://user:pass@a.co/p?utm_source=x&t=1")).toBe("https://a.co/p?utm_source=x");
+    expect(campaignOnlyUrl("https://a@b@a.co:8443/p")).toBe("https://a.co:8443/p");
+    expect(campaignOnlyUrl("https://a.co/@x?utm_term=t")).toBe("https://a.co/@x?utm_term=t");
+    expect(campaignOnlyUrl("https://a.co?next=https://u:p@b.co")).toBe("https://a.co");
   });
 });
