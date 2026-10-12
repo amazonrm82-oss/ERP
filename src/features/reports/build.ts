@@ -416,7 +416,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         kpis: [
           { label: "עסקאות תקועות", value: formatNumber(rows.length) },
           { label: "שווי", value: formatMoney(rows.reduce((s, r) => s + num(r.amount_agorot), 0)) },
-          { label: "בלי משימה הבאה", value: formatNumber(rows.filter((r) => r.no_next_step === true).length) },
+          { label: "בלי צעד הבא", value: formatNumber(rows.filter((r) => r.no_next_step === true).length) },
         ],
         sections: [
           {
@@ -439,11 +439,11 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
                 amount: num(r.amount_agorot),
                 idle_days: num(r.idle_days),
                 days_in_stage: num(r.days_in_stage),
-                why: [r.idle === true ? "אין פעילות" : null, r.no_next_step === true ? "אין משימה הבאה" : null].filter(Boolean).join(", "),
+                why: [r.idle === true ? "אין פעילות" : null, r.no_next_step === true ? "אין משימה או פגישה הבאה" : null].filter(Boolean).join(", "),
               }),
             ),
             empty: "אין עסקאות תקועות. כל העסקאות הפתוחות מטופלות.",
-            note: "תקועה: אין פעילות יותר ממספר הימים שהוגדר לשלב (ברירת מחדל 14), או שאין לה משימה פתוחה.",
+            note: "תקועה: אין פעילות יותר ממספר הימים שהוגדר לשלב (ברירת מחדל 14), או שאין לה משימה פתוחה וגם לא פגישה מתוכננת.",
           },
         ],
       };

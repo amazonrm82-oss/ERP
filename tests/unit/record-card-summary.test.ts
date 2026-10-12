@@ -27,7 +27,7 @@ describe("record card summary (REC-10)", () => {
     expect(data.lastTouch).toEqual({ type: "call", occurredAt: "2026-10-10T12:00:00Z" });
     expect(data.nextTask).toEqual({ id: "t1", title: "להתקשר", taskType: "call", dueAt: null });
     expect(data.openTasks).toBe(3);
-    expect(parseRecordSummary(null)).toEqual({ deals: [], lastTouch: null, nextTask: null, openTasks: 0 });
+    expect(parseRecordSummary(null)).toEqual({ deals: [], lastTouch: null, nextTask: null, openTasks: 0, nextMeeting: null });
   });
 
   it("formats agorot in the given currency, whole amounts without decimals", () => {
@@ -89,5 +89,17 @@ describe("record card summary (REC-10)", () => {
     );
     expect(later.nextTask).toMatchObject({ overdue: false, dateText: null, moreCount: 0 });
     expect(later.lastTouch).toBeNull();
+  });
+
+  it("shows the next planned meeting as a next step too (RVW-1)", () => {
+    const view = buildSummaryView(
+      parseRecordSummary({ next_meeting: { id: "m1", title: "פגישת היכרות", starts_at: "2026-10-13T08:30:00Z" } }),
+      { currency: "ILS", timeZone: TZ, now: NOW },
+    );
+    expect(view.nextTask).toBeNull();
+    expect(view.nextMeeting).toMatchObject({ title: "פגישת היכרות", iso: "2026-10-13T08:30:00Z" });
+    // 11:30 in Jerusalem
+    expect(view.nextMeeting?.dateText).toMatch(/11:30/);
+    expect(parseRecordSummary({ next_meeting: { id: "m1", title: "x" } }).nextMeeting).toBeNull();
   });
 });

@@ -13,6 +13,8 @@ export type RecordSummaryData = {
   lastTouch: { type: string; occurredAt: string } | null;
   nextTask: { id: string; title: string; taskType: string; dueAt: string | null } | null;
   openTasks: number;
+  // the nearest planned meeting that has not ended (RVW-1): a next step too
+  nextMeeting: { id: string; title: string; startsAt: string } | null;
 };
 
 const TOUCH_LABELS: Record<string, string> = {
@@ -54,11 +56,15 @@ export function parseRecordSummary(raw: unknown): RecordSummaryData {
   const touchAt = str(touch?.occurred_at);
   const task = obj(root.next_task);
   const taskId = str(task?.id);
+  const meeting = obj(root.next_meeting);
+  const meetingId = str(meeting?.id);
+  const meetingAt = str(meeting?.starts_at);
   return {
     deals,
     lastTouch: touchType && touchAt ? { type: touchType, occurredAt: touchAt } : null,
     nextTask: task && taskId ? { id: taskId, title: str(task.title) ?? "", taskType: str(task.task_type) ?? "todo", dueAt: str(task.due_at) } : null,
     openTasks: num(root.open_tasks),
+    nextMeeting: meeting && meetingId && meetingAt ? { id: meetingId, title: str(meeting.title) ?? "", startsAt: meetingAt } : null,
   };
 }
 
@@ -129,6 +135,7 @@ export type SummaryView = {
   open: DealLine;
   lastTouch: { label: string; ago: string; dateText: string; iso: string } | null;
   nextTask: { title: string; dateText: string | null; iso: string | null; overdue: boolean; moreCount: number } | null;
+  nextMeeting: { title: string; dateText: string; iso: string } | null;
 };
 
 /** Everything the card shows, in the organization's currency and time zone. */
@@ -136,6 +143,7 @@ export function buildSummaryView(data: RecordSummaryData, options: { currency: s
   const { currency, timeZone, now } = options;
   const touch = data.lastTouch;
   const task = data.nextTask;
+  const meeting = data.nextMeeting;
   return {
     won: dealLine(data.deals, "won", currency),
     open: dealLine(data.deals, "open", currency),
@@ -156,5 +164,6 @@ export function buildSummaryView(data: RecordSummaryData, options: { currency: s
           moreCount: Math.max(0, data.openTasks - 1),
         }
       : null,
+    nextMeeting: meeting ? { title: meeting.title, dateText: dateText(meeting.startsAt, timeZone, true), iso: meeting.startsAt } : null,
   };
 }

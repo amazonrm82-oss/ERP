@@ -10,13 +10,13 @@ type StuckRow = { id: string; idle: boolean; idle_days: number; no_next_step: bo
 export function stuckReason(row: Pick<StuckRow, "idle" | "idle_days" | "no_next_step">): string {
   const parts: string[] = [];
   if (row.idle) parts.push(row.idle_days === 1 ? "בלי פעילות יום אחד" : `בלי פעילות ${formatNumber(row.idle_days)} ימים`);
-  if (row.no_next_step) parts.push("אין משימה פתוחה");
+  if (row.no_next_step) parts.push("אין משימה או פגישה");
   return parts.join(" · ");
 }
 
 /**
  * Open deals of a pipeline that are stuck: idle longer than their stage allows
- * (the stage's days, 14 by default), or with no open task. Read through
+ * (the stage's days, 14 by default), or with no open task and no planned meeting. Read through
  * report_stuck_deals, security invoker: the user sees only deals they may see.
  */
 export async function getStuckDeals(orgId: string, pipelineId: string): Promise<Record<string, string>> {

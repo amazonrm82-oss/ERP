@@ -31,7 +31,8 @@ function Deals({ line, empty }: { line: DealLine; empty: string }) {
 
 /**
  * REC-10: the automatic summary of a contact or a company: won and open deals
- * (count and sum), the last logged touch and the next open task.
+ * (count and sum), the last logged touch, the next open task and the next
+ * planned meeting.
  */
 export async function RecordSummaryCard({ orgId, type, id, currency, timeZone }: Props) {
   const data = await getRecordSummary(orgId, type, id);
@@ -88,9 +89,17 @@ export async function RecordSummaryCard({ orgId, type, id, currency, timeZone }:
                     ) : null}
                   </span>
                 </>
-              ) : (
-                <span className="text-ink-soft">אין משימה פתוחה</span>
+              ) : view.nextMeeting ? null : (
+                <span className="text-ink-soft">אין משימה פתוחה או פגישה מתוכננת</span>
               )}
+              {view.nextMeeting ? (
+                <span className={`block${view.nextTask ? " mt-2" : ""}`}>
+                  <span className="block font-medium">פגישה: {view.nextMeeting.title}</span>
+                  <time dateTime={view.nextMeeting.iso} className="mt-0.5 block text-sm text-ink-soft">
+                    {view.nextMeeting.dateText}
+                  </time>
+                </span>
+              ) : null}
             </dd>
           </div>
         </dl>

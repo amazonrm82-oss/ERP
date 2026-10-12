@@ -73,6 +73,8 @@ const OWN_MESSAGES: Array<[RegExp, string]> = [
   [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק מנהל מערכת יכול לערוך אותה."],
   // REC-01: trigger activities_edit_window (hint note:pin_only), a team manager on a colleague's entry
   [/note pin only/i, "אפשר לנעוץ את הרשומה הזו, אבל רק מי שכתב אותה או מנהל מערכת יכולים לערוך אותה."],
+  // RVW-1: trigger activities_verify_meeting_entry (hint meeting:entry); the app never sends the key
+  [/meeting entry link is set by the server/i, "את הקישור לפגישה המערכת קובעת. אי אפשר לשנות אותו."],
   // CAL-01: trigger meetings_check_links
   [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה."],
   [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק."],

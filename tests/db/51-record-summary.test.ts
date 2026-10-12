@@ -144,7 +144,7 @@ describe("record_summary: the contact / company card summary", () => {
 
   it("someone from another organization gets nothing", async () => {
     const s = await summary(outsider.id, "company", company);
-    expect(s).toEqual({ deals: [], last_touch: null, next_task: null, open_tasks: 0 });
+    expect(s).toEqual({ deals: [], last_touch: null, next_task: null, open_tasks: 0, next_meeting: null });
   });
 
   it("refuses an unknown record type", async () => {

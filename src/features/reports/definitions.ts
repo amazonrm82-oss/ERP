@@ -18,7 +18,7 @@ export const REPORTS: ReportDefinition[] = [
   { key: "forecast", title: "תחזית הכנסות", description: "שווי משוקלל של עסקאות פתוחות לפי חודש סגירה צפוי.", filters: ["owner", "pipeline"] },
   { key: "lost", title: "סיבות הפסד", description: "למה עסקאות אובדות, באיזה שלב ואצל מי.", filters: ["period", "owner", "pipeline"] },
   { key: "cycle", title: "אורך מחזור מכירה", description: "ימים מליד לסגירה, וימים בכל שלב.", filters: ["period", "owner", "pipeline"] },
-  { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות בלי פעילות או בלי משימה הבאה.", filters: ["owner", "pipeline"] },
+  { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות בלי פעילות, או בלי משימה או פגישה הבאה.", filters: ["owner", "pipeline"] },
   { key: "revenue", title: "הכנסות", description: "הכנסה שנסגרה לפי חודש, אחראי ולקוח.", filters: ["period", "owner", "pipeline"] },
 ];
 
