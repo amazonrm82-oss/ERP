@@ -306,6 +306,13 @@ that back.
 - Entry (LND-01/06/07/08): `/` is the public landing page (`paths.landing`); the business picker is `/app`
   (`paths.home`). The proxy sends a signed-in visitor of `/` to `/app`; the installed app starts at `/app`
   (manifest `id` stays `/`), and the landing page opened inside it goes to `/login`.
+- Column grants (RVW-12, 0073): `contacts`, like `leads` (0038) and `tasks` (0063), has column-level INSERT/UPDATE
+  grants; a new column on any of them needs `grant insert, update (col) ... to authenticated`. `last_contacted_at` /
+  `first_contacted_at` are server-only. Tasks may link only records the caller can see (0074: `tasks_insert` +
+  trigger `tasks_check_links`, which checks only links an update changes); activities from the browser are limited to
+  the six logged types (0072).
+- Reads past 1,000 rows (RVW-2): PostgREST caps a read at 1,000 rows; a read that can pass it pages through
+  `readAllPages` / `readAllPagesByIds` in `src/lib/paged-read.ts` with a deterministic order (by id or a tie-break on id).
 - Managed lists (owner's rule, 12 October 2026): every list an organization manages (types, reasons, statuses and the like)
   starts with default values the business can rename or delete. `create_organization()` seeds them; there is no "add the
   suggested values" button. A new list ships with its defaults and seeds organizations whose list is still empty.
