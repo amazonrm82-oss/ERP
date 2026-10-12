@@ -107,6 +107,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             status: statusName.get(lead.statusId) ?? null,
             source: lead.sourceId ? (sourceName.get(lead.sourceId) ?? null) : null,
             owner: lead.ownerName,
+            last_contact: lead.lastContactedAt ? created(lead.lastContactedAt) : null,
             created: created(lead.createdAt),
           },
         });

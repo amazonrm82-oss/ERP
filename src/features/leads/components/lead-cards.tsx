@@ -1,5 +1,6 @@
 import { RecordCards } from "@/components/record-cards";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { leadDisplayName, statusTone } from "../display";
@@ -21,7 +22,11 @@ export function LeadCards({ orgId, leads, statuses, className }: Props) {
           href: paths.lead(orgId, lead.id),
           title: leadDisplayName(lead),
           badge: status ? <Badge tone={statusTone(status)}>{status.name}</Badge> : null,
-          details: [lead.companyName, lead.ownerName ? `אחראי: ${lead.ownerName}` : null],
+          details: [
+            lead.companyName,
+            lead.ownerName ? `אחראי: ${lead.ownerName}` : null,
+            lead.lastContactedAt ? `מגע אחרון: ${formatDate(lead.lastContactedAt)}` : null,
+          ],
           phone: lead.phone,
           phoneE164: lead.phoneE164,
         };

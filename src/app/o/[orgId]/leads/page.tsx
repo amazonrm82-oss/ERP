@@ -102,7 +102,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   };
   const hrefFor = (target: number) => listHref(target, sortValue(sort));
   // a new sort starts again from the first page; dates start with the newest
-  const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created")));
+  const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created" && key !== "last_contact")));
 
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>

@@ -74,6 +74,21 @@ describe("filterToPostgrest", () => {
     expect(one("created", "on_or_after", "1/7/2026").skipped).toBe(1);
   });
 
+  it("no contact for X days (LEAD-02): the last contact is older, or there was none and the record is older", () => {
+    const bound = '"2026-07-07T21:00:00.000Z"';
+    expect(one("no_contact", "idle_days", "7").logic).toBe(
+      `and(and(or(last_contacted_at.lt.${bound},and(last_contacted_at.is.null,created_at.lt.${bound}))))`,
+    );
+    // the complement of "last contact in the last 7 days" uses the same day boundary
+    expect(one("last_contact", "last_days", "7").logic).toContain(`last_contacted_at.gte.${bound}`);
+    expect(one("no_contact", "idle_days", "0").logic).toContain('last_contacted_at.lt."2026-07-14T21:00:00.000Z"');
+    for (const bad of ["", "-1", "1.5", "abc", "7),id.neq.(0", "99999"]) {
+      expect(one("no_contact", "idle_days", bad).skipped, bad).toBe(1);
+    }
+    // only its own operator
+    expect(one("no_contact", "older_than_days", "7").skipped).toBe(1);
+  });
+
   it("this month in October starts in summer time and ends in winter time", () => {
     const october = filterToPostgrest(
       { match: "all", groups: [{ match: "all", conditions: [{ field: "created", op: "this_month", value: "" }] }] } as FilterTree,

@@ -33,6 +33,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
   const tag: ServerField = { key: "tag", label: "תגית", kind: "tag", column: "tag_ids", options: lookups.tags };
   const created: ServerField = { key: "created", label: "תאריך יצירה", kind: "date", column: "created_at" };
   const lastContact: ServerField = { key: "last_contact", label: "מגע אחרון", kind: "date", column: "last_contacted_at" };
+  // LEAD-02: "no contact for X days"; a record never contacted counts from the day it was created
+  const noContact: ServerField = { key: "no_contact", label: "ימים בלי מגע", kind: "idle", column: "last_contacted_at" };
   const text = (key: string, label: string, column: string): ServerField => ({ key, label, kind: "text", column });
 
   const builtIn: Record<FilterObject, ServerField[]> = {
@@ -49,6 +51,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       tag,
       created,
       lastContact,
+      noContact,
     ],
     contact: [
       text("name", "שם", "full_name"),
@@ -62,6 +65,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
       created,
       lastContact,
+      noContact,
     ],
     company: [
       text("name", "שם", "name"),
@@ -254,6 +258,15 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
         return range(first, next.toISOString().slice(0, 10));
       }
       return null;
+    }
+    case "idle": {
+      // the last contact is older than X days (the same bound as "older_than_days"); a record never
+      // contacted counts from its creation, so one created in those days is not idle yet
+      const days = Number.parseInt(value, 10);
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(days) || days > 3650) return null;
+      const zone = ctx.timeZone ?? TIME_ZONE;
+      const bound = quote(zonedIso(addDays(zoneDate(ctx.now, zone), -days), "00:00:00", zone));
+      return `or(${c}.lt.${bound},and(${c}.is.null,created_at.lt.${bound}))`;
     }
   }
 }

@@ -50,6 +50,8 @@ export type LeadListItem = {
   sourceId: string | null;
   ownerId: string | null;
   ownerName: string | null;
+  // LEAD-02: the last contact entry a person logged on the lead's timeline
+  lastContactedAt: string | null;
   createdAt: string;
   customFields: Json;
 };
@@ -64,6 +66,7 @@ export const LEAD_SORT_COLUMNS = {
   status: "sort_status",
   source: "sort_source",
   owner: "sort_owner",
+  last_contact: "last_contacted_at",
   created: "created_at",
 } as const;
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
@@ -91,7 +94,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   let query = supabase
     .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, owner_id, created_at, custom_fields")
+    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, owner_id, last_contacted_at, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -137,6 +140,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       sourceId: row.source_id,
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+      lastContactedAt: row.last_contacted_at,
       createdAt: row.created_at,
       customFields: row.custom_fields,
     })),
@@ -151,7 +155,7 @@ export async function getLead(orgId: string, leadId: string) {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, message, disqualify_reason, owner_id, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
+      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
     )
     .eq("organization_id", orgId)
     .eq("id", leadId)

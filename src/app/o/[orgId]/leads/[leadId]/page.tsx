@@ -156,6 +156,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               disqualifyReason: lead.disqualify_reason,
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
               createdAtText: formatDateTime(lead.created_at),
+              lastContactText: lead.last_contacted_at ? formatDateTime(lead.last_contacted_at) : null,
               custom: { definitions: fields, values: asCustomValues(lead.custom_fields) },
               attribution: attributionRows(lead),
             }}

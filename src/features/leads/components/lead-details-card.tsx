@@ -29,6 +29,8 @@ export type LeadDetailsView = {
   // formatted on the server so server and browser output cannot differ
   ownerName: string | null;
   createdAtText: string;
+  // LEAD-02: the last contact logged on the timeline, formatted on the server; null when none yet
+  lastContactText: string | null;
   // active custom fields and the values stored on the record
   custom: { definitions: FieldDefinition[]; values: CustomValues };
   // CAP-02: campaign, UTM, pages and ad click ids the lead arrived with (first touch); only lines with a value
@@ -68,6 +70,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
           <Detail label="חברה" value={lead.companyName} />
           <Detail label="מקור" value={sourceName} />
           <Detail label="אחראי" value={lead.ownerName} />
+          <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
           <Detail label="נוצר" value={lead.createdAtText} />
           {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
           <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} />

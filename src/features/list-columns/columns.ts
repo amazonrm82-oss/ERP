@@ -18,9 +18,11 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "status", label: "סטטוס" },
       { key: "source", label: "מקור" },
       { key: "owner", label: "אחראי" },
+      // LEAD-02: set from the timeline
+      { key: "last_contact", label: "מגע אחרון" },
       { key: "created", label: "נוצר" },
     ],
-    defaults: ["phone", "email", "status", "source", "owner", "created"],
+    defaults: ["phone", "email", "status", "source", "owner", "last_contact", "created"],
   },
   contact: {
     columns: [

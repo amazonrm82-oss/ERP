@@ -5,7 +5,8 @@ import { z } from "zod";
 // The filter travels in the URL as JSON (`f=`); the server checks every field,
 // operator and value against the list's fields before it builds a query.
 
-export type FilterKind = "text" | "select" | "user" | "tag" | "date" | "number" | "checkbox" | "day";
+// "idle": days since the last contact (LEAD-02); a record never contacted counts from its creation
+export type FilterKind = "text" | "select" | "user" | "tag" | "date" | "number" | "checkbox" | "day" | "idle";
 
 export type FilterOp =
   | "contains"
@@ -23,6 +24,7 @@ export type FilterOp =
   | "older_than_days"
   | "this_week"
   | "this_month"
+  | "idle_days"
   | "is_true"
   | "is_false"
   | "empty"
@@ -38,6 +40,7 @@ export const OPS_BY_KIND: Record<FilterKind, FilterOp[]> = {
   // a timestamp (created, last contact) and a plain date (a custom date field)
   date: ["on_or_after", "before", "last_days", "older_than_days", "this_week", "this_month", "empty", "not_empty"],
   day: ["on_or_after", "before", "last_days", "older_than_days", "this_week", "this_month", "empty", "not_empty"],
+  idle: ["idle_days"],
 };
 
 export const OP_LABELS: Record<FilterOp, string> = {
@@ -56,6 +59,7 @@ export const OP_LABELS: Record<FilterOp, string> = {
   older_than_days: "לפני יותר מ-X ימים",
   this_week: "השבוע",
   this_month: "החודש",
+  idle_days: "X ימים או יותר",
   is_true: "מסומן",
   is_false: "לא מסומן",
   empty: "ריק",
@@ -65,7 +69,7 @@ export const OP_LABELS: Record<FilterOp, string> = {
 /** What value an operator needs: none, a typed text, a number of days, a date, or a choice from the field's options. */
 export function valueKind(kind: FilterKind, op: FilterOp): "none" | "text" | "number" | "days" | "date" | "option" {
   if (["empty", "not_empty", "this_week", "this_month", "is_true", "is_false"].includes(op)) return "none";
-  if (op === "last_days" || op === "older_than_days") return "days";
+  if (op === "last_days" || op === "older_than_days" || op === "idle_days") return "days";
   if (op === "on_or_after" || op === "before") return "date";
   if (kind === "select" || kind === "user" || kind === "tag") return "option";
   if (kind === "number") return "number";

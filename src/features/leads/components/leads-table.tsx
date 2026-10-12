@@ -144,6 +144,14 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
                   {lead.ownerName}
                 </InlineEdit>
               );
+            case "last_contact":
+              return lead.lastContactedAt ? (
+                <time dateTime={lead.lastContactedAt} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(lead.lastContactedAt)}
+                </time>
+              ) : (
+                <span className="text-ink-soft">אין עדיין</span>
+              );
             case "created":
               return (
                 <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">

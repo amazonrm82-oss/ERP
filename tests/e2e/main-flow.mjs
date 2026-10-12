@@ -226,6 +226,15 @@ try {
   await owner.getByRole("button", { name: "הוספה לציר הזמן" }).click();
   await expectText(owner, "דיברנו בטלפון, מעוניין בהצעה");
 
+  step("the call sets the lead's last contact (LEAD-02)");
+  {
+    const leadIdCall = owner.url().split("/leads/")[1];
+    const [{ at }] = await sql("select last_contacted_at as at from public.leads where id = $1", [leadIdCall]);
+    if (!at) throw new Error("the call did not set last_contacted_at");
+    await owner.reload();
+    await owner.getByText(/^מגע אחרון$/).first().waitFor({ timeout: 15000 });
+  }
+
   step("pin the call to the top of the timeline, then unpin it (REC-01)");
   {
     const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
@@ -823,6 +832,7 @@ try {
     ["leads", "סטטוס", "status"],
     ["leads", "מקור", "source"],
     ["leads", "אחראי", "owner"],
+    ["leads", "מגע אחרון", "last_contact"],
     ["contacts", "חברה", "company"],
     ["contacts", "אחראי", "owner"],
     ["companies", "אחראי", "owner"],
@@ -837,6 +847,13 @@ try {
       where l.organization_id = $1 and l.deleted_at is null order by s.position, l.id limit 1`,
     [orgUrl.split("/").pop()],
   );
+  {
+    // LEAD-02: "no contact for 0 days or more" leaves out the lead that was called today
+    const idle = JSON.stringify({ match: "all", groups: [{ match: "all", conditions: [{ field: "no_contact", op: "idle_days", value: "0" }] }] });
+    await ownerDesk.goto(`${orgUrl}/leads?f=${encodeURIComponent(idle)}`);
+    await ownerDesk.getByRole("heading", { name: /^לידים$/ }).waitFor();
+    if ((await ownerDesk.locator("tbody tr", { hasText: "משה כהן" }).count()) !== 0) throw new Error("a lead contacted today is listed as idle");
+  }
   await ownerDesk.goto(`${orgUrl}/leads?sort=status`);
   const firstByStatus = (await ownerDesk.locator("tbody tr td:first-child a").first().innerText()).trim();
   if (expected && firstByStatus !== expected) throw new Error(`leads by status: first shown ${firstByStatus}, expected ${expected}`);
