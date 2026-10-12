@@ -10,6 +10,7 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { deleteIntakeAction } from "@/features/intake/actions";
 import { FormQr } from "@/features/intake/components/form-qr";
 import { CopyBlock, IntakeSettingsForm, ShareLink } from "@/features/intake/components/intake-editor";
+import { SubmissionList } from "@/features/intake/components/submission-list";
 import { formFieldOptions, formInputName, isCustomFormKey } from "@/features/intake/fields";
 import { formQrUrl, qrFileName } from "@/features/intake/qr-link";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
@@ -17,7 +18,6 @@ import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
-import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 
@@ -144,29 +144,7 @@ export default async function IntakeItemPage({ params }: Props) {
             <p className="text-md text-ink-soft">עוד לא התקבלו פניות.</p>
           </CardBody>
         ) : (
-          <ul className="divide-y divide-line">
-            {submissions.map((submission) => (
-              <li key={submission.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
-                <span className="min-w-0">
-                  {submission.leadId ? (
-                    <Link href={paths.lead(orgId, submission.leadId)} className="font-medium underline-offset-4 hover:underline">
-                      {submission.summary}
-                    </Link>
-                  ) : (
-                    <span className="font-medium text-ink-soft">{submission.summary}</span>
-                  )}
-                  <span className="block text-sm text-ink-soft">{formatDateTime(submission.createdAt)}</span>
-                </span>
-                {submission.status === "spam" ? (
-                  <Badge tone="warning">ספאם, לא נוצר ליד</Badge>
-                ) : submission.status === "duplicate" ? (
-                  <Badge tone="accent">פנייה חוזרת, נוספה לרשומה קיימת</Badge>
-                ) : (
-                  <Badge tone="success">ליד נוצר</Badge>
-                )}
-              </li>
-            ))}
-          </ul>
+          <SubmissionList orgId={orgId} submissions={submissions} />
         )}
       </Card>
 
@@ -175,7 +153,7 @@ export default async function IntakeItemPage({ params }: Props) {
           action={deleteIntakeAction.bind(null, orgId, intake.id)}
           pendingText="מוחקים…"
           variant="danger-ghost"
-          confirm={`למחוק את "${intake.name}"? הכתובת תפסיק לעבוד מייד. הלידים שכבר נוצרו נשארים.`}
+          confirm={`למחוק את "${intake.name}"? הכתובת תפסיק לעבוד מייד. הלידים שכבר נוצרו ויומן הפניות נשארים.`}
         >
           מחיקה
         </ActionButton>

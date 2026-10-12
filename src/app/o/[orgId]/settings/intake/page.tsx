@@ -6,7 +6,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { ForwardIcon, FormIcon } from "@/components/ui/icons";
 import { CreateIntakeForm } from "@/features/intake/components/intake-editor";
-import { listIntakes } from "@/features/intake/queries";
+import { SubmissionList } from "@/features/intake/components/submission-list";
+import { listIntakes, listKeptSubmissions } from "@/features/intake/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
@@ -25,7 +26,7 @@ export default async function IntakeSettingsPage({ params }: Props) {
       </div>
     );
   }
-  const intakes = await listIntakes(orgId);
+  const [intakes, kept] = await Promise.all([listIntakes(orgId), listKeptSubmissions(orgId)]);
 
   return (
     <div className="space-y-5">
@@ -70,6 +71,13 @@ export default async function IntakeSettingsPage({ params }: Props) {
           </ul>
         )}
       </Card>
+      {kept.length > 0 ? (
+        <Card aria-labelledby="kept-submissions-title">
+          <CardHeader id="kept-submissions-title" title="פניות מטפסים שנמחקו" />
+          <p className="px-4 pt-3 text-md text-ink-soft sm:px-5">הטופס נמחק, אבל הפניות שהגיעו ממנו נשמרות כאן.</p>
+          <SubmissionList orgId={orgId} submissions={kept} />
+        </Card>
+      ) : null}
     </div>
   );
 }

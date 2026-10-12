@@ -1542,6 +1542,26 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/users`);
   await expectText(ownerDesk, "לא זמין ללידים");
 
+  step("intake (CAP-04): deleting a webhook keeps its inquiry log");
+  await ownerDesk.goto(`${orgUrl}/settings/intake`);
+  await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("חיבור זמני");
+  await ownerDesk.getByLabel("סוג").selectOption("webhook");
+  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
+  const tempHookUrl = await ownerDesk.getByLabel("כתובת ה-webhook").inputValue();
+  const tempReply = await fetch(tempHookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "פונה מחיבור זמני", phone: "058-2000099" }),
+  });
+  if (tempReply.status !== 200) throw new Error(`temporary webhook answered ${tempReply.status}`);
+  await ownerDesk.getByRole("button", { name: /^מחיקה$/ }).click();
+  await ownerDesk.getByRole("group", { name: /למחוק את "חיבור זמני"/ }).getByRole("button", { name: /^מחיקה$/ }).click();
+  await ownerDesk.waitForURL(/\/settings\/intake$/);
+  const kept = ownerDesk.getByRole("region", { name: /פניות מטפסים שנמחקו/ });
+  await kept.getByRole("link", { name: /פונה מחיבור זמני/ }).waitFor({ timeout: 15000 });
+  await kept.getByText(/חיבור זמני ·/).first().waitFor();
+
   // ---------------------------------------------------------------- section 6: automations
   step("automations: a template runs by itself (pg_cron) on a new lead");
   await ownerDesk.goto(`${orgUrl}/settings/automations`);

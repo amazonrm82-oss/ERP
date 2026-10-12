@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { FormKind } from "@/lib/database.types";
+import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { parseFieldsConfig, type FormFieldConfig } from "./fields";
@@ -98,25 +99,48 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
 
 export type SubmissionItem = { id: string; status: string; leadId: string | null; createdAt: string; summary: string };
 
+type SubmissionRow = { id: string; status: string; lead_id: string | null; payload: unknown; created_at: string };
+
+function toSubmissionItem(row: SubmissionRow): SubmissionItem {
+  const payload =
+    row.payload && typeof row.payload === "object" && !Array.isArray(row.payload) ? (row.payload as Record<string, unknown>) : {};
+  const summary = ["full_name", "phone", "email"]
+    .map((key) => payload[key])
+    .filter((value): value is string => typeof value === "string" && value !== "")
+    .join(", ");
+  return { id: row.id, status: row.status, leadId: row.lead_id, createdAt: row.created_at, summary: summary || "ללא פרטים" };
+}
+
 /** The latest submissions of a form (30). */
 export async function listSubmissions(orgId: string, formId: string): Promise<SubmissionItem[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("form_submissions")
-    .select("id, status, lead_id, payload, created_at")
-    .eq("organization_id", orgId)
-    .eq("form_id", formId)
-    .order("created_at", { ascending: false })
-    .limit(30);
-  if (error) {
-    throw new Error(`submissions query failed: ${error.message}`);
-  }
-  return data.map((row) => {
-    const payload = row.payload && typeof row.payload === "object" && !Array.isArray(row.payload) ? row.payload : {};
-    const summary = ["full_name", "phone", "email"]
-      .map((key) => payload[key])
-      .filter((value): value is string => typeof value === "string" && value !== "")
-      .join(", ");
-    return { id: row.id, status: row.status, leadId: row.lead_id, createdAt: row.created_at, summary: summary || "ללא פרטים" };
-  });
+  const data = must(
+    await supabase
+      .from("form_submissions")
+      .select("id, status, lead_id, payload, created_at")
+      .eq("organization_id", orgId)
+      .eq("form_id", formId)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    "form submissions",
+  );
+  return data.map(toSubmissionItem);
+}
+
+export type KeptSubmissionItem = SubmissionItem & { formName: string };
+
+/** CAP-04: the latest submissions whose form was deleted (30); the log outlives the form. */
+export async function listKeptSubmissions(orgId: string): Promise<KeptSubmissionItem[]> {
+  const supabase = await createClient();
+  const data = must(
+    await supabase
+      .from("form_submissions")
+      .select("id, status, lead_id, payload, created_at, form_name")
+      .eq("organization_id", orgId)
+      .is("form_id", null)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    "kept form submissions",
+  );
+  return data.map((row) => ({ ...toSubmissionItem(row), formName: row.form_name?.trim() || "טופס שנמחק" }));
 }

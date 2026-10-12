@@ -118,7 +118,7 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
   return { ok: true, message: "נשמר." };
 }
 
-/** Deletes the form or webhook with its submission log. Leads it created stay. */
+/** Deletes the form or webhook. Leads it created and its submission log stay (CAP-04). */
 export async function deleteIntakeAction(orgId: string, formId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, formId);
   if (!context.ok) {
