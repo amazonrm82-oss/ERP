@@ -357,6 +357,8 @@ file wins.
   `docs/BACKLOG.md` / `docs/SPEC-ADDITIONS.md` in wave order and keep going, one requirement after
   another, without waiting for approval between them. Each change stays small and reviewable: one
   requirement, all four checks green, migration applied and verified (hard rule 3), then push.
+  Since 12 October 2026 a few requirements may be built at the same time by workers, under the rules
+  of "Parallel work" below; each one still lands on `main` on its own, in order.
 - When a wave is done, add the next wave to the backlog and continue (1 to 6; chapter 17.6 of the
   additions spec lists the chapter 18–19 requirements per wave). What depends on a provider the owner
   has not chosen is built behind the provider layer with a fake provider and tests; the real adapter
@@ -384,3 +386,66 @@ file wins.
 - Say plainly what was tested and what was not.
 - **Every message to the owner is in Hebrew** (owner's request, 9 October 2026), progress updates during
   work included, not only the final report. Code, commits and docs for developers stay in English.
+
+## Parallel work
+
+Owner's decision, 12 October 2026: build faster with a few agents at once, on the condition that the
+result is no worse than building one requirement at a time. Parallel work is a tool, not a goal.
+Everything above still applies to every agent. The lanes are in `docs/BACKLOG.md` ("מסלולים לעבודה מקבילה").
+
+**One lead, at most three workers.**
+
+- The lead is the session the owner talks to. Only the lead merges into `main`, pushes, uses the
+  Supabase connector, edits `CLAUDE.md` and `docs/`, marks the backlog, and talks to the owner.
+- A worker is a subagent with one requirement (or a short chain in one area) from one lane. It works in
+  its own git worktree on a branch `lane/<lane>-<id>` cut from the current `main`, with its own
+  `npm ci` and its own throwaway database: a different `TEST_DB_PORT`, `TEST_DB_DIR` and
+  `TEST_DATABASE_URL` per worker (the database name still ends in `_test`). Two agents never share a
+  test database: `test:db` drops and rebuilds it.
+- A worker never pushes, never touches the hosted database (no connector call at all), never asks the
+  owner. A question goes back to the lead in its report; the lead records and asks it (Working
+  agreement). A worker that hits something on the stop-and-ask list stops that requirement and reports.
+
+**What may run side by side.** Two requirements run in the same round only when they touch different
+feature folders and different database objects (table, function, trigger, policy, cron job). When in
+doubt they run one after the other.
+
+**Shared ground is serial.** One agent at a time, named by the lead in the round's plan, and merged
+before anyone else builds on it:
+
+- `src/components/ui/`, `src/app/globals.css` and the design tokens, the app shell and layouts,
+  `src/proxy.ts`, `src/lib/supabase/`, auth and MFA code, `next.config.ts`, `package.json` and the
+  lockfile, `.github/`, `tests/db/helpers.ts`, existing migrations.
+- Database objects many features lean on: the access helpers in schema `app`, `app.membership_role()`,
+  `app.emit_event()`, `app.process_outbox()`, `app.notify_assignment()`, `app.merge_move_links()`,
+  `app.merge_columns()`, the check constraint of notification kinds, `plans`, `public.org_context()`.
+- Files every new table adds a few lines to (`src/lib/database.types.ts`, `src/lib/record-types.ts`,
+  `src/lib/errors.ts`, `tests/db/02-tenant-isolation.test.ts`, `03-roles-and-visibility.test.ts`) are
+  not serial: workers add their lines, and the lead settles the conflicts when it rebases the branch.
+
+**The brief the lead gives a worker.** The requirement id and its text from the spec, with the defaults
+of chapter 22.9; the folders and database objects it may touch and the ones it may not; its database
+settings; what must be true at the end (the new-table checklist, Hebrew texts, 360px, the design
+system); and the shape of the report: what was built, each check with its real output, what was not
+tested, questions. A worker that needs shared ground says so instead of changing it.
+
+**Migrations get their number at merge, not when written.** A worker names its migration with the next
+free number it sees. Before merging, the lead renames it to come after everything on `main`, so the
+order of names, the order of merges and the order of applying to the hosted project are the same.
+
+**Merging, one branch at a time (the lead).**
+
+1. Rebase the branch on `main`, renumber its migrations, settle conflicts.
+2. Run `lint`, `typecheck`, `build`, `test:db` and `test:unit` on the rebased branch. The worker's
+   report is not evidence; the lead's own run is.
+3. Read the whole diff. A branch with a migration, or one that touches policies, grants, a
+   `security definer` function, auth or the service-role key, is also reviewed by a fresh subagent
+   that did not write it and is given the diff and this file, not the worker's summary. A new table
+   needs `policy-mutation-sweep` with 0 missed.
+4. Merge so that each requirement stays one commit, apply its migration to the hosted project and
+   verify it (hard rule 3, Migrations), then push. The next merge waits until CI is green on `main`.
+5. A branch that fails goes back to its worker with the failure, or is fixed by the lead. A test, a
+   guard or a policy is never weakened to get a branch in.
+
+**Back to one at a time** when `main` is red, when two merges in a row needed hand repairs in the same
+files, when what is left is all shared ground, or when the usage limit is close. Say so to the owner.
