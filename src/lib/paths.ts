@@ -31,6 +31,8 @@ export const paths = {
   deal: (orgId: string, dealId: string) => `/o/${orgId}/deals/${dealId}`,
   vcard: (orgId: string, kind: "lead" | "contact", id: string) => `/o/${orgId}/vcard/${kind}/${id}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
+  // the tasks list with the "new task" form open and focused (REC-08)
+  taskNew: (orgId: string) => `/o/${orgId}/tasks?new=1`,
   notifications: (orgId: string) => `/o/${orgId}/notifications`,
   file: (orgId: string, fileId: string) => `/o/${orgId}/files/${fileId}`,
   merge: (orgId: string, type: string, keep: string, merge?: string) =>

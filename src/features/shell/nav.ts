@@ -40,6 +40,24 @@ export function navItems(orgId: string): NavItem[] {
   ];
 }
 
+export type CreateItem = {
+  key: "lead" | "contact" | "company" | "deal" | "task";
+  label: string;
+  href: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+};
+
+/** REC-08: what the "+" button of the top bar can create; each opens that type's own create screen. */
+export function createItems(orgId: string): CreateItem[] {
+  return [
+    { key: "lead", label: "ליד חדש", href: paths.leadNew(orgId), icon: InboxIcon },
+    { key: "contact", label: "איש קשר חדש", href: paths.contactNew(orgId), icon: UsersIcon },
+    { key: "company", label: "חברה חדשה", href: paths.companyNew(orgId), icon: BuildingIcon },
+    { key: "deal", label: "עסקה חדשה", href: paths.dealNew(orgId), icon: BoardIcon },
+    { key: "task", label: "משימה חדשה", href: paths.taskNew(orgId), icon: CheckSquareIcon },
+  ];
+}
+
 export function isActive(pathname: string, item: NavItem): boolean {
   return item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
 }

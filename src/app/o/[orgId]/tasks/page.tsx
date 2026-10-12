@@ -114,6 +114,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
   const { user, canWrite } = context;
   const query = await searchParams;
   const showAll = firstParam(query.who) === "all";
+  const openNew = firstParam(query.new) === "1";
   if (firstParam(query.view) === "table") {
     return <TasksTableView orgId={orgId} context={context} query={query} showAll={showAll} />;
   }
@@ -214,7 +215,8 @@ export default async function TasksPage({ params, searchParams }: Props) {
         {canWrite ? (
           // first on a phone, beside the list on a computer
           <div className="order-first lg:sticky lg:top-20 lg:order-none">
-            <NewTaskPanel>
+            {/* REC-08: "?new=1" comes from the top bar's "+"; the key opens it afresh when the page is already shown */}
+            <NewTaskPanel key={openNew ? "new" : "list"} startOpen={openNew}>
               <Card aria-labelledby="new-task-title">
                 <CardHeader id="new-task-title" title="משימה חדשה" />
                 <CardBody>

@@ -455,6 +455,27 @@ try {
     await exportMenu.locator("summary").click();
   }
   await panelInside(owner.getByRole("button", { name: /רונית בעלים/ }), "user menu");
+  await panelInside(owner.getByRole("banner").getByRole("button", { name: "יצירה", exact: true }), "create menu");
+
+  step("the top bar's '+' creates each record type from any screen (REC-08)");
+  {
+    const openCreate = async () => {
+      await owner.getByRole("banner").getByRole("button", { name: "יצירה", exact: true }).click();
+      return owner.getByRole("dialog", { name: "יצירה" });
+    };
+    await owner.goto(`${orgUrl}/deals`);
+    let menu = await openCreate();
+    for (const label of ["ליד חדש", "איש קשר חדש", "חברה חדשה", "עסקה חדשה", "משימה חדשה"]) await menu.getByRole("link", { name: label, exact: true }).waitFor();
+    await shot(owner, "04c-create-menu-360");
+    await menu.getByRole("link", { name: "משימה חדשה", exact: true }).click();
+    await owner.waitForURL(/\/tasks\?new=1$/);
+    // the folded phone panel starts open, with the focus in its first field
+    await owner.getByLabel("מה צריך לעשות").waitFor();
+    if (!(await owner.getByLabel("מה צריך לעשות").evaluate((el) => el === document.activeElement))) throw new Error("new task field is not focused");
+    menu = await openCreate();
+    await menu.getByRole("link", { name: "ליד חדש", exact: true }).click();
+    await owner.waitForURL(/\/leads\/new$/);
+  }
   await owner.goto(`${orgUrl}/settings`);
 
   step("settings: business details");
@@ -1481,7 +1502,7 @@ try {
   step("intake: create a web form, set it up");
   await ownerDesk.goto(`${orgUrl}/settings/intake`);
   await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("טופס צור קשר");
-  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.getByRole("main").getByRole("button", { name: "יצירה", exact: true }).click();
   await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
   const formAdminUrl = ownerDesk.url();
   await ownerDesk.getByLabel("כותרת הטופס").fill("השאירו פרטים ונחזור אליכם");
@@ -1578,7 +1599,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/intake`);
   await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("Zapier");
   await ownerDesk.getByLabel("סוג").selectOption("webhook");
-  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.getByRole("main").getByRole("button", { name: "יצירה", exact: true }).click();
   await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
   const hookAdminUrl = ownerDesk.url();
   const hookUrl = await ownerDesk.getByLabel("כתובת ה-webhook").inputValue();
@@ -1673,7 +1694,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/intake`);
   await ownerDesk.getByRole("textbox", { name: "שם", exact: true }).fill("חיבור זמני");
   await ownerDesk.getByLabel("סוג").selectOption("webhook");
-  await ownerDesk.getByRole("button", { name: "יצירה" }).click();
+  await ownerDesk.getByRole("main").getByRole("button", { name: "יצירה", exact: true }).click();
   await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
   const tempHookUrl = await ownerDesk.getByLabel("כתובת ה-webhook").inputValue();
   const tempReply = await fetch(tempHookUrl, {

@@ -9,6 +9,7 @@ import { GlobalSearch } from "@/features/search/components/global-search";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { countUnread, listNotifications } from "@/features/notifications/queries";
 import { AvailabilityToggle } from "@/features/shell/components/availability-toggle";
+import { CreateMenu } from "@/features/shell/components/create-menu";
 import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
@@ -61,6 +62,8 @@ export default async function OrgLayout({ children, params }: Props) {
           {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} /> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {/* REC-08: create anything from any screen, for who may write */}
+          {context.canWrite ? <CreateMenu orgId={org.id} /> : null}
           <GlobalSearch orgId={org.id} />
           <NotificationBell
             // new server data (after marking read, or navigation) starts the bell afresh
