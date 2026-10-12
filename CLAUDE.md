@@ -171,6 +171,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   triggers) checks every changed key of `custom_fields` written by `authenticated`/`anon` against
   `field_definitions` with `app.custom_value_ok()`, mirroring `src/features/custom-fields/values.ts`;
   keep the two in step. Unknown keys are rejected (hint `custom_field:invalid`); "required" is app-only.
+- Since 0085 (RVW-4) the erasure also erases every entry of a deleted note that was ever linked to the record,
+  through `app.activity_audit_links` (ids only, filled by the activities audit triggers); and `log_list_export` stores
+  only the shape of the filters (`app.export_filters`, an allow-list: a search is `q: true`, typed values become `true`).
 - Privacy erasure (migration 0027): `public.audit_erase_record(org, type, id)` (owner/admin, record must be
   purged first, hint `erase:exists`) sets `changes = {"erased": true}` on the record's audit entries and
   on those of its deleted tasks/files, empties merge snapshots and unlinked form submissions, and logs
@@ -201,6 +204,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/leads/status.ts`), shared with the status form and the board.
 - Bulk actions (LST-07, no migration): `src/features/bulk/`. `bulkAction()` changes each picked row on its
   own with the user's session (owner, lead status, add tag, recycle bin) and returns `{done, skipped}`.
+- Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
+  times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
+  the two in step). The app warns and lets the user save anyway.
 - List export (LST-08, migration 0034): `/o/[org]/{leads,contacts,companies}/export` → `exportList()`
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
