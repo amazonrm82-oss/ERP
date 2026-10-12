@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
@@ -15,10 +16,11 @@ import { paths } from "@/lib/paths";
 import { createLeadAction } from "../actions";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[] };
+// reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
+type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[]; reasons: string[] };
 
 /** New lead form. On success the action redirects to the lead's page. */
-export function LeadForm({ orgId, statuses, sources, fields }: Props) {
+export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -28,6 +30,10 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
   const selectable = statuses.filter((status) => status.kind !== "converted");
   const defaultStatus = values.status_id ?? selectable.find((status) => status.isDefault)?.id ?? selectable[0]?.id ?? "";
   const manualSource = values.source_id ?? "";
+  // a lead that starts "not relevant" needs a reason, as in the status form (RVW-9)
+  const [statusId, setStatusId] = useState(defaultStatus);
+  const [reason, setReason] = useState(values.disqualify_reason ?? "");
+  const needsReason = statuses.find((status) => status.id === statusId)?.kind === "disqualified";
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -92,11 +98,11 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
           ))}
         </SelectField>
         <SelectField
-          key={`status-${defaultStatus}`}
           label="סטטוס"
           name="status_id"
           required
-          defaultValue={defaultStatus}
+          value={statusId}
+          onChange={(event) => setStatusId(event.target.value)}
           error={errors.status_id}
         >
           {selectable.map((status) => (
@@ -106,6 +112,16 @@ export function LeadForm({ orgId, statuses, sources, fields }: Props) {
           ))}
         </SelectField>
       </div>
+      {needsReason ? (
+        <DisqualifyReasonField
+          reasons={reasons}
+          label="למה הליד לא רלוונטי?"
+          name="disqualify_reason"
+          value={reason}
+          onChange={setReason}
+          error={errors.disqualify_reason}
+        />
+      ) : null}
       <TextareaField
         label="הודעה או הערה ראשונה"
         name="message"

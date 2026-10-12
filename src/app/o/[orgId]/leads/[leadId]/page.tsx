@@ -160,7 +160,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
               companyName: lead.company_name,
               sourceId: lead.source_id,
               message: lead.message,
-              disqualifyReason: lead.disqualify_reason,
+              // an old reason left on a lead that is no longer "not relevant" is not shown (RVW-9)
+              disqualifyReason: status?.kind === "disqualified" ? lead.disqualify_reason : null,
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
               createdAtText: formatDateTime(lead.created_at),
               lastContactText: lead.last_contacted_at ? formatDateTime(lead.last_contacted_at) : null,

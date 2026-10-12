@@ -16,7 +16,7 @@ import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
 import { changeStatusSchema, convertLeadSchema, createLeadSchema, LEAD_FIELD_NAMES, updateLeadSchema } from "./schema";
-import { setLeadStatus } from "./status";
+import { setLeadStatus, validateStatusChoice } from "./status";
 
 function revalidateLead(orgId: string, leadId?: string) {
   revalidatePath(paths.leads(orgId));
@@ -72,9 +72,16 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   if (!context.ok) {
     return context;
   }
-  const parsed = createLeadSchema.safeParse(pick(formData, [...LEAD_FIELD_NAMES, "status_id"]));
+  const parsed = createLeadSchema.safeParse(pick(formData, [...LEAD_FIELD_NAMES, "status_id", "disqualify_reason"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
+  }
+
+  // RVW-9: the same rules as a status change (no "converted"; "not relevant" needs a reason)
+  const choice = await validateStatusChoice(context.supabase, orgId, parsed.data.status_id, parsed.data.disqualify_reason ?? null);
+  if (!choice.ok) {
+    const field = choice.needsReason ? "disqualify_reason" : "status_id";
+    return fail(choice.message, { fieldErrors: { [field]: choice.message }, values: formValues(formData) });
   }
 
   const custom = await customFieldsFromForm(orgId, "lead", formData);
@@ -97,7 +104,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   // owner_id is left out: the database assigns the lead to its creator.
   const { data, error } = await context.supabase
     .from("leads")
-    .insert({ organization_id: orgId, ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, disqualify_reason: choice.reason, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {

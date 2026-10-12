@@ -20,7 +20,12 @@ const identityIssue = { path: ["full_name"], error: "יש למלא לפחות א
 export const LEAD_FIELD_NAMES = ["full_name", "phone", "email", "company_name", "source_id", "message"] as const;
 
 export const createLeadSchema = z
-  .object({ ...leadFields, status_id: requiredId("יש לבחור סטטוס.") })
+  .object({
+    ...leadFields,
+    status_id: requiredId("יש לבחור סטטוס."),
+    // only with a "not relevant" status; checked against the organization's list (RVW-9)
+    disqualify_reason: optionalText(500, "הסיבה ארוכה מדי (עד 500 תווים)."),
+  })
   .refine(hasIdentity, identityIssue);
 
 export const updateLeadSchema = z.object(leadFields).refine(hasIdentity, identityIssue);

@@ -1,7 +1,8 @@
 import { RECORD_TYPES } from "@/lib/record-types";
 
 // What can be merged, and how each field is named on the merge screen.
-// Must match app.merge_columns() in migration 0020.
+// MERGE_FIELDS plus MERGE_COMPANIONS must match app.merge_columns() (latest in migration 0090);
+// tests/db/61-disqualify-reason-everywhere.test.ts compares them.
 
 export const MERGE_TYPES = ["lead", "contact", "company"] as const;
 export type MergeType = (typeof MERGE_TYPES)[number];
@@ -47,6 +48,26 @@ export const MERGE_FIELDS: Record<MergeType, Array<{ key: string; label: string 
     { key: "owner_id", label: "אחראי" },
   ],
 };
+
+// Columns that travel with a picked field and are not offered on their own: the "not relevant"
+// reason goes with the status it explains (RVW-9).
+// merge_records applies picks in jsonb_each_text order (status_id before disqualify_reason); that order keeps the reason.
+export const MERGE_COMPANIONS: Record<MergeType, Record<string, readonly string[]>> = {
+  lead: { status_id: ["disqualify_reason"] },
+  contact: {},
+  company: {},
+};
+
+/** The picks sent to merge_records: each field taken from the duplicate, with its companions. */
+export function mergePicks(type: MergeType, fromDuplicate: (key: string) => boolean): Record<string, "merge"> {
+  const picks: Record<string, "merge"> = {};
+  for (const { key } of MERGE_FIELDS[type]) {
+    if (!fromDuplicate(key)) continue;
+    picks[key] = "merge";
+    for (const companion of MERGE_COMPANIONS[type][key] ?? []) picks[companion] = "merge";
+  }
+  return picks;
+}
 
 export const TYPE_LABELS: Record<MergeType, { one: string; many: string }> = {
   lead: { one: "ליד", many: "לידים" },

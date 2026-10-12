@@ -57,12 +57,13 @@ describe("disqualify reasons (LEAD-03)", () => {
     expect(await setStatus(member, lead, open, null)).toBe(1);
   });
 
-  it("server-side changes and new leads are not checked here", async () => {
+  it("server-side changes are not checked here; a new lead from a person is (RVW-9)", async () => {
     const lead = await insertLead(member.id, org);
     await asAdmin((q) => q("update public.leads set status_id = $1, disqualify_reason = null where id = $2", [disqualified, lead]));
     const row = await asAdmin(async (q) => (await q<{ status_id: string }>("select status_id from public.leads where id = $1", [lead])).rows[0]);
     expect(row.status_id).toBe(disqualified);
-    expect(await insertLead(member.id, org, { status_id: disqualified })).toBeTruthy();
+    // since 0092 a person's new lead follows the same rule as a status change
+    expect((await pgError(insertLead(member.id, org, { status_id: disqualified }))).hint).toBe("lead:disqualify_reason");
   });
 
   it("names are unique per organization (ignoring case) and trimmed; at most 50", async () => {

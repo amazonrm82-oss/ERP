@@ -60,7 +60,7 @@ export async function loadMergePair(orgId: string, type: MergeType, keepId: stri
 
   const ids = (key: string) => [keep[key], dup[key]].filter((v): v is string => typeof v === "string");
   const [statuses, sources, companies, owners] = await Promise.all([
-    type === "lead" ? supabase.from("lead_statuses").select("id, name").in("id", ids("status_id")) : Promise.resolve({ data: [] }),
+    type === "lead" ? supabase.from("lead_statuses").select("id, name, kind").in("id", ids("status_id")) : Promise.resolve({ data: [] }),
     supabase.from("lead_sources").select("id, name").in("id", ids("source_id")),
     type === "contact" ? supabase.from("companies").select("id, name").in("id", ids("company_id")) : Promise.resolve({ data: [] }),
     getUserNames(ids("owner_id")),
@@ -73,11 +73,16 @@ export async function loadMergePair(orgId: string, type: MergeType, keepId: stri
     owner_id: owners,
   };
 
+  // a "not relevant" status is shown with its reason, which is merged with it (RVW-9)
+  const disqualified = new Set(((statuses.data ?? []) as Array<{ id: string; kind?: string }>).filter((s) => s.kind === "disqualified").map((s) => s.id));
+
   const side = (r: Row): MergeSide => {
     const values: Record<string, string | null> = {};
     for (const { key } of MERGE_FIELDS[type]) {
       const v = r[key];
       if (v === null || v === undefined || v === "") values[key] = null;
+      else if (key === "status_id" && disqualified.has(String(v)) && str(r.disqualify_reason))
+        values[key] = `${lookups[key].get(String(v)) ?? "—"}: ${str(r.disqualify_reason)}`;
       else if (lookups[key]) values[key] = lookups[key].get(String(v)) ?? "—";
       else if (key === "budget_agorot") values[key] = formatMoney(Number(v));
       else if (key === "birth_date") values[key] = formatDate(String(v));

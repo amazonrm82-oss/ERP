@@ -7,7 +7,7 @@ import { fail, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
-import { isMergeType, MERGE_FIELDS } from "./fields";
+import { isMergeType, mergePicks } from "./fields";
 
 const RECORD_PATH = { lead: paths.lead, contact: paths.contact, company: paths.company } as const;
 
@@ -16,10 +16,7 @@ export async function mergeRecordsAction(orgId: string, type: string, keepId: st
   if (!isMergeType(type)) return fail("סוג רשומה לא מוכר.");
   const context = await actionContext(orgId, keepId, mergeId);
   if (!context.ok) return context;
-  const picks: Record<string, string> = {};
-  for (const { key } of MERGE_FIELDS[type]) {
-    if (formData.get(key) === "merge") picks[key] = "merge";
-  }
+  const picks = mergePicks(type, (key) => formData.get(key) === "merge");
   const { error } = await context.supabase.rpc("merge_records", { p_org: orgId, p_type: type, p_keep: keepId, p_merge: mergeId, p_picks: picks });
   if (error) {
     if (error.hint === "merge:both_converted") return fail("שני הלידים כבר הומרו. אפשר למזג את אנשי הקשר שנוצרו מהם.");
