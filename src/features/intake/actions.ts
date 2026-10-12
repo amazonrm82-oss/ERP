@@ -9,6 +9,10 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
+import { isFieldType, type FieldType } from "@/features/custom-fields/types";
+import type { Json } from "@/lib/database.types";
+
+import { formFieldOptions, storedFields } from "./fields";
 import { createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 
 export async function createIntakeAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -67,14 +71,39 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
   if (!current) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  const fields = fieldsFromForm(formData);
-  if (current.kind === "form" && !fields.some((field) => ["full_name", "phone", "email"].includes(field.key))) {
-    return fail("הטופס צריך לבקש לפחות אחד: שם, טלפון או אימייל.", { values: formValues(formData) });
+  let fields: Json | undefined;
+  if (current.kind === "form") {
+    // CAP-01: the builder's fields, checked against the business's lead fields
+    const { data: definitions, error: definitionsError } = await context.supabase
+      .from("field_definitions")
+      .select("key, label, field_type, options, is_active")
+      .eq("organization_id", orgId)
+      .eq("object_type", "lead");
+    if (definitionsError) return fail(dbErrorMessage(definitionsError));
+    const options = formFieldOptions(
+      definitions
+        .filter((row) => isFieldType(row.field_type))
+        .map((row) => ({
+          id: row.key,
+          key: row.key,
+          label: row.label,
+          type: row.field_type as FieldType,
+          options: Array.isArray(row.options) ? row.options.filter((o): o is string => typeof o === "string") : [],
+          isRequired: false,
+          isActive: row.is_active,
+          helpText: null,
+        })),
+    );
+    const checked = fieldsFromForm(formData, options);
+    if (!checked.ok) {
+      return fail(checked.message, { values: formValues(formData) });
+    }
+    fields = storedFields(checked.fields);
   }
 
   const { data, error } = await context.supabase
     .from("forms")
-    .update({ ...parsed.data, ...(current.kind === "form" ? { fields } : {}) })
+    .update({ ...parsed.data, ...(fields !== undefined ? { fields } : {}) })
     .eq("organization_id", orgId)
     .eq("id", formId)
     .select("id");

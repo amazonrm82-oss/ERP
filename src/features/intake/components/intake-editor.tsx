@@ -7,9 +7,11 @@ import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Input, Label, SelectField, Textarea, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
+import type { Json } from "@/lib/database.types";
 
 import { createIntakeAction, updateIntakeAction } from "../actions";
-import { INTAKE_FIELD_LABELS, INTAKE_FIELDS } from "../fields";
+import { parseFieldsConfig, storedFields, type FormFieldConfig, type FormFieldOption } from "../fields";
+import { FormFieldsBuilder } from "./form-fields-builder";
 import type { IntakeDetails } from "../queries";
 
 type Option = { id: string; name: string };
@@ -43,17 +45,26 @@ export function CreateIntakeForm({ orgId }: { orgId: string }) {
   );
 }
 
-type EditProps = { orgId: string; intake: IntakeDetails; sources: Option[]; members: Option[]; teams: Option[] };
+type EditProps = { orgId: string; intake: IntakeDetails; sources: Option[]; members: Option[]; teams: Option[]; fieldOptions: FormFieldOption[] };
 
-export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: EditProps) {
+/** The builder's JSON (camelCase) in the stored shape, for parseFieldsConfig. */
+function fieldsJsonToStored(json: string): Json {
+  try {
+    const list: unknown = JSON.parse(json);
+    return Array.isArray(list) ? storedFields(list as FormFieldConfig[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fieldOptions }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
   const isForm = intake.kind === "form";
-  const shown = (key: string) => (values ? values[`show_${key}`] === "on" : intake.fields.some((field) => field.key === key));
-  const required = (key: string) =>
-    values ? values[`required_${key}`] === "on" : intake.fields.some((field) => field.key === key && field.required);
+  // after a failed save, the builder starts from what was sent
+  const builderInitial = values?.fields_json ? parseFieldsConfig(fieldsJsonToStored(values.fields_json)) : intake.fields;
   const sourceValue = values?.source_id ?? intake.sourceId ?? "";
   const ownerValue = values?.owner_id ?? intake.ownerId ?? "";
   const teamValue = values?.team_id ?? intake.teamId ?? "";
@@ -67,24 +78,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams }: E
         <>
           <TextField label="כותרת הטופס" name="title" maxLength={120} autoComplete="off" defaultValue={values?.title ?? intake.title ?? ""} error={errors.title} />
           <TextareaField label="טקסט מעל הטופס (לא חובה)" name="intro" rows={2} maxLength={500} defaultValue={values?.intro ?? intake.intro ?? ""} error={errors.intro} />
-          <fieldset className="rounded-md border border-line p-3">
-            <legend className="px-1 text-sm font-medium">שדות בטופס</legend>
-            <div className="divide-y divide-line">
-              {INTAKE_FIELDS.map((key) => (
-                <div key={`${key}-${shown(key)}-${required(key)}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <label className="flex items-center gap-2 text-md">
-                    <input type="checkbox" name={`show_${key}`} defaultChecked={shown(key)} className="size-4.5 accent-accent" />
-                    {INTAKE_FIELD_LABELS[key]}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-ink-soft">
-                    <input type="checkbox" name={`required_${key}`} defaultChecked={required(key)} className="size-4 accent-accent" />
-                    חובה
-                    <span className="sr-only">: {INTAKE_FIELD_LABELS[key]}</span>
-                  </label>
-                </div>
-              ))}
-            </div>
-          </fieldset>
+          <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
             <TextField

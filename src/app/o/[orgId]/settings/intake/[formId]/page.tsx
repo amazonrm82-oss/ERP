@@ -6,8 +6,10 @@ import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { BackIcon } from "@/components/ui/icons";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { deleteIntakeAction } from "@/features/intake/actions";
 import { CopyBlock, IntakeSettingsForm, ShareLink } from "@/features/intake/components/intake-editor";
+import { formFieldOptions, formInputName, isCustomFormKey } from "@/features/intake/fields";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -27,13 +29,14 @@ export default async function IntakeItemPage({ params }: Props) {
   if (!isUuid(formId) || !isAdminRole(role)) {
     notFound();
   }
-  const [intake, submissions, lookups, members, teams, origin] = await Promise.all([
+  const [intake, submissions, lookups, members, teams, origin, definitions] = await Promise.all([
     getIntake(orgId, formId),
     listSubmissions(orgId, formId),
     getLeadLookups(orgId),
     listMembers(orgId),
     listTeams(orgId),
     siteOrigin(),
+    listFieldDefinitions(orgId, "lead", { includeInactive: true }),
   ]);
   if (!intake) {
     notFound();
@@ -43,6 +46,8 @@ export default async function IntakeItemPage({ params }: Props) {
     .filter((member) => member.status === "active" && member.role !== "viewer")
     .map((member) => ({ id: member.userId, name: member.name }));
 
+  const fieldOptions = formFieldOptions(definitions);
+  const customNames = intake.fields.filter((field) => isCustomFormKey(field.key)).map((field) => formInputName(field.key));
   const pageUrl = `${origin}/f/${intake.token}`;
   const postUrl = `${origin}/api/forms/${intake.token}`;
   const hookUrl = `${origin}/api/in/${intake.token}`;
@@ -82,6 +87,7 @@ export default async function IntakeItemPage({ params }: Props) {
               <div className="mt-3 space-y-3">
                 <p className="text-ink-soft">
                   טופס HTML קיים יכול לשלוח ישירות לכתובת הזו (POST). שמות השדות: full_name, phone, email, company_name, message.
+                  {customNames.length > 0 ? <> שדות מותאמים: <span dir="ltr">{customNames.join(", ")}</span>.</> : null}
                 </p>
                 <CopyBlock label="כתובת שליחה" value={postUrl} />
               </div>
@@ -115,6 +121,7 @@ export default async function IntakeItemPage({ params }: Props) {
               sources={sources}
               members={assignable}
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+              fieldOptions={fieldOptions}
             />
           ) : (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד.</p>

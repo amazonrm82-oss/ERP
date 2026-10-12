@@ -1225,7 +1225,17 @@ try {
   await ownerDesk.waitForURL(/\/settings\/intake\/[0-9a-f-]{36}$/);
   const formAdminUrl = ownerDesk.url();
   await ownerDesk.getByLabel("כותרת הטופס").fill("השאירו פרטים ונחזור אליכם");
-  await ownerDesk.getByRole("checkbox", { name: "חברה", exact: true }).check();
+  // CAP-01: the form builder adds a built-in field and two custom ones, one shown only on a condition
+  const addFormField = async (label) => {
+    await ownerDesk.getByLabel("הוספת שדה", { exact: true }).selectOption({ label });
+    await ownerDesk.getByRole("button", { name: "הוספה", exact: true }).click();
+  };
+  await addFormField("חברה");
+  await addFormField("תקציב (בחירה מרשימה)");
+  await ownerDesk.getByRole("checkbox", { name: "חובה: תקציב" }).check();
+  await ownerDesk.getByLabel("טקסט עזרה: תקציב").fill("בערך, לא צריך מדויק");
+  await addFormField("שירותים (בחירה מרובה מרשימה)");
+  await ownerDesk.getByLabel("מתי להציג: שירותים").selectOption({ label: 'כש"תקציב" הוא מעל 50,000' });
   await ownerDesk.getByLabel("מקור הליד").selectOption({ label: "טופס באתר" });
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "נשמר.");
@@ -1242,6 +1252,8 @@ try {
   await visitor.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
   // FXA-06: the accessibility statement is one tap away, in a new tab when embedded
   if ((await visitor.getByRole("link", { name: /הצהרת נגישות/ }).getAttribute("target")) !== "_blank") throw new Error("no accessibility link on the public form");
+  // CAP-01: a custom field shows its help text (until an error takes its place)
+  await visitor.getByText("בערך, לא צריך מדויק").waitFor();
   // FXA-02: an empty send marks the wrong field, says why next to it, and puts focus there
   await visitor.getByRole("button", { name: "שליחת הפרטים" }).click();
   await visitor.locator('[aria-invalid="true"]').first().waitFor();
@@ -1255,6 +1267,12 @@ try {
   await visitor.getByLabel("שם מלא").fill("גלית מהאתר");
   await visitor.getByLabel("טלפון").fill("054-7778899");
   await visitor.getByLabel("חברה").fill("גלית עיצובים");
+  // CAP-01: the conditional field appears only for the right choice (its help text was checked before the empty send)
+  if (await visitor.getByRole("checkbox", { name: "התקנה" }).count()) throw new Error("a conditional field shows before its condition holds");
+  await visitor.getByLabel(/^תקציב/).selectOption("10,000-50,000");
+  if (await visitor.getByRole("checkbox", { name: "התקנה" }).count()) throw new Error("a conditional field shows for the wrong choice");
+  await visitor.getByLabel(/^תקציב/).selectOption("מעל 50,000");
+  await visitor.getByRole("checkbox", { name: "התקנה" }).check();
   await visitor.waitForTimeout(2200); // a person takes a moment; faster than 2 seconds counts as a bot
   await visitor.getByRole("button", { name: "שליחת הפרטים" }).click();
   await expectText(visitor, "תודה! קיבלנו את הפרטים");
@@ -1273,6 +1291,8 @@ try {
   await ownerDesk.getByRole("link", { name: /גלית מהאתר/ }).click();
   await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
   await expectText(ownerDesk, "גלית עיצובים");
+  await expectText(ownerDesk, "מעל 50,000");
+  await expectText(ownerDesk, "התקנה");
   await expectText(ownerDesk, "טופס באתר");
   await expectText(ownerDesk, "מבצע חורף");
   await expectText(ownerDesk, "facebook / cpc");

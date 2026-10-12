@@ -7,7 +7,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseAttribution, safeText } from "./attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
-import { wrongField } from "./public-validate";
+import { readPublicForm } from "./public-form";
+import { checkSubmission, wrongField, type RawValues } from "./public-validate";
 
 export type IntakeKind = "form" | "webhook";
 
@@ -58,7 +59,10 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
       const form = await new Response(bytes as unknown as BodyInit, { headers: { "content-type": type } }).formData();
       const out: Record<string, unknown> = {};
       for (const [key, value] of form.entries()) {
-        if (typeof value === "string") out[key] = value;
+        if (typeof value !== "string") continue;
+        // a repeated name (several boxes of a multiple choice) becomes a list
+        const before = out[key];
+        out[key] = before === undefined ? value : Array.isArray(before) ? [...before, value] : [before, value];
       }
       return out;
     }
@@ -95,6 +99,7 @@ async function readLimited(request: Request): Promise<Uint8Array | "too_large"> 
 }
 
 function text(value: unknown): string | null {
+  if (Array.isArray(value)) return text(value[0]);
   if (typeof value === "number") return String(value);
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
@@ -115,6 +120,36 @@ export function normalize(body: Record<string, unknown>): Record<IntakeField, st
     out[field] = out[field] === null || out[field] === undefined ? null : safeText(out[field], MAX_LENGTH[field]) || null;
   }
   return out;
+}
+
+// FXS-02 for custom values: a few dozen inputs, each cut to what a field can hold
+const MAX_CUSTOM_INPUTS = 60;
+const MAX_CUSTOM_ITEMS = 50;
+
+/** The cf_<key> inputs of a form post, as the hosted form's checks read them. */
+export function customInputs(body: Record<string, unknown>): RawValues {
+  const out: RawValues = {};
+  const one = (value: unknown): string | null => {
+    if (typeof value === "string") return safeText(value, 5000);
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (value === true) return "on";
+    return null;
+  };
+  for (const [key, value] of Object.entries(body)) {
+    if (!/^cf_[a-z][a-z0-9_]{0,39}$/.test(key)) continue;
+    if (Object.keys(out).length >= MAX_CUSTOM_INPUTS) break;
+    if (Array.isArray(value)) {
+      out[key] = value.slice(0, MAX_CUSTOM_ITEMS).map(one).filter((v): v is string => v !== null);
+    } else {
+      const v = one(value);
+      if (v !== null) out[key] = v;
+    }
+  }
+  return out;
+}
+
+function nonNull(values: Record<string, string | null>): RawValues {
+  return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== null));
 }
 
 function clientIp(request: Request): string | null {
@@ -178,11 +213,27 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     isSpam = text(body[HONEYPOT_FIELD]) !== null || (Number.isFinite(startedAt) && startedAt > 0 && Date.now() - startedAt < MIN_FILL_MS);
   }
 
+  let fields: Record<string, unknown> = normalize(body);
+  if (kind === "form" && !isSpam) {
+    // CAP-01: the form's own fields, conditions and custom fields, checked as
+    // the hosted form checks them; the database checks again
+    const form = await readPublicForm(service, token);
+    if (!form) {
+      return respond(404, { ok: false, message: MESSAGES.notFound });
+    }
+    const checked = checkSubmission(form.fields, { ...customInputs(body), ...nonNull(normalize(body)) });
+    const wrong = Object.entries(checked.errors)[0];
+    if (wrong) {
+      return respond(400, { ok: false, message: wrong[1], field: wrong[0] });
+    }
+    fields = { ...checked.builtins, custom: checked.custom };
+  }
+
   const { data, error } = await service.rpc("intake_submit", {
     p_token: token,
     p_kind: kind,
     // CAP-02: utm_*, click ids and page addresses ride along; the database keeps them on a new lead only
-    p_payload: { ...normalize(body), attribution: parseAttribution(body) } as unknown as Json,
+    p_payload: { ...fields, attribution: parseAttribution(body) } as unknown as Json,
     p_ip_hash: ipHash,
     p_user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
     p_is_spam: isSpam,
