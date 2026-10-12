@@ -63,7 +63,9 @@ and build this CRM here instead. The old code is preserved on the branch
    with a shared secret), which calls `public.claim_push_notifications()` and reads/deletes
    `push_subscriptions`; and the file cleanup (`src/features/files/cleanup-server.ts`, route
    `/api/files/cleanup`, woken at night by the database with the same secret), which calls
-   `public.claim_orphan_files()` / `finish_orphan_files()` and removes those Storage objects.
+   `public.claim_orphan_objects()` / `finish_orphan_files()` and removes those Storage objects, only from the buckets
+   in `CLEANUP_BUCKETS` (`src/features/files/orphans.ts`): `record-files` (files of deleted rows) and `avatars` (the
+   photos of deleted accounts and replaced photos; owner's decision USR-01, 12 October 2026).
    Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
    `QUO-08`, `CAL-10`, `BAL-04`): a server route calls one `security definer` function granted to
    `service_role` only, which checks the token and does only what that page needs; no direct table access.
@@ -164,6 +166,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `/api/files/cleanup` (URL from `app.settings` `files_cleanup_url`, else derived from
   `push_dispatch_url`; secret `push_dispatch_secret`). The route claims paths, removes the objects
   with the service role, and reports them done.
+  Since 0086 `app.orphan_files.bucket` is `record-files` | `avatars`; trigger `profiles_avatar_orphans` queues a
+  deleted profile's photo folder and a replaced or removed photo; an avatar still in use is never claimed;
+  `claim_orphan_files()` stays for old code and returns record files only.
 - Handover (migration 0024): `public.transfer_records(org, from, to)` moves owner_id on leads,
   contacts, companies, deals and tasks. It sets `app.bulk_transfer` (notify_assignment skips) and
   `app.automation_running` (events marked as automation, so automations skip) for its duration.
