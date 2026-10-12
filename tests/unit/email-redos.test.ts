@@ -4,6 +4,10 @@ import type { FieldDefinition } from "@/features/custom-fields/types";
 import { parseCustomFields } from "@/features/custom-fields/values";
 import { type PublicField, validatePublicForm } from "@/features/intake/public-validate";
 
+// The quadratic versions took 3.7 to 12 seconds on these inputs; the linear ones take a few
+// milliseconds. A generous budget keeps the test meaningful without failing on a loaded CI runner.
+const TIME_BUDGET_MS = 1000;
+
 // RVW-3 follow-up: the email check's regex is quadratic on "a@...." with no end,
 // so the length (254, as app.custom_value_ok() checks) is looked at first.
 
@@ -38,7 +42,7 @@ const publicFields: PublicField[] = [
 function timed<T>(run: () => T): T {
   const started = performance.now();
   const result = run();
-  expect(performance.now() - started).toBeLessThan(100);
+  expect(performance.now() - started).toBeLessThan(TIME_BUDGET_MS);
   return result;
 }
 

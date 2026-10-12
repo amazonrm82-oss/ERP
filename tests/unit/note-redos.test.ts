@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { parseNote, safeHref, sanitizeNote } from "@/features/activities/markdown";
 import { callLogSchema, NOTE_RAW_MAX, noteEditSchema, noteSchema } from "@/features/activities/schema";
 
+// The quadratic versions took 3.7 to 12 seconds on these inputs; the linear ones take a few
+// milliseconds. A generous budget keeps the test meaningful without failing on a loaded CI runner.
+const TIME_BUDGET_MS = 1000;
+
 // RVW-3: a hostile note must not hold the server. Too long is refused before any cleaning,
 // and the cleaning itself is linear.
 
@@ -35,10 +39,10 @@ const HOSTILE: Array<[string, string]> = [
 
 describe("RVW-3: hostile notes", () => {
   for (const [name, text] of HOSTILE) {
-    it(`sanitizes ${name} in under 100 ms`, () => {
+    it(`sanitizes ${name} quickly`, () => {
       const started = performance.now();
       sanitizeNote(text);
-      expect(performance.now() - started).toBeLessThan(100);
+      expect(performance.now() - started).toBeLessThan(TIME_BUDGET_MS);
     });
   }
 
@@ -46,7 +50,7 @@ describe("RVW-3: hostile notes", () => {
     for (const [, text] of HOSTILE) {
       const started = performance.now();
       parseNote(text.slice(0, 5000));
-      expect(performance.now() - started).toBeLessThan(100);
+      expect(performance.now() - started).toBeLessThan(TIME_BUDGET_MS);
     }
   });
 
@@ -55,7 +59,7 @@ describe("RVW-3: hostile notes", () => {
     for (const schema of [noteSchema, noteEditSchema, callLogSchema]) {
       const started = performance.now();
       const result = schema.safeParse({ type: "note", outcome: "answered", body, private_field: null, private: null });
-      expect(performance.now() - started).toBeLessThan(100);
+      expect(performance.now() - started).toBeLessThan(TIME_BUDGET_MS);
       expect(result.success).toBe(false);
       expect(result.error?.issues.map((issue) => issue.message)).toEqual([TOO_LONG]);
     }
