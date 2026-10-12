@@ -8,8 +8,10 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { BackIcon } from "@/components/ui/icons";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { deleteIntakeAction } from "@/features/intake/actions";
+import { FormQr } from "@/features/intake/components/form-qr";
 import { CopyBlock, IntakeSettingsForm, ShareLink } from "@/features/intake/components/intake-editor";
 import { formFieldOptions, formInputName, isCustomFormKey } from "@/features/intake/fields";
+import { formQrUrl, qrFileName } from "@/features/intake/qr-link";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -72,6 +74,12 @@ export default async function IntakeItemPage({ params }: Props) {
           <CardBody className="space-y-5">
             <p className="text-md text-ink-soft">שולחים את הקישור ב-WhatsApp, בפוסט או במודעה. כל מי שממלא את הטופס נכנס כליד.</p>
             <ShareLink url={pageUrl} title={intake.title ?? intake.name} />
+            <details className="text-md">
+              <summary className="cursor-pointer font-medium">קוד QR לשלט, לפלייר או לכרטיס ביקור</summary>
+              <div className="mt-3">
+                <FormQr url={formQrUrl(pageUrl)} printUrl={`${pageUrl}/qr`} fileName={qrFileName(intake.name)} />
+              </div>
+            </details>
             <details className="text-md">
               <summary className="cursor-pointer font-medium">יש לכם אתר? קוד להטמעה</summary>
               <div className="mt-3 space-y-3">

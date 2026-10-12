@@ -30,7 +30,11 @@ const PASSWORD = "Test-pass-12345";
 const errors = [];
 
 // E2E_CHROMIUM_PATH: use an already installed Chromium instead of `npx playwright install`
-const browser = await chromium.launch({ executablePath: process.env.E2E_CHROMIUM_PATH || undefined });
+// a UTF-8 locale: without one (a bare container) Chromium drops Hebrew from download file names
+const browser = await chromium.launch({
+  executablePath: process.env.E2E_CHROMIUM_PATH || undefined,
+  env: { ...process.env, LANG: process.env.LANG || "C.UTF-8" },
+});
 
 function step(name) {
   console.log(`\n== ${name}`);
@@ -1241,6 +1245,23 @@ try {
   await expectText(ownerDesk, "נשמר.");
   const publicUrl = await ownerDesk.getByLabel("קישור לשיתוף").inputValue();
   await shot(ownerDesk, "40-intake-form-1280");
+
+  step("intake: the form's QR code, as a file and as a page to print (CAP-03)");
+  await ownerDesk.getByText(/^קוד QR לשלט/).click();
+  await ownerDesk.getByRole("img", { name: "קוד QR של הטופס" }).waitFor();
+  const [qrDownload] = await Promise.all([ownerDesk.waitForEvent("download"), ownerDesk.getByRole("button", { name: /הורדה לדפוס/ }).click()]);
+  if (!/^qr-.*\.svg$/.test(qrDownload.suggestedFilename())) throw new Error(`QR file name: ${qrDownload.suggestedFilename()}`);
+  const qrFile = await readFile(await qrDownload.path(), "utf8");
+  if (!qrFile.startsWith("<svg") || !qrFile.includes("<path d=\"M")) throw new Error("the downloaded QR is not an SVG drawing");
+  const [qrPng] = await Promise.all([ownerDesk.waitForEvent("download"), ownerDesk.getByRole("button", { name: /הורדה כתמונה/ }).click()]);
+  if (!qrPng.suggestedFilename().endsWith(".png")) throw new Error(`QR image name: ${qrPng.suggestedFilename()}`);
+  const poster = await newPage(360);
+  await poster.goto(`${publicUrl}/qr`);
+  await poster.getByRole("heading", { name: "השאירו פרטים ונחזור אליכם" }).waitFor();
+  await poster.getByRole("img", { name: /^קוד QR לטופס/ }).waitFor();
+  await poster.getByRole("button", { name: /הדפסה/ }).waitFor();
+  await shot(poster, "40b-form-qr-poster-360");
+  await poster.close();
 
   step("intake: a visitor (signed out, phone) fills the public form");
   const frameHeaders = (await fetch(publicUrl)).headers.get("content-security-policy");
