@@ -3,15 +3,19 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { ISRAEL } from "@/features/companies/countries";
 import { companySchema } from "@/features/companies/schema";
+import { companyTaxId, foreignCompanyNumber } from "@/features/companies/tax-id";
 import { parseCustomFields } from "@/features/custom-fields/values";
 import { inputName, type FieldDefinition } from "@/features/custom-fields/types";
 import type { Database, Json } from "@/lib/database.types";
 import { dbErrorMessage } from "@/lib/errors";
 import { normalizePhone } from "@/lib/phone";
+import { israeliIdNumber } from "@/lib/israeli-id";
 import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { COUNTRY_UNKNOWN, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fields";
 
 type Client = SupabaseClient<Database>;
@@ -114,9 +118,13 @@ type Prepared = {
   // for duplicate detection
   phoneE164: string | null;
   email: string | null;
-  taxId: string | null;
+  // companies: the values the number may be stored as, for duplicate detection
+  taxIds: string[];
   name: string | null;
   companyName: string | null;
+  // companies with a number but no country in the file: checked once the country is
+  // known (an existing company's own, otherwise Israel)
+  pendingTaxId: string | null;
 };
 
 /** Validates one row and turns it into column values. Returns a message when the row cannot be imported. */
@@ -136,6 +144,8 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
   const values: Record<string, unknown> = {};
   let name: string | null = null;
   let companyName: string | null = null;
+  let taxIds: string[] = [];
+  let pendingTaxId: string | null = null;
 
   if (ctx.entity === "lead") {
     const parsed = leadRowSchema.safeParse({
@@ -182,9 +192,15 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     if (companyName && companyName.length > 200) return "שם החברה ארוך מדי (עד 200 תווים).";
     name = [parsed.data.first_name, parsed.data.last_name].filter(Boolean).join(" ") || null;
   } else {
+    // CON-04: the number is checked by the company's country. A row with a country
+    // checks it now; a row without one waits until the import knows whether it
+    // updates an existing company (its stored country) or creates one (Israel).
+    const country = raw.country ? importCountry(raw.country) : null;
+    if (raw.country && !country) return COUNTRY_UNKNOWN(raw.country);
     const parsed = companySchema.safeParse({
       name: raw.name,
-      tax_id: raw.tax_id,
+      country: country ?? ISRAEL,
+      tax_id: country ? raw.tax_id : undefined,
       industry: "",
       phone: raw.phone,
       email: raw.email,
@@ -193,12 +209,19 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
       address_line: raw.address_line,
     });
     if (!parsed.success) return firstIssue(parsed.error);
-    // the file has no country: an import never writes one, so an update keeps the
-    // company's country (CON-04) and a new company gets the database default (IL)
-    const { industry: _industry, country: _country, ...rest } = parsed.data;
+    const { industry: _industry, country: _country, tax_id: taxId, ...rest } = parsed.data;
     void _industry;
     void _country;
     Object.assign(values, rest);
+    if (country) {
+      // only a filled cell writes the country; an empty one keeps an existing company's
+      values.country = country;
+      values.tax_id = taxId;
+      if (taxId) taxIds = [taxId];
+    } else if (raw.tax_id) {
+      pendingTaxId = raw.tax_id;
+      taxIds = present([israeliIdNumber(raw.tax_id), foreignCompanyNumber(raw.tax_id)]);
+    }
     name = parsed.data.name;
   }
 
@@ -224,9 +247,10 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     values,
     phoneE164: normalizePhone(values.phone as string | null),
     email: (values.email as string | null) ?? null,
-    taxId: (values.tax_id as string | null) ?? null,
+    taxIds,
     name,
     companyName,
+    pendingTaxId,
   };
 }
 
@@ -239,14 +263,14 @@ class LookupFailed extends Error {}
 const present = (values: Array<string | null>) => [...new Set(values.filter((v): v is string => Boolean(v)))];
 
 /** Records already in the organization (that the user can see) matching any row of the chunk; one query in the database. */
-async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: Array<Pick<Prepared, "phoneE164" | "email" | "taxId" | "name">>): Promise<Existing[]> {
+async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: Array<Pick<Prepared, "phoneE164" | "email" | "taxIds" | "name">>): Promise<Existing[]> {
   if (rows.length === 0) return [];
   const { data, error } = await ctx.supabase.rpc("import_find_duplicates", {
     p_org: ctx.orgId,
     p_entity: entity,
     p_phones: present(rows.map((r) => r.phoneE164)),
     p_emails: present(rows.map((r) => r.email)),
-    p_tax_ids: entity === "company" ? present(rows.map((r) => r.taxId)) : [],
+    p_tax_ids: entity === "company" ? present(rows.flatMap((r) => r.taxIds)) : [],
     p_names: entity === "company" ? present(rows.map((r) => r.name)) : [],
   });
   if (error) throw new LookupFailed(error.message);
@@ -260,7 +284,7 @@ function matchExisting(entity: ImportEntityKey, existing: Existing[], row: Prepa
     (e) =>
       (row.phoneE164 && e.phone_e164 === row.phoneE164) ||
       same(row.email, e.email) ||
-      (entity === "company" && ((row.taxId && e.tax_id === row.taxId) || same(row.name, e.name))),
+      (entity === "company" && ((e.tax_id !== null && row.taxIds.includes(e.tax_id)) || same(row.name, e.name))),
   );
 }
 
@@ -272,7 +296,7 @@ async function resolveCompanies(ctx: ImportContext, rows: Prepared[], jobId: str
   const found = await findExisting(
     ctx,
     "company",
-    names.map((name) => ({ phoneE164: null, email: null, taxId: null, name })),
+    names.map((name) => ({ phoneE164: null, email: null, taxIds: [], name })),
   );
   for (const c of found) if (c.name && names.some((n) => same(n, c.name))) ids.set(key(c.name), c.id);
   const missing = names.filter((n) => !ids.has(key(n)));
@@ -318,8 +342,29 @@ export async function processChunk(ctx: ImportContext, lookups: Lookups | null, 
   }
 }
 
+/** The stored country of each matched company, read with the user's session (CON-04). */
+async function companyCountries(ctx: ImportContext, existing: Existing[]): Promise<Map<string, string>> {
+  const countries = new Map<string, string>();
+  const ids = present(existing.map((e) => e.id));
+  if (ctx.entity !== "company" || ids.length === 0) return countries;
+  const { data, error } = await ctx.supabase.from("companies").select("id, country").eq("organization_id", ctx.orgId).in("id", ids);
+  if (error) throw new LookupFailed(error.message);
+  for (const c of data) countries.set(c.id, c.country);
+  return countries;
+}
+
+/** Checks a number that waited for its company's country; sets it on the row, or returns the message. */
+function settleTaxId(row: Prepared, country: string): string | null {
+  if (row.pendingTaxId === null) return null;
+  const taxId = companyTaxId(row.pendingTaxId, country);
+  if (!taxId.ok) return taxId.message;
+  row.values.tax_id = taxId.value;
+  return null;
+}
+
 async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[], outcomes: RowOutcome[], jobId: string | null): Promise<RowOutcome[]> {
   const existing = ctx.mode === "create" ? [] : await findExisting(ctx, ctx.entity, prepared);
+  const countries = ctx.mode === "update" ? await companyCountries(ctx, existing) : new Map<string, string>();
   const toInsert: Prepared[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
@@ -330,6 +375,12 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     if (earlier || (match && ctx.mode === "skip")) {
       outcomes.push({ row: row.row, status: "skipped", message: "כבר קיים" });
     } else if (match && ctx.mode === "update") {
+      // an update keeps the company's country, so its number is checked against that one
+      const taxError = settleTaxId(row, countries.get(match.id) ?? ISRAEL);
+      if (taxError) {
+        outcomes.push({ row: row.row, status: "failed", message: taxError });
+        continue;
+      }
       if (!jobId) {
         outcomes.push({ row: row.row, status: "updated" });
         continue;
@@ -347,7 +398,10 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
       if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : "אין הרשאה לעדכן את הרשומה הקיימת." });
       else outcomes.push({ row: row.row, status: "updated" });
     } else {
-      toInsert.push(row);
+      // a new company without a country in the file gets the default, Israel
+      const taxError = settleTaxId(row, ISRAEL);
+      if (taxError) outcomes.push({ row: row.row, status: "failed", message: taxError });
+      else toInsert.push(row);
     }
   }
 

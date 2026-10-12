@@ -56,7 +56,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
   ],
   company: [
     { key: "name", label: "שם החברה", synonyms: [...COMPANY, "שם"] },
-    { key: "tax_id", label: "ח.פ. / ע.מ.", synonyms: ["ח.פ.", "חפ", "ח.פ", "ע.מ.", "עוסק מורשה", "מספר עוסק", "tax id", "vat", "company number"] },
+    { key: "country", label: "מדינה (שם או קוד, למשל GB)", synonyms: ["מדינה", "ארץ", "country", "country code"] },
+    { key: "tax_id", label: "ח.פ. / ע.מ. / מספר רישום", synonyms: ["ח.פ.", "חפ", "ח.פ", "ע.מ.", "עוסק מורשה", "מספר עוסק", "מספר רישום", "tax id", "vat", "company number", "registration number"] },
     { key: "phone", label: "טלפון", synonyms: PHONE },
     { key: "email", label: "אימייל", synonyms: EMAIL },
     { key: "website", label: "אתר", synonyms: ["אתר", "אתר אינטרנט", "website", "web", "url", "site"] },
