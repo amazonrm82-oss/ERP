@@ -139,7 +139,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `org_reset_member_mfa()` (owner/admin, aal2, target in no other org) and `platform_reset_mfa()`
   (support, identity check required). `app.agreement_signatures` (not in the API) keeps every signed
   copy; `requireAgreement()` (`src/features/legal/queries.ts`) gates `/`, onboarding, invites and
-  `getOrgContext`. Changing a legal text means a new `LEGAL_VERSION`, and everyone signs again.
+  `getOrgContext`. Changing a legal text means a new `LEGAL_VERSION`, and everyone signs again (owner, 12 October
+  2026: filling contact details into a draft does not open a version; a change to the terms does).
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
