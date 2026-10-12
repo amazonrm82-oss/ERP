@@ -120,6 +120,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `app.run_scheduled_automations()` every 15 minutes, scheduled with pg_cron. Every id inside a rule's
   JSON is re-checked against the rule's organization when it runs. Changes made by an automation are
   marked `payload.origin = 'automation'` in the outbox and do not trigger automations.
+- Outbox retries and scheduled scans (RVW-20, RVW-6; migrations 0081, 0082): `process_outbox()` skips an event already
+  tried in the current transaction (`outbox_events.last_attempt_at`), so a failed event is retried once per cron run even
+  though `process_outbox_rounds()` loops. "No activity" and "stuck in stage" continue from a per-rule cursor in
+  `app.automation_scan_cursors` (no grants) and reset at the end of the list; a cursor older than the rule's `updated_at`
+  is ignored. The scan limit per run is `app.scheduled_scan_limit()` (setting `app.scheduled_scan_limit`, default and
+  max 20,000; tests lower it).
 - Notifications (migration 0010): `notifications` is in the `supabase_realtime` publication (the bell
   subscribes with the user's token, RLS filters). pg_cron job `crm-notifications` runs every minute:
   `app.send_task_reminders()` then `app.dispatch_push()`, which pings the app through pg_net using
