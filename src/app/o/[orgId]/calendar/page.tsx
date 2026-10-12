@@ -91,7 +91,10 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   const [allMembers, teamData] = await Promise.all([listMembers(orgId), listCalendarTeams(orgId)]);
   const members = allMembers.filter((member) => member.status === "active").map((member) => ({ id: member.userId, name: member.name }));
-  const teams = visibleTeams(teamData.teams, teamData.memberships, me, context.role === "owner" || context.role === "admin");
+  const teams = visibleTeams(teamData.teams, teamData.memberships, me, {
+    isAdmin: context.role === "owner" || context.role === "admin",
+    visibility: teamData.visibility,
+  });
   const team = teams.find((t) => t.id === firstParam(query.team)) ?? null;
   // the people the filters may pick from: the team's, or everyone
   const pool = team ? teamPeople(team.id, teamData.teams, teamData.memberships, members) : members;

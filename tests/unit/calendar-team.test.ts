@@ -44,21 +44,47 @@ describe("teams of the filter", () => {
     expect([...teamWithDescendants("a", loop)].sort()).toEqual(["a", "b"]);
   });
 
-  it("owners and admins get every team, by name", () => {
-    expect(visibleTeams(teams, [], ME, true).map((t) => t.id)).toEqual(["sales", "north", "ne", "service"]);
+  // owner, 12 October 2026: the teams offered follow the organization's record visibility
+  const rows: TeamMembership[] = [
+    { teamId: "sales", userId: ME, isManager: true },
+    { teamId: "service", userId: ANA, isManager: false },
+    { teamId: "north", userId: BEN, isManager: false },
+  ];
+  const ALL = ["sales", "north", "ne", "service"];
+  const VISIBILITIES = ["org", "team", "own"] as const;
+
+  it("owners and admins get every team, by name, whatever the visibility", () => {
+    for (const visibility of VISIBILITIES) {
+      expect(visibleTeams(teams, rows, ME, { isAdmin: true, visibility }).map((t) => t.id)).toEqual(ALL);
+      // an admin who sits in no team
+      expect(visibleTeams(teams, rows, DAN, { isAdmin: true, visibility }).map((t) => t.id)).toEqual(ALL);
+    }
   });
 
-  it("a manager gets the teams they manage with their sub-teams; a member only their own teams", () => {
-    const rows: TeamMembership[] = [
-      { teamId: "sales", userId: ME, isManager: true },
+  it('with visibility "org" everyone gets every team: a manager, a member, someone in no team', () => {
+    for (const user of [ME, ANA, BEN, DAN]) {
+      expect(visibleTeams(teams, rows, user, { isAdmin: false, visibility: "org" }).map((t) => t.id)).toEqual(ALL);
+    }
+  });
+
+  it('with visibility "team" or "own" each user gets only the teams they sit in', () => {
+    for (const visibility of ["team", "own"] as const) {
+      const viewer = { isAdmin: false, visibility };
+      // a manager of a parent team gets that team only, not the teams under it
+      expect(visibleTeams(teams, rows, ME, viewer).map((t) => t.id)).toEqual(["sales"]);
+      expect(visibleTeams(teams, rows, ANA, viewer).map((t) => t.id)).toEqual(["service"]);
+      // a member of a parent team does not get its sub-teams either
+      expect(visibleTeams(teams, rows, BEN, viewer).map((t) => t.id)).toEqual(["north"]);
+      expect(visibleTeams(teams, rows, DAN, viewer)).toEqual([]);
+    }
+  });
+
+  it("someone in two teams gets both, by name", () => {
+    const two: TeamMembership[] = [
       { teamId: "service", userId: ANA, isManager: false },
-      { teamId: "north", userId: BEN, isManager: false },
+      { teamId: "ne", userId: ANA, isManager: true },
     ];
-    expect(visibleTeams(teams, rows, ME, false).map((t) => t.id).sort()).toEqual(["ne", "north", "sales"]);
-    expect(visibleTeams(teams, rows, ANA, false).map((t) => t.id)).toEqual(["service"]);
-    // a plain member of a parent team does not get its sub-teams
-    expect(visibleTeams(teams, rows, BEN, false).map((t) => t.id)).toEqual(["north"]);
-    expect(visibleTeams(teams, rows, DAN, false)).toEqual([]);
+    expect(visibleTeams(teams, two, ANA, { isAdmin: false, visibility: "team" }).map((t) => t.id)).toEqual(["ne", "service"]);
   });
 
   it("a team's people include the sub-teams' people, in the given order, once each", () => {

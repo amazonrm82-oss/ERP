@@ -3,6 +3,8 @@
 // items of each person. Pure, so it is unit-tested. None of this widens access:
 // the items themselves are read with the user's session and RLS decides.
 
+import type { RecordVisibility } from "@/lib/database.types";
+
 export type CalendarTeam = { id: string; name: string; parentId: string | null };
 export type TeamMembership = { teamId: string; userId: string; isManager: boolean };
 export type CalendarPerson = { id: string; name: string };
@@ -27,19 +29,22 @@ export function teamWithDescendants(teamId: string, teams: CalendarTeam[]): Set<
 }
 
 /**
- * The teams the team filter offers: all of them to an owner or admin; to
- * everyone else the teams they sit in, plus every team under a team they manage.
- * Sorted by name.
+ * The teams the team filter offers (owner, 12 October 2026: by the
+ * organization's record visibility). Owners and admins get every team; so does
+ * everyone in an organization whose records are visible to all ("org"). With
+ * visibility "team" or "own", each user gets only the teams they sit in (as a
+ * member or as its manager), without the teams under them. Sorted by name.
+ * This only narrows whose items are read; RLS still decides what is shown.
  */
-export function visibleTeams(teams: CalendarTeam[], memberships: TeamMembership[], userId: string, isAdmin: boolean): CalendarTeam[] {
+export function visibleTeams(
+  teams: CalendarTeam[],
+  memberships: TeamMembership[],
+  userId: string,
+  viewer: { isAdmin: boolean; visibility: RecordVisibility },
+): CalendarTeam[] {
   const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name, "he"));
-  if (isAdmin) return sorted;
-  const ids = new Set<string>();
-  for (const row of memberships) {
-    if (row.userId !== userId) continue;
-    ids.add(row.teamId);
-    if (row.isManager) for (const id of teamWithDescendants(row.teamId, teams)) ids.add(id);
-  }
+  if (viewer.isAdmin || viewer.visibility === "org") return sorted;
+  const ids = new Set(memberships.filter((row) => row.userId === userId).map((row) => row.teamId));
   return sorted.filter((team) => ids.has(team.id));
 }
 

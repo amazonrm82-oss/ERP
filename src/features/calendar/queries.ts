@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
+import type { RecordVisibility } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 import type { RecordType } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
@@ -144,16 +145,22 @@ export async function listCalendarItems(
 }
 
 /**
- * The organization's teams and who sits in them, for the team filter (CAL-04).
- * Members may read both (RLS); which teams are offered is `visibleTeams()`.
+ * The organization's teams, who sits in them and the organization's record
+ * visibility, for the team filter (CAL-04). Members may read all three (RLS);
+ * which teams are offered is `visibleTeams()`.
  */
-export async function listCalendarTeams(orgId: string): Promise<{ teams: CalendarTeam[]; memberships: TeamMembership[] }> {
+export async function listCalendarTeams(
+  orgId: string,
+): Promise<{ teams: CalendarTeam[]; memberships: TeamMembership[]; visibility: RecordVisibility }> {
   const supabase = await createClient();
-  const [teamResult, memberResult] = await Promise.all([
+  const [teamResult, memberResult, orgResult] = await Promise.all([
     supabase.from("teams").select("id, name, parent_team_id").eq("organization_id", orgId),
     supabase.from("team_members").select("team_id, user_id, is_manager").eq("organization_id", orgId),
+    supabase.from("organizations").select("record_visibility").eq("id", orgId).maybeSingle(),
   ]);
   const teams = must(teamResult, "calendar teams").map((t) => ({ id: t.id, name: t.name, parentId: t.parent_team_id }));
   const memberships = must(memberResult, "calendar team members").map((m) => ({ teamId: m.team_id, userId: m.user_id, isManager: m.is_manager }));
-  return { teams, memberships };
+  // no row (should not happen to a member): the narrowest choice
+  const visibility = must(orgResult, "calendar visibility")?.record_visibility ?? "own";
+  return { teams, memberships, visibility };
 }
