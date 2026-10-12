@@ -42,7 +42,7 @@ export function NewMeetingButton({ orgId, subject, members, timeZone, initial }:
         פגישה חדשה
       </Button>
       <Dialog open={open} onClose={close} title="פגישה חדשה" variant="sheet">
-        {open ? <MeetingForm orgId={orgId} subject={subject} initial={initial} members={members} timeZone={timeZone} onDone={saved} /> : null}
+        {open ? <MeetingForm orgId={orgId} subject={subject} initial={initial} members={members} timeZone={timeZone} onDone={saved} onCancel={close} /> : null}
       </Dialog>
       <FormNotice message={notice} className="mt-2" />
       <FormError message={warning} className="mt-2" />
@@ -50,23 +50,35 @@ export function NewMeetingButton({ orgId, subject, members, timeZone, initial }:
   );
 }
 
-type ItemProps = Common & {
+type ItemProps = Omit<Common, "subject"> & {
+  // null: a meeting opened from the calendar that is on no record (an internal meeting)
+  subject: TimelineSubject | null;
   meetingId: string;
   title: string;
   status: string;
   outcome: string;
   initial: MeetingFormValues;
+  // the calendar closes its own window after a change: what was done, and a warning (participants not saved)
+  onChanged?: (change: MeetingChange, message?: string) => void;
 };
 
+/** What was done to a meeting from its buttons. */
+export type MeetingChange = "edit" | "status" | "delete";
+
 /** The two things done to a meeting after it is set: say how it went, or change its details. */
-export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingId, title, status, outcome, initial }: ItemProps) {
+export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingId, title, status, outcome, initial, onChanged }: ItemProps) {
   const [open, setOpen] = useState<"status" | "edit" | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
-  const saved = useCallback((message?: string) => {
-    setOpen(null);
-    setWarning(message ?? null);
-  }, []);
+  const saved = useCallback(
+    (change: MeetingChange, message?: string) => {
+      setOpen(null);
+      setWarning(message ?? null);
+      onChanged?.(change, message);
+    },
+    [onChanged],
+  );
+  const edited = useCallback((message?: string) => saved("edit", message), [saved]);
   return (
     <div className="flex flex-wrap gap-2">
       <FormError message={warning} className="w-full" />
@@ -80,20 +92,23 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingI
       </Button>
       <Dialog open={open === "status"} onClose={close} title="סטטוס ותוצאה" description={title} variant="sheet">
         {open === "status" ? (
-          <MeetingStatusForm orgId={orgId} meetingId={meetingId} subject={subject} status={status} outcome={outcome} onDone={saved} />
+          <MeetingStatusForm orgId={orgId} meetingId={meetingId} subject={subject} status={status} outcome={outcome} onDone={() => saved("status")} onCancel={close} />
         ) : null}
       </Dialog>
       <Dialog open={open === "edit"} onClose={close} title="עריכת הפגישה" variant="sheet">
         {open === "edit" ? (
           <div className="space-y-5">
-            <MeetingForm orgId={orgId} subject={subject} meetingId={meetingId} initial={initial} members={members} timeZone={timeZone} onDone={saved} />
+            <MeetingForm orgId={orgId} subject={subject} meetingId={meetingId} initial={initial} members={members} timeZone={timeZone} onDone={edited} onCancel={close} />
             <div className="border-t border-line pt-4">
               <ConfirmButton
                 title="למחוק את הפגישה?"
                 description="המחיקה סופית. פגישה שלא התקיימה אפשר לסמן כ״בוטלה״ במקום למחוק."
                 confirmLabel="מחיקה"
                 action={deleteMeetingAction.bind(null, orgId, meetingId, subject)}
-                onDone={() => setOpen(null)}
+                onDone={() => {
+                  setOpen(null);
+                  onChanged?.("delete");
+                }}
               >
                 מחיקת הפגישה
               </ConfirmButton>

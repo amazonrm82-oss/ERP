@@ -22,13 +22,16 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { BackIcon, CalendarIcon, CheckSquareIcon, ForwardIcon } from "@/components/ui/icons";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
 import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
+import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
+import type { MemberOption } from "@/features/meetings/components/meeting-form";
+import { meetingFormTimes } from "@/features/meetings/display";
 import type { ConflictReport, Span } from "@/features/meetings/conflicts";
 import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
 import { cn } from "@/lib/cn";
 import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
 
-import { moveCalendarItemAction } from "../actions";
+import { meetingDetailsAction, moveCalendarItemAction, type MeetingDetails } from "../actions";
 import { LONG_PRESS_MS, pressDistance, pressOutcome } from "../long-press";
 import {
   calendarPath,
@@ -80,6 +83,8 @@ type Props = {
   autoView: boolean;
   // Israeli holidays of the shown days, by day (CAL-03)
   holidays: Record<string, Holiday[]>;
+  // the active members, for the participants of the meeting form (writers only)
+  members: MemberOption[];
 };
 
 type DragMode = "time" | "month";
@@ -100,6 +105,13 @@ type Drag = {
   active: boolean;
   // `column` is the grid column dropped on (a day, or a person on the side-by-side view)
   target: { day: string; column: string; minutes: number } | null;
+};
+
+// what the calendar says after a meeting was changed from its window
+const CHANGE_TEXT: Record<MeetingChange, string> = {
+  edit: "הפגישה עודכנה.",
+  status: "סטטוס הפגישה עודכן.",
+  delete: "הפגישה נמחקה.",
 };
 
 // one hour on the time grid
@@ -147,7 +159,7 @@ function itemClasses(item: CalendarEntry): string {
  * item is also a button that opens its details with a "move" form, so moving
  * works from the keyboard and with a screen reader.
  */
-export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays }: Props) {
+export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays, members }: Props) {
   const router = useRouter();
   const [shown, showMoved] = useOptimistic(items, (state, moved: { id: string; startsAt: string; endsAt: string | null }) =>
     state.map((item) => (item.id === moved.id ? { ...item, startsAt: moved.startsAt, endsAt: moved.endsAt } : item)),
@@ -408,12 +420,18 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
         {opened ? (
           <ItemDetails
             key={`${opened.id}-${opened.startsAt}`}
+            orgId={orgId}
             item={opened}
             timeZone={timeZone}
             canMove={canMove}
+            members={members}
             onMove={(date, time) => {
               setOpenId(null);
               move(opened, date, time);
+            }}
+            onChanged={(change, message) => {
+              setOpenId(null);
+              setStatus(message ? { tone: "error", text: message } : { tone: "ok", text: CHANGE_TEXT[change] });
             }}
           />
         ) : null}
@@ -786,12 +804,52 @@ function AgendaList({
   );
 }
 
-/** What the item is, a link to its record, and the "move" form. */
-function ItemDetails({ item, timeZone, canMove, onMove }: { item: CalendarEntry; timeZone: string; canMove: boolean; onMove: (date: string, time: string) => void }) {
+/**
+ * What the item is, a link to its record, and the "move" form. A meeting also
+ * loads its details (CAL-01 follow-up: participants, video link, description,
+ * outcome) with the same edit, status and delete buttons as the record cards,
+ * so a meeting on no record can be changed from here. The buttons show to
+ * writers; the database decides (0 rows = not permitted, with a message).
+ */
+function ItemDetails({
+  orgId,
+  item,
+  timeZone,
+  canMove,
+  members,
+  onMove,
+  onChanged,
+}: {
+  orgId: string;
+  item: CalendarEntry;
+  timeZone: string;
+  canMove: boolean;
+  members: MemberOption[];
+  onMove: (date: string, time: string) => void;
+  onChanged: (change: MeetingChange, message?: string) => void;
+}) {
   const start = new Date(item.startsAt);
   const [date, setDate] = useState(zoneDate(start, timeZone));
   const [time, setTime] = useState(zoneTime(start, timeZone));
   const [error, setError] = useState<string | null>(null);
+  // a meeting's details: loading, loaded, or why not
+  const [details, setDetails] = useState<{ meeting: MeetingDetails } | { error: string } | null>(null);
+
+  useEffect(() => {
+    if (item.kind !== "meeting") return;
+    let live = true;
+    meetingDetailsAction(orgId, item.id).then(
+      (result) => {
+        if (live) setDetails(result.ok && result.meeting ? { meeting: result.meeting } : { error: result.ok ? "לא מצאנו את הפגישה." : result.message });
+      },
+      () => {
+        if (live) setDetails({ error: "לא הצלחנו לטעון את פרטי הפגישה. נסו שוב." });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [orgId, item.id, item.kind]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -799,6 +857,8 @@ function ItemDetails({ item, timeZone, canMove, onMove }: { item: CalendarEntry;
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return setError("יש לבחור שעה.");
     onMove(date, time);
   }
+
+  const meeting = details && "meeting" in details ? details.meeting : null;
 
   return (
     <div className="space-y-4">
@@ -821,13 +881,66 @@ function ItemDetails({ item, timeZone, canMove, onMove }: { item: CalendarEntry;
             <dd className="break-words">{item.location}</dd>
           </>
         ) : null}
+        {meeting && meeting.participants.length > 0 ? (
+          <>
+            <dt className="text-ink-soft">משתתפים</dt>
+            <dd className="break-words">{meeting.participants.map((p) => p.name).join(", ")}</dd>
+          </>
+        ) : null}
       </dl>
+      {item.kind === "meeting" ? (
+        details === null ? (
+          <p role="status" className="text-sm text-ink-soft">
+            טוענים את פרטי הפגישה…
+          </p>
+        ) : "error" in details ? (
+          <p role="alert" className="text-sm text-danger">
+            {details.error}
+          </p>
+        ) : null
+      ) : null}
+      {meeting?.videoUrl ? (
+        <p className="text-md">
+          <a href={meeting.videoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
+            כניסה לשיחת הווידאו
+          </a>
+        </p>
+      ) : null}
+      {meeting?.description ? <p className="whitespace-pre-line break-words text-md">{meeting.description}</p> : null}
+      {meeting?.outcome ? (
+        <p className="whitespace-pre-line break-words rounded-md bg-canvas px-3 py-2 text-md">
+          <span className="font-medium">תוצאה: </span>
+          {meeting.outcome}
+        </p>
+      ) : null}
       {item.related ? (
         <p>
           <Link href={item.related.href} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
             {item.related.label}
           </Link>
         </p>
+      ) : null}
+      {meeting && canMove ? (
+        <MeetingItemButtons
+          orgId={orgId}
+          subject={meeting.subject}
+          members={members}
+          timeZone={timeZone}
+          meetingId={meeting.id}
+          title={meeting.title}
+          status={meeting.status}
+          outcome={meeting.outcome ?? ""}
+          initial={{
+            title: meeting.title,
+            meeting_type: meeting.meetingType,
+            ...meetingFormTimes(meeting.startsAt, meeting.endsAt, timeZone),
+            location: meeting.location ?? "",
+            video_url: meeting.videoUrl ?? "",
+            description: meeting.description ?? "",
+            participant_ids: meeting.participants.map((p) => p.userId),
+          }}
+          onChanged={onChanged}
+        />
       ) : null}
       {canMove ? (
         <form onSubmit={submit} noValidate className="space-y-3 border-t border-line pt-4">

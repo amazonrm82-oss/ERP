@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
-import { HIDDEN_MEETING_STATUSES } from "@/features/calendar/range";
+import { calendarPath, HIDDEN_MEETING_STATUSES } from "@/features/calendar/range";
+import { revalidateLinked, type LinkedRecords } from "@/features/calendar/revalidate";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
@@ -48,9 +49,23 @@ async function conflictState(
 
 const PARTICIPANTS_FAILED = "הפגישה נשמרה, אבל המשתתפים לא נשמרו. פתחו את הפגישה לעריכה ובחרו אותם שוב.";
 
-function revalidateSubject(orgId: string, subject: TimelineSubject) {
-  revalidatePath(recordPage(subject.kind, orgId, subject.id));
+/** The record page the meeting was changed from (none from the calendar), and the calendar. */
+function revalidateSubject(orgId: string, subject: TimelineSubject | null) {
+  if (subject) revalidatePath(recordPage(subject.kind, orgId, subject.id));
+  revalidatePath(calendarPath(orgId));
 }
+
+// the columns read back after a change, so every linked record's page is refreshed
+const LINKED = "id, lead_id, contact_id, company_id, deal_id";
+
+/** After a meeting was saved, changed or deleted: the page it was changed from, the calendar and every linked record. */
+function revalidateMeeting(orgId: string, subject: TimelineSubject | null, rows: LinkedRecords[]) {
+  revalidateSubject(orgId, subject);
+  for (const row of rows) revalidateLinked(orgId, row);
+}
+
+// the calendar (CAL-01 follow-up) edits a meeting that has no record page: subject null
+const subjectOrNone = subjectSchema.nullable();
 
 /** The organization's time zone; null when the organization cannot be read. */
 async function orgTimeZone(supabase: Client, orgId: string): Promise<string | null> {
@@ -143,11 +158,12 @@ async function syncParticipants(supabase: Client, orgId: string, meetingId: stri
  * the user (set by the database). A meeting on a deal also carries the deal's
  * customer, so it shows on the contact's and the company's pages too.
  */
-export async function createMeetingAction(orgId: string, subject: TimelineSubject, _prev: MeetingFormState, formData: FormData): Promise<MeetingFormState> {
+export async function createMeetingAction(orgId: string, subject: TimelineSubject | null, _prev: MeetingFormState, formData: FormData): Promise<MeetingFormState> {
   return keepParticipants(await createMeeting(orgId, subject, formData), formData);
 }
 
-async function createMeeting(orgId: string, subject: TimelineSubject, formData: FormData): Promise<MeetingFormState> {
+async function createMeeting(orgId: string, subject: TimelineSubject | null, formData: FormData): Promise<MeetingFormState> {
+  // a new meeting is set on a record: null (the calendar's edit form) is refused here
   if (!validArg(subjectSchema, subject)) {
     return fail(INVALID_ARGS);
   }
@@ -185,12 +201,12 @@ async function createMeeting(orgId: string, subject: TimelineSubject, formData: 
   }
 
   // RLS: the user can write in the organization and can see every linked record
-  const { data, error } = await supabase.from("meetings").insert(row).select("id").single();
+  const { data, error } = await supabase.from("meetings").insert(row).select(LINKED).single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את הפגישה. נסו שוב."), { values: formValues(formData) });
   }
   const participantsSaved = await syncParticipants(supabase, orgId, data.id, parsed.participants);
-  revalidateSubject(orgId, subject);
+  revalidateMeeting(orgId, subject, [data]);
   // the meeting itself is saved: report success (the form closes, nothing is sent twice) with the warning
   return participantsSaved ? ok() : { ok: true, message: PARTICIPANTS_FAILED };
 }
@@ -199,18 +215,18 @@ async function createMeeting(orgId: string, subject: TimelineSubject, formData: 
 export async function updateMeetingAction(
   orgId: string,
   meetingId: string,
-  subject: TimelineSubject,
+  subject: TimelineSubject | null,
   _prev: MeetingFormState,
   formData: FormData,
 ): Promise<MeetingFormState> {
   return keepParticipants(await updateMeeting(orgId, meetingId, subject, formData), formData);
 }
 
-async function updateMeeting(orgId: string, meetingId: string, subject: TimelineSubject, formData: FormData): Promise<MeetingFormState> {
-  if (!validArg(subjectSchema, subject)) {
+async function updateMeeting(orgId: string, meetingId: string, subject: TimelineSubject | null, formData: FormData): Promise<MeetingFormState> {
+  if (!validArg(subjectOrNone, subject)) {
     return fail(INVALID_ARGS);
   }
-  const context = await actionContext(orgId, meetingId, subject.id);
+  const context = await actionContext(orgId, meetingId, ...(subject ? [subject.id] : []));
   if (!context.ok) {
     return context;
   }
@@ -240,7 +256,7 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
       if (warning) return warning;
     }
   }
-  const { data, error } = await supabase.from("meetings").update(parsed.row).eq("organization_id", orgId).eq("id", meetingId).select("id");
+  const { data, error } = await supabase.from("meetings").update(parsed.row).eq("organization_id", orgId).eq("id", meetingId).select(LINKED);
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את הפגישה. נסו שוב."), { values: formValues(formData) });
   }
@@ -248,7 +264,7 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
     return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
   }
   const participantsSaved = await syncParticipants(supabase, orgId, meetingId, parsed.participants);
-  revalidateSubject(orgId, subject);
+  revalidateMeeting(orgId, subject, data);
   // the meeting itself is saved: report success (the form closes, nothing is sent twice) with the warning
   return participantsSaved ? ok() : { ok: true, message: PARTICIPANTS_FAILED };
 }
@@ -257,14 +273,14 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
 export async function setMeetingStatusAction(
   orgId: string,
   meetingId: string,
-  subject: TimelineSubject,
+  subject: TimelineSubject | null,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  if (!validArg(subjectSchema, subject)) {
+  if (!validArg(subjectOrNone, subject)) {
     return fail(INVALID_ARGS);
   }
-  const context = await actionContext(orgId, meetingId, subject.id);
+  const context = await actionContext(orgId, meetingId, ...(subject ? [subject.id] : []));
   if (!context.ok) {
     return context;
   }
@@ -277,33 +293,33 @@ export async function setMeetingStatusAction(
     .update({ status: parsed.data.status, outcome: parsed.data.outcome })
     .eq("organization_id", orgId)
     .eq("id", meetingId)
-    .select("id");
+    .select(LINKED);
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את הפגישה. נסו שוב."), { values: formValues(formData) });
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
   }
-  revalidateSubject(orgId, subject);
+  revalidateMeeting(orgId, subject, data);
   return ok();
 }
 
 /** Delete a meeting set up by mistake (no recycle bin: a meeting that did not happen is cancelled). */
-export async function deleteMeetingAction(orgId: string, meetingId: string, subject: TimelineSubject): Promise<ActionResult> {
-  if (!validArg(subjectSchema, subject)) {
+export async function deleteMeetingAction(orgId: string, meetingId: string, subject: TimelineSubject | null): Promise<ActionResult> {
+  if (!validArg(subjectOrNone, subject)) {
     return fail(INVALID_ARGS);
   }
-  const context = await actionContext(orgId, meetingId, subject.id);
+  const context = await actionContext(orgId, meetingId, ...(subject ? [subject.id] : []));
   if (!context.ok) {
     return context;
   }
-  const { data, error } = await context.supabase.from("meetings").delete().eq("organization_id", orgId).eq("id", meetingId).select("id");
+  const { data, error } = await context.supabase.from("meetings").delete().eq("organization_id", orgId).eq("id", meetingId).select(LINKED);
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו למחוק את הפגישה. נסו שוב."));
   }
   if (data.length === 0) {
     return fail("אי אפשר למחוק את הפגישה. רק מי שקבע אותה, מנהל הצוות של המארגן או מנהל העסק יכולים למחוק אותה. אפשר לסמן אותה כ\"בוטלה\".");
   }
-  revalidateSubject(orgId, subject);
+  revalidateMeeting(orgId, subject, data);
   return ok();
 }

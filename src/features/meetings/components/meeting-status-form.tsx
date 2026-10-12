@@ -12,10 +12,10 @@ import type { FormState } from "@/lib/action-result";
 import { setMeetingStatusAction } from "../actions";
 import { MEETING_STATUS_OPTIONS } from "../schema";
 
-type Props = { orgId: string; meetingId: string; subject: TimelineSubject; status: string; outcome: string; onDone: () => void };
+type Props = { orgId: string; meetingId: string; subject: TimelineSubject | null; status: string; outcome: string; onDone: () => void; onCancel?: () => void };
 
 /** How the meeting went: held, cancelled or the customer did not come, and what came of it. */
-export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, onDone }: Props) {
+export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, onDone, onCancel }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(setMeetingStatusAction.bind(null, orgId, meetingId, subject), null);
   const failure = state && !state.ok ? state : null;
   const current = failure?.values?.status ?? status;
@@ -53,7 +53,7 @@ export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, 
       />
       <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="שומרים…">שמירה</SubmitButton>
-        <Button variant="ghost" onClick={onDone}>
+        <Button variant="ghost" onClick={() => (onCancel ?? onDone)()}>
           ביטול
         </Button>
       </div>

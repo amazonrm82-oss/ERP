@@ -402,6 +402,41 @@ try {
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the calendar scrolls sideways at 360px");
   await shot(owner, "03a-calendar-agenda-360");
+  step("calendar: a meeting's window loads its details with the record card's edit and status buttons (CAL-01)");
+  await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).click();
+  const detailSheet = owner.getByRole("dialog", { name: /פגישת היכרות/ });
+  await detailSheet.getByRole("button", { name: /^עריכה/ }).waitFor({ timeout: 15000 });
+  await detailSheet.getByRole("button", { name: "עדכון סטטוס" }).waitFor();
+  await owner.keyboard.press("Escape");
+  await detailSheet.waitFor({ state: "hidden" });
+
+  step("calendar: an internal meeting (on no record) is edited from its window, and the new title shows (CAL-01)");
+  await sql(
+    `insert into public.meetings (organization_id, title, starts_at, ends_at, owner_id, created_by, reminder_minutes)
+     select m.organization_id, 'ישיבת צוות', m.starts_at + interval '2 hours', m.ends_at + interval '2 hours', u.id, u.id, null
+       from public.meetings m cross join auth.users u
+      where m.title = 'פגישת היכרות' and m.lead_id = $1 and u.email = $2`,
+    [leadIdNow, ownerEmail],
+  );
+  await owner.reload();
+  const internalSheet = owner.getByRole("dialog", { name: /^ישיבת צוות$/ });
+  for (let tries = 0; tries < 5 && !(await internalSheet.isVisible()); tries++) {
+    await owner.getByRole("button", { name: /פגישה: ישיבת צוות/ }).click();
+    await internalSheet.waitFor({ timeout: 3000 }).catch(() => {});
+  }
+  await internalSheet.getByRole("button", { name: /^עריכה/ }).click();
+  const editSheet = owner.getByRole("dialog", { name: "עריכת הפגישה" });
+  await editSheet.getByLabel(/^כותרת/).fill("ישיבת צוות שבועית");
+  await editSheet.getByRole("button", { name: "שמירת השינויים" }).click();
+  // on a rest day or off hours the conflict warning asks first (CAL-05)
+  const saveAnyway = editSheet.getByRole("button", { name: "לשמור בכל זאת" });
+  const updated = owner.getByText("הפגישה עודכנה.");
+  await Promise.race([updated.waitFor({ timeout: 15000 }).catch(() => {}), saveAnyway.waitFor({ timeout: 15000 }).catch(() => {})]);
+  if (await saveAnyway.isVisible()) await saveAnyway.click();
+  await updated.waitFor({ timeout: 15000 });
+  await owner.getByRole("button", { name: /פגישה: ישיבת צוות שבועית/ }).waitFor();
+  const [internal] = await sql("select count(*)::int as n from public.meetings where title = 'ישיבת צוות שבועית' and lead_id is null and contact_id is null and company_id is null and deal_id is null and organization_id = $1", [orgUrl.split("/").pop()]);
+  if (internal.n !== 1) throw new Error("the internal meeting's new title was not saved");
 
   step("team calendar: side by side on a phone is one person at a time, starting with me (CAL-04)");
   await owner.goto(`${orgUrl}/calendar?view=people&done=1`);

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { TimelineSubject } from "@/features/activities/schema";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
@@ -9,26 +10,18 @@ import { TIME_ZONE } from "@/lib/app";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { zonedIso } from "@/lib/format";
 import { paths } from "@/lib/paths";
-import { recordPage } from "@/lib/record-types";
 
 import { CONFLICT_MESSAGE, type ConflictReport, type Span } from "@/features/meetings/conflicts";
 import { meetingConflicts } from "@/features/meetings/conflicts-server";
 
-import { calendarPath, HIDDEN_MEETING_STATUSES, movedEnd } from "./range";
+import { HIDDEN_MEETING_STATUSES, movedEnd } from "./range";
+import { revalidateLinked, type LinkedRecords } from "./revalidate";
 import { moveTargetSchema, type MoveTarget } from "./schema";
 
 /** A move's answer; on a conflict (CAL-05) nothing moved and the report says why. */
 export type MoveResult = ActionResult & { conflicts?: ConflictReport; span?: Span };
 
-type Linked = { lead_id: string | null; contact_id: string | null; company_id: string | null; deal_id: string | null };
-
-function revalidateMoved(orgId: string, row: Linked) {
-  revalidatePath(calendarPath(orgId));
-  if (row.lead_id) revalidatePath(recordPage("lead", orgId, row.lead_id));
-  if (row.contact_id) revalidatePath(recordPage("contact", orgId, row.contact_id));
-  if (row.company_id) revalidatePath(recordPage("company", orgId, row.company_id));
-  if (row.deal_id) revalidatePath(recordPage("deal", orgId, row.deal_id));
-}
+type Linked = LinkedRecords;
 
 /**
  * Move a meeting or a task on the calendar (CAL-02), by dragging or with the
@@ -99,7 +92,7 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
     if (data.length === 0) {
       return fail(NOT_FOUND_OR_FORBIDDEN);
     }
-    revalidateMoved(orgId, meeting);
+    revalidateLinked(orgId, meeting);
     return ok();
   }
 
@@ -131,8 +124,93 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  revalidateMoved(orgId, task);
+  revalidateLinked(orgId, task);
   revalidatePath(paths.tasks(orgId));
   revalidatePath(paths.org(orgId));
   return ok();
+}
+
+/** A meeting as the calendar's window shows it (CAL-01 follow-up): what the record cards show, plus its record. */
+export type MeetingDetails = {
+  id: string;
+  title: string;
+  meetingType: string;
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+  videoUrl: string | null;
+  description: string | null;
+  status: string;
+  outcome: string | null;
+  participants: { userId: string; name: string }[];
+  // the record it is on, for refreshing that record's page after a change; null = an internal meeting
+  subject: TimelineSubject | null;
+};
+
+/**
+ * The details of one meeting for the calendar's window, read with the user's
+ * session: a meeting the user may not read (RLS) answers "not found", so its
+ * details and buttons never show.
+ */
+export async function meetingDetailsAction(orgId: string, meetingId: string): Promise<ActionResult & { meeting?: MeetingDetails }> {
+  const context = await actionContext(orgId, meetingId);
+  if (!context.ok) {
+    return context;
+  }
+  const { supabase } = context;
+  const { data: row, error } = await supabase
+    .from("meetings")
+    .select("id, title, meeting_type, starts_at, ends_at, location, video_url, description, status, outcome, lead_id, contact_id, company_id, deal_id")
+    .eq("organization_id", orgId)
+    .eq("id", meetingId)
+    .maybeSingle();
+  if (error) {
+    return fail(dbErrorMessage(error));
+  }
+  if (!row) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  const { data: participants, error: participantsError } = await supabase
+    .from("meeting_participants")
+    .select("user_id")
+    .eq("organization_id", orgId)
+    .eq("meeting_id", meetingId);
+  if (participantsError) {
+    return fail(dbErrorMessage(participantsError));
+  }
+  const ids = participants.map((p) => p.user_id);
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+    if (profilesError) {
+      return fail(dbErrorMessage(profilesError));
+    }
+    for (const p of profiles) names.set(p.id, p.full_name?.trim() || p.email || "משתמש");
+  }
+  return {
+    ok: true,
+    meeting: {
+      id: row.id,
+      title: row.title,
+      meetingType: row.meeting_type,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      location: row.location,
+      videoUrl: row.video_url,
+      description: row.description,
+      status: row.status,
+      outcome: row.outcome,
+      participants: ids.map((id) => ({ userId: id, name: names.get(id) ?? "משתמש" })),
+      subject: subjectOf(row),
+    },
+  };
+}
+
+/** The record a meeting is on, as the record pages see it: the deal first, then the contact, company and lead. */
+function subjectOf(row: Linked): TimelineSubject | null {
+  if (row.deal_id) return { kind: "deal", id: row.deal_id };
+  if (row.contact_id) return { kind: "contact", id: row.contact_id };
+  if (row.company_id) return { kind: "company", id: row.company_id };
+  if (row.lead_id) return { kind: "lead", id: row.lead_id };
+  return null;
 }

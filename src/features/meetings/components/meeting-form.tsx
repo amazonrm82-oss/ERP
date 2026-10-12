@@ -30,7 +30,8 @@ export type MeetingFormValues = {
 
 type Props = {
   orgId: string;
-  subject: TimelineSubject;
+  // the record the meeting is on; null when it is edited from the calendar (no record page to refresh)
+  subject: TimelineSubject | null;
   // absent: a new meeting
   meetingId?: string;
   initial: MeetingFormValues;
@@ -38,6 +39,8 @@ type Props = {
   timeZone: string;
   // message: the meeting was saved but something next to it was not (participants)
   onDone: (message?: string) => void;
+  // "ביטול"; without it, onDone() is called
+  onCancel?: () => void;
 };
 
 /** One hour after "HH:MM", capped at 23:59 (a meeting in the form stays on one day). */
@@ -48,7 +51,7 @@ function anHourLater(time: string): string {
 }
 
 /** New or edited meeting (CAL-01): what, when, where, who comes. */
-export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZone, onDone }: Props) {
+export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZone, onDone, onCancel }: Props) {
   const action = meetingId ? updateMeetingAction.bind(null, orgId, meetingId, subject) : createMeetingAction.bind(null, orgId, subject);
   const [state, formAction] = useActionState<MeetingFormState, FormData>(action, null);
   const failure = state && !state.ok ? state : null;
@@ -169,7 +172,7 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
       <div className="flex flex-wrap gap-2">
         {/* while the warning shows, saving goes through its button; changing the form brings this one back */}
         {conflict ? null : <SubmitButton pendingText="שומרים…">{meetingId ? "שמירת השינויים" : "קביעת הפגישה"}</SubmitButton>}
-        <Button variant="ghost" onClick={() => onDone()}>
+        <Button variant="ghost" onClick={() => (onCancel ? onCancel() : onDone())}>
           ביטול
         </Button>
       </div>

@@ -256,6 +256,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         people={side?.people ?? []}
         autoView={requestedView === null}
         holidays={holidays}
+        members={context.canWrite ? members.map((member) => ({ userId: member.id, name: member.id === me ? `${member.name} (אני)` : member.name })) : []}
       />
 
       {side ? <p className="mt-3 text-sm text-ink-soft">בכל עמודה מוצג רק מה שמותר לך לראות.</p> : null}
