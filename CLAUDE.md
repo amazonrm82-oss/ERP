@@ -275,11 +275,13 @@ that back.
   function of 0001–0033 exists there and report gaps (0010 once ran half way; see `supabase/repair/`).
   The hosted database is Postgres 17; CI runs the database tests on Postgres 17 (FXD-05), the local
   `test:db` on whatever PostgreSQL the machine has (16 here), and the local Supabase stack is 17.
-- No statement in a migration starts with `drop` (seen 12 October 2026: since 0048, the connector's
-  `apply_migration` hangs for 60 seconds and applies nothing when one does; 0036/0037 still went through).
-  Use `create or replace trigger`, `alter policy`, or a `do` block that creates a policy only when it is
-  missing. `alter table … drop constraint if exists` inside an `alter table` is fine. After a timeout,
-  check read-only what exists before trying again.
+- The connector stops on destructive SQL (seen 12 October 2026, since 0048): a migration whose text holds
+  a `drop …` statement or a `delete from`, even inside a function body, makes `apply_migration` hang for
+  60 seconds and apply nothing (it waits for a confirmation nobody sees). So: no statement starts with
+  `drop` (use `create or replace trigger`, `alter policy`, or a `do` block that creates a policy only when
+  missing; `alter table … drop constraint if exists` passed); a function that must contain a `delete` goes
+  into its own small migration file, which the owner pastes in the SQL Editor (fallback below). Never
+  disguise the SQL to get past this check. After a timeout, check read-only what exists before retrying.
 - If the connector is not available in a session, fall back to the old way: hand the migration over in
   parts (`node scripts/split-for-sql-editor.mjs <migration>`; a paste over ~4,000 chars was cut off)
   and push code only after the owner confirms it ran.
