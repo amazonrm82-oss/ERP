@@ -29,7 +29,7 @@ describe("exporting a list is written to the audit log (LST-08)", () => {
     await log(owner.id);
     await log(manager.id, "contact", "xlsx", 3, "selected", { ids: 3 });
     expect(await entries()).toEqual([
-      { actor_id: owner.id, entity_type: "leads", changes: { format: "csv", rows: 12, scope: "filtered", filters: { q: "משה" } } },
+      { actor_id: owner.id, entity_type: "leads", changes: { format: "csv", rows: 12, scope: "filtered", filters: { q: true } } },
       { actor_id: manager.id, entity_type: "contacts", changes: { format: "xlsx", rows: 3, scope: "selected", filters: { ids: 3 } } },
     ]);
   });

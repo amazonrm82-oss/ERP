@@ -1447,7 +1447,14 @@ try {
     "select changes from public.audit_log where organization_id = $1 and action = 'export' order by id offset $2",
     [orgIdNow, exportsBefore],
   );
-  if (exportsLogged.length !== 4 || exportsLogged[0].changes.filters?.q !== bulkLeads[1].full_name || exportsLogged[3].changes.scope !== "selected" || exportsLogged[3].changes.rows !== 2)
+  // RVW-4: the log says a search was used, never the typed text
+  if (
+    exportsLogged.length !== 4 ||
+    exportsLogged[0].changes.filters?.q !== true ||
+    JSON.stringify(exportsLogged).includes(bulkLeads[1].full_name) ||
+    exportsLogged[3].changes.scope !== "selected" ||
+    exportsLogged[3].changes.rows !== 2
+  )
     throw new Error(`export audit: ${JSON.stringify(exportsLogged)}`);
   // Dana is a team manager here; as a plain member she gets no menu, and the address refuses her
   const [{ id: danaUser }] = await sql("select id from auth.users where email = $1", [inviteeEmail]);

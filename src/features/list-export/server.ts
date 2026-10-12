@@ -198,7 +198,8 @@ export async function exportList(request: Request, orgId: string, object: ListOb
     }),
   ]);
 
-  // the audit entry comes first: no entry, no file
+  // the audit entry comes first: no entry, no file. log_list_export() keeps only the shape of the
+  // filters (RVW-4): the search becomes "a search was used", the pipeline and view go as ids
   const supabase = await createClient();
   const filters: Record<string, string | number> =
     scope === "selected"
@@ -210,9 +211,9 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             status: statusId ?? "",
             f: filter.tree ? JSON.stringify(filter.tree) : "",
             sort: params.get("sort") ?? "",
-            pipeline: pipeline?.name ?? "",
+            pipeline: pipeline?.id ?? "",
             who: object === "task" ? (taskOwner ? "mine" : "all") : "",
-            view: view?.name ?? "",
+            view: view?.id ?? "",
           }).filter(([, value]) => value !== ""),
         );
   const { error } = await supabase.rpc("log_list_export", {
