@@ -131,7 +131,8 @@ export function checkSubmission(fields: PublicField[], values: RawValues): Check
     if (field.required && !hasValue(value)) errors[name] = requiredMessage(field);
   }
 
-  if (builtins.email && !EMAIL.test(builtins.email) && !errors.email) {
+  // length first: the regex is slow on very long text (the server cuts the email to 254 before this)
+  if (builtins.email && (builtins.email.length > 254 || !EMAIL.test(builtins.email)) && !errors.email) {
     errors.email = "כתובת האימייל לא תקינה. לדוגמה: name@example.co.il";
   }
   // a lead needs a way back to the person

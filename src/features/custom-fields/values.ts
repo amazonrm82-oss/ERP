@@ -123,7 +123,8 @@ export function parseCustomFields(
         }
         break;
       case "email":
-        if (!EMAIL_RE.test(text) || text.length > 254) {
+        // length first (as app.custom_value_ok() does): the regex is slow on very long text
+        if (text.length > 254 || !EMAIL_RE.test(text)) {
           errors[name] = "כתובת האימייל אינה תקינה.";
         } else {
           values[field.key] = text.toLowerCase();
