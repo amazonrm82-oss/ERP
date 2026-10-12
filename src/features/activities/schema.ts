@@ -25,6 +25,28 @@ export const LOGGED_TYPES = [
 
 const LOGGED_TYPE_VALUES = ["note", "call", "meeting", "whatsapp", "email", "sms"] as const;
 
+// REC-01: what a person logged can be pinned to the top of the timeline; system events cannot.
+// Several entries may be pinned at once; pinned ones come first, newest first, then the rest.
+export const PINNABLE_TYPES = LOGGED_TYPE_VALUES;
+
+export function isPinnableType(type: string): boolean {
+  return (PINNABLE_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * UI hint for the pin button, mirroring the activities_update policy: the organization is writable
+ * for the user, and the user wrote the entry or is an owner/admin. The database still decides.
+ */
+export function canPinHint(
+  item: { type: string; createdBy: string | null },
+  viewer: { userId: string; role: string; canWrite: boolean },
+): boolean {
+  if (!viewer.canWrite || !isPinnableType(item.type)) {
+    return false;
+  }
+  return item.createdBy === viewer.userId || viewer.role === "owner" || viewer.role === "admin";
+}
+
 export const noteSchema = z.object({
   type: z.preprocess((value) => (value === null || value === "" ? "note" : value), z.enum(LOGGED_TYPE_VALUES, { error: "יש לבחור סוג." })),
   body: requiredText(5000, "יש לכתוב את ההערה לפני השמירה.", "ההערה ארוכה מדי (עד 5,000 תווים)."),

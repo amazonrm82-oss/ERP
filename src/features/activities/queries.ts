@@ -16,6 +16,9 @@ export type TimelineItem = {
   isUserContent: boolean;
   occurredAt: string;
   authorName: string | null;
+  createdBy: string | null;
+  // REC-01: pinned to the top of the timeline
+  pinned: boolean;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -43,15 +46,16 @@ function metaString(metadata: Json, key: string): string | null {
 
 const TIMELINE_LIMIT = 100;
 
-/** Newest-first timeline of a record (latest 100 entries). */
+/** Timeline of a record: pinned entries first, then newest first (100 entries at most). */
 export async function getTimeline(orgId: string, subject: TimelineSubject): Promise<TimelineItem[]> {
   const supabase = await createClient();
 
   const { data: activities, error } = await supabase
     .from("activities")
-    .select("id, type, body, metadata, occurred_at, created_by")
+    .select("id, type, body, metadata, occurred_at, created_by, is_pinned")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id)
+    .order("is_pinned", { ascending: false })
     .order("occurred_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(TIMELINE_LIMIT);
@@ -116,6 +120,8 @@ export async function getTimeline(orgId: string, subject: TimelineSubject): Prom
       isUserContent,
       occurredAt: activity.occurred_at,
       authorName: activity.created_by ? (authors.get(activity.created_by) ?? null) : null,
+      createdBy: activity.created_by,
+      pinned: activity.is_pinned,
     };
   });
 }

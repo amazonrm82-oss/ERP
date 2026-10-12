@@ -222,6 +222,22 @@ try {
   await owner.getByRole("button", { name: "הוספה לציר הזמן" }).click();
   await expectText(owner, "דיברנו בטלפון, מעוניין בהצעה");
 
+  step("pin the call to the top of the timeline, then unpin it (REC-01)");
+  {
+    const timeline = owner.locator('section[aria-labelledby="timeline-title"]').or(owner.getByRole("region", { name: "ציר זמן" })).first();
+    await timeline.getByRole("button", { name: /^נעיצה.*שיחה/ }).click();
+    await timeline.getByText("נעוץ", { exact: true }).waitFor({ timeout: 15000 });
+    const leadIdPin = owner.url().split("/leads/")[1];
+    const [{ n: pinnedNow }] = await sql("select count(*)::int as n from public.activities where lead_id = $1 and is_pinned", [leadIdPin]);
+    if (pinnedNow !== 1) throw new Error(`the call was not pinned (${pinnedNow})`);
+    // the pinned entry is listed first
+    const firstEntry = (await timeline.locator("ol > li").first().innerText()).trim();
+    if (!firstEntry.includes("דיברנו בטלפון")) throw new Error(`the pinned entry is not first: ${firstEntry.slice(0, 80)}`);
+    await timeline.getByRole("button", { name: /^ביטול הנעיצה.*שיחה/ }).click();
+    await timeline.getByRole("button", { name: /^נעיצה.*שיחה/ }).waitFor({ timeout: 15000 });
+    if ((await timeline.getByText("נעוץ", { exact: true }).count()) !== 0) throw new Error("the call is still marked pinned");
+  }
+
   step("record tasks: one line and 'מחר' add a task to the lead, and it is done in one tap (FXU-01)");
   const recordTasks = owner.getByRole("region", { name: /משימות/ }).or(owner.locator('section[aria-labelledby="record-tasks-title"]')).first();
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");

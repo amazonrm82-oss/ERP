@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
-import { fail, invalid, formValues, ok, type FormState } from "@/lib/action-result";
+import { fail, invalid, formValues, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { ActivityInsert } from "@/lib/database.types";
-import { dbErrorMessage, NOT_FOUND } from "@/lib/errors";
+import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
@@ -14,7 +15,15 @@ import { zoneDate, zonedIso } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
 import type { TaskInsert } from "@/lib/database.types";
 
-import { CALL_OUTCOME_LABEL, callLogSchema, noteSchema, subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "./schema";
+import {
+  CALL_OUTCOME_LABEL,
+  callLogSchema,
+  noteSchema,
+  PINNABLE_TYPES,
+  subjectSchema,
+  SUBJECT_COLUMN,
+  type TimelineSubject,
+} from "./schema";
 
 function subjectPath(orgId: string, subject: TimelineSubject): string | null {
   switch (subject.kind) {
@@ -109,6 +118,48 @@ export async function logCallAction(orgId: string, subject: TimelineSubject, rec
     }
     revalidatePath(paths.tasks(orgId));
     revalidatePath(paths.org(orgId));
+  }
+
+  revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
+  return ok();
+}
+
+/**
+ * REC-01: pins an entry the user logged to the top of the record's timeline, or unpins it.
+ * With the user's session: RLS lets the author or an owner/admin of a writable organization
+ * change it. Zero rows back means deleted, not on this record, or not permitted.
+ */
+export async function setActivityPinnedAction(
+  orgId: string,
+  subject: TimelineSubject,
+  activityId: string,
+  pinned: boolean,
+): Promise<ActionResult> {
+  const parsedSubject = subjectSchema.safeParse(subject);
+  if (!parsedSubject.success) {
+    return fail(NOT_FOUND);
+  }
+  if (!validArg(booleanArg, pinned)) {
+    return fail(INVALID_ARGS);
+  }
+  const context = await actionContext(orgId, parsedSubject.data.id, activityId);
+  if (!context.ok) {
+    return context;
+  }
+
+  const { data, error } = await context.supabase
+    .from("activities")
+    .update({ is_pinned: pinned })
+    .eq("organization_id", orgId)
+    .eq("id", activityId)
+    .eq(SUBJECT_COLUMN[parsedSubject.data.kind], parsedSubject.data.id)
+    .in("type", [...PINNABLE_TYPES])
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, pinned ? "לא הצלחנו לנעוץ. נסו שוב." : "לא הצלחנו לבטל את הנעיצה. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
   }
 
   revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
