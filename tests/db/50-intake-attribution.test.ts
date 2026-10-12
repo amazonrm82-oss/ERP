@@ -107,6 +107,74 @@ describe("a lead keeps where it came from (CAP-02, ADS-01)", () => {
     expect(meta.attribution).toEqual({ utm_source: "facebook", utm_campaign: "חדש", fbclid: "F-second" });
   });
 
+  it("the extra parameters of the closed list are kept together in utm.extra; unknown keys are dropped (CAP-02)", async () => {
+    const r = await submit(form.token, {
+      full_name: "נוסף",
+      phone: "052-7000021",
+      attribution: {
+        utm_source: "google",
+        utm_id: "1234567",
+        utm_source_platform: "Search Ads 360",
+        utm_creative_format: " display ",
+        utm_marketing_tactic: "a\u0001b",
+        msclkid: "ms-1_a",
+        ttclid: "E.C.P.tt~1",
+        li_fat_id: "li-fat-1",
+        gbraid: "0AAAAA-gb",
+        wbraid: "CjkKwb_1",
+        // dropped: not on the list, or not a plain token
+        utm_campaign_id: "x",
+        dclid: "D1",
+        twclid: "T1",
+        extra: { evil: "x" },
+        msclkid_x: "y",
+      },
+    });
+    expect(r.status).toBe("accepted");
+    expect((await leadAttr(r.lead_id!)).utm).toEqual({
+      utm_source: "google",
+      extra: {
+        utm_id: "1234567",
+        utm_source_platform: "Search Ads 360",
+        utm_creative_format: "display",
+        utm_marketing_tactic: "ab",
+        msclkid: "ms-1_a",
+        ttclid: "E.C.P.tt~1",
+        li_fat_id: "li-fat-1",
+        gbraid: "0AAAAA-gb",
+        wbraid: "CjkKwb_1",
+      },
+    });
+
+    // bad values: the click id rule (1..500 plain characters) and the UTM rule (200 characters)
+    const bad = await submit(webhook.token, {
+      email: "attr-extra-bad@example.com",
+      attribution: { msclkid: "has space", ttclid: "t".repeat(501), li_fat_id: "<x>", gbraid: "", wbraid: 7, utm_id: "   ", utm_source_platform: "פ".repeat(300) },
+    }, "webhook");
+    expect((await leadAttr(bad.lead_id!)).utm).toEqual({ extra: { utm_source_platform: "פ".repeat(200) } });
+
+    // nothing from the list: no 'extra' key at all
+    const none = await submit(webhook.token, { email: "attr-extra-none@example.com", attribution: { msclkid: "a b", utm_source: "x" } }, "webhook");
+    expect((await leadAttr(none.lead_id!)).utm).toEqual({ utm_source: "x" });
+
+    // a repeat inquiry keeps this visit's extra parameters on the inquiry
+    await submit(form.token, { full_name: "נוסף", phone: "052-7000021", attribution: { ttclid: "T2", utm_id: "9" } });
+    const meta = await asAdmin(async (q) =>
+      (await q<{ metadata: Record<string, unknown> }>("select metadata from public.activities where lead_id = $1 and type = 'inquiry'", [r.lead_id])).rows[0].metadata,
+    );
+    expect(meta.attribution).toEqual({ extra: { utm_id: "9", ttclid: "T2" } });
+  });
+
+  it("the extra parameters count as campaign parameters on the landing page (CAP-02)", async () => {
+    const r = await submit(webhook.token, {
+      email: "attr-extra-landing@example.com",
+      attribution: { landing_url: "https://shop.co.il/p?msclkid=M1&x=1&utm_id=7&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W&utm_source_platform=SA360&utm_creative_format=f&utm_marketing_tactic=t&dclid=D" },
+    }, "webhook");
+    expect((await leadAttr(r.lead_id!)).landing_url).toBe(
+      "https://shop.co.il/p?msclkid=M1&utm_id=7&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W&utm_source_platform=SA360&utm_creative_format=f&utm_marketing_tactic=t",
+    );
+  });
+
   it("the landing page keeps only its campaign parameters, whoever calls the function (CAP-02)", async () => {
     const r = await submit(webhook.token, {
       email: "attr-landing@example.com",
@@ -129,7 +197,7 @@ describe("a lead keeps where it came from (CAP-02, ADS-01)", () => {
   });
 
   it("app.campaign_only_url() follows the same rules as the app's campaignOnlyUrl()", async () => {
-    // the same cases as tests/unit/intake-embed-script.test.ts
+    // the same cases as tests/unit/intake-embed-script.test.ts (campaignOnlyUrl() cases there)
     const cases: Array<[string | null, string | null]> = [
       [null, null],
       ["https://a.co/", "https://a.co/"],
@@ -147,6 +215,9 @@ describe("a lead keeps where it came from (CAP-02, ADS-01)", () => {
       ["https://a.co/p?next=https://u:p@b.co", "https://a.co/p"],
       ["https://a.co/@x?utm_term=t", "https://a.co/@x?utm_term=t"],
       ["https://a.co/p?utm_campaign=%D7%90+%D7%91&fbclid=F&ctwa_clid=C&utm_term=t&utm_content=c", "https://a.co/p?utm_campaign=%D7%90+%D7%91&fbclid=F&ctwa_clid=C&utm_term=t&utm_content=c"],
+      // CAP-02: the closed list of extra parameters
+      ["https://a.co/p?utm_id=1&x=1&utm_source_platform=SA&utm_creative_format=f&utm_marketing_tactic=t", "https://a.co/p?utm_id=1&utm_source_platform=SA&utm_creative_format=f&utm_marketing_tactic=t"],
+      ["https://a.co/p?msclkid=M&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W&dclid=D&twclid=X&utm_idx=1", "https://a.co/p?msclkid=M&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W"],
     ];
     for (const [input, expected] of cases) {
       const got = await asAdmin(async (q) => (await q<{ r: string | null }>("select app.campaign_only_url($1) as r", [input])).rows[0].r);

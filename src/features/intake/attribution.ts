@@ -8,7 +8,17 @@
 export const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const;
 export const CLICK_ID_KEYS = ["gclid", "fbclid", "ctwa_clid"] as const;
 export const URL_KEYS = ["referrer_url", "landing_url"] as const;
-export const ATTRIBUTION_KEYS = [...UTM_KEYS, ...CLICK_ID_KEYS, ...URL_KEYS] as const;
+/**
+ * More campaign parameters, a closed list (CAP-02, owner 12 October 2026): Google's newer
+ * UTM parameters and the ad click ids of Microsoft, TikTok, LinkedIn and Google (iOS / web
+ * to app). They arrive flat like the others; the database keeps them together in one
+ * general place, `leads.utm.extra` (and `attribution.extra` on a repeat inquiry).
+ * The same list is in app.intake_attribution() and app.campaign_only_url(); keep them in step.
+ */
+export const EXTRA_UTM_KEYS = ["utm_id", "utm_source_platform", "utm_creative_format", "utm_marketing_tactic"] as const;
+export const EXTRA_CLICK_ID_KEYS = ["msclkid", "ttclid", "li_fat_id", "gbraid", "wbraid"] as const;
+export const EXTRA_KEYS = [...EXTRA_UTM_KEYS, ...EXTRA_CLICK_ID_KEYS] as const;
+export const ATTRIBUTION_KEYS = [...UTM_KEYS, ...CLICK_ID_KEYS, ...EXTRA_KEYS, ...URL_KEYS] as const;
 
 export type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
 export type Attribution = Partial<Record<AttributionKey, string>>;
@@ -39,7 +49,7 @@ export function safeText(value: string, max: number): string {
 const USER_INFO = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/?#]*@/;
 
 /** The query parameters a stored landing page address may keep (CAP-02, owner 12 October 2026). */
-export const CAMPAIGN_KEYS: readonly string[] = [...UTM_KEYS, ...CLICK_ID_KEYS];
+export const CAMPAIGN_KEYS: readonly string[] = [...UTM_KEYS, ...CLICK_ID_KEYS, ...EXTRA_KEYS];
 
 /**
  * A page address with only its campaign parameters: the fragment, any user info
@@ -83,7 +93,7 @@ function cleanValue(key: AttributionKey, value: unknown): string | null {
   // the landing page keeps only its campaign parameters (CAP-02, owner 12 October 2026)
   if (key === "landing_url") return cleanUrl(campaignOnlyUrl(value.trim()));
   if ((URL_KEYS as readonly string[]).includes(key)) return cleanUrl(value);
-  if ((CLICK_ID_KEYS as readonly string[]).includes(key)) {
+  if ((CLICK_ID_KEYS as readonly string[]).includes(key) || (EXTRA_CLICK_ID_KEYS as readonly string[]).includes(key)) {
     const trimmed = value.trim();
     return trimmed.length > 0 && trimmed.length <= CLICK_ID_MAX && CLICK_ID.test(trimmed) ? trimmed : null;
   }
@@ -106,7 +116,7 @@ export function parseAttribution(body: Record<string, unknown>): Attribution {
   return out;
 }
 
-const PASS_THROUGH: readonly AttributionKey[] = [...UTM_KEYS, ...CLICK_ID_KEYS];
+const PASS_THROUGH: readonly AttributionKey[] = [...UTM_KEYS, ...CLICK_ID_KEYS, ...EXTRA_KEYS];
 
 function paramsOf(href: string | null | undefined): URLSearchParams | null {
   if (!href) return null;
@@ -179,6 +189,43 @@ function utmValue(utm: unknown, key: string): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
+// what the lead card calls each extra click id
+const EXTRA_CLICK_NAMES: Record<(typeof EXTRA_CLICK_ID_KEYS)[number], string> = {
+  msclkid: "Microsoft Ads",
+  ttclid: "TikTok",
+  li_fat_id: "LinkedIn",
+  gbraid: "Google Ads (gbraid)",
+  wbraid: "Google Ads (wbraid)",
+};
+
+function extraOf(utm: unknown): unknown {
+  return utm && typeof utm === "object" && !Array.isArray(utm) ? (utm as Record<string, unknown>).extra : null;
+}
+
+/** Text cut for a narrow card, between characters (the full value stays in the database). */
+function shortText(value: string, max: number): string {
+  const chars = Array.from(value);
+  return chars.length > max ? `${chars.slice(0, max - 1).join("")}…` : value;
+}
+
+/** The "more campaign parameters" line: the extra UTM values as key=value, each cut short. */
+function extraParamsValue(utm: unknown): string | null {
+  const extra = extraOf(utm);
+  const parts: string[] = [];
+  for (const key of EXTRA_UTM_KEYS) {
+    const value = utmValue(extra, key);
+    if (value) parts.push(`${key}=${shortText(value, 40)}`);
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+/** The "more ad ids" line: the extra click ids by platform name. */
+function extraClicksValue(utm: unknown): string | null {
+  const extra = extraOf(utm);
+  const names = EXTRA_CLICK_ID_KEYS.filter((key) => utmValue(extra, key)).map((key) => EXTRA_CLICK_NAMES[key]);
+  return names.length > 0 ? names.join(", ") : null;
+}
+
 /** Page address without the protocol, cut for a narrow card (the full address stays in the database). */
 function shortUrl(value: string): string {
   const bare = value.replace(/^https?:\/\//i, "");
@@ -201,5 +248,10 @@ export function attributionRows(lead: LeadAttributionColumns): AttributionRow[] 
   if (lead.landing_url) rows.push({ label: "דף הנחיתה", value: shortUrl(lead.landing_url), ltr: true });
   const clicks = CLICK_PLATFORMS.filter(([key]) => lead[key]).map(([, name]) => name);
   if (clicks.length > 0) rows.push({ label: "מזהה פרסום", value: clicks.join(", ") });
+  // CAP-02: the extra parameters of the closed list, kept in utm.extra
+  const params = extraParamsValue(lead.utm);
+  if (params) rows.push({ label: "פרמטרי קמפיין נוספים", value: params, ltr: true });
+  const ids = extraClicksValue(lead.utm);
+  if (ids) rows.push({ label: "מזהי פרסום נוספים", value: ids, ltr: true });
   return rows;
 }

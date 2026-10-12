@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { attributionRows, collectAttribution, parseAttribution } from "@/features/intake/attribution";
+import { attributionRows, collectAttribution, EXTRA_CLICK_ID_KEYS, EXTRA_UTM_KEYS, parseAttribution } from "@/features/intake/attribution";
 
 describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
   it("keeps the known keys of a body and ignores the rest", () => {
@@ -47,6 +50,44 @@ describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
       landing_url: `https://x.co/${"p".repeat(2000)}`,
     });
     expect(out).toEqual({ utm_source: "א".repeat(200), utm_medium: "abc" });
+  });
+
+  it("keeps the extra parameters of the closed list (CAP-02): UTM values by the UTM rule, click ids by the click id rule", () => {
+    expect(
+      parseAttribution({
+        utm_id: " 123 ",
+        utm_source_platform: "Search Ads 360",
+        utm_creative_format: "x".repeat(300),
+        utm_marketing_tactic: "a\u0001b",
+        msclkid: "ms-1_a",
+        ttclid: "E.C.P~1",
+        li_fat_id: "li-1",
+        gbraid: "0AAA-gb",
+        wbraid: "Cjk_wb",
+        dclid: "D1",
+        utm_campaign_id: "x",
+        extra: { evil: "x" },
+      }),
+    ).toEqual({
+      utm_id: "123",
+      utm_source_platform: "Search Ads 360",
+      utm_creative_format: "x".repeat(200),
+      utm_marketing_tactic: "ab",
+      msclkid: "ms-1_a",
+      ttclid: "E.C.P~1",
+      li_fat_id: "li-1",
+      gbraid: "0AAA-gb",
+      wbraid: "Cjk_wb",
+    });
+    expect(parseAttribution({ msclkid: "has space", ttclid: "t".repeat(501), li_fat_id: "<x>", gbraid: "", wbraid: 7, utm_id: "  " })).toEqual({});
+  });
+
+  it("the hosted form passes the extra parameters from its own address (CAP-02)", () => {
+    expect(collectAttribution("https://crm.example/f/abc?msclkid=M1&utm_id=9&dclid=D", "")).toEqual({
+      msclkid: "M1",
+      utm_id: "9",
+      landing_url: "https://crm.example/f/abc?msclkid=M1&utm_id=9",
+    });
   });
 
   it("reads the names webhook senders use, the canonical key first", () => {
@@ -124,6 +165,19 @@ describe("intake: where a lead came from (CAP-02, ADS-01)", () => {
       { label: "דף הנחיתה", value: "example.co.il/offer", ltr: true },
       { label: "מזהה פרסום", value: "Google Ads, Facebook" },
     ]);
+    // CAP-02: the extra parameters, kept in utm.extra, on one generic line
+    expect(
+      attributionRows({ ...empty, utm: { extra: { utm_id: "77", utm_source_platform: "SA360", msclkid: "M1", wbraid: "W1", odd: "x", ttclid: 5 } } }),
+    ).toEqual([
+      { label: "פרמטרי קמפיין נוספים", value: "utm_id=77, utm_source_platform=SA360", ltr: true },
+      { label: "מזהי פרסום נוספים", value: "Microsoft Ads, Google Ads (wbraid)", ltr: true },
+    ]);
+    // only one of the two, and a long value cut for the card
+    expect(attributionRows({ ...empty, utm: { extra: { ttclid: "T" } } })).toEqual([{ label: "מזהי פרסום נוספים", value: "TikTok", ltr: true }]);
+    expect(attributionRows({ ...empty, utm: { extra: { utm_marketing_tactic: "ט".repeat(200) } } })).toEqual([
+      { label: "פרמטרי קמפיין נוספים", value: `utm_marketing_tactic=${"ט".repeat(39)}…`, ltr: true },
+    ]);
+    expect(attributionRows({ ...empty, utm: { extra: "x" } })).toEqual([]);
   });
 });
 
@@ -136,5 +190,21 @@ describe("a bad value never costs a lead (review of CAP-02)", () => {
     expect(cut.endsWith("😀")).toBe(true);
     expect(safeText("שלום\ud83d", 50)).toBe("שלום");
     expect(safeText("שורה 1\nשורה 2\u0007", 50)).toBe("שורה 1\nשורה 2");
+  });
+});
+
+describe("the closed list of extra parameters is the same in the app and the database (CAP-02)", () => {
+  it("EXTRA_UTM_KEYS and EXTRA_CLICK_ID_KEYS equal the lists of migration more_campaign_params", () => {
+    const sql = readFileSync(path.join(process.cwd(), "supabase/migrations/20261006009800_more_campaign_params.sql"), "utf8");
+    const body = sql.slice(sql.indexOf("create or replace function app.intake_attribution"));
+    const arrays = [...body.matchAll(/foreach v_key in array array\[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([^']+)'/g)].map((k) => k[1]));
+    // classic UTMs, classic click ids, extra UTMs, extra click ids, page addresses: in that order
+    expect(arrays).toHaveLength(5);
+    expect(arrays[2]).toEqual([...EXTRA_UTM_KEYS]);
+    expect(arrays[3]).toEqual([...EXTRA_CLICK_ID_KEYS]);
+    // and app.campaign_only_url() keeps the classic and the extra keys
+    const only = sql.slice(sql.indexOf("create or replace function app.campaign_only_url"), sql.indexOf("create or replace function app.intake_attribution"));
+    const kept = [...(only.match(/= any \(array\[([^\]]*)\]/)?.[1] ?? "").matchAll(/'([^']+)'/g)].map((k) => k[1]);
+    expect(kept).toEqual([...arrays[0], ...arrays[1], ...EXTRA_UTM_KEYS, ...EXTRA_CLICK_ID_KEYS]);
   });
 });

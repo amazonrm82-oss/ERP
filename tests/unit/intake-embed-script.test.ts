@@ -2,7 +2,7 @@ import vm from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { campaignOnlyUrl, collectAttribution } from "@/features/intake/attribution";
+import { CAMPAIGN_KEYS, campaignOnlyUrl, collectAttribution } from "@/features/intake/attribution";
 import { EMBED_SCRIPT } from "@/features/intake/embed-script";
 
 type FakeFrame = {
@@ -61,6 +61,29 @@ describe("CAP-02: the embed script passes only campaign details and the page add
       fbclid: "F1",
       landing_url: "https://shop.co.il/sale?utm_source=facebook&utm_campaign=%D7%97%D7%95%D7%A8%D7%A3&fbclid=F1",
     });
+  });
+
+  it("copies the extra parameters of the closed list too, and nothing else (CAP-02)", () => {
+    const host =
+      "https://shop.co.il/p?utm_id=77&msclkid=M1&ttclid=T1&li_fat_id=L1&gbraid=G1&wbraid=W1&utm_source_platform=SA360&utm_creative_format=video&utm_marketing_tactic=remarketing&dclid=D1&token=s";
+    const [f] = runScript(host, [frame("https://crm.example/f/t?embed=1")]);
+    const src = new URL(f.src);
+    expect([...src.searchParams.keys()]).toEqual([
+      "embed",
+      "utm_id",
+      "utm_source_platform",
+      "utm_creative_format",
+      "utm_marketing_tactic",
+      "msclkid",
+      "ttclid",
+      "li_fat_id",
+      "gbraid",
+      "wbraid",
+      "page_url",
+    ]);
+    expect(src.searchParams.get("page_url")).toBe(campaignOnlyUrl(host));
+    expect(src.searchParams.get("page_url")).not.toContain("dclid");
+    expect(collectAttribution(f.src, "")).toMatchObject({ utm_id: "77", msclkid: "M1", wbraid: "W1", utm_marketing_tactic: "remarketing" });
   });
 
   it("leaves other iframes, other origins and forms opened without embed=1 alone", () => {
@@ -131,7 +154,7 @@ describe("CAP-02: the embed script passes only campaign details and the page add
     // the script's own copy of the rule, on text a browser would never give it as location
     const script = EMBED_SCRIPT.match(/function campaignOnly\(value\) \{[\s\S]*?\n  \}/)?.[0];
     expect(script).toBeTruthy();
-    const KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid", "ctwa_clid"];
+    const KEYS = [...CAMPAIGN_KEYS];
     const scriptRule = vm.runInNewContext(`(${script!.replace("function campaignOnly", "function")})`, { KEYS }) as (v: string) => string;
     for (const raw of ["https://u:p@a.co/p?utm_source=a&x=1#h", "https://a@b@a.co/?fbclid=F", "https://a.co/p?next=https://u:p@b.co", "https://a.co/@x?utm_term=t"]) {
       expect(scriptRule(raw), raw).toBe(campaignOnlyUrl(raw));
@@ -154,5 +177,14 @@ describe("campaignOnlyUrl()", () => {
     expect(campaignOnlyUrl("https://a@b@a.co:8443/p")).toBe("https://a.co:8443/p");
     expect(campaignOnlyUrl("https://a.co/@x?utm_term=t")).toBe("https://a.co/@x?utm_term=t");
     expect(campaignOnlyUrl("https://a.co?next=https://u:p@b.co")).toBe("https://a.co");
+  });
+
+  it("keeps the extra parameters of the closed list too (CAP-02), the same cases as the database test", () => {
+    expect(campaignOnlyUrl("https://a.co/p?utm_id=1&x=1&utm_source_platform=SA&utm_creative_format=f&utm_marketing_tactic=t")).toBe(
+      "https://a.co/p?utm_id=1&utm_source_platform=SA&utm_creative_format=f&utm_marketing_tactic=t",
+    );
+    expect(campaignOnlyUrl("https://a.co/p?msclkid=M&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W&dclid=D&twclid=X&utm_idx=1")).toBe(
+      "https://a.co/p?msclkid=M&ttclid=T&li_fat_id=L&gbraid=G&wbraid=W",
+    );
   });
 });
