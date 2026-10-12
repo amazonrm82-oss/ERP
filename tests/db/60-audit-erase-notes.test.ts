@@ -163,7 +163,8 @@ describe("a list export keeps only the shape of its filters (RVW-4)", () => {
               { field: "tags", op: "has", value: true },
               { field: "tags", op: "has", value: [uuid] },
               { field: "x", op: "is", value: true },
-              { field: true, op: true, value: "1" },
+              // an unknown operator keeps no value (0088)
+              { field: true, op: true, value: true },
             ],
           },
         ],

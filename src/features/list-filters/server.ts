@@ -298,10 +298,30 @@ export function filterToPostgrest(tree: FilterTree, fields: ServerField[], ctx: 
   return { logic: `${tree.match === "all" ? "and" : "or"}(${groups.join(",")})`, skipped };
 }
 
+/**
+ * Only the conditions `filterToPostgrest()` would use, in their groups; null when none fits.
+ * The list export logs this (RVW-4), so a condition the list left out is not kept.
+ */
+export function appliedFilter(tree: FilterTree, fields: ServerField[], ctx: Context): FilterTree | null {
+  const byKey = new Map(fields.map((field) => [field.key, field]));
+  const groups = tree.groups
+    .map((group) => ({
+      match: group.match,
+      conditions: group.conditions.filter((condition) => {
+        const field = byKey.get(condition.field);
+        return field ? conditionFilter(field, condition.op as FilterOp, condition.value ?? "", ctx) !== null : false;
+      }),
+    }))
+    .filter((group) => group.conditions.length > 0);
+  return groups.length > 0 ? { match: tree.match, groups } : null;
+}
+
 export type PreparedFilter = {
   fields: FilterField[];
   tree: FilterTree | null;
   // for `.or()` on the list query; null when there is no usable filter
   logic: string | null;
   skipped: number;
+  // the conditions the list applied (`tree` without the ones left out); for the export's audit entry
+  applied: FilterTree | null;
 };

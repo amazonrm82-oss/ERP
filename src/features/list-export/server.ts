@@ -21,7 +21,7 @@ import { csvText } from "@/lib/csv";
 import type { Json } from "@/lib/database.types";
 import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format";
 import { isUuid } from "@/lib/paths";
-import { parseSort, type CustomSortKey, type Sort } from "@/lib/sort";
+import { parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { xlsxFile } from "@/lib/xlsx";
 import { readAllPages } from "@/lib/paged-read";
@@ -199,7 +199,8 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   ]);
 
   // the audit entry comes first: no entry, no file. log_list_export() keeps only the shape of the
-  // filters (RVW-4): the search becomes "a search was used", the pipeline and view go as ids
+  // filters (RVW-4): the search becomes "a search was used", the pipeline and view go as ids, and a
+  // filter value only when it fits its operator
   const supabase = await createClient();
   const filters: Record<string, string | number> =
     scope === "selected"
@@ -209,8 +210,9 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             q: search,
             tag: tagId ?? "",
             status: statusId ?? "",
-            f: filter.tree ? JSON.stringify(filter.tree) : "",
-            sort: params.get("sort") ?? "",
+            // only the conditions the list applied, and the sort it used (a real column key)
+            f: filter.applied ? JSON.stringify(filter.applied) : "",
+            sort: sortValue(sort),
             pipeline: pipeline?.id ?? "",
             who: object === "task" ? (taskOwner ? "mine" : "all") : "",
             view: view?.id ?? "",

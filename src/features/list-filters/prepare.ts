@@ -8,7 +8,7 @@ import { getOrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 
 import { parseFilterParam } from "./model";
-import { filterFields, filterToPostgrest, publicFields, type FilterObject, type PreparedFilter } from "./server";
+import { appliedFilter, filterFields, filterToPostgrest, publicFields, type FilterObject, type PreparedFilter } from "./server";
 
 /**
  * The advanced filter of a list page (LST-05): the fields it offers (with the
@@ -43,6 +43,7 @@ export async function prepareListFilter(
     fields: customFields,
   });
   const tree = parseFilterParam(param);
-  const built = tree ? filterToPostgrest(tree, fields, { userId, now: new Date(), timeZone: context.org.timeZone }) : { logic: null, skipped: 0 };
-  return { fields: publicFields(fields), tree, logic: built.logic, skipped: built.skipped };
+  const ctx = { userId, now: new Date(), timeZone: context.org.timeZone };
+  const built = tree ? filterToPostgrest(tree, fields, ctx) : { logic: null, skipped: 0 };
+  return { fields: publicFields(fields), tree, logic: built.logic, skipped: built.skipped, applied: tree ? appliedFilter(tree, fields, ctx) : null };
 }
