@@ -22,6 +22,49 @@ describe("schema guards", () => {
     expect(rows).toEqual([]);
   });
 
+  // RVW-15: the live project has RLS on every table of schema app; the repo must match, and a
+  // future app table must not forget it. Not FORCEd: the security definer functions that use
+  // these tables run as the table owner and must keep bypassing RLS.
+  it("every table in schema app has row level security enabled, not forced, and owned by the function owner", async () => {
+    const rows = await asAdmin(async (q) =>
+      (
+        await q<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean; owner: string }>(`
+          select c.relname, c.relrowsecurity, c.relforcerowsecurity, pg_get_userbyid(c.relowner) as owner
+          from pg_class c
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'app' and c.relkind in ('r', 'p')
+          order by 1`)
+      ).rows,
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(9);
+    expect(rows.filter((r) => !r.relrowsecurity).map((r) => r.relname)).toEqual([]);
+    expect(rows.filter((r) => r.relforcerowsecurity).map((r) => r.relname)).toEqual([]);
+    const definerOwners = await asAdmin(async (q) =>
+      (
+        await q<{ owner: string }>(`
+          select distinct pg_get_userbyid(p.proowner) as owner
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname in ('app', 'public') and p.prosecdef`)
+      ).rows.map((r) => r.owner),
+    );
+    expect(definerOwners.length).toBeGreaterThan(0);
+    for (const r of rows) expect(definerOwners).toContain(r.owner);
+    // an invoker function or trigger reading an app table would silently see 0 rows under RLS
+    const pattern = `app\\.(${rows.map((r) => r.relname).join("|")})\\M`;
+    const invokers = await asAdmin(async (q) =>
+      (
+        await q<{ fn: string }>(
+          `select n.nspname || '.' || p.proname as fn
+           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname in ('app', 'public') and not p.prosecdef and p.prosrc ~ $1
+           order by 1`,
+          [pattern],
+        )
+      ).rows.map((r) => r.fn),
+    );
+    expect(invokers).toEqual([]);
+  });
+
   it("every tenant table except the outbox has a select policy", async () => {
     const rows = await asAdmin(async (q) =>
       (
