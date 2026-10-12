@@ -24,6 +24,7 @@ import { isUuid } from "@/lib/paths";
 import { parseSort, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { xlsxFile } from "@/lib/xlsx";
+import { readAllPages } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 // Exporting a list (LST-08): the rows the list shows with its filters, search
@@ -31,7 +32,6 @@ import { RECORD_TYPES } from "@/lib/record-types";
 // CSV or Excel. Read with the user's session, so RLS decides as on screen;
 // for owners, admins and team managers only, and written to the audit log first.
 
-const CHUNK = 1000;
 // past this, the full export (settings) is the tool
 const MAX_ROWS = 50000;
 const MAX_PICKED = 100;
@@ -83,19 +83,19 @@ export async function exportList(request: Request, orgId: string, object: ListOb
 
   // picked rows ignore the list's filters: they were picked on screen
   const options = scope === "selected" ? { search: "", page: 1, sort, ids: picked } : { search, tagId, page: 1, sort, filter: filter.logic };
-  const rows: ExportRow[] = [];
   const lookups = object === "lead" ? await getLeadLookups(orgId) : null;
   const statusName = new Map(lookups?.statuses.map((s) => [s.id, s.name]) ?? []);
   const sourceName = new Map(lookups?.sources.map((s) => [s.id, s.name]) ?? []);
   const stageName = new Map(pipeline?.stages.map((s) => [s.id, s.name]) ?? []);
   const created = (iso: string) => formatDate(iso);
 
-  for (let from = 0; ; from += CHUNK) {
-    const chunk = { from, size: CHUNK };
-    let more: boolean;
+  // one page of the list as export rows; read page after page until a short page (RVW-2: a read
+  // returns at most 1,000 rows, so asking for more and stopping when fewer came back lost rows)
+  const readPage = async (from: number, to: number): Promise<ExportRow[]> => {
+    const chunk = { from, size: to - from + 1 };
+    const rows: ExportRow[] = [];
     if (object === "lead") {
       const page = await listLeads(orgId, { ...options, statusId: scope === "selected" ? null : statusId, chunk });
-      more = page.hasMore;
       for (const lead of page.leads) {
         rows.push({
           name: leadDisplayName(lead),
@@ -114,7 +114,6 @@ export async function exportList(request: Request, orgId: string, object: ListOb
       }
     } else if (object === "contact") {
       const page = await listContacts(orgId, { ...options, chunk });
-      more = page.hasMore;
       for (const contact of page.contacts) {
         rows.push({
           name: contactDisplayName(contact),
@@ -132,7 +131,6 @@ export async function exportList(request: Request, orgId: string, object: ListOb
       }
     } else if (object === "deal") {
       const page = await listDeals(orgId, { ...options, pipelineId: pipeline!.id, chunk });
-      more = page.hasMore;
       for (const deal of page.deals) {
         rows.push({
           name: deal.name,
@@ -151,7 +149,6 @@ export async function exportList(request: Request, orgId: string, object: ListOb
       }
     } else if (object === "task") {
       const page = await listTasks(orgId, { ...options, ownerId: scope === "selected" ? null : taskOwner, sort: sort as unknown as Sort<TaskSortKey>, chunk });
-      more = page.hasMore;
       for (const task of page.tasks) {
         rows.push({
           name: task.title,
@@ -169,7 +166,6 @@ export async function exportList(request: Request, orgId: string, object: ListOb
       }
     } else {
       const page = await listCompanies(orgId, { ...options, chunk });
-      more = page.hasMore;
       for (const company of page.companies) {
         rows.push({
           name: company.name,
@@ -185,10 +181,11 @@ export async function exportList(request: Request, orgId: string, object: ListOb
         });
       }
     }
-    if (rows.length > MAX_ROWS) {
-      return text(`ברשימה יותר מ-${MAX_ROWS.toLocaleString("he-IL")} שורות. צמצמו בסינון, או השתמשו בייצוא המלא בהגדרות.`, 413);
-    }
-    if (!more) break;
+    return rows;
+  };
+  const { rows, complete } = await readAllPages(readPage, { limit: MAX_ROWS });
+  if (!complete) {
+    return text(`ברשימה יותר מ-${MAX_ROWS.toLocaleString("he-IL")} שורות. צמצמו בסינון, או השתמשו בייצוא המלא בהגדרות.`, 413);
   }
 
   const header = [object === "task" ? "כותרת" : "שם", ...columns.map((column) => labels.get(column.key) ?? column.key)];

@@ -14,7 +14,7 @@ import { listMembers, listTeams } from "@/features/settings/queries";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
 import { DealsTable } from "@/features/deals/components/deals-table";
-import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getBoard, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
+import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, FILTERED_TOTALS_LIMIT, getBoard, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
@@ -213,6 +213,12 @@ export default async function DealsPage({ params, searchParams }: Props) {
             action={newDealButton}
           />
         </div>
+      ) : null}
+
+      {board.totalsPartial ? (
+        <p className="mb-3 text-sm text-ink-soft" role="status">
+          {`יותר מ-${formatNumber(FILTERED_TOTALS_LIMIT)} עסקאות מתאימות לסינון. הסכומים מחושבים מ-${formatNumber(FILTERED_TOTALS_LIMIT)} הראשונות בלבד. צמצמו את הסינון כדי לקבל סכום מדויק.`}
+        </p>
       ) : null}
 
       <DealsBoard

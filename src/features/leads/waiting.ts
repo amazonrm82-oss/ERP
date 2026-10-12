@@ -2,6 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
+import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
 // "Contact with the customer", as in the reports (DECISIONS.md; app.contact_types()):
@@ -55,17 +56,23 @@ export async function getWaitingLeads(orgId: string, ownerId: string | null): Pr
     const batch = must(await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(scanned, scanned + BATCH - 1), "waiting leads") ?? [];
     scanned += batch.length;
     if (batch.length > 0) {
-      const answered = must(
-        await supabase
-          .from("activities")
-          .select("lead_id")
-          .eq("organization_id", orgId)
-          .in("lead_id", batch.map((row) => row.id))
-          .in("type", [...CONTACT_TYPES])
-          .not("created_by", "is", null),
-        "lead activities",
+      // a lead can have many activities: page through them, or past 1,000 rows answered leads would show as waiting (RVW-2)
+      const { rows: answered } = await readAllPages(
+        async (from, to) =>
+          must(
+            await supabase
+              .from("activities")
+              .select("lead_id")
+              .eq("organization_id", orgId)
+              .in("lead_id", batch.map((row) => row.id))
+              .in("type", [...CONTACT_TYPES])
+              .not("created_by", "is", null)
+              .order("id", { ascending: true })
+              .range(from, to),
+            "lead activities",
+          ) ?? [],
       );
-      const answeredIds = new Set((answered ?? []).map((row) => row.lead_id));
+      const answeredIds = new Set(answered.map((row) => row.lead_id));
       waiting.push(...batch.filter((row) => !answeredIds.has(row.id)));
     }
     if (batch.length < BATCH) {

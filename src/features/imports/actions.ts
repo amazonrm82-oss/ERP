@@ -8,6 +8,7 @@ import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { paths } from "@/lib/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
 
@@ -176,25 +177,50 @@ export async function finishImportAction(
   return ok();
 }
 
+class ReadFailed {
+  constructor(readonly error: unknown) {}
+}
+
 /**
  * The companies a contacts import created go to the recycle bin with its contacts,
  * except one that a contact from outside the import uses by now.
  */
 async function trashImportedCompanies(supabase: ImportContext["supabase"], orgId: string, jobId: string): Promise<string | null> {
-  const { data: companies, error } = await supabase.from("companies").select("id").eq("organization_id", orgId).eq("import_job_id", jobId).is("deleted_at", null);
-  if (error) return dbErrorMessage(error, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.");
-  if (companies.length === 0) return null;
-  const ids = companies.map((c) => c.id);
+  const checkFailed = "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.";
+  // both reads page through: a read returns at most 1,000 rows (RVW-2)
+  let ids: string[];
   const inUse = new Set<string>();
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data: users, error: usersError } = await supabase
-      .from("contacts")
-      .select("company_id, import_job_id")
-      .eq("organization_id", orgId)
-      .in("company_id", ids.slice(i, i + 200))
-      .is("deleted_at", null);
-    if (usersError) return dbErrorMessage(usersError, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.");
+  try {
+    const { rows: companies } = await readAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("import_job_id", jobId)
+        .is("deleted_at", null)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw new ReadFailed(error);
+      return data;
+    });
+    if (companies.length === 0) return null;
+    ids = companies.map((c) => c.id);
+    const users = await readAllPagesByIds(ids, async (slice, from, to) => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("company_id, import_job_id")
+        .eq("organization_id", orgId)
+        .in("company_id", slice)
+        .is("deleted_at", null)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw new ReadFailed(error);
+      return data;
+    });
     for (const u of users) if (u.company_id && u.import_job_id !== jobId) inUse.add(u.company_id);
+  } catch (e) {
+    if (e instanceof ReadFailed) return dbErrorMessage(e.error, checkFailed);
+    throw e;
   }
   const unused = ids.filter((id) => !inUse.has(id));
   for (let i = 0; i < unused.length; i += 200) {

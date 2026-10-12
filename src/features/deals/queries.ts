@@ -6,6 +6,7 @@ import { ilikeAny, PAGE_SIZE } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
+import { readAllPages } from "@/lib/paged-read";
 
 export type StageOption = { id: string; name: string; kind: StageKind };
 
@@ -26,6 +27,8 @@ export type Board = {
   deals: BoardDeal[];
   // exact count and sum per stage (the board loads only part of the deals)
   totals: Record<string, StageTotal>;
+  // a filtered board counted only the first FILTERED_TOTALS_LIMIT deals
+  totalsPartial: boolean;
   // stages whose deals were loaded (closed stages only on request)
   loadedStages: string[];
   showClosed: boolean;
@@ -41,8 +44,8 @@ export function isBoardFiltered(filter: BoardFilter): boolean {
 // Cards loaded per stage: the most recently moved first. One stage can be opened in full.
 export const STAGE_LIMIT = 50;
 export const STAGE_FULL_LIMIT = 500;
-// a filtered board sums its deals itself, up to this many
-const FILTERED_TOTALS_LIMIT = 5000;
+// a filtered board sums its deals itself, up to this many (and says so past it)
+export const FILTERED_TOTALS_LIMIT = 5000;
 
 export type PipelineOption = { id: string; name: string; isDefault: boolean };
 
@@ -116,13 +119,23 @@ export async function getBoard(
     return q;
   };
 
+  // the totals function has no filters: a filtered board counts its deals itself (amounts only),
+  // page by page (a read returns at most 1,000 rows, RVW-2), up to FILTERED_TOTALS_LIMIT
+  const filteredTotals = () =>
+    readAllPages(
+      async (from, to) =>
+        must(
+          await narrow(
+            supabase.from("deals").select("stage_id, amount_agorot").eq("organization_id", orgId).eq("pipeline_id", pipeline.id).is("deleted_at", null),
+          )
+            .order("id", { ascending: true })
+            .range(from, to),
+          "deal totals",
+        ) ?? [],
+      { limit: FILTERED_TOTALS_LIMIT },
+    );
   const [totalsResult, ...stageResults] = await Promise.all([
-    filtered
-      ? // the totals function has no filters: count the filtered deals themselves (amounts only)
-        narrow(
-          supabase.from("deals").select("stage_id, amount_agorot").eq("organization_id", orgId).eq("pipeline_id", pipeline.id).is("deleted_at", null),
-        ).limit(FILTERED_TOTALS_LIMIT)
-      : supabase.rpc("deal_stage_totals", { p_org: orgId, p_pipeline: pipeline.id }),
+    filtered ? filteredTotals() : supabase.rpc("deal_stage_totals", { p_org: orgId, p_pipeline: pipeline.id }),
     ...loadedStages.map((stageId) =>
       narrow(
         supabase
@@ -138,7 +151,7 @@ export async function getBoard(
         .limit(options.fullStage === stageId ? STAGE_FULL_LIMIT : STAGE_LIMIT),
     ),
   ]);
-  if (totalsResult.error) {
+  if ("error" in totalsResult && totalsResult.error) {
     throw new Error(`deal totals query failed: ${totalsResult.error.message}`);
   }
   for (const result of stageResults) {
@@ -149,8 +162,10 @@ export async function getBoard(
   const rows = stageResults.flatMap((result) => result.data ?? []);
 
   const totals: Record<string, StageTotal> = {};
-  if (filtered) {
-    for (const row of (totalsResult.data ?? []) as Array<{ stage_id: string; amount_agorot: number }>) {
+  let totalsPartial = false;
+  if ("rows" in totalsResult) {
+    totalsPartial = !totalsResult.complete;
+    for (const row of totalsResult.rows) {
       const t = (totals[row.stage_id] ??= { count: 0, amountAgorot: 0 });
       t.count += 1;
       t.amountAgorot += Number(row.amount_agorot);
@@ -178,6 +193,7 @@ export async function getBoard(
     pipeline: { id: pipeline.id, name: pipeline.name },
     stages: pipeline.stages,
     totals,
+    totalsPartial,
     loadedStages,
     showClosed,
     deals: rows.map((row) => ({
