@@ -75,7 +75,8 @@ describe("the stored rule", () => {
     expect(describeRecurrence({ kind: "daily" })).toBe("כל יום");
     expect(describeRecurrence({ kind: "weekly", weekdays: [3, 0] })).toBe("כל שבוע בימים א׳, ד׳");
     expect(describeRecurrence({ kind: "monthly", day: 15, until: "2031-02-03" })).toBe("כל חודש ב-15, עד 3.2.2031");
-    expect(describeRecurrence({ kind: "after_done", days: 3, left: 2 })).toBe("3 ימים אחרי ההשלמה, עוד 2 פעמים");
+    expect(describeRecurrence({ kind: "after_done", days: 3, left: 2 })).toBe("3 ימים אחרי ההשלמה, עוד 3 משימות כולל זו");
+    expect(describeRecurrence({ kind: "daily", left: 1 })).toBe("כל יום, עוד 2 משימות כולל זו");
   });
 });
 
@@ -86,7 +87,7 @@ describe("the form", () => {
     expect(parse({ repeat: "none", repeat_days: "x" }).data).toBeNull();
     expect(parse({}).data).toBeNull();
     expect(parse({ repeat: "weekly", repeat_weekdays: "3,0,3", repeat_day: "x" }).data).toEqual({ kind: "weekly", weekdays: [0, 3] });
-    expect(parse({ repeat: "monthly", repeat_day: "31", repeat_end: "count", repeat_count: "5" }).data).toEqual({ kind: "monthly", day: 31, left: 5 });
+    expect(parse({ repeat: "monthly", repeat_day: "31", repeat_end: "count", repeat_count: "5" }).data).toEqual({ kind: "monthly", day: 31, left: 4 });
     expect(parse({ repeat: "after_done", repeat_days: "7", repeat_end: "until", repeat_until: "2031-01-01" }).data).toEqual({ kind: "after_done", days: 7, until: "2031-01-01" });
   });
 
@@ -97,6 +98,31 @@ describe("the form", () => {
     expect(field({ repeat: "after_done", repeat_days: "" })).toBe("repeat_days");
     expect(field({ repeat: "daily", repeat_end: "until", repeat_until: "2031-02-30" })).toBe("repeat_until");
     expect(field({ repeat: "daily", repeat_end: "count", repeat_count: "1000" })).toBe("repeat_count");
+    // X counts the task itself, so 1 would not repeat at all
+    expect(field({ repeat: "daily", repeat_end: "count", repeat_count: "1" })).toBe("repeat_count");
+  });
+
+  it("X tasks in total: completing them one after another makes exactly X tasks, the first included", () => {
+    // owner, 12 October 2026: "end after X" counts the first task too
+    const now = new Date("2030-05-01T05:00:00Z");
+    for (const total of [2, 3, 7]) {
+      let rule = parse({ repeat: "daily", repeat_end: "count", repeat_count: String(total) }).data as Recurrence | null;
+      let task = { dueAt: "2030-05-01T06:00:00Z", remindAt: null };
+      let made = 1;
+      while (rule) {
+        const next = nextTask(rule, task, now);
+        if (!next) break;
+        made++;
+        rule = next.recurrence;
+        task = { dueAt: next.dueAt, remindAt: null };
+      }
+      expect(made).toBe(total);
+    }
+  });
+
+  it("a rule saved before the change (left = more after this one) keeps its meaning and shows as left + 1 in total", () => {
+    expect(repeatValues({ kind: "daily", left: 2 }).repeat_count).toBe("3");
+    expect(parse({ repeat: "daily", repeat_end: "count", repeat_count: "3" }).data).toEqual({ kind: "daily", left: 2 });
   });
 
   it("round-trips a saved rule through the form", () => {

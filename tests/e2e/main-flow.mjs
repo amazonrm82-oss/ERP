@@ -873,12 +873,13 @@ try {
     await ownerDesk.getByLabel("חזרה", { exact: true }).selectOption({ label: "כל שבוע" });
     await ownerDesk.getByLabel(/^ראשון$/).check();
     await ownerDesk.getByLabel(/^רביעי$/).check();
-    await ownerDesk.getByLabel("סיום החזרה").selectOption({ label: "אחרי מספר פעמים" });
-    await ownerDesk.getByLabel("כמה פעמים עוד").fill("3");
+    await ownerDesk.getByLabel("סיום החזרה").selectOption({ label: "אחרי מספר משימות" });
+    // "X in total" counts this task too: 4 in total = 3 more after this one
+    await ownerDesk.getByLabel("כמה משימות בסך הכול").fill("4");
     await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
     const row = ownerDesk.locator("li", { has: ownerDesk.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }) });
     await row.getByText(/^חוזרת$/).waitFor({ timeout: 15000 });
-    await row.getByText(/כל שבוע בימים א׳, ד׳, עוד 3 פעמים/).waitFor();
+    await row.getByText(/כל שבוע בימים א׳, ד׳, עוד 4 משימות כולל זו/).waitFor();
     await row.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }).click();
     let next;
     for (let i = 0; i < 60 && !next; i++) {

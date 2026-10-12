@@ -10,6 +10,12 @@ import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
  * is checked by constraint tasks_recurrence_shape and the next task is created
  * by app.spawn_recurring_task() (migration 20261006006300). This file mirrors
  * both: keep the three in step.
+ *
+ * The end "after X tasks" (owner, 12 October 2026): the user types X tasks in
+ * total, counting the task being saved. The stored key keeps its meaning,
+ * "left" = how many more tasks completing this one may create, so the form
+ * stores X - 1 and shows left + 1. Rows saved before the change therefore keep
+ * their behaviour, and the database needed no change.
  */
 
 const until = z.string().refine(isCalendarDate);
@@ -124,7 +130,8 @@ export function describeRecurrence(rule: Recurrence): string {
     const [y, m, d] = rule.until.split("-");
     text += `, עד ${Number(d)}.${Number(m)}.${y}`;
   }
-  if (rule.left !== undefined) text += rule.left === 1 ? ", עוד פעם אחת" : `, עוד ${rule.left} פעמים`;
+  // this task plus the ones still to come
+  if (rule.left !== undefined) text += `, עוד ${rule.left + 1} משימות כולל זו`;
   return text;
 }
 
@@ -137,6 +144,11 @@ export const REPEAT_FIELD_NAMES = ["repeat", "repeat_weekdays", "repeat_day", "r
 export type RepeatValues = Partial<Record<(typeof REPEAT_FIELD_NAMES)[number], string | null>>;
 
 const text = z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string());
+// "after X tasks in total": X counts the task being saved, so at least 2
+// (1 would be a task that does not repeat); stored as left = X - 1
+export const TOTAL_MIN = 2;
+export const TOTAL_MAX = 999;
+
 const wholeNumber = (min: number, max: number, message: string) =>
   text.refine((value) => /^\d{1,3}$/.test(value) && Number(value) >= min && Number(value) <= max, { error: message }).transform(Number);
 
@@ -188,9 +200,10 @@ export const repeatFormSchema = z
       if (!isCalendarDate(form.repeat_until)) return issue("repeat_until", "יש לבחור תאריך סיום.");
       rule.until = form.repeat_until;
     } else if (form.repeat_end === "count") {
-      const count = wholeNumber(1, 999, "יש לכתוב מספר פעמים, מ-1 עד 999.").safeParse(form.repeat_count);
-      if (!count.success) return issue("repeat_count", "יש לכתוב מספר פעמים, מ-1 עד 999.");
-      rule.left = count.data;
+      const message = `יש לכתוב כמה משימות בסך הכול, מ-${TOTAL_MIN} עד ${TOTAL_MAX}.`;
+      const total = wholeNumber(TOTAL_MIN, TOTAL_MAX, message).safeParse(form.repeat_count);
+      if (!total.success) return issue("repeat_count", message);
+      rule.left = total.data - 1;
     }
     return rule;
   });
@@ -205,6 +218,7 @@ export function repeatValues(rule: Recurrence | null): RepeatValues {
     repeat_days: rule.kind === "after_done" ? String(rule.days) : "",
     repeat_end: rule.until ? "until" : rule.left !== undefined ? "count" : "never",
     repeat_until: rule.until ?? "",
-    repeat_count: rule.left !== undefined ? String(rule.left) : "",
+    // the form counts tasks in total, this one included
+    repeat_count: rule.left !== undefined ? String(rule.left + 1) : "",
   };
 }

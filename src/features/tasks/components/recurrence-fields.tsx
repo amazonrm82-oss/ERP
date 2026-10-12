@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { WEEKDAYS_LONG } from "@/lib/calendar-grid";
 
-import type { RepeatValues } from "../recurrence";
+import { TOTAL_MAX, TOTAL_MIN, type RepeatValues } from "../recurrence";
 
 export const REPEAT_OPTIONS = [
   { value: "none", label: "בלי חזרה" },
@@ -18,7 +18,7 @@ export const REPEAT_OPTIONS = [
 const END_OPTIONS = [
   { value: "never", label: "בלי סוף" },
   { value: "until", label: "עד תאריך" },
-  { value: "count", label: "אחרי מספר פעמים" },
+  { value: "count", label: "אחרי מספר משימות" },
 ] as const;
 
 function weekdayList(text: string | null | undefined): number[] {
@@ -135,13 +135,14 @@ export function RecurrenceFields({ values, errors }: Props) {
           ) : null}
           {end === "count" ? (
             <TextField
-              label="כמה פעמים עוד"
+              label="כמה משימות בסך הכול"
               name="repeat_count"
               type="number"
               inputMode="numeric"
-              min={1}
-              max={999}
+              min={TOTAL_MIN}
+              max={TOTAL_MAX}
               dir="ltr"
+              hint="כולל המשימה הזו"
               defaultValue={values.repeat_count ?? ""}
               error={errors.repeat_count}
             />

@@ -136,6 +136,8 @@ describe("recurring tasks (TASK-04)", () => {
     const lastDay = await newTask(member, { due: "2030-05-01 09:00+03", recurrence: { kind: "daily", until: "2030-05-02" } });
     expect((await completeAndNext(member, lastDay)).recurrence).toEqual({ kind: "daily", until: "2030-05-02" });
 
+    // left = how many more tasks may follow; the form saves "3 tasks in total" as
+    // left 2 (src/features/tasks/recurrence.ts), so this series has exactly 3
     const counted = await newTask(member, { due: "2030-05-01 09:00+03", recurrence: { kind: "daily", left: 2 } });
     const second = await completeAndNext(member, counted);
     expect(second.recurrence).toEqual({ kind: "daily", left: 1 });
