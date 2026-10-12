@@ -509,18 +509,24 @@ try {
   await owner.getByLabel(/^טלפון/).fill("052-7654321");
   await owner.getByLabel(/^אזור זמן/).selectOption("Europe/London");
   await owner.getByRole("checkbox", { name: /^שישי$/ }).check();
-  await owner.getByLabel(/שעת סיום ביום שישי/).fill("13:00");
+  await owner.getByLabel(/^שעת סיום ביום שישי$/).fill("13:00");
+  // a split day (owner's decision of 12 October 2026): a second range on Friday
+  await owner.getByRole("button", { name: /הוספת טווח ביום שישי/ }).click();
+  await owner.getByLabel(/^שעת התחלה ביום שישי, טווח 2$/).fill("17:00");
+  await owner.getByLabel(/^שעת סיום ביום שישי, טווח 2$/).fill("19:00");
   await owner.getByLabel(/^חתימה להודעות/).fill("רונית\nבעלת העסק");
   await owner.getByRole("button", { name: /שמירת הפרטים/ }).click();
   await expectText(owner, "הפרטים נשמרו");
   await shot(owner, "05b-account-profile-360");
   await owner.reload();
   if ((await owner.getByLabel(/^אזור זמן/).inputValue()) !== "Europe/London") throw new Error("profile time zone not saved");
-  if ((await owner.getByLabel(/שעת סיום ביום שישי/).inputValue()) !== "13:00") throw new Error("profile working hours not saved");
+  if ((await owner.getByLabel(/^שעת סיום ביום שישי$/).inputValue()) !== "13:00") throw new Error("profile working hours not saved");
+  if ((await owner.getByLabel(/^שעת סיום ביום שישי, טווח 2$/).inputValue()) !== "19:00") throw new Error("profile split working hours not saved");
   {
     const [row] = await sql("select p.phone_e164, p.working_hours from public.profiles p join auth.users u on u.id = p.id where u.email = $1", [ownerEmail]);
     if (row?.phone_e164 !== "+972527654321") throw new Error(`profile phone_e164 is ${row?.phone_e164}`);
-    if (row?.working_hours?.fri?.end !== "13:00") throw new Error("profile working_hours not stored");
+    const fri = row?.working_hours?.fri;
+    if (fri?.[0]?.end !== "13:00" || fri?.[1]?.start !== "17:00" || fri?.[1]?.end !== "19:00") throw new Error(`profile working_hours not stored: ${JSON.stringify(fri)}`);
   }
   // put everything back as it was: no phone, the business's time zone, no hours, no signature
   await owner.getByLabel(/^טלפון/).fill("");

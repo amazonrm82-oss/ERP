@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { isWorkingHours } from "../../src/features/profile/working-hours";
+import { WORKING_HOURS_CASES } from "../working-hours-cases";
 import { addMember, asAdmin, asMfaUser, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
@@ -69,43 +70,37 @@ describe("personal profile (USR-01)", () => {
   });
 
   it("working hours must have the exact shape", async () => {
-    const bad = [
-      [],
-      { sunday: { start: "09:00", end: "17:00" } },
-      { sun: { start: "9:00", end: "17:00" } },
-      { sun: { start: "17:00", end: "09:00" } },
-      { sun: { start: "09:00", end: "09:00" } },
-      { sun: { start: "09:00", end: "24:00" } },
-      { sun: { start: "09:00" } },
-      { sun: { start: "09:00", end: "17:00", note: "x" } },
-      { sun: [] },
-      { sun: { start: 900, end: 1700 } },
-      "09:00-17:00",
-    ];
-    for (const value of bad) {
-      expect((await pgError(update(owner, owner, "working_hours = $2", [JSON.stringify(value)]))).code).toBe("23514");
+    for (const { name, value, ok } of WORKING_HOURS_CASES) {
+      if (value === null || ok) continue;
+      expect((await pgError(update(owner, owner, "working_hours = $2", [JSON.stringify(value)]))).code, name).toBe("23514");
     }
     expect(await update(owner, owner, "working_hours = '{}'")).toBe(1);
     expect(await update(owner, owner, "working_hours = null")).toBe(1);
   });
 
+  it("split days are saved; rows of the first shape stay valid and can be written again", async () => {
+    const split = { sun: [{ start: "08:00", end: "12:00" }, { start: "16:00", end: "19:00" }], mon: [{ start: "09:00", end: "17:00" }] };
+    expect(await update(owner, owner, "working_hours = $2", [JSON.stringify(split)])).toBe(1);
+    expect((await profile(owner.id)).working_hours).toEqual(split);
+    const old = { sun: { start: "09:00", end: "17:00" } };
+    expect(await update(owner, owner, "working_hours = $2", [JSON.stringify(old)])).toBe(1);
+    // another column changes on a row that holds the first shape: the constraint still passes
+    expect(await update(owner, owner, "signature = 'חתימה ישנה'")).toBe(1);
+    expect((await profile(owner.id)).working_hours).toEqual(old);
+    for (const { name, value, ok } of WORKING_HOURS_CASES) {
+      if (!ok) continue;
+      expect(await update(owner, owner, "working_hours = $2", [value === null ? null : JSON.stringify(value)]), name).toBe(1);
+    }
+    expect(await update(owner, owner, "working_hours = null, signature = null")).toBe(1);
+  });
+
   it("app and database agree on the working hours shape", async () => {
-    const samples: unknown[] = [
-      {},
-      { sat: { start: "00:00", end: "23:59" } },
-      { sun: { start: "09:00", end: "17:00" }, mon: { start: "10:00", end: "12:00" } },
-      { sun: { start: "17:00", end: "09:00" } },
-      { xyz: { start: "09:00", end: "17:00" } },
-      { sun: { start: "09:00", end: "17:00", x: 1 } },
-      { sun: { start: "25:00", end: "26:00" } },
-      { sun: null },
-      [],
-      "x",
-      1,
-    ];
-    for (const sample of samples) {
-      const db = await asAdmin(async (q) => (await q<{ v: boolean }>("select app.working_hours_ok($1::jsonb) as v", [JSON.stringify(sample)])).rows[0].v);
-      expect(isWorkingHours(sample), JSON.stringify(sample)).toBe(db);
+    for (const { name, value, ok } of WORKING_HOURS_CASES) {
+      const db = await asAdmin(
+        async (q) => (await q<{ v: boolean }>("select app.working_hours_ok($1::jsonb) as v", [value === null ? null : JSON.stringify(value)])).rows[0].v,
+      );
+      expect(db, name).toBe(ok);
+      expect(isWorkingHours(value), name).toBe(db);
     }
   });
 

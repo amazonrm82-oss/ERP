@@ -160,7 +160,7 @@ export type ProfileRow = {
   locale: string;
   phone_e164: string | null;
   timezone: string | null;
-  // USR-01: {"sun": {"start": "09:00", "end": "17:00"}, ...}; see src/features/profile/working-hours.ts
+  // USR-01: {"sun": [{"start": "08:00", "end": "12:00"}, ...], ...} (or one object per day, first version); see src/features/profile/working-hours.ts
   working_hours: Json | null;
   signature: string | null;
   created_at: string;
