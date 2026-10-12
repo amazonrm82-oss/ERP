@@ -2394,6 +2394,8 @@ try {
   await lost.goto(`${orgUrl}/settings/users`);
   await lost.getByRole("link", { name: /העברת רשומות.*דנה חברה/ }).click();
   await lost.waitForURL(/\/transfer$/);
+  // meetings are counted too, since transfer_records moves them (RVW-8)
+  await expectText(lost, "פגישות:");
   await lost.getByLabel("למי להעביר").selectOption({ label: "רונית בעלים" });
   await lost.getByRole("button", { name: "העברת כל הרשומות" }).click();
   await expectText(lost, "הועברו");

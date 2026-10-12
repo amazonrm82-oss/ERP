@@ -7,6 +7,7 @@ import { TransferRecordsForm } from "@/features/settings/components/transfer-rec
 import { isAdminRole } from "@/features/settings/permissions";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { must } from "@/lib/db-read";
 import { formatNumber } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +22,8 @@ const KINDS = [
   { table: "companies", label: "חברות" },
   { table: "deals", label: "עסקאות" },
   { table: "tasks", label: "משימות" },
+  // transfer_records moves the meetings the person organizes (owner_id) too
+  { table: "meetings", label: "פגישות" },
 ] as const;
 
 export default async function TransferRecordsPage({ params }: Props) {
@@ -43,8 +46,9 @@ export default async function TransferRecordsPage({ params }: Props) {
   const supabase = await createClient();
   const counts = await Promise.all(
     KINDS.map(async (k) => {
-      const { count } = await supabase.from(k.table).select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("owner_id", userId);
-      return { ...k, count: count ?? 0 };
+      const result = await supabase.from(k.table).select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("owner_id", userId);
+      must(result, `transfer count ${k.table}`);
+      return { ...k, count: result.count ?? 0 };
     }),
   );
   const total = counts.reduce((sum, c) => sum + c.count, 0);
@@ -56,7 +60,7 @@ export default async function TransferRecordsPage({ params }: Props) {
     <>
       <PageHeader
         title={`העברת הרשומות של ${person.name}`}
-        description={`כל מה שבבעלות ${person.name} עובר למשתמש אחר: לידים, אנשי קשר, חברות ועסקאות (גם בסל המחזור), ומשימות.`}
+        description={`כל מה שבבעלות ${person.name} עובר למשתמש אחר: לידים, אנשי קשר, חברות ועסקאות (גם בסל המחזור), משימות ופגישות.`}
         back={back}
       />
       <Card className="max-w-xl">
