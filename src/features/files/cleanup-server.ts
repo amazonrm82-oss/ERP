@@ -4,7 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { createServiceClient } from "@/lib/supabase/service";
 
-import { FILES_BUCKET } from "./types";
+import { groupOrphans } from "./orphans";
 
 const json = (status: number, body: Record<string, unknown>) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -18,7 +18,9 @@ function sameSecret(given: string, expected: string): boolean {
 /**
  * Called by the database (app.cleanup_files, through pg_net) at night. Not a user
  * request: it carries the shared secret of the push dispatcher, and uses the
- * service role only to claim paths of deleted file rows and remove those objects.
+ * service role only to claim paths of deleted file rows and of the profile photos
+ * of deleted accounts (USR-01), and remove those objects. Objects are removed only
+ * from the buckets in CLEANUP_BUCKETS.
  */
 export async function cleanupFiles(request: Request): Promise<Response> {
   const secret = process.env.PUSH_DISPATCH_SECRET?.trim();
@@ -29,17 +31,18 @@ export async function cleanupFiles(request: Request): Promise<Response> {
 
   let removed = 0;
   for (let round = 0; round < 10; round++) {
-    const { data, error } = await supabase.rpc("claim_orphan_files", { p_limit: 500 });
+    const { data, error } = await supabase.rpc("claim_orphan_objects", { p_limit: 500 });
     if (error) return json(500, { error: "claim failed", removed });
-    const paths = Array.isArray(data) ? data.filter((p): p is string => typeof p === "string") : [];
-    if (paths.length === 0) break;
-    for (let i = 0; i < paths.length; i += 100) {
-      const chunk = paths.slice(i, i + 100);
-      // an object that is already gone counts as done
-      const { error: removeError } = await supabase.storage.from(FILES_BUCKET).remove(chunk);
-      if (removeError) continue; // claimed again in an hour
-      await supabase.rpc("finish_orphan_files", { p_paths: chunk });
-      removed += chunk.length;
+    if (!Array.isArray(data) || data.length === 0) break;
+    for (const [bucket, paths] of groupOrphans(data)) {
+      for (let i = 0; i < paths.length; i += 100) {
+        const chunk = paths.slice(i, i + 100);
+        // an object that is already gone counts as done
+        const { error: removeError } = await supabase.storage.from(bucket).remove(chunk);
+        if (removeError) continue; // claimed again in an hour
+        await supabase.rpc("finish_orphan_files", { p_paths: chunk });
+        removed += chunk.length;
+      }
     }
   }
   return json(200, { removed });

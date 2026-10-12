@@ -15,9 +15,10 @@ import { getSupabaseEnv } from "@/lib/env";
  *   the database with a shared secret. It calls public.claim_push_notifications()
  *   and reads and prunes push_subscriptions;
  * - the file cleanup (src/features/files/cleanup-server.ts), woken by the
- *   database at night with the same secret. It calls public.claim_orphan_files()
+ *   database at night with the same secret. It calls public.claim_orphan_objects()
  *   and public.finish_orphan_files(), and removes those objects from the
- *   'record-files' bucket.
+ *   'record-files' bucket (files of deleted rows) or the 'avatars' bucket (photos
+ *   of deleted accounts and replaced photos), and from no other bucket.
  * Never import this from code that serves a signed-in user.
  * Returns null when the key is not configured.
  */

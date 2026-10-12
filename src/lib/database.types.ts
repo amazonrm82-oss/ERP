@@ -1222,6 +1222,8 @@ export type Database = {
       };
       // stored files of deleted rows (migration 0021), service role only
       claim_orphan_files: { Args: { p_limit?: number }; Returns: Json };
+      // every bucket (USR-01, migration avatar_cleanup): [{ bucket, path }]
+      claim_orphan_objects: { Args: { p_limit?: number }; Returns: Json };
       finish_orphan_files: { Args: { p_paths: string[] }; Returns: number };
       run_automation_now: {
         Args: { p_automation_id: string; p_entity_id: string };
