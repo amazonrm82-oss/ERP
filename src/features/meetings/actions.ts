@@ -302,7 +302,7 @@ export async function deleteMeetingAction(orgId: string, meetingId: string, subj
     return fail(dbErrorMessage(error, "לא הצלחנו למחוק את הפגישה. נסו שוב."));
   }
   if (data.length === 0) {
-    return fail("אי אפשר למחוק את הפגישה. מוחק אותה מי שקבע אותה, או מנהל. אפשר לסמן אותה כ\"בוטלה\".");
+    return fail("אי אפשר למחוק את הפגישה. רק מי שקבע אותה, מנהל הצוות של המארגן או מנהל העסק יכולים למחוק אותה. אפשר לסמן אותה כ\"בוטלה\".");
   }
   revalidateSubject(orgId, subject);
   return ok();

@@ -503,10 +503,11 @@ describe("roles and record visibility", () => {
     const byViewer = await pgError(asUser(viewer.id, (q) => q(meetingSql, [org, "x", null])));
     expect(byViewer.code).toBe("42501");
 
-    // the record's editors edit its meetings; others do not
+    // the record's editors edit its meetings; others do not. The manager of the
+    // organizer's team edits the internal one too (owner's answer, 12 October 2026; 0097)
     await asUser(manager.id, async (q) => {
       expect((await q("update public.meetings set outcome = 'סוכם המשך' where id = $1", [onLead.id])).rowCount).toBe(1);
-      expect((await q("update public.meetings set outcome = 'x' where id = $1", [internal])).rowCount).toBe(0);
+      expect((await q("update public.meetings set outcome = 'x' where id = $1", [internal])).rowCount).toBe(1);
     });
     await asUser(m2.id, async (q) => {
       expect((await q("update public.meetings set status = 'held' where id = $1", [onLead.id])).rowCount).toBe(0);
