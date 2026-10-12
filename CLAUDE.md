@@ -306,6 +306,9 @@ that back.
 - Entry (LND-01/06/07/08): `/` is the public landing page (`paths.landing`); the business picker is `/app`
   (`paths.home`). The proxy sends a signed-in visitor of `/` to `/app`; the installed app starts at `/app`
   (manifest `id` stays `/`), and the landing page opened inside it goes to `/login`.
+- Managed lists (owner's rule, 12 October 2026): every list an organization manages (types, reasons, statuses and the like)
+  starts with default values the business can rename or delete. `create_organization()` seeds them; there is no "add the
+  suggested values" button. A new list ships with its defaults and seeds organizations whose list is still empty.
 - Record types (FXC-06): `src/lib/record-types.ts` (`RECORD_TYPES`, `isRecordType`, `recordPage`) says each
   type's table, pages, Hebrew names and features. Use it instead of a local map; a new type is added there.
 - Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with
