@@ -45,6 +45,8 @@ export function Button({ variant = "primary", size = "md", className, type = "bu
       className={buttonClasses(variant, size, className)}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
+      // lets a Dialog find it after it opens (React's autoFocus cannot focus inside a closed <dialog>)
+      data-autofocus={props.autoFocus || undefined}
       {...props}
     >
       {loading ? <SpinnerIcon className="size-4" /> : null}

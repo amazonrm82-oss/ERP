@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import type { FieldDefinition } from "@/features/custom-fields/types";
@@ -37,6 +38,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
+      <FormGuard state={state} />
       <FormError message={failure?.message} />
       {errors.allow_duplicate ? (
         <div className="space-y-2 rounded-md border border-line p-3">

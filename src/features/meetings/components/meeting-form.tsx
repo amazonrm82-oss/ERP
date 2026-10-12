@@ -7,6 +7,7 @@ import { DateField } from "@/components/ui/date-picker";
 import { FormError } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { TimelineSubject } from "@/features/activities/schema";
 
 import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
@@ -68,6 +69,7 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
 
   return (
     <form action={formAction} onChange={() => setChangedAfter(state)} className="space-y-4" noValidate>
+      <FormGuard state={state} />
       <FormError message={failure && !failure.fieldErrors && !failure.conflicts ? failure.message : null} />
       <TextField
         label="כותרת"

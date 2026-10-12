@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { AttributionRow } from "@/features/intake/attribution";
@@ -118,6 +119,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
       <CardHeader id="lead-details-title" title="עריכת פרטי הליד" />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
+          <FormGuard state={state} />
           <FormError message={failure?.message} />
           <TextField
             label="שם מלא"

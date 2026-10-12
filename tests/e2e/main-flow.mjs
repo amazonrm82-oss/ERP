@@ -709,6 +709,18 @@ try {
   await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
   await ownerDesk.getByLabel("עיר").fill("חיפה");
   await ownerDesk.getByLabel("אתר").fill("cohen.co.il");
+  {
+    // REC-11: leaving the edited card through the menu asks first; "להישאר" keeps the page and the typed values
+    const companyUrl = ownerDesk.url();
+    await ownerDesk.getByRole("link", { name: "לידים", exact: true }).filter({ visible: true }).first().click({ timeout: 10000 });
+    const leave = ownerDesk.getByRole("dialog", { name: "יש שינויים שלא נשמרו" });
+    await leave.waitFor({ timeout: 5000 });
+    await shot(ownerDesk, "20a-unsaved-changes-1280");
+    await leave.getByRole("button", { name: "להישאר" }).click();
+    await leave.waitFor({ state: "detached", timeout: 5000 });
+    if (ownerDesk.url() !== companyUrl) throw new Error("REC-11: the page was left although the user chose to stay");
+    if ((await ownerDesk.getByLabel("עיר").inputValue()) !== "חיפה") throw new Error("REC-11: the typed value was lost");
+  }
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await ownerDesk.getByRole("link", { name: "cohen.co.il" }).waitFor({ timeout: 15000 });
   await shot(ownerDesk, "20-company-1280");

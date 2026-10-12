@@ -7,7 +7,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Calendar, DateField } from "@/components/ui/date-picker";
-import { Dialog } from "@/components/ui/dialog";
+import { Dialog, LeaveDialog } from "@/components/ui/dialog";
 import { EmptyState, FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, Switch, TextareaField, TextField } from "@/components/ui/field";
 import * as Icons from "@/components/ui/icons";
@@ -18,6 +18,7 @@ import { ListSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { ListCard, ListCards, Table, Td, Th, Tr } from "@/components/ui/table";
 import { TextLink } from "@/components/ui/text-link";
 import { ToastProvider, ToastView, useToast } from "@/components/ui/toast";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
 import { holidaysOn } from "@/features/calendar-days/holidays";
@@ -207,6 +208,10 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         </Dialog>
       </Section>
 
+      <Section title="שינויים שלא נשמרו">
+        <UnsavedSample prefix={p("unsaved")} />
+      </Section>
+
       <Section title="בורר תאריך">
         <Card className="max-w-sm p-4">
           <Calendar selected={day} today="2026-10-09" onPick={setDay} onClear={() => setDay("")} />
@@ -296,5 +301,35 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         <ListSkeleton rows={2} />
       </Section>
     </div>
+  );
+}
+
+/** REC-11: a guarded form; change the name and follow the link, or open the warning itself. */
+function UnsavedSample({ prefix }: { prefix: string }) {
+  const [saved, setSaved] = useState<{ ok: true } | null>(null);
+  const [asking, setAsking] = useState(false);
+  return (
+    <Card className="max-w-sm p-4">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSaved({ ok: true });
+        }}
+      >
+        <FormGuard state={saved} />
+        <TextField label="שם" name={`${prefix}-name`} defaultValue="דנה כהן" hint="שנו את השם ולחצו על הקישור: נשאל לפני היציאה." />
+        <TextLink href="/admin" className="self-start">מעבר לדף אחר</TextLink>
+        <Row>
+          <Button type="submit" size="sm">
+            שמירה
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>
+            הצגת האזהרה
+          </Button>
+        </Row>
+      </form>
+      {asking ? <LeaveDialog onStay={() => setAsking(false)} onLeave={() => setAsking(false)} /> : null}
+    </Card>
   );
 }

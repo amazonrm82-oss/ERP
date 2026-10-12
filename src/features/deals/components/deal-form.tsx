@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
@@ -38,6 +39,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
+      <FormGuard state={state} />
       <FormError message={failure?.message} />
       <TextField
         label="שם העסקה"

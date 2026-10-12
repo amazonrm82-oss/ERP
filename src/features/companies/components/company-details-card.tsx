@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import { INDUSTRIES } from "@/features/onboarding/options";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
@@ -101,6 +102,7 @@ function CompanyEditForm({ orgId, company, types, onDone }: { orgId: string; com
       <CardHeader id="company-details-title" title="עריכת פרטי החברה" />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
+          <FormGuard state={state} />
           <FormError message={failure?.message} />
           <CompanyFields values={failure?.values ?? company} errors={failure?.fieldErrors ?? {}} types={types} legacyType={company.company_type} />
           <CustomFieldInputs

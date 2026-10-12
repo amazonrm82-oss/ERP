@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { CompanyOption } from "@/features/companies/queries";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
@@ -104,6 +105,7 @@ function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps
       <CardHeader id="contact-details-title" title="עריכת איש הקשר" />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
+          <FormGuard state={state} />
           <FormError message={failure?.message} />
           <ContactFields values={failure?.values ?? contact} errors={failure?.fieldErrors ?? {}} companies={companies}
             types={types}
