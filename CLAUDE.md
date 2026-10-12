@@ -365,7 +365,7 @@ file wins.
   another, without waiting for approval between them. Each change stays small and reviewable: one
   requirement, all four checks green, migration applied and verified (hard rule 3), then push.
   Since 12 October 2026 a few requirements may be built at the same time by workers, under the rules
-  of "Parallel work" below; each one still lands on `main` on its own, in order.
+  of "Parallel work" below; each one still lands on `main` as its own commit, in order.
 - When a wave is done, add the next wave to the backlog and continue (1 to 6; chapter 17.6 of the
   additions spec lists the chapter 18–19 requirements per wave). What depends on a provider the owner
   has not chosen is built behind the provider layer with a fake provider and tests; the real adapter
@@ -400,11 +400,19 @@ Owner's decision, 12 October 2026: build faster with a few agents at once, on th
 result is no worse than building one requirement at a time. Parallel work is a tool, not a goal.
 Everything above still applies to every agent. The lanes are in `docs/BACKLOG.md` ("מסלולים לעבודה מקבילה").
 
-**One lead, at most three workers.**
+**One lead, three lane workers and one shared-ground worker** (the fourth worker and the batch merging
+below: owner's decision of the evening of 12 October 2026, after the first day showed finished branches
+waiting up to three hours for their merge).
 
 - The lead is the session the owner talks to. Only the lead merges into `main`, pushes, uses the
   Supabase connector, edits `CLAUDE.md` and `docs/`, marks the backlog, and talks to the owner.
-- A worker is a subagent with one requirement (or a short chain in one area) from one lane. It works in
+- The lead integrates. While finished branches are waiting it does not build: the shared-ground
+  queue in `docs/BACKLOG.md` (lane ד: the requirements listed as shared ground and the follow-ups left
+  by merged requirements) belongs to the fourth worker, one item at a time.
+- A lane holds at most two finished branches that are not merged yet. A worker whose lane is at that
+  limit takes nothing new until one of them lands: work that cannot be merged only goes stale.
+- A worker is a subagent with one requirement from one lane, or a chain of up to three small
+  requirements of the same area in one branch, one commit per requirement. It works in
   its own git worktree on a branch `lane/<lane>-<id>` cut from the current `main`, with its own
   `npm ci` and its own throwaway database: a different `TEST_DB_PORT`, `TEST_DB_DIR` and
   `TEST_DATABASE_URL` per worker (the database name still ends in `_test`). Two agents never share a
@@ -440,19 +448,33 @@ tested, questions. A worker that needs shared ground says so instead of changing
 free number it sees. Before merging, the lead renames it to come after everything on `main`, so the
 order of names, the order of merges and the order of applying to the hosted project are the same.
 
-**Merging, one branch at a time (the lead).**
+**Merging: one queue, in small batches (the lead).**
 
-1. Rebase the branch on `main`, renumber its migrations, settle conflicts.
-2. Run `lint`, `typecheck`, `build`, `test:db` and `test:unit` on the rebased branch. The worker's
-   report is not evidence; the lead's own run is.
-3. Read the whole diff. A branch with a migration, or one that touches policies, grants, a
-   `security definer` function, auth or the service-role key, is also reviewed by a fresh subagent
-   that did not write it and is given the diff and this file, not the worker's summary. A new table
-   needs `policy-mutation-sweep` with 0 missed.
-4. Merge so that each requirement stays one commit, apply its migration to the hosted project and
-   verify it (hard rule 3, Migrations), then push. The next merge waits until CI is green on `main`.
-5. A branch that fails goes back to its worker with the failure, or is fixed by the lead. A test, a
-   guard or a policy is never weakened to get a branch in.
+1. Review happens while a branch waits, not when its turn comes. As soon as a worker reports, a branch
+   with a migration, or one that touches policies, grants, a `security definer` function, auth or the
+   service-role key, goes to a fresh subagent that did not write it and is given the diff and this
+   file, not the worker's summary. For a new table that reviewer also runs `policy-mutation-sweep`
+   (0 missed) in the branch's worktree. Findings go back to the worker before the branch is merged.
+2. A batch is up to three waiting branches, oldest first, from different lanes, that pass the
+   side-by-side test above (different feature folders, different database objects). Rebase them on
+   `main` one after another in queue order, renumber their migrations in that order, settle conflicts.
+   If settling a conflict changed reviewed code in a migration, a policy or a grant, that part is
+   reviewed again, and the sweep is rerun for a table whose migration or tests changed.
+3. Run `lint`, `typecheck`, `build`, `test:db` and `test:unit` once, on the combined result. The
+   workers' reports are not evidence; the lead's own run is, and it is a run of exactly what will be
+   on `main`. Read every diff in the batch.
+4. If a check fails, do not debug the batch: merge its branches one at a time instead, so the failing
+   one is found and the others go in. The failing branch goes back to its worker with the failure, or
+   is fixed by the lead. A test, a guard or a policy is never weakened to get a branch in.
+5. Keep each requirement as one commit. Apply the batch's migrations to the hosted project in name
+   order and verify each one (hard rule 3, Migrations); run the advisors once after the last. Then push
+   once: the requirement commits together with one commit that marks the backlog and the decisions for
+   the whole batch. The next batch waits until CI is green on `main`.
+6. Merged alone, never in a batch: a shared-ground branch (lane ד), and a branch that changes anything
+   on the shared-ground list. It lands before any lane builds on it.
+7. A branch whose migration the owner must run by hand (the connector stop, see Migrations) steps out
+   of the queue until he confirms it ran. The queue goes on without it.
 
-**Back to one at a time** when `main` is red, when two merges in a row needed hand repairs in the same
-files, when what is left is all shared ground, or when the usage limit is close. Say so to the owner.
+**Back to one at a time** (batches of one, or no workers at all) when `main` is red, when two batches
+in a row failed their checks, when two merges in a row needed hand repairs in the same files, when
+what is left is all shared ground, or when the usage limit is close. Say so to the owner.
