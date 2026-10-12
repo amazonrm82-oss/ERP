@@ -369,11 +369,21 @@ try {
   await statusSheet.getByRole("button", { name: "שמירה", exact: true }).click();
   await recordMeetings.getByText("הלקוח לא הגיע", { exact: true }).waitFor();
 
-  step("calendar: the meeting is on today's day view and moves to 12:30 with the 'move' form, keeping its hour (CAL-02)");
+  step("calendar: the no-show meeting is hidden until 'show what was done or cancelled' is on, then moves to 12:30 with the 'move' form, keeping its hour (CAL-02)");
   const leadUrlForCalendar = owner.url();
   await owner.goto(`${orgUrl}/calendar?view=day`);
   await owner.getByRole("heading", { name: /^יומן$/ }).waitFor();
   await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^יום$/ }).waitFor();
+  const doneSwitch = owner.getByRole("switch", { name: /^הצגת מה שבוצע או בוטל$/ });
+  if ((await doneSwitch.getAttribute("aria-checked")) !== "false") throw new Error("the calendar shows done and cancelled items by default");
+  if ((await owner.getByRole("button", { name: /פגישה: .*פגישת היכרות/ }).count()) !== 0) throw new Error("a no-show meeting is on the calendar while the switch is off");
+  // the board may still be hydrating on a cold dev server: press again until the address changes
+  for (let tries = 0; tries < 5 && !/[?&]done=1/.test(owner.url()); tries++) {
+    await doneSwitch.click();
+    await owner.waitForURL(/[?&]done=1/, { timeout: 3000 }).catch(() => {});
+  }
+  if (!/[?&]done=1/.test(owner.url())) throw new Error("the done switch did not put done=1 in the address");
+  await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^סדר יום$/ }).and(owner.locator('[href*="done=1"]')).waitFor();
   const moveSheet = owner.getByRole("dialog", { name: /פגישת היכרות/ });
   // the board may still be hydrating on a cold dev server: click again until the sheet opens
   for (let tries = 0; tries < 5 && !(await moveSheet.isVisible()); tries++) {
@@ -388,13 +398,13 @@ try {
     [leadIdNow],
   );
   if (calMoved.at !== "12:30" || calMoved.secs !== 3600) throw new Error(`the meeting did not move to 12:30 keeping an hour: ${JSON.stringify(calMoved)}`);
-  await owner.goto(`${orgUrl}/calendar?view=agenda`);
+  await owner.goto(`${orgUrl}/calendar?view=agenda&done=1`);
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the calendar scrolls sideways at 360px");
   await shot(owner, "03a-calendar-agenda-360");
 
   step("team calendar: side by side on a phone is one person at a time, starting with me (CAL-04)");
-  await owner.goto(`${orgUrl}/calendar?view=people`);
+  await owner.goto(`${orgUrl}/calendar?view=people&done=1`);
   await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^זה לצד זה$/ }).waitFor();
   await owner.getByRole("combobox", { name: /^היומן של$/ }).waitFor();
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();

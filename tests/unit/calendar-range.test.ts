@@ -4,12 +4,16 @@ import { moveTargetSchema } from "@/features/calendar/schema";
 import {
   calendarPath,
   daySegments,
+  HIDDEN_MEETING_STATUSES,
+  HIDDEN_TASK_STATUSES,
+  isDoneOrCancelled,
   isOnDay,
   itemsOnDay,
   layoutColumns,
   minutesToTime,
   movedEnd,
   parseDay,
+  parseShowDone,
   parseView,
   rangeBounds,
   snapMinutes,
@@ -41,6 +45,32 @@ describe("calendar URL (CAL-02)", () => {
     expect(calendarPath("o1")).toBe("/o/o1/calendar");
     expect(calendarPath("o1", { view: "week", date: "2026-10-12" })).toBe("/o/o1/calendar?view=week&date=2026-10-12");
     expect(calendarPath("o1", { who: "all" })).toBe("/o/o1/calendar?who=all");
+  });
+
+  it("keeps the done switch (done=1) and reads it back", () => {
+    expect(calendarPath("o1", { done: false })).toBe("/o/o1/calendar");
+    expect(calendarPath("o1", { done: true })).toBe("/o/o1/calendar?done=1");
+    const path = calendarPath("o1", { view: "people", date: "2026-10-12", team: "t1", people: ["u1", "u2"], done: true });
+    expect(path).toBe("/o/o1/calendar?view=people&date=2026-10-12&team=t1&p=u1&p=u2&done=1");
+    const params = new URLSearchParams(path.split("?")[1]);
+    expect(parseShowDone(params.get("done") ?? undefined)).toBe(true);
+    expect(params.getAll("p")).toEqual(["u1", "u2"]);
+    expect(parseShowDone(new URLSearchParams(calendarPath("o1", { who: "all" }).split("?")[1]).get("done") ?? undefined)).toBe(false);
+    for (const value of [undefined, "", "0", "true", "yes", "11"]) expect(parseShowDone(value)).toBe(false);
+  });
+
+  it("hides done tasks and cancelled or no-show meetings, not held ones (owner, 12 October 2026)", () => {
+    expect(isDoneOrCancelled("task", "done")).toBe(true);
+    expect(isDoneOrCancelled("task", "open")).toBe(false);
+    expect(isDoneOrCancelled("meeting", "cancelled")).toBe(true);
+    expect(isDoneOrCancelled("meeting", "no_show")).toBe(true);
+    expect(isDoneOrCancelled("meeting", "held")).toBe(false);
+    expect(isDoneOrCancelled("meeting", "planned")).toBe(false);
+    // statuses of the other kind do not leak across
+    expect(isDoneOrCancelled("meeting", "done")).toBe(false);
+    expect(isDoneOrCancelled("task", "cancelled")).toBe(false);
+    expect([...HIDDEN_MEETING_STATUSES]).toEqual(["cancelled", "no_show"]);
+    expect([...HIDDEN_TASK_STATUSES]).toEqual(["done"]);
   });
 });
 

@@ -5,7 +5,7 @@ import { must } from "@/lib/db-read";
 import type { RecordType } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
-import type { TimedItem } from "./range";
+import { HIDDEN_MEETING_STATUSES, HIDDEN_TASK_STATUSES, type TimedItem } from "./range";
 import type { CalendarTeam, TeamMembership } from "./team";
 
 export type CalendarItem = TimedItem & {
@@ -43,12 +43,15 @@ function relatedOf(row: Linked): CalendarItem["related"] {
  * picks) or for everyone (`people` null). A meeting belongs to a person when
  * they organize it or take part in it; a task when it is assigned to them.
  * Each item says which of the people it belongs to. Cancelled tasks and tasks
- * in the recycle bin are left out.
+ * in the recycle bin are left out. Done tasks and cancelled / no-show meetings
+ * are left out too unless `showDone` (CAL-02); they are filtered in the query,
+ * so CALENDAR_LIMIT counts only what is shown.
  */
 export async function listCalendarItems(
   orgId: string,
   range: { from: string; to: string },
   people: string[] | null,
+  showDone = false,
 ): Promise<{ items: CalendarItem[]; truncated: boolean }> {
   if (people && people.length === 0) return { items: [], truncated: false };
   const supabase = await createClient();
@@ -62,16 +65,18 @@ export async function listCalendarItems(
     .gte("due_at", range.from)
     .lt("due_at", range.to);
   if (people) taskQuery = taskQuery.in("owner_id", people);
+  if (!showDone) taskQuery = taskQuery.not("status", "in", `(${HIDDEN_TASK_STATUSES.join(",")})`);
+
+  let meetingQuery = supabase
+    .from("meetings")
+    .select("id, title, meeting_type, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id")
+    .eq("organization_id", orgId)
+    .lt("starts_at", range.to)
+    .gt("ends_at", range.from);
+  if (!showDone) meetingQuery = meetingQuery.not("status", "in", `(${HIDDEN_MEETING_STATUSES.join(",")})`);
 
   const [meetingResult, taskResult] = await Promise.all([
-    supabase
-      .from("meetings")
-      .select("id, title, meeting_type, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id")
-      .eq("organization_id", orgId)
-      .lt("starts_at", range.to)
-      .gt("ends_at", range.from)
-      .order("starts_at")
-      .limit(CALENDAR_LIMIT + 1),
+    meetingQuery.order("starts_at").limit(CALENDAR_LIMIT + 1),
     taskQuery.order("due_at").limit(CALENDAR_LIMIT + 1),
   ]);
   const meetingRows = must(meetingResult, "calendar meetings");

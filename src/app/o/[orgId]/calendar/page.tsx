@@ -8,8 +8,22 @@ import { BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 import { CalendarBoard, type CalendarEntry } from "@/features/calendar/components/calendar-board";
+import { CalendarDoneToggle } from "@/features/calendar/components/done-toggle";
 import { CALENDAR_LIMIT, listCalendarItems, listCalendarTeams, type CalendarItem } from "@/features/calendar/queries";
-import { calendarPath, CALENDAR_VIEWS, parseDay, parseView, rangeBounds, stepDay, viewDays, viewTitle, VIEW_LABEL, type CalendarQuery } from "@/features/calendar/range";
+import {
+  calendarPath,
+  CALENDAR_VIEWS,
+  isDoneOrCancelled,
+  parseDay,
+  parseShowDone,
+  parseView,
+  rangeBounds,
+  stepDay,
+  viewDays,
+  viewTitle,
+  VIEW_LABEL,
+  type CalendarQuery,
+} from "@/features/calendar/range";
 import { parsePeople, pickPeople, PEOPLE_MAX, teammatesOf, teamPeople, visibleTeams } from "@/features/calendar/team";
 import { holidaysByDay } from "@/features/calendar-days/holidays";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
@@ -42,7 +56,7 @@ function entry(orgId: string, item: CalendarItem): CalendarEntry {
     kindLabel: meeting ? "פגישה" : "משימה",
     typeLabel: (meeting ? MEETING_TYPE_LABEL[item.type] : TASK_TYPE_LABEL[item.type]) ?? item.type,
     statusLabel: (meeting ? MEETING_STATUS_LABEL[item.status] : TASK_STATUS_LABEL[item.status]) ?? item.status,
-    closed: meeting ? item.status === "cancelled" || item.status === "no_show" : item.status === "done",
+    closed: isDoneOrCancelled(item.kind, item.status),
     ownerName: item.ownerName,
     location: item.location,
     related: item.related ? { href: recordPage(item.related.type, orgId, item.related.id), label: RELATED_LABEL[item.related.type] } : null,
@@ -58,6 +72,8 @@ function entry(orgId: string, item: CalendarItem): CalendarEntry {
  * means the whole team), and the side-by-side view shows a day with a column
  * per person (`p`, or a default). Items are read with the user's session, so
  * a column shows only what the user may already see.
+ * Done tasks and cancelled / no-show meetings are hidden unless `done=1`
+ * (owner, 12 October 2026); the switch keeps it on every link.
  */
 export default async function CalendarPage({ params, searchParams }: Props) {
   const { orgId } = await params;
@@ -69,6 +85,9 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   const requestedView = parseView(firstParam(query.view));
   const view = requestedView ?? "week";
   const day = parseDay(firstParam(query.date), today);
+  const showDone = parseShowDone(firstParam(query.done));
+  // `done` rides along on every link of the screen
+  const done = showDone || undefined;
 
   const [allMembers, teamData] = await Promise.all([listMembers(orgId), listCalendarTeams(orgId)]);
   const members = allMembers.filter((member) => member.status === "active").map((member) => ({ id: member.userId, name: member.name }));
@@ -81,15 +100,15 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   const teammate = pool.find((member) => member.id === whoParam && member.id !== me);
   // "who" on links: undefined = mine (or the whole team when a team is chosen)
   const who = teammate ? teammate.id : whoParam === "all" && !team ? "all" : undefined;
-  const scope: Pick<CalendarQuery, "who" | "team"> = { who, team: team?.id };
+  const scope: Pick<CalendarQuery, "who" | "team" | "done"> = { who, team: team?.id, done };
 
   const side = view === "people" ? pickPeople({ requested: parsePeople(query.p), pool, me, teammates: teammatesOf(me, teamData.memberships), teamChosen: team !== null }) : null;
   // whose items to read; null = everyone the user can see
   const people = side ? side.people.map((p) => p.id) : teammate ? [teammate.id] : team ? pool.map((p) => p.id) : who === "all" ? null : [me];
-  const linkScope: CalendarQuery = view === "people" ? { team: team?.id, people: parsePeople(query.p).length > 0 ? side?.people.map((p) => p.id) : undefined } : scope;
+  const linkScope: CalendarQuery = view === "people" ? { team: team?.id, people: parsePeople(query.p).length > 0 ? side?.people.map((p) => p.id) : undefined, done } : scope;
 
   const days = viewDays(view, day);
-  const { items, truncated } = await listCalendarItems(orgId, rangeBounds(days, timeZone), people);
+  const { items, truncated } = await listCalendarItems(orgId, rangeBounds(days, timeZone), people, showDone);
   const entries = items.map((item) => entry(orgId, item));
   const holidays = Object.fromEntries(holidaysByDay(days[0], days[days.length - 1]));
 
@@ -115,7 +134,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         label="תצוגת היומן"
         className="mb-4"
         items={CALENDAR_VIEWS.map((option) => ({
-          href: calendarPath(orgId, { view: option, date: day === today ? undefined : day, ...(option === "people" || view === "people" ? { team: team?.id } : scope) }),
+          href: calendarPath(orgId, { view: option, date: day === today ? undefined : day, ...(option === "people" || view === "people" ? { team: team?.id, done } : scope) }),
           label: VIEW_LABEL[option],
           current: option === view,
         }))}
@@ -140,6 +159,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         <Form action={calendarPath(orgId)} className="flex flex-wrap items-end gap-2">
           {requestedView ? <input type="hidden" name="view" value={requestedView} /> : null}
           {day !== today ? <input type="hidden" name="date" value={day} /> : null}
+          {showDone ? <input type="hidden" name="done" value="1" /> : null}
           {teams.length > 0 ? (
             <SelectField label="צוות" name="team" defaultValue={team?.id ?? ""} className="min-w-0 w-44">
               <option value="">{view === "people" ? "כולם" : "בלי סינון לפי צוות"}</option>
@@ -175,6 +195,14 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         </Form>
       </div>
 
+      <div className="mb-4">
+        <CalendarDoneToggle
+          checked={showDone}
+          onHref={calendarPath(orgId, { view: requestedView ?? undefined, date: day === today ? undefined : day, ...linkScope, done: true })}
+          offHref={calendarPath(orgId, { view: requestedView ?? undefined, date: day === today ? undefined : day, ...linkScope, done: undefined })}
+        />
+      </div>
+
       {side ? (
         <details className="mb-4 rounded-lg border border-line bg-surface">
           <summary className="flex min-h-11 cursor-pointer items-center px-4 text-md font-medium">
@@ -184,6 +212,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
             <input type="hidden" name="view" value="people" />
             {day !== today ? <input type="hidden" name="date" value={day} /> : null}
             {team ? <input type="hidden" name="team" value={team.id} /> : null}
+            {showDone ? <input type="hidden" name="done" value="1" /> : null}
             <fieldset>
               <legend className="mb-2 text-sm text-ink-soft">עד {formatNumber(PEOPLE_MAX)} אנשים{team ? ` מצוות ${team.name}` : ""}.</legend>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

@@ -69,8 +69,8 @@ type Props = {
   timeZone: string;
   // UI hint: the database decides who may move what
   canMove: boolean;
-  // whose calendar (the "who" and "team" of the URL), kept on links
-  scope: Pick<CalendarQuery, "who" | "team">;
+  // whose calendar (the "who" and "team" of the URL) and `done`, kept on links
+  scope: Pick<CalendarQuery, "who" | "team" | "done">;
   // the side-by-side view: a column per person (CAL-04)
   people: CalendarPerson[];
   // no view in the URL: a phone switches to the agenda

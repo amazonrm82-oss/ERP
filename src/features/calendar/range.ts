@@ -222,7 +222,25 @@ export type CalendarQuery = {
   // CAL-04: a team id, and the people of the side-by-side view (repeated `p`)
   team?: string;
   people?: string[];
+  // CAL-02: also show done tasks and cancelled / no-show meetings (`done=1`)
+  done?: boolean;
 };
+
+/** `done=1` in the URL: the calendar also shows what was done or cancelled. Anything else: hidden. */
+export function parseShowDone(value: string | undefined): boolean {
+  return value === "1";
+}
+
+// CAL-02 (owner, 12 October 2026): hidden from the calendar unless `done=1`;
+// they stay everywhere else. A held meeting keeps showing.
+export const HIDDEN_MEETING_STATUSES = ["cancelled", "no_show"] as const;
+export const HIDDEN_TASK_STATUSES = ["done"] as const;
+
+/** True for a done task or a cancelled / no-show meeting (hidden by default, struck through when shown). */
+export function isDoneOrCancelled(kind: TimedItem["kind"], status: string): boolean {
+  const hidden: readonly string[] = kind === "meeting" ? HIDDEN_MEETING_STATUSES : HIDDEN_TASK_STATUSES;
+  return hidden.includes(status);
+}
 
 /** The calendar screen; the view, the day and whose calendar travel in the query string. */
 export function calendarPath(orgId: string, query?: CalendarQuery): string {
@@ -234,6 +252,7 @@ export function calendarPath(orgId: string, query?: CalendarQuery): string {
   if (query.who) params.set("who", query.who);
   if (query.team) params.set("team", query.team);
   for (const person of query.people ?? []) params.append("p", person);
+  if (query.done) params.set("done", "1");
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
 }
