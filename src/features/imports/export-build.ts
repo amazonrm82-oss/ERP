@@ -102,6 +102,8 @@ export const LOOKUPS: Record<string, string> = {
   company_id: "company",
   contact_id: "contact",
   deal_id: "deal",
+  // DEAL-11: the deal a follow-up continues
+  previous_deal_id: "previous_deal",
   meeting_id: "meeting",
   team_id: "team",
   type_id: "type",

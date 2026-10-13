@@ -25,7 +25,9 @@ import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { DealSnoozeForm } from "@/features/deals/components/deal-snooze-form";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
-import { getDeal } from "@/features/deals/queries";
+import { getDeal, getDealLinks, listPipelines } from "@/features/deals/queries";
+import { DealContinuationCard } from "@/features/deals/components/deal-continuation-card";
+import { skippedNotice } from "@/features/deals/copy";
 import { stageTone } from "@/features/deals/stage-colors";
 import { isSnoozed } from "@/features/deals/snooze";
 import { getStuckDeals } from "@/features/deals/stuck";
@@ -49,11 +51,12 @@ export const metadata: Metadata = { title: "עסקה" };
 type Props = {
   params: Promise<{ orgId: string; dealId: string }>;
   // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[] }>;
+  // DEAL-11: copy_fields = the custom fields a copy left out (keys, or "all")
+  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[]; copy_fields?: string | string[] }>;
 };
 
 export default async function DealPage({ params, searchParams }: Props) {
-  const [{ orgId, dealId }, { tl, edit }] = await Promise.all([params, searchParams]);
+  const [{ orgId, dealId }, { tl, edit, copy_fields: copyFields }] = await Promise.all([params, searchParams]);
   // DQL-01: open the details for editing at this input
   const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
@@ -82,6 +85,13 @@ export default async function DealPage({ params, searchParams }: Props) {
     calendar,
     context.user.id,
   );
+  // DEAL-11: the deal this one continues and its follow-ups; the pipelines for a new deal (writers only)
+  const [links, pipelines] = await Promise.all([
+    getDealLinks(orgId, deal.id, deal.previous_deal_id),
+    context.canWrite ? listPipelines(orgId) : Promise.resolve(null),
+  ]);
+  // DEAL-11: right after a copy, the custom fields it could not carry
+  const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
   const today = zoneDate(new Date(), context.org.timeZone);
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
@@ -105,6 +115,11 @@ export default async function DealPage({ params, searchParams }: Props) {
         }
       />
 
+      {copyNotice ? (
+        <p role="status" className="mb-4 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          {copyNotice}
+        </p>
+      ) : null}
       {attention && (attention.stuck || attention.noNextStep) ? (
         <p role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
           <span className="font-semibold">{attention.stuck ? "העסקה תקועה:" : "אין צעד הבא:"}</span>
@@ -216,6 +231,13 @@ export default async function DealPage({ params, searchParams }: Props) {
               dealContacts.map((item) => item.contactId),
               deal.contact_id,
             )}
+          />
+
+          <DealContinuationCard
+            orgId={orgId}
+            deal={{ id: deal.id, name: deal.name, pipelineId: deal.pipeline_id, stageName: stage?.name ?? null, stageOpen: stage?.kind === "open" }}
+            links={links}
+            pipelines={pipelines}
           />
 
           <TagPicker orgId={orgId} kind="deal" recordId={deal.id} allTags={tags} selectedIds={deal.tag_ids} canEdit={canEdit} />

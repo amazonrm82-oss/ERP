@@ -1050,6 +1050,8 @@ export type DealRow = {
   team_id: string | null;
   tag_ids: string[];
   custom_fields: Json;
+  // DEAL-11: the deal this follow-up continues; set once by a person (deals_previous_check)
+  previous_deal_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1078,6 +1080,7 @@ export type DealInsert = {
   tag_ids?: string[];
   custom_fields?: Json;
   snoozed_until?: string | null;
+  previous_deal_id?: string | null;
   deleted_at?: string | null;
 };
 

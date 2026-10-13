@@ -348,7 +348,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)
@@ -497,4 +497,32 @@ export async function listDeals(
       customFields: row.custom_fields,
     })),
   };
+}
+
+export type DealLinks = {
+  // the deal this one continues, when the user may read it and it is not in the recycle bin
+  previous: { id: string; name: string } | null;
+  // follow-up deals of this one the user reads, newest first (latest 50)
+  followUps: RelatedDeal[];
+};
+
+/** DEAL-11: the deal a follow-up continues, and the follow-ups of a deal. */
+export async function getDealLinks(orgId: string, dealId: string, previousDealId: string | null): Promise<DealLinks> {
+  const supabase = await createClient();
+  const [previous, followUps] = await Promise.all([
+    previousDealId
+      ? supabase.from("deals").select("id, name").eq("organization_id", orgId).eq("id", previousDealId).is("deleted_at", null).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("deals")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("previous_deal_id", dealId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+  const previousRow = must(previous, "previous deal");
+  const ids = must(followUps, "follow-up deals").map((row) => row.id);
+  return { previous: previousRow, followUps: await listRelatedDeals(orgId, { dealIds: ids }) };
 }

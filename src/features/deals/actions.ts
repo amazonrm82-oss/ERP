@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
@@ -20,6 +21,18 @@ import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
 import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 import { snoozeSchema } from "./snooze";
+import {
+  COPY_SKIPPED_PARAM,
+  copyCloseDate,
+  copyCustomFields,
+  copyStage,
+  DUPLICATE_FIELD_NAMES,
+  duplicateDealSchema,
+  firstOpenStage,
+  FOLLOW_UP_FIELD_NAMES,
+  followUpDealSchema,
+  skippedParam,
+} from "./copy";
 
 function revalidateDeal(orgId: string, dealId?: string) {
   revalidatePath(paths.deals(orgId));
@@ -386,4 +399,136 @@ export async function trashDealAction(orgId: string, dealId: string): Promise<Ac
   }
   revalidateDeal(orgId, dealId);
   redirect(paths.deals(orgId));
+}
+
+const COPY_FAILED = "לא הצלחנו ליצור את העסקה. נסו שוב.";
+const NO_OPEN_STAGE = "בתהליך המכירה הזה אין שלב פתוח. אפשר להוסיף שלב בהגדרות.";
+
+/**
+ * DEAL-11: a copy of a deal, written with the user's session through the ordinary insert,
+ * so every deal trigger applies (stage, owner = the user, team, record limit, audit,
+ * automations). It carries the name ("עותק של …" by default), pipeline, amount, contact,
+ * company, source, a close date that has not passed, tags and custom fields; it starts in
+ * the first open stage unless the user keeps the deal's open stage. Never copied: the
+ * closed state and its date, loss reason and competitor, time in stage, postponement,
+ * timeline, tasks, files, followers and the deal's other contacts.
+ */
+export async function duplicateDealAction(orgId: string, dealId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const { supabase } = context;
+  const values = { values: formValues(formData) };
+  const parsed = duplicateDealSchema.safeParse(pick(formData, DUPLICATE_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  const { data: deal, error: dealError } = await supabase
+    .from("deals")
+    .select("id, pipeline_id, stage_id, amount_agorot, contact_id, company_id, source_id, expected_close_date, tag_ids, custom_fields")
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (dealError) return fail(dbErrorMessage(dealError), values);
+  if (!deal) return fail(NOT_FOUND_OR_FORBIDDEN);
+
+  const [{ data: stages, error: stagesError }, { data: org, error: orgError }, fields] = await Promise.all([
+    supabase.from("stages").select("id, kind").eq("organization_id", orgId).eq("pipeline_id", deal.pipeline_id).order("position", { ascending: true }),
+    supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(),
+    // a failed read is an answer here, not a thrown error
+    listFieldDefinitions(orgId, "deal").then(
+      (definitions) => ({ definitions, error: null }),
+      (error: unknown) => ({ definitions: [], error }),
+    ),
+  ]);
+  if (fields.error) return fail(dbErrorMessage(fields.error), values);
+  if (stagesError) return fail(dbErrorMessage(stagesError), values);
+  if (orgError) return fail(dbErrorMessage(orgError), values);
+  const stage = copyStage(stages, deal.stage_id, parsed.data.keep_stage);
+  if (!stage) return fail(NO_OPEN_STAGE, values);
+  const today = zoneDate(new Date(), org?.timezone || TIME_ZONE);
+
+  const row = {
+    organization_id: orgId,
+    name: parsed.data.name,
+    pipeline_id: deal.pipeline_id,
+    stage_id: stage.id,
+    amount_agorot: deal.amount_agorot,
+    contact_id: deal.contact_id,
+    company_id: deal.company_id,
+    source_id: deal.source_id,
+    expected_close_date: copyCloseDate(deal.expected_close_date, today),
+    tag_ids: deal.tag_ids,
+  };
+  // values a field no longer accepts are left out, and the new deal's page names those fields
+  const custom = copyCustomFields(deal.custom_fields, fields.definitions);
+  let skipped: string[] | "all" = custom.skipped;
+  let { data, error } = await supabase.from("deals").insert({ ...row, custom_fields: custom.values }).select("id").single();
+  if (error?.hint === "custom_field:invalid") {
+    // the database still refused one (its rule and the form's differ somewhere): the copy goes without custom fields
+    skipped = "all";
+    ({ data, error } = await supabase.from("deals").insert(row).select("id").single());
+  }
+  if (error || !data) {
+    return fail(error ? dbErrorMessage(error, COPY_FAILED) : COPY_FAILED, values);
+  }
+  revalidateDeal(orgId);
+  const notice = skippedParam(skipped);
+  redirect(notice ? `${paths.deal(orgId, data.id)}?${COPY_SKIPPED_PARAM}=${encodeURIComponent(notice)}` : paths.deal(orgId, data.id));
+}
+
+/**
+ * DEAL-11: a new open deal for the same customer (contact and company), in a pipeline the
+ * user picks, with no amount and the name the user typed. When asked it points back at this
+ * deal (deals.previous_deal_id; the database lets a person set it only here, once).
+ */
+export async function followUpDealAction(orgId: string, dealId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const { supabase } = context;
+  const values = { values: formValues(formData) };
+  const parsed = followUpDealSchema.safeParse(pick(formData, FOLLOW_UP_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+
+  const [{ data: deal, error: dealError }, { data: pipeline, error: pipelineError }, { data: stages, error: stagesError }] = await Promise.all([
+    supabase.from("deals").select("id, contact_id, company_id").eq("organization_id", orgId).eq("id", dealId).is("deleted_at", null).maybeSingle(),
+    supabase.from("pipelines").select("id").eq("organization_id", orgId).eq("id", parsed.data.pipeline_id).is("deleted_at", null).maybeSingle(),
+    supabase.from("stages").select("id, kind").eq("organization_id", orgId).eq("pipeline_id", parsed.data.pipeline_id).order("position", { ascending: true }),
+  ]);
+  if (dealError) return fail(dbErrorMessage(dealError), values);
+  if (pipelineError) return fail(dbErrorMessage(pipelineError), values);
+  if (stagesError) return fail(dbErrorMessage(stagesError), values);
+  if (!deal) return fail(NOT_FOUND_OR_FORBIDDEN);
+  if (!pipeline) return fail("תהליך המכירה שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.", values);
+  const stage = firstOpenStage(stages);
+  if (!stage) return fail(NO_OPEN_STAGE, values);
+
+  const { data, error } = await supabase
+    .from("deals")
+    .insert({
+      organization_id: orgId,
+      name: parsed.data.name,
+      pipeline_id: pipeline.id,
+      stage_id: stage.id,
+      amount_agorot: 0,
+      contact_id: deal.contact_id,
+      company_id: deal.company_id,
+      previous_deal_id: parsed.data.link ? deal.id : null,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    return fail(dbErrorMessage(error, COPY_FAILED), values);
+  }
+  revalidateDeal(orgId, dealId);
+  if (deal.contact_id) revalidatePath(paths.contact(orgId, deal.contact_id));
+  if (deal.company_id) revalidatePath(paths.company(orgId, deal.company_id));
+  redirect(paths.deal(orgId, data.id));
 }
