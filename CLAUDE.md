@@ -74,6 +74,13 @@ and build this CRM here instead. The old code is preserved on the branch
    a counter only (no IP, device or visitor id) and redirect only to the stored target; the widget gets display settings
    only, no cookies or visitor id; each has rate limits, database tests that prove nothing beyond what is needed is
    returned and no cross-organization access, and an independent review before merge.
+   Owner, 13 October 2026: the landing page "notify me" for a coming-soon plan (LND-13) uses the same pattern for an
+   anonymous write: one definer function (service_role only) that stores only email, plan, consent (unticked box, draft
+   wording, wording version saved) and date, into a table in schema `app`; plan from the closed list of coming-soon plans;
+   one row per email and plan; the same answer to the visitor whether new or not; FXS-11 rate limit (keyed IP hash, deleted
+   after the window) and a honeypot field; no cookies or visitor id; used only for that one message (with an unsubscribe
+   link) and deleted after it is sent or after 12 months; read only through `platform_*` (counts; addresses for the
+   platform owner only); database tests and an independent review before merge.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
 6. If something looks like it belongs to another system, stop and ask.
