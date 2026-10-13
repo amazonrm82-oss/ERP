@@ -68,10 +68,10 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
         </button>
       </form>
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full min-w-[44rem] text-md">
+        <table className="w-full min-w-[50rem] text-md">
           <thead>
             <tr className="border-b border-line text-sm text-ink-soft">
-              {["ארגון", "בעלים", "מצב", "חבילה", "משתמשים", "רשומות", "הצטרף"].map((h) => (
+              {["ארגון", "בעלים", "מצב", "חבילה", "משתמשים", "רשומות", "הצטרף", "התחיל לעבוד"].map((h) => (
                 <th key={h} scope="col" className="px-4 py-2.5 text-start font-medium">
                   {h}
                 </th>
@@ -94,6 +94,7 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
                 <td className="px-4 py-2.5 tabular-nums">{formatNumber(Number(r.members ?? 0))}</td>
                 <td className="px-4 py-2.5 tabular-nums">{formatNumber(Number(r.records ?? 0))}</td>
                 <td className="px-4 py-2.5">{formatDate(String(r.created_at))}</td>
+                <td className="px-4 py-2.5">{r.activated_at ? formatDate(String(r.activated_at)) : "עדיין לא"}</td>
               </tr>
             ))}
           </tbody>

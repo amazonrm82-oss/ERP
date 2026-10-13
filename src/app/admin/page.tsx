@@ -13,12 +13,19 @@ export default async function AdminHomePage() {
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;
   const ended = n(conversion.ended);
+  const activation = (m.activation ?? {}) as Obj;
+  const medianHours = activation.median_hours == null ? null : n(activation.median_hours);
   const tiles = [
     { label: "הכנסה חודשית חוזרת (MRR)", value: formatMoney(n(m.mrr_agorot)), hint: "לפני מע\"מ, חבילות בתשלום במצב פעיל" },
     { label: "ארגונים משלמים", value: formatNumber(n(m.paying_orgs)), hint: m.arpa_agorot ? `הכנסה ממוצעת לארגון: ${formatMoney(n(m.arpa_agorot))}` : undefined },
     { label: "המרה מניסיון לתשלום", value: ended ? `${Math.round((n(conversion.paying) / ended) * 100)}%` : "—", hint: `${formatNumber(n(conversion.paying))} מתוך ${formatNumber(ended)} שהניסיון שלהם נגמר` },
     { label: "ארגונים", value: formatNumber(n(m.orgs_total)), hint: `${formatNumber(n(m.cancelled_30d))} בוטלו ב-30 הימים האחרונים` },
     { label: "משתמשים פעילים", value: `${formatNumber(n(m.active_users_1d))} ביום · ${formatNumber(n(m.active_users_30d))} בחודש`, hint: `${formatNumber(n(m.users_total))} משתמשים רשומים` },
+    {
+      label: "ארגונים שהתחילו לעבוד",
+      value: `${formatNumber(n(activation.activated))} מתוך ${formatNumber(n(m.orgs_total))}`,
+      hint: `ליד אמיתי ראשון שקיבל מענה בתוך 24 שעות${medianHours == null ? "" : ` · חציון מההרשמה: ${formatNumber(medianHours)} שעות`}`,
+    },
     { label: "ארגונים בסיכון נטישה", value: formatNumber(n(m.quiet_orgs)), hint: "אף משתמש לא נכנס 14 יום" },
   ];
   const byStatus = (m.by_status ?? {}) as Obj;
