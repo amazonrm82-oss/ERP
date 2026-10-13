@@ -316,6 +316,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   and statuses before the closed ones, adds automations switched off, skips and reports items over a plan limit, and
   records the key in `organizations.industry_templates` (server only) only when nothing was cut. "My day" (TASK-09, no
   migration) uses `report_stuck_deals`' `no_next_step`, the same rule as the board.
+- Call-back time (SPD-05, migration 0119): `forms.callback_choice` (owners/admins, column grants) adds "now" or a slot today
+  or tomorrow (09-12, 12-15, 15-18, 18-20, org time zone; `src/features/intake/callback.ts` mirrors `app.intake_callback_*`).
+  `intake_submit` refuses an unknown or ended slot (22023, hint `callback:invalid` / `callback:past`) and creates a call task
+  due then for the lead's owner (repeat inquiry: the record's owner, else the form's owner, active members only); the time
+  goes into the notification bodies. `intake_form()` returns `callback {time_zone}` when the form asks.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
