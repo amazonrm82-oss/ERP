@@ -509,6 +509,15 @@ export type FileRow = {
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
+// CON-03: further contacts on a deal, each with an optional role (DEAL_CONTACT_ROLES)
+export type DealContactRow = {
+  organization_id: string;
+  deal_id: string;
+  contact_id: string;
+  role: string | null;
+  created_at: string;
+};
+
 export type RecordFollowerRow = {
   id: string;
   organization_id: string;
@@ -1155,6 +1164,12 @@ export type Database = {
       >;
       leads: Table<LeadRow, LeadInsert>;
       deals: Table<DealRow, DealInsert>;
+      // CON-03: only the role changes (column-level update grant)
+      deal_contacts: Table<
+        DealContactRow,
+        { organization_id: string; deal_id: string; contact_id: string; role?: string | null },
+        { role?: string | null }
+      >;
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
       tasks: Table<TaskRow, TaskInsert>;
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;

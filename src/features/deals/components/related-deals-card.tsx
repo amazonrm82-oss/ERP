@@ -43,6 +43,7 @@ export function RelatedDealsCard({ orgId, deals, newDealQuery, emptyText }: Prop
                   <Link href={paths.deal(orgId, deal.id)} className="block break-words font-medium underline-offset-4 hover:underline">
                     {deal.name}
                   </Link>
+                  {deal.roleLabel ? <span className="block text-sm text-ink-soft">{deal.roleLabel}</span> : null}
                   <span className="block text-sm text-ink-soft">
                     {formatMoney(deal.amountAgorot)}
                     {deal.stageName ? `, ${deal.stageName}` : ""}

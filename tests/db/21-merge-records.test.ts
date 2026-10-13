@@ -147,7 +147,7 @@ describe("merging duplicates", () => {
       const dup = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'רות', $2) returning id", [org, owner.id])).rows[0].id;
       const both = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'שתיהן', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
       const only = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'רק הכפולה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
-      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'מחליטה'), ($1, $2, $4, 'משפיעה'), ($1, $5, $4, 'משתמשת')", [org, both, keep, dup, only]);
+      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'decision_maker'), ($1, $2, $4, 'influencer'), ($1, $5, $4, 'user')", [org, both, keep, dup, only]);
       return { keep, dup, both, only };
     });
     await merge(owner.id, "contact", r.keep, r.dup);
@@ -155,8 +155,8 @@ describe("merging duplicates", () => {
       (await q<{ deal_id: string; contact_id: string; role: string }>("select deal_id, contact_id, role from public.deal_contacts where deal_id = any($1)", [[r.both, r.only]])).rows,
     );
     expect(rows.length).toBe(2);
-    expect(rows.find((x) => x.deal_id === r.both)).toEqual({ deal_id: r.both, contact_id: r.keep, role: "מחליטה" });
-    expect(rows.find((x) => x.deal_id === r.only)).toEqual({ deal_id: r.only, contact_id: r.keep, role: "משתמשת" });
+    expect(rows.find((x) => x.deal_id === r.both)).toEqual({ deal_id: r.both, contact_id: r.keep, role: "decision_maker" });
+    expect(rows.find((x) => x.deal_id === r.only)).toEqual({ deal_id: r.only, contact_id: r.keep, role: "user" });
   });
 
   it("refuses what is not allowed", async () => {

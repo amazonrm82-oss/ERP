@@ -17,6 +17,9 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { listContactOptions } from "@/features/contacts/queries";
 import { trashDealAction } from "@/features/deals/actions";
+import { DealContactsCard } from "@/features/deal-contacts/components/deal-contacts-card";
+import { addableDealContacts } from "@/features/deal-contacts/options";
+import { listDealContacts } from "@/features/deal-contacts/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
@@ -45,11 +48,12 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
-  const [deal, fields, tags, follow] = await Promise.all([
+  const [deal, fields, tags, follow, dealContacts] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
     getFollowState(orgId, { kind: "deal", id: dealId }, context.user.id),
+    listDealContacts(orgId, dealId),
   ]);
   if (!deal) {
     notFound();
@@ -152,6 +156,18 @@ export default async function DealPage({ params, searchParams }: Props) {
               createdAtText: formatDateTime(deal.created_at),
               custom: { definitions: fields, values: asCustomValues(deal.custom_fields) },
             }}
+          />
+
+          <DealContactsCard
+            orgId={orgId}
+            dealId={deal.id}
+            canEdit={canEdit}
+            items={dealContacts}
+            options={addableDealContacts(
+              contacts,
+              dealContacts.map((item) => item.contactId),
+              deal.contact_id,
+            )}
           />
 
           <TagPicker orgId={orgId} kind="deal" recordId={deal.id} allTags={tags} selectedIds={deal.tag_ids} canEdit={canEdit} />

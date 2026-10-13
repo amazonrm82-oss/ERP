@@ -207,20 +207,36 @@ export async function getBoard(
   };
 }
 
-export type RelatedDeal = { id: string; name: string; amountAgorot: number; stageName: string | null; status: StageKind };
+export type RelatedDeal = {
+  id: string;
+  name: string;
+  amountAgorot: number;
+  stageName: string | null;
+  status: StageKind;
+  // CON-03: the record's part in the deal, when the card shows one
+  roleLabel?: string | null;
+};
 
-/** Live deals whose main contact (or company) is the given record, newest first (latest 50). */
+/**
+ * Live deals whose main contact (or company) is the given record, or the given deals
+ * (CON-03: the deals a contact takes part in), newest first (latest 50).
+ */
 export async function listRelatedDeals(
   orgId: string,
-  related: { contactId: string } | { companyId: string },
+  related: { contactId: string } | { companyId: string } | { dealIds: string[] },
 ): Promise<RelatedDeal[]> {
+  if ("dealIds" in related && related.dealIds.length === 0) {
+    return [];
+  }
   const supabase = await createClient();
-  const [column, value] = "contactId" in related ? ["contact_id", related.contactId] : ["company_id", related.companyId];
-  const { data, error } = await supabase
-    .from("deals")
-    .select("id, name, amount_agorot, stage_id, status")
-    .eq("organization_id", orgId)
-    .eq(column, value)
+  const base = supabase.from("deals").select("id, name, amount_agorot, stage_id, status").eq("organization_id", orgId);
+  const filtered =
+    "dealIds" in related
+      ? base.in("id", related.dealIds)
+      : "contactId" in related
+        ? base.eq("contact_id", related.contactId)
+        : base.eq("company_id", related.companyId);
+  const { data, error } = await filtered
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);

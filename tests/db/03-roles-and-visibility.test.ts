@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, insertLead, pgError, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -326,7 +326,7 @@ describe("roles and record visibility", () => {
         await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה של m2', $2, $3) returning id", [org, pipe.p, pipe.s])
       ).rows[0].id;
       const task = (await q<{ id: string }>("insert into public.tasks (organization_id, title) values ($1, 'משימה של m2') returning id", [org])).rows[0].id;
-      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'מחליט')", [org, deal, contact]);
+      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'decision_maker')", [org, deal, contact]);
       return { company, contact, contact2, deal, task };
     });
 
@@ -343,7 +343,7 @@ describe("roles and record visibility", () => {
         expect((await q(`update public.${table} set deleted_at = now() where id = $1`, [id])).rowCount, `trash ${table}`).toBe(0);
         expect((await q(`delete from public.${table} where id = $1`, [id])).rowCount, `delete ${table}`).toBe(0);
       }
-      expect((await q("update public.deal_contacts set role = 'x' where deal_id = $1", [rec.deal])).rowCount).toBe(0);
+      expect((await q("update public.deal_contacts set role = 'user' where deal_id = $1", [rec.deal])).rowCount).toBe(0);
       expect((await q("delete from public.deal_contacts where deal_id = $1", [rec.deal])).rowCount).toBe(0);
     });
     const link = await pgError(
@@ -358,7 +358,7 @@ describe("roles and record visibility", () => {
       for (const [table, id, set] of tables) {
         expect((await q(`update public.${table} set ${set} where id = $1`, [id])).rowCount, `own update ${table}`).toBe(1);
       }
-      expect((await q("update public.deal_contacts set role = 'משפיע' where deal_id = $1", [rec.deal])).rowCount).toBe(1);
+      expect((await q("update public.deal_contacts set role = 'influencer' where deal_id = $1", [rec.deal])).rowCount).toBe(1);
     });
     for (const [table, id] of tables) {
       const err = await pgError(asUser(m2.id, (q) => q(`update public.${table} set deleted_at = now() where id = $1`, [id])));
@@ -383,6 +383,75 @@ describe("roles and record visibility", () => {
       for (const [table, id] of [...tables].reverse()) {
         expect((await q(`delete from public.${table} where id = $1`, [id])).rowCount, `admin purge ${table}`).toBe(1);
       }
+    });
+  });
+
+  it("contacts on a deal follow the deal; a new link needs a live contact the caller reads, and only the role changes (CON-03)", async () => {
+    await setVisibility("own");
+    const pipe = await asAdmin(async (q) => {
+      const p = (await q<{ id: string }>("select id from public.pipelines where organization_id = $1 and is_default", [org])).rows[0].id;
+      const s = (await q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [p])).rows[0].id;
+      return { p, s };
+    });
+    const mine = await asUser(m1.id, async (q) => {
+      const deal = (
+        await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקת תפקידים', $2, $3) returning id", [org, pipe.p, pipe.s])
+      ).rows[0].id;
+      const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מקבלת החלטה') returning id", [org])).rows[0].id;
+      const binned = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'בסל') returning id", [org])).rows[0].id;
+      return { deal, contact, binned };
+    });
+    const theirs = await asUser(m2.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'של m2') returning id", [org])).rows[0].id,
+    );
+    await asUser(admin.id, (q) => q("update public.contacts set deleted_at = now() where id = $1", [mine.binned]));
+
+    const link = (contactId: string, role: string | null) => (q: Query) =>
+      q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, $4)", [org, mine.deal, contactId, role]);
+
+    // the deal's owner links a contact they read, with one of the four roles
+    await asUser(m1.id, link(mine.contact, "decision_maker"));
+    // not a contact they cannot read, nor one in the recycle bin, nor an unknown role
+    expect((await pgError(asUser(m1.id, link(theirs, "user")))).code).toBe("42501");
+    expect((await pgError(asUser(m1.id, link(mine.binned, "user")))).code).toBe("42501");
+    await asUser(admin.id, async (q) => {
+      expect((await pgError(q("update public.deal_contacts set role = 'boss' where deal_id = $1", [mine.deal]))).code).toBe("23514");
+    });
+
+    // only the role of a link changes; moving it is "remove and add"
+    expect(
+      (await pgError(asUser(m1.id, (q) => q("update public.deal_contacts set contact_id = $1 where deal_id = $2", [theirs, mine.deal])))).code,
+    ).toBe("42501");
+    expect(
+      (await pgError(asUser(m1.id, (q) => q("update public.deal_contacts set deal_id = deal_id where deal_id = $1", [mine.deal])))).code,
+    ).toBe("42501");
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.deal_contacts set role = 'finance' where deal_id = $1", [mine.deal])).rowCount).toBe(1);
+      expect((await q("update public.deal_contacts set role = null where deal_id = $1", [mine.deal])).rowCount).toBe(1);
+    });
+
+    // an admin reads every contact and may link m2's contact; m1 then sees the link but not the contact
+    await asUser(admin.id, link(theirs, "influencer"));
+    await asUser(m1.id, async (q) => {
+      expect(await count(q, "select 1 from public.deal_contacts where deal_id = $1", [mine.deal])).toBe(2);
+      expect(await count(q, "select 1 from public.contacts where id = $1", [theirs])).toBe(0);
+    });
+    // m2 does not read m1's deal, so none of its contacts either, and cannot touch them
+    await asUser(m2.id, async (q) => {
+      expect(await count(q, "select 1 from public.deal_contacts where deal_id = $1", [mine.deal])).toBe(0);
+      expect((await q("update public.deal_contacts set role = 'user' where deal_id = $1", [mine.deal])).rowCount).toBe(0);
+      expect((await q("delete from public.deal_contacts where deal_id = $1", [mine.deal])).rowCount).toBe(0);
+    });
+    // a viewer reading the deal (visibility org) still changes nothing
+    await setVisibility("org");
+    await asUser(viewer.id, async (q) => {
+      expect(await count(q, "select 1 from public.deal_contacts where deal_id = $1", [mine.deal])).toBe(2);
+      expect((await q("update public.deal_contacts set role = 'user' where deal_id = $1", [mine.deal])).rowCount).toBe(0);
+      expect((await q("delete from public.deal_contacts where deal_id = $1", [mine.deal])).rowCount).toBe(0);
+    });
+    // the deal's owner removes the links, also of a contact they do not own
+    await asUser(m1.id, async (q) => {
+      expect((await q("delete from public.deal_contacts where deal_id = $1", [mine.deal])).rowCount).toBe(2);
     });
   });
 

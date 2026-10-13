@@ -23,6 +23,8 @@ import { ContactDetailsCard } from "@/features/contacts/components/contact-detai
 import { contactDisplayName } from "@/features/contacts/display";
 import { getContact } from "@/features/contacts/queries";
 import { listRecordTypes } from "@/features/record-type-options/queries";
+import { contactDealsWithRoles } from "@/features/deal-contacts/contact-deals";
+import { listContactDealRoles } from "@/features/deal-contacts/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -51,13 +53,18 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, deals, fields, follow] = await Promise.all([
+  const [contact, mainDeals, dealRoles, fields, follow] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
+    listContactDealRoles(orgId, contactId),
     listFieldDefinitions(orgId, "contact"),
     getFollowState(orgId, { kind: "contact", id: contactId }, context.user.id),
   ]);
-  const tags = await listTags(orgId);
+  const [tags, takingPart] = await Promise.all([
+    listTags(orgId),
+    listRelatedDeals(orgId, { dealIds: dealRoles.map((entry) => entry.dealId) }),
+  ]);
+  const deals = contactDealsWithRoles(mainDeals, takingPart, dealRoles);
   if (!contact) {
     notFound();
   }
