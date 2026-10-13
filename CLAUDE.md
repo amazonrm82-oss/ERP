@@ -286,6 +286,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Deal contacts (CON-03, migration 0111): `deal_contacts.role` is null or `decision_maker|influencer|user|finance`
   (`deal_contacts_role_check`, mirrored by `src/features/deal-contacts/roles.ts`, unit test). Clients update only `role`
   (column grant); a new link needs an editable deal and a live contact the caller reads (`deal_contacts_insert`). Not audited.
+- Stage settings (DEAL-01, migration 0113): `stages.color` is null (by kind) or a palette key (`accent|success|warning|danger|neutral`,
+  check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
+  1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
+  use `stageTone()`.
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
