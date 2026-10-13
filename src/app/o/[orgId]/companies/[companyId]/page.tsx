@@ -26,7 +26,7 @@ import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
@@ -34,6 +34,8 @@ import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
+import { BillingCard } from "@/features/billing/components/billing-card";
+import { getRecordBilling } from "@/features/billing/queries";
 
 export const metadata: Metadata = { title: "חברה" };
 
@@ -52,7 +54,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals, fields, tags, types, follow] = await Promise.all([
+  const [company, contacts, deals, fields, tags, types, follow, billing] = await Promise.all([
     getCompany(orgId, companyId),
     listContactsOfCompany(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
@@ -60,6 +62,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     listTags(orgId),
     listRecordTypes(orgId, "company"),
     getFollowState(orgId, { kind: "company", id: companyId }, context.user.id),
+    // CON-08
+    getRecordBilling(orgId, "company", companyId),
   ]);
   if (!company) {
     notFound();
@@ -117,6 +121,17 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               custom: { definitions: fields, values: asCustomValues(company.custom_fields) },
             }}
           />
+
+          {billing ? (
+            <BillingCard
+              orgId={orgId}
+              recordId={company.id}
+              billing={billing}
+              canEdit={canEditRecordHint(context, company.owner_id)}
+              today={zoneDate(new Date(), context.org.timeZone)}
+              companyIsIsraeli={company.country === "IL"}
+            />
+          ) : null}
 
           <TagPicker
             orgId={orgId}

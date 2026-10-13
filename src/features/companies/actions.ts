@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { billingFromForm } from "@/features/billing/form";
 import { duplicateMessage, findCompanyDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
@@ -59,6 +60,11 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   if (!parent.ok) {
     return fail(parent.message, { fieldErrors: { parent_company_id: parent.message }, values: formValues(formData) });
   }
+  // CON-08: only when the form has the billing section
+  const billing = billingFromForm(formData, "company");
+  if (!billing.ok) {
+    return billing.failure;
+  }
 
   // DQL-02: a company the user can see with the same tax id, name or phone is pointed out first;
   // the user may still create the new one.
@@ -75,7 +81,7 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   // owner_id is left out: the database assigns the company to its creator.
   const { data, error } = await context.supabase
     .from("companies")
-    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...parent.patch, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...parent.patch, ...billing.patch, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {

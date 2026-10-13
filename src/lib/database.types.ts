@@ -738,6 +738,15 @@ export type CompanyRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // CON-08 (migration billing_details): billing details; payment_terms is PaymentTermsKind
+  // (src/features/billing/terms.ts) with payment_days for net / eom; price_list_id -> price_lists
+  billing_name: string | null;
+  billing_address: string | null;
+  shipping_address: string | null;
+  billing_email: string | null;
+  payment_terms: string | null;
+  payment_days: number | null;
+  price_list_id: string | null;
 };
 
 export type CompanyInsert = {
@@ -762,6 +771,14 @@ export type CompanyInsert = {
   tag_ids?: string[];
   custom_fields?: Json;
   deleted_at?: string | null;
+  // CON-08
+  billing_name?: string | null;
+  billing_address?: string | null;
+  shipping_address?: string | null;
+  billing_email?: string | null;
+  payment_terms?: string | null;
+  payment_days?: number | null;
+  price_list_id?: string | null;
 };
 
 export type ContactRow = {
@@ -800,6 +817,16 @@ export type ContactRow = {
   // text columns with a check constraint: ContactPhoneType / ContactEmailType
   phone_type: string | null;
   email_type: string | null;
+  // CON-08 (migration billing_details): billing details; payment_terms is PaymentTermsKind
+  // (src/features/billing/terms.ts) with payment_days for net / eom; price_list_id -> price_lists
+  billing_name: string | null;
+  billing_tax_id: string | null;
+  billing_address: string | null;
+  shipping_address: string | null;
+  billing_email: string | null;
+  payment_terms: string | null;
+  payment_days: number | null;
+  price_list_id: string | null;
 };
 
 // CON-01: further phones and emails of a contact; the primary ones stay on the contact row
@@ -878,6 +905,15 @@ export type ContactInsert = {
   custom_fields?: Json;
   last_contacted_at?: string | null;
   deleted_at?: string | null;
+  // CON-08
+  billing_name?: string | null;
+  billing_tax_id?: string | null;
+  billing_address?: string | null;
+  shipping_address?: string | null;
+  billing_email?: string | null;
+  payment_terms?: string | null;
+  payment_days?: number | null;
+  price_list_id?: string | null;
 };
 
 export type LeadRow = {

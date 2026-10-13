@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { billingFromForm } from "@/features/billing/form";
 import { duplicateMessage, findPersonDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
@@ -115,6 +116,11 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
   if (!type.ok) {
     return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
   }
+  // CON-08: only when the form has the billing section
+  const billing = billingFromForm(formData, "contact");
+  if (!billing.ok) {
+    return billing.failure;
+  }
 
   // DQL-02: as in the lead form, a lead or contact the user can see with one of these phones or
   // emails is pointed out first; the user may still create the new contact.
@@ -134,7 +140,7 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
   // A company id from another organization fails the composite foreign key.
   const { data, error } = await context.supabase
     .from("contacts")
-    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...billing.patch, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {

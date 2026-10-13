@@ -7,6 +7,8 @@ import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { DuplicateNotice } from "@/features/data-quality/components/duplicate-notice";
+import { BillingSection } from "@/features/billing/components/billing-fields";
+import type { BillingPriceList } from "@/features/billing/queries";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { RecordType } from "@/features/record-type-options/schema";
@@ -17,7 +19,7 @@ import { createCompanyAction } from "../actions";
 import { CompanyFields } from "./company-fields";
 
 /** New company form. On success the action redirects to the company's page. */
-export function CompanyForm({ orgId, fields, types }: { orgId: string; fields: FieldDefinition[]; types: RecordType[] }) {
+export function CompanyForm({ orgId, fields, types, priceLists }: { orgId: string; fields: FieldDefinition[]; types: RecordType[]; priceLists: BillingPriceList[] }) {
   const [state, formAction] = useActionState<FormState, FormData>(createCompanyAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -28,6 +30,7 @@ export function CompanyForm({ orgId, fields, types }: { orgId: string; fields: F
       {failure?.fieldErrors?.allow_duplicate ? <DuplicateNotice href={failure.fieldErrors.allow_duplicate} createLabel="ליצור חברה חדשה בכל זאת" /> : null}
       <CompanyFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} types={types} parent={{ orgId, companyId: "", initial: null }} />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} />
+      <BillingSection subject="company" values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} priceLists={priceLists} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצרים חברה…">יצירת חברה</SubmitButton>
         <ButtonLink href={paths.companies(orgId)} variant="ghost">

@@ -4,6 +4,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { ContactForm } from "@/features/contacts/components/contact-form";
+import { listPriceLists } from "@/features/price-lists/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
@@ -28,10 +29,11 @@ export default async function NewContactPage({ params }: Props) {
     );
   }
 
-  const [companies, fields, types] = await Promise.all([
+  const [companies, fields, types, priceLists] = await Promise.all([
     listCompanyOptions(orgId),
     listFieldDefinitions(orgId, "contact"),
     listRecordTypes(orgId, "contact"),
+    listPriceLists(orgId),
   ]);
 
   return (
@@ -39,7 +41,7 @@ export default async function NewContactPage({ params }: Props) {
       <PageHeader title="איש קשר חדש" back={back} />
       <Card>
         <CardBody>
-          <ContactForm orgId={orgId} companies={companies} fields={fields} types={types} />
+          <ContactForm orgId={orgId} companies={companies} fields={fields} types={types} priceLists={priceLists} />
         </CardBody>
       </Card>
     </div>

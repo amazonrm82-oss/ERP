@@ -31,7 +31,7 @@ import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
@@ -39,6 +39,8 @@ import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
+import { BillingCard } from "@/features/billing/components/billing-card";
+import { getRecordBilling } from "@/features/billing/queries";
 
 export const metadata: Metadata = { title: "איש קשר" };
 
@@ -58,12 +60,14 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, mainDeals, dealRoles, fields, follow] = await Promise.all([
+  const [contact, mainDeals, dealRoles, fields, follow, billing] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
     listContactDealRoles(orgId, contactId),
     listFieldDefinitions(orgId, "contact"),
     getFollowState(orgId, { kind: "contact", id: contactId }, context.user.id),
+    // CON-08
+    getRecordBilling(orgId, "contact", contactId),
   ]);
   const [tags, takingPart] = await Promise.all([
     listTags(orgId),
@@ -144,6 +148,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields) },
             }}
           />
+
+          {billing ? <BillingCard orgId={orgId} recordId={contact.id} billing={billing} canEdit={canEdit} today={zoneDate(new Date(), context.org.timeZone)} /> : null}
 
           <TagPicker orgId={orgId} kind="contact" recordId={contact.id} allTags={tags} selectedIds={contact.tag_ids} canEdit={canEdit} />
 
