@@ -253,8 +253,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `*_notify_followers` (status/stage/owner; skipped during `app.bulk_transfer` and for records in the bin) and
   `activities_notify_followers` (a person's own logged entry, `current_user = 'authenticated'`, not private) send kind
   `follow` to followers who may read the record (`app.user_can_read_record`), never to the actor, never to the new owner
-  about the owner change, never to someone the entry mentions; no entry text. `app.merge_move_links()` does not move
-  followers yet (follow-up).
+  about the owner change, never to someone the entry mentions; no entry text. Since 0109 a merge moves followers who may read the kept
+  record; a user who followed both keeps one row; other rows go with the duplicate by cascade.
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
@@ -262,8 +262,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   column grants); further ones (up to 10 per kind from the browser) in `public.contact_channels` (rights follow the
   contact; `value_e164` set by trigger; audited as `extra_phone` / `extra_email` changes of the contact). Repeat inquiries
   (`intake_submit`), `app.search_contacts` and `public.contact_channel_matches()` (security invoker, for the app's
-  duplicate checks) match on all of them. Until `app.merge_move_links()` moves channels, trigger
-  `activities_merge_contact_channels` copies the duplicate's phones and emails to the kept contact in a merge.
+  duplicate checks) match on all of them. Since 0109 `app.merge_move_links()` moves the duplicate's further
+  phones and emails (`app.merge_contact_channels_move`) and adds its valid primary ones as further ones, skipping values
+  the kept contact has; a merge may exceed 10; `activities_merge_contact_channels` is a no-op. `merge_move_links()` holds no
+  DELETE since 0109 (clashing deal_contacts and followers stay on the duplicate and cascade). A pick of the duplicate's
+  primary still loses the kept contact's old one (follow-up: `merge_records()` must pass the pre-pick row).
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
