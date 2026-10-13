@@ -294,7 +294,8 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
 }
 
 
-type Existing = { id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null };
+// viaChannel: a contact found by a further phone or email (CON-01), whose primary ones an update keeps
+type Existing = { id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null; viaChannel?: boolean };
 
 /** A lookup that failed: the chunk fails as a whole rather than guessing (FXC-02). */
 class LookupFailed extends Error {}
@@ -313,7 +314,23 @@ async function findExisting(ctx: ImportContext, entity: ImportEntityKey, rows: A
     p_names: entity === "company" ? present(rows.map((r) => r.name)) : [],
   });
   if (error) throw new LookupFailed(error.message);
-  return data;
+  if (entity !== "contact") return data;
+  // CON-01: a contact's further phones and emails count too
+  const { data: channels, error: channelError } = await ctx.supabase.rpc("contact_channel_matches", {
+    p_org: ctx.orgId,
+    p_phones: present(rows.map((r) => r.phoneE164)),
+    p_emails: present(rows.map((r) => r.email)),
+  });
+  if (channelError) throw new LookupFailed(channelError.message);
+  const extra: Existing[] = channels.map((c) => ({
+    id: c.contact_id,
+    phone_e164: c.kind === "phone" ? c.value : null,
+    email: c.kind === "email" ? c.value : null,
+    tax_id: null,
+    name: null,
+    viaChannel: true,
+  }));
+  return [...data, ...extra];
 }
 
 const same = (a: string | null | undefined, b: string | null | undefined) => Boolean(a && b && a.toLowerCase() === b.toLowerCase());
@@ -507,6 +524,11 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         continue;
       }
       const values = { ...row.values };
+      // CON-01: a file value that is already a further phone or email of this contact is not
+      // written as its primary (it would replace the primary and repeat the further one)
+      const further = existing.filter((e) => e.viaChannel && e.id === match.id);
+      if (row.phoneE164 && further.some((e) => e.phone_e164 === row.phoneE164)) delete values.phone;
+      if (row.email && further.some((e) => same(e.email, row.email))) delete values.email;
       // only what the file filled in; an empty cell does not erase
       for (const [k, v] of Object.entries(values)) if (v === null) delete values[k];
       if (values.custom_fields) {

@@ -1,3 +1,4 @@
+import { draftsFrom } from "@/features/contacts/channels";
 import { getContact } from "@/features/contacts/queries";
 import { getLead } from "@/features/leads/queries";
 import { getOrgContext } from "@/features/shell/queries";
@@ -28,6 +29,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ org
         company: contact.companyName,
         jobTitle: contact.job_title,
         birthday: contact.birth_date,
+        phoneType: contact.phone_type,
+        emailType: contact.email_type,
+        // the further ones as the card shows them: in order, without a copy of the primary
+        extraPhones: draftsFrom("phone", contact.phone, contact.phone_type, contact.channels).filter((r) => !r.primary).map((r) => ({ value: r.value, type: r.type })),
+        extraEmails: draftsFrom("email", contact.email, contact.email_type, contact.channels).filter((r) => !r.primary).map((r) => ({ value: r.value, type: r.type })),
       };
     }
   }

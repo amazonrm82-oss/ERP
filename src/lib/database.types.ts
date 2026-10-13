@@ -621,6 +621,30 @@ export type ContactRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // CON-01: the type of the primary phone and email (null when cleared or not said)
+  // text columns with a check constraint: ContactPhoneType / ContactEmailType
+  phone_type: string | null;
+  email_type: string | null;
+};
+
+// CON-01: further phones and emails of a contact; the primary ones stay on the contact row
+export type ContactPhoneType = "mobile" | "work" | "home" | "other";
+export type ContactEmailType = "work" | "home" | "other";
+export type ContactChannelRow = {
+  id: string;
+  organization_id: string;
+  contact_id: string;
+  // "phone" | "email"; label is a ContactPhoneType (an email's: ContactEmailType)
+  kind: string;
+  label: string;
+  // as typed (an email lower-cased); value_e164 is a phone's normalized number, set by trigger
+  value: string;
+  value_e164: string | null;
+  position: number;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ContactInsert = {
@@ -630,6 +654,8 @@ export type ContactInsert = {
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
+  phone_type?: ContactPhoneType | null;
+  email_type?: ContactEmailType | null;
   job_title?: string | null;
   contact_type?: string | null;
   type_id?: string | null;
@@ -1103,6 +1129,11 @@ export type Database = {
       list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
+      contact_channels: Table<
+        ContactChannelRow,
+        { organization_id: string; contact_id: string; kind: "phone" | "email"; label?: ContactPhoneType; value: string; position?: number },
+        { label?: ContactPhoneType; value?: string; position?: number }
+      >;
       leads: Table<LeadRow, LeadInsert>;
       deals: Table<DealRow, DealInsert>;
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
@@ -1232,6 +1263,11 @@ export type Database = {
       import_find_duplicates: {
         Args: { p_org: string; p_entity: string; p_phones: string[]; p_emails: string[]; p_tax_ids: string[]; p_names: string[] };
         Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
+      };
+      // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
+      contact_channel_matches: {
+        Args: { p_org: string; p_phones: string[]; p_emails: string[] };
+        Returns: Array<{ contact_id: string; kind: "phone" | "email"; value: string }>;
       };
       // an exported list goes to the audit log (migration 0034)
       log_export: { Args: { p_org: string; p_kind: string; p_report: string | null; p_rows: number }; Returns: undefined };

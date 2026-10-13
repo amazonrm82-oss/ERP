@@ -670,6 +670,53 @@ describe("roles and record visibility", () => {
     expect((await pgError(insertFor(admin.id, viewer.id))).code).toBe("23503");
   });
 
+  it("a contact's further phones and emails follow the contact: who reads it reads them, who edits it changes them (CON-01)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, team_id) values ($1, 'איש של m1', $2) returning id", [org, team])).rows[0].id,
+    );
+    const add = (u: U, value: string) =>
+      asUser(u.id, (q) =>
+        q<{ id: string }>("insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'phone', $3) returning id", [org, contact, value]),
+      );
+    const mine = (await add(m1, "052-1110001")).rows[0].id;
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.contact_channels where contact_id = $1", [contact]));
+    const relabel = (u: U) => asUser(u.id, async (q) => (await q("update public.contact_channels set label = 'work' where id = $1", [mine])).rowCount);
+
+    // a colleague who cannot see the contact sees, adds and changes nothing
+    expect(await seen(m2)).toBe(0);
+    expect((await pgError(add(m2, "052-1110002"))).code).toBe("42501");
+    expect(await relabel(m2)).toBe(0);
+    await asUser(m2.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount).toBe(0));
+    // the team's manager and an admin do
+    expect(await seen(manager)).toBe(1);
+    expect(await relabel(manager)).toBe(1);
+    expect((await add(manager, "052-1110003")).rowCount).toBe(1);
+    expect(await seen(admin)).toBe(2);
+
+    // reading is not editing: with visibility "org" a colleague and a viewer read, and change nothing
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(2);
+      expect((await pgError(add(u, "052-1110004"))).code, u.email).toBe("42501");
+      expect(await relabel(u), u.email).toBe(0);
+      await asUser(u.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount, u.email).toBe(0));
+    }
+
+    // a read-only organization keeps them readable and unchanged
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await seen(m1)).toBe(2);
+      expect((await pgError(add(m1, "052-1110005"))).code).toBe("42501");
+      expect(await relabel(m1)).toBe(0);
+      await asUser(m1.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount).toBe(0));
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+    await asUser(m1.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount).toBe(1));
+  });
+
   it("ownership moves only through transfer_ownership, and only by the owner", async () => {
     const byAdmin = await pgError(asUser(admin.id, (q) => q("select public.transfer_ownership($1, $2)", [org, admin.id])));
     expect(byAdmin.code).toBe("42501");

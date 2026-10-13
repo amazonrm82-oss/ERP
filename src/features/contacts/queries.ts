@@ -9,6 +9,8 @@ import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import type { StoredChannel } from "./channels";
+
 export type ContactListItem = {
   id: string;
   fullName: string | null;
@@ -77,7 +79,9 @@ export async function listContacts(
 
   const searchFilter = personSearchFilter(["full_name"], options.search);
   if (searchFilter) {
-    query = query.or(searchFilter);
+    // CON-01: a further phone or email finds its contact too
+    const byChannel = await contactIdsByChannelSearch(orgId, options.search);
+    query = query.or(byChannel.length ? `${searchFilter},id.in.(${byChannel.join(",")})` : searchFilter);
   }
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
@@ -135,7 +139,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)
@@ -147,17 +151,19 @@ export async function getContact(orgId: string, contactId: string) {
     return null;
   }
 
-  const [owners, companies, types, source] = await Promise.all([
+  const [owners, companies, types, source, channels] = await Promise.all([
     getUserNames([data.owner_id]),
     getCompanyNames(orgId, [data.company_id]),
     recordTypeNames(orgId, "contact"),
     data.source_id
       ? supabase.from("lead_sources").select("name").eq("organization_id", orgId).eq("id", data.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    listContactChannels(orgId, contactId),
   ]);
 
   return {
     ...data,
+    channels,
     ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
     companyName: data.company_id ? (companies.get(data.company_id) ?? null) : null,
     sourceName: source.data?.name ?? null,
@@ -181,4 +187,40 @@ export async function listContactOptions(orgId: string): Promise<ContactOption[]
     throw new Error(`contact options query failed: ${error.message}`);
   }
   return data.map((row) => ({ id: row.id, name: row.full_name || row.email || row.phone || "איש קשר ללא שם" }));
+}
+
+/** CON-01: a contact's further phones and emails, in their order. */
+export async function listContactChannels(orgId: string, contactId: string): Promise<StoredChannel[]> {
+  const supabase = await createClient();
+  const data = must(
+    await supabase
+      .from("contact_channels")
+      .select("id, kind, label, value, value_e164, position")
+      .eq("organization_id", orgId)
+      .eq("contact_id", contactId)
+      .order("position")
+      .order("id"),
+    "contact channels",
+  );
+  return data as StoredChannel[];
+}
+
+/**
+ * CON-01: ids of contacts whose further phones or emails contain the search term, for the
+ * list's search box (the primary ones are searched on the contact row itself).
+ */
+export async function contactIdsByChannelSearch(orgId: string, term: string): Promise<string[]> {
+  const clean = term.replace(/["\\]/g, "").trim().slice(0, 100);
+  if (clean.length < 2) return [];
+  const digits = clean.replace(/\D/g, "").replace(/^0+/, "");
+  const ors = [`value.ilike."%${clean}%"`];
+  if (digits.length >= 3) ors.push(`value_e164.ilike."%${digits}%"`);
+  const supabase = await createClient();
+  const data = must(
+    // at most 200 rows: a search term that matches more further values than that is too wide to be
+    // useful, and the contact row's own phone and email are searched without this cap
+    await supabase.from("contact_channels").select("contact_id").eq("organization_id", orgId).or(ors.join(",")).limit(200),
+    "contact channel search",
+  );
+  return [...new Set(data.map((row) => row.contact_id))];
 }

@@ -1,3 +1,4 @@
+import { channelTypeLabel } from "@/features/contacts/channels";
 import type { Json } from "@/lib/database.types";
 import { formatDateTime } from "@/lib/format";
 import { isUuid } from "@/lib/paths";
@@ -9,6 +10,10 @@ function show(value: Json, field: string, names: Map<string, string>): string {
   if (value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "כן" : "לא";
   if (field === "amount_agorot" && typeof value === "number") return `₪${(value / 100).toLocaleString("he-IL")}`;
+  // CON-01: the type of a contact's primary phone or email
+  if ((field === "phone_type" || field === "email_type") && typeof value === "string") {
+    return channelTypeLabel(field === "phone_type" ? "phone" : "email", value) ?? value;
+  }
   if (typeof value === "string") {
     const text: string = value;
     // isUuid() is a type guard ("is string"); a plain boolean keeps the string type afterwards

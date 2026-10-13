@@ -8,7 +8,16 @@ export type VCardPerson = {
   company?: string | null;
   jobTitle?: string | null;
   birthday?: string | null; // YYYY-MM-DD
+  // CON-01: the type of the primary phone / email (mobile | work | home | other); a phone without one is CELL
+  phoneType?: string | null;
+  emailType?: string | null;
+  // CON-01: a contact's further phones and emails, with their type (mobile | work | home | other)
+  extraPhones?: Array<{ value: string; type: string }>;
+  extraEmails?: Array<{ value: string; type: string }>;
 };
+
+const VCARD_PHONE_TYPE: Record<string, string> = { mobile: "CELL", work: "WORK", home: "HOME", other: "VOICE" };
+const VCARD_EMAIL_TYPE: Record<string, string> = { work: "WORK", home: "HOME", other: "INTERNET" };
 
 // vCard 3.0 (RFC 2426; the same in RFC 6350 3.4): backslash, comma, semicolon and line
 // breaks are escaped. The backslash goes first, so the ones added here are not doubled.
@@ -37,8 +46,14 @@ function fold(line: string): string {
 export function buildVCard(person: VCardPerson): string {
   const name = person.name.trim() || "ללא שם";
   const lines = ["BEGIN:VCARD", "VERSION:3.0", `FN:${escapeVCardText(name)}`, `N:${escapeVCardText(name)};;;;`];
-  if (person.phone?.trim()) lines.push(`TEL;TYPE=CELL:${escapeVCardText(person.phone.trim())}`);
-  if (person.email?.trim()) lines.push(`EMAIL:${escapeVCardText(person.email.trim())}`);
+  if (person.phone?.trim()) lines.push(`TEL;TYPE=${VCARD_PHONE_TYPE[person.phoneType ?? ""] ?? "CELL"}:${escapeVCardText(person.phone.trim())}`);
+  for (const phone of person.extraPhones ?? []) {
+    if (phone.value.trim()) lines.push(`TEL;TYPE=${VCARD_PHONE_TYPE[phone.type] ?? "VOICE"}:${escapeVCardText(phone.value.trim())}`);
+  }
+  if (person.email?.trim()) lines.push(person.emailType && VCARD_EMAIL_TYPE[person.emailType] ? `EMAIL;TYPE=${VCARD_EMAIL_TYPE[person.emailType]}:${escapeVCardText(person.email.trim())}` : `EMAIL:${escapeVCardText(person.email.trim())}`);
+  for (const email of person.extraEmails ?? []) {
+    if (email.value.trim()) lines.push(`EMAIL;TYPE=${VCARD_EMAIL_TYPE[email.type] ?? "INTERNET"}:${escapeVCardText(email.value.trim())}`);
+  }
   if (person.company?.trim()) lines.push(`ORG:${escapeVCardText(person.company.trim())}`);
   if (person.jobTitle?.trim()) lines.push(`TITLE:${escapeVCardText(person.jobTitle.trim())}`);
   if (person.birthday && /^\d{4}-\d{2}-\d{2}$/.test(person.birthday)) lines.push(`BDAY:${person.birthday}`);

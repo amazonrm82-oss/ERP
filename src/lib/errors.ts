@@ -71,6 +71,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // REC-02 (trigger activities_notify_mentions)
   "mention:forbidden": "אפשר לאזכר רק מי שרשאי לראות את הרשומה. הסירו את האזכור ונסו שוב.",
   "mention:too_many": `אפשר לאזכר עד ${MENTION_MAX} אנשים בהערה אחת.`,
+  // CON-01 (trigger contact_channels_payload_check)
+  "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר.",
+  "contact_channel:max": "אפשר לשמור עד 10 טלפונים נוספים ו-10 אימיילים נוספים לאיש קשר.",
 };
 
 // P0001 raised without a hint: recognised by the (stable) English message.

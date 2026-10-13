@@ -27,8 +27,28 @@ export async function findDuplicateCandidates(orgId: string, type: MergeType, id
   const phone = str(row.phone_e164);
   const email = str(row.email);
   const taxId = type === "company" ? str(row.tax_id) : null;
-  if (phone && /^\+\d{6,15}$/.test(phone)) ors.push(`phone_e164.eq.${phone}`);
-  if (email && /^[^,()\s]+@[^,()\s]+$/.test(email)) ors.push(`email.ilike.${email}`);
+  if (type === "contact") {
+    // CON-01: every phone and email of the contact, against every phone and email of the others
+    const own = must(
+      await supabase.from("contact_channels").select("kind, value, value_e164").eq("organization_id", orgId).eq("contact_id", id),
+      "channels",
+    );
+    const phones = [...new Set([phone, ...own.map((c) => c.value_e164)].filter((p): p is string => Boolean(p && /^\+\d{6,15}$/.test(p))))];
+    const emails = [
+      ...new Set([email, ...own.filter((c) => c.kind === "email").map((c) => c.value)].filter((e): e is string => Boolean(e && /^[^,()"\\\s]+@[^,()"\\\s]+$/.test(e)))),
+    ].map((e) => e.toLowerCase());
+    if (phones.length) ors.push(`phone_e164.in.(${phones.join(",")})`);
+    if (emails.length) ors.push(`email.in.(${emails.map((e) => `"${e}"`).join(",")})`);
+    if (phones.length || emails.length) {
+      const { data: matches, error } = await supabase.rpc("contact_channel_matches", { p_org: orgId, p_phones: phones, p_emails: emails });
+      if (error) throw new Error(`duplicate candidates: ${error.message}`);
+      const ids = [...new Set(matches.map((m) => m.contact_id))].filter((x) => x !== id);
+      if (ids.length) ors.push(`id.in.(${ids.join(",")})`);
+    }
+  } else {
+    if (phone && /^\+\d{6,15}$/.test(phone)) ors.push(`phone_e164.eq.${phone}`);
+    if (email && /^[^,()\s]+@[^,()\s]+$/.test(email)) ors.push(`email.ilike.${email}`);
+  }
   if (taxId && /^\d{5,12}$/.test(taxId)) ors.push(`tax_id.eq.${taxId}`);
   if (ors.length === 0) return [];
   const data = must(await supabase

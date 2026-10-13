@@ -3,6 +3,9 @@ import type { CompanyOption } from "@/features/companies/queries";
 import { RecordTypeField } from "@/features/record-type-options/components/type-field";
 import type { RecordType } from "@/features/record-type-options/schema";
 
+import { draftsFrom, type ChannelDraft, type ChannelKind, type StoredChannel } from "../channels";
+import { ChannelsEditor } from "./channels-editor";
+
 export type ContactValues = {
   first_name?: string | null;
   last_name?: string | null;
@@ -13,7 +16,34 @@ export type ContactValues = {
   birth_date?: string | null;
   // CON-02
   type_id?: string | null;
+  // CON-01: the primary's types and the further phones and emails as stored ...
+  phone_type?: string | null;
+  email_type?: string | null;
+  channels?: StoredChannel[];
+  // ... or as the form sent them (JSON), after a failed save
+  phones?: string;
+  emails?: string;
 };
+
+/** The editor's rows: what the form sent when a save failed, else what is stored. */
+function initialDrafts(kind: ChannelKind, values: ContactValues): ChannelDraft[] {
+  const sent = kind === "phone" ? values.phones : values.emails;
+  if (typeof sent === "string") {
+    try {
+      const rows: unknown = JSON.parse(sent);
+      if (Array.isArray(rows)) {
+        return rows
+          .filter((r): r is ChannelDraft => typeof r === "object" && r !== null && typeof r.value === "string" && typeof r.type === "string")
+          .map((r) => ({ id: typeof r.id === "string" ? r.id : null, type: r.type, value: r.value, primary: r.primary === true }));
+      }
+    } catch {
+      // fall back to what is stored
+    }
+  }
+  return kind === "phone"
+    ? draftsFrom("phone", values.phone, values.phone_type, values.channels ?? [])
+    : draftsFrom("email", values.email, values.email_type, values.channels ?? []);
+}
 
 type Props = {
   values: ContactValues;
@@ -48,26 +78,8 @@ export function ContactFields({ values, errors, companies, types, legacyType }: 
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="טלפון"
-          name="phone"
-          type="tel"
-          dir="ltr"
-          inputMode="tel"
-          autoComplete="off"
-          defaultValue={values.phone ?? ""}
-          error={errors.phone}
-        />
-        <TextField
-          label="אימייל"
-          name="email"
-          type="email"
-          dir="ltr"
-          inputMode="email"
-          autoComplete="off"
-          defaultValue={values.email ?? ""}
-          error={errors.email}
-        />
+        <ChannelsEditor kind="phone" initial={initialDrafts("phone", values)} error={errors.phones} />
+        <ChannelsEditor kind="email" initial={initialDrafts("email", values)} error={errors.emails} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField

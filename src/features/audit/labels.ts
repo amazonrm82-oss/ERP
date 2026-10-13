@@ -127,4 +127,9 @@ export const FIELD_LABELS: Record<string, string> = {
   // team members (CAP-06: primary team)
   is_manager: "מנהל הצוות",
   is_primary: "צוות ראשי",
+  // CON-01: the type of a contact's primary phone and email, and its further ones
+  phone_type: "סוג הטלפון",
+  email_type: "סוג האימייל",
+  extra_phone: "טלפון נוסף",
+  extra_email: "אימייל נוסף",
 };

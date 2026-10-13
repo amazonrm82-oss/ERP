@@ -18,6 +18,7 @@ import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
 import { updateContactAction } from "../actions";
+import { channelTypeLabel, draftsFrom, type ChannelKind } from "../channels";
 import { ContactFields, type ContactValues } from "./contact-fields";
 
 export type ContactDetailsView = ContactValues & {
@@ -63,8 +64,8 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit }
       <CardBody>
         <DetailList>
           <Detail label="שם מלא" value={contact.full_name} />
-          <Detail label="טלפון" value={contact.phone} ltr />
-          <Detail label="אימייל" value={contact.email} ltr />
+          <Detail label="טלפון" value={<ChannelList kind="phone" contact={contact} />} />
+          <Detail label="אימייל" value={<ChannelList kind="email" contact={contact} />} />
           <Detail label="תפקיד" value={contact.job_title} />
           <Detail
             label="חברה"
@@ -126,5 +127,42 @@ function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps
         </form>
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * CON-01: the primary phone (or email) first, marked, then the further ones, each with its
+ * type and a link that dials or writes. The call and WhatsApp buttons at the top use the primary.
+ */
+function ChannelList({ kind, contact }: { kind: ChannelKind; contact: ContactDetailsView }) {
+  const rows = draftsFrom(kind, kind === "phone" ? contact.phone : contact.email, kind === "phone" ? contact.phone_type : contact.email_type, contact.channels ?? []);
+  if (rows.length === 0) {
+    return (
+      <>
+        <span aria-hidden="true" className="text-ink-soft">
+          –
+        </span>
+        <span className="sr-only">לא הוזן</span>
+      </>
+    );
+  }
+  return (
+    <ul className="space-y-1">
+      {rows.map((row) => {
+        // a primary without a stored type shows none (the form only suggests one)
+        const type = channelTypeLabel(kind, row.primary ? (kind === "phone" ? contact.phone_type : contact.email_type) : row.type);
+        const href = kind === "phone" ? `tel:${row.value.replace(/[^\d+]/g, "")}` : `mailto:${row.value}`;
+        return (
+          <li key={`${row.id ?? "primary"}-${row.value}`} className="flex flex-wrap items-baseline gap-x-2">
+            <a href={href} dir="ltr" className="break-all text-accent underline underline-offset-4">
+              {row.value}
+            </a>
+            {type || row.primary ? (
+              <span className="text-sm text-ink-soft">{[type, row.primary && rows.length > 1 ? "ראשי" : null].filter(Boolean).join(" · ")}</span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

@@ -64,6 +64,32 @@ async function findExisting(
       };
     }
   }
+  // CON-01: a contact's further phone or email counts too
+  const { data: matches, error } = await supabase.rpc("contact_channel_matches", {
+    p_org: orgId,
+    p_phones: e164 ? [e164] : [],
+    p_emails: email ? [email.toLowerCase()] : [],
+  });
+  if (error) {
+    throw new Error(`duplicate search: ${error.message}`);
+  }
+  const ids = [...new Set(matches.map((m) => m.contact_id))];
+  if (ids.length > 0) {
+    const contact = must(
+      await supabase
+        .from("contacts")
+        .select("id, full_name, phone, email")
+        .eq("organization_id", orgId)
+        .is("deleted_at", null)
+        .in("id", ids)
+        .order("created_at", { ascending: false })
+        .limit(1),
+      "duplicate search",
+    )?.[0];
+    if (contact) {
+      return { kind: "contact", name: contact.full_name || contact.email || contact.phone || "ללא שם", href: paths.contact(orgId, contact.id) };
+    }
+  }
   return null;
 }
 

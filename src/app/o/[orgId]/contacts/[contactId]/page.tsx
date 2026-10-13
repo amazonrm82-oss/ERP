@@ -8,6 +8,7 @@ import { ShareSummary } from "@/features/share/components/share-summary";
 import { recordSummary } from "@/features/share/summary";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
+import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
@@ -38,11 +39,12 @@ export const metadata: Metadata = { title: "איש קשר" };
 type Props = {
   params: Promise<{ orgId: string; contactId: string }>;
   // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[] }>;
+  // CON-01: channels=failed after a create whose further phones or emails were not saved
+  searchParams: Promise<{ tl?: string | string[]; channels?: string | string[] }>;
 };
 
 export default async function ContactPage({ params, searchParams }: Props) {
-  const [{ orgId, contactId }, { tl }] = await Promise.all([params, searchParams]);
+  const [{ orgId, contactId }, { tl, channels }] = await Promise.all([params, searchParams]);
   const context = await getOrgContext(orgId);
   if (!isUuid(contactId)) {
     notFound();
@@ -70,6 +72,9 @@ export default async function ContactPage({ params, searchParams }: Props) {
         back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
         actions={<FollowButton orgId={orgId} subject={{ kind: "contact", id: contact.id }} state={follow} />}
       />
+      {channels === "failed" ? (
+        <FormError className="mb-4" message="איש הקשר נוצר, אבל לא כל הטלפונים והאימיילים הנוספים נשמרו. אפשר להוסיף אותם בעריכה." />
+      ) : null}
       <div className="mb-5">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "contact", id: contact.id }, name } : undefined}
