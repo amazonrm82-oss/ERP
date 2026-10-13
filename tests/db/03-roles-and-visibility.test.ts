@@ -242,6 +242,8 @@ describe("roles and record visibility", () => {
       "insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'x')",
       "insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')",
       "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
+      "insert into public.product_categories (organization_id, name) values ($1, 'x')",
+      "insert into public.product_units (organization_id, name) values ($1, 'x')",
       "insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-01-01', 'won_deals', 1)",
       "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'x', 'x', 'text')",
     ]) {
@@ -281,6 +283,9 @@ describe("roles and record visibility", () => {
       record_type_options: "name = name",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
+      // PRD-04, seeded for every organization
+      product_categories: "name = name",
+      product_units: "name = name",
       goals: "target = target",
       field_definitions: "label = label",
       teams: "name = name",

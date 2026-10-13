@@ -40,6 +40,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_document_settings: "מע\"מ ופרטים למסמכים",
   // TAX-02 follow-up (the account number is stored masked)
   org_bank_details: "פרטי הבנק של העסק",
+  // PRD-04
+  product_categories: "קטגוריית מוצרים",
+  product_units: "יחידת מידה",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };

@@ -119,6 +119,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "vat:before_table": VAT_BEFORE_TABLE,
   // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
   "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
+  // PRD-04 (migration product_lists)
+  "product_categories:max": "אפשר לשמור עד 200 קטגוריות. מחקו קטגוריה שלא בשימוש כדי להוסיף חדשה.",
+  "product_categories:depth": "אפשר לשים קטגוריה רק בתוך קטגוריה ראשית, ורק אם אין בתוכה קטגוריות אחרות (עד שתי רמות).",
+  "product_units:max": "אפשר לשמור עד 50 יחידות מידה. מחקו יחידה שלא בשימוש כדי להוסיף חדשה.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

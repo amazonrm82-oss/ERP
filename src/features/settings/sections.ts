@@ -18,6 +18,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
+import { productListsSettingsPath } from "@/features/products/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
@@ -69,6 +70,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         ? [
             { href: paths.settingsPipelines(orgId), label: "פייפליינים", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
             { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
+            // PRD-04
+            { href: productListsSettingsPath(orgId), label: "קטגוריות ויחידות מידה", description: "הרשימות שבוחרים מהן בכל מוצר בקטלוג", icon: TagIcon },
             { href: paths.settingsLeads(orgId), label: "סטטוסים ומקורות", description: "השלבים של ליד ומאיפה הוא הגיע", icon: InboxIcon },
             { href: paths.settingsDisqualifyReasons(orgId), label: "סיבות לליד לא רלוונטי", description: "הרשימה שבוחרים ממנה כשליד לא רלוונטי", icon: InboxIcon },
             { href: paths.settingsRecordTypes(orgId), label: "סוגי אנשי קשר וחברות", description: "לקוח, ספק, שותף: הרשימה שבוחרים ממנה וסוננים לפיה", icon: UsersIcon },

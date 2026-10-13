@@ -167,6 +167,9 @@ describe("tenant isolation", () => {
     "deal_loss_reasons",
     // GOL-01
     "goals",
+    // PRD-04, seeded for every new organization
+    "product_categories",
+    "product_units",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -288,6 +291,8 @@ describe("tenant isolation", () => {
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       goals: "target = target",
+      product_categories: "name = name",
+      product_units: "name = name",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -367,6 +372,8 @@ describe("tenant isolation", () => {
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
+      ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -430,6 +437,8 @@ describe("tenant isolation", () => {
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["goals", "target = 777", "target = 777"],
+      ["product_categories", "position = 777", "position = 777"],
+      ["product_units", "position = 777", "position = 777"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>
