@@ -325,6 +325,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (hint `bank:invalid`, no value in errors); audit masks the account (`app.mask_bank_account`); every change notifies all
   active owners/admins with kind `system`; documents store `app.document_bank_snapshot(org)` (service_role only) when made.
   Business name rule (owner): customer-facing communication uses the display name; documents use the registered name when set.
+- Prices, totals, currency (TAX-04..06, migrations 0141-0143): `org_document_settings.prices_include_vat` (default false); every
+  document stores its own copy when made. `app.document_totals(lines, rate_bp, include_vat, discount_bp, discount_agorot,
+  round)` (pure, agorot and basis points, half up, discounts before VAT, VAT once per document, hint `totals:invalid`) mirrors
+  `documentTotals()` in `src/features/tax/calc.ts` (test 94 compares them; change both). `app.org_document_vat_rate(org, date)`:
+  0 = no VAT, null = status not set. Every amount has a currency next to it, ILS only until DEAL-12 (`leads.currency`,
+  `leads_currency_ils`, `deals_currency_ils`); a new money table carries `currency text not null default 'ILS' check (currency =
+  'ILS')`. `app.sample_row()` was last redefined in 0143 (ignores a missing `currency` key while it holds 'ILS').
 - Business days (HEB-03, migration 0134): `app.add_business_days(org, from, n)` (app only) counts n working days after a date by
   the CAL-03 rest days, read once and decided by `app.rest_day_with()` (the rule of `app.org_rest_day()` with the settings passed
   in; keep the two in step); n = 0 is the day itself or the next working day; n outside 0..1000 → hint `business_days:range`;
