@@ -189,6 +189,7 @@ describe("hosted form: what the server reads (CAP-01)", () => {
       brand: { logoPath: null, color: null },
       thanks: { whatsappUrl: null },
       callback: null,
+      builtWith: false,
     });
     expect(publicFormFrom(null)).toBeNull();
   });

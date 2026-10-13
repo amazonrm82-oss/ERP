@@ -14,6 +14,7 @@ import { ROLE_LABELS } from "@/features/shell/labels";
 import type { MembershipRole } from "@/lib/database.types";
 import { formatDate, formatDateTime, formatNumber, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
+import { effectiveLimits } from "@/lib/plan-keys";
 
 export const metadata: Metadata = { title: "כרטיס ארגון" };
 
@@ -36,7 +37,8 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
   const owner = (data.owner ?? {}) as Obj;
   const members = (data.members ?? {}) as Record<string, number>;
   const counts = (data.counts ?? {}) as Obj;
-  const limits = { ...((plan.limits ?? {}) as Obj), ...((sub.limit_overrides ?? {}) as Obj) };
+  // the same rule as app.org_limit(), wave 2 defaults included
+  const limits = effectiveLimits(plan.limits, sub.limit_overrides) as Obj;
   const supportUntil = str(data.support_until) || null;
   const activation = (data.activation ?? null) as Obj | null;
 

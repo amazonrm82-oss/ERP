@@ -7,10 +7,11 @@ import { describe, expect, it } from "vitest";
 
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { builtWithVisible } from "@/features/built-with/visibility";
+import { publicFormFrom } from "@/features/intake/public-form";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { SUPPORT_LINE } from "@/lib/support-phone";
-import { REMOVE_BUILT_WITH, WAVE2_FEATURE_KEYS, WAVE2_FEATURES, WAVE2_LIMIT_KEYS, WAVE2_LIMITS } from "@/lib/plan-keys";
+import { effectiveFeature, effectiveLimits, REMOVE_BUILT_WITH, WAVE2_FEATURE_KEYS, WAVE2_FEATURES, WAVE2_LIMIT_KEYS, WAVE2_LIMITS } from "@/lib/plan-keys";
 
 function migrationDefaults(): { features: Record<string, unknown>; limits: Record<string, unknown> } {
   const dir = join(process.cwd(), "supabase/migrations");
@@ -60,6 +61,29 @@ describe("wave 2 plan keys (owner, 13 October 2026)", () => {
   });
 });
 
+describe("effective flags and limits in the app mirror app.org_has_feature / app.org_limit", () => {
+  it("override, else plan, else the wave 2 default; older keys missing = off", () => {
+    expect(effectiveFeature("goals", {}, {})).toBe(true);
+    expect(effectiveFeature("remove_built_with", {}, {})).toBe(false);
+    expect(effectiveFeature("goals", { goals: false }, {})).toBe(false);
+    expect(effectiveFeature("goals", { goals: false }, { goals: true })).toBe(true);
+    expect(effectiveFeature("remove_built_with", {}, { remove_built_with: true })).toBe(true);
+    expect(effectiveFeature("view_seats", {}, {})).toBe(false);
+    expect(effectiveFeature("view_seats", { view_seats: true }, null)).toBe(true);
+    expect(effectiveFeature("goals", null, { goals: null })).toBe(false);
+  });
+
+  it("limits: defaults, then the plan, then the overrides; null stays unlimited; older keys missing = absent", () => {
+    const limits = effectiveLimits({ max_records: 1000, max_products: null }, { max_qr_codes: 5 });
+    expect(limits.max_records).toBe(1000);
+    expect(limits.max_products).toBeNull();
+    expect(limits.max_qr_codes).toBe(5);
+    expect(limits.max_price_lists).toBe(100000);
+    expect(limits.max_pdf_per_month).toBe(1000);
+    expect(limits.max_users).toBeUndefined();
+  });
+});
+
 describe('the "נבנה ב-Mexuz" line (FLD-04)', () => {
   it("shows only on an explicit true from the database", () => {
     expect(builtWithVisible(true)).toBe(true);
@@ -67,6 +91,10 @@ describe('the "נבנה ב-Mexuz" line (FLD-04)', () => {
     expect(builtWithVisible(null)).toBe(false);
     expect(builtWithVisible(undefined)).toBe(false);
     expect(builtWithVisible("true")).toBe(false);
+    const base = { title: "t", fields: [] };
+    expect(publicFormFrom({ ...base, built_with: true })?.builtWith).toBe(true);
+    expect(publicFormFrom({ ...base, built_with: false })?.builtWith).toBe(false);
+    expect(publicFormFrom(base)?.builtWith).toBe(false);
   });
 
   it("links to the landing page in a new tab, with an accessible name", () => {

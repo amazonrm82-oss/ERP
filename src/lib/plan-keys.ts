@@ -1,5 +1,5 @@
 // Wave 2 plan keys (owner, 13 October 2026). Mirrors app.plan_key_defaults() in
-// supabase/migrations/20261006013500_wave2_plan_keys.sql; tests/unit/plan-keys.test.ts
+// migration wave2_plan_keys; tests/unit/plan-keys.test.ts
 // keeps the two equal. Until pricing is decided every flag is on in every plan
 // (remove_built_with off) and every count quota has a high temporary value.
 // A module checks its own key in the database (app.org_has_feature / app.org_limit,
@@ -57,3 +57,30 @@ export const WAVE2_LIMIT_KEYS = Object.keys(WAVE2_LIMITS) as Wave2LimitKey[];
 
 /** The flag that hides the "נבנה ב-Mexuz" line on customer-facing pages. */
 export const REMOVE_BUILT_WITH: Wave2FeatureKey = "remove_built_with";
+
+type JsonObject = Record<string, unknown>;
+
+function asObject(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonObject) : {};
+}
+
+/**
+ * The effective flag, as app.org_has_feature() decides it: the organization's
+ * override, else the plan's value, else (a wave 2 key the plan does not hold) its
+ * default here; anything but true is off.
+ */
+export function effectiveFeature(key: string, planFeatures: unknown, overrides: unknown): boolean {
+  const own = asObject(overrides);
+  if (key in own) return own[key] === true;
+  const plan = asObject(planFeatures);
+  if (key in plan) return plan[key] === true;
+  return (WAVE2_FEATURES as JsonObject)[key] === true;
+}
+
+/**
+ * The effective limits, as app.org_limit() decides them: the wave 2 defaults, then
+ * the plan's keys, then the overrides (a present key wins, null = unlimited).
+ */
+export function effectiveLimits(planLimits: unknown, overrides: unknown): JsonObject {
+  return { ...WAVE2_LIMITS, ...asObject(planLimits), ...asObject(overrides) };
+}

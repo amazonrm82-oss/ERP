@@ -168,9 +168,9 @@ describe('the "נבנה ב-Mexuz" line on the public form (FLD-04)', () => {
   });
 
   const builtWith = (token: string) =>
-    asService(async (q) => (await q<{ v: boolean | null }>("select public.intake_form_built_with($1) as v", [token])).rows[0].v);
+    asService(async (q) => (await q<{ r: { built_with: boolean } | null }>("select public.intake_form($1) as r", [token])).rows[0].r?.built_with ?? null);
 
-  it("is shown by default", async () => {
+  it("is shown by default, in intake_form()'s reply", async () => {
     expect(await builtWith(form.token)).toBe(true);
   });
 
@@ -184,31 +184,36 @@ describe('the "נבנה ב-Mexuz" line on the public form (FLD-04)', () => {
     expect(await builtWith(form.token)).toBe(true);
   });
 
-  it("answers nothing for an unknown or inactive form", async () => {
+  it("a bad value never fails the form; the line then shows", async () => {
+    await setOverrides(org, { remove_built_with: "maybe" });
+    try {
+      const err = await pgError(asAdmin((q) => q("select app.org_has_feature($1, 'remove_built_with')", [org])));
+      expect(err.code).toBe("22P02");
+      expect(await builtWith(form.token)).toBe(true);
+    } finally {
+      await setOverrides(org, {});
+    }
+  });
+
+  it("nothing for an unknown or inactive form, and only for the service role", async () => {
     expect(await builtWith("0".repeat(32))).toBeNull();
-    expect(await builtWith("")).toBeNull();
     await asAdmin((q) => q("update public.forms set is_active = false where id = $1", [form.id]));
     try {
       expect(await builtWith(form.token)).toBeNull();
     } finally {
       await asAdmin((q) => q("update public.forms set is_active = true where id = $1", [form.id]));
     }
-  });
-
-  it("is for the server's service role only", async () => {
-    expect((await pgError(asAnon((q) => q("select public.intake_form_built_with($1)", [form.token])))).code).toBe("42501");
-    const user = await createUser("built-user");
-    expect((await pgError(asUser(user.id, (q) => q("select public.intake_form_built_with($1)", [form.token])))).code).toBe("42501");
+    expect((await pgError(asAnon((q) => q("select public.intake_form($1)", [form.token])))).code).toBe("42501");
     const grants = await asAdmin(
       async (q) =>
         (
-          await q<{ anon: boolean; auth: boolean; defaults: boolean }>(
-            `select has_function_privilege('anon', 'public.intake_form_built_with(text)', 'execute') as anon,
-                    has_function_privilege('authenticated', 'public.intake_form_built_with(text)', 'execute') as auth,
-                    has_function_privilege('authenticated', 'app.plan_key_defaults()', 'execute') as defaults`,
+          await q<{ defaults: boolean; built: boolean; old: boolean }>(
+            `select has_function_privilege('authenticated', 'app.plan_key_defaults()', 'execute') as defaults,
+                    has_function_privilege('authenticated', 'app.show_built_with(uuid)', 'execute') as built,
+                    exists (select 1 from pg_proc where proname = 'intake_form_built_with') as old`,
           )
         ).rows[0],
     );
-    expect(grants).toEqual({ anon: false, auth: false, defaults: false });
+    expect(grants).toEqual({ defaults: false, built: false, old: false });
   });
 });

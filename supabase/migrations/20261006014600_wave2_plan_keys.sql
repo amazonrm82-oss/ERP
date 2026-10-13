@@ -133,16 +133,98 @@ as $$
 $$;
 revoke all on function app.show_built_with(uuid) from public, anon, authenticated;
 
--- The hosted form (/f/[token]) asks whether to show the line. Same rules as
--- intake_form(): only an active form answers; null otherwise. It tells nothing
--- else about the organization.
-create or replace function public.intake_form_built_with(p_token text) returns boolean
-language sql stable security definer
+-- intake_form(): the body of 0127 (callback_slot_rules), plus 'built_with'
+-- (true = the hosted form (/f/[token]) shows the line). Nothing else changes.
+create or replace function public.intake_form(p_token text) returns jsonb
+language plpgsql stable security definer
 set search_path = ''
 as $$
-  select app.show_built_with(f.organization_id)
-    from public.forms f
-   where f.token = coalesce(p_token, '') and f.kind = 'form' and f.is_active
+declare
+  v_form public.forms%rowtype;
+  v_fields jsonb;
+  v_brand jsonb;
+  v_whatsapp text;
+  -- SPD-05
+  v_callback jsonb;
+  -- FLD-04: the "נבנה ב-Mexuz" line
+  v_built_with boolean;
+begin
+  select * into v_form from public.forms f
+   where f.token = coalesce(p_token, '') and f.kind = 'form';
+  if not found or not v_form.is_active then
+    return null;
+  end if;
+
+  select coalesce(jsonb_agg(x.field order by x.ord), '[]'::jsonb) into v_fields
+    from (
+      select a.ord,
+             jsonb_build_object(
+               'key', a.item ->> 'key',
+               'required', coalesce(a.item -> 'required' = 'true'::jsonb, false),
+               'help', coalesce(nullif(btrim(a.item ->> 'help'), ''), d.help_text),
+               'show_if', case when jsonb_typeof(a.item -> 'show_if') = 'object' then a.item -> 'show_if' end,
+               'label', d.label,
+               'type', d.field_type,
+               'options', d.options) as field
+        from jsonb_array_elements(case when jsonb_typeof(v_form.fields) = 'array' then v_form.fields else '[]'::jsonb end)
+               with ordinality as a(item, ord)
+        left join public.field_definitions d
+          on (a.item ->> 'key') like 'cf:%'
+         and d.organization_id = v_form.organization_id
+         and d.object_type = 'lead'
+         and d.key = substr(a.item ->> 'key', 4)
+         and d.is_active
+         and d.field_type <> 'user'
+       where (a.item ->> 'key') in ('full_name', 'phone', 'email', 'company_name', 'message')
+          or d.id is not null
+    ) x;
+
+  -- FLD-04: only the logo's object name and the colour; nothing else of the organization
+  select jsonb_build_object('logo', o.logo_path, 'color', o.brand_color) into v_brand
+    from public.organizations o
+   where o.id = v_form.organization_id;
+
+  -- CAP-05: the WhatsApp number of the thank-you page, only when the form turns it on:
+  -- the form's own number, else the business phone; only a valid E.164 number leaves
+  if v_form.whatsapp_button then
+    select app.normalize_phone(coalesce(nullif(btrim(v_form.whatsapp_phone), ''), o.phone)) into v_whatsapp
+      from public.organizations o
+     where o.id = v_form.organization_id;
+    if v_whatsapp !~ '^\+[1-9][0-9]{7,14}$' then
+      v_whatsapp := null;
+    end if;
+  end if;
+
+  -- SPD-05: the call-back choice: the business's time zone, whether "now" is
+  -- offered, and the slots still open today and on the next working day
+  if v_form.callback_choice then
+    select jsonb_build_object('time_zone', app.intake_zone(o.timezone))
+           || app.intake_callback_offer(v_form.organization_id, v_form.callback_slots_off, now())
+      into v_callback
+      from public.organizations o
+     where o.id = v_form.organization_id;
+  end if;
+
+  -- FLD-04: shown unless the plan or the override turns remove_built_with on; a bad
+  -- plan value never fails the form (the line then shows)
+  begin
+    v_built_with := coalesce(app.show_built_with(v_form.organization_id), true);
+  exception when others then
+    v_built_with := true;
+  end;
+
+  return jsonb_build_object(
+    'built_with', v_built_with,
+    'callback', v_callback,
+    'title', coalesce(nullif(btrim(v_form.title), ''), v_form.name),
+    'intro', v_form.intro,
+    'submit_label', v_form.submit_label,
+    'fields', v_fields,
+    'brand', coalesce(v_brand, jsonb_build_object('logo', null, 'color', null)),
+    'thanks', jsonb_build_object(
+      'whatsapp', v_whatsapp,
+      'whatsapp_text', case when v_whatsapp is not null then nullif(btrim(v_form.whatsapp_text), '') end));
+end;
 $$;
-revoke all on function public.intake_form_built_with(text) from public, anon, authenticated;
-grant execute on function public.intake_form_built_with(text) to service_role;
+revoke all on function public.intake_form(text) from public, anon, authenticated;
+grant execute on function public.intake_form(text) to service_role;

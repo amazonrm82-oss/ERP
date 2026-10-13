@@ -24,6 +24,8 @@ export type PublicForm = {
   thanks: { whatsappUrl: string | null };
   // SPD-05: the form asks when to call back: what it offers now (database rules), or null when it does not ask
   callback: CallbackOffer | null;
+  // FLD-04: show the "נבנה ב-Mexuz" line (false unless the database says true)
+  builtWith: boolean;
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -76,6 +78,7 @@ export function publicFormFrom(data: Json): PublicForm | null {
         : null,
     },
     callback: callbackOfferFrom(data.callback),
+    builtWith: builtWithVisible(data.built_with),
   };
 }
 
@@ -100,22 +103,4 @@ export async function getPublicForm(token: string): Promise<PublicForm | null | 
     return "not-configured";
   }
   return readPublicForm(service, token);
-}
-
-/**
- * Whether the hosted form shows the "נבנה ב-Mexuz" line (FLD-04), through
- * public.intake_form_built_with(): true unless the business's plan or override
- * turns remove_built_with on. Anything but true (form not found, no service key)
- * hides the line.
- */
-export async function getPublicFormBuiltWith(token: string): Promise<boolean> {
-  if (!/^[0-9a-f]{32}$/.test(token)) {
-    return false;
-  }
-  const service = createServiceClient();
-  if (!service) {
-    return false;
-  }
-  const data = must(await service.rpc("intake_form_built_with", { p_token: token }), "intake_form_built_with");
-  return builtWithVisible(data);
 }

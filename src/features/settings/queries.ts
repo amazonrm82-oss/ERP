@@ -4,6 +4,7 @@ import { getUserNames } from "@/features/shell/queries";
 import type { MembershipRole, MembershipStatus, RecordVisibility, SeatType } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
+import { effectiveFeature } from "@/lib/plan-keys";
 
 import { primaryTeamState, type PrimaryTeamState } from "./primary-team";
 
@@ -50,13 +51,12 @@ export async function orgHasFeature(orgId: string, key: string): Promise<boolean
   if (!subscription) {
     return false;
   }
-  const overrides = subscription.feature_overrides;
-  if (overrides && typeof overrides === "object" && !Array.isArray(overrides) && key in overrides) {
-    return overrides[key] === true;
-  }
   const plan = must(await supabase.from("plans").select("features").eq("key", subscription.plan_key).maybeSingle(), "plans");
-  const features = plan?.features;
-  return Boolean(features && typeof features === "object" && !Array.isArray(features) && features[key] === true);
+  if (!plan) {
+    return false;
+  }
+  // the same rule as app.org_has_feature(), wave 2 defaults included
+  return effectiveFeature(key, plan.features, subscription.feature_overrides);
 }
 
 export type Member = {
