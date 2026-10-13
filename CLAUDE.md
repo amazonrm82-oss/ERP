@@ -255,6 +255,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `follow` to followers who may read the record (`app.user_can_read_record`), never to the actor, never to the new owner
   about the owner change, never to someone the entry mentions; no entry text. Since 0109 a merge moves followers who may read the kept
   record; a user who followed both keeps one row; other rows go with the duplicate by cascade.
+  Since 0112 trigger `leads_convert_followers` (`app.convert_followers()`, after `converted_at` is first set, also by a
+  merge) adds the lead's followers who may read them to the new contact and deal (not in the bin; one row per user;
+  no notifications; company not carried; no backfill); `convert_lead()` unchanged.
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
