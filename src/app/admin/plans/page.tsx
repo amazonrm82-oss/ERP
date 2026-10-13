@@ -7,9 +7,9 @@ import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { businessPlanCanOpen } from "@/features/plans/capabilities";
 import { annualPriceLabel, AVAILABILITY_LABELS, monthlyPriceLabel, VAT_NOTE } from "@/features/plans/price";
-import { setPlanAvailabilityAction, setTrialEndAction, updatePlanAction } from "@/features/platform/actions";
+import { setPlanAvailabilityAction, setSuspensionCancelAction, setTrialEndAction, updatePlanAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
-import { getPlanWaitlistCounts, getTrialEndStatus, listPlans, platformReady } from "@/features/platform/queries";
+import { getPlanWaitlistCounts, getSuspensionCancelStatus, getTrialEndStatus, listPlans, platformReady } from "@/features/platform/queries";
 import { formatDate, formatNumber } from "@/lib/format";
 
 export const metadata: Metadata = { title: "חבילות" };
@@ -19,7 +19,7 @@ const shekels = (agorot: number) => String(agorot / 100);
 export default async function AdminPlansPage() {
   const me = await platformReady();
   if (!me) return null;
-  const [plans, waiting, trialEnd] = await Promise.all([listPlans(), getPlanWaitlistCounts(), getTrialEndStatus()]);
+  const [plans, waiting, trialEnd, cancel] = await Promise.all([listPlans(), getPlanWaitlistCounts(), getTrialEndStatus(), getSuspensionCancelStatus()]);
   const canEdit = me.role === "owner";
   const business = plans.find((plan) => plan.key === "business");
 
@@ -77,6 +77,50 @@ export default async function AdminPlansPage() {
             )
           ) : (
             <p className="text-sm text-ink-soft">רק בעלי הפלטפורמה מדליקים או מכבים את המעבר.</p>
+          )}
+        </CardBody>
+      </Card>
+      {/* BIL-09: 'cancelled' 90 days after suspension, off until the owner decides (13 October 2026) */}
+      <Card aria-labelledby="suspension-cancel" className="mb-5">
+        <CardHeader id="suspension-cancel" title="ביטול אחרי 90 יום בהשעיה" />
+        <CardBody className="space-y-3">
+          <p className="flex flex-wrap items-center gap-2">
+            <Badge tone={cancel.enabled ? "warning" : "neutral"}>{cancel.enabled ? "דולק" : "כבוי"}</Badge>
+            {cancel.enabled && cancel.enabledAt ? <span className="text-sm text-ink-soft">מאז {formatDate(cancel.enabledAt)}</span> : null}
+          </p>
+          <p className="text-md text-ink-soft">
+            כבוי: עסק מושהה נשאר מושהה. דולק: 90 יום אחרי ההשעיה (ולפחות 30 יום מההודעה הראשונה) המנוי מבוטל, עם הודעות לבעלים 30, 7 ויום
+            אחד לפני. שום נתון לא נמחק. אחרי הביטול הטפסים מפסיקים לקלוט לידים, והבעלים עדיין יכול להוריד את הנתונים.
+          </p>
+          <ul className="space-y-1 text-md">
+            <li>עסקים מושהים: {formatNumber(cancel.suspended)}</li>
+            <li>עם יום ביטול מתוכנן: {formatNumber(cancel.planned)}</li>
+            <li>בוטלו אחרי השעיה: {formatNumber(cancel.cancelled)}</li>
+          </ul>
+          {canEdit ? (
+            cancel.enabled ? (
+              <ConfirmButton
+                variant="secondary"
+                title="לכבות את הביטול אחרי השעיה?"
+                description="ימי הביטול המתוכננים מתבטלים, ועסקים מושהים נשארים מושהים. עסק שכבר בוטל נשאר מבוטל."
+                confirmLabel="כיבוי"
+                action={setSuspensionCancelAction.bind(null, false)}
+              >
+                כיבוי הביטול
+              </ConfirmButton>
+            ) : (
+              <ConfirmButton
+                variant="danger"
+                title="להדליק את הביטול אחרי השעיה?"
+                description={`${formatNumber(cancel.suspended)} עסקים מושהים יקבלו יום ביטול: 90 יום אחרי ההשעיה, ולפחות 30 יום מהיום, עם הודעות לבעלים לפני כן.`}
+                confirmLabel="הדלקה"
+                action={setSuspensionCancelAction.bind(null, true)}
+              >
+                הדלקת הביטול
+              </ConfirmButton>
+            )
+          ) : (
+            <p className="text-sm text-ink-soft">רק בעלי הפלטפורמה מדליקים או מכבים את הביטול.</p>
           )}
         </CardBody>
       </Card>

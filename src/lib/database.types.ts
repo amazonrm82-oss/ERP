@@ -1802,6 +1802,9 @@ export type Database = {
       // BIL-08: the trial-end switch (owner changes it; every platform role reads it)
       platform_trial_end_status: { Args: Record<string, never>; Returns: Json };
       platform_set_trial_end: { Args: { p_enabled: boolean }; Returns: Json };
+      // BIL-09 (0162): 'cancelled' 90 days after suspension, OFF by default
+      platform_suspension_cancel_status: { Args: Record<string, never>; Returns: Json };
+      platform_set_suspension_cancel: { Args: { p_enabled: boolean }; Returns: Json };
       // null, or { phase: 'grace' | 'read_only', read_only_on, closes_on } (local YYYY-MM-DD days) for a member
       trial_end_notice: { Args: { p_org: string }; Returns: Json };
       platform_staff_list: { Args: Record<string, never>; Returns: Json };

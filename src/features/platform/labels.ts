@@ -29,6 +29,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "trial_end.read_only": "סוף ניסיון: מעבר לקריאה בלבד",
   "trial_end.closed": "סוף ניסיון: סגירת העסק",
   "trial_end.restored": "סוף ניסיון: העסק חזר לעבוד",
+  "suspension_cancel.switch": "הדלקה או כיבוי של הביטול אחרי השעיה",
+  "suspension.cancelled": "ביטול מנוי אחרי 90 יום בהשעיה",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

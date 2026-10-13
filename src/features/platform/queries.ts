@@ -30,7 +30,9 @@ export async function platformReady(): Promise<PlatformMe | null> {
   return me && !me.needsMfa ? me : null;
 }
 
-async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health" | "platform_trial_end_status"): Promise<Json> {
+async function call(
+  name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health" | "platform_trial_end_status" | "platform_suspension_cancel_status",
+): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
   if (error) throw new Error(`${name} failed: ${error.message}`);
@@ -87,6 +89,21 @@ export async function getTrialEndStatus(): Promise<TrialEndStatus> {
     readOnly: n(data.read_only),
     closed: n(data.closed),
     assigned: n(data.assigned),
+  };
+}
+
+/** BIL-09: the switch that cancels a business 90 days after it was suspended, and what it covers. */
+export type SuspensionCancelStatus = { enabled: boolean; enabledAt: string | null; suspended: number; planned: number; cancelled: number };
+
+export async function getSuspensionCancelStatus(): Promise<SuspensionCancelStatus> {
+  const data = obj(await call("platform_suspension_cancel_status"));
+  const n = (value: unknown) => Number(value) || 0;
+  return {
+    enabled: data.enabled === true,
+    enabledAt: typeof data.enabled_at === "string" ? data.enabled_at : null,
+    suspended: n(data.suspended),
+    planned: n(data.planned),
+    cancelled: n(data.cancelled),
   };
 }
 

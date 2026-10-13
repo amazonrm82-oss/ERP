@@ -140,6 +140,17 @@ export async function setTrialEndAction(enabled: boolean): Promise<ActionResult>
   return { ok: true };
 }
 
+/** BIL-09: the platform owner turns the cancel-after-suspension stage on or off (logged in the database). */
+export async function setSuspensionCancelAction(enabled: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, enabled)) return fail(INVALID_ARGS);
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const { error } = await supabase.rpc("platform_set_suspension_cancel", { p_enabled: enabled });
+  if (error) return fail(platformError(error));
+  revalidatePath(paths.adminPlans);
+  return { ok: true };
+}
+
 export async function setStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await client();
   if (!supabase) return fail(SESSION_EXPIRED);
