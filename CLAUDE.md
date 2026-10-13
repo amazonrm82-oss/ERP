@@ -644,6 +644,9 @@ file wins.
   in hard rule 5); the go-ahead list in hard rule 3; anything that needs a secret, an account or money
   from the owner; weakening a test, a guard or an RLS policy to make something pass; anything that
   looks like another system.
+- **Plans and capabilities** (owner, 13 October 2026): every capability and quota is its own key in `plans` (DECISIONS.md
+  "דגלים ומכסות"). A capability that touches law or privacy (consents, retention, erasure, audit) is never locked by plan.
+  A new capability not yet assigned to plans is asked of the owner before it is opened to everyone.
 - **A question does not stop the line.** Write it under "שאלות שמחכות לבעל המוצר" in
   `docs/DECISIONS.md` with the requirement id, skip that requirement, continue with the next one that
   does not depend on it, and ask the waiting questions in plain Hebrew at the end of the turn, **one
