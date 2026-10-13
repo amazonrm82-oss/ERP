@@ -783,6 +783,8 @@ export type LeadRow = {
   utm: Json;
   score: number;
   budget_agorot: number | null;
+  // TAX-06 (migration money_currency): the currency of budget_agorot; 'ILS' only for now
+  currency: string;
   message: string | null;
   disqualify_reason: string | null;
   owner_id: string | null;
@@ -827,6 +829,7 @@ export type LeadInsert = {
   utm?: Json;
   score?: number;
   budget_agorot?: number | null;
+  currency?: "ILS";
   message?: string | null;
   disqualify_reason?: string | null;
   owner_id?: string | null;

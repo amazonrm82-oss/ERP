@@ -53,7 +53,8 @@ describe("record_summary: the contact / company card summary", () => {
       // linked both to contact A and to the company: counted once for the company
       await deal("פתוחה כפולה", 20000, "open", contactA, company);
       await deal("פתוחה של החברה", 30000, "open", null, company);
-      await deal("בדולר", 5000, "open", contactB, null, "USD");
+      // TAX-06: shekels only for now (deals_currency_ils); amounts in another currency: last test
+      await deal("של בתיה", 5000, "open", contactB, null);
       await deal("אבודה", 99999, "lost", contactA, null);
       await deal("של אחר", 77777, "won", loner, null);
       trashed = await deal("בסל", 88888, "open", contactA, null);
@@ -101,11 +102,10 @@ describe("record_summary: the contact / company card summary", () => {
     expect(s.open_tasks).toBe(1);
   });
 
-  it("a company: its own links plus its contacts', each deal once, currencies apart", async () => {
+  it("a company: its own links plus its contacts', each deal once", async () => {
     const s = await summary(owner.id, "company", company);
     expect(s.deals).toEqual([
-      { status: "open", currency: "ILS", count: 2, sum: 50000 },
-      { status: "open", currency: "USD", count: 1, sum: 5000 },
+      { status: "open", currency: "ILS", count: 3, sum: 55000 },
       { status: "won", currency: "ILS", count: 1, sum: 100000 },
     ]);
     expect(s.last_touch?.type).toBe("call");
@@ -119,11 +119,38 @@ describe("record_summary: the contact / company card summary", () => {
     await asUser(owner.id, (q) => q("update public.contacts set company_id = null where id = $1", [contactB]));
     try {
       const s = await summary(owner.id, "company", company);
-      expect(s.deals.find((d) => d.currency === "USD")).toBeUndefined();
+      expect(s.deals.find((d) => d.status === "open")).toEqual({ status: "open", currency: "ILS", count: 2, sum: 50000 });
       expect(s.open_tasks).toBe(2);
     } finally {
       await asUser(owner.id, (q) => q("update public.contacts set company_id = $1 where id = $2", [company, contactB]));
     }
+  });
+
+  it("currencies are summed apart (ready for wave 6; the ILS-only check is lifted inside a rolled-back transaction)", async () => {
+    let result: Summary | null = null;
+    await asAdmin(async (q) => {
+      const { pipelineId, stages } = await defaultPipeline(org);
+      await q("alter table public.deals drop constraint deals_currency_ils");
+      await q(
+        `insert into public.deals (organization_id, name, amount_agorot, currency, pipeline_id, stage_id, contact_id)
+         values ($1, 'בדולר', 7000, 'USD', $2, $3, $4)`,
+        [org, pipelineId, stages.find((st) => st.kind === "open")!.id, contactB],
+      );
+      await q("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: owner.id, role: "authenticated" })]);
+      await q("set local role authenticated");
+      result = (await q<{ s: Summary }>("select public.record_summary($1, 'company', $2) as s", [org, company])).rows[0].s;
+      throw new Error("rollback");
+    }).catch((error: Error) => {
+      if (error.message !== "rollback") throw error;
+    });
+    expect(result!.deals).toEqual([
+      { status: "open", currency: "ILS", count: 3, sum: 55000 },
+      { status: "open", currency: "USD", count: 1, sum: 7000 },
+      { status: "won", currency: "ILS", count: 1, sum: 100000 },
+    ]);
+    // the check is back
+    const back = await pgError(asAdmin((q) => q("update public.deals set currency = 'USD' where organization_id = $1", [org])));
+    expect(back.code).toBe("23514");
   });
 
   it("RLS decides: with 'own' visibility a member counts only their own deals", async () => {
