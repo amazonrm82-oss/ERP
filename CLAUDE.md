@@ -353,6 +353,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   only goals whose actual the caller sees in full are returned (own meetings goal via `app.goal_entries_readable`). Overdue
   open deals are their own line, never inside a month; the goal comparison is null when the view is partial or a pipeline is
   picked. Pace shows after a quarter of the period (`src/features/goals/progress.ts`).
+- Pipeline cleanup and money waiting (MNY-05/01/02, migrations 0144, 0145): `report_pipeline_cleanup(org, owner)` (security
+  invoker) copies `report_stuck_deals`' stuck rule (keep in step; test 93 compares them in two far time zones); overdue =
+  expected close date before the org's today; postponed deals left out; each deal once (stuck, else overdue); 300 rows.
+  `report_money_waiting` = cleanup totals as the main number plus a separate estimate (unhandled leads × average won deal of 90
+  days the caller sees, null below 5). Unhandled = the waiting-leads rule (`src/features/leads/waiting.ts`): no non-private
+  contact entry by a person, and a lead someone else took is hidden as in `takenLeadsFilter`; keep SQL and TS in step. New
+  groups go into `MONEY_GROUPS` (`src/features/money-waiting/groups.ts`) plus a report key.
 - Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
   read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
   `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
