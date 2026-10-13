@@ -67,8 +67,13 @@ and build this CRM here instead. The old code is preserved on the branch
    in `CLEANUP_BUCKETS` (`src/features/files/orphans.ts`): `record-files` (files of deleted rows) and `avatars` (the
    photos of deleted accounts and replaced photos; owner's decision USR-01, 12 October 2026).
    Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
-   `QUO-08`, `CAL-10`, `BAL-04`): a server route calls one `security definer` function granted to
-   `service_role` only, which checks the token and does only what that page needs; no direct table access.
+   `QUO-08`, `CAL-10`, `BAL-04`; owner, 13 October 2026: digital business card `BIZ-02`, QR scan counter `BIZ-03`,
+   site widget `SPD-07`): a server route calls one `security definer` function granted to `service_role` only, which
+   checks the token and does only what that page needs; no direct table access. Conditions for the 13 October three
+   (DECISIONS.md): only public fields; inactive or deleted rep = "not found"; forms go through `intake_submit`; scans are
+   a counter only (no IP, device or visitor id) and redirect only to the stored target; the widget gets display settings
+   only, no cookies or visitor id; each has rate limits, database tests that prove nothing beyond what is needed is
+   returned and no cross-organization access, and an independent review before merge.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
 6. If something looks like it belongs to another system, stop and ask.
