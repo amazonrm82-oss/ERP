@@ -378,6 +378,10 @@ export type FormRow = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // CAP-05: WhatsApp button on the thank-you state; phone null = the business phone
+  whatsapp_button: boolean;
+  whatsapp_phone: string | null;
+  whatsapp_text: string | null;
 };
 
 export type FormSubmissionRow = {
@@ -999,6 +1003,9 @@ export type Database = {
           team_id?: string | null;
           assign_mode?: AssignMode;
           is_active?: boolean;
+          whatsapp_button?: boolean;
+          whatsapp_phone?: string | null;
+          whatsapp_text?: string | null;
         },
         {
           name?: string;
@@ -1013,6 +1020,9 @@ export type Database = {
           team_id?: string | null;
           assign_mode?: AssignMode;
           is_active?: boolean;
+          whatsapp_button?: boolean;
+          whatsapp_phone?: string | null;
+          whatsapp_text?: string | null;
         }
       >;
       // written only by intake_submit()

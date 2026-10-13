@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { FORM_EXCLUDED_TYPES, INTAKE_FIELD_LABELS, isIntakeField, parseFieldsConfig } from "./fields";
 import type { PublicField } from "./public-validate";
+import { whatsappChatUrl } from "./whatsapp";
 
 export type PublicForm = {
   title: string;
@@ -17,6 +18,8 @@ export type PublicForm = {
   fields: PublicField[];
   // FLD-04: the business's logo (object name in the public bucket) and main colour, or null
   brand: { logoPath: string | null; color: string | null };
+  // CAP-05: the thank-you state's WhatsApp chat link (wa.me), or null for no button
+  thanks: { whatsappUrl: string | null };
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -60,6 +63,14 @@ export function publicFormFrom(data: Json): PublicForm | null {
       logoPath: isObject(data.brand) && isLogoPath(data.brand.logo) ? data.brand.logo : null,
       color: isObject(data.brand) && isHexColor(data.brand.color) ? data.brand.color : null,
     },
+    thanks: {
+      whatsappUrl: isObject(data.thanks)
+        ? whatsappChatUrl(
+            typeof data.thanks.whatsapp === "string" ? data.thanks.whatsapp : null,
+            typeof data.thanks.whatsapp_text === "string" ? data.thanks.whatsapp_text : null,
+          )
+        : null,
+    },
   };
 }
 
@@ -71,7 +82,8 @@ export async function readPublicForm(service: ServiceClient, token: string): Pro
 
 /**
  * What the hosted form shows, by its public token. Only display settings are
- * read, plus the organization's logo and colour (FLD-04); nothing else about
+ * read, plus the organization's logo and colour (FLD-04) and, when the form
+ * turns it on, the WhatsApp number of the thank-you page (CAP-05); nothing else about
  * the organization or its data leaves the server.
  */
 export async function getPublicForm(token: string): Promise<PublicForm | null | "not-configured"> {

@@ -37,7 +37,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
             <h1 className="text-2xl font-semibold">{found.title}</h1>
             {found.intro ? <p className="mt-1 whitespace-pre-wrap text-ink-soft">{found.intro}</p> : null}
             <div className="mt-6">
-              <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} />
+              <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} whatsappUrl={found.thanks.whatsappUrl} />
             </div>
           </>
         )}

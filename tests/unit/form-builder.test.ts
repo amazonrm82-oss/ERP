@@ -187,6 +187,7 @@ describe("hosted form: what the server reads (CAP-01)", () => {
         { key: "cf:service", required: false, help: null, showIf: null, label: "שירות", custom: { type: "select", label: "שירות", options: ["א", "ב"] } },
       ],
       brand: { logoPath: null, color: null },
+      thanks: { whatsappUrl: null },
     });
     expect(publicFormFrom(null)).toBeNull();
   });

@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
-import { FormError, FormNotice } from "@/components/ui/feedback";
+import { buttonClasses } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
+import { ChatIcon, CheckIcon } from "@/components/ui/icons";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 
@@ -10,7 +12,8 @@ import { collectAttribution } from "../attribution";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
 
-type Props = { token: string; fields: PublicField[]; submitLabel: string };
+// whatsappUrl: CAP-05, the thank-you state's chat with the business (wa.me), or null for no button
+type Props = { token: string; fields: PublicField[]; submitLabel: string; whatsappUrl: string | null };
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
 function rawValues(form: HTMLFormElement): RawValues {
@@ -24,7 +27,7 @@ function rawValues(form: HTMLFormElement): RawValues {
 }
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
-export function PublicLeadForm({ token, fields, submitLabel }: Props) {
+export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl }: Props) {
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export function PublicLeadForm({ token, fields, submitLabel }: Props) {
   }
 
   if (done) {
-    return <FormNotice message={done} />;
+    return <ThankYou message={done} whatsappUrl={whatsappUrl} />;
   }
 
   return (
@@ -94,6 +97,34 @@ export function PublicLeadForm({ token, fields, submitLabel }: Props) {
         {submitLabel}
       </SubmitButton>
     </form>
+  );
+}
+
+/**
+ * CAP-05: the thank-you state, in the business's colour (inside BrandScope).
+ * Focus moves to it, so a screen reader reads it out and a keyboard user is not
+ * left on a button that is gone. A redirect URL, when set, wins before this shows.
+ */
+function ThankYou({ message, whatsappUrl }: { message: string; whatsappUrl: string | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <div ref={ref} tabIndex={-1} role="status" className="rounded-lg border border-line bg-surface p-5 text-center outline-none">
+      <span aria-hidden="true" className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-accent text-on-accent">
+        <CheckIcon className="size-6" />
+      </span>
+      <p className="text-lead font-semibold whitespace-pre-wrap">{message}</p>
+      {whatsappUrl ? (
+        <>
+          <p className="mt-4 text-md text-ink-soft">רוצים להמשיך לדבר? אפשר לכתוב לנו גם ב-WhatsApp.</p>
+          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses("primary", "md", "mt-3 w-full gap-2")}>
+            <ChatIcon className="size-5" aria-hidden="true" />
+            שליחת הודעה ב-WhatsApp
+            <span className="sr-only"> (נפתח בחלון חדש)</span>
+          </a>
+        </>
+      ) : null}
+    </div>
   );
 }
 

@@ -12,6 +12,7 @@ import {
   type FormFieldOption,
   type ShowIf,
 } from "./fields";
+import { MAX_WHATSAPP_TEXT, whatsappNumber } from "./whatsapp";
 
 export const createIntakeSchema = z.object({
   name: requiredText(80, "יש לתת שם.", "השם ארוך מדי (עד 80 תווים)."),
@@ -30,6 +31,12 @@ const optionalHttpsUrl = optionalText(500, "הכתובת ארוכה מדי.").re
   { error: "יש להזין כתובת מלאה שמתחילה ב-https://" },
 );
 
+// CAP-05: a number WhatsApp can open, as typed; empty = the business phone
+const optionalWhatsappPhone = optionalText(30, "המספר ארוך מדי.").refine(
+  (value) => value === null || (/^[0-9+() -]+$/.test(value) && whatsappNumber(value) !== null),
+  { error: "יש להזין מספר טלפון תקין, למשל 050-1234567." },
+);
+
 export const updateIntakeSchema = z.object({
   name: requiredText(80, "יש לתת שם.", "השם ארוך מדי (עד 80 תווים)."),
   title: optionalText(120, "הכותרת ארוכה מדי (עד 120 תווים)."),
@@ -42,6 +49,9 @@ export const updateIntakeSchema = z.object({
   team_id: optionalId,
   assign_mode: z.enum(["owner", "round_robin"], { error: "יש לבחור איך מחלקים את הלידים." }),
   is_active: checkbox,
+  whatsapp_button: checkbox,
+  whatsapp_phone: optionalWhatsappPhone,
+  whatsapp_text: optionalText(MAX_WHATSAPP_TEXT, `ההודעה ארוכה מדי (עד ${MAX_WHATSAPP_TEXT} תווים).`),
 });
 
 const fieldsJsonSchema = z

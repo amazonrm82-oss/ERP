@@ -16,7 +16,8 @@ import { formQrUrl, qrFileName } from "@/features/intake/qr-link";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { listMembers, listTeams } from "@/features/settings/queries";
+import { getOrganizationSettings, listMembers, listTeams } from "@/features/settings/queries";
+import { whatsappNumber } from "@/features/intake/whatsapp";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
@@ -31,7 +32,7 @@ export default async function IntakeItemPage({ params }: Props) {
   if (!isUuid(formId) || !isAdminRole(role)) {
     notFound();
   }
-  const [intake, submissions, lookups, members, teams, origin, definitions] = await Promise.all([
+  const [intake, submissions, lookups, members, teams, origin, definitions, organization] = await Promise.all([
     getIntake(orgId, formId),
     listSubmissions(orgId, formId),
     getLeadLookups(orgId),
@@ -39,6 +40,7 @@ export default async function IntakeItemPage({ params }: Props) {
     listTeams(orgId),
     siteOrigin(),
     listFieldDefinitions(orgId, "lead", { includeInactive: true }),
+    getOrganizationSettings(orgId),
   ]);
   if (!intake) {
     notFound();
@@ -49,6 +51,8 @@ export default async function IntakeItemPage({ params }: Props) {
     .map((member) => ({ id: member.userId, name: member.name }));
 
   const fieldOptions = formFieldOptions(definitions);
+  // CAP-05: the business phone, as typed, when a WhatsApp chat can open it
+  const businessPhone = organization?.phone && whatsappNumber(organization.phone) ? organization.phone : null;
   const customNames = intake.fields.filter((field) => isCustomFormKey(field.key)).map((field) => formInputName(field.key));
   const pageUrl = `${origin}/f/${intake.token}`;
   const postUrl = `${origin}/api/forms/${intake.token}`;
@@ -136,6 +140,7 @@ export default async function IntakeItemPage({ params }: Props) {
               members={assignable}
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
               fieldOptions={fieldOptions}
+              businessPhone={businessPhone}
             />
           ) : (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד.</p>

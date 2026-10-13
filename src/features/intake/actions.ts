@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { actionContext } from "@/lib/action-context";
-import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
+import { fail, FORM_INVALID, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
@@ -14,6 +14,7 @@ import type { Json } from "@/lib/database.types";
 
 import { formFieldOptions, storedFields } from "./fields";
 import { createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
+import { whatsappNumber } from "./whatsapp";
 
 export async function createIntakeAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
@@ -61,6 +62,9 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
       "team_id",
       "assign_mode",
       "is_active",
+      "whatsapp_button",
+      "whatsapp_phone",
+      "whatsapp_text",
     ]),
   );
   if (!parsed.success) {
@@ -100,10 +104,26 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
     }
     fields = storedFields(checked.fields);
   }
+  // CAP-05: the WhatsApp button needs a number: the form's own, else the business phone
+  if (current.kind === "form" && parsed.data.whatsapp_button && !parsed.data.whatsapp_phone) {
+    const { data: org, error: orgError } = await context.supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle();
+    if (orgError) return fail(dbErrorMessage(orgError));
+    if (!whatsappNumber(org?.phone)) {
+      return fail(FORM_INVALID, {
+        values: formValues(formData),
+        fieldErrors: { whatsapp_phone: "יש להזין מספר ל-WhatsApp: בפרטי העסק אין מספר טלפון תקין." },
+      });
+    }
+  }
 
+  // CAP-05: webhooks keep their WhatsApp columns as they are; with the button off
+  // only the switch is saved, and the stored number and text stay untouched
+  const { whatsapp_button, whatsapp_phone, whatsapp_text, ...settings } = parsed.data;
+  const thanks =
+    current.kind !== "form" ? {} : whatsapp_button ? { whatsapp_button, whatsapp_phone, whatsapp_text } : { whatsapp_button };
   const { data, error } = await context.supabase
     .from("forms")
-    .update({ ...parsed.data, ...(fields !== undefined ? { fields } : {}) })
+    .update({ ...settings, ...thanks, ...(fields !== undefined ? { fields } : {}) })
     .eq("organization_id", orgId)
     .eq("id", formId)
     .select("id");

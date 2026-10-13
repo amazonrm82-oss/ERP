@@ -62,13 +62,17 @@ export type IntakeDetails = {
   teamId: string | null;
   assignMode: "owner" | "round_robin";
   isActive: boolean;
+  // CAP-05: the thank-you state's WhatsApp button; phone null = the business phone
+  whatsappButton: boolean;
+  whatsappPhone: string | null;
+  whatsappText: string | null;
 };
 
 export async function getIntake(orgId: string, formId: string): Promise<IntakeDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text")
     .eq("organization_id", orgId)
     .eq("id", formId)
     .maybeSingle();
@@ -94,6 +98,9 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     teamId: data.team_id,
     assignMode: data.assign_mode === "round_robin" ? "round_robin" : "owner",
     isActive: data.is_active,
+    whatsappButton: data.whatsapp_button,
+    whatsappPhone: data.whatsapp_phone,
+    whatsappText: data.whatsapp_text,
   };
 }
 

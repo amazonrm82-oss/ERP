@@ -45,7 +45,16 @@ export function CreateIntakeForm({ orgId }: { orgId: string }) {
   );
 }
 
-type EditProps = { orgId: string; intake: IntakeDetails; sources: Option[]; members: Option[]; teams: Option[]; fieldOptions: FormFieldOption[] };
+// businessPhone: the business phone as typed, when a WhatsApp chat can open it, else null (CAP-05)
+type EditProps = {
+  orgId: string;
+  intake: IntakeDetails;
+  sources: Option[];
+  members: Option[];
+  teams: Option[];
+  fieldOptions: FormFieldOption[];
+  businessPhone: string | null;
+};
 
 /** The builder's JSON (camelCase) in the stored shape, for parseFieldsConfig. */
 function fieldsJsonToStored(json: string): Json {
@@ -57,7 +66,7 @@ function fieldsJsonToStored(json: string): Json {
   }
 }
 
-export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fieldOptions }: EditProps) {
+export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fieldOptions, businessPhone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
@@ -79,28 +88,8 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <TextField label="כותרת הטופס" name="title" maxLength={120} autoComplete="off" defaultValue={values?.title ?? intake.title ?? ""} error={errors.title} />
           <TextareaField label="טקסט מעל הטופס (לא חובה)" name="intro" rows={2} maxLength={500} defaultValue={values?.intro ?? intake.intro ?? ""} error={errors.intro} />
           <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
-            <TextField
-              label="מעבר לדף אחרי שליחה (לא חובה)"
-              name="redirect_url"
-              dir="ltr"
-              inputMode="url"
-              autoComplete="off"
-              placeholder="https://example.co.il/thanks"
-              defaultValue={values?.redirect_url ?? intake.redirectUrl ?? ""}
-              error={errors.redirect_url}
-            />
-          </div>
-          <TextField
-            label="הודעת תודה"
-            name="success_message"
-            maxLength={300}
-            autoComplete="off"
-            placeholder="תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם."
-            defaultValue={values?.success_message ?? intake.successMessage ?? ""}
-            error={errors.success_message}
-          />
+          <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
+          <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>
       ) : null}
 
@@ -180,6 +169,95 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
       <FormNotice message={state?.ok ? state.message : null} />
       <SubmitButton>שמירה</SubmitButton>
     </form>
+  );
+}
+
+/**
+ * CAP-05: what the person sees after sending: the thank-you message, with an
+ * optional WhatsApp button, or a page of the business's own (which wins).
+ */
+function ThanksSettings({
+  intake,
+  businessPhone,
+  values,
+  errors,
+}: {
+  intake: IntakeDetails;
+  businessPhone: string | null;
+  values: Record<string, string> | undefined;
+  errors: Record<string, string>;
+}) {
+  const [whatsapp, setWhatsapp] = useState(values ? values.whatsapp_button === "on" : intake.whatsappButton);
+  return (
+    <fieldset className="space-y-4 rounded-md border border-line p-3">
+      <legend className="px-1 text-sm font-medium">אחרי השליחה</legend>
+      <TextField
+        label="הודעת תודה"
+        name="success_message"
+        maxLength={300}
+        autoComplete="off"
+        placeholder="תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם."
+        defaultValue={values?.success_message ?? intake.successMessage ?? ""}
+        error={errors.success_message}
+      />
+      <div className="space-y-3">
+        <label className="flex items-start gap-2.5 text-md">
+          <input
+            type="checkbox"
+            name="whatsapp_button"
+            checked={whatsapp}
+            onChange={(event) => setWhatsapp(event.currentTarget.checked)}
+            className="mt-1 size-4.5 accent-accent"
+          />
+          <span>
+            כפתור WhatsApp בהודעת התודה
+            <span className="block text-sm text-ink-soft">מי שמילא את הטופס יכול לפתוח שיחה עם העסק בלחיצה.</span>
+          </span>
+        </label>
+        {whatsapp ? (
+          <>
+            <p className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+              המספר יוצג לכל מי שפותח את הטופס: המספר שכאן, ואם הוא ריק, הטלפון שבפרטי העסק.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="מספר ל-WhatsApp"
+                name="whatsapp_phone"
+                type="tel"
+                dir="ltr"
+                inputMode="tel"
+                maxLength={30}
+                autoComplete="off"
+                placeholder={businessPhone ?? "050-1234567"}
+                defaultValue={values?.whatsapp_phone ?? intake.whatsappPhone ?? ""}
+                error={errors.whatsapp_phone}
+                hint={businessPhone ? "ריק: הטלפון שבפרטי העסק." : "בפרטי העסק אין טלפון, לכן צריך מספר כאן."}
+              />
+              <TextareaField
+                label="הודעה מוכנה בשיחה (לא חובה)"
+                name="whatsapp_text"
+                rows={2}
+                maxLength={300}
+                placeholder="היי, מילאתי עכשיו את הטופס באתר"
+                defaultValue={values?.whatsapp_text ?? intake.whatsappText ?? ""}
+                error={errors.whatsapp_text}
+              />
+            </div>
+          </>
+        ) : null}
+      </div>
+      <TextField
+        label="מעבר לדף אחרי שליחה (לא חובה)"
+        name="redirect_url"
+        dir="ltr"
+        inputMode="url"
+        autoComplete="off"
+        placeholder="https://example.co.il/thanks"
+        defaultValue={values?.redirect_url ?? intake.redirectUrl ?? ""}
+        error={errors.redirect_url}
+        hint="כשיש כתובת, עוברים אליה במקום הודעת התודה וכפתור ה-WhatsApp."
+      />
+    </fieldset>
   );
 }
 
