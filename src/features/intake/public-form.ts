@@ -20,6 +20,8 @@ export type PublicForm = {
   brand: { logoPath: string | null; color: string | null };
   // CAP-05: the thank-you state's WhatsApp chat link (wa.me), or null for no button
   thanks: { whatsappUrl: string | null };
+  // SPD-05: the form asks when to call back; the business's time zone for its slots, or null when it does not ask
+  callback: { timeZone: string } | null;
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -71,6 +73,7 @@ export function publicFormFrom(data: Json): PublicForm | null {
           )
         : null,
     },
+    callback: isObject(data.callback) && typeof data.callback.time_zone === "string" ? { timeZone: data.callback.time_zone } : null,
   };
 }
 

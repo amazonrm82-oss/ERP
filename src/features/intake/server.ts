@@ -6,6 +6,7 @@ import type { Json } from "@/lib/database.types";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseAttribution, safeText } from "./attribution";
+import { CALLBACK_INPUT } from "./callback";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { readPublicForm } from "./public-form";
 import { checkSubmission, wrongField, type RawValues } from "./public-validate";
@@ -170,6 +171,8 @@ const MESSAGES = {
   unavailable: "לא ניתן לשלוח את הטופס כרגע.",
   error: "משהו השתבש. נסו שוב בעוד רגע.",
   thanks: "תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם.",
+  callbackPast: "השעה שבחרתם כבר עברה. בחרו שעה אחרת.",
+  callbackInvalid: "בחרו מהרשימה מתי נוח שנחזור אליכם.",
 };
 
 /**
@@ -226,7 +229,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     if (wrong) {
       return respond(400, { ok: false, message: wrong[1], field: wrong[0] });
     }
-    fields = { ...checked.builtins, custom: checked.custom };
+    // SPD-05: the call-back choice; the database uses it only when the form asks, and checks it
+    fields = { ...checked.builtins, custom: checked.custom, callback: text(body[CALLBACK_INPUT])?.slice(0, 40) ?? null };
   }
 
   const { data, error } = await service.rpc("intake_submit", {
@@ -241,6 +245,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
 
   if (error) {
     if (error.code === "P0002") return respond(404, { ok: false, message: MESSAGES.notFound });
+    if (error.hint === "callback:past") return respond(400, { ok: false, message: MESSAGES.callbackPast, field: CALLBACK_INPUT });
+    if (error.hint === "callback:invalid") return respond(400, { ok: false, message: MESSAGES.callbackInvalid, field: CALLBACK_INPUT });
     if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid, field: wrongField(error.message) });
     if (error.code === "P0001" && error.hint === "rate_limited") return respond(429, { ok: false, message: MESSAGES.rateLimited });
     if (error.code === "P0001") return respond(403, { ok: false, message: MESSAGES.unavailable });

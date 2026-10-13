@@ -88,6 +88,20 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <TextField label="כותרת הטופס" name="title" maxLength={120} autoComplete="off" defaultValue={values?.title ?? intake.title ?? ""} error={errors.title} />
           <TextareaField label="טקסט מעל הטופס (לא חובה)" name="intro" rows={2} maxLength={500} defaultValue={values?.intro ?? intake.intro ?? ""} error={errors.intro} />
           <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
+          <label className="flex items-start gap-2.5 text-md">
+            <input
+              type="checkbox"
+              name="callback_choice"
+              defaultChecked={values ? values.callback_choice === "on" : intake.callbackChoice}
+              className="mt-1 size-4.5 accent-accent"
+            />
+            <span>
+              לשאול מתי נוח שנחזור
+              <span className="block text-sm text-ink-soft">
+                עכשיו, או שעה היום או מחר. כל בחירה יוצרת משימת שיחה למי שמטפל בליד, ומופיעה בהתראה.
+              </span>
+            </span>
+          </label>
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>

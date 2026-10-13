@@ -399,6 +399,8 @@ export type FormRow = {
   whatsapp_button: boolean;
   whatsapp_phone: string | null;
   whatsapp_text: string | null;
+  // SPD-05: the hosted form asks when to call back; the choice creates a call task
+  callback_choice: boolean;
 };
 
 export type FormSubmissionRow = {
@@ -1065,6 +1067,7 @@ export type Database = {
           whatsapp_button?: boolean;
           whatsapp_phone?: string | null;
           whatsapp_text?: string | null;
+          callback_choice?: boolean;
         },
         {
           name?: string;
@@ -1082,6 +1085,7 @@ export type Database = {
           whatsapp_button?: boolean;
           whatsapp_phone?: string | null;
           whatsapp_text?: string | null;
+          callback_choice?: boolean;
         }
       >;
       // written only by intake_submit()

@@ -52,6 +52,8 @@ export const updateIntakeSchema = z.object({
   whatsapp_button: checkbox,
   whatsapp_phone: optionalWhatsappPhone,
   whatsapp_text: optionalText(MAX_WHATSAPP_TEXT, `ההודעה ארוכה מדי (עד ${MAX_WHATSAPP_TEXT} תווים).`),
+  // SPD-05: ask when to call back
+  callback_choice: checkbox,
 });
 
 const fieldsJsonSchema = z
