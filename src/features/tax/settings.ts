@@ -22,3 +22,57 @@ export function taxSettingsFromRow(
     otherChargesVat: row?.other_charges_vat ?? null,
   };
 }
+
+/** The business as its documents show it (TAX-02). The logo is the FLD-04 logo, read with getOrgBranding(). */
+export type DocumentDetails = {
+  legalName: string | null;
+  taxId: string | null;
+  addressLine: string | null;
+  city: string | null;
+  postalCode: string | null;
+  phone: string | null;
+  email: string | null;
+  bankName: string | null;
+  bankBranch: string | null;
+  bankAccount: string | null;
+  bankAccountName: string | null;
+};
+
+export const DETAILS_COLUMNS =
+  "legal_name, tax_id, address_line, city, postal_code, phone, email, bank_name, bank_branch, bank_account, bank_account_name" as const;
+
+type DetailsRow = Pick<
+  OrgDocumentSettingsRow,
+  "legal_name" | "tax_id" | "address_line" | "city" | "postal_code" | "phone" | "email" | "bank_name" | "bank_branch" | "bank_account" | "bank_account_name"
+>;
+
+export function documentDetailsFromRow(row: DetailsRow | null): DocumentDetails {
+  return {
+    legalName: row?.legal_name ?? null,
+    taxId: row?.tax_id ?? null,
+    addressLine: row?.address_line ?? null,
+    city: row?.city ?? null,
+    postalCode: row?.postal_code ?? null,
+    phone: row?.phone ?? null,
+    email: row?.email ?? null,
+    bankName: row?.bank_name ?? null,
+    bankBranch: row?.bank_branch ?? null,
+    bankAccount: row?.bank_account ?? null,
+    bankAccountName: row?.bank_account_name ?? null,
+  };
+}
+
+/** "רחוב הרצל 1, תל אביב 6100000", or null when nothing is filled in. */
+export function documentAddress(details: Pick<DocumentDetails, "addressLine" | "city" | "postalCode">): string | null {
+  const place = [details.city, details.postalCode].filter(Boolean).join(" ");
+  const text = [details.addressLine, place].filter(Boolean).join(", ");
+  return text === "" ? null : text;
+}
+
+/** "בנק לאומי, סניף 800, חשבון 123456", or null without an account. */
+export function bankTransferText(details: Pick<DocumentDetails, "bankName" | "bankBranch" | "bankAccount" | "bankAccountName">): string | null {
+  if (!details.bankAccount) return null;
+  const parts = [details.bankName, details.bankBranch ? `סניף ${details.bankBranch}` : null, `חשבון ${details.bankAccount}`];
+  if (details.bankAccountName) parts.push(`על שם ${details.bankAccountName}`);
+  return parts.filter(Boolean).join(", ");
+}

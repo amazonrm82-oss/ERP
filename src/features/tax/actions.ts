@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
 import { documentSettingsPath } from "./paths";
-import { TAX_FIELD_NAMES, taxSettingsSchema } from "./schema";
+import { DETAILS_FIELD_NAMES, documentDetailsSchema, TAX_FIELD_NAMES, taxSettingsSchema } from "./schema";
 
 type SettingsWrite = Database["public"]["Tables"]["org_document_settings"]["Update"];
 type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
@@ -69,4 +69,22 @@ export async function saveTaxSettingsAction(orgId: string, _prev: FormState, for
   }
   revalidatePath(documentSettingsPath(orgId));
   return { ok: true, message: 'המעמד במע"מ נשמר.' };
+}
+
+/** Saves the business details printed on documents (TAX-02). */
+export async function saveDocumentDetailsAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = documentDetailsSchema.safeParse(pick(formData, DETAILS_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const saved = await saveSettingsRow(context.supabase, orgId, parsed.data);
+  if (saved.error || saved.denied) {
+    return fail(saved.error ?? NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
+  }
+  revalidatePath(documentSettingsPath(orgId));
+  return { ok: true, message: "הפרטים למסמכים נשמרו." };
 }

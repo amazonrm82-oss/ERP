@@ -6,13 +6,16 @@ import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { buildIcs, icsDisposition } from "./ics";
+import { inviteOrganizer } from "./organizer";
 
 /**
  * CAL-07: one meeting as an invite file (.ics) to send to the customer, read
  * with the user's session (RLS decides; no service role). METHOD:PUBLISH, the
  * business as the organizer's name. RFC 5545 requires an address with it: the
  * meeting organizer's own (profiles, read with the user's session); when it is
- * not visible, the file has no ORGANIZER. Never the downloader's address (a
+ * not visible, the file has no ORGANIZER. When the business has an email in its
+ * document details (TAX-02, read with the user's session), that address is the
+ * ORGANIZER instead, named "<organizer>, <business>" (owner, 13 October 2026). Never the downloader's address (a
  * support session downloads too). Title, times, place and video link only:
  * never the description, the outcome or the team.
  */
@@ -34,9 +37,12 @@ export async function meetingInviteResponse(orgId: string, meetingId: string): P
   if (!meeting) {
     return new Response("הפגישה לא נמצאה.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
-  const owner = meeting.owner_id
-    ? must(await supabase.from("profiles").select("email").eq("id", meeting.owner_id).maybeSingle(), "meeting organizer")
-    : null;
+  const [owner, details] = await Promise.all([
+    meeting.owner_id
+      ? supabase.from("profiles").select("full_name, email").eq("id", meeting.owner_id).maybeSingle().then((res) => must(res, "meeting organizer"))
+      : null,
+    supabase.from("org_document_settings").select("email").eq("organization_id", orgId).maybeSingle().then((res) => must(res, "business email")),
+  ]);
   const body = buildIcs({
     events: [
       {
@@ -50,7 +56,12 @@ export async function meetingInviteResponse(orgId: string, meetingId: string): P
         updatedAt: meeting.updated_at,
       },
     ],
-    organizer: owner?.email ? { name: org.name, email: owner.email } : null,
+    organizer: inviteOrganizer({
+      businessName: org.name,
+      businessEmail: details?.email ?? null,
+      organizerName: owner?.full_name ?? null,
+      organizerEmail: owner?.email ?? null,
+    }),
   });
   return new Response(body, {
     headers: {

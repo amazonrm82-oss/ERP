@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { optionalText } from "@/lib/validation";
+import { israeliIdNumber } from "@/lib/israeli-id";
+import { optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
 
 import { LEGAL_FORMS, VAT_STATUS_OTHER_MAX, VAT_STATUSES } from "./status";
 
@@ -43,3 +44,71 @@ export const taxSettingsSchema = z
   });
 
 export type TaxSettingsInput = z.infer<typeof taxSettingsSchema>;
+
+export const DETAILS_FIELD_NAMES = [
+  "legal_name",
+  "tax_id",
+  "address_line",
+  "city",
+  "postal_code",
+  "phone",
+  "email",
+  "bank_name",
+  "bank_branch",
+  "bank_account",
+  "bank_account_name",
+] as const;
+
+export const DOCUMENT_TAX_ID_INVALID = "המספר אינו תקין. מספר עוסק או ח.פ. הם 9 ספרות, והאחרונה היא ספרת ביקורת.";
+
+/** Digits only: spaces and dashes are dropped; "" becomes null; anything else fails. */
+function digitsField(pattern: RegExp, message: string) {
+  return optionalText(40).transform((value, ctx) => {
+    if (value === null) return null;
+    const digits = value.replace(/[\s-]/g, "");
+    if (!pattern.test(digits)) {
+      ctx.addIssue({ code: "custom", message });
+      return z.NEVER;
+    }
+    return digits;
+  });
+}
+
+/**
+ * The business details for documents (TAX-02). Everything is optional; the
+ * number is checked like a company number (CON-04) and stored as 9 digits; an
+ * account number needs its bank and branch. Mirrors the database checks of
+ * migration business_documents_details.
+ */
+export const documentDetailsSchema = z
+  .object({
+    legal_name: optionalText(120, "השם ארוך מדי (עד 120 תווים)."),
+    tax_id: optionalText(30, "המספר ארוך מדי.").transform((value, ctx) => {
+      if (value === null) return null;
+      const number = israeliIdNumber(value);
+      if (number === null) {
+        ctx.addIssue({ code: "custom", message: DOCUMENT_TAX_ID_INVALID });
+        return z.NEVER;
+      }
+      return number;
+    }),
+    address_line: optionalText(200, "הכתובת ארוכה מדי (עד 200 תווים)."),
+    city: optionalText(100, "שם היישוב ארוך מדי."),
+    postal_code: digitsField(/^(\d{5}|\d{7})$/, "מיקוד הוא 7 ספרות (או 5 ספרות בכתובת ישנה)."),
+    phone: optionalPhone,
+    email: optionalEmail,
+    bank_name: optionalText(80, "שם הבנק ארוך מדי (עד 80 תווים)."),
+    bank_branch: digitsField(/^\d{1,4}$/, "מספר סניף הוא עד 4 ספרות."),
+    bank_account: digitsField(/^\d{2,20}$/, "מספר חשבון הוא ספרות בלבד, עד 20 ספרות."),
+    bank_account_name: optionalText(120, "השם ארוך מדי (עד 120 תווים)."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.bank_account !== null && data.bank_name === null) {
+      ctx.addIssue({ code: "custom", path: ["bank_name"], message: "יש לכתוב את שם הבנק." });
+    }
+    if (data.bank_account !== null && data.bank_branch === null) {
+      ctx.addIssue({ code: "custom", path: ["bank_branch"], message: "יש לכתוב את מספר הסניף." });
+    }
+  });
+
+export type DocumentDetailsInput = z.infer<typeof documentDetailsSchema>;

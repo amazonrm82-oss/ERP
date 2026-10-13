@@ -68,6 +68,18 @@ export type OrgDocumentSettingsRow = {
   vat_status: string | null;
   vat_status_other: string | null;
   other_charges_vat: boolean | null;
+  // TAX-02 (migration business_documents_details): the business as documents show it
+  legal_name: string | null;
+  tax_id: string | null;
+  address_line: string | null;
+  city: string | null;
+  postal_code: string | null;
+  phone: string | null;
+  email: string | null;
+  bank_name: string | null;
+  bank_branch: string | null;
+  bank_account: string | null;
+  bank_account_name: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -77,6 +89,17 @@ type OrgDocumentSettingsWrite = {
   vat_status?: "licensed" | "exempt" | "nonprofit" | "other" | null;
   vat_status_other?: string | null;
   other_charges_vat?: boolean | null;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  address_line?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  bank_name?: string | null;
+  bank_branch?: string | null;
+  bank_account?: string | null;
+  bank_account_name?: string | null;
 };
 
 // CAL-01 (meetings migration): a meeting and its team participants

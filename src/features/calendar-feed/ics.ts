@@ -86,6 +86,8 @@ function safeUrl(value: string | null): string | null {
   return value && /^https?:\/\/[^\s"\u0000-\u001f\u007f]+$/i.test(value) ? value : null;
 }
 
+const ORGANIZER_EMAIL = /^[^\s"\u0000-\u001f\u007f@]+@[^\s"\u0000-\u001f\u007f@]+$/;
+
 function eventLines(event: IcsEvent, stamp: string, organizer: IcsOrganizer | null): string[] {
   const video = safeUrl(event.videoUrl);
   const location = event.location?.trim() || video;
@@ -105,7 +107,8 @@ function eventLines(event: IcsEvent, stamp: string, organizer: IcsOrganizer | nu
     // most calendar apps do not show URL; the link also goes in the text
     lines.push(`DESCRIPTION:${escapeIcsText(`קישור לשיחת הווידאו: ${video}`)}`);
   }
-  if (organizer) {
+  // an address that could break the line or the URI (spaces, quotes, control characters, a second @) is dropped
+  if (organizer && ORGANIZER_EMAIL.test(organizer.email)) {
     lines.push(`ORGANIZER;CN=${quoteIcsParam(organizer.name)}:mailto:${organizer.email}`);
   }
   lines.push(`STATUS:${event.status === "cancelled" ? "CANCELLED" : "CONFIRMED"}`, "TRANSP:OPAQUE", "END:VEVENT");
