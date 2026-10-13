@@ -7,11 +7,14 @@ import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
-import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
+import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
+import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
+import { COMPETITOR_MAX } from "@/features/deal-loss-reasons/schema";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import type { StageKind } from "@/lib/database.types";
@@ -29,7 +32,11 @@ export type DealDetailsView = {
   contactName: string | null;
   companyId: string | null;
   companyName: string | null;
+  // what the deal was lost with: the reason's current name, else the stored text
   lostReason: string | null;
+  // DEAL-03: the reason picked from the list (null for old free text), and the competitor
+  lossReason: LossReasonOption | null;
+  competitor: string | null;
   // formatted on the server so server and browser output cannot differ
   amountText: string;
   amountInput: string;
@@ -42,16 +49,17 @@ export type DealDetailsView = {
   custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
-type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; canEdit: boolean };
+// lossReasons: the organization's active loss reasons (DEAL-03)
+type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; canEdit: boolean };
 
 const linkClass = "text-accent underline underline-offset-4";
 
 /** Deal details that switch in place between reading and editing. */
-export function DealDetailsCard({ orgId, deal, contacts, companies, canEdit }: Props) {
+export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit }: Props) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
-    return <DealEditForm orgId={orgId} deal={deal} contacts={contacts} companies={companies} onDone={() => setEditing(false)} />;
+    return <DealEditForm orgId={orgId} deal={deal} contacts={contacts} companies={companies} lossReasons={lossReasons} onDone={() => setEditing(false)} />;
   }
 
   return (
@@ -93,6 +101,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, canEdit }: P
           <Detail label="סגירה צפויה" value={deal.expectedCloseText} />
           {deal.closedAtText ? <Detail label="נסגרה" value={deal.closedAtText} /> : null}
           {deal.status === "lost" ? <Detail label="סיבת הפסד" value={deal.lostReason} /> : null}
+          {deal.competitor || deal.status === "lost" ? <Detail label="מתחרה" value={deal.competitor} /> : null}
           <Detail label="אחראי" value={deal.ownerName} />
           <Detail label="נוצרה" value={deal.createdAtText} />
           <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} />
@@ -102,9 +111,9 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, canEdit }: P
   );
 }
 
-type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; onDone: () => void };
+type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; onDone: () => void };
 
-function DealEditForm({ orgId, deal, contacts, companies, onDone }: EditProps) {
+function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateDealAction(orgId, deal.id, prev, formData);
     if (result?.ok) {
@@ -167,15 +176,27 @@ function DealEditForm({ orgId, deal, contacts, companies, onDone }: EditProps) {
             error={errors.expected_close_date}
           />
           {deal.status === "lost" ? (
-            <TextareaField
-              label="סיבת הפסד"
-              name="lost_reason"
-              maxLength={500}
-              defaultValue={values?.lost_reason ?? deal.lostReason ?? ""}
-              error={errors.lost_reason}
+            <LossFields
+              key={`loss-${values?.lost_reason_id ?? deal.lossReason?.id ?? ""}`}
+              reasons={lossReasons}
+              current={
+                values?.lost_reason_id !== undefined
+                  ? (lossReasons.find((reason) => reason.id === values.lost_reason_id) ?? (deal.lossReason?.id === values.lost_reason_id ? deal.lossReason : null))
+                  : deal.lossReason
+              }
+              oldText={deal.lossReason ? null : deal.lostReason}
+              competitor={values?.competitor ?? deal.competitor}
+              errors={errors}
             />
           ) : (
-            <input type="hidden" name="lost_reason" value={deal.lostReason ?? ""} />
+            <TextField
+              label="מתחרה"
+              name="competitor"
+              maxLength={COMPETITOR_MAX}
+              autoComplete="off"
+              defaultValue={values?.competitor ?? deal.competitor ?? ""}
+              error={errors.competitor}
+            />
           )}
           <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} />
           <div className="flex flex-wrap gap-2 pt-1">

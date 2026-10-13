@@ -50,7 +50,8 @@ type Props = {
   exportPath: string | null;
   // false: the list is shown as is, without checkboxes (a viewer)
   enabled: boolean;
-  // leads: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
+  // leads: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely.
+  // deals: the active loss reasons, offered (not required) for a lost stage (DEAL-03)
   reasons?: string[];
   children: ReactNode;
 };
@@ -116,8 +117,9 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
       (k !== "export" || exportPath),
   );
   const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
-  const needsReason = kind === "status" && options.find((o) => o.value === value)?.needsReason;
-  const ready = kind === "trash" || (kind !== "" && value !== "" && (!needsReason || reason.trim() !== ""));
+  const needsReason = (kind === "status" || kind === "stage") && options.find((o) => o.value === value)?.needsReason;
+  // a deal's loss reason is optional; a lead's "not relevant" reason is not
+  const ready = kind === "trash" || (kind !== "" && value !== "" && (!needsReason || kind === "stage" || reason.trim() !== ""));
 
   // what the button says: the action, how many, and to what (FXU-06)
   const plural = RECORD_TYPES[object].plural;
@@ -157,7 +159,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
         : kind === "status"
           ? { kind, statusId: value, reason }
           : kind === "stage"
-            ? { kind, stageId: value }
+            ? { kind, stageId: value, reason: needsReason ? reason : undefined }
             : kind === "tag"
               ? { kind, tagId: value }
               : { kind: "trash" };

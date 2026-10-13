@@ -767,6 +767,17 @@ export type LeadInsert = {
   deleted_at?: string | null;
 };
 
+// DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
+export type DealLossReasonRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealRow = {
   id: string;
   organization_id: string;
@@ -781,7 +792,11 @@ export type DealRow = {
   expected_close_date: string | null;
   stage_entered_at: string;
   closed_at: string | null;
+  // the picked reason's name (a snapshot, set by trigger), or old free text
   lost_reason: string | null;
+  // DEAL-03: the reason picked from the organization's list, and the competitor
+  lost_reason_id: string | null;
+  competitor: string | null;
   contact_id: string | null;
   company_id: string | null;
   source_id: string | null;
@@ -805,6 +820,8 @@ export type DealInsert = {
   currency?: string;
   expected_close_date?: string | null;
   lost_reason?: string | null;
+  lost_reason_id?: string | null;
+  competitor?: string | null;
   contact_id?: string | null;
   company_id?: string | null;
   source_id?: string | null;
@@ -1171,6 +1188,7 @@ export type Database = {
       >;
       leads: Table<LeadRow, LeadInsert>;
       deals: Table<DealRow, DealInsert>;
+      deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
       // CON-03: only the role changes (column-level update grant)
       deal_contacts: Table<
         DealContactRow,

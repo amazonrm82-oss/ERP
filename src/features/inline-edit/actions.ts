@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
 import { setLeadStatus } from "@/features/leads/status";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
@@ -52,7 +53,7 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
 
   // the columns differ per table, so the patch is typed loosely and the table name picks the shape
-  let patch: { owner_id?: string | null; first_name?: string | null; last_name?: string | null; name?: string; full_name?: string | null; title?: string; stage_id?: string };
+  let patch: { owner_id?: string | null; first_name?: string | null; last_name?: string | null; name?: string; full_name?: string | null; title?: string; stage_id?: string; lost_reason_id?: string };
   if (field === "status") {
     if (!isUuid(value.id ?? "")) return fail("יש לבחור סטטוס.");
     const result = await setLeadStatus(context.supabase, orgId, id, value.id!, value.reason?.trim().slice(0, 500) || null);
@@ -64,6 +65,10 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
     // a stage of another pipeline (or organization) is refused by the (pipeline_id, stage_id) foreign key
     if (!isUuid(value.id ?? "")) return fail("יש לבחור שלב.");
     patch = { stage_id: value.id! };
+    // DEAL-03: a lost stage may come with a reason, by name; the database drops it on any other stage
+    const reason = await lossReasonIdByName(context.supabase, orgId, value.reason);
+    if (!reason.ok) return fail(reason.message);
+    if (reason.id) patch.lost_reason_id = reason.id;
   } else if (field === "owner") {
     const owner = value.id ?? null;
     if (owner !== null && !isUuid(owner)) return fail("יש לבחור אחראי.");

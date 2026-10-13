@@ -18,6 +18,10 @@ export type BoardDeal = {
   stageId: string;
   contactId: string | null;
   contactName: string | null;
+  // DEAL-03: kept when the deal is moved to a lost stage from the board
+  competitor: string | null;
+  // DEAL-03: the picked loss reason (name as stored on the deal), the default when it moves again
+  lossReason: { id: string; name: string } | null;
 };
 
 export type StageTotal = { count: number; amountAgorot: number };
@@ -141,7 +145,7 @@ export async function getBoard(
       narrow(
         supabase
           .from("deals")
-          .select("id, name, amount_agorot, stage_id, contact_id")
+          .select("id, name, amount_agorot, stage_id, contact_id, competitor, lost_reason_id, lost_reason")
           .eq("organization_id", orgId)
           .eq("pipeline_id", pipeline.id)
           .eq("stage_id", stageId)
@@ -204,6 +208,8 @@ export async function getBoard(
       stageId: row.stage_id,
       contactId: row.contact_id,
       contactName: row.contact_id ? (contactNames.get(row.contact_id) ?? null) : null,
+      competitor: row.competitor,
+      lossReason: row.lost_reason_id ? { id: row.lost_reason_id, name: row.lost_reason ?? "" } : null,
     })),
   };
 }
@@ -269,7 +275,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)

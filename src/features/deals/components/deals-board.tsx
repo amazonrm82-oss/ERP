@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
 import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -11,20 +12,22 @@ import { paths } from "@/lib/paths";
 import { dropDealAction } from "../actions";
 import type { Board, BoardDeal } from "../queries";
 import { STAGE_RULE, stageTone } from "../stage-colors";
+import { DealLossDialog, type LossTarget } from "./deal-loss-dialog";
 import { DealStageForm } from "./deal-stage-form";
 
 const DRAG_TYPE = "application/x-deal-id";
 
 // links built by the page: "showClosed", and one per stage id that opens that stage in full
 // stuck: open deal id -> why it is stuck (DEAL-02)
-type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string>; stuck: Record<string, string> };
+// lossReasons: the active loss reasons, asked for after a deal is dropped on a lost stage (DEAL-03)
+type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string>; stuck: Record<string, string>; lossReasons: LossReasonOption[] };
 
 /**
  * Kanban board: one column per stage, in pipeline order (first stage on the start side).
  * With a mouse, cards are dragged between columns; the stage menu on every card
  * does the same with a keyboard or a touch screen.
  */
-export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
+export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }: Props) {
   const [deals, moveOptimistic] = useOptimistic(board.deals, (current: BoardDeal[], move: { dealId: string; stageId: string }) =>
     current.map((deal) => (deal.id === move.dealId ? { ...deal, stageId: move.stageId } : deal)),
   );
@@ -32,6 +35,8 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
   const [overStage, setOverStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // a deal just dropped on a lost stage: why it was lost, and to whom (optional)
+  const [lossFor, setLossFor] = useState<LossTarget | null>(null);
 
   function onDrop(event: DragEvent, stageId: string) {
     event.preventDefault();
@@ -48,6 +53,9 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
       const result = await dropDealAction(orgId, dealId, stageId);
       if (result.ok) {
         setAnnouncement(`העסקה ${deal.name} הועברה לשלב ${stage.name}.`);
+        if (stage.kind === "lost") {
+          setLossFor({ dealId: deal.id, dealName: deal.name, competitor: deal.competitor, lossReason: deal.lossReason });
+        }
       } else {
         // the optimistic move is dropped when the transition ends
         setError(result.message);
@@ -65,6 +73,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
+      <DealLossDialog orgId={orgId} target={lossFor} reasons={lossReasons} onClose={() => setLossFor(null)} />
       {/* Scrolls sideways on its own, so the page never does. Focusable for keyboard scrolling.
           `relative` matters: without it the visually-hidden (absolutely positioned)
           labels inside off-screen columns escape the scroller and widen the page. */}
@@ -185,6 +194,9 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
                                 dealName={deal.name}
                                 currentStageId={deal.stageId}
                                 stages={board.stages}
+                                lossReasons={lossReasons}
+                                competitor={deal.competitor}
+                                lossReason={deal.lossReason}
                               />
                             ) : null}
                           </li>

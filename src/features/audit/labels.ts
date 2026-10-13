@@ -22,6 +22,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   field_definitions: "שדה מותאם",
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
+  deal_loss_reasons: "סיבת הפסד",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // CON-02
@@ -58,7 +59,9 @@ export const LOGIN_ACTION_LABELS: Record<string, string> = {
 };
 
 // fields that are noise in a change list
-export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "created_by", "custom_fields", "tag_ids", "import_job_id"]);
+export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "created_by", "custom_fields", "tag_ids", "import_job_id",
+  // DEAL-03: the reason's name is logged as lost_reason in the same change
+  "lost_reason_id"]);
 
 export const FIELD_LABELS: Record<string, string> = {
   full_name: "שם",
@@ -87,6 +90,7 @@ export const FIELD_LABELS: Record<string, string> = {
   setup_checklist_hidden_at: "רשימת ההקמה הוסתרה",
   expected_close_date: "תאריך סגירה צפוי",
   lost_reason: "סיבת הפסד",
+  competitor: "מתחרה",
   message: "הודעה",
   campaign: "קמפיין",
   // LEAD-01: budget and the UTM values of a lead (a utm change is listed key by key)

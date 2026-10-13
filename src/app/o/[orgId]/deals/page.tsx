@@ -10,6 +10,7 @@ import { PlusIcon, SearchIcon, BoardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { BoardFilters } from "@/features/deals/components/board-filters";
 import { DealsBoard } from "@/features/deals/components/deals-board";
+import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
@@ -129,12 +130,13 @@ export default async function DealsPage({ params, searchParams }: Props) {
     closeFrom: dayParam(firstParam(query.close_from)),
     closeTo: dayParam(firstParam(query.close_to)),
   };
-  const [board, pipelines, members, teams, tags] = await Promise.all([
+  const [board, pipelines, members, teams, tags, lossReasons] = await Promise.all([
     getBoard(orgId, requested, { showClosed, fullStage, filter }),
     listPipelines(orgId),
     listMembers(orgId),
     listTeams(orgId),
     listTags(orgId),
+    canWrite ? listLossReasons(orgId) : Promise.resolve([]),
   ]);
 
   if (!board) {
@@ -226,6 +228,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
         board={board}
         canWrite={canWrite}
         stuck={stuck}
+        lossReasons={activeLossReasons(lossReasons)}
         hrefs={{
           showClosed: boardHref({ closed: "1" }),
           ...Object.fromEntries(board.stages.map((stage) => [stage.id, boardHref({ stage: stage.id })])),
@@ -257,11 +260,12 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
   const sort = parseSort(firstParam(query.sort), sortKeys, DEAL_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const pipelineParam = pipelines.find((p) => p.id === pipeline.id)?.isDefault ? null : pipeline.id;
 
-  const [editing, tags, viewData, { deals, hasMore }] = await Promise.all([
+  const [editing, tags, viewData, { deals, hasMore }, lossReasons] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "deal", context),
     listDeals(orgId, { pipelineId: pipeline.id, search, tagId, page, sort, filter: filter.logic }),
+    context.canWrite ? listLossReasons(orgId) : Promise.resolve([]),
   ]);
   const views = viewData.chips;
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
@@ -345,6 +349,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           sortHref={sortHref}
           editing={editing}
           tags={tags}
+          lossReasons={activeLossReasons(lossReasons).map((reason) => reason.name)}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

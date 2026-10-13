@@ -27,12 +27,15 @@ type Props = {
   sortHref: (key: string) => string;
   editing: InlineEditing;
   tags: TagOption[];
+  // DEAL-03: the names of the active loss reasons, offered when a deal moves to a lost stage
+  lossReasons: string[];
 };
 
 /** A pipeline's deals as a table (LST-09): the same columns, sorting, editing in the cell and bulk actions as the other lists. */
-export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
+export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags, lossReasons }: Props) {
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
-  const stageOptions = stages.map((stage) => ({ value: stage.id, label: stage.name }));
+  // a lost stage offers a reason, when the organization has any (optional)
+  const stageOptions = stages.map((stage) => ({ value: stage.id, label: stage.name, needsReason: stage.kind === "lost" && lossReasons.length > 0 }));
 
   return (
     <BulkSelection
@@ -42,6 +45,7 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
       owners={editing.bulk?.reassign ? editing.owners : null}
       statuses={null}
       stages={stageOptions}
+      reasons={lossReasons}
       tags={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
       canTrash={editing.bulk?.trash ?? false}
       exportPath={editing.bulk?.exportable ? `${paths.deals(orgId)}/export` : null}
@@ -93,6 +97,7 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
                   label={`שלב: ${deal.name}`}
                   initial={{ id: deal.stageId }}
                   options={stageOptions}
+                  reasons={lossReasons}
                   canEdit={editing.canEdit(deal.ownerId)}
                 >
                   {stageById.get(deal.stageId)?.name ?? null}

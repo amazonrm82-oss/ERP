@@ -241,6 +241,7 @@ describe("roles and record visibility", () => {
       "insert into public.disqualify_reasons (organization_id, name) values ($1, 'x')",
       "insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'x')",
       "insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')",
+      "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
       "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'x', 'x', 'text')",
     ]) {
       expect((await pgError(asUser(m1.id, (q) => q(sql, [org])))).code, sql).toBe("42501");
@@ -277,6 +278,7 @@ describe("roles and record visibility", () => {
       disqualify_reasons: "name = name",
       record_type_options: "name = name",
       whatsapp_templates: "name = name",
+      deal_loss_reasons: "name = name",
       field_definitions: "label = label",
       teams: "name = name",
       team_members: "is_manager = is_manager",

@@ -54,6 +54,7 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "lead_statuses", file: "lead_statuses.csv" },
   { table: "lead_sources", file: "lead_sources.csv" },
   { table: "disqualify_reasons", file: "disqualify_reasons.csv" },
+  { table: "deal_loss_reasons", file: "deal_loss_reasons.csv" },
   { table: "record_type_options", file: "record_types.csv" },
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },

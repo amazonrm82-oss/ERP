@@ -20,6 +20,7 @@ import { trashDealAction } from "@/features/deals/actions";
 import { DealContactsCard } from "@/features/deal-contacts/components/deal-contacts-card";
 import { addableDealContacts } from "@/features/deal-contacts/options";
 import { listDealContacts } from "@/features/deal-contacts/queries";
+import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
@@ -49,12 +50,13 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
-  const [deal, fields, tags, follow, dealContacts] = await Promise.all([
+  const [deal, fields, tags, follow, dealContacts, lossReasons] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
     getFollowState(orgId, { kind: "deal", id: dealId }, context.user.id),
     listDealContacts(orgId, dealId),
+    listLossReasons(orgId),
   ]);
   if (!deal) {
     notFound();
@@ -67,6 +69,9 @@ export default async function DealPage({ params, searchParams }: Props) {
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
   const amount = deal.amount_agorot;
+  // DEAL-03: the picked reason by its current name; else the stored text (old free text, or a deleted reason)
+  const lossReason = lossReasons.find((reason) => reason.id === deal.lost_reason_id) ?? null;
+  const lossOptions = activeLossReasons(lossReasons);
 
   return (
     <>
@@ -129,6 +134,9 @@ export default async function DealPage({ params, searchParams }: Props) {
                   dealName={deal.name}
                   currentStageId={deal.stage_id}
                   stages={deal.stages}
+                  lossReasons={lossOptions}
+                  competitor={deal.competitor}
+                  lossReason={lossReason ? { id: lossReason.id, name: lossReason.name } : null}
                 />
               ) : null}
             </CardBody>
@@ -139,6 +147,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             canEdit={canEdit}
             contacts={contacts}
             companies={companies}
+            lossReasons={lossOptions}
             deal={{
               id: deal.id,
               name: deal.name,
@@ -147,7 +156,9 @@ export default async function DealPage({ params, searchParams }: Props) {
               contactName: deal.contactName,
               companyId: deal.company_id,
               companyName: deal.companyName,
-              lostReason: deal.lost_reason,
+              lostReason: lossReason?.name ?? deal.lost_reason,
+              lossReason: lossReason ? { id: lossReason.id, name: lossReason.name } : null,
+              competitor: deal.competitor,
               amountText: formatMoney(amount),
               amountInput: amount % 100 === 0 ? String(amount / 100) : (amount / 100).toFixed(2),
               expectedCloseDate: deal.expected_close_date,

@@ -12,6 +12,8 @@ import { setTrashed } from "@/lib/record-trash";
 import { isUuid } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
+import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
+
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 
 function revalidateDeal(orgId: string, dealId?: string) {
@@ -78,16 +80,29 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
   redirect(paths.deal(orgId, data.id));
 }
 
-async function moveDeal(orgId: string, dealId: string, stageId: string): Promise<ActionResult> {
+/**
+ * DEAL-03: the reason and competitor sent with a form, only when the form shows
+ * them (a move to a lost stage, the edit form of a lost deal). Absent: undefined.
+ */
+function lossFromForm(formData: FormData): { ok: true; loss: DealLoss | undefined } | { ok: false; state: FormState } {
+  if (!formData.has("lost_reason_id") && !formData.has("competitor")) {
+    return { ok: true, loss: undefined };
+  }
+  const parsed = dealLossSchema.safeParse(pick(formData, DEAL_LOSS_FIELD_NAMES));
+  return parsed.success ? { ok: true, loss: parsed.data } : { ok: false, state: invalid(parsed.error, formData) };
+}
+
+async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: DealLoss): Promise<ActionResult> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
     return context;
   }
   // A stage of another pipeline (or organization) is rejected by the
-  // (pipeline_id, stage_id) foreign key: SQLSTATE 23503.
+  // (pipeline_id, stage_id) foreign key: SQLSTATE 23503. A reason on a stage
+  // that is not lost is dropped by the database (deals_sync_stage_loss).
   const { data, error } = await context.supabase
     .from("deals")
-    .update({ stage_id: stageId })
+    .update({ stage_id: stageId, ...(loss ?? {}) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)
@@ -113,7 +128,38 @@ export async function moveDealAction(
   if (!parsed.success) {
     return invalid(parsed.error);
   }
-  return moveDeal(orgId, dealId, parsed.data.stage_id);
+  const loss = lossFromForm(formData);
+  if (!loss.ok) {
+    return loss.state;
+  }
+  return moveDeal(orgId, dealId, parsed.data.stage_id, loss.loss);
+}
+
+/** DEAL-03: the reason and competitor of a deal that was just dropped on a lost stage. */
+export async function setDealLossAction(orgId: string, dealId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = dealLossSchema.safeParse(pick(formData, DEAL_LOSS_FIELD_NAMES));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const { data, error } = await context.supabase
+    .from("deals")
+    .update(parsed.data)
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את הסיבה. נסו שוב."), { values: formValues(formData) });
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateDeal(orgId, dealId);
+  return ok();
 }
 
 /** Same move, from drag and drop on the board. */
@@ -142,10 +188,14 @@ export async function updateDealAction(
   if (!custom.ok) {
     return custom;
   }
-  const { lost_reason, amount, ...rest } = parsed.data;
+  const loss = lossFromForm(formData);
+  if (!loss.ok) {
+    return loss.state;
+  }
+  const { amount, ...rest } = parsed.data;
   const { data, error } = await context.supabase
     .from("deals")
-    .update({ ...rest, amount_agorot: amount, lost_reason, ...customFieldsPatch(custom.customFields) })
+    .update({ ...rest, amount_agorot: amount, ...(loss.loss ?? {}), ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)

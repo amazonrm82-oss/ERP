@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
 import { setLeadStatus } from "@/features/leads/status";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
@@ -20,11 +21,21 @@ export type BulkChange =
   | { kind: "owner"; ownerId: string | null }
   // a lead's status (lead_statuses id), or a task's status (open | done | cancelled)
   | { kind: "status"; statusId: string; reason?: string }
-  | { kind: "stage"; stageId: string }
+  | { kind: "stage"; stageId: string; reason?: string }
   | { kind: "tag"; tagId: string }
   | { kind: "trash" };
 // what each changed row was before, so the change can be undone (FXU-06)
-export type BulkUndoRow = { id: string; owner?: string | null; status?: string; reason?: string | null; stage?: string; tag?: string };
+// a deal's stage also brings back its loss reason (DEAL-03): the picked one, else its stored text
+export type BulkUndoRow = {
+  id: string;
+  owner?: string | null;
+  status?: string;
+  reason?: string | null;
+  stage?: string;
+  lossReasonId?: string | null;
+  lossText?: string | null;
+  tag?: string;
+};
 export type BulkUndo = { kind: BulkChange["kind"]; rows: BulkUndoRow[] };
 export type BulkOutcome = { done: number; skipped: number; undo: BulkUndo };
 
@@ -50,7 +61,7 @@ const BEFORE_COLUMNS: Record<BulkObject, string> = {
   lead: "id, tag_ids, owner_id, status_id, disqualify_reason",
   contact: "id, tag_ids, owner_id",
   company: "id, tag_ids, owner_id",
-  deal: "id, tag_ids, owner_id, stage_id",
+  deal: "id, tag_ids, owner_id, stage_id, lost_reason_id, lost_reason",
   task: "id, owner_id, status",
 };
 type BeforeRow = {
@@ -60,14 +71,18 @@ type BeforeRow = {
   status_id?: string;
   disqualify_reason?: string | null;
   stage_id?: string;
+  lost_reason_id?: string | null;
+  lost_reason?: string | null;
   status?: string;
 };
+// longer free text is not carried through the browser; undo then leaves the text as it is
+const LOSS_TEXT_MAX = 2000;
 
 // the shape of BulkChange, checked at runtime (FXC-08)
 const changeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("owner"), ownerId: z.string().nullable() }),
   z.object({ kind: z.literal("status"), statusId: z.string(), reason: z.string().max(2000).nullish() }),
-  z.object({ kind: z.literal("stage"), stageId: z.string() }),
+  z.object({ kind: z.literal("stage"), stageId: z.string(), reason: z.string().max(2000).nullish() }),
   z.object({ kind: z.literal("tag"), tagId: z.string() }),
   z.object({ kind: z.literal("trash") }),
 ]);
@@ -164,18 +179,26 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
     case "stage": {
       if (object !== "deal") return fail("לרשומות האלה אין שלב.");
       if (!isUuid(change.stageId)) return fail("יש לבחור שלב.");
+      // DEAL-03: an optional loss reason, by name; the database drops it unless the stage is a lost one
+      const lossReason = await lossReasonIdByName(supabase, orgId, change.reason);
+      if (!lossReason.ok) return fail(lossReason.message);
       // a stage of another pipeline is refused by the (pipeline_id, stage_id) foreign key, and that deal is skipped
       changed = await eachLimited(live, async (row) => {
         const { data, error: rowError } = await supabase
           .from("deals")
-          .update({ stage_id: change.stageId })
+          .update({ stage_id: change.stageId, ...(lossReason.id ? { lost_reason_id: lossReason.id } : {}) })
           .eq("organization_id", orgId)
           .eq("id", row.id)
           .is("deleted_at", null)
           .select("id");
         return !rowError && data.length > 0;
       });
-      undoRows = changed.map((row) => ({ id: row.id, stage: row.stage_id }));
+      undoRows = changed.map((row) => ({
+        id: row.id,
+        stage: row.stage_id,
+        lossReasonId: row.lost_reason_id ?? null,
+        lossText: row.lost_reason && row.lost_reason.length > LOSS_TEXT_MAX ? undefined : (row.lost_reason ?? null),
+      }));
       break;
     }
     case "tag": {
@@ -217,6 +240,8 @@ const undoSchema = z.object({
         status: z.string().max(40).optional(),
         reason: z.string().max(500).nullish(),
         stage: z.guid().optional(),
+        lossReasonId: z.guid().nullish(),
+        lossText: z.string().max(LOSS_TEXT_MAX).nullish(),
         tag: z.guid().optional(),
       }),
     )
@@ -239,7 +264,10 @@ export async function undoBulkAction(orgId: string, object: BulkObject, undo: Bu
   const { supabase } = context;
   const table = RECORD_TYPES[object].table;
   // one column of one row; the table differs by object, the column is checked by the database
-  const update = async (id: string, values: { owner_id?: string | null; stage_id?: string; status?: (typeof TASK_STATUSES)[number] }) => {
+  const update = async (
+    id: string,
+    values: { owner_id?: string | null; stage_id?: string; lost_reason_id?: string | null; lost_reason?: string; status?: (typeof TASK_STATUSES)[number] },
+  ) => {
     const { data, error } = await supabase
       .from(table as "leads")
       .update(values as never)
@@ -266,7 +294,22 @@ export async function undoBulkAction(orgId: string, object: BulkObject, undo: Bu
       }
       break;
     case "stage":
-      if (object === "deal") undone = await eachLimited(undo.rows, (row) => (row.stage ? update(row.id, { stage_id: row.stage }) : Promise.resolve(false)));
+      if (object === "deal") {
+        undone = await eachLimited(undo.rows, async (row) => {
+          if (!row.stage) return false;
+          // the reason goes back with the stage (the database refuses a reason that was hidden since; that row is not undone)
+          const moved = await update(row.id, {
+            stage_id: row.stage,
+            ...(row.lossReasonId !== undefined ? { lost_reason_id: row.lossReasonId } : {}),
+          });
+          // old free text without a picked reason: a second step, since clearing a picked reason also clears its text
+          if (moved && !row.lossReasonId && row.lossText) {
+            // counted as undone only when the text came back too
+            return update(row.id, { lost_reason: row.lossText });
+          }
+          return moved;
+        });
+      }
       break;
     case "tag":
       if (object !== "task") {

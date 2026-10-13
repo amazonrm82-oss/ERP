@@ -364,6 +364,8 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const byReason = list(data.by_reason as Json);
       const byStage = list(data.by_stage as Json);
       const byOwner = list(data.by_owner as Json);
+      // DEAL-03: the competitor the deal was lost to, when someone wrote it
+      const byCompetitor = list(data.by_competitor as Json);
       const name = await ownerNames(byOwner.map((r) => r.owner_id));
       const total = byReason.reduce((s, r) => s + num(r.deals), 0);
       return {
@@ -403,6 +405,17 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             ],
             rows: byOwner.map((r) => ({ owner: name(r.owner_id), deals: num(r.deals), amount: num(r.amount) })),
             empty: "לא אבדו עסקאות בתקופה הזו.",
+          },
+          {
+            title: "לפי מתחרה",
+            columns: [
+              { key: "competitor", label: "מתחרה", kind: "text" },
+              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "amount", label: "שווי", kind: "money" },
+            ],
+            rows: byCompetitor.map((r) => ({ competitor: str(r.competitor) ?? "", deals: num(r.deals), amount: num(r.amount) })),
+            bar: "deals",
+            empty: "לא נרשם מתחרה בעסקאות שאבדו בתקופה הזו.",
           },
         ],
       };
