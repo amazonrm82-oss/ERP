@@ -321,6 +321,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `intake_submit` refuses an unknown or ended slot (22023, hint `callback:invalid` / `callback:past`) and creates a call task
   due then for the lead's owner (repeat inquiry: the record's owner, else the form's owner, active members only); the time
   goes into the notification bodies. `intake_form()` returns `callback {time_zone}` when the form asks.
+- Test notification (GAP-01, migration 0120): `public.send_test_notification(org)` (security definer, active member, org
+  not suspended, hint `org:suspended`) writes one `system` notification to the caller and wakes `app.dispatch_push()` (a
+  failure there is swallowed; the cron sends it); 3 per user per 10 minutes in `app.push_tests`, answered `{ok:false,
+  reason:'rate', retry_seconds}`. Device state (`src/features/notifications/device.ts`) drives the dismissible bar.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
