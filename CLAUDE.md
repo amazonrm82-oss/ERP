@@ -221,6 +221,18 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the newer ones (`EXTRA_UTM_KEYS`, `EXTRA_CLICK_ID_KEYS` in `src/features/intake/attribution.ts`) go to `leads.utm.extra`;
   the landing URL keeps only campaign keys (`app.campaign_only_url`), the referrer only site and path
   (`app.site_and_path_url`). TS and SQL lists must stay identical (a unit test reads the migration).
+- Mentions (REC-02, migration 0099): a note's body holds `@[Name](user:<uuid>)` (`src/features/mentions/token.ts`, same
+  grammar as `app.mention_ids()`, code points). Triggers `activities_notify_mentions_*` fire only when
+  `current_user = 'authenticated'`; they refuse a new mention of anyone who may not read the record (`mention:forbidden`,
+  at most 20, `mention:too_many`) and send kind `mention` once per entry per user (`app.activity_mentions`), never while
+  the note is private, with the record type, name and author only (no note text). `app.user_can_read_record(org, user,
+  owner, team)` mirrors `app.can_read_record()` for a given user; keep the two in step. `public.mention_candidates()`
+  feeds the picker.
+- Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
+  grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
+  participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
+- Setup wizard (USR-03, migration 0101): `organizations.setup_step` (1..4 next step, null = done; default 1 for new orgs,
+  null for older ones; owners/admins write it through a column grant, forward only). `/o/[org]/setup` + `src/features/setup/`.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
