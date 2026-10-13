@@ -1,12 +1,23 @@
 import "server-only";
 
+import { goalMetric, GOAL_METRIC_KEYS } from "@/features/goals/metrics";
+import {
+  paceFromText,
+  paceStartDay,
+  periodEndLabel,
+  periodLabel,
+  progressFigures,
+  reportGoalPeriod,
+  requiredPerDayValue,
+} from "@/features/goals/progress";
+import { getGoalProgress } from "@/features/goals/progress-queries";
 import { getUserNames } from "@/features/shell/queries";
 import type { Database, Json } from "@/lib/database.types";
-import { formatDate, formatMoney, formatNumber, zoneDate } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
-import type { ReportRow, ReportView } from "./definitions";
+import type { ReportRow, ReportSection, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
 import { responseTargetLabels } from "./response-target";
@@ -56,7 +67,65 @@ async function ownerNames(ids: unknown[]): Promise<(id: unknown) => string> {
 }
 
 /** Runs one report with the user's session (RLS decides what is counted) and shapes it for display and export. */
-export async function buildReport(orgId: string, key: string, filters: ReportFilters): Promise<ReportView> {
+/**
+ * GOL-03 in the rep performance report: one table per metric with the people's goals of the
+ * report's period (a whole month, quarter or year), what they did, the percent and the pace.
+ */
+async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{ sections: ReportSection[]; note: string | null }> {
+  const { period, pipelineId } = filters;
+  const goalPeriod = reportGoalPeriod(period.key, period.fromDate, period.toDate);
+  if (!goalPeriod) {
+    return { sections: [], note: "עמידה ביעד מוצגת כשהתקופה היא חודש, רבעון או שנה שלמים." };
+  }
+  const people = (await getGoalProgress(orgId, { period: goalPeriod })).filter((g) => g.scope === "user");
+  const sections = GOAL_METRIC_KEYS.flatMap((metric): ReportSection[] => {
+    const rows = people.filter((g) => g.metric === metric);
+    if (rows.length === 0) return [];
+    const definition = goalMetric(metric);
+    const kind = definition.kind === "money" ? ("money" as const) : ("number" as const);
+    const today = rows[0].today;
+    const paceFrom = paceStartDay(goalPeriod.period, goalPeriod.periodStart);
+    const notes = [
+      definition.description,
+      today < paceFrom ? `${paceFromText(paceFrom)}.` : null,
+      pipelineId ? "היעדים נמדדים בכל הפייפליינים, בלי קשר לסינון." : null,
+    ];
+    return [
+      {
+        title: `עמידה ביעד: ${definition.label}, ${periodLabel(goalPeriod.period, goalPeriod.periodStart)}`,
+        columns: [
+          { key: "owner", label: "חבר צוות", kind: "text" },
+          { key: "actual", label: "בפועל", kind },
+          { key: "target", label: "יעד", kind },
+          { key: "percent", label: "אחוז מהיעד", kind: "percent" },
+          { key: "projected", label: `קצב צפוי ${periodEndLabel(goalPeriod.period)}`, kind },
+          { key: "projected_percent", label: "צפי באחוזים", kind: "percent" },
+          { key: "required_per_day", label: "נדרש ליום", kind },
+        ],
+        rows: rows
+          .map((r) => {
+            const figures = progressFigures(r, r.today);
+            return {
+              owner: r.subject,
+              actual: r.actual,
+              target: r.target,
+              percent: figures.percent,
+              projected: figures.projected,
+              projected_percent: figures.projectedPercent,
+              required_per_day: figures.requiredPerDay === null ? null : requiredPerDayValue(metric, figures.requiredPerDay),
+            };
+          })
+          .sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1)),
+        bar: "percent",
+        empty: "",
+        note: notes.filter(Boolean).join(" "),
+      },
+    ];
+  });
+  return { sections, note: null };
+}
+
+export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean } = {}): Promise<ReportView> {
   const { period, ownerId, pipelineId } = filters;
   const range = { p_org: orgId, p_from: period.from, p_to: period.to };
 
@@ -238,7 +307,10 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
     }
 
     case "reps": {
-      const rows = list(await rpc("report_rep_performance", { ...range, p_pipeline: pipelineId }));
+      const [rows, goals] = await Promise.all([
+        rpc("report_rep_performance", { ...range, p_pipeline: pipelineId }).then(list),
+        options.goals === false ? Promise.resolve({ sections: [], note: null }) : repGoalSections(orgId, filters),
+      ]);
       const name = await ownerNames(rows.map((r) => r.owner_id));
       const won = rows.reduce((s, r) => s + num(r.won), 0);
       const lost = rows.reduce((s, r) => s + num(r.lost), 0);
@@ -274,8 +346,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             })),
             bar: "won_amount",
             empty: "אין עסקאות בתקופה הזו.",
-            note: "עמידה ביעד תתווסף כשיהיה מסך יעדים לחברי הצוות.",
+            ...(goals.note ? { note: goals.note } : {}),
           },
+          ...goals.sections,
         ],
       };
     }
@@ -331,35 +404,173 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
     }
 
     case "forecast": {
-      const rows = list(await rpc("report_forecast", { p_org: orgId, p_pipeline: pipelineId, p_owner: ownerId }));
-      const thisMonth = `${zoneDate(new Date()).slice(0, 7)}-01`;
-      const weighted = rows.reduce((s, r) => s + num(r.weighted), 0);
-      const amount = rows.reduce((s, r) => s + num(r.amount), 0);
+      // GOL-04: weighted open deals by expected close month against the month's revenue goal
+      const data = parseReportData("report_goal_forecast", await rpc("report_goal_forecast", { p_org: orgId, p_pipeline: pipelineId, p_owner: ownerId }));
+      const name = await ownerNames([...data.by_owner.map((r) => r.owner_id), ...data.overdue_deals.map((r) => r.owner_id), ownerId]);
+      const thisMonth = `${data.today.slice(0, 7)}-01`;
+      const current = data.months.find((m) => m.month.slice(0, 10) === thisMonth);
+      const currentForecast = current ? current.won_amount + current.weighted : 0;
+      const totalWeighted = data.months.reduce((s, m) => s + m.weighted, 0) + data.overdue.weighted + data.undated.weighted;
+      const goalOf = (forecast: number, goal: number | null) => (goal ? pct(forecast, goal) : null);
+      // no comparison with the goal when the caller does not see every deal it is about, or a pipeline is
+      // picked (a goal covers every pipeline); the database returns no goal then either
+      const withGoal = data.complete && !pipelineId;
+      const overdueMore = data.overdue.weighted > 0 ? `ועוד ${formatMoney(data.overdue.weighted)} בעסקאות שתאריך הסגירה שלהן עבר` : null;
+      const goalWho = data.goal_scope === "user" && ownerId ? `היעד האישי של ${name(ownerId)}` : "יעד ההכנסה של כל העסק";
+      const pipelines = new Set(data.by_stage.map((r) => r.pipeline_id));
+      const split = (kind: "owner" | "stage") => [
+        { key: kind, label: kind === "owner" ? "חבר צוות" : "שלב", kind: "text" as const },
+        { key: "deals", label: "עסקאות", kind: "number" as const },
+        { key: "amount", label: "שווי", kind: "money" as const },
+        { key: "weighted", label: "משוקלל", kind: "money" as const },
+        { key: "month_weighted", label: "משוקלל לחודש הזה", kind: "money" as const },
+        { key: "overdue_deals", label: "תאריך הסגירה עבר", kind: "number" as const },
+        { key: "overdue_weighted", label: "משוקלל, תאריך עבר", kind: "money" as const },
+      ];
+      const splitRow = (r: { deals: number; amount: number; weighted: number; month_weighted: number; overdue_deals: number; overdue_weighted: number }) => ({
+        deals: r.deals,
+        amount: r.amount,
+        weighted: r.weighted,
+        month_weighted: r.month_weighted,
+        overdue_deals: r.overdue_deals,
+        overdue_weighted: r.overdue_weighted,
+      });
+      const line = (label: string, l: { deals: number; amount: number; weighted: number }): ReportRow => ({
+        month: label,
+        deals: l.deals,
+        amount: l.amount,
+        weighted: l.weighted,
+        won_amount: null,
+        forecast: null,
+        goal: null,
+        goal_percent: null,
+      });
       return {
         kpis: [
-          { label: "שווי משוקלל", value: formatMoney(weighted), hint: "סכום כל עסקה כפול סיכויי הסגירה שלה" },
-          { label: "שווי כולל", value: formatMoney(amount) },
-          { label: "עסקאות פתוחות", value: formatNumber(rows.reduce((s, r) => s + num(r.deals), 0)) },
+          {
+            label: "צפי לחודש הזה",
+            value: formatMoney(currentForecast),
+            hint: [
+              withGoal
+                ? current?.goal
+                  ? `${formatNumber(goalOf(currentForecast, current.goal) ?? 0)}% מיעד של ${formatMoney(current.goal)}`
+                  : "אין יעד הכנסה לחודש הזה"
+                : null,
+              overdueMore,
+            ]
+              .filter(Boolean)
+              .join(". "),
+          },
+          { label: "שווי משוקלל", value: formatMoney(totalWeighted), hint: "סכום כל עסקה פתוחה כפול סיכויי הסגירה שלה" },
+          {
+            label: "תאריך הסגירה עבר",
+            value: formatNumber(data.overdue.deals),
+            hint: data.overdue.deals ? `עסקאות פתוחות, משוקלל ${formatMoney(data.overdue.weighted)}` : "אין עסקאות פתוחות שהתאריך שלהן עבר",
+          },
         ],
         sections: [
           {
-            title: "לפי חודש סגירה צפוי",
+            title: withGoal ? "לפי חודש סגירה צפוי, מול היעד" : "לפי חודש סגירה צפוי",
             columns: [
               { key: "month", label: "חודש", kind: "text" },
               { key: "deals", label: "עסקאות", kind: "number" },
               { key: "amount", label: "שווי", kind: "money" },
               { key: "weighted", label: "משוקלל", kind: "money" },
+              { key: "won_amount", label: "כבר נסגר", kind: "money" },
+              { key: "forecast", label: "צפי", kind: "money" },
+              ...(withGoal
+                ? [
+                    { key: "goal", label: "יעד", kind: "money" as const },
+                    { key: "goal_percent", label: "צפי מול יעד", kind: "percent" as const },
+                  ]
+                : []),
             ],
-            rows: rows.map((r) => {
-              const month = str(r.month);
-              const overdue = month !== null && month.slice(0, 10) < thisMonth;
-              return { month: overdue ? `${monthLabel(month)} (עבר)` : monthLabel(month), deals: num(r.deals), amount: num(r.amount), weighted: num(r.weighted) };
-            }),
+            rows: [
+              // the line opens the list of those deals below, with what can be done with each
+              ...(data.overdue.deals ? [{ ...line("תאריך הסגירה עבר", data.overdue), _href: "#overdue-deals" }] : []),
+              ...data.months.map((m) => {
+                const forecast = m.won_amount + m.weighted;
+                return {
+                  month: monthLabel(m.month),
+                  deals: m.deals,
+                  amount: m.amount,
+                  weighted: m.weighted,
+                  won_amount: m.won_amount,
+                  forecast,
+                  goal: m.goal,
+                  goal_percent: goalOf(forecast, m.goal),
+                };
+              }),
+              ...(data.undated.deals ? [line("ללא תאריך צפוי", data.undated)] : []),
+            ],
             bar: "weighted",
             empty: "אין עסקאות פתוחות.",
-            note: "חודש שעבר: עסקאות שתאריך הסגירה הצפוי שלהן עבר והן עדיין פתוחות. כדאי לעדכן אותן.",
+            note: [
+              "צפי: מה שכבר נסגר בחודש ועוד השווי המשוקלל של העסקאות הפתוחות שצפויות להיסגר בו.",
+              withGoal ? `יעד: ${goalWho} לחודש.` : null,
+              pipelineId ? "היעדים נמדדים בכל הפייפליינים, ולכן הם לא מוצגים כשבוחרים פייפליין." : null,
+              "עסקאות שתאריך הסגירה שלהן עבר לא נכנסות לאף חודש, והן בשורה נפרדת.",
+              overdueMore ? `${overdueMore}.` : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          },
+          {
+            title: "לפי חבר צוות",
+            columns: split("owner"),
+            rows: data.by_owner.map((r) => ({ owner: name(r.owner_id), ...splitRow(r) })),
+            bar: "weighted",
+            empty: "אין עסקאות פתוחות.",
+          },
+          {
+            title: "לפי שלב",
+            columns: split("stage"),
+            rows: data.by_stage.map((r) => ({
+              stage: pipelines.size > 1 ? `${r.pipeline_name ?? "פייפליין"}: ${r.name ?? "שלב"}` : (r.name ?? "שלב"),
+              ...splitRow(r),
+            })),
+            bar: "weighted",
+            empty: "אין עסקאות פתוחות.",
+          },
+          {
+            title: "עסקאות שתאריך הסגירה שלהן עבר",
+            anchor: "overdue-deals",
+            columns: [
+              { key: "deal", label: "עסקה", kind: "text" },
+              { key: "owner", label: "חבר צוות", kind: "text" },
+              { key: "stage", label: "שלב", kind: "text" },
+              { key: "expected", label: "תאריך סגירה צפוי", kind: "text" },
+              { key: "amount", label: "שווי", kind: "money" },
+              { key: "weighted", label: "משוקלל", kind: "money" },
+            ],
+            rows: data.overdue_deals.map((d) => ({
+              deal: d.name ?? "עסקה",
+              _href: paths.deal(orgId, d.id),
+              owner: name(d.owner_id),
+              stage: d.stage_name,
+              expected: `${formatDate(`${d.expected_close_date.slice(0, 10)}T12:00:00Z`)} (עבר)`,
+              amount: d.amount_agorot,
+              weighted: d.weighted,
+            })),
+            empty: "אין עסקאות פתוחות שתאריך הסגירה שלהן עבר.",
+            note:
+              data.overdue.deals > data.overdue_deals.length
+                ? `מוצגות ${formatNumber(data.overdue_deals.length)} העסקאות הוותיקות מתוך ${formatNumber(data.overdue.deals)}. כדאי לעדכן להן תאריך או לסגור אותן.`
+                : "כדאי לעדכן להן תאריך סגירה או לסגור אותן.",
           },
         ],
+        overdueTotal: data.overdue.deals,
+        overdueDeals: data.overdue_deals.map((d) => ({
+          id: d.id,
+          name: d.name ?? "עסקה",
+          ownerId: d.owner_id,
+          ownerName: name(d.owner_id),
+          pipelineId: d.pipeline_id,
+          stageName: d.stage_name,
+          amount: d.amount_agorot,
+          weighted: d.weighted,
+          expected: d.expected_close_date.slice(0, 10),
+        })),
       };
     }
 

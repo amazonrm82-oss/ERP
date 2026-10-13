@@ -15,7 +15,7 @@ export const REPORTS: ReportDefinition[] = [
   { key: "response", title: "זמן תגובה לליד", description: "זמן עד מגע ראשון ואחוז הלידים שנענו בתוך היעד, לפי אחראי, מקור ושעה.", filters: ["period", "owner"] },
   { key: "reps", title: "ביצועי חברי הצוות", description: "עסקאות שנסגרו, סכום ואחוז סגירה בהצלחה לכל חבר צוות.", filters: ["period", "pipeline"] },
   { key: "activity", title: "פעילות", description: "שיחות, פגישות, הודעות ומשימות לחבר צוות וליום.", filters: ["period", "owner"] },
-  { key: "forecast", title: "תחזית הכנסות", description: "שווי משוקלל של עסקאות פתוחות לפי חודש סגירה צפוי.", filters: ["owner", "pipeline"] },
+  { key: "forecast", title: "תחזית הכנסות", description: "שווי משוקלל של עסקאות פתוחות לפי חודש סגירה צפוי, מול יעד ההכנסה, לפי חבר צוות ושלב.", filters: ["owner", "pipeline"] },
   { key: "lost", title: "סיבות הפסד", description: "למה עסקאות אובדות, באיזה שלב ואצל מי.", filters: ["period", "owner", "pipeline"] },
   { key: "cycle", title: "אורך מחזור מכירה", description: "ימים מליד לסגירה, וימים בכל שלב.", filters: ["period", "owner", "pipeline"] },
   { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות שנמצאות בשלב יותר מדי זמן, או בלי משימה או פגישה הבאה.", filters: ["owner", "pipeline"] },
@@ -40,10 +40,28 @@ export type ReportSection = {
   bar?: string;
   empty: string;
   note?: string;
+  // the section's element id, for links to it ("#overdue-deals"); a page may also render it its own way
+  anchor?: string;
+};
+
+// GOL-04: an open deal whose expected close date has passed, for the forecast screen's actions
+export type OverdueDeal = {
+  id: string;
+  name: string;
+  ownerId: string | null;
+  ownerName: string;
+  pipelineId: string;
+  stageName: string | null;
+  amount: number;
+  weighted: number;
+  expected: string;
 };
 
 export type ReportView = {
   kpis: Array<{ label: string; value: string; hint?: string }>;
   sections: ReportSection[];
   note?: string;
+  overdueDeals?: OverdueDeal[];
+  // all of them; overdueDeals holds the 200 oldest
+  overdueTotal?: number;
 };

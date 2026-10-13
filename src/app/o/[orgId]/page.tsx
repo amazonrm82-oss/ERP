@@ -5,13 +5,15 @@ import { ContactActions } from "@/components/contact-actions";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/feedback";
+import { EmptyState, FormError } from "@/components/ui/feedback";
 import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { idleText, meetingSpanText } from "@/features/home/my-day";
 import { getMyDay } from "@/features/home/queries";
+import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
+import { getGoalProgress, getMyMonthClosings } from "@/features/goals/progress-queries";
 import { DeviceWarning } from "@/features/notifications/components/device-warning";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
@@ -20,6 +22,7 @@ import { SetupChecklistCard } from "@/features/setup/components/setup-checklist-
 import { SetupResumeCard } from "@/features/setup/components/setup-resume-card";
 import { getSetupChecklist, getSetupStep } from "@/features/setup/queries";
 import { leadDisplayName } from "@/features/leads/display";
+import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
 import { TaskQuickAdd } from "@/features/tasks/components/task-quick-add";
@@ -44,11 +47,15 @@ export default async function HomePage({ params }: Props) {
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
-  const [day, setupStep] = await Promise.all([
+  const [day, setupStep, goals] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
     setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
+    // GOL-03: the person's own goals whose period holds today; no goal, no card
+    withReportShape(() => getGoalProgress(orgId, { userId: user.id })),
   ]);
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
+  // no goal to show: the person's own closings this month, with no goal and no percent (owner, 13 October 2026)
+  const closings = goals.ok && goals.value.length === 0 ? await withReportShape(() => getMyMonthClosings(orgId, user.id, org.timeZone)) : null;
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
   const firstName = user.displayName.split(" ")[0];
@@ -106,6 +113,34 @@ export default async function HomePage({ params }: Props) {
       </ul>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
+        {closings ? (
+          <Card aria-labelledby="my-goals-title">
+            <CardHeader id="my-goals-title" title="הסגירות שלי" />
+            <CardBody>
+              {closings.ok ? (
+                <p>
+                  הסגירות שלך החודש: <span className="font-semibold tabular-nums">{formatMoney(closings.value)}</span>
+                </p>
+              ) : (
+                <FormError message={closings.message} />
+              )}
+            </CardBody>
+          </Card>
+        ) : (
+          <Card aria-labelledby="my-goals-title">
+            <CardHeader
+              id="my-goals-title"
+              title="היעדים שלי"
+              action={
+                <ButtonLink href={paths.goals(orgId)} variant="ghost" size="sm">
+                  לכל היעדים
+                </ButtonLink>
+              }
+            />
+            <CardBody>{goals.ok ? <GoalProgressList items={goals.value} showSubject={false} /> : <FormError message={goals.message} />}</CardBody>
+          </Card>
+        )}
+
         <Card aria-labelledby="my-meetings-title">
           <CardHeader
             id="my-meetings-title"

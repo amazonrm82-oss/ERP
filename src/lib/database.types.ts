@@ -1351,6 +1351,13 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
         Returns: Json;
       };
+      // GOL-04: forecast against the goal (migration goal_forecast)
+      report_goal_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // GOL-03: progress against the goals the caller reads (migration goal_progress)
+      report_goal_progress: {
+        Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };
+        Returns: Json;
+      };
       // account security (migration 0014)
       mfa_required_orgs: { Args: Record<string, never>; Returns: Json };
       // { enrolled: boolean, aal: string }

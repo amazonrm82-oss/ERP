@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 
-import { closeDealWonAction, dealOnboardingTaskAction } from "../actions";
+import { closeDealWonAction, closeOpenDealWonAction, dealOnboardingTaskAction } from "../actions";
 import {
   amountInputValue,
   type CloseWindowSetup,
@@ -29,14 +29,15 @@ export type WonTarget = { dealId: string; dealName: string; stageId: string; sta
 
 export type { CloseWindowSetup };
 
-type Props = { orgId: string; target: WonTarget | null; setup: CloseWindowSetup; onClose: () => void; onDone?: (target: WonTarget) => void };
+// expectOpen: only a deal that is still open is closed (GOL-04, the forecast's overdue list)
+type Props = { orgId: string; target: WonTarget | null; setup: CloseWindowSetup; onClose: () => void; onDone?: (target: WonTarget) => void; expectOpen?: boolean };
 
 /**
  * DEAL-04, the close window on the won side: confirm the amount and the close
  * date, and choose what comes next (wave 1: an onboarding task). Nothing moves
  * until "סגירה בהצלחה" is pressed; closing the window leaves the deal where it was.
  */
-export function DealWonDialog({ orgId, target, setup, onClose, onDone }: Props) {
+export function DealWonDialog({ orgId, target, setup, onClose, onDone, expectOpen = false }: Props) {
   return (
     <Dialog open={target !== null} onClose={onClose} title="העסקה נסגרה בהצלחה?" description={target ? `${target.dealName} · שלב ${target.stageName}` : undefined} variant="sheet">
       {target ? (
@@ -45,6 +46,7 @@ export function DealWonDialog({ orgId, target, setup, onClose, onDone }: Props) 
           orgId={orgId}
           target={target}
           setup={setup}
+          expectOpen={expectOpen}
           onCancel={onClose}
           onDone={() => {
             onDone?.(target);
@@ -73,7 +75,21 @@ function rememberChoice(key: string, checked: boolean) {
   }
 }
 
-function WonForm({ orgId, target, setup, onCancel, onDone }: { orgId: string; target: WonTarget; setup: CloseWindowSetup; onCancel: () => void; onDone: () => void }) {
+function WonForm({
+  orgId,
+  target,
+  setup,
+  expectOpen,
+  onCancel,
+  onDone,
+}: {
+  orgId: string;
+  target: WonTarget;
+  setup: CloseWindowSetup;
+  expectOpen: boolean;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
   const choiceKey = onboardingChoiceKey(orgId, setup.userId);
   // an open onboarding task already linked to the deal: none is offered (checked again on save)
   const [existing, setExisting] = useState<"checking" | "open" | "none">("checking");
@@ -92,7 +108,7 @@ function WonForm({ orgId, target, setup, onCancel, onDone }: { orgId: string; ta
   }, [orgId, target.dealId]);
 
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
-    const result = await closeDealWonAction(orgId, target.dealId, target.stageId, prev, formData);
+    const result = await (expectOpen ? closeOpenDealWonAction : closeDealWonAction)(orgId, target.dealId, target.stageId, prev, formData);
     if (result?.ok) {
       if (existing !== "open") rememberChoice(choiceKey, formData.get("onboarding") === "on");
       onDone();

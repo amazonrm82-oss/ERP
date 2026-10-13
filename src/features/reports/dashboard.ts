@@ -1,5 +1,8 @@
 import "server-only";
 
+import type { GoalPeriod } from "@/features/goals/metrics";
+import { countsDeals } from "@/features/goals/progress";
+import { getGoalProgress, getUnteamedWon, type NamedGoalProgress } from "@/features/goals/progress-queries";
 import { formatMoney, formatNumber, zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,7 +13,16 @@ import { parseReportData } from "./schemas";
 
 export type DashboardTile = { label: string; value: string; change: string | null; trend: "up" | "down" | "same" | null };
 
-export type Dashboard = { tiles: DashboardTile[]; reps: ReportSection | null; stuck: ReportSection | null };
+// goals: the business's and the teams' goals whose period holds today (GOL-03); people's goals are in the rep report
+// unteamed (owners and admins): won deals with no team in each period of the team goals on deals (option A)
+export type UnteamedWon = { period: GoalPeriod; periodStart: string; deals: number; amount: number };
+export type Dashboard = {
+  tiles: DashboardTile[];
+  goals: NamedGoalProgress[];
+  unteamed: UnteamedWon[];
+  reps: ReportSection | null;
+  stuck: ReportSection | null;
+};
 
 type Obj = Record<string, unknown>;
 const num = (value: unknown): number => Number(value ?? 0) || 0;
@@ -39,7 +51,8 @@ function sameDaysLastMonth(now: Date): { from: string; to: string } {
 }
 
 /** Manager dashboard: this month so far against the same days of last month, plus the pipeline now. */
-export async function getDashboard(orgId: string): Promise<Dashboard> {
+// unteamed: the owners' and admins' line, in the organization's time zone
+export async function getDashboard(orgId: string, options: { unteamed?: { timeZone: string } } = {}): Promise<Dashboard> {
   const now = new Date();
   const period = parsePeriod({ period: "this_month" }, now);
   const previous = sameDaysLastMonth(now);
@@ -74,7 +87,18 @@ export async function getDashboard(orgId: string): Promise<Dashboard> {
   ];
 
   const filters = { period, ownerId: null, pipelineId: null };
-  const [reps, stuck] = await Promise.all([buildReport(orgId, "reps", filters), buildReport(orgId, "stuck", filters)]);
+  const [reps, stuck, goals] = await Promise.all([
+    buildReport(orgId, "reps", filters, { goals: false }),
+    buildReport(orgId, "stuck", filters),
+    getGoalProgress(orgId),
+  ]);
   const stuckSection = stuck.sections[0] ? { ...stuck.sections[0], title: "עסקאות שדורשות טיפול", rows: stuck.sections[0].rows.slice(0, 5) } : null;
-  return { tiles, reps: reps.sections[0] ?? null, stuck: stuckSection };
+  const shown = goals.filter((g) => g.scope !== "user");
+  const periods = options.unteamed
+    ? [...new Map(shown.filter((g) => g.scope === "team" && countsDeals(g.metric)).map((g) => [`${g.period}:${g.periodStart}`, g])).values()]
+    : [];
+  const unteamed = (
+    await Promise.all(periods.map(async (g) => ({ period: g.period, periodStart: g.periodStart, ...(await getUnteamedWon(orgId, g.period, g.periodStart, options.unteamed!.timeZone)) })))
+  ).filter((u) => u.deals > 0);
+  return { tiles, goals: shown, unteamed, reps: reps.sections[0] ?? null, stuck: stuckSection };
 }

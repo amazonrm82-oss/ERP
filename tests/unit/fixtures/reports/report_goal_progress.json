@@ -1,0 +1,14 @@
+[
+  {
+    "scope": "org",
+    "actual": 100000,
+    "metric": "won_amount",
+    "period": "month",
+    "target": 500000,
+    "elapsed": 0.4072,
+    "goal_id": "00000000-0000-4000-8000-000000000012",
+    "team_id": null,
+    "user_id": null,
+    "period_start": "2026-10-01"
+  }
+]

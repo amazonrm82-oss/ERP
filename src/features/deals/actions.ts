@@ -30,6 +30,7 @@ function revalidateDeal(orgId: string, dealId?: string) {
 }
 
 const SNOOZE_CLOSED = "אפשר לדחות רק עסקה פתוחה.";
+const NO_LONGER_OPEN = "העסקה כבר לא פתוחה. רעננו את הדף.";
 const STAGE_GONE = "השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.";
 
 export async function createDealAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -98,7 +99,8 @@ function lossFromForm(formData: FormData): { ok: true; loss: DealLoss | undefine
   return parsed.success ? { ok: true, loss: parsed.data } : { ok: false, state: invalid(parsed.error, formData) };
 }
 
-async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: DealLoss): Promise<ActionResult> {
+// expectOpen: the move is only for a deal that is still open (the forecast's overdue list, GOL-04)
+async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: DealLoss, expectOpen = false): Promise<ActionResult> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
     return context;
@@ -106,18 +108,19 @@ async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: D
   // A stage of another pipeline (or organization) is rejected by the
   // (pipeline_id, stage_id) foreign key: SQLSTATE 23503. A reason on a stage
   // that is not lost is dropped by the database (deals_sync_stage_loss).
-  const { data, error } = await context.supabase
+  let update = context.supabase
     .from("deals")
     .update({ stage_id: stageId, ...(loss ?? {}) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
-    .is("deleted_at", null)
-    .select("id");
+    .is("deleted_at", null);
+  if (expectOpen) update = update.eq("status", "open");
+  const { data, error } = await update.select("id");
   if (error) {
     return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו להעביר את העסקה. נסו שוב."));
   }
   if (data.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
+    return fail(expectOpen ? NO_LONGER_OPEN : NOT_FOUND_OR_FORBIDDEN);
   }
   revalidateDeal(orgId, dealId);
   return ok();
@@ -130,6 +133,15 @@ export async function moveDealAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  return moveFromForm(orgId, dealId, formData, false);
+}
+
+/** The same move, only while the deal is still open (GOL-04: the forecast's overdue list; 0 rows otherwise). */
+export async function moveOpenDealAction(orgId: string, dealId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  return moveFromForm(orgId, dealId, formData, true);
+}
+
+async function moveFromForm(orgId: string, dealId: string, formData: FormData, expectOpen: boolean): Promise<FormState> {
   const parsed = moveDealSchema.safeParse(pick(formData, ["stage_id"]));
   if (!parsed.success) {
     return invalid(parsed.error);
@@ -138,7 +150,7 @@ export async function moveDealAction(
   if (!loss.ok) {
     return loss.state;
   }
-  return moveDeal(orgId, dealId, parsed.data.stage_id, loss.loss);
+  return moveDeal(orgId, dealId, parsed.data.stage_id, loss.loss, expectOpen);
 }
 
 /** DEAL-03: the reason and competitor of a deal that was just dropped on a lost stage. */
@@ -190,6 +202,15 @@ export async function dealOnboardingTaskAction(orgId: string, dealId: string): P
  * user's session. The deal is not moved until the form is sent; cancelling leaves it.
  */
 export async function closeDealWonAction(orgId: string, dealId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  return closeWon(orgId, dealId, stageId, formData, false);
+}
+
+/** The close window for a deal that must still be open (GOL-04: the forecast's overdue list). */
+export async function closeOpenDealWonAction(orgId: string, dealId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  return closeWon(orgId, dealId, stageId, formData, true);
+}
+
+async function closeWon(orgId: string, dealId: string, stageId: string, formData: FormData, expectOpen: boolean): Promise<FormState> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
     return context;
@@ -215,18 +236,19 @@ export async function closeDealWonAction(orgId: string, dealId: string, stageId:
   }
   const close = parsed.data;
 
-  const { data: moved, error } = await supabase
+  let update = supabase
     .from("deals")
     .update({ stage_id: stageId, amount_agorot: close.amount, closed_at: closedAtFor(close.closedDate, today, now, timeZone) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
-    .is("deleted_at", null)
-    .select("id, contact_id, company_id");
+    .is("deleted_at", null);
+  if (expectOpen) update = update.eq("status", "open");
+  const { data: moved, error } = await update.select("id, contact_id, company_id");
   if (error) {
     return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו לסגור את העסקה. נסו שוב."), values);
   }
   if (moved.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
+    return fail(expectOpen ? NO_LONGER_OPEN : NOT_FOUND_OR_FORBIDDEN);
   }
   revalidateDeal(orgId, dealId);
 

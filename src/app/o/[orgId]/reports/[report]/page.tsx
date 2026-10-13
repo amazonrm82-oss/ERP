@@ -7,6 +7,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { listPipelines } from "@/features/deals/queries";
 import { buildReport } from "@/features/reports/build";
 import { ReportBody } from "@/features/reports/components/report-body";
+import { ForecastOverdueDeals } from "@/features/reports/components/forecast-overdue";
+import { getOverdueActionsSetup } from "@/features/reports/forecast-overdue-server";
 import { ReportFilters } from "@/features/reports/components/report-filters";
 import { findReport } from "@/features/reports/definitions";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
@@ -40,6 +42,10 @@ export default async function ReportPage({ params, searchParams }: Props) {
     definition.filters.includes("owner") ? listMembers(orgId) : Promise.resolve([]),
     definition.filters.includes("pipeline") ? listPipelines(orgId) : Promise.resolve([]),
   ]);
+  // GOL-04: the overdue deals of the forecast, with a new date, a win or a loss for those the user may change
+  const overdue = view.ok && view.value.overdueDeals ? view.value.overdueDeals : null;
+  const overdueSetup = overdue && overdue.length > 0 ? await getOverdueActionsSetup(context, overdue) : null;
+  const overdueTotal = view.ok ? (view.value.overdueTotal ?? 0) : 0;
   const owners = members
     .filter((m) => m.status === "active" && m.role !== "viewer")
     .map((m) => ({ value: m.userId, label: m.userId === context.user.id ? `${m.name} (אני)` : m.name }));
@@ -71,7 +77,14 @@ export default async function ReportPage({ params, searchParams }: Props) {
         pipelines={pipelines.map((p) => ({ value: p.id, label: p.isDefault ? `${p.name} (ברירת מחדל)` : p.name }))}
         pipelineEmptyLabel={definition.key === "funnel" ? "ברירת המחדל" : "כל הפייפליינים"}
       />
-      {view.ok ? <ReportBody view={view.value} /> : <FormError message={view.message} />}
+      {view.ok ? (
+        <ReportBody
+          view={view.value}
+          replace={overdue ? { "overdue-deals": <ForecastOverdueDeals orgId={orgId} deals={overdue} total={overdueTotal} setup={overdueSetup} /> } : {}}
+        />
+      ) : (
+        <FormError message={view.message} />
+      )}
     </>
   );
 }

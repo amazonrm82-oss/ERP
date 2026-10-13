@@ -1,0 +1,71 @@
+{
+  "today": "2026-10-13",
+  "months": [
+    {
+      "goal": 500000,
+      "deals": 0,
+      "month": "2026-10-01",
+      "amount": 0,
+      "weighted": 0,
+      "won_amount": 100000
+    },
+    {
+      "goal": null,
+      "deals": 1,
+      "month": "2026-11-01",
+      "amount": 80000,
+      "weighted": 8000,
+      "won_amount": 0
+    }
+  ],
+  "overdue": {
+    "deals": 1,
+    "amount": 30000,
+    "weighted": 3000
+  },
+  "undated": {
+    "deals": 0,
+    "amount": 0,
+    "weighted": 0
+  },
+  "by_owner": [
+    {
+      "deals": 2,
+      "amount": 110000,
+      "owner_id": "00000000-0000-4000-8000-000000000008",
+      "weighted": 11000,
+      "overdue_deals": 1,
+      "month_weighted": 0,
+      "overdue_weighted": 3000
+    }
+  ],
+  "by_stage": [
+    {
+      "name": "פנייה ראשונית",
+      "deals": 2,
+      "amount": 110000,
+      "position": 0,
+      "stage_id": "00000000-0000-4000-8000-000000000002",
+      "weighted": 11000,
+      "pipeline_id": "00000000-0000-4000-8000-000000000006",
+      "overdue_deals": 1,
+      "pipeline_name": "מכירות",
+      "month_weighted": 0,
+      "overdue_weighted": 3000
+    }
+  ],
+  "complete": true,
+  "goal_scope": "org",
+  "overdue_deals": [
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "עסקה באיחור",
+      "owner_id": "00000000-0000-4000-8000-000000000008",
+      "weighted": 3000,
+      "stage_name": "פנייה ראשונית",
+      "pipeline_id": "00000000-0000-4000-8000-000000000006",
+      "amount_agorot": 30000,
+      "expected_close_date": "2026-09-23"
+    }
+  ]
+}

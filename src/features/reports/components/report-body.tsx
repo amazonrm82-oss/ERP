@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Card, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -7,7 +8,7 @@ import type { ReportSection, ReportView } from "../definitions";
 import { formatCell } from "../format";
 
 /** Headline numbers, then one table per section. Bars are decoration: the numbers are in the table. */
-export function ReportBody({ view }: { view: ReportView }) {
+export function ReportBody({ view, replace = {} }: { view: ReportView; replace?: Record<string, ReactNode> }) {
   return (
     <div className="space-y-5">
       {view.kpis.length > 0 ? (
@@ -21,9 +22,13 @@ export function ReportBody({ view }: { view: ReportView }) {
           ))}
         </dl>
       ) : null}
-      {view.sections.map((section, index) => (
-        <Section key={section.title} section={section} id={`report-section-${index}`} />
-      ))}
+      {view.sections.map((section, index) =>
+        section.anchor && replace[section.anchor] !== undefined ? (
+          <div key={section.title}>{replace[section.anchor]}</div>
+        ) : (
+          <Section key={section.title} section={section} id={`report-section-${index}`} />
+        ),
+      )}
     </div>
   );
 }
@@ -34,7 +39,7 @@ function Section({ section, id }: { section: ReportSection; id: string }) {
   const [first, ...rest] = section.columns;
 
   return (
-    <Card aria-labelledby={id}>
+    <Card aria-labelledby={id} id={section.anchor} className={section.anchor ? "scroll-mt-20" : undefined}>
       <CardHeader id={id} title={section.title} />
       {section.rows.length === 0 ? (
         <p className="px-4 py-6 text-md text-ink-soft sm:px-5">{section.empty}</p>

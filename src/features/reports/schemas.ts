@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 
+import { GOAL_METRIC_KEYS, GOAL_PERIODS, GOAL_SCOPES, type GoalMetric } from "@/features/goals/metrics";
 import { SUPPORT_LINE } from "@/lib/support-phone";
 
 const count = z.number().int().nonnegative();
@@ -25,6 +26,9 @@ const responseMeasures = {
   avg_minutes: decimal,
   median_minutes: decimal,
 };
+
+const forecastLine = z.object({ deals: count, amount, weighted: amount });
+const forecastSplit = { deals: count, amount, weighted: amount, month_weighted: amount, overdue_deals: count, overdue_weighted: amount };
 
 export const REPORT_SCHEMAS = {
   report_leads_by_source: z.array(
@@ -109,6 +113,36 @@ export const REPORT_SCHEMAS = {
     weighted_amount: amount,
     overdue_tasks: count,
   }),
+  // GOL-04: open deals weighted by expected close month against the month's won_amount goal
+  report_goal_forecast: z.object({
+    today: day,
+    goal_scope: z.enum(["org", "user"]),
+    // the caller sees every deal the goal is about; false (or a pipeline picked): goal is null
+    complete: z.boolean(),
+    months: z.array(z.object({ month: day, deals: count, amount, weighted: amount, won_amount: amount, goal: amount.nullable() })),
+    overdue: forecastLine,
+    undated: forecastLine,
+    by_owner: z.array(z.object({ owner_id: id, ...forecastSplit })),
+    by_stage: z.array(stage.extend({ pipeline_id: id, pipeline_name: text, ...forecastSplit })),
+    overdue_deals: z.array(
+      z.object({ id: uuid, name: text, owner_id: id, pipeline_id: uuid, stage_name: text, amount_agorot: amount, weighted: amount, expected_close_date: day }),
+    ),
+  }),
+  // GOL-03: one row per goal the caller reads, with what was done in its period
+  report_goal_progress: z.array(
+    z.object({
+      goal_id: uuid,
+      scope: z.enum(GOAL_SCOPES),
+      user_id: id,
+      team_id: id,
+      period: z.enum(GOAL_PERIODS),
+      period_start: day,
+      metric: z.enum(GOAL_METRIC_KEYS as [GoalMetric, ...GoalMetric[]]),
+      target: count,
+      actual: count,
+      elapsed: z.number().min(0).max(1),
+    }),
+  ),
 } as const;
 
 export type ReportFunction = keyof typeof REPORT_SCHEMAS;

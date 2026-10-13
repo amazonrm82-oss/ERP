@@ -1,3 +1,9 @@
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import Link from "next/link";
+
+import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
+import { goalDealsHref, periodLabel } from "@/features/goals/progress";
+import { formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 import type { Dashboard } from "../dashboard";
@@ -10,7 +16,7 @@ const TREND = {
 } as const;
 
 /** Business at a glance for owners, admins and team managers. */
-export function ManagerDashboard({ dashboard }: { dashboard: Dashboard }) {
+export function ManagerDashboard({ dashboard, orgId }: { dashboard: Dashboard; orgId: string }) {
   return (
     <section aria-labelledby="dashboard-title" className="mb-8 space-y-5">
       <h2 id="dashboard-title" className="text-lg font-semibold">
@@ -34,6 +40,26 @@ export function ManagerDashboard({ dashboard }: { dashboard: Dashboard }) {
           </div>
         ))}
       </dl>
+      {dashboard.goals.length > 0 ? (
+        <Card aria-labelledby="dashboard-goals-title">
+          <CardHeader id="dashboard-goals-title" title="עמידה ביעדים" />
+          <CardBody>
+            <GoalProgressList items={dashboard.goals} orgId={orgId} />
+            {dashboard.unteamed.length > 0 ? (
+              <ul className="mt-4 space-y-1 border-t border-line pt-3 text-sm">
+                {dashboard.unteamed.map((u) => (
+                  <li key={`${u.period}:${u.periodStart}`}>
+                    <Link href={goalDealsHref(orgId, "none", u.period, u.periodStart)} className="text-accent-strong underline underline-offset-4">
+                      {formatNumber(u.deals)} עסקאות בסך {formatMoney(u.amount)} לא משויכות לצוות
+                    </Link>{" "}
+                    <span className="text-ink-soft">({periodLabel(u.period, u.periodStart)})</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardBody>
+        </Card>
+      ) : null}
       <ReportBody view={{ kpis: [], sections: [dashboard.reps, dashboard.stuck].filter((s) => s !== null) }} />
     </section>
   );

@@ -103,6 +103,25 @@ describe("report result shapes (FXC-12)", () => {
       q("insert into public.tasks (organization_id, title, owner_id, status, completed_at) values ($1, 'משימה', $2, 'done', now())", [org, owner.id]),
     );
 
+    // an open deal whose expected close date has passed (goal forecast: overdue_deals)
+    await asUser(member.id, (q) =>
+      q(
+        `insert into public.deals (organization_id, name, amount_agorot, pipeline_id, stage_id, owner_id, expected_close_date)
+         select $1, 'עסקה באיחור', 30000, p.id, s.id, $2, (now() - interval '20 days')::date
+           from public.pipelines p join public.stages s on s.pipeline_id = p.id and s.kind = 'open'
+          where p.organization_id = $1 and p.is_default order by s.position limit 1`,
+        [org, member.id],
+      ),
+    );
+    // a goal of this month (goal progress)
+    await asUser(owner.id, (q) =>
+      q(
+        `insert into public.goals (organization_id, scope, period, period_start, metric, target)
+         values ($1, 'org', 'month', date_trunc('month', now() at time zone 'Asia/Jerusalem')::date, 'won_amount', 500000)`,
+        [org],
+      ),
+    );
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -117,6 +136,8 @@ describe("report result shapes (FXC-12)", () => {
       report_stuck_deals: ["public.report_stuck_deals($1)", [org]],
       report_revenue: ["public.report_revenue($1, $2, $3)", range],
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],
+      report_goal_progress: ["public.report_goal_progress($1)", [org]],
+      report_goal_forecast: ["public.report_goal_forecast($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

@@ -15,9 +15,9 @@ export const metadata: Metadata = { title: "דוחות" };
 
 export default async function ReportsPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { role } = await getOrgContext(orgId);
+  const { role, org } = await getOrgContext(orgId);
   // the dashboard is for people who manage others; reps get the reports list
-  const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId)) : null;
+  const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId, role === "owner" || role === "admin" ? { unteamed: { timeZone: org.timeZone } } : {})) : null;
 
   return (
     <>
@@ -30,7 +30,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
           </ButtonLink>
         }
       />
-      {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} /> : null}
+      {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} orgId={orgId} /> : null}
       {dashboard && !dashboard.ok ? <FormError message={dashboard.message} className="mb-6" /> : null}
       <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
