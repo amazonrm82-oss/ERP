@@ -258,6 +258,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
+- Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
+  `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
+  (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
+  and statuses before the closed ones, adds automations switched off, skips and reports items over a plan limit, and
+  records the key in `organizations.industry_templates` (server only) only when nothing was cut. "My day" (TASK-09, no
+  migration) uses `report_stuck_deals`' `no_next_step`, the same rule as the board.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
