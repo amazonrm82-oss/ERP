@@ -299,6 +299,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   classic keys only); `$merge` is refused on insert; browser writes may insert only the five keys and may not change any
   other key (`utm.extra`) on update; values ≤ 200 code points; server writers are unchanged. `LEAD_UTM_KEYS` = intake
   `UTM_KEYS` = the trigger's `v_classic` (unit test). Click ids, referrer and landing URL stay server-only.
+- Activation (GAP-06, migration 0116): `app.org_activation` (one row per org, times only, no API access) is set once by
+  trigger `activities_activation` (`app.mark_org_activation()`): a person's contact entry (rule of `stamp_last_contact`) on a
+  lead not imported and not in the bin, within 24 hours of `least(lead.created_at, now())`. Never cleared; the migration
+  filled it from the timeline. `platform_list_orgs` / `platform_org` / `platform_metrics` show it. USR-04 sample leads must
+  be excluded once they have a marker.
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
