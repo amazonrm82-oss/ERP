@@ -1,5 +1,6 @@
 import "server-only";
 
+import { requestedProductNames } from "@/features/requested-product/queries";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json, LeadStatusKind } from "@/lib/database.types";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
@@ -48,6 +49,8 @@ export type LeadListItem = {
   companyName: string | null;
   statusId: string;
   sourceId: string | null;
+  // LEAD-04: the requested product's name (listLeads only)
+  requestedProductName?: string | null;
   ownerId: string | null;
   ownerName: string | null;
   // LEAD-02: the last contact entry a person logged on the lead's timeline
@@ -67,6 +70,8 @@ export const LEAD_SORT_COLUMNS = {
   source: "sort_source",
   owner: "sort_owner",
   last_contact: "last_contacted_at",
+  // LEAD-04: computed field public.sort_requested_product(leads)
+  product: "sort_requested_product",
   created: "created_at",
   // DQL-01: computed field public.completeness(leads)
   completeness: "completeness",
@@ -96,7 +101,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   let query = supabase
     .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, owner_id, last_contacted_at, created_at, custom_fields")
+    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -127,7 +132,11 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
   }
 
   const rows = data.slice(0, size);
-  const owners = await getUserNames(rows.map((row) => row.owner_id));
+  // LEAD-04: product names only when a row has one
+  const [owners, productNames] = await Promise.all([
+    getUserNames(rows.map((row) => row.owner_id)),
+    requestedProductNames(orgId, rows.map((row) => row.requested_product_id)),
+  ]);
 
   return {
     hasMore: data.length > size,
@@ -140,6 +149,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       companyName: row.company_name,
       statusId: row.status_id,
       sourceId: row.source_id,
+      requestedProductName: row.requested_product_id ? (productNames.get(row.requested_product_id) ?? null) : null,
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       lastContactedAt: row.last_contacted_at,
@@ -157,7 +167,7 @@ export async function getLead(orgId: string, leadId: string) {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
+      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, requested_product_id, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
     )
     .eq("organization_id", orgId)
     .eq("id", leadId)

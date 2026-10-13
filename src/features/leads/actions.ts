@@ -25,6 +25,8 @@ import {
   leadCampaignSchema,
   updateLeadSchema,
 } from "./schema";
+import { requestedProductFromForm } from "@/features/requested-product/schema";
+
 import { setLeadStatus, validateStatusChoice } from "./status";
 
 function revalidateLead(orgId: string, leadId?: string) {
@@ -61,6 +63,11 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   if (!custom.ok) {
     return custom;
   }
+  // LEAD-04: only when the form has the field (the plan has the product catalog)
+  const product = requestedProductFromForm(formData);
+  if (!product.ok) {
+    return fail(product.message, { fieldErrors: { requested_product_id: product.message }, values: formValues(formData) });
+  }
 
   // A repeat lead (same phone or email as a lead or contact the user can see)
   // is pointed out first; the user may still create a new one.
@@ -82,6 +89,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
       ...parsed.data,
       ...campaignInsert(campaign.data),
       disqualify_reason: choice.reason,
+      ...product.patch,
       ...customFieldsPatch(custom.customFields),
     })
     .select("id")
@@ -121,10 +129,15 @@ export async function updateLeadAction(
   if (!custom.ok) {
     return custom;
   }
+  // LEAD-04: only when the form has the field (the plan has the product catalog)
+  const product = requestedProductFromForm(formData);
+  if (!product.ok) {
+    return fail(product.message, { fieldErrors: { requested_product_id: product.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("leads")
-    .update({ ...parsed.data, ...campaignPatch, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

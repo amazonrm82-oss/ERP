@@ -27,6 +27,7 @@ import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
+import { getRequestedProduct, requestedProductEnabled } from "@/features/requested-product/queries";
 import { utmValues } from "@/features/leads/schema";
 import { canEditRecordHint, getOrgContext, getUserNames } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -66,11 +67,16 @@ export default async function LeadPage({ params, searchParams }: Props) {
     activeReasonNames(orgId),
     getFollowState(orgId, { kind: "lead", id: leadId }, context.user.id),
   ]);
-  const tags = await listTags(orgId);
   if (!lead) {
     notFound();
   }
-  const owners = await getUserNames([lead.owner_id]);
+  // LEAD-04: the requested product, and whether the plan has the product catalog
+  const [tags, owners, productsEnabled, requestedProduct] = await Promise.all([
+    listTags(orgId),
+    getUserNames([lead.owner_id]),
+    requestedProductEnabled(orgId),
+    getRequestedProduct(orgId, lead.requested_product_id),
+  ]);
 
   const name = leadDisplayName({ fullName: lead.full_name, email: lead.email, phone: lead.phone });
   const status = lookups.statuses.find((option) => option.id === lead.status_id);
@@ -196,6 +202,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               campaign: lead.campaign,
               budgetAgorot: lead.budget_agorot,
               utm: utmValues(lead.utm),
+              requestedProduct: { enabled: productsEnabled, product: requestedProduct },
             }}
           />
 

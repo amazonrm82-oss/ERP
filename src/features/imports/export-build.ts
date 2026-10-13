@@ -120,6 +120,8 @@ export const LOOKUPS: Record<string, string> = {
   unit_id: "unit",
   // CON-08: a company's or contact's price list
   price_list_id: "price_list",
+  // LEAD-04: a lead's requested product
+  requested_product_id: "requested_product",
 };
 
 export type ExportRow = Record<string, unknown>;
@@ -152,7 +154,7 @@ const READABLE: Record<string, { header: string; get: (value: unknown, row: Expo
 // tables whose rows are named by their name column
 const NAMED_BY_NAME = new Set<string>([
   "lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams", "record_type_options", "product_categories", "product_units",
-  "price_lists",
+  "price_lists", "products",
 ]);
 
 /**
@@ -218,6 +220,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון.
 המחירונים נמצאים ב-price_lists.csv: valid_from ו-valid_to הם התאריכים שבהם המחירון בתוקף (ריק = בלי הגבלה), is_active אומר אם הוא פעיל, ו-prices_include_vat אומר אם המחירים הקבועים במחירון כוללים מע"מ. מחירון ברירת המחדל הוא המחיר שבכל מוצר. המחירים שבכל מחירון נמצאים ב-price_list_lines.csv: min_quantity היא הכמות שממנה השורה חלה (0 = כל כמות), ובכל שורה יש מחיר קבוע באגורות (price_agorot; price_includes_vat בשורה מעתיק את ההגדרה של המחירון) או הנחה מהמחיר של המוצר (discount_bp, ב-1/100 של אחוז: 1000 = 10%).
 פרטי החיוב של חברות ואנשי קשר נמצאים בעמודות של companies.csv ושל contacts.csv: billing_name (שם לחשבונית), billing_tax_id (באנשי קשר: מספר עוסק או ת"ז; בחברה המספר הוא tax_id), billing_address ו-shipping_address (כתובת לחיוב ולמשלוח), billing_email (אימייל לחשבוניות), payment_terms (immediate = מיידי, net = מספר ימים מתאריך המסמך, eom = שוטף + מספר ימים) עם payment_days, ו-price_list_id עם שם המחירון ב-price_list.
+המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.

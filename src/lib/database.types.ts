@@ -961,6 +961,8 @@ export type LeadRow = {
   meta_lead_id: string | null;
   // SPD-01: when someone pressed "I took it" (take_lead() only; cleared when the owner changes)
   taken_at: string | null;
+  // LEAD-04: the product the lead asked about (public.products); a person may pick only an offerable one
+  requested_product_id: string | null;
 };
 
 export type LeadInsert = {
@@ -987,6 +989,7 @@ export type LeadInsert = {
   first_contacted_at?: string | null;
   last_contacted_at?: string | null;
   deleted_at?: string | null;
+  requested_product_id?: string | null;
 };
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
@@ -1720,6 +1723,8 @@ export type Database = {
       // computed fields for sorting lists (migration 0032): used as `order=sort_owner`, not called as RPCs
       sort_status: { Args: Record<string, never>; Returns: number | null };
       sort_source: { Args: Record<string, never>; Returns: string | null };
+      // LEAD-04: computed field on leads, the requested product's name (order=sort_requested_product)
+      sort_requested_product: { Args: Record<string, never>; Returns: string | null };
       sort_owner: { Args: Record<string, never>; Returns: string | null };
       sort_company: { Args: Record<string, never>; Returns: string | null };
       // deals and tasks lists (migration 0035)

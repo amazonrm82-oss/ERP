@@ -133,6 +133,8 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
             }
             case "source":
               return lead.sourceId ? sourceById.get(lead.sourceId) : null;
+            case "product":
+              return lead.requestedProductName ?? null;
             case "owner":
               return (
                 <InlineEdit

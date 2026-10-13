@@ -22,6 +22,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "owner", label: "אחראי" },
       // LEAD-02: set from the timeline
       { key: "last_contact", label: "מגע אחרון" },
+      // LEAD-04: the requested product from the catalog
+      { key: "product", label: "מוצר מבוקש" },
       { key: "created", label: "נוצר" },
       // DQL-01: share of the important fields that are filled
       { key: "completeness", label: "שלמות" },
@@ -85,9 +87,16 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
 
 export const CUSTOM_PREFIX = "cf:";
 
-/** Every column a list can show: the built-in ones, then the organization's custom fields. */
-export function catalogFor(object: ListObject, fields: Array<{ key: string; label: string }>): CatalogColumn[] {
-  return [...BUILT_IN[object].columns, ...fields.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
+// LEAD-04: the leads' "requested product" column, offered only with the plan flag 'products'
+export const PRODUCT_COLUMN = "product";
+
+/**
+ * Every column a list can show: the built-in ones, then the organization's custom fields.
+ * `products`: whether the business has the product catalog (the leads' product column).
+ */
+export function catalogFor(object: ListObject, fields: Array<{ key: string; label: string }>, options: { products?: boolean } = {}): CatalogColumn[] {
+  const builtIn = BUILT_IN[object].columns.filter((column) => object !== "lead" || column.key !== PRODUCT_COLUMN || options.products === true);
+  return [...builtIn, ...fields.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
 }
 
 export const columnChoicesSchema = z

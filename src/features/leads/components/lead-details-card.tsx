@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { CheckedTextField } from "@/features/data-quality/components/checked-field";
@@ -18,6 +19,9 @@ import type { AttributionRow } from "@/features/intake/attribution";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { formatMoney } from "@/lib/format";
+import { productPath } from "@/features/products/paths";
+import { RequestedProductPicker } from "@/features/requested-product/components/requested-product-picker";
+import type { RequestedProduct } from "@/features/requested-product/queries";
 
 import { updateLeadAction } from "../actions";
 import type { LeadSourceOption } from "../queries";
@@ -46,6 +50,8 @@ export type LeadDetailsView = {
   campaign?: string | null;
   budgetAgorot?: number | null;
   utm?: Partial<Record<LeadUtmKey, string>>;
+  // LEAD-04: the requested product (null: none, or not readable) and whether the plan has products
+  requestedProduct?: { enabled: boolean; product: RequestedProduct | null };
 };
 
 type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null };
@@ -82,6 +88,9 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props
           <Detail label="אימייל" value={lead.email} ltr />
           <Detail label="חברה" value={lead.companyName} />
           <Detail label="מקור" value={sourceName} />
+          {lead.requestedProduct && (lead.requestedProduct.enabled || lead.requestedProduct.product) ? (
+            <Detail label="מוצר מבוקש" value={lead.requestedProduct.product ? <RequestedProductValue orgId={orgId} product={lead.requestedProduct.product} /> : null} />
+          ) : null}
           <Detail label="אחראי" value={lead.ownerName} />
           <Detail label="תקציב" value={lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null} />
           <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
@@ -109,6 +118,17 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props
         ) : null}
       </CardBody>
     </Card>
+  );
+}
+
+function RequestedProductValue({ orgId, product }: { orgId: string; product: RequestedProduct }) {
+  return (
+    <span>
+      <Link href={productPath(orgId, product.id)} className="text-accent underline underline-offset-4">
+        <bdi>{product.name}</bdi>
+      </Link>
+      {product.note ? <span className="text-sm text-ink-soft"> ({product.note})</span> : null}
+    </span>
   );
 }
 
@@ -180,6 +200,13 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
               </option>
             ))}
           </SelectField>
+          {lead.requestedProduct?.enabled ? (
+            <RequestedProductPicker
+              orgId={orgId}
+              initial={lead.requestedProduct.product ? { id: lead.requestedProduct.product.id, name: lead.requestedProduct.product.name, note: lead.requestedProduct.product.note } : null}
+              error={errors.requested_product_id}
+            />
+          ) : null}
           <TextareaField
             label="הודעה"
             name="message"

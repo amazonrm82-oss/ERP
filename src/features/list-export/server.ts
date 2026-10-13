@@ -113,6 +113,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             source: lead.sourceId ? (sourceName.get(lead.sourceId) ?? null) : null,
             owner: lead.ownerName,
             last_contact: lead.lastContactedAt ? created(lead.lastContactedAt) : null,
+            product: lead.requestedProductName ?? null,
             created: created(lead.createdAt),
             completeness: percent(scores?.get(lead.id)),
           },

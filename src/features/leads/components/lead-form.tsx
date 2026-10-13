@@ -16,14 +16,17 @@ import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
 import { createLeadAction } from "../actions";
+import { RequestedProductPicker } from "@/features/requested-product/components/requested-product-picker";
+
 import { LeadCampaignFields } from "./lead-campaign-fields";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
 // reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
-type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[]; reasons: string[] };
+// products: LEAD-04, the requested product picker shows when the plan has the product catalog
+type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[]; reasons: string[]; products?: boolean };
 
 /** New lead form. On success the action redirects to the lead's page. */
-export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
+export function LeadForm({ orgId, statuses, sources, fields, reasons, products = false }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -118,6 +121,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
           error={errors.disqualify_reason}
         />
       ) : null}
+      {products ? <RequestedProductPicker orgId={orgId} initial={null} error={errors.requested_product_id} /> : null}
       <LeadCampaignFields values={values} errors={errors} />
       <TextareaField
         label="הודעה או הערה ראשונה"
