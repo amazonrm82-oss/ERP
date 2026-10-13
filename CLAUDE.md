@@ -258,6 +258,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
+- Contact channels (CON-01, migration 0108): the primary phone and email stay on `contacts` (`phone_type`, `email_type`,
+  column grants); further ones (up to 10 per kind from the browser) in `public.contact_channels` (rights follow the
+  contact; `value_e164` set by trigger; audited as `extra_phone` / `extra_email` changes of the contact). Repeat inquiries
+  (`intake_submit`), `app.search_contacts` and `public.contact_channel_matches()` (security invoker, for the app's
+  duplicate checks) match on all of them. Until `app.merge_move_links()` moves channels, trigger
+  `activities_merge_contact_channels` copies the duplicate's phones and emails to the kept contact in a merge.
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
