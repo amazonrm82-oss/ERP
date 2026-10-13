@@ -1,15 +1,18 @@
 import { Card, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
-import { getPlatformMetrics, platformReady } from "@/features/platform/queries";
+import { consentHealthWarnings, getConsentHealth, getPlatformMetrics, platformReady } from "@/features/platform/queries";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 type Obj = Record<string, unknown>;
 const n = (value: unknown) => Number(value ?? 0) || 0;
 
 export default async function AdminHomePage() {
-  if (!(await platformReady())) return null;
+  const me = await platformReady();
+  if (!me) return null;
   const m = await getPlatformMetrics();
+  // the consent alert is for the platform owner and support (the function refuses other roles)
+  const warnings = me.role === "owner" || me.role === "support" ? consentHealthWarnings(await getConsentHealth()) : [];
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;
   const ended = n(conversion.ended);
@@ -36,6 +39,18 @@ export default async function AdminHomePage() {
   return (
     <>
       <PageHeader title="מדדים" description="נתוני חשבון ושימוש בלבד. נתוני לקוחות לא מוצגים כאן." />
+      {warnings.length > 0 ? (
+        <section role="alert" aria-labelledby="consent-health" className="mb-5 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-warning sm:px-5">
+          <h2 id="consent-health" className="font-semibold">
+            הסכמות ומחיקות: נדרש טיפול
+          </h2>
+          <ul className="mt-1 list-disc ps-5 text-md">
+            {warnings.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <dl className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-lg border border-line bg-surface p-4">

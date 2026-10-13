@@ -118,6 +118,7 @@ describe("tenant isolation", () => {
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
       await q("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000)", [orgA]);
+      await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -162,6 +163,7 @@ describe("tenant isolation", () => {
     "record_type_options",
     "contact_channels",
     "plan_waitlist",
+    "consents",
     // seeded for every new organization (WA-01)
     "whatsapp_templates",
     // DEAL-03, also seeded
@@ -291,6 +293,8 @@ describe("tenant isolation", () => {
       contact_channels: "label = label",
       // no update or delete grant at all: a permission error is the expected outcome
       plan_waitlist: "plan_key = plan_key",
+      // append-only (CNS-02): no update or delete grant, a permission error is the expected outcome
+      consents: "state = state",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       goals: "target = target",
@@ -373,6 +377,7 @@ describe("tenant isolation", () => {
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
       ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
+      ["insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'x')", [orgA, ids.leadA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
@@ -439,6 +444,7 @@ describe("tenant isolation", () => {
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
       ["plan_waitlist", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
+      ["consents", "state = 'denied'", "state = 'denied'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["goals", "target = 777", "target = 777"],
@@ -554,6 +560,14 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaFile.code);
+
+    // a consent in org B recorded on org A's lead (CNS-01)
+    const viaConsent = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'x')", [orgB, ids.leadA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaConsent.code);
 
     // a meeting in org B about org A's lead, and org A's colleague added to org B's meeting
     const viaMeeting = await pgError(

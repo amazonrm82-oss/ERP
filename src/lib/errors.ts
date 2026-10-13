@@ -147,6 +147,20 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-01 (trigger contact_channels_payload_check)
   "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר.",
   "contact_channel:max": "אפשר לשמור עד 10 טלפונים נוספים ו-10 אימיילים נוספים לאיש קשר.",
+  // CNS-01, CNS-03 (trigger consents_prepare, guard consents_guard)
+  "consent:subject": "הסכמה נרשמת לליד אחד או לאיש קשר אחד. רעננו את הדף ונסו שוב.",
+  // owner's rules of 13 October 2026 (trigger consents_prepare)
+  "consent:erasure_block": "האדם ביקש למחוק את פרטיו. רק הסכמה חדשה שהוא נותן בעצמו בטופס מבטלת את החסימה.",
+  "consent:optout_locked": "האדם ביקש לא לקבל דיוור. רק הסכמה חדשה שהוא נותן בטופס, או ביטול של בעלים או מנהל מערכת עם מקור, מבטלים את זה.",
+  "consent:lift_admin": "רק בעלים או מנהל מערכת יכולים לבטל הסרה מדיוור.",
+  // a person's request after a completed erasure (function audit_erase_request)
+  "erase:no_address_left": 'הפרטים של הרשומה כבר נמחקו, ולכן אין טלפון או אימייל לרשום ברשימת "לא לפנות". אם האדם פונה שוב, אפשר להוסיף אותו לרשימה בבקשה חדשה.',
+  "consent:address_blocked": "אי אפשר לרשום הסכמה לכתובת הזאת. רק הסכמה שהאדם נותן בעצמו בטופס עם תיבת הסכמה תפתח אותה.",
+  "consent:lift_nothing": "אין כאן הסרה מדיוור לבטל. אפשר לרשום הסכמה רגילה.",
+  "consent:lift_note": "לביטול הסרה צריך לבחור מקור ולכתוב הערה קצרה.",
+  "consent:method": "צריך לכתוב איך התקבלה ההסכמה.",
+  "consent:no_address": "אין ברשומה טלפון או אימייל לערוץ הזה. הוסיפו אותו קודם, ואז רשמו את ההסכמה.",
+  "consent:append_only": "אי אפשר לשנות רישום הסכמה קיים. אפשר לרשום מצב חדש.",
   // USR-04 (function sample_data_add)
   "sample:exists": "נתוני הדוגמה כבר נמצאים במערכת. אפשר למחוק אותם ולהוסיף מחדש.",
   "sample:changed": "אחת מרשומות הדוגמה השתנתה בזמן המחיקה. נסו שוב: רשומות ששיניתם לא נמחקות.",

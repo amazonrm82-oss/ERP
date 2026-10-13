@@ -753,6 +753,38 @@ export type ContactChannelRow = {
   updated_at: string;
 };
 
+export type ConsentRow = {
+  id: string;
+  organization_id: string;
+  // orders rows that share a timestamp (the latest per channel is the current state)
+  seq: number;
+  // exactly one while the record exists; both null after it is purged (subject_* keep its id)
+  lead_id: string | null;
+  contact_id: string | null;
+  // "lead" | "contact" and the record's id, set by trigger
+  subject_type: string;
+  subject_id: string;
+  // ConsentChannel, ConsentState, ConsentSource (src/features/consents/model.ts)
+  channel: string;
+  state: string;
+  source: string;
+  wording: string | null;
+  method: string | null;
+  // HMAC-SHA256 (key app.settings consent_hash_key) of the organization, kind and the record's
+  // address at the time, set by trigger; null while the key is missing (filled later by the backfill).
+  // Clients may not select it (column grants); compare through consent_current().current_address
+  address_hash: string | null;
+  // 1 = HMAC-SHA256 keyed with consent_hash_key; a new key or method gets another version
+  hash_version: number;
+  // a copy made by the lead's conversion (LEAD-07): the lead's entry
+  copied_from: string | null;
+  // an owner's or admin's manual lift of an opt-out: LiftMethod (src/features/consents/model.ts) and a note
+  lift_method: string | null;
+  lift_note: string | null;
+  recorded_by: string | null;
+  created_at: string;
+};
+
 export type ContactInsert = {
   organization_id: string;
   import_job_id?: string | null;
@@ -1359,6 +1391,23 @@ export type Database = {
         { label?: ContactPhoneType; value?: string; position?: number }
       >;
       leads: Table<LeadRow, LeadInsert>;
+      // marketing consent (CNS-01): append-only; the browser inserts manual entries only
+      consents: Table<
+        ConsentRow,
+        {
+          organization_id: string;
+          lead_id?: string | null;
+          contact_id?: string | null;
+          channel: "email" | "sms" | "whatsapp" | "phone";
+          state: "granted" | "denied" | "withdrawn" | "unknown";
+          source: "manual";
+          wording?: string | null;
+          method: string;
+          lift_method?: "signed_form" | "written_message" | "recorded_call" | null;
+          lift_note?: string | null;
+        },
+        Record<string, never>
+      >;
       deals: Table<DealRow, DealInsert>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
       // PRD-04: organization_id is fixed once inserted (column grants)
@@ -1531,6 +1580,8 @@ export type Database = {
       // privacy erasure (migration 0027)
       audit_erase_candidates: { Args: { p_org: string; p_query: string }; Returns: Json };
       audit_erase_record: { Args: { p_org: string; p_type: string; p_id: string }; Returns: number };
+      // -1 = paused until the server can complete it (CNS); p_person_request records "do not contact"
+      audit_erase_request: { Args: { p_org: string; p_type: string; p_id: string; p_person_request: boolean }; Returns: number };
       // adds and removes tags on one record (migration 0042)
       change_record_tags: { Args: { p_table: string; p_org: string; p_id: string; p_add: string[]; p_remove: string[] }; Returns: boolean };
       // import duplicates of a chunk, with the caller's rights (migration 0044)
@@ -1539,6 +1590,21 @@ export type Database = {
         Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
       };
       // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
+      // CNS-01: the latest entry per channel of a lead or contact (security invoker)
+      consent_current: {
+        Args: { p_org: string; p_kind: string; p_id: string };
+        Returns: Array<{
+          channel: string;
+          state: string;
+          source: string;
+          method: string | null;
+          wording: string | null;
+          recorded_by: string | null;
+          created_at: string;
+          // null = cannot check (no hash key)
+          current_address: boolean | null;
+        }>;
+      };
       contact_channel_matches: {
         Args: { p_org: string; p_phones: string[]; p_emails: string[] };
         Returns: Array<{ contact_id: string; kind: "phone" | "email"; value: string }>;
@@ -1575,6 +1641,8 @@ export type Database = {
       platform_metrics: { Args: Record<string, never>; Returns: Json };
       platform_set_plan_availability: { Args: { p_key: string; p_availability: string }; Returns: undefined };
       platform_plan_waitlist: { Args: Record<string, never>; Returns: Json };
+      // CNS: hash key and paused erasures, for the panel's alert (platform owner and support)
+      platform_consent_health: { Args: Record<string, never>; Returns: Json };
       platform_staff_list: { Args: Record<string, never>; Returns: Json };
       platform_set_staff: { Args: { p_email: string; p_role: PlatformRole | null }; Returns: undefined };
       platform_log_list: { Args: { p_org?: string | null; p_limit?: number }; Returns: Json };

@@ -419,8 +419,9 @@ describe("setup checklist and sample data (USR-04)", () => {
   it("running the migration again keeps every stored value", async () => {
     const before = await records(owner.id, org);
     const dir = path.resolve(__dirname, "../../supabase/migrations");
-    // the last ones redefine app.sample_row() (DEAL-03, TAX-06), so they run again after the first, keeping the latest version
-    for (const suffix of ["_setup_checklist.sql", "_sample_data_remove.sql", "_sample_data_followups.sql", "_deal_loss_reasons.sql", "_money_currency.sql"]) {
+    // later ones redefine app.sample_row() (DEAL-03, TAX-06) and app.sample_untouched() (CNS-01), so they run again
+    // after the first, keeping the latest versions (each redefines a different function, so their order does not matter)
+    for (const suffix of ["_setup_checklist.sql", "_sample_data_remove.sql", "_sample_data_followups.sql", "_deal_loss_reasons.sql", "_consents_followups.sql", "_money_currency.sql"]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();
       await asAdmin((q) => q(readFileSync(path.join(dir, file as string), "utf8")));

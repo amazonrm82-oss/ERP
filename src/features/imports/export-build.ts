@@ -42,6 +42,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "leads", file: "leads.csv" },
   { table: "contacts", file: "contacts.csv" },
   { table: "contact_channels", file: "contact_channels.csv" },
+  // CNS-01: the consent history of leads and contacts (rows of purged records are not readable, so not exported)
+  { table: "consents", file: "consents.csv" },
   { table: "companies", file: "companies.csv" },
   { table: "deals", file: "deals.csv" },
   { table: "deal_contacts", file: "deal_contacts.csv", key: ["deal_id", "contact_id"] },
@@ -74,10 +76,18 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "files", file: "files.csv" },
 ];
 
+// tables whose clients may not select every column: the columns the export reads (else "*")
+export const EXPORT_COLUMNS: Partial<Record<ExportTableName, string>> = {
+  // CNS-01: the address hash is not shown to anyone (column grants)
+  consents:
+    "id, organization_id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, method, copied_from, lift_method, lift_note, recorded_by, created_at",
+};
+
 // readable names added next to these id columns
 export const LOOKUPS: Record<string, string> = {
   owner_id: "owner",
   created_by: "created_by_name",
+  recorded_by: "recorded_by_name",
   user_id: "user",
   status_id: "status",
   source_id: "source",

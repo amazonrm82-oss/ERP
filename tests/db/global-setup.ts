@@ -50,6 +50,9 @@ export default async function setup(): Promise<void> {
         throw new Error(`Failed to apply ${path.basename(file)}: ${String(error)}`);
       }
     }
+    // The consent hash key, filled in by the owner on every real environment before the first
+    // customer (CNS, owner's decision of 13 October 2026). Tests that need it missing remove it.
+    await db.query("insert into app.settings (key, value) values ('consent_hash_key', 'test-consent-key') on conflict (key) do update set value = excluded.value");
   } finally {
     await db.end();
   }

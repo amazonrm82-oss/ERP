@@ -30,7 +30,7 @@ export async function platformReady(): Promise<PlatformMe | null> {
   return me && !me.needsMfa ? me : null;
 }
 
-async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist"): Promise<Json> {
+async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health"): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
   if (error) throw new Error(`${name} failed: ${error.message}`);
@@ -45,6 +45,32 @@ export async function getPlatformMetrics(): Promise<Obj> {
 export async function getPlanWaitlistCounts(): Promise<Record<string, number>> {
   const data = obj(await call("platform_plan_waitlist"));
   return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, Number(value) || 0]));
+}
+
+export type ConsentHealth = { keyPresent: boolean; pendingErasures: number; erasuresStopped: number; unhashedOptOuts: number; erasureFailures7d: number };
+
+/** The consent hash key and paused privacy erasures (CNS, owner's decision of 13 October 2026). */
+export async function getConsentHealth(): Promise<ConsentHealth> {
+  const h = obj(await call("platform_consent_health"));
+  const n = (value: unknown) => Number(value ?? 0) || 0;
+  return {
+    keyPresent: h.key_present === true,
+    pendingErasures: n(h.pending_erasures),
+    erasuresStopped: n(h.erasures_stopped),
+    unhashedOptOuts: n(h.unhashed_optouts_total),
+    erasureFailures7d: n(h.erasure_failures_last_7d),
+  };
+}
+
+/** The panel's warning lines; empty when all is well. Plain Hebrew, no personal data. */
+export function consentHealthWarnings(h: ConsentHealth): string[] {
+  const lines: string[] = [];
+  if (!h.keyPresent) lines.push("מפתח ההסכמות חסר");
+  if (h.pendingErasures > 0) lines.push(`${h.pendingErasures} מחיקות ממתינות`);
+  if (h.erasureFailures7d > 0) lines.push(`${h.erasureFailures7d} כשלים בהשלמת מחיקה בשבוע האחרון`);
+  if (h.erasuresStopped > 0) lines.push(`${h.erasuresStopped} מחיקות שהפסיקו לנסות להשלים (נדרש טיפול)`);
+  if (h.unhashedOptOuts > 0) lines.push(`${h.unhashedOptOuts} בקשות הסרה שעוד לא ניתן לבדוק`);
+  return lines;
 }
 
 export async function listPlatformStaff(): Promise<Obj[]> {

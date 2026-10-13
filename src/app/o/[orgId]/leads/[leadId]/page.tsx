@@ -1,3 +1,4 @@
+import { RecordConsents } from "@/features/consents/components/record-consents";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -195,6 +196,15 @@ export default async function LeadPage({ params, searchParams }: Props) {
             allTags={tags}
             selectedIds={lead.tag_ids}
             canEdit={canEditRecordHint(context, lead.owner_id)}
+          />
+
+          <RecordConsents
+            orgId={orgId}
+            subject={{ kind: "lead", id: lead.id }}
+            canEdit={canEditRecordHint(context, lead.owner_id)}
+            hasPhone={Boolean(lead.phone_e164)}
+            hasEmail={Boolean(lead.email?.trim())}
+            canLift={isAdminRole(context.role)}
           />
 
         </div>

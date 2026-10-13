@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import { eraseFromAuditAction } from "@/features/audit/actions";
+import { EraseDetailsButton } from "@/features/audit/components/erase-details-button";
 import { AuditEntries, idsInChanges } from "@/features/audit/components/audit-entries";
 import { ENTITY_LABELS, LOGIN_ACTION_LABELS } from "@/features/audit/labels";
 import { nameIds } from "@/features/audit/names";
@@ -116,15 +115,7 @@ export default async function AuditPage({ params, searchParams }: Props) {
                       </p>
                     </div>
                     {canWrite ? (
-                      <ActionButton
-                        action={eraseFromAuditAction.bind(null, orgId, c.entityType, c.entityId)}
-                        pendingText="מוחקים…"
-                        variant="danger-ghost"
-                        srLabel={c.name ?? undefined}
-                        confirm="למחוק את הפרטים של הרשומה הזו מהיומן? אי אפשר לשחזר אותם."
-                      >
-                        מחיקת הפרטים מהיומן
-                      </ActionButton>
+                      <EraseDetailsButton orgId={orgId} entityType={c.entityType} entityId={c.entityId} name={c.name ?? null} />
                     ) : null}
                   </li>
                 ))}

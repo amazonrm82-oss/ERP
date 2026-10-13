@@ -2,7 +2,7 @@ import "server-only";
 
 import { strToU8, zipSync } from "fflate";
 
-import { EXPORT_README, EXPORT_TABLES, exportKey, exportNames, type ExportRow, type ExportTable, toCsv } from "@/features/imports/export-build";
+import { EXPORT_COLUMNS, EXPORT_README, EXPORT_TABLES, exportKey, exportNames, type ExportRow, type ExportTable, toCsv } from "@/features/imports/export-build";
 import { FILES_BUCKET } from "@/features/files/types";
 import { must } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
@@ -17,14 +17,14 @@ async function fetchAll(t: ExportTable, orgId: string): Promise<ExportRow[]> {
   const { rows } = await readAllPages<ExportRow>(async (from, to) => {
     let query = supabase
       .from(t.table as "leads")
-      .select("*")
+      .select(EXPORT_COLUMNS[t.table] ?? "*")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: true });
     // rows written in one statement share created_at; without a tie-breaker a row can be skipped or repeated between pages (FXC-07)
     for (const column of exportKey(t)) query = query.order(column as "id", { ascending: true });
     const { data, error } = await query.range(from, to);
     if (error) throw new Error(`export of ${t.table} failed: ${error.message}`);
-    return data as ExportRow[];
+    return data as unknown as ExportRow[];
   });
   return rows;
 }

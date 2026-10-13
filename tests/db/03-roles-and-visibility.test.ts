@@ -860,6 +860,43 @@ describe("roles and record visibility", () => {
     await asUser(m1.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount).toBe(1));
   });
 
+  it("a lead's consents follow the lead: who reads it reads them, who edits it records a new one; nobody changes one (CNS-01)", async () => {
+    await setVisibility("own");
+    const lead = await insertLead(m1.id, org, { phone: "052-1120001", team_id: team });
+    const add = (u: U) =>
+      asUser(u.id, (q) =>
+        q<{ id: string }>(
+          "insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה') returning id",
+          [org, lead],
+        ),
+      );
+    const mine = (await add(m1)).rows[0].id;
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.consents where lead_id = $1", [lead]));
+    const change = (u: U) => pgError(asUser(u.id, (q) => q("update public.consents set state = 'denied' where id = $1", [mine])));
+    const remove = (u: U) => pgError(asUser(u.id, (q) => q("delete from public.consents where id = $1", [mine])));
+
+    // a colleague who cannot see the lead sees and records nothing
+    expect(await seen(m2)).toBe(0);
+    expect((await pgError(add(m2))).code).toBe("42501");
+    // the team's manager and an admin read and record
+    expect(await seen(manager)).toBe(1);
+    expect((await add(manager)).rowCount).toBe(1);
+    expect((await add(admin)).rowCount).toBe(1);
+    expect(await seen(owner)).toBe(3);
+
+    // reading is not editing: with visibility "org" a colleague and a viewer read, and record nothing
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(3);
+      expect((await pgError(add(u))).code, u.email).toBe("42501");
+    }
+    // no role updates or deletes an entry
+    for (const u of [owner, admin, manager, m1, m2, viewer]) {
+      expect((await change(u)).code, u.email).toBe("42501");
+      expect((await remove(u)).code, u.email).toBe("42501");
+    }
+  });
+
   it("ownership moves only through transfer_ownership, and only by the owner", async () => {
     const byAdmin = await pgError(asUser(admin.id, (q) => q("select public.transfer_ownership($1, $2)", [org, admin.id])));
     expect(byAdmin.code).toBe("42501");

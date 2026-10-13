@@ -1,3 +1,4 @@
+import { RecordConsents } from "@/features/consents/components/record-consents";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -138,6 +139,15 @@ export default async function ContactPage({ params, searchParams }: Props) {
           />
 
           <TagPicker orgId={orgId} kind="contact" recordId={contact.id} allTags={tags} selectedIds={contact.tag_ids} canEdit={canEdit} />
+
+          <RecordConsents
+            orgId={orgId}
+            subject={{ kind: "contact", id: contact.id }}
+            canEdit={canEdit}
+            hasPhone={Boolean(contact.phone_e164)}
+            hasEmail={Boolean(contact.email?.trim())}
+            canLift={isAdminRole(context.role)}
+          />
 
           <RelatedDealsCard
             orgId={orgId}

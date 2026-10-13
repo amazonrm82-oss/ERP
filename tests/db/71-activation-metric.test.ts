@@ -14,12 +14,16 @@ if (!MIGRATION_FILE) throw new Error("activation metric migration not found");
 const MIGRATION = readFileSync(join(MIGRATIONS_DIR, MIGRATION_FILE), "utf8");
 // Re-running this migration puts back its own functions; the later migrations that redefine one of
 // them (0118: sample leads never activate; plan_review_fixes: platform_metrics counts a price per
-// business once) run again after it, so no later test sees an old body.
+// business once) run again after it, so no later test sees an old body. 0118 also redefines
+// app.sample_untouched(), so the later migrations that redefine that one run again too (CNS follow-ups:
+// a consent keeps a sample record).
 const LATER = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql") && f > MIGRATION_FILE)
   .sort()
   .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
-  .filter((sql) => /function\s+(app\.mark_org_activation|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql));
+  .filter((sql) =>
+    /function\s+(app\.mark_org_activation|app\.sample_untouched|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql),
+  );
 const rerun = (): Promise<void> =>
   asAdmin(async (q) => {
     await q(MIGRATION);
