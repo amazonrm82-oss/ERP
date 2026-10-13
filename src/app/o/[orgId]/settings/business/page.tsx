@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { INDUSTRIES, TEAM_SIZES } from "@/features/onboarding/options";
+import { BrandingSettings } from "@/features/branding/components/branding-settings";
+import { getOrgBranding } from "@/features/branding/queries";
 import { OrgSecurityCard } from "@/features/account/components/org-security-card";
 import { OrganizationSettingsForm } from "@/features/settings/components/organization-settings-form";
 import { isAdminRole, VISIBILITY_OPTIONS } from "@/features/settings/permissions";
@@ -27,10 +29,11 @@ export default async function OrganizationSettingsPage({ params }: Props) {
   // the database lets admins edit even a read-only organization's profile,
   // but the screen follows the general rule: nothing changes while read-only
   if (isAdminRole(role) && canWrite) {
-    const grant = await getOpenSupportGrant(orgId);
+    const [grant, branding] = await Promise.all([getOpenSupportGrant(orgId), getOrgBranding(orgId)]);
     return (
       <>
         <OrganizationSettingsForm orgId={orgId} settings={settings} />
+        <BrandingSettings orgId={orgId} logoUrl={branding.logoUrl} color={branding.color} />
         <OrgSecurityCard orgId={orgId} requireMfa={settings.requireMfa} />
         <SupportAccessCard orgId={orgId} grant={grant} />
       </>

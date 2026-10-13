@@ -20,6 +20,10 @@ import { TextLink } from "@/components/ui/text-link";
 import { ToastProvider, ToastView, useToast } from "@/components/ui/toast";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
+import { BrandScope } from "@/features/branding/components/brand-scope";
+import { OrgLogo } from "@/features/branding/components/org-logo";
+import { brandPalette } from "@/features/branding/color";
+import sampleLogo from "@/assets/mexuz-logo.png";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
 import { holidaysOn } from "@/features/calendar-days/holidays";
 
@@ -35,6 +39,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-3">{children}</div>;
 }
+
+// a colour that passes, one too light for white text, one too dark for the dark theme
+const BRAND_SAMPLES = ["#0f7b6c", "#ffd400", "#5b2a86"];
 
 const ok = async () => ({ ok: true as const });
 const failing = async () => ({ ok: false as const, message: "לא הצלחנו להעביר לסל. נסו שוב." });
@@ -299,6 +306,31 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         </div>
         <Skeleton className="h-6 w-40" />
         <ListSkeleton rows={2} />
+      </Section>
+
+      <Section title="מיתוג העסק בדפי הלקוח (FLD-04)">
+        <p className="text-sm text-ink-soft">
+          הצבע של העסק מחליף את צבע ההדגשה רק בדפים שהלקוח רואה. צבע שלא עומד בניגודיות 4.5:1 מתוקן לגוון הקרוב שעומד.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {BRAND_SAMPLES.map((color) => (
+            <BrandScope key={color} color={color}>
+              <Card className="flex flex-col gap-3 p-4">
+                <OrgLogo url={sampleLogo.src} alt="לוגו לדוגמה" className="h-6 max-w-32" />
+                <p className="text-sm text-ink-soft">
+                  נבחר <span dir="ltr">{color}</span>
+                  {brandPalette(color, theme).corrected ? " · תוקן לקריאות" : ""}
+                </p>
+                <TextField label="שם מלא" name={p(`brand-${color}`)} defaultValue="דנה כהן" />
+                <Row>
+                  <Button size="sm">שליחת הפרטים</Button>
+                  <TextLink href="#">קישור</TextLink>
+                  <Badge tone="accent">תגית</Badge>
+                </Row>
+              </Card>
+            </BrandScope>
+          ))}
+        </div>
       </Section>
     </div>
   );

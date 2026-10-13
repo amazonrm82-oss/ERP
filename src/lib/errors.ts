@@ -65,6 +65,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "profile:locale": "השפה שנבחרה אינה נתמכת.",
   "profile:timezone": "אזור הזמן הזה אינו נתמך. בחרו עיר אחרת באותו אזור זמן.",
   "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
+  "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",
   // REC-02 (trigger activities_notify_mentions)
   "mention:forbidden": "אפשר לאזכר רק מי שרשאי לראות את הרשומה. הסירו את האזכור ונסו שוב.",
   "mention:too_many": `אפשר לאזכר עד ${MENTION_MAX} אנשים בהערה אחת.`,

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isHexColor } from "@/features/branding/color";
+import { isLogoPath } from "@/features/branding/logo";
 import { isFieldType } from "@/features/custom-fields/types";
 import type { Json } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
@@ -8,7 +10,14 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { FORM_EXCLUDED_TYPES, INTAKE_FIELD_LABELS, isIntakeField, parseFieldsConfig } from "./fields";
 import type { PublicField } from "./public-validate";
 
-export type PublicForm = { title: string; intro: string | null; submitLabel: string; fields: PublicField[] };
+export type PublicForm = {
+  title: string;
+  intro: string | null;
+  submitLabel: string;
+  fields: PublicField[];
+  // FLD-04: the business's logo (object name in the public bucket) and main colour, or null
+  brand: { logoPath: string | null; color: string | null };
+};
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
 
@@ -47,6 +56,10 @@ export function publicFormFrom(data: Json): PublicForm | null {
     intro: typeof data.intro === "string" && data.intro !== "" ? data.intro : null,
     submitLabel: typeof data.submit_label === "string" && data.submit_label.trim() !== "" ? data.submit_label : "שליחת הפרטים",
     fields,
+    brand: {
+      logoPath: isObject(data.brand) && isLogoPath(data.brand.logo) ? data.brand.logo : null,
+      color: isObject(data.brand) && isHexColor(data.brand.color) ? data.brand.color : null,
+    },
   };
 }
 
@@ -58,7 +71,8 @@ export async function readPublicForm(service: ServiceClient, token: string): Pro
 
 /**
  * What the hosted form shows, by its public token. Only display settings are
- * read; nothing about the organization or its data leaves the server.
+ * read, plus the organization's logo and colour (FLD-04); nothing else about
+ * the organization or its data leaves the server.
  */
 export async function getPublicForm(token: string): Promise<PublicForm | null | "not-configured"> {
   if (!/^[0-9a-f]{32}$/.test(token)) {

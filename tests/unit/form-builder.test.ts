@@ -186,8 +186,17 @@ describe("hosted form: what the server reads (CAP-01)", () => {
         { key: "full_name", required: true, help: "שם ומשפחה", showIf: null, label: "שם מלא", custom: null },
         { key: "cf:service", required: false, help: null, showIf: null, label: "שירות", custom: { type: "select", label: "שירות", options: ["א", "ב"] } },
       ],
+      brand: { logoPath: null, color: null },
     });
     expect(publicFormFrom(null)).toBeNull();
+  });
+
+  it("reads the business's logo and colour (FLD-04), and drops anything that is not one", () => {
+    const logo = "11111111-2222-4333-8444-555555555555/66666666-7777-4888-8999-aaaaaaaaaaaa";
+    expect(publicFormFrom({ title: "t", fields: [], brand: { logo, color: "#1e56d6" } })?.brand).toEqual({ logoPath: logo, color: "#1e56d6" });
+    for (const brand of [{ logo: "../x", color: "red" }, { logo: `${logo}/x`, color: "#1E56D6" }, "x", null]) {
+      expect(publicFormFrom({ title: "t", fields: [], brand })?.brand).toEqual({ logoPath: null, color: null });
+    }
   });
 
   it("reads only cf_ inputs from a post, capped", () => {

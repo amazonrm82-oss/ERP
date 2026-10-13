@@ -152,6 +152,9 @@ export type OrganizationRow = {
   require_mfa: boolean;
   // USR-03: next step of the setup wizard (1..4); null = finished, skipped, or an older organization
   setup_step: number | null;
+  // FLD-04: logo object in the public bucket org-logos (<org id>/<uuid>) and main colour (#rrggbb)
+  logo_path: string | null;
+  brand_color: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -864,6 +867,8 @@ export type Database = {
           record_visibility?: RecordVisibility;
           require_mfa?: boolean;
           setup_step?: number | null;
+          logo_path?: string | null;
+          brand_color?: string | null;
         }
       >;
       profiles: Table<

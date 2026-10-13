@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
+import { OrgLogo } from "@/features/branding/components/org-logo";
+import { getOrgBranding } from "@/features/branding/queries";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { GlobalSearch } from "@/features/search/components/global-search";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
@@ -33,7 +35,11 @@ export default async function OrgLayout({ children, params }: Props) {
   const context = await getOrgContext(orgId);
   const { org, user, subscription } = context;
   const notice = ORG_STATUS_NOTICES[org.status];
-  const [notifications, unread] = await Promise.all([listNotifications(org.id, user.id, 8), countUnread(org.id, user.id)]);
+  const [notifications, unread, branding] = await Promise.all([
+    listNotifications(org.id, user.id, 8),
+    countUnread(org.id, user.id),
+    getOrgBranding(org.id),
+  ]);
 
   return (
     <div className="min-h-dvh md:ps-60">
@@ -58,6 +64,8 @@ export default async function OrgLayout({ children, params }: Props) {
 
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
+          {/* FLD-04: the business's own logo; the name next to it says who it is */}
+          {branding.logoUrl ? <OrgLogo url={branding.logoUrl} alt="" className="h-7 max-w-16 sm:max-w-24" /> : null}
           <p className="truncate font-semibold">{org.name}</p>
           {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} /> : null}
         </div>
