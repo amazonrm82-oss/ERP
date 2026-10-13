@@ -6,9 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { BoardIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
+import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { calendarPath } from "@/features/calendar/range";
+import { idleText, meetingSpanText } from "@/features/home/my-day";
 import { getMyDay } from "@/features/home/queries";
+import { MEETING_STATUS_TONE } from "@/features/meetings/display";
+import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { isAdminRole } from "@/features/settings/permissions";
 import { SetupResumeCard } from "@/features/setup/components/setup-resume-card";
 import { getSetupStep } from "@/features/setup/queries";
@@ -21,6 +25,8 @@ import { paths } from "@/lib/paths";
 import { RECORD_TYPES, recordPage } from "@/lib/record-types";
 
 type Props = { params: Promise<{ orgId: string }> };
+
+const RELATED_LABEL = { lead: "פתיחת הליד", contact: "פתיחת איש הקשר", company: "פתיחת החברה", deal: "פתיחת העסקה" } as const;
 
 // The title template of this segment's layout does not apply to its own page.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -40,6 +46,8 @@ export default async function HomePage({ params }: Props) {
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
   const firstName = user.displayName.split(" ")[0];
+  const noNextStep = day.dealsWithoutNextStep;
+  const stuckReportHref = `${paths.report(orgId, "stuck")}?${new URLSearchParams({ owner: user.id })}`;
 
   // three tiles that lead to the full list; three in a row on a phone too
   const summary = [
@@ -90,6 +98,63 @@ export default async function HomePage({ params }: Props) {
       </ul>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
+        <Card aria-labelledby="my-meetings-title">
+          <CardHeader
+            id="my-meetings-title"
+            title="הפגישות שלי היום"
+            action={
+              <ButtonLink href={calendarPath(orgId, { view: "day" })} variant="ghost" size="sm">
+                ליומן
+              </ButtonLink>
+            }
+          />
+          <CardBody>
+            {day.meetings.length === 0 ? (
+              <EmptyState compact icon={<CalendarIcon />} title="אין פגישות היום" description="פגישה שאתם מארגנים או משתתפים בה היום תופיע כאן." />
+            ) : (
+              <>
+                <ul className="divide-y divide-line">
+                  {day.meetings.map((meeting) => (
+                    <li key={meeting.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                      <time
+                        dateTime={meeting.startsAt}
+                        className={meeting.phase === "over" ? "shrink-0 pt-0.5 text-sm tabular-nums text-ink-soft" : "shrink-0 pt-0.5 text-sm font-medium tabular-nums"}
+                        dir="ltr"
+                      >
+                        {meetingSpanText(meeting.startsAt, meeting.endsAt, day.today, org.timeZone)}
+                      </time>
+                      <span className="min-w-0">
+                        <span className="block break-words">{meeting.title}</span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+                          {meeting.phase === "now" && meeting.status === "planned" ? <Badge tone="accent">עכשיו</Badge> : null}
+                          {meeting.status !== "planned" ? (
+                            <Badge tone={MEETING_STATUS_TONE[meeting.status] ?? "neutral"}>{MEETING_STATUS_LABEL[meeting.status] ?? meeting.status}</Badge>
+                          ) : null}
+                          <span>{MEETING_TYPE_LABEL[meeting.type] ?? meeting.type}</span>
+                          {meeting.location ? <bdi className="break-words">{meeting.location}</bdi> : null}
+                          {meeting.related ? (
+                            <Link href={recordPage(meeting.related.type, orgId, meeting.related.id)} className="text-accent-strong underline-offset-4 hover:underline">
+                              {RELATED_LABEL[meeting.related.type]}
+                            </Link>
+                          ) : null}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {day.meetingsTruncated ? (
+                  <p className="mt-3 text-sm text-ink-soft">
+                    ייתכן שיש עוד פגישות.{" "}
+                    <Link href={calendarPath(orgId, { view: "day" })} className="text-accent-strong underline underline-offset-4">
+                      לרשימה המלאה ביומן
+                    </Link>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </CardBody>
+        </Card>
+
         <Card aria-labelledby="my-tasks-title">
           <CardHeader
             id="my-tasks-title"
@@ -179,6 +244,50 @@ export default async function HomePage({ params }: Props) {
                 לידים שעוד לא קיבלו מענה
               </Link>
             </p>
+          </CardBody>
+        </Card>
+
+        <Card aria-labelledby="my-no-next-step-title">
+          <CardHeader
+            id="my-no-next-step-title"
+            title="עסקאות בלי פעולה הבאה"
+            action={
+              <ButtonLink href={stuckReportHref} variant="ghost" size="sm">
+                לדוח המלא
+              </ButtonLink>
+            }
+          />
+          <CardBody>
+            {noNextStep.deals.length === 0 ? (
+              <EmptyState
+                compact
+                kind="done"
+                title="לכל העסקאות שלכם יש צעד הבא"
+                description="עסקה פתוחה בלי משימה פתוחה ובלי פגישה מתוכננת תופיע כאן."
+              />
+            ) : (
+              <>
+                <ul className="divide-y divide-line">
+                  {noNextStep.deals.map((deal) => (
+                    <li key={deal.id} className="py-2.5 first:pt-0 last:pb-0">
+                      <Link href={paths.deal(orgId, deal.id)} className="block break-words font-medium underline-offset-4 hover:underline">
+                        {deal.name}
+                      </Link>
+                      <span className="block text-sm text-ink-soft">
+                        {deal.stageName ? `${deal.stageName} · ` : ""}
+                        {idleText(deal.idleDays)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {noNextStep.count > noNextStep.deals.length || noNextStep.truncated ? (
+                  <p className="mt-3 text-sm text-ink-soft">
+                    {noNextStep.truncated ? "יש עוד עסקאות כאלה" : `ועוד ${formatNumber(noNextStep.count - noNextStep.deals.length)} עסקאות כאלה`} בדוח העסקאות התקועות.
+                  </p>
+                ) : null}
+                <p className="mt-3 text-sm text-ink-soft">כדאי לקבוע לכל עסקה משימה או פגישה, כדי שלא תישכח.</p>
+              </>
+            )}
           </CardBody>
         </Card>
       </div>

@@ -1,9 +1,14 @@
 import "server-only";
 
+import { TIME_ZONE } from "@/lib/app";
 import { endOfToday, zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 import { relatedRecords, type RelatedRecord } from "@/features/tasks/queries";
+import { listCalendarItems } from "@/features/calendar/queries";
+import { rangeBounds } from "@/features/calendar/range";
+
+import { dealsWithoutNextStep, myMeetings, type DealsWithoutNextStep, type MyMeeting } from "./my-day";
 
 // related: the record the task belongs to, when it has one (FXU-01)
 export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean; related: RelatedRecord | null };
@@ -25,13 +30,23 @@ export type MyDay = {
   newLeadsCount: number;
   openDealsCount: number;
   openDealsTotalAgorot: number;
+  // TASK-09: today's meetings the user organizes or takes part in (as the calendar's "mine")
+  meetings: MyMeeting[];
+  meetingsTruncated: boolean;
+  // TASK-09: the user's open deals with no open task and no planned meeting ahead
+  dealsWithoutNextStep: DealsWithoutNextStep;
 };
 
 const TASK_LIMIT = 50;
 const NEW_LEADS_SHOWN = 8;
 const DEALS_SUM_LIMIT = 1000;
+const NO_NEXT_STEP_SHOWN = 8;
 
-/** "My day": the signed-in user's due tasks, new leads and open deals in one organization. */
+/**
+ * "My day": the signed-in user's due tasks, new leads, open deals, today's meetings and the
+ * deals that have no next action, in one organization. Everything is read with the user's
+ * session, so RLS decides what shows.
+ */
 export async function getMyDay(orgId: string, userId: string, timeZone?: string): Promise<MyDay> {
   const supabase = await createClient();
   const now = new Date();
@@ -45,7 +60,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     .eq("is_default", true)
     .maybeSingle(), "lead_statuses");
 
-  const [tasks, leads, deals] = await Promise.all([
+  const [tasks, leads, deals, calendar, stuck] = await Promise.all([
     supabase
       .from("tasks")
       .select("id, title, due_at, lead_id, contact_id, company_id, deal_id")
@@ -75,6 +90,10 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
       .eq("status", "open")
       .is("deleted_at", null)
       .limit(DEALS_SUM_LIMIT),
+    // the calendar's own read: a meeting that overlaps today, organizer or participant, not cancelled
+    listCalendarItems(orgId, rangeBounds([today], timeZone ?? TIME_ZONE), [userId]),
+    // "no next action" as the board and the stuck-deals report decide it (security invoker)
+    supabase.rpc("report_stuck_deals", { p_org: orgId, p_owner: userId }),
   ]);
 
   if (tasks.error) {
@@ -86,6 +105,8 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
   if (deals.error) {
     throw new Error(`my deals query failed: ${deals.error.message}`);
   }
+
+  const stuckRows = must(stuck, "stuck deals");
 
   const related = await relatedRecords(orgId, tasks.data);
   return {
@@ -111,5 +132,8 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     openDealsCount: deals.count ?? deals.data.length,
     // summed over at most DEALS_SUM_LIMIT deals, far above one person's open pipeline
     openDealsTotalAgorot: deals.data.reduce((sum, deal) => sum + deal.amount_agorot, 0),
+    meetings: myMeetings(calendar.items, now),
+    meetingsTruncated: calendar.truncated,
+    dealsWithoutNextStep: dealsWithoutNextStep(stuckRows, NO_NEXT_STEP_SHOWN),
   };
 }
