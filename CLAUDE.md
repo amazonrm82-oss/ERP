@@ -496,6 +496,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   schema-qualified names and NO `SET` clause, so the planner inlines them; the advisor's 10 `function_search_path_mutable`
   warnings on them are expected. A key a list no longer knows is skipped, never missing. DQL-02 typing checks and duplicate
   notices are app-only (`src/features/data-quality/typing.ts`, `duplicates.ts`).
+- Working hours and leave (CAP-09, migration 0161; owner's option B): `org_calendar_settings.working_hours` (null = no hours limit)
+  and `profiles.working_hours` (a person's own hours limit them even when the business has none; the hours form says so).
+  `public.member_leaves` (members read; own, owner anyone's, admin all but owner/admins via `app.member_hours_editable`; 100
+  current/future, advisory lock). `app.member_in_hours` = `memberInHours()` in `src/features/work-hours/in-hours.ts` (test 100).
+  `app.next_lead_owner(org, team, at)` skips anyone outside hours or on leave. `intake_submit` (last redefined here): rotation
+  members exist but none in hours → no owner, SPD-01 recipients, row in `app.rotation_waiting_leads`; pg_cron
+  `crm-rotation-waiting` (every minute, `app.assign_waiting_rotation_leads()`, fair per org: 50 per org, 500 per run, per-row
+  exception block) gives it to the first member back in hours; a lead taken meanwhile is left alone; 14 days then given up.
+  `take_lead` never moves the rotation pointer. A new redefinition of `intake_submit` must keep the `v_rotation_closed` lines.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
