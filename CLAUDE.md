@@ -459,6 +459,17 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the input. Never replace that key without a process that recomputes every stored hash first: after an erasure the phone or
   email is gone, so a hash made with an old key can no longer be matched, and a person who opted out could be contacted again.
   If the key is missing at run time, marketing sends nothing and logs a clear error; never fall back to a plain hash.
+- Consents (CNS-01..03, LEAD-07 carry-over; migrations 0155, 015510): `public.consents` is append-only per lead/contact and channel
+  (clients select and insert; `consent_guard` stops server rewrites; the hash is never selectable). `address_hash` = HMAC with
+  `consent_hash_key` (set on hosted 13 October 2026); without the key the address waits in `app.consent_pending_address` and pg_cron
+  `crm-consent-backfill` hashes it. The rule is applied at read time: `app.consent_state_of()` / `app.consent_suppressed()`
+  (service_role; fail closed: null = cannot check, a sender must refuse). An opt-out is lifted only by a public-form consent or an
+  owner/admin manual lift with method and note (audited); an erasure at the person's request records do-not-contact (source
+  'erasure', 'blocked') and is lifted only by a form consent. `consent_prepare`'s refusal is a message only: for non-admins it
+  comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
+  `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
+  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links`, `app.audit_erase_core` and
+  `app.sample_untouched` were last redefined in 015510; a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
