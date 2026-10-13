@@ -69,6 +69,8 @@ and build this CRM here instead. The old code is preserved on the branch
    Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
    `QUO-08`, `CAL-10`, `BAL-04`): a server route calls one `security definer` function granted to
    `service_role` only, which checks the token and does only what that page needs; no direct table access.
+   In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
+   public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -233,6 +235,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
 - Setup wizard (USR-03, migration 0101): `organizations.setup_step` (1..4 next step, null = done; default 1 for new orgs,
   null for older ones; owners/admins write it through a column grant, forward only). `/o/[org]/setup` + `src/features/setup/`.
+- Calendar feed (CAL-07, migration 0102): `app.calendar_feeds` keeps the SHA-256 of one token per (org, user) (cascade with
+  the membership; trigger `memberships_calendar_feed_off` clears it when the member is suspended).
+  `calendar_feed_create/status/revoke` act on the caller's own row (create needs `app.membership_role`, no support
+  session). `calendar_feed_events(token)` is service_role only: meetings the person organizes or joins, 30 days back to
+  365 ahead, at most 2,000, no notes; nothing for a suspended member or a suspended/cancelled/deleted org; read-only keeps
+  working; 60 fetches per 10 minutes. The invite file `/o/[org]/calendar/invite/[meeting]` uses the user's session and
+  the organizer's own address (or no ORGANIZER line). ICS builder: `src/features/calendar-feed/ics.ts`.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
