@@ -574,6 +574,15 @@ that back.
 - Plan limits and feature flags live in `plans.limits` / `plans.features`, with per-organization
   overrides on `subscriptions`. Limit errors use SQLSTATE `P0001` with `hint = 'limit:<key>'` or
   `'feature:<key>'`; the app maps hints to Hebrew messages in `src/lib/errors.ts`.
+- Plans (migrations 0146-0151, owner's pricing of 13 October 2026): every wave 2 capability and quota is its own key; the
+  values per plan are in DECISIONS.md and mirrored by `PLAN_VALUES` in `src/lib/plan-keys.ts` (unit test reads the migration).
+  A wave 2 key a plan does not hold falls back to `app.plan_key_defaults()` (flag off, quota 0; mirrored by `PLAN_KEY_FALLBACK`);
+  older keys keep their old meaning (missing flag off, missing limit unlimited). A key with `_per_user` is per paid seat plus the
+  business-wide key. `plans.price_unit` org|seat; `plans.availability` hidden|coming_soon|available (`is_public` follows it by
+  trigger; only `platform_set_plan_availability()` changes it, logged); a business cannot be moved onto a plan that is not
+  available. `app.show_built_with(org)`: the line shows on trial and unless a paid plan or an override removes it.
+  `PLAN_CAPABILITIES` (`src/features/plans/capabilities.ts`) lists what a card shows; flip `built` when a requirement merges.
+  A new capability gets its key in the same change (Working agreement, "Plans and capabilities").
 
 ### Application code
 
