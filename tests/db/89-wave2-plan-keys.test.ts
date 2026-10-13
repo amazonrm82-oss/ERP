@@ -135,26 +135,44 @@ describe('the "נבנה ב-Mexuz" line on the public form (FLD-04)', () => {
 
   const builtWith = (token: string) =>
     asService(async (q) => (await q<{ r: { built_with: boolean } | null }>("select public.intake_form($1) as r", [token])).rows[0].r?.built_with ?? null);
-  const setPlan = (plan: string) => asAdmin((q) => q("update public.subscriptions set plan_key = $2 where organization_id = $1", [org, plan]));
+  const setPlan = (plan: string, status = "trialing") =>
+    asAdmin((q) => q("update public.subscriptions set plan_key = $2, status = $3 where organization_id = $1", [org, plan, status]));
 
-  it("follows the plan: hidden on pro and business, shown on personal and basic", async () => {
+  it("a business in its trial keeps the line, even on pro (owner, 13 October 2026)", async () => {
+    const sub = await asAdmin(
+      async (q) => (await q<{ plan_key: string; status: string }>("select plan_key, status from public.subscriptions where organization_id = $1", [org])).rows[0],
+    );
+    expect(sub).toEqual({ plan_key: "pro", status: "trialing" });
+    expect(await builtWith(form.token)).toBe(true);
+  });
+
+  it("a paid subscription follows its plan: hidden on pro and business, shown on personal and basic", async () => {
     try {
-      for (const plan of SOLD_PLANS) {
-        await setPlan(plan);
-        expect(await builtWith(form.token), plan).toBe(!PLAN_VALUES[plan].features.remove_built_with);
+      for (const status of ["active", "past_due"]) {
+        for (const plan of SOLD_PLANS) {
+          await setPlan(plan, status);
+          expect(await builtWith(form.token), `${plan} ${status}`).toBe(!PLAN_VALUES[plan].features.remove_built_with);
+        }
       }
+      await setPlan("pro", "active");
+      expect(await builtWith(form.token)).toBe(false);
+      await setPlan("basic", "active");
+      expect(await builtWith(form.token)).toBe(true);
     } finally {
       await setPlan("pro");
     }
-    expect(await builtWith(form.token)).toBe(false);
   });
 
-  it("an override decides for one organization", async () => {
-    await setOverrides(org, { remove_built_with: false });
+  it("an override decides alone, in the trial or not", async () => {
     try {
+      await setOverrides(org, { remove_built_with: true });
+      expect(await builtWith(form.token)).toBe(false);
+      await setPlan("pro", "active");
+      await setOverrides(org, { remove_built_with: false });
       expect(await builtWith(form.token)).toBe(true);
     } finally {
       await setOverrides(org, {});
+      await setPlan("pro");
     }
   });
 

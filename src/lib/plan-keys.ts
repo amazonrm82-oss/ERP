@@ -1,7 +1,9 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
-// temporary "everything open, high values" defaults). Mirrors migration plan_pricing:
-// PLAN_VALUES = its seed, PLAN_KEY_FALLBACK = app.plan_key_defaults(). The unit test
-// tests/unit/plan-keys.test.ts reads that migration and compares; keep them in step.
+// temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
+// (the seed) and plan_trial_built_with (the changes of the owner's second decision,
+// and app.plan_key_defaults()): PLAN_VALUES = the seed with those changes,
+// PLAN_KEY_FALLBACK = the latest app.plan_key_defaults(). tests/unit/plan-keys.test.ts
+// reads both migrations and compares; keep them in step.
 //
 // Every limit and flag is its own key in plans.limits / plans.features, editable in
 // the admin panel without code, with per-organization overrides on subscriptions.
@@ -60,11 +62,13 @@ const LIMITS: Record<string, Record<SoldPlan, number | null>> = {
   view_seats_per_paid_seat: byPlan(0, 0, 1, 1),
   max_custom_reports: byPlan(0, 10, 50, null),
   max_custom_objects: byPlan(0, 0, 3, 20),
-  // not in the 13 October pricing: the temporary value of the wave 2 keys stays
-  max_price_lists: byPlan(100000, 100000, 100000, 100000),
-  max_quote_templates: byPlan(100000, 100000, 100000, 100000),
-  max_segments: byPlan(100000, 100000, 100000, 100000),
-  max_qr_codes: byPlan(100000, 100000, 100000, 100000),
+  // owner, 13 October 2026 (second decision): wave 2 capabilities not in the pricing table
+  max_price_lists: byPlan(1, 3, 20, 100), // besides the default price list
+  max_quote_templates: byPlan(3, 10, 50, 200),
+  max_segments: byPlan(3, 10, 50, 200),
+  max_qr_codes: byPlan(5, 20, 100, 500),
+  max_site_widgets: byPlan(1, 3, 10, 50),
+  max_business_cards_per_user: byPlan(1, 1, 1, 1),
 };
 
 const ALL = byPlan(true, true, true, true);
@@ -100,7 +104,7 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   // business only
   field_permissions: BUSINESS,
   sso: BUSINESS,
-  // not in the 13 October pricing: open in every plan, as decided for wave 2
+  // owner, 13 October 2026 (second decision): wave 2 capabilities not in the pricing table
   products: ALL,
   price_lists: ALL,
   discounts: ALL,
@@ -109,11 +113,11 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   collection: ALL,
   consents: ALL,
   segments: ALL,
-  granular_permissions: ALL,
   business_card: ALL,
   qr_codes: ALL,
   site_widget: ALL,
   retention: ALL,
+  granular_permissions: PRO_UP,
 };
 
 const PRICES: Record<SoldPlan, Omit<PlanValues, "limits" | "features">> = {
@@ -149,6 +153,7 @@ const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",
   "max_segments", "max_qr_codes", "max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day",
   "max_custom_reports", "max_custom_objects", "max_teams", "max_whatsapp_numbers", "view_seats_per_paid_seat",
+  "max_site_widgets", "max_business_cards_per_user",
 ] as const;
 
 export type Wave2FeatureKey = (typeof WAVE2_FEATURE_LIST)[number];
@@ -162,7 +167,11 @@ export const PLAN_KEY_FALLBACK = {
   limits: Object.fromEntries(WAVE2_LIMIT_LIST.map((key) => [key, 0])) as Record<Wave2LimitKey, number>,
 };
 
-/** The flag that hides the "נבנה ב-Mexuz" line on customer-facing pages. */
+/**
+ * The flag that hides the "נבנה ב-Mexuz" line on customer-facing pages. A business in
+ * its trial keeps the line whatever its plan says; an override decides alone
+ * (app.show_built_with, migration plan_trial_built_with).
+ */
 export const REMOVE_BUILT_WITH: Wave2FeatureKey = "remove_built_with";
 
 type JsonObject = Record<string, unknown>;

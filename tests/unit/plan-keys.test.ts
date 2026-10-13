@@ -25,10 +25,10 @@ import {
   WAVE2_LIMIT_KEYS,
 } from "@/lib/plan-keys";
 
-function pricingMigration(): string {
+function migration(suffix: string): string {
   const dir = join(process.cwd(), "supabase/migrations");
-  const file = readdirSync(dir).find((name) => name.endsWith("_plan_pricing.sql"));
-  expect(file).toBeDefined();
+  const file = readdirSync(dir).find((name) => name.endsWith(suffix));
+  expect(file, suffix).toBeDefined();
   return readFileSync(join(dir, file as string), "utf8");
 }
 
@@ -38,11 +38,19 @@ const quoted = (sql: string, tag: string) => {
   return JSON.parse(body as string);
 };
 
+type Values = Record<string, { limits: Record<string, unknown>; features: Record<string, unknown> }>;
+
 describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () => {
-  it("the TS mirror equals the migration's seed and app.plan_key_defaults()", () => {
-    const sql = pricingMigration();
-    expect(quoted(sql, "seed")).toEqual(PLAN_VALUES);
-    expect(quoted(sql, "json")).toEqual(PLAN_KEY_FALLBACK);
+  it("the TS mirror equals the seed with the later changes, and the latest app.plan_key_defaults()", () => {
+    const seed = quoted(migration("_plan_pricing.sql"), "seed") as Values;
+    const later = migration("_plan_trial_built_with.sql");
+    const delta = quoted(later, "delta") as Values;
+    for (const [plan, change] of Object.entries(delta)) {
+      seed[plan].limits = { ...seed[plan].limits, ...change.limits };
+      seed[plan].features = { ...seed[plan].features, ...change.features };
+    }
+    expect(seed).toEqual(PLAN_VALUES);
+    expect(quoted(later, "json")).toEqual(PLAN_KEY_FALLBACK);
   });
 
   it("a wave 2 key a plan does not hold falls back to the most restrictive value", () => {
@@ -78,6 +86,14 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     expect(flag("orders")).toEqual([false, true, true, true]);
     expect(flag("remove_built_with")).toEqual([false, false, true, true]);
     expect(flag("sso")).toEqual([false, false, false, true]);
+    expect(flag("granular_permissions")).toEqual([false, false, true, true]);
+    expect(flag("site_widget")).toEqual([true, true, true, true]);
+    expect(limit("max_price_lists")).toEqual([1, 3, 20, 100]);
+    expect(limit("max_quote_templates")).toEqual([3, 10, 50, 200]);
+    expect(limit("max_segments")).toEqual([3, 10, 50, 200]);
+    expect(limit("max_qr_codes")).toEqual([5, 20, 100, 500]);
+    expect(limit("max_site_widgets")).toEqual([1, 3, 10, 50]);
+    expect(limit("max_business_cards_per_user")).toEqual([1, 1, 1, 1]);
   });
 
   it("a per-user quota is multiplied by the paid seats and added to the business-wide one", () => {
@@ -126,6 +142,7 @@ describe("effective flags and limits in the app mirror app.org_has_feature / app
     expect(limits.max_products).toBeNull();
     expect(limits.max_qr_codes).toBe(5);
     expect(limits.max_price_lists).toBe(0);
+    expect(limits.max_site_widgets).toBe(0);
     expect(limits.max_pdf_per_month).toBe(0);
     expect(limits.max_users).toBeUndefined();
   });

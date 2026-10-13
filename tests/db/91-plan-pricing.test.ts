@@ -5,10 +5,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { asAdmin, asMfaUser, closePool, createOrg, createUser, pgError } from "./helpers";
 
-afterAll(closePool);
+const staffIds: string[] = [];
+afterAll(async () => {
+  // other files count the platform owners (the last one cannot step down)
+  await asAdmin((q) => q("delete from app.platform_staff where user_id = any($1)", [staffIds]));
+  await closePool();
+});
 
-const makeStaff = (userId: string, role: string) =>
-  asAdmin((q) => q("insert into app.platform_staff (user_id, role) values ($1, $2) on conflict (user_id) do update set role = excluded.role", [userId, role]));
+const makeStaff = (userId: string, role: string) => {
+  staffIds.push(userId);
+  return asAdmin((q) => q("insert into app.platform_staff (user_id, role) values ($1, $2) on conflict (user_id) do update set role = excluded.role", [userId, role]));
+};
 
 type PlanState = { key: string; price_monthly_agorot: number; price_annual_agorot: number; price_unit: string; availability: string; is_public: boolean; position: number };
 const planStates = () =>
@@ -107,18 +114,42 @@ describe("plan prices and states", () => {
     expect(await planOf(org)).toBe("pro");
   });
 
-  it("running the migration again changes no plan and no subscription", async () => {
-    const sql = migration("_plan_pricing.sql");
+  it("running the latest migration again changes no row; both again in order end at the same values", async () => {
+    const pricing = migration("_plan_pricing.sql");
+    const later = migration("_plan_trial_built_with.sql");
     await asAdmin(async (q) => {
-      const snapshot = async () => ({
-        plans: (await q("select xmin::text as x, * from public.plans order by key")).rows,
+      const snapshot = async (withXmin: boolean) => ({
+        plans: (await q(`select ${withXmin ? "xmin::text as x, " : ""}* from public.plans order by key`)).rows,
         subscriptions: (await q("select xmin::text as x, * from public.subscriptions order by organization_id")).rows,
       });
-      const before = await snapshot();
+      const before = await snapshot(true);
       expect(before.subscriptions.length).toBeGreaterThan(0);
       await q("savepoint s");
+      await q(later);
+      expect(await snapshot(true)).toEqual(before);
+      const values = await snapshot(false);
+      // the pricing seed rewrites the later keys and the later migration puts them back
+      await q(pricing);
+      await q(later);
+      expect(await snapshot(false)).toEqual(values);
+      await q("rollback to savepoint s");
+    });
+  });
+
+  it("the second decision changes only its own keys on the sold plans", async () => {
+    const sql = migration("_plan_trial_built_with.sql");
+    await asAdmin(async (q) => {
+      await q("savepoint s");
+      await q("update public.plans set limits = limits || '{\"max_records\": 7, \"max_qr_codes\": 7}', features = features || '{\"sso\": true, \"site_widget\": false}' where key = 'basic'");
+      await q("update public.plans set limits = limits || '{\"max_qr_codes\": 7}' where key = 'free'");
       await q(sql);
-      expect(await snapshot()).toEqual(before);
+      const basic = (await q<{ l: Record<string, unknown>; f: Record<string, unknown> }>("select limits as l, features as f from public.plans where key = 'basic'")).rows[0];
+      expect(basic.l.max_records).toBe(7);
+      expect(basic.f.sso).toBe(true);
+      expect(basic.l.max_qr_codes).toBe(20);
+      expect(basic.f.site_widget).toBe(true);
+      const free = (await q<{ l: Record<string, unknown> }>("select limits as l from public.plans where key = 'free'")).rows[0];
+      expect(free.l.max_qr_codes).toBe(7);
       await q("rollback to savepoint s");
     });
   });
