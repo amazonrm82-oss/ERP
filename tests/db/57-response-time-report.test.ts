@@ -9,7 +9,7 @@ type Breakdown = { target_minutes: number; by_source: Row[]; by_hour: Row[] };
 
 /**
  * SPD-06: the response time report adds the share answered within the target
- * (15 minutes until CAP-10), and a breakdown by lead source and by the hour of
+ * (60 minutes until CAP-10), and a breakdown by lead source and by the hour of
  * the day the lead arrived, in the organization's time zone. Security invoker:
  * a member who may see only their own records gets numbers of their own leads.
  */
@@ -59,7 +59,7 @@ describe("response time report (SPD-06)", () => {
       ).rows.map((r) => r.id),
     );
 
-    const first = await lead(owner, s1, "2026-01-15T08:10:00Z", 10); // 10:10 local, within the target
+    const first = await lead(owner, s1, "2026-01-15T08:10:00Z", 75); // 10:10 local, over the target
     // a private note 2 minutes in is not contact with the customer (LEAD-02); the owner reads it, so only the rule hides it
     await asUser(owner.id, (q) =>
       q("insert into public.activities (organization_id, type, body, lead_id, occurred_at, is_private) values ($1, 'note', 'פרטי', $2, $3, true)", [
@@ -68,48 +68,48 @@ describe("response time report (SPD-06)", () => {
         "2026-01-15T08:12:00Z",
       ]),
     );
-    await lead(owner, s1, "2026-01-15T08:30:00Z", 40); // 10:30 local, within an hour only
+    await lead(owner, s1, "2026-01-15T08:30:00Z", 40); // 10:30 local, within the target (over the old 15)
     await lead(member, s2, "2026-01-15T18:05:00Z", 5); // 20:05 local, within the target
     await lead(member, null, "2026-01-15T18:20:00Z", null); // 20:20 local, no contact
     await lead(owner, s1, "2026-01-16T08:10:00Z", 1); // outside the period
   });
 
-  it("per owner: the share within the target next to the share within an hour", async () => {
+  it("per owner: 40 minutes is within the 60 minute target, 75 is not", async () => {
     const rows = await report<Row[]>(owner.id, "public.report_response_time($1, $2, $3)", [org, from, to]);
     expect(rows.find((r) => r.owner_id === owner.id)).toMatchObject({
       leads: 2,
       contacted: 2,
       within_target: 1,
-      within_hour: 2,
-      avg_minutes: 25,
-      median_minutes: 25,
+      within_hour: 1,
+      avg_minutes: 57.5,
+      median_minutes: 57.5,
     });
     expect(rows.find((r) => r.owner_id === member.id)).toMatchObject({ leads: 2, contacted: 1, within_target: 1, within_hour: 1 });
   });
 
   it("a private note before the first call does not count as the first contact", async () => {
     const data = await report<Breakdown>(owner.id, "public.report_response_breakdown($1, $2, $3)", [org, from, to]);
-    // 10 and 40 minutes (the calls), not 2 and 40 (the private note)
-    expect(data.by_hour.find((r) => r.hour === 10)).toMatchObject({ avg_minutes: 25, median_minutes: 25 });
+    // 75 and 40 minutes (the calls), not 2 and 40 (the private note, which would also put both within the target)
+    expect(data.by_hour.find((r) => r.hour === 10)).toMatchObject({ within_target: 1, avg_minutes: 57.5, median_minutes: 57.5 });
     const rows = await report<Row[]>(owner.id, "public.report_response_time($1, $2, $3)", [org, from, to]);
-    expect(rows.find((r) => r.owner_id === owner.id)).toMatchObject({ avg_minutes: 25 });
+    expect(rows.find((r) => r.owner_id === owner.id)).toMatchObject({ within_target: 1, avg_minutes: 57.5 });
   });
 
   it("by source and by hour of arrival, in the organization's time zone", async () => {
     const data = await report<Breakdown>(owner.id, "public.report_response_breakdown($1, $2, $3)", [org, from, to]);
-    expect(data.target_minutes).toBe(15);
+    expect(data.target_minutes).toBe(60);
     expect(data.by_source.find((r) => r.source_id === s1)).toMatchObject({
       leads: 2,
       contacted: 2,
       within_target: 1,
-      avg_minutes: 25,
-      median_minutes: 25,
+      avg_minutes: 57.5,
+      median_minutes: 57.5,
     });
     expect(data.by_source.find((r) => r.source_id === s2)).toMatchObject({ leads: 1, contacted: 1, within_target: 1, avg_minutes: 5 });
     expect(data.by_source.find((r) => r.source_id === null)).toMatchObject({ leads: 1, contacted: 0, within_target: 0, avg_minutes: null });
     expect(data.by_source.find((r) => r.source_id === s1)?.source_name).toBeTruthy();
     expect(data.by_hour).toEqual([
-      { hour: 10, leads: 2, contacted: 2, within_target: 1, avg_minutes: 25, median_minutes: 25 },
+      { hour: 10, leads: 2, contacted: 2, within_target: 1, avg_minutes: 57.5, median_minutes: 57.5 },
       { hour: 20, leads: 2, contacted: 1, within_target: 1, avg_minutes: 5, median_minutes: 5 },
     ]);
 

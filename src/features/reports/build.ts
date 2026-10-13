@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ReportRow, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
+import { responseTargetLabels } from "./response-target";
 import { must } from "@/lib/db-read";
 
 export type ReportFilters = { period: Period; ownerId: string | null; pipelineId: string | null };
@@ -177,8 +178,8 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const rows = list(ownerData);
       const breakdown = obj(breakdownData);
       const target = num(breakdown.target_minutes);
-      const targetLabel = formatCell("minutes", target);
-      const shareNote = `האחוז בעמודת "תוך ${targetLabel}" הוא מתוך כל הלידים בתקופה, כולל לידים שעוד לא נוצר איתם מגע.`;
+      const labels = responseTargetLabels(target);
+      const shareNote = `האחוז בעמודת "${labels.column}" הוא מתוך כל הלידים בתקופה, כולל לידים שעוד לא נוצר איתם מגע.`;
       const name = await ownerNames(rows.map((r) => r.owner_id));
       const leads = rows.reduce((s, r) => s + num(r.leads), 0);
       const contacted = rows.reduce((s, r) => s + num(r.contacted), 0);
@@ -194,25 +195,21 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const measureColumns = [
         { key: "leads", label: "לידים", kind: "number" as const },
         { key: "contacted", label: "נוצר מגע", kind: "number" as const },
-        { key: "within_target", label: `תוך ${targetLabel}`, kind: "percent" as const },
+        { key: "within_target", label: labels.column, kind: "percent" as const },
         { key: "avg", label: "ממוצע", kind: "minutes" as const },
         { key: "median", label: "חציון", kind: "minutes" as const },
       ];
       return {
         kpis: [
           { label: "זמן ממוצע עד מגע ראשון", value: contacted ? formatCell("minutes", weighted / contacted) : "—" },
-          { label: "נענו בתוך היעד", value: leads ? `${pct(withinTarget, leads)}%` : "—", hint: `היעד: מגע ראשון תוך ${targetLabel}` },
+          { label: labels.kpi, value: leads ? `${pct(withinTarget, leads)}%` : "—", hint: labels.clock },
           { label: "לידים בלי מגע", value: formatNumber(leads - contacted) },
         ],
         sections: [
           {
             title: "לפי חבר צוות",
-            columns: [
-              { key: "owner", label: "חבר צוות", kind: "text" },
-              ...measureColumns,
-              { key: "within_hour", label: "תוך שעה", kind: "percent" },
-            ],
-            rows: rows.map((r) => ({ owner: name(r.owner_id), ...measures(r), within_hour: pct(num(r.within_hour), num(r.leads)) })),
+            columns: [{ key: "owner", label: "חבר צוות", kind: "text" }, ...measureColumns],
+            rows: rows.map((r) => ({ owner: name(r.owner_id), ...measures(r) })),
             empty: "אין לידים בתקופה הזו.",
             note: `מגע ראשון: השיחה, הפגישה, ההודעה או ההערה הראשונה שנרשמה בליד (לא הערה פרטית). בציר הזמן של הליד בוחרים את סוג הפעילות. ${shareNote}`,
           },
