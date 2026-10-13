@@ -7,7 +7,7 @@ import { PlanCards } from "@/features/plans/components/plan-cards";
 import { listPlanCards } from "@/features/plans/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getPlanUsage } from "@/features/settings/plan-usage";
-import { getOrgContext } from "@/features/shell/queries";
+import { getOrgContextForOwner } from "@/features/shell/queries";
 import { trialEndBannerText } from "@/features/trial-end/notice";
 import { getTrialEndNotice } from "@/features/trial-end/queries";
 import { SupportContact } from "@/features/support/components/support-contact";
@@ -28,7 +28,8 @@ const STATUS: Record<string, string> = {
 // FXU-04: until there is billing, the plan and its usage, read only, with the way to reach us.
 export default async function PlanUsagePage({ params }: Props) {
   const { orgId } = await params;
-  const { role } = await getOrgContext(orgId);
+  // also for the owner of a business closed until payment: choosing a plan is the way back (BIL-09)
+  const { role } = await getOrgContextForOwner(orgId);
   if (!isAdminRole(role)) {
     return (
       <Card>

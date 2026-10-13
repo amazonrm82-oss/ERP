@@ -9,6 +9,7 @@ import { listMfaBlockedOrganizations, listMyOrganizations } from "@/features/onb
 import { requireAgreement } from "@/features/legal/queries";
 import { getPlatformMe } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
+import { listClosedOrganizations } from "@/features/shell/queries";
 import { APP_NAME } from "@/lib/app";
 import { requireUser } from "@/lib/auth";
 import { paths } from "@/lib/paths";
@@ -23,17 +24,21 @@ export default async function RootPage() {
   await requireAgreement(paths.home);
   const organizations = await listMyOrganizations(user.id);
 
-  const blocked = await listMfaBlockedOrganizations();
+  const [blocked, closed] = await Promise.all([listMfaBlockedOrganizations(), listClosedOrganizations()]);
   const mfaHref = (orgId: string) => `${paths.loginMfa}?next=${encodeURIComponent(paths.org(orgId))}`;
-  if (organizations.length === 0 && blocked.length > 0) {
+  if (organizations.length === 0 && closed.length === 0 && blocked.length > 0) {
     redirect(mfaHref(blocked[0].id));
   }
-  if (organizations.length === 0) {
+  if (organizations.length === 0 && closed.length === 0) {
     // platform staff without a business of their own go to the admin panel
     redirect((await getPlatformMe()) ? paths.admin : paths.onboarding);
   }
-  if (organizations.length === 1 && blocked.length === 0) {
+  if (organizations.length === 1 && blocked.length === 0 && closed.length === 0) {
     redirect(paths.org(organizations[0].id));
+  }
+  // BIL-09: a business closed until payment shows nothing but its closed screen
+  if (organizations.length === 0 && blocked.length === 0 && closed.length === 1) {
+    redirect(paths.orgSuspended(closed[0].id));
   }
 
   return (
@@ -55,6 +60,17 @@ export default async function RootPage() {
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{org.name}</span>
                   <span className="block text-sm text-ink-soft">{ROLE_LABELS[org.role]}</span>
+                </span>
+                <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
+              </Link>
+            </li>
+          ))}
+          {closed.map((org) => (
+            <li key={org.id}>
+              <Link href={paths.orgSuspended(org.id)} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-canvas">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{org.name}</span>
+                  <span className="block text-sm text-ink-soft">הגישה סגורה עד לתשלום</span>
                 </span>
                 <ForwardIcon className="size-5 shrink-0 text-ink-soft" />
               </Link>

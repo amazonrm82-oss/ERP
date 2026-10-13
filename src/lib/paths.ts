@@ -16,6 +16,8 @@ export const paths = {
   agreement: "/agreement",
   agreementSigned: "/agreement/signed",
   org: (orgId: string) => `/o/${orgId}`,
+  // BIL-09: the one screen of a business closed until payment
+  orgSuspended: (orgId: string) => `/o/${orgId}/suspended`,
   // the setup wizard after a business is created (USR-03); no step = where the business stopped
   setup: (orgId: string, step?: number) => `/o/${orgId}/setup${step ? `?step=${step}` : ""}`,
   leads: (orgId: string) => `/o/${orgId}/leads`,
@@ -71,6 +73,8 @@ export const paths = {
   settingsAutomationEdit: (orgId: string, id: string) => `/o/${orgId}/settings/automations/${id}/edit`,
   imports: (orgId: string) => `/o/${orgId}/settings/import`,
   importNew: (orgId: string) => `/o/${orgId}/settings/import/new`,
+  // the full export ZIP (SPEC 12.4), for the owner
+  fullExport: (orgId: string) => `/o/${orgId}/settings/import/export`,
   settingsAudit: (orgId: string) => `/o/${orgId}/settings/audit`,
   settingsAccount: (orgId: string) => `/o/${orgId}/settings/account`,
   settingsTrash: (orgId: string) => `/o/${orgId}/settings/trash`,

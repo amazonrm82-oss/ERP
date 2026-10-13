@@ -17,7 +17,7 @@ import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
 import { isAdminRole } from "@/features/settings/permissions";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
-import { getOrgContext } from "@/features/shell/queries";
+import { getOrgContextAllowClosed } from "@/features/shell/queries";
 import { trialEndBannerText } from "@/features/trial-end/notice";
 import { getTrialEndNotice } from "@/features/trial-end/queries";
 import { daysUntil, formatDateTime } from "@/lib/format";
@@ -27,15 +27,45 @@ type Props = { children: ReactNode; params: Promise<{ orgId: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { orgId } = await params;
-  const { org } = await getOrgContext(orgId);
+  const { org } = await getOrgContextAllowClosed(orgId);
   return { title: { default: org.name, template: `%s | ${org.name}` } };
 }
 
 export default async function OrgLayout({ children, params }: Props) {
   const { orgId } = await params;
   // 404s unless the signed-in user is an active member of this organization
-  const context = await getOrgContext(orgId);
+  const context = await getOrgContextAllowClosed(orgId);
   const { org, user, subscription } = context;
+  // BIL-09: a business closed until payment gets a bare frame; its pages send everyone to the
+  // closed screen (getOrgContext), except the owner's plan and full export
+  if (context.closed) {
+    return (
+      <div className="min-h-dvh">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Link href={paths.orgSuspended(org.id)} className="shrink-0 rounded-md">
+              <Wordmark />
+            </Link>
+            <p className="truncate font-semibold">{org.name}</p>
+          </div>
+          <UserMenu
+            name={user.displayName}
+            email={user.email}
+            roleLabel={ROLE_LABELS[context.role]}
+            links={[
+              { href: paths.home, label: "החלפת עסק" },
+              { href: paths.help, label: "מרכז עזרה" },
+            ]}
+          >
+            <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
+          </UserMenu>
+        </header>
+        <main id="main" className="mx-auto w-full max-w-3xl px-4 pt-5 pb-12 sm:px-6 sm:pt-7">
+          {children}
+        </main>
+      </div>
+    );
+  }
   const [notifications, unread, branding, trialEnd] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),

@@ -40,7 +40,8 @@ export type SettingsGroup = { label: string; sections: SettingsSection[] };
 export type SettingsAccess = {
   // owners and admins: customization, intake, automations, audit
   admin: boolean;
-  // owners, admins and team managers who can write (app.can_import)
+  // the import and export page: owners, admins and team managers who can write (app.can_import),
+  // and the owner in every state for the full export (BIL-09)
   canImport: boolean;
   // owners, admins and team managers (recycle bin)
   canDelete: boolean;

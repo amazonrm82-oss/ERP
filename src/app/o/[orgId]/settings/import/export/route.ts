@@ -1,12 +1,14 @@
 import { buildFullExport } from "@/features/imports/export";
-import { getOrgContext } from "@/features/shell/queries";
+import { getOrgContextForOwner } from "@/features/shell/queries";
 import { zoneDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
-// Full export (SPEC 12.4): the account owner downloads everything as a ZIP of CSV files.
+// Full export (SPEC 12.4): the account owner downloads everything as a ZIP of CSV files, in every
+// state of the business (owner, 13 October 2026).
 export async function GET(_request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { role } = await getOrgContext(orgId);
+  // also while the business is read-only or closed until payment: the owner's data stays theirs (BIL-09)
+  const { role } = await getOrgContextForOwner(orgId);
   if (role !== "owner") {
     return new Response("ייצוא מלא זמין לבעלים של העסק בלבד.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }

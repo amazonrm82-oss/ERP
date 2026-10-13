@@ -10,7 +10,7 @@ import { undoImportAction } from "@/features/imports/actions";
 import { IMPORT_ENTITIES } from "@/features/imports/fields";
 import { listImportJobs } from "@/features/imports/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getOrgContext } from "@/features/shell/queries";
+import { getOrgContextForOwner } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -26,57 +26,61 @@ function canUndo(job: { created_by: string | null; status: string; created_count
 
 export default async function ImportsPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { role, canWrite, user } = await getOrgContext(orgId);
-  if (!canWrite || !(isAdminRole(role) || role === "manager")) {
+  // the owner opens the full export in every state: read-only, and closed until payment (BIL-09)
+  const { role, canWrite, user } = await getOrgContextForOwner(orgId);
+  const canImport = canWrite && (isAdminRole(role) || role === "manager");
+  if (!canImport && role !== "owner") {
     notFound();
   }
-  const jobs = await listImportJobs(orgId);
+  const jobs = canImport ? await listImportJobs(orgId) : [];
 
   return (
     <div className="space-y-5">
-      <Card aria-labelledby="import-title">
-        <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
-        {jobs.length === 0 ? (
-          <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר, חברות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
-        ) : (
-          <ul className="divide-y divide-line">
-            {jobs.map((job) => {
-              const undoable = canUndo(job, user.id);
-              return (
-                <li key={job.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
-                  <div className="min-w-0">
-                    <p className="font-medium break-words">
-                      {job.file_name} <span className="font-normal text-ink-soft">· {IMPORT_ENTITIES.find((e) => e.value === job.entity_type)?.label}</span>
-                    </p>
-                    <p className="mt-0.5 text-sm text-ink-soft">
-                      {formatDateTime(job.created_at)}
-                      {job.createdByName ? `, ${job.createdByName}` : ""} · {STATUS_LABEL[job.status] ?? job.status}
-                    </p>
-                    <p className="mt-0.5 text-sm">
-                      נוצרו {formatNumber(job.created_count)}, עודכנו {formatNumber(job.updated_count)}, דולגו {formatNumber(job.skipped_count)}, נכשלו {formatNumber(job.failed_count)} מתוך {formatNumber(job.total_rows)}
-                    </p>
-                  </div>
-                  {undoable ? (
-                    <ActionButton
-                      action={undoImportAction.bind(null, orgId, job.id)}
-                      pendingText="מבטלים…"
-                      variant="danger-ghost"
-                      confirm={
-                        job.entity_type === "product"
-                          ? `למחוק את ${formatNumber(job.created_count)} המוצרים שנוצרו? מוצר שכבר מופיע במסמך יעבור לארכיון במקום להימחק.`
-                          : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
-                      }
-                      srLabel={job.file_name}
-                    >
-                      ביטול הייבוא
-                    </ActionButton>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+      {canImport ? (
+        <Card aria-labelledby="import-title">
+          <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
+          {jobs.length === 0 ? (
+            <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר, חברות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
+          ) : (
+            <ul className="divide-y divide-line">
+              {jobs.map((job) => {
+                const undoable = canUndo(job, user.id);
+                return (
+                  <li key={job.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">
+                        {job.file_name} <span className="font-normal text-ink-soft">· {IMPORT_ENTITIES.find((e) => e.value === job.entity_type)?.label}</span>
+                      </p>
+                      <p className="mt-0.5 text-sm text-ink-soft">
+                        {formatDateTime(job.created_at)}
+                        {job.createdByName ? `, ${job.createdByName}` : ""} · {STATUS_LABEL[job.status] ?? job.status}
+                      </p>
+                      <p className="mt-0.5 text-sm">
+                        נוצרו {formatNumber(job.created_count)}, עודכנו {formatNumber(job.updated_count)}, דולגו {formatNumber(job.skipped_count)}, נכשלו {formatNumber(job.failed_count)} מתוך {formatNumber(job.total_rows)}
+                      </p>
+                    </div>
+                    {undoable ? (
+                      <ActionButton
+                        action={undoImportAction.bind(null, orgId, job.id)}
+                        pendingText="מבטלים…"
+                        variant="danger-ghost"
+                        confirm={
+                          job.entity_type === "product"
+                            ? `למחוק את ${formatNumber(job.created_count)} המוצרים שנוצרו? מוצר שכבר מופיע במסמך יעבור לארכיון במקום להימחק.`
+                            : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
+                        }
+                        srLabel={job.file_name}
+                      >
+                        ביטול הייבוא
+                      </ActionButton>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : null}
 
       <Card aria-labelledby="export-title">
         <CardHeader id="export-title" title="ייצוא מלא" />
@@ -85,7 +89,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
             קובץ ZIP עם כל הנתונים של העסק: לידים, אנשי קשר, חברות, עסקאות, משימות, ציר הזמן, פייפליינים, תגיות ושדות מותאמים. כל טבלה בקובץ CSV שנפתח ב-Excel.
           </p>
           {role === "owner" ? (
-            <a href={`${paths.imports(orgId)}/export`} className={buttonClasses("secondary", "md")} download>
+            <a href={paths.fullExport(orgId)} className={buttonClasses("secondary", "md")} download>
               הורדת ייצוא מלא
             </a>
           ) : (
