@@ -482,6 +482,16 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Record completeness (DQL-01, migration 0157; DQL-02 no migration): `public.completeness_settings` (one row per org and type
+  lead|contact|company|deal, `fields` = built-in keys of `app.completeness_builtin_keys()` mirrored by `COMPLETENESS_BUILT_IN` in
+  `src/features/data-quality/completeness.ts`, test 96, or `cf:<key>`; seeded by `organizations_seed_completeness`; members read,
+  owners/admins of a writable org write; audited; no delete). Score in the database only: computed field
+  `public.completeness(leads|contacts|companies|deals)` (`order=completeness`), `record_completeness()`, `incomplete_records()`
+  (security invoker). Keys come from `app.completeness_keys()` (definer, checks the caller once): its inlined copy of the
+  `app.membership_role()` two-step rule must be kept in step with it. The computed field and its helpers stay invoker with
+  schema-qualified names and NO `SET` clause, so the planner inlines them; the advisor's 10 `function_search_path_mutable`
+  warnings on them are expected. A key a list no longer knows is skipped, never missing. DQL-02 typing checks and duplicate
+  notices are app-only (`src/features/data-quality/typing.ts`, `duplicates.ts`).
 - Trial end (BIL-08 partial, migration 0156): `app.trial_end_settings` holds one switch, OFF; only `platform_set_trial_end()`
   (platform owner, aal2) changes it, logged `trial_end.switch`. It covers trial/trialing businesses whose `trial_ends_at` passed
   and that staff did not assign by hand (`app.trial_end_candidates`; `app.platform_assignments` is set by
@@ -686,7 +696,8 @@ Verified on 6 October 2026:
 
 Not verified yet:
 - The flow on the hosted project and the live site (`https://erp-3yft.vercel.app`).
-- Performance of the per-row access functions on large tables.
+- Performance of the per-row access functions on large tables. Seen 13 October 2026: sorting any list of 20,000 rows takes
+  about 2 s, mostly `app.can_read_record()` per row (the completeness sort adds little on top).
 
 ## Skills
 
