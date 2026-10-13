@@ -388,8 +388,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   untouched (`app.sample_untouched()`: row equals its snapshot and nothing real links to it: activities, files, meetings,
   non-sample tasks, form submissions, deal contacts, conversions, contact channels); guard triggers `*_guard_sample_removal`.
   A new table that links to leads, contacts, companies or deals must also be checked in `app.sample_untouched()`. A new
-  column on those tables needs nothing: since 0121 `app.sample_row()` ignores a key missing from a note's snapshot while it is
-  null (a person who fills it makes the record kept). Test 64 re-runs the sample migrations and must end with the latest
+  nullable column on those tables needs nothing: since 0121 `app.sample_row()` ignores a key missing from a note's snapshot while
+  it is null (a person who fills it makes the record kept); a new NOT NULL column with a default needs its own exception there. Test 64 re-runs the sample migrations and must end with the latest
   migration that redefines `app.sample_row()`. Sample leads
   never count for activation (GAP-06).
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
