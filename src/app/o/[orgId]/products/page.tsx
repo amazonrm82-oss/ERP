@@ -8,6 +8,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, TagIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
+import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { ProductsTable, ProductStatusBadge } from "@/features/products/components/products-table";
 import { billingSuffix, productPriceText } from "@/features/products/display";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
@@ -22,9 +23,10 @@ import {
   type ProductStatusFilter,
 } from "@/features/products/queries";
 import { PRODUCT_KIND_LABELS, PRODUCT_KINDS, type ProductKind } from "@/features/products/schema";
+import { canExport } from "@/features/reports/request";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
-import { isUuid } from "@/lib/paths";
+import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
 import { nextSort, parseSort, sortValue } from "@/lib/sort";
 
@@ -92,7 +94,24 @@ export default async function ProductsPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title="מוצרים" description="המוצרים והשירותים שהעסק מוכר, עם המחיר, היחידה והמע״מ של כל אחד." actions={newButton} />
+      <PageHeader
+        title="מוצרים"
+        description="המוצרים והשירותים שהעסק מוכר, עם המחיר, היחידה והמע״מ של כל אחד."
+        actions={
+          newButton || canExport(context.role) ? (
+            <>
+              {/* PRD-05: export with the list's filters; import through the import wizard */}
+              {canExport(context.role) ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
+              {canEdit ? (
+                <ButtonLink href={`${paths.importNew(orgId)}?entity=product`} variant="secondary">
+                  ייבוא
+                </ButtonLink>
+              ) : null}
+              {newButton}
+            </>
+          ) : null
+        }
+      />
 
       <Form action={productsPath(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField

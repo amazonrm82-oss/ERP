@@ -105,12 +105,15 @@ export type ProductListOptions = {
   status: ProductStatusFilter;
   page: number;
   sort?: Sort<ProductSortKey>;
+  // PRD-05: an export reads the list in larger chunks instead of a page
+  chunk?: { from: number; size: number };
 };
 
 /** One page of the catalog (PRD-01). Fetches one extra row to know if there is a next page. */
 export async function listProducts(orgId: string, options: ProductListOptions): Promise<{ products: Product[]; hasMore: boolean }> {
   const supabase = await createClient();
-  const from = (options.page - 1) * PAGE_SIZE;
+  const size = options.chunk?.size ?? PAGE_SIZE;
+  const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
   let query = supabase.from("products").select(COLUMNS).eq("organization_id", orgId);
   const search = ilikeAny(["name", "sku", "barcode"], options.search);
   if (search) query = query.or(search);
@@ -129,10 +132,10 @@ export async function listProducts(orgId: string, options: ProductListOptions): 
       await query
         .order(sortColumn(PRODUCT_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
         .order("id", { ascending: sort.ascending })
-        .range(from, from + PAGE_SIZE),
+        .range(from, from + size),
       "products",
     ) ?? [];
-  return { products: rows.slice(0, PAGE_SIZE).map(toProduct), hasMore: rows.length > PAGE_SIZE };
+  return { products: rows.slice(0, size).map(toProduct), hasMore: rows.length > size };
 }
 
 /** One product of the organization, archived ones included, or null. */

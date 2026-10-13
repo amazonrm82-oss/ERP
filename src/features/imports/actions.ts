@@ -11,18 +11,63 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { paths } from "@/lib/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
+import { productsPath } from "@/features/products/paths";
 
-import { CHUNK_SIZE, CUSTOM_PREFIX, IMPORT_TARGETS, MAX_IMPORT_ROWS, type DuplicateModeKey, type ImportEntityKey } from "./fields";
+import {
+  CHUNK_SIZE,
+  CUSTOM_PREFIX,
+  duplicateModesFor,
+  IMPORT_TABLES,
+  IMPORT_TARGETS,
+  MAX_IMPORT_ROWS,
+  type DuplicateModeKey,
+  type RecordImportEntity,
+} from "./fields";
+import { loadProductLookups, processProductChunk, ProductImportStopped, type ProductImportContext } from "./product-server";
 import { ImportStopped, loadLookups, processChunk, type ImportContext, type RowOutcome } from "./server";
 
-const entitySchema = z.enum(["lead", "contact", "company"]);
+const entitySchema = z.enum(["lead", "contact", "company", "product"]);
 const modeSchema = z.enum(["skip", "update", "create"]);
 const cellsSchema = z.array(z.array(z.string().max(10_000)).max(200)).max(CHUNK_SIZE);
 const mappingSchema = z.array(z.string().max(100)).max(200);
 
 const UNDO_DAYS = 7;
 
-async function importContext(orgId: string, entity: ImportEntityKey, mode: DuplicateModeKey, mapping: string[]) {
+const PRODUCTS_FOR_ADMINS = "ייבוא מוצרים מותר לבעלים ולמנהלי מערכת.";
+
+type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
+
+/** PRD-05: the catalog is written by owners and admins only (RLS refuses others row by row; say it once, up front). */
+async function mayImportProducts(supabase: Supabase, orgId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("role")
+    .eq("organization_id", orgId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  // a failed read answers "no": the user sees the rule and can try again
+  if (error) return false;
+  return data?.role === "owner" || data?.role === "admin";
+}
+
+/** PRD-05: products have no custom fields; only their own columns can be mapped. */
+async function productContext(orgId: string, mapping: string[]) {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  if (!(await mayImportProducts(context.supabase, orgId, context.user.id))) return fail(PRODUCTS_FOR_ADMINS);
+  const allowed = new Set([...IMPORT_TARGETS.product.map((t) => t.key), ""]);
+  if (!mapping.every((target) => allowed.has(target))) {
+    return fail("בחירת השדות לא נשמרה. בחרו שוב לאיזה שדה כל עמודה נכנסת.");
+  }
+  if (!mapping.includes("name")) {
+    return fail("יש לבחור את העמודה של שם המוצר.");
+  }
+  const ctx: ProductImportContext = { supabase: context.supabase, orgId, mapping };
+  return { ok: true as const, ctx };
+}
+
+async function importContext(orgId: string, entity: RecordImportEntity, mode: DuplicateModeKey, mapping: string[]) {
   const context = await actionContext(orgId);
   if (!context.ok) return context;
   const definitions = await listFieldDefinitions(orgId, entity);
@@ -49,6 +94,16 @@ export async function previewImportAction(
   if (!entity.success || !mode.success || !mapping.success || !rows.success) {
     return fail("הקובץ או המיפוי אינם תקינים.");
   }
+  if (entity.data === "product") {
+    const product = await productContext(orgId, mapping.data);
+    if (!product.ok) return product;
+    try {
+      return ok((await processProductChunk(product.ctx, null, rows.data, 1, null)).outcomes);
+    } catch (error) {
+      if (error instanceof ProductImportStopped) return fail(error.message);
+      throw error;
+    }
+  }
   const prepared = await importContext(orgId, entity.data, mode.data, mapping.data);
   if (!prepared.ok) return prepared;
   try {
@@ -74,6 +129,12 @@ export async function startImportAction(
   const mode = modeSchema.safeParse(input.mode);
   if (!entity.success || !mode.success || !Number.isInteger(input.totalRows) || input.totalRows < 1 || input.totalRows > MAX_IMPORT_ROWS) {
     return fail("הקובץ אינו תקין.");
+  }
+  if (!duplicateModesFor(entity.data).includes(mode.data)) {
+    return fail("הקובץ אינו תקין.");
+  }
+  if (entity.data === "product" && !(await mayImportProducts(context.supabase, orgId, context.user.id))) {
+    return fail(PRODUCTS_FOR_ADMINS);
   }
   const { data, error } = await context.supabase
     .from("import_jobs")
@@ -129,6 +190,17 @@ export async function importChunkAction(
     return fail("הייבוא נעצר כי לא התקבלו נתונים כמה דקות. אפשר לבטל אותו בהיסטוריית הייבוא ולייבא שוב.");
   }
   const entity = entitySchema.parse(job.entity_type);
+  if (entity === "product") {
+    const product = await productContext(orgId, mapping.data);
+    if (!product.ok) return product;
+    try {
+      const lookups = await loadProductLookups(product.ctx);
+      return ok(await processProductChunk(product.ctx, lookups, rows.data, input.firstRow, jobId));
+    } catch (error) {
+      if (error instanceof ProductImportStopped) return ok({ outcomes: [], stopped: error.message });
+      throw error;
+    }
+  }
   const prepared = await importContext(orgId, entity, modeSchema.parse(job.duplicate_mode), mapping.data);
   if (!prepared.ok) return prepared;
   try {
@@ -158,7 +230,7 @@ export async function finishImportAction(
   if (!job) return fail(NOT_FOUND_OR_FORBIDDEN);
   const entity = entitySchema.parse(job.entity_type);
   const { count } = await context.supabase
-    .from(RECORD_TYPES[entity].table)
+    .from(IMPORT_TABLES[entity])
     .select("id", { count: "exact", head: true })
     .eq("organization_id", orgId)
     .eq("import_job_id", jobId);
@@ -241,6 +313,52 @@ async function trashImportedCompanies(supabase: ImportContext["supabase"], orgId
   return null;
 }
 
+/**
+ * PRD-05: removes the products an import created, and only those (products have no recycle bin).
+ * A product that a document uses by now cannot be removed (no action foreign key, 23503): it is
+ * archived instead, like the product page does.
+ */
+async function removeImportedProducts(supabase: Supabase, orgId: string, jobId: string): Promise<string | null> {
+  let ids: string[];
+  try {
+    const { rows } = await readAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("import_job_id", jobId)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw new ReadFailed(error);
+      return data;
+    });
+    ids = rows.map((r) => r.id);
+  } catch (e) {
+    if (e instanceof ReadFailed) return dbErrorMessage(e.error, "לא הצלחנו לקרוא את המוצרים שנוצרו בייבוא.");
+    throw e;
+  }
+  for (let i = 0; i < ids.length; i += 200) {
+    const slice = ids.slice(i, i + 200);
+    const { error } = await supabase.from("products").delete().eq("organization_id", orgId).eq("import_job_id", jobId).in("id", slice);
+    if (!error) continue;
+    if (error.code !== "23503") return dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא.");
+    // one of them is on a document: remove the others one by one, archive that one
+    for (const id of slice) {
+      const { error: rowError } = await supabase.from("products").delete().eq("organization_id", orgId).eq("import_job_id", jobId).eq("id", id);
+      if (!rowError) continue;
+      if (rowError.code !== "23503") return dbErrorMessage(rowError, "לא הצלחנו לבטל את הייבוא.");
+      const { error: archiveError } = await supabase
+        .from("products")
+        .update({ archived_at: new Date().toISOString() })
+        .eq("organization_id", orgId)
+        .eq("id", id)
+        .is("archived_at", null);
+      if (archiveError) return dbErrorMessage(archiveError, "לא הצלחנו לבטל את הייבוא.");
+    }
+  }
+  return null;
+}
+
 /** Moves the records an import created to the recycle bin (within 7 days). Updates are not reverted. */
 export async function undoImportAction(orgId: string, jobId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
@@ -258,6 +376,19 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   if (Date.now() - Date.parse(job.created_at) > UNDO_DAYS * 86_400_000) return fail("אפשר לבטל ייבוא רק בשבעת הימים הראשונים.");
 
   const entity = entitySchema.parse(job.entity_type);
+  if (entity === "product") {
+    const removeError = await removeImportedProducts(context.supabase, orgId, jobId);
+    if (removeError) return fail(removeError);
+    const { error: jobError } = await context.supabase
+      .from("import_jobs")
+      .update({ status: "undone", undone_at: new Date().toISOString() })
+      .eq("organization_id", orgId)
+      .eq("id", jobId);
+    if (jobError) return fail(dbErrorMessage(jobError, "המוצרים הוסרו, אבל לא הצלחנו לעדכן את סטטוס הייבוא."));
+    revalidatePath(paths.imports(orgId));
+    revalidatePath(productsPath(orgId));
+    return ok();
+  }
   const { error } = await context.supabase
     .from(RECORD_TYPES[entity].table)
     .update({ deleted_at: new Date().toISOString() })

@@ -12,14 +12,18 @@ import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { productsPath } from "@/features/products/paths";
+
 import { finishImportAction, importChunkAction, previewImportAction, startImportAction } from "../actions";
 import {
   CHUNK_SIZE,
   CUSTOM_PREFIX,
   DUPLICATE_MODES,
+  duplicateModesFor,
   IMPORT_ENTITIES,
   IMPORT_TARGETS,
   MAX_IMPORT_ROWS,
+  PRODUCT_DUPLICATE_HINT,
   suggestMapping,
   type DuplicateModeKey,
   type ImportEntityKey,
@@ -31,7 +35,8 @@ import { NewFieldForm } from "./new-field-form";
 
 type CustomField = { key: string; label: string };
 // canCreateFields: owners and admins may add a custom field while mapping (IMP-01)
-type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]>; canCreateFields: boolean };
+// canImportProducts: owners and admins write the product catalog (PRD-05)
+type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]>; canCreateFields: boolean; canImportProducts: boolean; initialEntity?: ImportEntityKey };
 
 type Sheet = { fileName: string; headers: string[]; rows: string[][] };
 type Step = "file" | "map" | "preview" | "running" | "done";
@@ -93,12 +98,12 @@ const OUTCOME_LABEL: Record<RowOutcome["status"], string> = {
   failed: "שגיאה",
 };
 
-export function ImportWizard({ orgId, customFields: initialFields, canCreateFields }: Props) {
+export function ImportWizard({ orgId, customFields: initialFields, canCreateFields, canImportProducts, initialEntity = "lead" }: Props) {
   const [customFields, setCustomFields] = useState(initialFields);
   // the column whose "new field" form is open
   const [newFieldFor, setNewFieldFor] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("file");
-  const [entity, setEntity] = useState<ImportEntityKey>("lead");
+  const [entity, setEntity] = useState<ImportEntityKey>(initialEntity);
   const [mode, setMode] = useState<DuplicateModeKey>("skip");
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [mapping, setMapping] = useState<string[]>([]);
@@ -218,6 +223,17 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
 
   const mappedCount = mapping.filter(Boolean).length;
   const entityLabel = IMPORT_ENTITIES.find((e) => e.value === entity)?.label ?? "";
+  const entities = IMPORT_ENTITIES.filter((e) => e.value !== "product" || canImportProducts);
+  const isProduct = entity === "product";
+  // products: no custom fields; their name column is required (PRD-05)
+  const canAddField = canCreateFields && !isProduct;
+  const modes = DUPLICATE_MODES.filter((m) => duplicateModesFor(entity).includes(m.value));
+  const listHref = isProduct ? productsPath(orgId) : RECORD_TYPES[entity].list(orgId);
+
+  function chooseEntity(next: ImportEntityKey) {
+    setEntity(next);
+    if (!duplicateModesFor(next).includes(mode)) setMode("skip");
+  }
 
   return (
     <div className="space-y-5">
@@ -236,9 +252,9 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
           <fieldset>
             <legend className="mb-2 text-sm font-medium">מה מייבאים?</legend>
             <div className="flex flex-wrap gap-4">
-              {IMPORT_ENTITIES.map((option) => (
+              {entities.map((option) => (
                 <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-2">
-                  <input type="radio" name="entity" value={option.value} checked={entity === option.value} onChange={() => setEntity(option.value)} className="size-4 accent-accent" />
+                  <input type="radio" name="entity" value={option.value} checked={entity === option.value} onChange={() => chooseEntity(option.value)} className="size-4 accent-accent" />
                   {option.label}
                 </label>
               ))}
@@ -296,7 +312,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
                         </option>
                       ))}
                     </Select>
-                    {canCreateFields && !mapping[index] && newFieldFor !== index ? (
+                    {canAddField && !mapping[index] && newFieldFor !== index ? (
                       <Button variant="ghost" size="sm" onClick={() => setNewFieldFor(index)} aria-label={`שדה חדש לעמודה ${header}`}>
                         + שדה חדש
                       </Button>
@@ -321,22 +337,31 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               ))}
             </ul>
           </div>
-          <fieldset className="rounded-lg border border-line bg-surface p-4 sm:p-5">
-            <legend className="px-1 text-sm font-medium">שורה שכבר קיימת במערכת</legend>
-            <div className="space-y-2">
-              {DUPLICATE_MODES.map((option) => (
-                <label key={option.value} className="flex cursor-pointer items-start gap-2">
-                  <input type="radio" name="mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} className="mt-1 size-4 accent-accent" />
-                  <span>
-                    <span className="block">{option.label}</span>
-                    <span className="block text-sm text-ink-soft">{option.hint}</span>
-                  </span>
-                </label>
-              ))}
+          {isProduct ? (
+            <div className="rounded-lg border border-line bg-surface p-4 text-sm sm:p-5">
+              <p className="font-medium">מוצר שכבר קיים</p>
+              <p className="mt-1 text-ink-soft">{PRODUCT_DUPLICATE_HINT}</p>
+              <p className="mt-1 text-ink-soft">כל מוצר שנוצר נספר במכסת המוצרים של החבילה. כשמגיעים למכסה הייבוא נעצר, והשורות שלא נכנסו מופיעות ברשימת השורות שנכשלו.</p>
             </div>
-          </fieldset>
+          ) : (
+            <fieldset className="rounded-lg border border-line bg-surface p-4 sm:p-5">
+              <legend className="px-1 text-sm font-medium">שורה שכבר קיימת במערכת</legend>
+              <div className="space-y-2">
+                {modes.map((option) => (
+                  <label key={option.value} className="flex cursor-pointer items-start gap-2">
+                    <input type="radio" name="mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} className="mt-1 size-4 accent-accent" />
+                    <span>
+                      <span className="block">{option.label}</span>
+                      <span className="block text-sm text-ink-soft">{option.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          {isProduct && !mapping.includes("name") ? <p className="text-sm text-ink-soft">בחרו את העמודה של שם המוצר.</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={check} disabled={busy || mappedCount === 0} aria-busy={busy || undefined}>
+            <Button onClick={check} disabled={busy || mappedCount === 0 || (isProduct && !mapping.includes("name"))} aria-busy={busy || undefined}>
               {busy ? "בודקים…" : "בדיקת 20 השורות הראשונות"}
             </Button>
             <Button variant="ghost" onClick={reset}>
@@ -366,6 +391,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
                     <td className={cn("px-3 py-2", outcome.status === "failed" ? "text-danger" : "text-ink-soft")}>
                       {OUTCOME_LABEL[outcome.status]}
                       {outcome.status === "failed" && outcome.message ? `: ${outcome.message}` : ""}
+                      {outcome.status === "skipped" && isProduct && outcome.message ? `: ${outcome.message}` : ""}
                       {outcome.status !== "failed" && outcome.warning ? `. ${outcome.warning}` : ""}
                     </td>
                   </tr>
@@ -422,7 +448,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
           ) : null}
           {step === "done" ? (
             <div className="flex flex-wrap gap-2">
-              <Link href={RECORD_TYPES[entity].list(orgId)} className={buttonClasses("primary", "md")}>
+              <Link href={listHref} className={buttonClasses("primary", "md")}>
                 ל{entityLabel}
               </Link>
               {failures.length > 0 ? (

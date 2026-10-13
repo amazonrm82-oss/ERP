@@ -10,8 +10,12 @@ import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "ייבוא מקובץ" };
 
-export default async function NewImportPage({ params }: { params: Promise<{ orgId: string }> }) {
+type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function NewImportPage({ params, searchParams }: Props) {
   const { orgId } = await params;
+  // "?entity=product" from the products list (PRD-05)
+  const initialEntity = (await searchParams).entity === "product" ? "product" : "lead";
   const { role, canWrite } = await getOrgContext(orgId);
   if (!canWrite || !(isAdminRole(role) || role === "manager")) {
     notFound();
@@ -28,8 +32,10 @@ export default async function NewImportPage({ params }: { params: Promise<{ orgI
       <PageHeader title="ייבוא מקובץ" back={{ href: paths.imports(orgId), label: "ייבוא וייצוא" }} />
       <ImportWizard
         orgId={orgId}
-        customFields={{ lead: short(lead), contact: short(contact), company: short(company) }}
+        customFields={{ lead: short(lead), contact: short(contact), company: short(company), product: [] }}
         canCreateFields={isAdminRole(role)}
+        canImportProducts={isAdminRole(role)}
+        initialEntity={initialEntity === "product" && isAdminRole(role) ? "product" : "lead"}
       />
     </>
   );

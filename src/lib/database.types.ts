@@ -552,7 +552,7 @@ export type NotificationRow = {
   created_at: string;
 };
 
-export type ImportEntity = "lead" | "contact" | "company";
+export type ImportEntity = "lead" | "contact" | "company" | "product";
 export type DuplicateMode = "skip" | "update" | "create";
 export type ImportStatus = "running" | "done" | "failed" | "undone";
 
@@ -946,6 +946,8 @@ export type ProductRow = {
   barcode: string | null;
   is_active: boolean;
   archived_at: string | null;
+  // PRD-05: the import that created the product (set on insert only)
+  import_job_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1428,7 +1430,7 @@ export type Database = {
         { name?: string; parent_id?: string | null; position?: number }
       >;
       // PRD-01: column grants; organization_id is fixed once inserted, archived_at only on update (stamped by trigger)
-      products: Table<ProductRow, ProductWrite & { organization_id: string }, Partial<ProductWrite> & { archived_at?: string | null }>;
+      products: Table<ProductRow, ProductWrite & { organization_id: string; import_job_id?: string | null }, Partial<ProductWrite> & { archived_at?: string | null }>;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)
       goals: Table<
@@ -1607,6 +1609,8 @@ export type Database = {
         Args: { p_org: string; p_entity: string; p_phones: string[]; p_emails: string[]; p_tax_ids: string[]; p_names: string[] };
         Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
       };
+      // PRD-05: products whose SKU (without case) is one of these; security invoker
+      product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };
       // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
       // CNS-01: the latest entry per channel of a lead or contact (security invoker)
       consent_current: {

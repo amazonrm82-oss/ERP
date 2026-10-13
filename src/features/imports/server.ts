@@ -17,7 +17,7 @@ import { readAllPagesByIds } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
-import { CUSTOM_PREFIX, type DuplicateModeKey, type ImportEntityKey } from "./fields";
+import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
 
 type Client = SupabaseClient<Database>;
 

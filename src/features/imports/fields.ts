@@ -5,9 +5,13 @@ export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
   { value: "contact", label: "אנשי קשר" },
   { value: "company", label: "חברות" },
+  // PRD-05: owners and admins only (they write the catalog)
+  { value: "product", label: "מוצרים" },
 ] as const;
 
 export type ImportEntityKey = (typeof IMPORT_ENTITIES)[number]["value"];
+/** The objects imported as CRM records (custom fields, owner, recycle bin); products have their own path (PRD-05). */
+export type RecordImportEntity = Exclude<ImportEntityKey, "product">;
 
 export const DUPLICATE_MODES = [
   { value: "skip", label: "לדלג עליהן", hint: "רשומה שכבר קיימת (לפי טלפון או אימייל; בחברות לפי ח.פ. או שם) לא תיובא." },
@@ -16,6 +20,17 @@ export const DUPLICATE_MODES = [
 ] as const;
 
 export type DuplicateModeKey = (typeof DUPLICATE_MODES)[number]["value"];
+
+/** PRD-05: a product whose SKU is already in the catalog (or earlier in the file) is skipped; there is no other choice. */
+export const PRODUCT_DUPLICATE_HINT = 'מוצר עם מק"ט שכבר קיים בקטלוג, או שכבר הופיע בקובץ, לא ייובא. מוצר בלי מק"ט תמיד נוצר.';
+
+/** The duplicate rules an object offers in the wizard. */
+export function duplicateModesFor(entity: ImportEntityKey): DuplicateModeKey[] {
+  return entity === "product" ? ["skip"] : DUPLICATE_MODES.map((m) => m.value);
+}
+
+/** The table an import of the object writes into. */
+export const IMPORT_TABLES = { lead: "leads", contact: "contacts", company: "companies", product: "products" } as const satisfies Record<ImportEntityKey, string>;
 
 export type ImportTarget = { key: string; label: string; synonyms: string[] };
 
@@ -70,6 +85,22 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "city", label: "עיר", synonyms: ["עיר", "ישוב", "יישוב", "city", "town"] },
     { key: "address_line", label: "כתובת", synonyms: ["כתובת", "רחוב", "address", "street"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+  ],
+  // PRD-05: the same headers the product export writes, so an exported file imports back
+  product: [
+    { key: "name", label: "שם המוצר", synonyms: ["שם", "שם מוצר", "מוצר", "שירות", "product", "product name", "name", "item"] },
+    { key: "description", label: "תיאור", synonyms: ["תיאור", "פירוט", "description", "details"] },
+    { key: "sku", label: 'מק"ט', synonyms: ['מק"ט', "מקט", "קוד מוצר", "קוד פריט", "sku", "item code", "product code", "code"] },
+    { key: "category", label: "קטגוריה (לפי שם; חסרה תיווצר)", synonyms: ["קטגוריה", "קטגוריית מוצר", "category", "group", "קבוצה"] },
+    { key: "kind", label: "סוג (מוצר, שירות, מנוי, חבילה)", synonyms: ["סוג", "סוג מוצר", "type", "kind"] },
+    { key: "unit", label: "יחידת מידה (לפי שם מהרשימה)", synonyms: ["יחידת מידה", "יחידה", "unit", "uom", "unit of measure"] },
+    { key: "price", label: "מחיר", synonyms: ["מחיר", "מחיר מכירה", "price", "sale price", "unit price"] },
+    { key: "price_includes_vat", label: 'המחיר כולל מע"מ (כן / לא)', synonyms: ['המחיר כולל מע"מ', 'כולל מע"מ', "כולל מעמ", "includes vat", "price includes vat", "vat included"] },
+    { key: "vat_kind", label: 'מע"מ (חייב, פטור, שיעור אפס)', synonyms: ['מע"מ', "מעמ", 'סוג מע"מ', "vat", "vat type", "tax"] },
+    { key: "billing", label: "חיוב (חד-פעמי, חודשי, רבעוני, שנתי)", synonyms: ["חיוב", "אופן חיוב", "תדירות חיוב", "billing", "billing cycle"] },
+    { key: "duration_minutes", label: "משך בדקות", synonyms: ["משך", "משך בדקות", "דקות", "duration", "minutes"] },
+    { key: "barcode", label: "ברקוד", synonyms: ["ברקוד", "barcode", "ean", "upc"] },
+    { key: "is_active", label: "פעיל (כן / לא)", synonyms: ["פעיל", "active", "is active", "status", "מצב"] },
   ],
 };
 
