@@ -8,8 +8,9 @@
 --    remove_built_with on the subscription decides alone (support cases).
 -- 2. The wave 2 capabilities that the pricing table left out: open in every plan,
 --    granular_permissions from pro up; their quotas replace the 100000
---    placeholders, plus max_site_widgets and max_business_cards_per_user (one
---    card per paid user; the "_per_user" rule of src/lib/plan-keys.ts).
+--    placeholders, plus max_site_widgets, max_business_cards_per_user (one
+--    card per paid user; the "_per_user" rule of src/lib/plan-keys.ts) and
+--    max_booking_team_pages (team booking pages, separate from the personal ones).
 --    Only these keys change, only on the four sold plans; no subscription or
 --    override is touched. The changes are mirrored by PLAN_VALUES and the defaults
 --    by PLAN_KEY_FALLBACK in src/lib/plan-keys.ts (unit test).
@@ -40,7 +41,8 @@ with delta as (
       "max_segments": 3,
       "max_qr_codes": 5,
       "max_site_widgets": 1,
-      "max_business_cards_per_user": 1
+      "max_business_cards_per_user": 1,
+      "max_booking_team_pages": 0
     },
     "features": {
       "products": true,
@@ -65,7 +67,8 @@ with delta as (
       "max_segments": 10,
       "max_qr_codes": 20,
       "max_site_widgets": 3,
-      "max_business_cards_per_user": 1
+      "max_business_cards_per_user": 1,
+      "max_booking_team_pages": 0
     },
     "features": {
       "products": true,
@@ -90,7 +93,8 @@ with delta as (
       "max_segments": 50,
       "max_qr_codes": 100,
       "max_site_widgets": 10,
-      "max_business_cards_per_user": 1
+      "max_business_cards_per_user": 1,
+      "max_booking_team_pages": 10
     },
     "features": {
       "products": true,
@@ -115,7 +119,8 @@ with delta as (
       "max_segments": 200,
       "max_qr_codes": 500,
       "max_site_widgets": 50,
-      "max_business_cards_per_user": 1
+      "max_business_cards_per_user": 1,
+      "max_booking_team_pages": 50
     },
     "features": {
       "products": true,
@@ -195,7 +200,8 @@ as $$
     "max_whatsapp_numbers": 0,
     "view_seats_per_paid_seat": 0,
     "max_site_widgets": 0,
-    "max_business_cards_per_user": 0
+    "max_business_cards_per_user": 0,
+    "max_booking_team_pages": 0
   }
 }
 $json$::jsonb

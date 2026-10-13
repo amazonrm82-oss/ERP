@@ -94,6 +94,8 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     expect(limit("max_qr_codes")).toEqual([5, 20, 100, 500]);
     expect(limit("max_site_widgets")).toEqual([1, 3, 10, 50]);
     expect(limit("max_business_cards_per_user")).toEqual([1, 1, 1, 1]);
+    expect(limit("max_booking_team_pages")).toEqual([0, 0, 10, 50]);
+    expect(flag("booking_team_pages")).toEqual([false, false, true, true]);
   });
 
   it("a per-user quota is multiplied by the paid seats and added to the business-wide one", () => {
@@ -115,7 +117,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     for (const key of WAVE2_LIMIT_KEYS) {
       expect(raised(`limit:${key}`), key).not.toBe(genericLimit);
     }
-    for (const key of ["max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day"]) {
+    for (const key of ["max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day", "max_booking_team_pages"]) {
       expect(raised(`limit:${key}`)).toContain(SUPPORT_LINE);
     }
     expect(raised("limit:max_customer_emails_per_day")).toContain("כקישור");

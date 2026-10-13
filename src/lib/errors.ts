@@ -95,6 +95,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "limit:view_seats_per_paid_seat": "אפשר להוסיף עד מושב צפייה אחד על כל מושב בתשלום. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:max_site_widgets": "הגעתם למספר הכפתורים הצפים לאתר המרבי בחבילה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:max_business_cards_per_user": "לכל משתמש יש כרטיס ביקור אחד.",
+  "limit:max_booking_team_pages": `הגעתם למספר דפי קביעת התור הצוותיים בחבילה. לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   // hidden plans cannot be chosen (migration hide_free_plan)
   "plan:hidden": "החבילה הזו לא זמינה יותר לבחירה.",
   "plan:not_available": "החבילה הזו תיפתח בקרוב. עדיין אי אפשר לבחור בה.",

@@ -69,6 +69,8 @@ const LIMITS: Record<string, Record<SoldPlan, number | null>> = {
   max_qr_codes: byPlan(5, 20, 100, 500),
   max_site_widgets: byPlan(1, 3, 10, 50),
   max_business_cards_per_user: byPlan(1, 1, 1, 1),
+  // team booking pages, separate from the personal ones (max_booking_pages_per_user)
+  max_booking_team_pages: byPlan(0, 0, 10, 50),
 };
 
 const ALL = byPlan(true, true, true, true);
@@ -153,7 +155,7 @@ const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",
   "max_segments", "max_qr_codes", "max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day",
   "max_custom_reports", "max_custom_objects", "max_teams", "max_whatsapp_numbers", "view_seats_per_paid_seat",
-  "max_site_widgets", "max_business_cards_per_user",
+  "max_site_widgets", "max_business_cards_per_user", "max_booking_team_pages",
 ] as const;
 
 export type Wave2FeatureKey = (typeof WAVE2_FEATURE_LIST)[number];

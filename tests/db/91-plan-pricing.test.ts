@@ -148,6 +148,13 @@ describe("plan prices and states", () => {
       expect(basic.f.sso).toBe(true);
       expect(basic.l.max_qr_codes).toBe(20);
       expect(basic.f.site_widget).toBe(true);
+      const team = (await q<{ key: string; n: number }>("select key, (limits ->> 'max_booking_team_pages')::int as n from public.plans where key <> 'free' order by position")).rows;
+      expect(team).toEqual([
+        { key: "personal", n: 0 },
+        { key: "basic", n: 0 },
+        { key: "pro", n: 10 },
+        { key: "business", n: 50 },
+      ]);
       const free = (await q<{ l: Record<string, unknown> }>("select limits as l from public.plans where key = 'free'")).rows[0];
       expect(free.l.max_qr_codes).toBe(7);
       await q("rollback to savepoint s");
