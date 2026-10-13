@@ -108,8 +108,9 @@ describe("busy times for conflict warnings (CAL-05)", () => {
     await newMeeting(stranger, otherOrg, from, to);
     expect(await busy(rep, org, [stranger.id])).toHaveLength(0);
 
-    for (const attempt of [busy(stranger, org, [rep.id]), busy(rep, otherOrg, [stranger.id])]) {
-      expect((await pgError(attempt)).code).toBe("42501");
+    // thunks: each call starts only when awaited, so a refusal is never an unhandled rejection
+    for (const attempt of [() => busy(stranger, org, [rep.id]), () => busy(rep, otherOrg, [stranger.id])]) {
+      expect((await pgError(attempt())).code).toBe("42501");
     }
     const anon = await pgError(asAnon((q) => q("select * from public.meeting_busy($1, $2::uuid[], $3, $4)", [org, [rep.id], from, to])));
     expect(anon.code).toBe("42501");

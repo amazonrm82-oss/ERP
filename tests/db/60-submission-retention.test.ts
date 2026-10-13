@@ -137,11 +137,12 @@ describe("inquiries of a deleted form are kept 12 months (CAP-04)", () => {
   });
 
   it("no client may run the removal, and clients cannot write the new column", async () => {
+    // thunks: each call starts only when awaited, so a refusal is never an unhandled rejection
     for (const run of [
-      asUser(owner.id, (q) => q("select app.purge_old_form_submissions()")),
-      asService((q) => q("select app.purge_old_form_submissions()")),
+      () => asUser(owner.id, (q) => q("select app.purge_old_form_submissions()")),
+      () => asService((q) => q("select app.purge_old_form_submissions()")),
     ]) {
-      expect((await pgError(run)).code).toBe("42501");
+      expect((await pgError(run())).code).toBe("42501");
     }
     const err = await pgError(asUser(owner.id, (q) => q("update public.form_submissions set form_deleted_at = null where organization_id = $1", [org])));
     expect(err.code).toBe("42501");
