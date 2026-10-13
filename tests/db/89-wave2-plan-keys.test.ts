@@ -56,6 +56,18 @@ describe("wave 2 plan keys", () => {
     }
   });
 
+  it("the per-use quotas are the owner's temporary values in every plan (13 October 2026)", async () => {
+    const perUse = { max_pdf_per_month: 1000, max_customer_emails_per_month: 1000, max_customer_emails_per_day: 100 };
+    for (const plan of await plans()) {
+      for (const [key, value] of Object.entries(perUse)) {
+        expect(plan.limits[key], `${plan.key}.${key}`).toBe(value);
+      }
+    }
+    for (const [key, value] of Object.entries(perUse)) {
+      expect(await limitOf(org, key), key).toBe(value);
+    }
+  });
+
   it("remove_built_with is off in every plan", async () => {
     for (const plan of await plans()) {
       expect(plan.features.remove_built_with, plan.key).toBe(false);

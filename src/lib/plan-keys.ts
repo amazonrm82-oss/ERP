@@ -29,7 +29,14 @@ export const WAVE2_FEATURES = {
   remove_built_with: false, // FLD-04: on = the "נבנה ב-Mexuz" line is hidden
 } as const;
 
-/** Count quotas in plans.limits (not per-use), with their temporary value in every plan. */
+/**
+ * Quotas in plans.limits, with their temporary value in every plan. Per use (owner,
+ * 13 October 2026; not counted yet): max_pdf_per_month, counted by the PDF module
+ * (QUO-06) per new document version, monthly in the organization's time zone; and
+ * max_customer_emails_per_month / _per_day, only emails a business sends to its own
+ * customers (never system emails to its users), enforced behind the email provider
+ * layer (wave 3). The rest are counts.
+ */
 export const WAVE2_LIMITS = {
   max_products: 100000, // PRD-08
   max_price_lists: 100000, // PL-01
@@ -37,6 +44,9 @@ export const WAVE2_LIMITS = {
   max_booking_pages: 100000, // CAL-10
   max_segments: 100000, // SEG-01
   max_qr_codes: 100000, // BIZ-03
+  max_pdf_per_month: 1000, // QUO-06 (per use)
+  max_customer_emails_per_month: 1000, // emails to the business's customers (per use, wave 3 provider layer)
+  max_customer_emails_per_day: 100, // same, per day
 } as const;
 
 export type Wave2FeatureKey = keyof typeof WAVE2_FEATURES;

@@ -8,7 +8,18 @@
 -- temporary value (not "unlimited"). remove_built_with is off everywhere: the
 -- public form shows the "נבנה ב-Mexuz" line unless an override turns it on.
 -- Quotas of things that cost money per use (storage, SMS, email, WhatsApp
--- messages, PDF) are not added here; the owner decides each one.
+-- messages) are not added here without the owner's decision on each one. The
+-- per-use quotas here (owner, 13 October 2026, temporary until pricing) are not
+-- counted or enforced yet:
+-- - max_pdf_per_month (1000): counted per new document version, resets monthly
+--   in the organization's time zone, enforced by the PDF module (QUO-06).
+-- - max_customer_emails_per_month (1000) and max_customer_emails_per_day (100):
+--   count ONLY emails a business sends to its own customers (quotes, reminders,
+--   booking confirmations). System emails to the business's users (verification,
+--   password reset, invitations, staff notifications) are never counted and never
+--   blocked. Bulk marketing gets its own quota later. Enforcement is in the
+--   database behind the email provider layer (wave 3), so it works with the fake
+--   provider too.
 --
 -- app.plan_key_defaults() is the one list. It is mirrored by
 -- src/lib/plan-keys.ts (tests/unit/plan-keys.test.ts reads the JSON between the
@@ -57,7 +68,10 @@ as $$
     "max_quote_templates": 100000,
     "max_booking_pages": 100000,
     "max_segments": 100000,
-    "max_qr_codes": 100000
+    "max_qr_codes": 100000,
+    "max_pdf_per_month": 1000,
+    "max_customer_emails_per_month": 1000,
+    "max_customer_emails_per_day": 100
   }
 }
 $json$::jsonb

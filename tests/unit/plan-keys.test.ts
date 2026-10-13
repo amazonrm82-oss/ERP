@@ -9,6 +9,7 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { builtWithVisible } from "@/features/built-with/visibility";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import { SUPPORT_LINE } from "@/lib/support-phone";
 import { REMOVE_BUILT_WITH, WAVE2_FEATURE_KEYS, WAVE2_FEATURES, WAVE2_LIMIT_KEYS, WAVE2_LIMITS } from "@/lib/plan-keys";
 
 function migrationDefaults(): { features: Record<string, unknown>; limits: Record<string, unknown> } {
@@ -28,12 +29,17 @@ describe("wave 2 plan keys (owner, 13 October 2026)", () => {
     expect(db.limits).toEqual(WAVE2_LIMITS);
   });
 
-  it("every flag is on except remove_built_with, and every quota is high but not unlimited", () => {
+  it("every flag is on except remove_built_with, every count quota is high, and the per-use quotas are the owner's", () => {
     for (const key of WAVE2_FEATURE_KEYS) {
       expect(WAVE2_FEATURES[key]).toBe(key !== REMOVE_BUILT_WITH);
     }
     for (const key of WAVE2_LIMIT_KEYS) {
-      expect(WAVE2_LIMITS[key]).toBe(100000);
+      const perUse: Record<string, number> = {
+        max_pdf_per_month: 1000,
+        max_customer_emails_per_month: 1000,
+        max_customer_emails_per_day: 100,
+      };
+      expect(WAVE2_LIMITS[key]).toBe(perUse[key] ?? 100000);
     }
   });
 
@@ -47,6 +53,10 @@ describe("wave 2 plan keys (owner, 13 October 2026)", () => {
     for (const key of WAVE2_LIMIT_KEYS) {
       expect(raised(`limit:${key}`)).not.toBe(genericLimit);
     }
+    for (const key of ["max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day"]) {
+      expect(raised(`limit:${key}`)).toContain(SUPPORT_LINE);
+    }
+    expect(raised("limit:max_customer_emails_per_day")).toContain("כקישור");
   });
 });
 
