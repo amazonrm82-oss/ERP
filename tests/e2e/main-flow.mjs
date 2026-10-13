@@ -2121,9 +2121,9 @@ try {
   console.log("support entries in the customer's audit log:", opened[0].n);
   if (opened[0].n < 1) throw new Error("support access was not logged for the customer");
 
-  // a plan change, with its reason in the platform log
+  // a subscription save with its reason in the platform log ("עסקי" is "coming soon", so it is not offered)
   await staff.goto(`${APP}/admin/orgs/${orgUrl.split("/o/")[1]}`);
-  await staff.getByLabel("חבילה", { exact: true }).selectOption({ label: "עסקי" });
+  await staff.getByLabel("חבילה", { exact: true }).selectOption({ label: "מקצועי" });
   await staff.getByLabel("סיבה (נרשמת ביומן)").first().fill("פיילוט בבדיקה");
   await staff.getByRole("button", { name: "שמירה" }).first().click();
   await expectText(staff, "נשמר.");
