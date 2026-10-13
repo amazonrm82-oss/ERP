@@ -314,6 +314,30 @@ describe("setup checklist and sample data (USR-04)", () => {
       expect(await exists("companies", company)).toBe(1);
     });
 
+    it("a sample contact with an added phone or email is real work: it stays, with its channel and its company", async () => {
+      const { o, id, ids } = await fresh("t7");
+      const contact = await sampleId(id, "contacts", "company_id is not null");
+      const other = await sampleId(id, "contacts", "company_id is null");
+      const company = ids("company")[0];
+      // sample data itself adds no channels
+      expect(await asAdmin((q) => count(q, "select 1 from public.contact_channels where organization_id = $1", [id]))).toBe(0);
+      const channel = await asUser(o.id, async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'phone', '050-1234567') returning id",
+            [id, contact],
+          )
+        ).rows[0].id,
+      );
+      expect((await records(o.id, id)).find((r) => r.record_id === contact)?.removable).toBe(false);
+      await remove(o.id, id);
+      expect(await exists("contacts", contact)).toBe(1);
+      expect(await exists("contact_channels", channel)).toBe(1);
+      expect(await exists("companies", company)).toBe(1);
+      // the untouched contact went
+      expect(await exists("contacts", other)).toBe(0);
+    });
+
     it("the snapshot does not depend on the session's time zone", async () => {
       const o = await createUser("tz");
       const id = await createOrg(o.id, "עסק אזור זמן");
@@ -366,6 +390,24 @@ describe("setup checklist and sample data (USR-04)", () => {
     });
   });
 
+  describe("activation (GAP-06) ignores sample leads", () => {
+    const activated = (orgId: string) => asAdmin((q) => count(q, "select 1 from app.org_activation where organization_id = $1", [orgId]));
+    const call = (userId: string, orgId: string, lead: string) =>
+      asUser(userId, (q) => q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'call', 'שיחה', $2)", [orgId, lead]));
+
+    it("a call on a sample lead does not activate the business; a call on a real lead does", async () => {
+      const o = await createUser("act-sample");
+      const id = await createOrg(o.id, "עסק הפעלה");
+      await add(o.id, id);
+      const sampleLead = await sampleId(id, "leads", "full_name like 'דנה%'");
+      await call(o.id, id, sampleLead);
+      expect(await activated(id)).toBe(0);
+      const real = await insertLead(o.id, id, { full_name: "לקוח אמיתי" });
+      await call(o.id, id, real);
+      expect(await activated(id)).toBe(1);
+    });
+  });
+
   it("two calls at the same time add one set", async () => {
     const o = await createUser("owner5");
     const org5 = await createOrg(o.id, "עסק חמישי");
@@ -377,7 +419,7 @@ describe("setup checklist and sample data (USR-04)", () => {
   it("running the migration again keeps every stored value", async () => {
     const before = await records(owner.id, org);
     const dir = path.resolve(__dirname, "../../supabase/migrations");
-    for (const suffix of ["_setup_checklist.sql", "_sample_data_remove.sql"]) {
+    for (const suffix of ["_setup_checklist.sql", "_sample_data_remove.sql", "_sample_data_followups.sql"]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();
       await asAdmin((q) => q(readFileSync(path.join(dir, file as string), "utf8")));
