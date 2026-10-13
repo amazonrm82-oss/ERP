@@ -61,6 +61,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:closed_at": "תאריך הסגירה לא יכול להיות בעתיד.",
   // stuck by time in stage (migration deal_stage_entered)
   "deal:snoozed_until": "אפשר לדחות עסקה ליום שאחרי היום, עד שנה קדימה.",
+  // TAX-02 follow-up (trigger org_bank_details_check): no value in the error, so the account never leaks
+  "bank:invalid": "פרטי הבנק אינם תקינים. סניף: עד 4 ספרות. חשבון: 2 עד 20 ספרות, ויחד איתו שם הבנק והסניף.",
   // TAX-03 (migration vat_rates, app.document_vat_rate): a document dated before the first VAT rate
   "vat:before_table": VAT_BEFORE_TABLE,
   // WA-01 (migration whatsapp_templates)

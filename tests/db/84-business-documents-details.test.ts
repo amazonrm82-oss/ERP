@@ -75,24 +75,22 @@ describe("business details for documents", () => {
     }
   });
 
-  it("bank details: digits only, and an account needs its bank and branch", async () => {
-    expect((await pgError(set(owner.id, "bank_account = '123456'"))).code).toBe("23514");
-    expect((await pgError(set(owner.id, "bank_account = '123456', bank_name = 'בנק לאומי'"))).code).toBe("23514");
-    for (const bad of ["bank_branch = '12345'", "bank_branch = '8a'", "bank_account = '12-345', bank_name = 'x', bank_branch = '800'", "bank_name = ''"]) {
-      expect((await pgError(set(owner.id, bad))).code, bad).toBe("23514");
-    }
-    expect(
-      (await set(owner.id, "bank_name = 'בנק לאומי', bank_branch = '800', bank_account = '1234567', bank_account_name = 'דוגמה בע\"מ'")).rowCount,
-    ).toBe(1);
-    // a bank and branch alone are allowed (filled in step by step)
-    expect((await set(owner.id, "bank_account = null")).rowCount).toBe(1);
+  it("the bank details are not in this table (owners and admins only, migration org_bank_details)", async () => {
+    const columns = await asAdmin(async (q) =>
+      (
+        await q<{ column_name: string }>(
+          "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'org_document_settings' and column_name like 'bank%'",
+        )
+      ).rows,
+    );
+    expect(columns).toEqual([]);
   });
 
   it("every member reads them (quotes are made by members); only owners and admins change them", async () => {
     const row = await asUser(member.id, async (q) =>
-      (await q<{ legal_name: string; bank_branch: string }>("select legal_name, bank_branch from public.org_document_settings where organization_id = $1", [org])).rows[0],
+      (await q<{ legal_name: string; postal_code: string }>("select legal_name, postal_code from public.org_document_settings where organization_id = $1", [org])).rows[0],
     );
-    expect(row).toEqual({ legal_name: 'דוגמה בע"מ', bank_branch: "800" });
+    expect(row).toEqual({ legal_name: 'דוגמה בע"מ', postal_code: "61000" });
     expect((await set(member.id, "legal_name = 'נפרץ'")).rowCount).toBe(0);
     expect((await set(admin.id, "legal_name = 'דוגמה בע\"מ'")).rowCount).toBe(1);
   });
@@ -107,7 +105,7 @@ describe("business details for documents", () => {
     const changed = await asAdmin(async (q) =>
       (
         await q<{ n: number }>(
-          "select count(*)::int as n from public.audit_log where organization_id = $1 and entity_type = 'org_document_settings' and action = 'update' and changes ? 'bank_account'",
+          "select count(*)::int as n from public.audit_log where organization_id = $1 and entity_type = 'org_document_settings' and action = 'update' and changes ? 'postal_code'",
           [org],
         )
       ).rows[0].n,

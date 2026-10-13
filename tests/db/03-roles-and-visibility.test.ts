@@ -627,6 +627,35 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("only owners and admins read and write the bank details (TAX-02 follow-up)", async () => {
+    const insert = "insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק לאומי', '800', '7654321')";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(insert, [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(insert, [org]));
+    for (const u of [owner, admin]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.org_bank_details where organization_id = $1", [org]), u.email).toBe(1);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.org_bank_details where organization_id = $1", [org]), u.email).toBe(0);
+        expect((await q("update public.org_bank_details set bank_branch = '1' where organization_id = $1", [org])).rowCount, u.email).toBe(0);
+        expect((await q("delete from public.org_bank_details where organization_id = $1", [org])).rowCount, u.email).toBe(0);
+      });
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.org_bank_details set bank_branch = '801' where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    expect(
+      await asAdmin(async (q) => (await q<{ bank_branch: string }>("select bank_branch from public.org_bank_details where organization_id = $1", [org])).rows[0].bank_branch),
+    ).toBe("801");
+    await asUser(admin.id, async (q) => {
+      expect((await q("delete from public.org_bank_details where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+  });
+
   it("meetings follow the record they are about; organizer, creator and participants always see them (CAL-01)", async () => {
     await setVisibility("own");
     const lead = await insertLead(m1.id, org, { full_name: "ליד לפגישה", team_id: team });

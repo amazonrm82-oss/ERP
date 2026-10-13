@@ -6,7 +6,17 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import type { VatRate } from "./rates";
-import { DETAILS_COLUMNS, documentDetailsFromRow, TAX_COLUMNS, taxSettingsFromRow, type DocumentDetails, type TaxSettings } from "./settings";
+import {
+  BANK_COLUMNS,
+  bankDetailsFromRow,
+  DETAILS_COLUMNS,
+  documentDetailsFromRow,
+  TAX_COLUMNS,
+  taxSettingsFromRow,
+  type BankDetails,
+  type DocumentDetails,
+  type TaxSettings,
+} from "./settings";
 
 /**
  * The business's tax settings (TAX-01), with the member's session. Read on its
@@ -36,4 +46,17 @@ export const getVatRates = cache(async (): Promise<VatRate[]> => {
   const supabase = await createClient();
   const rows = must(await supabase.from("vat_rates").select("effective_from, rate_bp").order("effective_from"), "vat rates");
   return rows.map((row) => ({ effectiveFrom: row.effective_from, rateBp: row.rate_bp }));
+});
+
+/**
+ * The bank details (TAX-02 follow-up). Only owners and admins get the row; for
+ * anyone else RLS returns nothing, so call it only for them.
+ */
+export const getBankDetails = cache(async (orgId: string): Promise<BankDetails> => {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("org_bank_details").select(BANK_COLUMNS).eq("organization_id", orgId).maybeSingle(),
+    "org bank details",
+  );
+  return bankDetailsFromRow(row);
 });

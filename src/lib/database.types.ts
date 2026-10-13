@@ -76,6 +76,14 @@ export type OrgDocumentSettingsRow = {
   postal_code: string | null;
   phone: string | null;
   email: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+// TAX-02 follow-up (migration org_bank_details): owners and admins only
+export type OrgBankDetailsRow = {
+  id: string;
+  organization_id: string;
   bank_name: string | null;
   bank_branch: string | null;
   bank_account: string | null;
@@ -83,6 +91,12 @@ export type OrgDocumentSettingsRow = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+type OrgBankDetailsWrite = {
+  bank_name?: string | null;
+  bank_branch?: string | null;
+  bank_account?: string | null;
+  bank_account_name?: string | null;
 };
 // TAX-03 (migration vat_rates): platform table, read by every signed-in user, written by no client
 export type VatRateRow = {
@@ -106,10 +120,6 @@ type OrgDocumentSettingsWrite = {
   postal_code?: string | null;
   phone?: string | null;
   email?: string | null;
-  bank_name?: string | null;
-  bank_branch?: string | null;
-  bank_account?: string | null;
-  bank_account_name?: string | null;
 };
 
 // CAL-01 (meetings migration): a meeting and its team participants
@@ -1289,6 +1299,7 @@ export type Database = {
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
+      org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
     };
     Views: { [_ in never]: never };

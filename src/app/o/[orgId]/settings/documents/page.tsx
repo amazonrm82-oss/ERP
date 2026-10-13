@@ -7,10 +7,11 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
+import { BankDetailsForm } from "@/features/tax/components/bank-details-form";
 import { DocumentDetailsForm } from "@/features/tax/components/document-details-form";
 import { TaxStatusForm } from "@/features/tax/components/tax-status-form";
 import { VatRatesCard } from "@/features/tax/components/vat-rates-card";
-import { getDocumentDetails, getTaxSettings, getVatRates } from "@/features/tax/queries";
+import { getBankDetails, getDocumentDetails, getTaxSettings, getVatRates } from "@/features/tax/queries";
 import { bankTransferText, documentAddress } from "@/features/tax/settings";
 import { chargesVat, LEGAL_FORM_OPTIONS, vatStatusLabel } from "@/features/tax/status";
 import { zoneDate } from "@/lib/format";
@@ -27,6 +28,7 @@ function chargesText(value: boolean | null): string {
 
 // TAX-01: the business's VAT status, apart from its legal form.
 // TAX-02: the business details printed on quotes and payment requests.
+// Bank details: owners and admins only (owner, 13 October 2026); others get one line.
 // TAX-03: the VAT rate of today and its history (read only; the platform sets it).
 export default async function DocumentSettingsPage({ params }: Props) {
   const { orgId } = await params;
@@ -34,6 +36,8 @@ export default async function DocumentSettingsPage({ params }: Props) {
   const [tax, details, branding, rates] = await Promise.all([getTaxSettings(orgId), getDocumentDetails(orgId), getOrgBranding(orgId), getVatRates()]);
   const ratesCard = <VatRatesCard rates={rates} today={zoneDate(new Date(), org.timeZone)} charges={chargesVat(tax.vatStatus, tax.otherChargesVat)} />;
   const editable = isAdminRole(role) && canWrite;
+  // the database gives the bank row to owners and admins only; nobody else is even asked
+  const bank = isAdminRole(role) ? await getBankDetails(orgId) : null;
 
   // the logo on documents is the business logo (FLD-04); it is changed with the branding
   const logoCard = (
@@ -60,6 +64,7 @@ export default async function DocumentSettingsPage({ params }: Props) {
         <TaxStatusForm orgId={orgId} settings={tax} />
         {ratesCard}
         <DocumentDetailsForm orgId={orgId} details={details} />
+        {bank ? <BankDetailsForm orgId={orgId} details={bank} /> : null}
         {logoCard}
       </div>
     );
@@ -87,8 +92,9 @@ export default async function DocumentSettingsPage({ params }: Props) {
             <Detail label="כתובת" value={documentAddress(details)} />
             <Detail label="טלפון" value={details.phone} ltr />
             <Detail label="אימייל" value={details.email} ltr />
-            <Detail label="העברה בנקאית" value={bankTransferText(details)} />
+            {bank ? <Detail label="העברה בנקאית" value={bankTransferText(bank)} /> : null}
           </DetailList>
+          {bank ? null : <p className="mt-4 text-sm text-ink-soft">פרטי הבנק מוצגים לבעלים ולמנהלי מערכת</p>}
           <p className="mt-4 text-sm text-ink-soft">
             {isAdminRole(role) ? "העסק במצב קריאה בלבד, ולכן אי אפשר לשנות כרגע." : "רק בעלים ומנהלי מערכת יכולים לשנות את הפרטים."}
           </p>

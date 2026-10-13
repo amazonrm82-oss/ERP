@@ -3,11 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { DETAILS_FIELD_NAMES, DOCUMENT_TAX_ID_INVALID, documentDetailsSchema } from "@/features/tax/schema";
-import { bankTransferText, DETAILS_COLUMNS, documentAddress, documentDetailsFromRow } from "@/features/tax/settings";
+import { BANK_FIELD_NAMES, bankDetailsSchema, DETAILS_FIELD_NAMES, DOCUMENT_TAX_ID_INVALID, documentDetailsSchema } from "@/features/tax/schema";
+import { BANK_COLUMNS, bankDetailsFromRow, bankTransferText, DETAILS_COLUMNS, documentAddress, documentDetailsFromRow } from "@/features/tax/settings";
 
 const empty = Object.fromEntries(DETAILS_FIELD_NAMES.map((name) => [name, ""]));
 const parse = (values: Record<string, string>) => documentDetailsSchema.safeParse({ ...empty, ...values });
+const emptyBank = Object.fromEntries(BANK_FIELD_NAMES.map((name) => [name, ""]));
+const parseBank = (values: Record<string, string>) => bankDetailsSchema.safeParse({ ...emptyBank, ...values });
 
 // TAX-02: the business details printed on documents
 describe("business details for documents (TAX-02)", () => {
@@ -16,6 +18,12 @@ describe("business details for documents (TAX-02)", () => {
     const added = [...migration.matchAll(/add column if not exists ([a-z_]+)/g)].map((m) => m[1]);
     expect(added).toEqual([...DETAILS_FIELD_NAMES]);
     expect(DETAILS_COLUMNS.split(", ")).toEqual([...DETAILS_FIELD_NAMES]);
+    // bank details are in their own table, owners and admins only (owner, 13 October 2026)
+    expect(added.some((name) => name.startsWith("bank_"))).toBe(false);
+    const bank = readFileSync(join(process.cwd(), "supabase/migrations/20261006013800_org_bank_details.sql"), "utf8");
+    const bankColumns = [...bank.matchAll(/^  (bank_[a-z_]+)\s+text/gm)].map((m) => m[1]);
+    expect(bankColumns).toEqual([...BANK_FIELD_NAMES]);
+    expect(BANK_COLUMNS.split(", ")).toEqual([...BANK_FIELD_NAMES]);
   });
 
   it("everything is optional; empty fields are stored as null", () => {
@@ -38,15 +46,15 @@ describe("business details for documents (TAX-02)", () => {
     expect(parse({ postal_code: "61 000 00" }).data?.postal_code).toBe("6100000");
     expect(parse({ postal_code: "61000" }).data?.postal_code).toBe("61000");
     expect(parse({ postal_code: "610000" }).success).toBe(false);
-    expect(parse({ bank_name: "בנק לאומי", bank_branch: "800", bank_account: "12-345-67" }).data?.bank_account).toBe("1234567");
-    expect(parse({ bank_branch: "12345" }).success).toBe(false);
+    expect(parseBank({ bank_name: "בנק לאומי", bank_branch: "800", bank_account: "12-345-67" }).data?.bank_account).toBe("1234567");
+    expect(parseBank({ bank_branch: "12345" }).success).toBe(false);
   });
 
   it("an account number needs the bank and the branch", () => {
-    const result = parse({ bank_account: "1234567" });
+    const result = parseBank({ bank_account: "1234567" });
     expect(result.success).toBe(false);
     expect(result.error?.issues.map((issue) => issue.path[0]).sort()).toEqual(["bank_branch", "bank_name"]);
-    expect(parse({ bank_name: "בנק הפועלים", bank_branch: "600" }).success).toBe(true);
+    expect(parseBank({ bank_name: "בנק הפועלים", bank_branch: "600" }).success).toBe(true);
   });
 
   it("phone and email follow the usual rules", () => {
@@ -58,7 +66,7 @@ describe("business details for documents (TAX-02)", () => {
   it("address and bank lines for documents", () => {
     const details = documentDetailsFromRow(null);
     expect(documentAddress(details)).toBeNull();
-    expect(bankTransferText(details)).toBeNull();
+    expect(bankTransferText(bankDetailsFromRow(null))).toBeNull();
     expect(documentAddress({ addressLine: "הרצל 1", city: "תל אביב", postalCode: "6100000" })).toBe("הרצל 1, תל אביב 6100000");
     expect(documentAddress({ addressLine: null, city: "חיפה", postalCode: null })).toBe("חיפה");
     expect(bankTransferText({ bankName: "בנק לאומי", bankBranch: "800", bankAccount: "1234567", bankAccountName: 'דוגמה בע"מ' })).toBe(

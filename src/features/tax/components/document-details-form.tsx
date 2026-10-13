@@ -97,53 +97,12 @@ export function DocumentDetailsForm({ orgId, details }: Props) {
               error={errors.email}
             />
           </div>
-        </CardBody>
-      </Card>
-
-      <Card aria-labelledby="doc-bank-title">
-        <CardHeader id="doc-bank-title" title="פרטים להעברה בנקאית" />
-        <CardBody className="space-y-4">
-          <p className="text-sm text-ink-soft">מוצגים ללקוח בהצעת מחיר ובדרישת תשלום, כדי שיוכל להעביר כסף.</p>
-          <TextField
-            label="בנק"
-            name="bank_name"
-            maxLength={80}
-            hint="למשל: בנק לאומי"
-            defaultValue={value("bank_name", details.bankName)}
-            error={errors.bank_name}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              label="סניף"
-              name="bank_branch"
-              dir="ltr"
-              inputMode="numeric"
-              maxLength={10}
-              defaultValue={value("bank_branch", details.bankBranch)}
-              error={errors.bank_branch}
-            />
-            <TextField
-              label="מספר חשבון"
-              name="bank_account"
-              dir="ltr"
-              inputMode="numeric"
-              maxLength={30}
-              defaultValue={value("bank_account", details.bankAccount)}
-              error={errors.bank_account}
-            />
-          </div>
-          <TextField
-            label="שם בעל החשבון"
-            name="bank_account_name"
-            maxLength={120}
-            defaultValue={value("bank_account_name", details.bankAccountName)}
-            error={errors.bank_account_name}
-          />
           <FormError message={failure?.message} />
           <FormNotice message={state?.ok ? state.message : null} />
           <SubmitButton>שמירה</SubmitButton>
         </CardBody>
       </Card>
+
     </form>
   );
 }

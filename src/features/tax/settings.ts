@@ -1,4 +1,4 @@
-import type { OrgDocumentSettingsRow } from "@/lib/database.types";
+import type { OrgBankDetailsRow, OrgDocumentSettingsRow } from "@/lib/database.types";
 
 import { isLegalForm, isVatStatus, type LegalForm, type VatStatus } from "./status";
 
@@ -32,18 +32,14 @@ export type DocumentDetails = {
   postalCode: string | null;
   phone: string | null;
   email: string | null;
-  bankName: string | null;
-  bankBranch: string | null;
-  bankAccount: string | null;
-  bankAccountName: string | null;
 };
 
 export const DETAILS_COLUMNS =
-  "legal_name, tax_id, address_line, city, postal_code, phone, email, bank_name, bank_branch, bank_account, bank_account_name" as const;
+  "legal_name, tax_id, address_line, city, postal_code, phone, email" as const;
 
 type DetailsRow = Pick<
   OrgDocumentSettingsRow,
-  "legal_name" | "tax_id" | "address_line" | "city" | "postal_code" | "phone" | "email" | "bank_name" | "bank_branch" | "bank_account" | "bank_account_name"
+  "legal_name" | "tax_id" | "address_line" | "city" | "postal_code" | "phone" | "email"
 >;
 
 export function documentDetailsFromRow(row: DetailsRow | null): DocumentDetails {
@@ -55,10 +51,6 @@ export function documentDetailsFromRow(row: DetailsRow | null): DocumentDetails 
     postalCode: row?.postal_code ?? null,
     phone: row?.phone ?? null,
     email: row?.email ?? null,
-    bankName: row?.bank_name ?? null,
-    bankBranch: row?.bank_branch ?? null,
-    bankAccount: row?.bank_account ?? null,
-    bankAccountName: row?.bank_account_name ?? null,
   };
 }
 
@@ -69,8 +61,33 @@ export function documentAddress(details: Pick<DocumentDetails, "addressLine" | "
   return text === "" ? null : text;
 }
 
+/**
+ * Bank details for a transfer (TAX-02 follow-up): public.org_bank_details, read
+ * and written by owners and admins only. Others see them only inside a document,
+ * which keeps app.document_bank_snapshot() from the time it was made.
+ */
+export type BankDetails = {
+  bankName: string | null;
+  bankBranch: string | null;
+  bankAccount: string | null;
+  bankAccountName: string | null;
+};
+
+export const BANK_COLUMNS = "bank_name, bank_branch, bank_account, bank_account_name" as const;
+
+export function bankDetailsFromRow(
+  row: Pick<OrgBankDetailsRow, "bank_name" | "bank_branch" | "bank_account" | "bank_account_name"> | null,
+): BankDetails {
+  return {
+    bankName: row?.bank_name ?? null,
+    bankBranch: row?.bank_branch ?? null,
+    bankAccount: row?.bank_account ?? null,
+    bankAccountName: row?.bank_account_name ?? null,
+  };
+}
+
 /** "בנק לאומי, סניף 800, חשבון 123456", or null without an account. */
-export function bankTransferText(details: Pick<DocumentDetails, "bankName" | "bankBranch" | "bankAccount" | "bankAccountName">): string | null {
+export function bankTransferText(details: BankDetails): string | null {
   if (!details.bankAccount) return null;
   const parts = [details.bankName, details.bankBranch ? `סניף ${details.bankBranch}` : null, `חשבון ${details.bankAccount}`];
   if (details.bankAccountName) parts.push(`על שם ${details.bankAccountName}`);

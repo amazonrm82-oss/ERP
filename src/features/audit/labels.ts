@@ -38,6 +38,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_calendar_settings: "ימי מנוחה וחגים",
   // TAX-01, TAX-02
   org_document_settings: "מע\"מ ופרטים למסמכים",
+  // TAX-02 follow-up (the account number is stored masked)
+  org_bank_details: "פרטי הבנק של העסק",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };

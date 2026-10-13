@@ -55,6 +55,8 @@ describe("notification kinds (USR-06)", () => {
     const id = "00000000-0000-4000-8000-000000000002";
     expect(notificationHref(org, "meeting", id)).toBe(`/o/${org}/calendar?view=agenda`);
     expect(notificationHref(org, "automation", id)).toBe(`/o/${org}/settings/automations/${id}`);
+    // TAX-02 follow-up: a bank details change leads to the documents settings
+    expect(notificationHref(org, "org_bank_details", id)).toBe(`/o/${org}/settings/documents`);
     expect(notificationHref(org, "lead", id)).toBe(`/o/${org}/leads/${id}`);
     expect(notificationHref(org, "something", id)).toBeNull();
     expect(notificationHref(org, "meeting", null)).toBeNull();
