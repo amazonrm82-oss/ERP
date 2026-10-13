@@ -101,5 +101,6 @@ export function isOfferable(product: { isActive: boolean; archivedAt: string | n
 
 /** The name of a copy (PRD-02): "עותק של …", cut to fit the name column. */
 export function copyName(name: string): string {
-  return `עותק של ${name}`.slice(0, PRODUCT_NAME_MAX).trimEnd();
+  // by code points, so an emoji at the cut is never split in half
+  return Array.from(`עותק של ${name}`).slice(0, PRODUCT_NAME_MAX).join("").trimEnd();
 }

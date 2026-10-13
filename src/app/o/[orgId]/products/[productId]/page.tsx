@@ -1,31 +1,50 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { Card, CardBody } from "@/components/ui/card";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { ProductActions } from "@/features/products/components/product-actions";
 import { ProductDetails } from "@/features/products/components/product-details";
+import { ProductForm } from "@/features/products/components/product-form";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
-import { categoryLabel } from "@/features/products/lists";
+import { categoryLabel, categoryOptions } from "@/features/products/lists";
 import { productsPath } from "@/features/products/paths";
 import { getProduct } from "@/features/products/queries";
+import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
+import { getPricesIncludeVat } from "@/features/tax/queries";
 import { isUuid } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "מוצר" };
 
 type Props = { params: Promise<{ orgId: string; productId: string }> };
 
-/** PRD-01: one product of the catalog. */
+/** PRD-01, PRD-02: one product. Everyone reads it; owners and admins of a writable organization edit, copy, archive and remove. */
 export default async function ProductPage({ params }: Props) {
   const { orgId, productId } = await params;
-  await getOrgContext(orgId);
+  const { role, canWrite } = await getOrgContext(orgId);
   if (!isUuid(productId)) notFound();
-  const [product, categories, units] = await Promise.all([getProduct(orgId, productId), listProductCategories(orgId), listProductUnits(orgId)]);
+  const canEdit = isAdminRole(role) && canWrite;
+  const [product, categories, units, pricesIncludeVat] = await Promise.all([
+    getProduct(orgId, productId),
+    listProductCategories(orgId),
+    listProductUnits(orgId),
+    canEdit ? getPricesIncludeVat(orgId) : Promise.resolve(false),
+  ]);
   if (!product) notFound();
 
   return (
-    <div className="max-w-3xl">
-      <PageHeader title={product.name} back={{ href: productsPath(orgId), label: "מוצרים" }} />
+    <div className="max-w-3xl space-y-4">
+      <PageHeader
+        title={product.name}
+        back={{ href: productsPath(orgId), label: "מוצרים" }}
+        actions={canEdit ? <ProductActions orgId={orgId} productId={product.id} name={product.name} archived={product.archivedAt !== null} /> : null}
+      />
+      {product.archivedAt ? (
+        <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          המוצר בארכיון: הוא לא מוצע במסמכים חדשים, ומסמכים קיימים לא משתנים.
+        </p>
+      ) : null}
       <Card>
         <CardBody>
           <ProductDetails
@@ -35,6 +54,20 @@ export default async function ProductPage({ params }: Props) {
           />
         </CardBody>
       </Card>
+      {canEdit ? (
+        <Card aria-labelledby="product-edit-title">
+          <CardHeader id="product-edit-title" title="עריכת המוצר" />
+          <CardBody>
+            <ProductForm
+              orgId={orgId}
+              product={product}
+              categories={categoryOptions(categories)}
+              units={units.map((u) => ({ id: u.id, label: u.name }))}
+              orgPricesIncludeVat={pricesIncludeVat}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
     </div>
   );
 }
