@@ -150,7 +150,7 @@ describe("business branding (FLD-04)", () => {
                   has_function_privilege('anon', p.oid, 'execute') as anon,
                   has_function_privilege('authenticated', p.oid, 'execute') as auth
              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'app' and p.proname in ('org_logo_org', 'organizations_branding_check') order by 1`,
+            where n.nspname = 'app' and p.proname in ('org_logo_org', 'organizations_branding_check') order by p.oid::regprocedure::text collate "C"`,
         )
       ).rows,
     );
