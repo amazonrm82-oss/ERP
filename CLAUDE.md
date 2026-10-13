@@ -340,6 +340,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   The grid shows "את היעד הזה קובעים בעלים ומנהלי מערכת" on rows a manager cannot set. Report results are parsed through
   zod schemas before shaping (FXC-12, `src/features/reports/schemas.ts`, fixtures in `tests/unit/fixtures/reports/`; test
   89-report-shapes compares SQL output with them): a new or changed report function updates its schema and fixture.
+- Goal progress and forecast (GOL-03/04, migrations 0139, 0140): `report_goal_progress(org, period, start, user)` and
+  `report_goal_forecast(org, pipeline, owner)` (security invoker). Actuals use the definitions of the existing reports; a team
+  goal counts by the team set on the record (meetings: `app.activity_goal_team`, definer, answers only teams the caller reads);
+  only goals whose actual the caller sees in full are returned (own meetings goal via `app.goal_entries_readable`). Overdue
+  open deals are their own line, never inside a month; the goal comparison is null when the view is partial or a pipeline is
+  picked. Pace shows after a quarter of the period (`src/features/goals/progress.ts`).
 - Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
   read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
   `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
