@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -67,7 +68,17 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         actions={<FollowButton orgId={orgId} subject={{ kind: "company", id: company.id }} state={follow} />}
       />
       <div className="mb-5">
-        <ContactActions phone={company.phone} phoneE164={company.phone_e164} email={company.email} />
+        <ContactActions
+          phone={company.phone}
+          phoneE164={company.phone_e164}
+          email={company.email}
+          // a company has no first name: {שם פרטי} stays for the person to complete
+          whatsappLog={
+            context.canWrite
+              ? { orgId, subject: { kind: "company", id: company.id }, name: company.name, values: { ...recordTemplateValues({ fullName: company.name }, context), firstName: null } }
+              : undefined
+          }
+        />
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "company", id: company.id }} className="mt-4 lg:hidden" /> : null}
       </div>
 

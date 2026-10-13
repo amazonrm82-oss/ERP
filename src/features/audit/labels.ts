@@ -22,6 +22,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   field_definitions: "שדה מותאם",
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
+  // WA-01
+  whatsapp_templates: "תבנית WhatsApp",
   // CON-02
   record_type_options: "סוג איש קשר או חברה",
   subscriptions: "מנוי",

@@ -4,6 +4,7 @@ import {
   BoardIcon,
   BoltIcon,
   ChartIcon,
+  ChatIcon,
   BuildingIcon,
   CalendarIcon,
   FormIcon,
@@ -16,6 +17,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
+import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
 
 export type SettingsSection = {
@@ -65,6 +67,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
             { href: paths.settingsRecordTypes(orgId), label: "סוגי אנשי קשר וחברות", description: "לקוח, ספק, שותף: הרשימה שבוחרים ממנה וסוננים לפיה", icon: UsersIcon },
             { href: paths.settingsFields(orgId), label: "שדות", description: "שדות משלכם בכרטיסים ובטפסים", icon: PencilIcon },
             { href: paths.settingsTags(orgId), label: "תגיות", description: "סימון רשומות וסינון לפיהן", icon: TagIcon },
+            { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
           ]
         : [],
     },

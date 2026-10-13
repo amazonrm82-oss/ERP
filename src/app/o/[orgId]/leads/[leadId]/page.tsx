@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { ShareSummary } from "@/features/share/components/share-summary";
 import { recordSummary } from "@/features/share/summary";
 import { QuickNote } from "@/features/activities/components/quick-note";
@@ -85,6 +86,11 @@ export default async function LeadPage({ params, searchParams }: Props) {
       <div className="mb-5">
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "lead", id: lead.id }, name } : undefined}
+          whatsappLog={
+            context.canWrite
+              ? { orgId, subject: { kind: "lead", id: lead.id }, name, values: recordTemplateValues({ fullName: lead.full_name }, context) }
+              : undefined
+          }
         />
         <div className="mt-2">
           <ShareSummary

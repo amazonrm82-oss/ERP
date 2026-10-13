@@ -303,6 +303,19 @@ export type DisqualifyReasonRow = {
   updated_at: string;
 };
 
+// WA-01: the organization's WhatsApp text templates (migration whatsapp_templates).
+// kind is set by the seed only ('meeting_reminder' on the default reminder template).
+export type WhatsappTemplateRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  body: string;
+  position: number;
+  kind: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // CON-02: the contact and company types an organization offers (migration record_types)
 export type RecordTypeObject = "contact" | "company";
 export type RecordTypeOptionRow = {
@@ -980,6 +993,12 @@ export type Database = {
         { organization_id: string; name: string; kind?: string; is_active?: boolean }
       >;
       disqualify_reasons: Table<DisqualifyReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // kind is the server's: no insert or update grant on it
+      whatsapp_templates: Table<
+        WhatsappTemplateRow,
+        { organization_id: string; name: string; body: string; position?: number },
+        { name?: string; body?: string; position?: number }
+      >;
       // organization and object type are fixed (column-level update grant)
       record_type_options: Table<
         RecordTypeOptionRow,

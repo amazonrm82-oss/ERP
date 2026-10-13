@@ -2,6 +2,8 @@ import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { ChatIcon, MailIcon, PhoneIcon, UsersIcon } from "@/components/ui/icons";
 import { CallLogButton } from "@/features/activities/components/call-log-button";
 import type { TimelineSubject } from "@/features/activities/schema";
+import { WhatsappButton } from "@/features/whatsapp/components/whatsapp-button";
+import type { TemplateValues } from "@/features/whatsapp/templates";
 import { telUrl, whatsappUrl } from "@/lib/format";
 
 type Props = {
@@ -14,10 +16,12 @@ type Props = {
   saveHref?: string;
   // a record page: after dialling, offer to log the call (TASK-02)
   callLog?: { orgId: string; subject: TimelineSubject; name: string };
+  // a record page, for someone who can write: WhatsApp offers the templates and logs the message (WA-01)
+  whatsappLog?: { orgId: string; subject: TimelineSubject; name: string; values: TemplateValues };
 };
 
 /** One-tap ways to reach a person: call, WhatsApp, email. Renders nothing when there is no way. */
-export function ContactActions({ phone, phoneE164, email, compact, saveHref, callLog }: Props) {
+export function ContactActions({ phone, phoneE164, email, compact, saveHref, callLog, whatsappLog }: Props) {
   const tel = telUrl(phoneE164, phone);
   const whatsapp = whatsappUrl(phoneE164);
   if (compact) {
@@ -55,7 +59,11 @@ export function ContactActions({ phone, phoneE164, email, compact, saveHref, cal
           )}
         </li>
       ) : null}
-      {whatsapp ? (
+      {whatsapp && whatsappLog && phoneE164 ? (
+        <li>
+          <WhatsappButton phoneE164={phoneE164} {...whatsappLog} />
+        </li>
+      ) : whatsapp ? (
         <li>
           <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "sm")}>
             <ChatIcon className="size-4.5 text-accent" />

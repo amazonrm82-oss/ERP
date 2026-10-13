@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { ShareSummary } from "@/features/share/components/share-summary";
 import { recordSummary } from "@/features/share/summary";
 import { QuickNote } from "@/features/activities/components/quick-note";
@@ -78,6 +79,16 @@ export default async function ContactPage({ params, searchParams }: Props) {
       <div className="mb-5">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "contact", id: contact.id }, name } : undefined}
+          whatsappLog={
+            context.canWrite
+              ? {
+                  orgId,
+                  subject: { kind: "contact", id: contact.id },
+                  name,
+                  values: recordTemplateValues({ firstName: contact.first_name, fullName: contact.full_name }, context),
+                }
+              : undefined
+          }
         />
         <div className="mt-2">
           <ShareSummary

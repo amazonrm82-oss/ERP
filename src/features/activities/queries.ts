@@ -134,7 +134,11 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
     return {
       id: activity.id,
       type: activity.type,
-      label: TYPE_LABELS[activity.type] ?? "פעילות",
+      // WA-01: a message opened from the record's WhatsApp button
+      label:
+        activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
+          ? "נשלחה הודעת WhatsApp"
+          : (TYPE_LABELS[activity.type] ?? "פעילות"),
       text,
       isUserContent,
       body: activity.body ?? "",
