@@ -525,6 +525,16 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   mirror yet; PL-03 decides). Quota triggers start with `if auth.uid() is not null and not app.is_admin(org) then return new`,
   so an outsider gets RLS's plain 42501 and learns nothing about another org's plan; every new quota trigger does the same.
   Owner: one "prices include VAT" setting per list (follow-up), defaulting to the business's setting, locked once it has prices.
+- Response target and pass-on (CAP-10, SPD-03, migrations 0167, 0168): `public.lead_response_settings` (one row per org, no row =
+  60 minutes and 'notify'; members read, owners/admins of a writable org write; audited): `target_minutes` 5..1440, `breach_action`
+  notify|pass_on|none, `max_passes` 1..5 (default 2). 'pass_on' needs the flag `auto_reassign` when chosen (definer trigger with the
+  quota guard); without it at run time the job only notifies. `app.response_target_minutes(org)` reads the setting (SPD-06 uses it);
+  `app.response_deadline(org, from, minutes)` counts working time (CAP-09 hours, never rest days/holidays). Only intake leads are
+  watched (`app.lead_response_checks`, trigger `leads_response_watch`; a new owner restarts the clock). pg_cron `crm-response-target`
+  (every minute, `app.check_lead_responses()`, fair 50 per org / 500 per run, nowait lock, per-row exception block, 14-day cap):
+  overdue + not answered (the report's contact rule) -> pass to `app.next_lead_owner` (never a previous owner; skipped people keep
+  their rotation turn; the SPD-05 call task follows silently; one `system` entry `response_pass`) or `response_overdue` to the team's
+  managers (`app.response_managers`), else owners/admins. A taken lead (`taken_at`) is never passed on.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
