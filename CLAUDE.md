@@ -482,6 +482,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Trial end (BIL-08 partial, migration 0156): `app.trial_end_settings` holds one switch, OFF; only `platform_set_trial_end()`
+  (platform owner, aal2) changes it, logged `trial_end.switch`. It covers trial/trialing businesses whose `trial_ends_at` passed
+  and that staff did not assign by hand (`app.trial_end_candidates`; `app.platform_assignments` is set by
+  `platform_update_subscription` and `platform_set_org_status`, kind subscription|status). pg_cron `crm-trial-end` (04:10 UTC)
+  runs `app.run_trial_end()`, a no-op while off. On: grace from greatest(switch-on, trial end), system notices to owners/admins
+  (start, 7 and 1 days before, read-only day, 1 day before closing), `read_only` at the local day start after day 14,
+  `suspended` (= access closed until payment, owner) a week later; the plan is never touched. `trial_end_notice(org)` feeds the
+  banner. A new redefinition of either platform function must keep its `app.mark_platform_assignment` line.
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
