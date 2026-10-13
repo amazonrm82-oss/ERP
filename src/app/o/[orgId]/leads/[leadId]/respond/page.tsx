@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { CallLogButton } from "@/features/activities/components/call-log-button";
 import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { WaitingClock } from "@/features/leads/components/waiting-clock";
+import { takenLabel } from "@/features/leads/take";
 import { getRespondLead } from "@/features/leads/take-server";
 import { getOrgContext } from "@/features/shell/queries";
 import { WhatsappButton } from "@/features/whatsapp/components/whatsapp-button";
@@ -56,7 +57,9 @@ export default async function RespondLeadPage({ params, searchParams }: Props) {
         ? lead.takenAt
           ? "הליד אצלכם."
           : "הליד הוקצה לכם."
-        : `הליד אצל ${lead.ownerName ?? "מישהו אחר בצוות"}.`;
+        : lead.takenAt
+          ? `${takenLabel(lead, context.user.id)}.`
+          : `הליד אצל ${lead.ownerName ?? "מישהו אחר בצוות"}.`;
 
   return (
     <div className="mx-auto w-full max-w-md">

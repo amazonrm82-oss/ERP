@@ -249,7 +249,8 @@ describe("push batch with lead buttons (SPD-01)", () => {
     const formNote = batch.find((n) => n.entity_id === fromForm.lead_id);
     const handNote = batch.find((n) => n.entity_id === byHand);
     const system = batch.find((n) => n.type === "system");
-    expect(formNote).toMatchObject({ type: "assigned", lead_actions: true });
+    // since lead_new_notifications a form's lead is announced as 'lead_new'
+    expect(formNote).toMatchObject({ type: "lead_new", lead_actions: true });
     expect(handNote).toMatchObject({ type: "assigned", lead_actions: false });
     expect(system).toMatchObject({ lead_actions: false });
   });

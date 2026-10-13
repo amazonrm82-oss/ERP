@@ -16,7 +16,8 @@ import { formQrUrl, qrFileName } from "@/features/intake/qr-link";
 import { getIntake, listSubmissions } from "@/features/intake/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getOrganizationSettings, listMembers, listTeams } from "@/features/settings/queries";
+import { getOrganizationSettings, getTeam, listMembers, listTeams } from "@/features/settings/queries";
+import { UNOWNED_NOTE, unownedLeadsGoTo } from "@/features/intake/unowned";
 import { whatsappNumber } from "@/features/intake/whatsapp";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
@@ -49,6 +50,20 @@ export default async function IntakeItemPage({ params }: Props) {
   const assignable = members
     .filter((member) => member.status === "active" && member.role !== "viewer")
     .map((member) => ({ id: member.userId, name: member.name }));
+
+  // SPD-01: no active owner and no round robin: new leads go to the whole team (owner's answer, 13 October 2026)
+  const noActiveOwner = intake.assignMode !== "round_robin" && !assignable.some((member) => member.id === intake.ownerId);
+  const team = noActiveOwner && intake.teamId ? await getTeam(orgId, intake.teamId) : null;
+  const unownedNote = noActiveOwner
+    ? UNOWNED_NOTE[
+        unownedLeadsGoTo({
+          teamId: team ? team.id : null,
+          visibility: organization?.recordVisibility ?? "org",
+          members,
+          teamMembers: team?.members ?? [],
+        })
+      ]
+    : null;
 
   const fieldOptions = formFieldOptions(definitions);
   // CAP-05: the business phone, as typed, when a WhatsApp chat can open it
@@ -132,6 +147,11 @@ export default async function IntakeItemPage({ params }: Props) {
       <Card aria-labelledby="intake-settings-title">
         <CardHeader id="intake-settings-title" title="הגדרות" />
         <CardBody>
+          {unownedNote ? (
+            <p role="note" className="mb-4 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+              {unownedNote}
+            </p>
+          ) : null}
           {canWrite ? (
             <IntakeSettingsForm
               orgId={orgId}

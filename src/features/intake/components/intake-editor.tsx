@@ -134,25 +134,28 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           </label>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {mode === "round_robin" ? (
-            <SelectField key={`team-${teamValue}`} label="מי משתתף בסבב" name="team_id" defaultValue={teamValue} error={errors.team_id}>
-              <option value="">כל המשתמשים בעסק</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  צוות {team.name}
-                </option>
-              ))}
-            </SelectField>
-          ) : (
-            <input type="hidden" name="team_id" value={teamValue} />
-          )}
+          {/* the lead's team; in a round robin also who takes part. A lead nobody owns is offered to this team (SPD-01) */}
+          <SelectField
+            key={`team-${teamValue}`}
+            label={mode === "round_robin" ? "מי משתתף בסבב" : "הצוות של הליד"}
+            name="team_id"
+            defaultValue={teamValue}
+            error={errors.team_id}
+          >
+            <option value="">{mode === "round_robin" ? "כל המשתמשים בעסק" : "ללא צוות"}</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                צוות {team.name}
+              </option>
+            ))}
+          </SelectField>
           <SelectField
             key={`owner-${ownerValue}`}
             label={mode === "round_robin" ? "אם אף אחד לא זמין" : "חבר הצוות"}
             name="owner_id"
             defaultValue={ownerValue}
             error={errors.owner_id}
-            hint="בלי אחראי: רק הבעלים ומנהלי המערכת יראו את הליד, אלא אם כולם רואים הכול."
+            hint='בלי אחראי: ההתראה נשלחת לכל הצוות של הליד (בלי צוות: לבעלים ולמנהלי המערכת), והראשון שלוחץ "לקחתי" מקבל אותו.'
           >
             <option value="">ללא אחראי</option>
             {members.map((member) => (
