@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
@@ -20,7 +21,15 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
 
   return (
     <>
-      <PageHeader title="דוחות" description="כל דוח מציג רק את הרשומות שמותר לכם לראות." />
+      <PageHeader
+        title="דוחות"
+        description="כל דוח מציג רק את הרשומות שמותר לכם לראות."
+        actions={
+          <ButtonLink href={paths.goals(orgId)} variant="secondary" size="sm">
+            יעדים
+          </ButtonLink>
+        }
+      />
       {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} /> : null}
       {dashboard && !dashboard.ok ? <FormError message={dashboard.message} className="mb-6" /> : null}
       <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>

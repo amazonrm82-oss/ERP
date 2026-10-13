@@ -46,6 +46,8 @@ export const paths = {
     `/o/${orgId}/merge?type=${type}&keep=${keep}${merge ? `&merge=${merge}` : ""}`,
   reports: (orgId: string) => `/o/${orgId}/reports`,
   report: (orgId: string, key: string) => `/o/${orgId}/reports/${key}`,
+  // GOL-02
+  goals: (orgId: string) => `/o/${orgId}/reports/goals`,
   settings: (orgId: string) => `/o/${orgId}/settings`,
   settingsBusiness: (orgId: string) => `/o/${orgId}/settings/business`,
   settingsUsers: (orgId: string) => `/o/${orgId}/settings/users`,
