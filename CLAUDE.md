@@ -290,8 +290,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
   1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
   use `stageTone()`.
-- Response time (SPD-06, migration 0114): `app.response_target_minutes(org)` is the target (15 until CAP-10 reads an org
-  setting); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
+- Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
+  CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
   private notes are not contact.
 - Lead campaign fields (LEAD-01, migration 0115): trigger `leads_utm_merge` (before insert or update of utm,
