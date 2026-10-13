@@ -255,6 +255,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `follow` to followers who may read the record (`app.user_can_read_record`), never to the actor, never to the new owner
   about the owner change, never to someone the entry mentions; no entry text. `app.merge_move_links()` does not move
   followers yet (follow-up).
+- Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
+  `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
+  on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
