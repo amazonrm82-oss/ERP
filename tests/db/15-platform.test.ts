@@ -47,11 +47,11 @@ describe("platform admin", () => {
 
   it("each action needs its role, and every action is logged for good", async () => {
     const changePlan = (userId: string) =>
-      asMfaUser(userId, (q) => q("select public.platform_update_subscription($1, 'business', 5, now() + interval '30 days', 'פיילוט')", [org]));
+      asMfaUser(userId, (q) => q("select public.platform_update_subscription($1, 'basic', 5, now() + interval '30 days', 'פיילוט')", [org]));
     expect((await pgError(changePlan(readonly.id))).code).toBe("42501");
     expect((await pgError(changePlan(support.id))).code).toBe("42501");
     await changePlan(finance.id);
-    expect(await asAdmin(async (q) => (await q<{ plan_key: string }>("select plan_key from public.subscriptions where organization_id = $1", [org])).rows[0].plan_key)).toBe("business");
+    expect(await asAdmin(async (q) => (await q<{ plan_key: string }>("select plan_key from public.subscriptions where organization_id = $1", [org])).rows[0].plan_key)).toBe("basic");
 
     const suspend = (userId: string) => asMfaUser(userId, (q) => q("select public.platform_set_org_status($1, 'suspended', 'בדיקה')", [org]));
     expect((await pgError(suspend(finance.id))).code).toBe("42501");
@@ -106,13 +106,18 @@ describe("platform admin", () => {
   });
 
   it("plans and the team are the platform owner's", async () => {
-    const editPlan = (userId: string) =>
+    const editPlan = (userId: string, monthly = 7900, annual = 6900) =>
       asMfaUser(userId, (q) =>
-        q("select public.platform_update_plan('basic', 'בסיס', 7900, 6900, (select limits from public.plans where key = 'basic'), (select features from public.plans where key = 'basic'), true)"),
+        q(
+          "select public.platform_update_plan('basic', 'בסיס', $1, $2, (select limits from public.plans where key = 'basic'), (select features from public.plans where key = 'basic'), true)",
+          [monthly, annual],
+        ),
       );
     expect((await pgError(editPlan(finance.id))).code).toBe("42501");
     await editPlan(pOwner.id);
     expect(await asAdmin(async (q) => (await q<{ p: number }>("select price_monthly_agorot as p from public.plans where key = 'basic'")).rows[0].p)).toBe(7900);
+    // back to the owner's price (13 October 2026), for the tests that read it later
+    await editPlan(pOwner.id, 8900, 7900);
 
     expect((await pgError(asMfaUser(support.id, (q) => q("select public.platform_set_staff($1, 'owner')", [support.email])))).code).toBe("42501");
     await asMfaUser(pOwner.id, (q) => q("select public.platform_set_staff($1, 'readonly')", [member.email]));

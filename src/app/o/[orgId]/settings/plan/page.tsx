@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
+import { PlanCards } from "@/features/plans/components/plan-cards";
+import { listPlanCards } from "@/features/plans/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getPlanUsage } from "@/features/settings/plan-usage";
 import { getOrgContext } from "@/features/shell/queries";
@@ -37,6 +39,7 @@ export default async function PlanUsagePage({ params }: Props) {
     return null;
   }
   const trialDays = plan.status === "trialing" ? daysUntil(plan.trialEndsAt) : null;
+  const cards = await listPlanCards(orgId, plan.planKey);
 
   return (
     <div className="space-y-5">
@@ -54,6 +57,13 @@ export default async function PlanUsagePage({ params }: Props) {
           ) : null}
           <p className="text-md text-ink-soft">תשלום ושינוי חבילה מתוך המערכת עוד לא זמינים. כדי לשנות חבילה, דברו איתנו:</p>
           <SupportContact />
+        </CardBody>
+      </Card>
+
+      <Card aria-labelledby="plans-title">
+        <CardHeader id="plans-title" title="החבילות" />
+        <CardBody>
+          <PlanCards orgId={orgId} plans={cards} />
         </CardBody>
       </Card>
 

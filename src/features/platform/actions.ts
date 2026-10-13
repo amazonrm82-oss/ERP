@@ -109,8 +109,20 @@ export async function updatePlanAction(planKey: string, _prev: FormState, formDa
     p_price_annual_agorot: annual,
     p_limits: limits.value,
     p_features: features.value,
-    p_is_public: formData.get("is_public") === "on",
+    // is_public follows the plan's availability (migration plan_pricing); this value is overruled
+    p_is_public: true,
   });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminPlans);
+  return { ok: true, message: "נשמר." };
+}
+
+export async function setPlanAvailabilityAction(planKey: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const availability = z.enum(["hidden", "coming_soon", "available"]).safeParse(text(formData, "availability"));
+  if (!availability.success) return fail("יש לבחור מצב.", { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_set_plan_availability", { p_key: planKey, p_availability: availability.data });
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminPlans);
   return { ok: true, message: "נשמר." };

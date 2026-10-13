@@ -867,3 +867,42 @@ describe("roles and record visibility", () => {
     expect(roles.filter((r) => r.role === "owner")).toHaveLength(1);
   });
 });
+
+// "עדכנו אותי כשזה זמין" (migration plan_waitlist): every role asks for itself and
+// sees only its own requests; nobody changes or removes them from the browser.
+describe("plan waitlist: own rows, every role", () => {
+  let owner: U;
+  let org: string;
+  const people: Record<string, U> = {};
+
+  beforeAll(async () => {
+    owner = await createUser("wait-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `wait-${role}`);
+    }
+  });
+
+  it("each role adds and sees only its own request", async () => {
+    for (const [role, user] of Object.entries(people)) {
+      await asUser(user.id, (q) => q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [org]));
+      const seen = await asUser(user.id, (q) => count(q, "select 1 from public.plan_waitlist where organization_id = $1", [org]));
+      expect(seen, role).toBe(1);
+    }
+    expect(await asAdmin((q) => count(q, "select 1 from public.plan_waitlist where organization_id = $1", [org]))).toBe(5);
+  });
+
+  it("nobody asks for someone else, changes or removes a request", async () => {
+    const forged = await pgError(
+      asUser(people.member.id, (q) =>
+        q("insert into public.plan_waitlist (organization_id, user_id, plan_key) values ($1, $2, 'business')", [org, people.viewer.id]),
+      ),
+    );
+    expect(forged.code).toBe("42501");
+    for (const user of Object.values(people)) {
+      expect((await pgError(asUser(user.id, (q) => q("update public.plan_waitlist set plan_key = plan_key where organization_id = $1", [org])))).code).toBe("42501");
+      expect((await pgError(asUser(user.id, (q) => q("delete from public.plan_waitlist where organization_id = $1", [org])))).code).toBe("42501");
+    }
+  });
+});

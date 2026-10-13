@@ -116,6 +116,7 @@ describe("tenant isolation", () => {
       await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-10-01', 'won_amount', 100000)", [orgA]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
+      await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -159,6 +160,7 @@ describe("tenant isolation", () => {
     "org_bank_details",
     "record_type_options",
     "contact_channels",
+    "plan_waitlist",
     // seeded for every new organization (WA-01)
     "whatsapp_templates",
     // DEAL-03, also seeded
@@ -281,6 +283,8 @@ describe("tenant isolation", () => {
       org_bank_details: "bank_name = bank_name",
       record_type_options: "name = name",
       contact_channels: "label = label",
+      // no update or delete grant at all: a permission error is the expected outcome
+      plan_waitlist: "plan_key = plan_key",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       goals: "target = target",
@@ -359,6 +363,7 @@ describe("tenant isolation", () => {
       ["insert into public.org_bank_details (organization_id, bank_name) values ($1, 'x')", [orgA]],
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
+      ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
@@ -421,6 +426,7 @@ describe("tenant isolation", () => {
       ["org_bank_details", "bank_name = 'HACKED'", "bank_name = 'HACKED'"],
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
+      ["plan_waitlist", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["goals", "target = 777", "target = 777"],

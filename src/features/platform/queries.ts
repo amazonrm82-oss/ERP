@@ -30,7 +30,7 @@ export async function platformReady(): Promise<PlatformMe | null> {
   return me && !me.needsMfa ? me : null;
 }
 
-async function call(name: "platform_metrics" | "platform_staff_list"): Promise<Json> {
+async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist"): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
   if (error) throw new Error(`${name} failed: ${error.message}`);
@@ -39,6 +39,12 @@ async function call(name: "platform_metrics" | "platform_staff_list"): Promise<J
 
 export async function getPlatformMetrics(): Promise<Obj> {
   return obj(await call("platform_metrics"));
+}
+
+/** How many people asked "עדכנו אותי כשזה זמין", per plan key. */
+export async function getPlanWaitlistCounts(): Promise<Record<string, number>> {
+  const data = obj(await call("platform_plan_waitlist"));
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, Number(value) || 0]));
 }
 
 export async function listPlatformStaff(): Promise<Obj[]> {

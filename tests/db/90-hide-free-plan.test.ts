@@ -37,7 +37,7 @@ describe("hidden free plan", () => {
     );
     expect(free).toEqual({ is_public: false, quotes: false });
     const shown = await asAdmin(async (q) => (await q<{ key: string }>("select key from public.plans where is_public order by position")).rows.map((r) => r.key));
-    expect(shown).toEqual(["basic", "pro", "business"]);
+    expect(shown).toEqual(["personal", "basic", "pro"]);
   });
 
   it("staff cannot move a business onto a hidden plan", async () => {

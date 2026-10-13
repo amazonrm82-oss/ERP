@@ -201,6 +201,17 @@ export type PlanRow = {
   features: Json;
   is_public: boolean;
   position: number;
+  // migration plan_pricing: the price is per business or per user; hidden | coming_soon | available
+  price_unit: string;
+  availability: string;
+};
+
+export type PlanWaitlistRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  plan_key: string;
+  created_at: string;
 };
 
 export type OrganizationRow = {
@@ -1275,6 +1286,8 @@ export type Database = {
         { organization_id: string; lead_id?: string | null; contact_id?: string | null; company_id?: string | null; deal_id?: string | null },
         Record<string, never>
       >;
+      // "עדכנו אותי כשזה זמין" (migration plan_waitlist); user_id comes from the session
+      plan_waitlist: Table<PlanWaitlistRow, { organization_id: string; plan_key: string }, Record<string, never>>;
       // each user's columns per list (migration 0033); user_id comes from the session
       list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
       companies: Table<CompanyRow, CompanyInsert>;
@@ -1487,6 +1500,8 @@ export type Database = {
         Returns: undefined;
       };
       platform_metrics: { Args: Record<string, never>; Returns: Json };
+      platform_set_plan_availability: { Args: { p_key: string; p_availability: string }; Returns: undefined };
+      platform_plan_waitlist: { Args: Record<string, never>; Returns: Json };
       platform_staff_list: { Args: Record<string, never>; Returns: Json };
       platform_set_staff: { Args: { p_email: string; p_role: PlatformRole | null }; Returns: undefined };
       platform_log_list: { Args: { p_org?: string | null; p_limit?: number }; Returns: Json };

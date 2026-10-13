@@ -11,59 +11,106 @@ import { publicFormFrom } from "@/features/intake/public-form";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { SUPPORT_LINE } from "@/lib/support-phone";
-import { effectiveFeature, effectiveLimits, REMOVE_BUILT_WITH, WAVE2_FEATURE_KEYS, WAVE2_FEATURES, WAVE2_LIMIT_KEYS, WAVE2_LIMITS } from "@/lib/plan-keys";
+import {
+  effectiveFeature,
+  effectiveLimits,
+  orgAllowance,
+  PLAN_FEATURE_KEYS,
+  PLAN_KEY_FALLBACK,
+  PLAN_LIMIT_KEYS,
+  PLAN_VALUES,
+  REMOVE_BUILT_WITH,
+  SOLD_PLANS,
+  WAVE2_FEATURE_KEYS,
+  WAVE2_LIMIT_KEYS,
+} from "@/lib/plan-keys";
 
-function migrationDefaults(): { features: Record<string, unknown>; limits: Record<string, unknown> } {
+function pricingMigration(): string {
   const dir = join(process.cwd(), "supabase/migrations");
-  const file = readdirSync(dir).find((name) => name.endsWith("_wave2_plan_keys.sql"));
+  const file = readdirSync(dir).find((name) => name.endsWith("_plan_pricing.sql"));
   expect(file).toBeDefined();
-  const sql = readFileSync(join(dir, file as string), "utf8");
-  const json = /select \$json\$([\s\S]*?)\$json\$::jsonb/.exec(sql)?.[1];
-  expect(json).toBeDefined();
-  return JSON.parse(json as string);
+  return readFileSync(join(dir, file as string), "utf8");
 }
 
-describe("wave 2 plan keys (owner, 13 October 2026)", () => {
-  it("the TS list equals app.plan_key_defaults() in the migration", () => {
-    const db = migrationDefaults();
-    expect(db.features).toEqual(WAVE2_FEATURES);
-    expect(db.limits).toEqual(WAVE2_LIMITS);
+const quoted = (sql: string, tag: string) => {
+  const body = new RegExp(`\\$${tag}\\$([\\s\\S]*?)\\$${tag}\\$::jsonb`).exec(sql)?.[1];
+  expect(body, tag).toBeDefined();
+  return JSON.parse(body as string);
+};
+
+describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () => {
+  it("the TS mirror equals the migration's seed and app.plan_key_defaults()", () => {
+    const sql = pricingMigration();
+    expect(quoted(sql, "seed")).toEqual(PLAN_VALUES);
+    expect(quoted(sql, "json")).toEqual(PLAN_KEY_FALLBACK);
   });
 
-  it("every flag is on except remove_built_with, every count quota is high, and the per-use quotas are the owner's", () => {
-    for (const key of WAVE2_FEATURE_KEYS) {
-      expect(WAVE2_FEATURES[key]).toBe(key !== REMOVE_BUILT_WITH);
+  it("a wave 2 key a plan does not hold falls back to the most restrictive value", () => {
+    expect(Object.keys(PLAN_KEY_FALLBACK.features).sort()).toEqual([...WAVE2_FEATURE_KEYS].sort());
+    expect(Object.keys(PLAN_KEY_FALLBACK.limits).sort()).toEqual([...WAVE2_LIMIT_KEYS].sort());
+    expect(Object.values(PLAN_KEY_FALLBACK.features).every((v) => v === false)).toBe(true);
+    expect(Object.values(PLAN_KEY_FALLBACK.limits).every((v) => v === 0)).toBe(true);
+  });
+
+  it("prices: personal per business, the others per user; business coming soon", () => {
+    expect(PLAN_VALUES.personal).toMatchObject({ price_monthly_agorot: 7900, price_annual_agorot: 6900, price_unit: "org", availability: "available" });
+    expect(PLAN_VALUES.basic).toMatchObject({ price_monthly_agorot: 8900, price_annual_agorot: 7900, price_unit: "seat", availability: "available" });
+    expect(PLAN_VALUES.pro).toMatchObject({ price_monthly_agorot: 13900, price_annual_agorot: 11900, price_unit: "seat", availability: "available" });
+    expect(PLAN_VALUES.business).toMatchObject({ price_monthly_agorot: 21900, price_annual_agorot: 18900, price_unit: "seat", availability: "coming_soon" });
+  });
+
+  it("every sold plan holds every key; a few values per plan", () => {
+    for (const plan of SOLD_PLANS) {
+      expect(Object.keys(PLAN_VALUES[plan].limits).sort()).toEqual([...PLAN_LIMIT_KEYS].sort());
+      expect(Object.keys(PLAN_VALUES[plan].features).sort()).toEqual([...PLAN_FEATURE_KEYS].sort());
     }
-    for (const key of WAVE2_LIMIT_KEYS) {
-      const perUse: Record<string, number> = {
-        max_pdf_per_month: 1000,
-        max_customer_emails_per_month: 1000,
-        max_customer_emails_per_day: 100,
-      };
-      expect(WAVE2_LIMITS[key]).toBe(perUse[key] ?? 100000);
-    }
+    const limit = (key: string) => SOLD_PLANS.map((plan) => PLAN_VALUES[plan].limits[key]);
+    const flag = (key: string) => SOLD_PLANS.map((plan) => PLAN_VALUES[plan].features[key]);
+    expect(limit("max_users")).toEqual([2, null, null, null]);
+    expect(limit("max_teams")).toEqual([0, 2, null, null]);
+    expect(limit("ai_credits_per_month")).toEqual([100, 0, 0, 0]);
+    expect(limit("ai_credits_per_user_per_month")).toEqual([0, 300, 1000, 3000]);
+    expect(limit("max_pdf_per_month")).toEqual([200, 1000, 3000, 10000]);
+    expect(limit("max_customer_emails_per_day")).toEqual([100, 200, 500, 1500]);
+    expect(limit("view_seats_per_paid_seat")).toEqual([0, 0, 1, 1]);
+    expect(limit("max_custom_objects")).toEqual([0, 0, 3, 20]);
+    expect(flag("quotes")).toEqual([true, true, true, true]);
+    expect(flag("orders")).toEqual([false, true, true, true]);
+    expect(flag("remove_built_with")).toEqual([false, false, true, true]);
+    expect(flag("sso")).toEqual([false, false, false, true]);
+  });
+
+  it("a per-user quota is multiplied by the paid seats and added to the business-wide one", () => {
+    const personal = PLAN_VALUES.personal.limits;
+    const pro = PLAN_VALUES.pro.limits;
+    expect(orgAllowance(personal, "ai_credits_per_month", "ai_credits_per_user_per_month", 2)).toBe(100);
+    expect(orgAllowance(pro, "ai_credits_per_month", "ai_credits_per_user_per_month", 4)).toBe(4000);
+    expect(orgAllowance(pro, "max_booking_pages", "max_booking_pages_per_user", 3)).toBe(15);
+    expect(orgAllowance({ a: null, b: 1 }, "a", "b", 3)).toBeNull();
   });
 
   it("every gate has its own Hebrew message", () => {
     const raised = (hint: string) => dbErrorMessage({ code: "P0001", message: "x", hint });
     const generic = raised("feature:__none__");
     for (const key of WAVE2_FEATURE_KEYS.filter((k) => k !== REMOVE_BUILT_WITH)) {
-      expect(raised(`feature:${key}`)).not.toBe(generic);
+      expect(raised(`feature:${key}`), key).not.toBe(generic);
     }
     const genericLimit = raised("limit:__none__");
     for (const key of WAVE2_LIMIT_KEYS) {
-      expect(raised(`limit:${key}`)).not.toBe(genericLimit);
+      expect(raised(`limit:${key}`), key).not.toBe(genericLimit);
     }
     for (const key of ["max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day"]) {
       expect(raised(`limit:${key}`)).toContain(SUPPORT_LINE);
     }
     expect(raised("limit:max_customer_emails_per_day")).toContain("כקישור");
+    expect(raised("plan:not_available")).not.toBe(raised("plan:hidden"));
   });
 });
 
 describe("effective flags and limits in the app mirror app.org_has_feature / app.org_limit", () => {
-  it("override, else plan, else the wave 2 default; older keys missing = off", () => {
-    expect(effectiveFeature("goals", {}, {})).toBe(true);
+  it("override, else plan, else the restrictive fallback; older keys missing = off", () => {
+    expect(effectiveFeature("goals", {}, {})).toBe(false);
+    expect(effectiveFeature("goals", { goals: true }, {})).toBe(true);
     expect(effectiveFeature("remove_built_with", {}, {})).toBe(false);
     expect(effectiveFeature("goals", { goals: false }, {})).toBe(false);
     expect(effectiveFeature("goals", { goals: false }, { goals: true })).toBe(true);
@@ -78,8 +125,8 @@ describe("effective flags and limits in the app mirror app.org_has_feature / app
     expect(limits.max_records).toBe(1000);
     expect(limits.max_products).toBeNull();
     expect(limits.max_qr_codes).toBe(5);
-    expect(limits.max_price_lists).toBe(100000);
-    expect(limits.max_pdf_per_month).toBe(1000);
+    expect(limits.max_price_lists).toBe(0);
+    expect(limits.max_pdf_per_month).toBe(0);
     expect(limits.max_users).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { WAVE2_FEATURE_KEYS, WAVE2_FEATURES, WAVE2_LIMIT_KEYS, WAVE2_LIMITS } from "@/lib/plan-keys";
+import { PLAN_FEATURE_KEYS, PLAN_KEY_FALLBACK, PLAN_LIMIT_KEYS, PLAN_VALUES, SOLD_PLANS } from "@/lib/plan-keys";
 
 import { asAdmin, asAnon, asService, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
 
@@ -26,9 +26,10 @@ const setOverrides = (org: string, features: object, limits: object = {}) =>
     ]),
   );
 
-// Owner, 13 October 2026: every wave 2 module has its own key in plans, on in every
-// plan until pricing; count quotas high and temporary; remove_built_with off.
-describe("wave 2 plan keys", () => {
+// Owner's pricing of 13 October 2026: every limit and flag is its own key in plans,
+// with per-organization overrides; a plan without a wave 2 key gets the most
+// restrictive value.
+describe("plan keys: limits and flags", () => {
   let org: string;
   let otherOrg: string;
 
@@ -39,79 +40,63 @@ describe("wave 2 plan keys", () => {
     otherOrg = await createOrg(other.id, "עסק אחר");
   });
 
-  it("every plan holds every key, with the temporary values", async () => {
+  it("every sold plan holds every key, with the owner's values", async () => {
     const rows = await plans();
-    expect(rows.length).toBeGreaterThan(0);
-    for (const plan of rows) {
-      for (const key of WAVE2_FEATURE_KEYS) {
-        expect(plan.features, `${plan.key}.${key}`).toHaveProperty(key);
-        // quotes existed before wave 2 (off on the free plan) and is never overwritten
-        if (!(key === "quotes" && plan.key === "free")) {
-          expect(plan.features[key], `${plan.key}.${key}`).toBe(WAVE2_FEATURES[key]);
-        }
+    for (const key of SOLD_PLANS) {
+      const plan = rows.find((p) => p.key === key);
+      expect(plan, key).toBeDefined();
+      for (const limit of PLAN_LIMIT_KEYS) {
+        expect(plan?.limits[limit], `${key}.${limit}`).toBe(PLAN_VALUES[key].limits[limit]);
       }
-      for (const key of WAVE2_LIMIT_KEYS) {
-        expect(plan.limits[key], `${plan.key}.${key}`).toBe(WAVE2_LIMITS[key]);
+      for (const flag of PLAN_FEATURE_KEYS) {
+        expect(plan?.features[flag], `${key}.${flag}`).toBe(PLAN_VALUES[key].features[flag]);
       }
     }
   });
 
-  it("the per-use quotas are the owner's temporary values in every plan (13 October 2026)", async () => {
-    const perUse = { max_pdf_per_month: 1000, max_customer_emails_per_month: 1000, max_customer_emails_per_day: 100 };
-    for (const plan of await plans()) {
-      for (const [key, value] of Object.entries(perUse)) {
-        expect(plan.limits[key], `${plan.key}.${key}`).toBe(value);
-      }
-    }
-    for (const [key, value] of Object.entries(perUse)) {
-      expect(await limitOf(org, key), key).toBe(value);
-    }
-  });
-
-  it("remove_built_with is off in every plan", async () => {
-    for (const plan of await plans()) {
-      expect(plan.features.remove_built_with, plan.key).toBe(false);
-    }
-  });
-
-  it("the older keys are untouched", async () => {
-    const pro = (await plans()).find((p) => p.key === "pro");
-    expect(pro?.limits.storage_gb).toBe(50);
-    expect(pro?.limits.max_users).toBeNull();
-    expect(pro?.features.sso).toBe(false);
+  it("the free plan keeps its own values (quotes off) and its older keys", async () => {
     const free = (await plans()).find((p) => p.key === "free");
     expect(free?.features.quotes).toBe(false);
+    expect(free?.limits.max_users).toBe(2);
+    expect(free?.limits.storage_gb).toBe(1);
   });
 
-  it("an organization gets the plan's values through the access helpers", async () => {
-    for (const key of WAVE2_FEATURE_KEYS) {
-      expect(await hasFeature(org, key), key).toBe(WAVE2_FEATURES[key]);
+  it("an organization gets its plan's values through the access helpers (a trial is on pro)", async () => {
+    const plan = await asAdmin(
+      async (q) => (await q<{ plan_key: string }>("select plan_key from public.subscriptions where organization_id = $1", [org])).rows[0].plan_key,
+    );
+    expect(plan).toBe("pro");
+    for (const key of PLAN_FEATURE_KEYS) {
+      expect(await hasFeature(org, key), key).toBe(PLAN_VALUES.pro.features[key]);
     }
-    for (const key of WAVE2_LIMIT_KEYS) {
-      expect(await limitOf(org, key), key).toBe(WAVE2_LIMITS[key]);
+    for (const key of PLAN_LIMIT_KEYS) {
+      expect(await limitOf(org, key), key).toBe(PLAN_VALUES.pro.limits[key]);
     }
+    // pro, not business
+    expect(await hasFeature(org, "sso")).toBe(false);
+    expect(await hasFeature(org, "field_permissions")).toBe(false);
   });
 
-  it("an override turns a feature off, or remove_built_with on, for one organization only", async () => {
-    await setOverrides(org, { goals: false, remove_built_with: true }, { max_products: 5 });
+  it("an override changes a flag or a limit for one organization only", async () => {
+    await setOverrides(org, { goals: false, remove_built_with: false }, { max_products: 5 });
     try {
       expect(await hasFeature(org, "goals")).toBe(false);
-      expect(await hasFeature(org, "remove_built_with")).toBe(true);
+      expect(await hasFeature(org, "remove_built_with")).toBe(false);
       expect(await limitOf(org, "max_products")).toBe(5);
       expect(await hasFeature(otherOrg, "goals")).toBe(true);
-      expect(await hasFeature(otherOrg, "remove_built_with")).toBe(false);
-      expect(await limitOf(otherOrg, "max_products")).toBe(100000);
+      expect(await hasFeature(otherOrg, "remove_built_with")).toBe(true);
+      expect(await limitOf(otherOrg, "max_products")).toBe(5000);
     } finally {
       await setOverrides(org, {});
     }
   });
 
-  it("a plan without a wave 2 key falls back to its default; older keys keep their old meaning", async () => {
+  it("a plan without a wave 2 key gets the most restrictive value; older keys keep their old meaning", async () => {
+    expect(PLAN_KEY_FALLBACK.features.goals).toBe(false);
     await asAdmin(async (q) => {
       await q("savepoint s");
       await q(
-        "update public.plans set features = features - 'goals' - 'remove_built_with' - 'sso', limits = limits - 'max_products' - 'max_records' where key = (select plan_key from public.subscriptions where organization_id = $1)",
-        [org],
+        "update public.plans set features = features - 'goals' - 'remove_built_with' - 'sso', limits = limits - 'max_products' - 'max_records' where key = 'pro'",
       );
       const r = (
         await q<{ goals: boolean; built: boolean; sso: boolean; products: string | null; records: string | null }>(
@@ -121,37 +106,18 @@ describe("wave 2 plan keys", () => {
           [org],
         )
       ).rows[0];
-      expect(r.goals).toBe(true);
+      expect(r.goals).toBe(false);
       expect(r.built).toBe(false);
-      // a missing older feature is off, a missing older limit unlimited (as before)
       expect(r.sso).toBe(false);
-      expect(Number(r.products)).toBe(100000);
+      expect(Number(r.products)).toBe(0);
+      // a missing older limit is unlimited (as before)
       expect(r.records).toBeNull();
       // an explicit null limit on a wave 2 key still means unlimited
-      await q("update public.plans set limits = limits || '{\"max_products\": null}' where key = (select plan_key from public.subscriptions where organization_id = $1)", [org]);
+      await q("update public.plans set limits = limits || '{\"max_products\": null}' where key = 'pro'");
       expect((await q<{ v: string | null }>("select app.org_limit($1, 'max_products') as v", [org])).rows[0].v).toBeNull();
       await q("rollback to savepoint s");
     });
     expect(await hasFeature(org, "goals")).toBe(true);
-  });
-
-  it("seeding again changes nothing and never overwrites a value set on a plan", async () => {
-    await asAdmin(async (q) => {
-      await q("savepoint s");
-      await q("update public.plans set features = features || '{\"goals\": false}', limits = limits || '{\"max_products\": 7}' where key = 'basic'");
-      const res = await q(
-        `update public.plans p
-            set features = (app.plan_key_defaults() -> 'features') || coalesce(p.features, '{}'::jsonb),
-                limits = (app.plan_key_defaults() -> 'limits') || coalesce(p.limits, '{}'::jsonb)
-          where not (coalesce(p.features, '{}'::jsonb) ?& array(select jsonb_object_keys(app.plan_key_defaults() -> 'features')))
-             or not (coalesce(p.limits, '{}'::jsonb) ?& array(select jsonb_object_keys(app.plan_key_defaults() -> 'limits')))`,
-      );
-      expect(res.rowCount).toBe(0);
-      const basic = (await q<Plan>("select key, features, limits from public.plans where key = 'basic'")).rows[0];
-      expect(basic.features.goals).toBe(false);
-      expect(basic.limits.max_products).toBe(7);
-      await q("rollback to savepoint s");
-    });
   });
 });
 
@@ -169,19 +135,27 @@ describe('the "נבנה ב-Mexuz" line on the public form (FLD-04)', () => {
 
   const builtWith = (token: string) =>
     asService(async (q) => (await q<{ r: { built_with: boolean } | null }>("select public.intake_form($1) as r", [token])).rows[0].r?.built_with ?? null);
+  const setPlan = (plan: string) => asAdmin((q) => q("update public.subscriptions set plan_key = $2 where organization_id = $1", [org, plan]));
 
-  it("is shown by default, in intake_form()'s reply", async () => {
-    expect(await builtWith(form.token)).toBe(true);
+  it("follows the plan: hidden on pro and business, shown on personal and basic", async () => {
+    try {
+      for (const plan of SOLD_PLANS) {
+        await setPlan(plan);
+        expect(await builtWith(form.token), plan).toBe(!PLAN_VALUES[plan].features.remove_built_with);
+      }
+    } finally {
+      await setPlan("pro");
+    }
+    expect(await builtWith(form.token)).toBe(false);
   });
 
-  it("is hidden when the organization's override turns remove_built_with on", async () => {
-    await setOverrides(org, { remove_built_with: true });
+  it("an override decides for one organization", async () => {
+    await setOverrides(org, { remove_built_with: false });
     try {
-      expect(await builtWith(form.token)).toBe(false);
+      expect(await builtWith(form.token)).toBe(true);
     } finally {
       await setOverrides(org, {});
     }
-    expect(await builtWith(form.token)).toBe(true);
   });
 
   it("a bad value never fails the form; the line then shows", async () => {

@@ -4,7 +4,7 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 export type UsageRow = { key: string; label: string; limit: number | null; used: number; unit?: string };
-export type PlanUsage = { planName: string; status: string; trialEndsAt: string | null; usage: UsageRow[] };
+export type PlanUsage = { planKey: string | null; planName: string; status: string; trialEndsAt: string | null; usage: UsageRow[] };
 
 const LABELS: Record<string, { label: string; unit?: string }> = {
   max_users: { label: "משתמשים" },
@@ -27,6 +27,7 @@ export async function getPlanUsage(orgId: string): Promise<PlanUsage | null> {
   } | null;
   if (!data) return null;
   return {
+    planKey: data.plan_key ?? null,
     planName: data.plan_name ?? data.plan_key ?? "",
     status: data.status ?? "",
     trialEndsAt: data.trial_ends_at ?? null,
