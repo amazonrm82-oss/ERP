@@ -8,25 +8,44 @@ import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
-import { catalogFor, columnChoicesSchema, type ColumnChoice, type ListObject } from "./columns";
+import { BOARD_PREFERENCE, boardCatalog, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
+import { paths } from "@/lib/paths";
+
+import { catalogFor, columnChoicesSchema, type ColumnChoice, type PreferenceKey } from "./columns";
 
 
-/** Saves the user's columns for a list (only columns the list really has). */
-export async function saveListColumnsAction(orgId: string, object: ListObject, columns: ColumnChoice[]): Promise<ActionResult> {
-  if (!isRecordType(object)) {
+const isPreferenceKey = (object: unknown): object is PreferenceKey => object === BOARD_PREFERENCE || isRecordType(object);
+
+// the page that shows a list's columns (or the board's card fields)
+const pageOf = (orgId: string, object: PreferenceKey) => (object === BOARD_PREFERENCE ? paths.deals(orgId) : RECORD_TYPES[object].list(orgId));
+
+/** What can be picked for a list: its columns, or the fields of a board card (DEAL-09). */
+async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<string>> {
+  if (object === BOARD_PREFERENCE) {
+    return new Set(boardCatalog(await listFieldDefinitions(orgId, "deal")).map((column) => column.key));
+  }
+  return new Set(catalogFor(object, object === "task" ? [] : await listFieldDefinitions(orgId, object)).map((column) => column.key));
+}
+
+/** Saves the user's columns for a list, or the fields of a deal card on the board (only ones that really exist). */
+export async function saveListColumnsAction(orgId: string, object: PreferenceKey, columns: ColumnChoice[]): Promise<ActionResult> {
+  if (!isPreferenceKey(object)) {
     return fail("הרשימה לא נמצאה.");
   }
   const parsed = columnChoicesSchema.safeParse(columns);
   if (!parsed.success) {
     return fail("לא הצלחנו לקרוא את העמודות. רעננו את הדף ונסו שוב.");
   }
+  if (object === BOARD_PREFERENCE && parsed.data.length > MAX_BOARD_FIELDS) {
+    return fail(`אפשר להציג על הכרטיס עד ${MAX_BOARD_FIELDS} שדות.`);
+  }
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
   }
-  const known = new Set(catalogFor(object, object === "task" ? [] : await listFieldDefinitions(orgId, object)).map((column) => column.key));
+  const known = await knownKeys(orgId, object);
   if (parsed.data.some((choice) => !known.has(choice.key))) {
-    return fail("אחת העמודות כבר לא קיימת. רעננו את הדף ונסו שוב.");
+    return fail(object === BOARD_PREFERENCE ? "אחד השדות כבר לא קיים. רעננו את הדף ונסו שוב." : "אחת העמודות כבר לא קיימת. רעננו את הדף ונסו שוב.");
   }
 
   // update the user's row, or create it the first time (RLS: own rows only)
@@ -45,13 +64,13 @@ export async function saveListColumnsAction(orgId: string, object: ListObject, c
       return fail(dbErrorMessage(insertError, "לא הצלחנו לשמור את העמודות. נסו שוב."));
     }
   }
-  revalidatePath(RECORD_TYPES[object].list(orgId));
+  revalidatePath(pageOf(orgId, object));
   return ok();
 }
 
-/** Back to the list's default columns. */
-export async function resetListColumnsAction(orgId: string, object: ListObject): Promise<ActionResult> {
-  if (!isRecordType(object)) {
+/** Back to the list's default columns (or the board's default card fields). */
+export async function resetListColumnsAction(orgId: string, object: PreferenceKey): Promise<ActionResult> {
+  if (!isPreferenceKey(object)) {
     return fail("הרשימה לא נמצאה.");
   }
   const context = await actionContext(orgId);
@@ -62,6 +81,6 @@ export async function resetListColumnsAction(orgId: string, object: ListObject):
   if (error) {
     return fail(dbErrorMessage(error));
   }
-  revalidatePath(RECORD_TYPES[object].list(orgId));
+  revalidatePath(pageOf(orgId, object));
   return ok();
 }

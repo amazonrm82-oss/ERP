@@ -16,7 +16,8 @@ import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { DealsTable } from "@/features/deals/components/deals-table";
-import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, FILTERED_TOTALS_LIMIT, getBoard, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
+import { BOARD_PREFERENCE, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
+import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, FILTERED_TOTALS_LIMIT, getBoard, getBoardFields, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
@@ -131,8 +132,11 @@ export default async function DealsPage({ params, searchParams }: Props) {
     closeFrom: dayParam(firstParam(query.close_from)),
     closeTo: dayParam(firstParam(query.close_to)),
   };
-  const [board, pipelines, members, teams, tags, lossReasons] = await Promise.all([
-    getBoard(orgId, requested, { showClosed, fullStage, filter }),
+  // DEAL-09: the user's card fields decide what the board reads
+  const cardFieldsRead = getBoardFields(orgId);
+  const [cardFields, board, pipelines, members, teams, tags, lossReasons] = await Promise.all([
+    cardFieldsRead,
+    cardFieldsRead.then((fields) => getBoard(orgId, requested, { showClosed, fullStage, filter, cardFields: fields.keys })),
     listPipelines(orgId),
     listMembers(orgId),
     listTeams(orgId),
@@ -187,11 +191,28 @@ export default async function DealsPage({ params, searchParams }: Props) {
 
       <ViewNav orgId={orgId} pipelineId={board.pipeline.id} pipelines={pipelines} table={false} />
 
-      <p className="mb-3 text-sm">
-        <Link href={boardHref({ closed: showClosed ? null : "1" })} className="text-accent-strong underline underline-offset-4">
-          {showClosed ? "הסתרת עסקאות שנסגרו" : "הצגת עסקאות שנסגרו (בהצלחה ואבודות)"}
-        </Link>
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm">
+          <Link href={boardHref({ closed: showClosed ? null : "1" })} className="text-accent-strong underline underline-offset-4">
+            {showClosed ? "הסתרת עסקאות שנסגרו" : "הצגת עסקאות שנסגרו (בהצלחה ואבודות)"}
+          </Link>
+        </p>
+        <ColumnsPanel
+          orgId={orgId}
+          object={BOARD_PREFERENCE}
+          catalog={cardFields.catalog}
+          columns={cardFields.keys.map((key) => ({ key, width: "normal" }))}
+          saved={cardFields.saved}
+          widths={false}
+          max={MAX_BOARD_FIELDS}
+          texts={{
+            button: "שדות בכרטיס",
+            group: "בחירת השדות בכרטיס עסקה",
+            hint: "שם העסקה תמיד מוצג. מסמנים מה להציג על כל כרטיס, ומסדרים בחצים.",
+            save: "שמירת השדות",
+          }}
+        />
+      </div>
 
       <BoardFilters
         action={paths.deals(orgId)}
@@ -230,6 +251,12 @@ export default async function DealsPage({ params, searchParams }: Props) {
         canWrite={canWrite}
         stuck={stuck}
         lossReasons={activeLossReasons(lossReasons)}
+        cardFields={cardFields.keys}
+        lookups={{
+          owners: Object.fromEntries(members.map((m) => [m.userId, m.name])),
+          tags: Object.fromEntries(tags.map((t) => [t.id, t.name])),
+          fields: cardFields.fields.filter((field) => cardFields.keys.includes(`${CUSTOM_PREFIX}${field.key}`)),
+        }}
         closeWindow={
           canWrite
             ? closeWindowSetup(

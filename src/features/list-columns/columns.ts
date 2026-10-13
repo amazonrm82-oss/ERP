@@ -4,6 +4,8 @@ import { z } from "zod";
 // server (resolving a saved choice) and the "columns" panel in the browser.
 
 export type ListObject = "lead" | "contact" | "company" | "deal" | "task";
+// a saved choice in list_preferences: a list's columns, or the fields of a deal card on the board (DEAL-09)
+export type PreferenceKey = ListObject | "deal_board";
 export type ColumnWidth = "narrow" | "normal" | "wide";
 export type ColumnChoice = { key: string; width: ColumnWidth };
 export type CatalogColumn = { key: string; label: string };

@@ -6,7 +6,12 @@ import { ilikeAny, PAGE_SIZE } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
-import { readAllPages } from "@/lib/paged-read";
+import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import type { FieldDefinition } from "@/features/custom-fields/types";
+import type { CatalogColumn } from "@/features/list-columns/columns";
+
+import { BOARD_PREFERENCE, boardCatalog, boardNeeds, daysSince, resolveBoardFields } from "./board-fields";
 
 // color: a key of STAGE_COLORS or null (DEAL-01; see stage-colors.ts)
 export type StageOption = { id: string; name: string; kind: StageKind; color: string | null };
@@ -24,6 +29,15 @@ export type BoardDeal = {
   competitor: string | null;
   // DEAL-03: the picked loss reason (name as stored on the deal), the default when it moves again
   lossReason: { id: string; name: string } | null;
+  // DEAL-09: fields a card may show; a lookup nobody shows stays null
+  companyId: string | null;
+  companyName: string | null;
+  expectedCloseDate: string | null;
+  daysInStage: number;
+  tagIds: string[];
+  // only when a custom field is shown (else {})
+  customFields: Json;
+  nextTask: { title: string; dueAt: string | null } | null;
 };
 
 export type StageTotal = { count: number; amountAgorot: number };
@@ -103,7 +117,7 @@ export async function getPipeline(
 export async function getBoard(
   orgId: string,
   pipelineId?: string | null,
-  options: { showClosed?: boolean; fullStage?: string | null; filter?: BoardFilter } = {},
+  options: { showClosed?: boolean; fullStage?: string | null; filter?: BoardFilter; cardFields?: string[] } = {},
 ): Promise<Board | null> {
   const pipeline = await getPipeline(orgId, pipelineId);
   if (!pipeline) {
@@ -147,7 +161,7 @@ export async function getBoard(
       narrow(
         supabase
           .from("deals")
-          .select("id, name, amount_agorot, stage_id, contact_id, owner_id, competitor, lost_reason_id, lost_reason")
+          .select("id, name, amount_agorot, stage_id, contact_id, owner_id, competitor, lost_reason_id, lost_reason, company_id, expected_close_date, stage_entered_at, tag_ids, custom_fields")
           .eq("organization_id", orgId)
           .eq("pipeline_id", pipeline.id)
           .eq("stage_id", stageId)
@@ -196,6 +210,41 @@ export async function getBoard(
     }
   }
 
+  // DEAL-09: company names and next tasks only when a card shows them
+  const needs = boardNeeds(options.cardFields ?? []);
+  const companyNames = new Map<string, string>();
+  const nextTasks = new Map<string, { title: string; dueAt: string | null }>();
+  const companyIds = needs.company ? [...new Set(rows.map((row) => row.company_id).filter((id): id is string => Boolean(id)))] : [];
+  const dealIds = needs.nextTask ? rows.map((row) => row.id) : [];
+  const [companies, tasks] = await Promise.all([
+    readAllPagesByIds(companyIds, async (slice, from, to) =>
+      must(await supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "companies") ?? [],
+    ),
+    // open tasks of the cards' deals, soonest first (no date last); the first one per deal is its next step
+    readAllPagesByIds(dealIds, async (slice, from, to) =>
+      must(
+        await supabase
+          .from("tasks")
+          .select("id, deal_id, title, due_at")
+          .eq("organization_id", orgId)
+          .in("deal_id", slice)
+          .eq("status", "open")
+          .is("deleted_at", null)
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+        "next tasks",
+      ) ?? [],
+    ),
+  ]);
+  for (const company of companies) companyNames.set(company.id, company.name);
+  // slices are read one after another: order them again (time, no date last), then keep each deal's first
+  const byDue = (t: { due_at: string | null }) => (t.due_at ? new Date(t.due_at).getTime() : Number.POSITIVE_INFINITY);
+  for (const task of [...tasks].sort((a, b) => byDue(a) - byDue(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    if (task.deal_id && !nextTasks.has(task.deal_id)) nextTasks.set(task.deal_id, { title: task.title, dueAt: task.due_at });
+  }
+  const now = new Date();
+
   return {
     pipeline: { id: pipeline.id, name: pipeline.name },
     stages: pipeline.stages,
@@ -213,8 +262,29 @@ export async function getBoard(
       ownerId: row.owner_id,
       competitor: row.competitor,
       lossReason: row.lost_reason_id ? { id: row.lost_reason_id, name: row.lost_reason ?? "" } : null,
+      companyId: row.company_id,
+      companyName: row.company_id ? (companyNames.get(row.company_id) ?? null) : null,
+      expectedCloseDate: row.expected_close_date,
+      daysInStage: daysSince(row.stage_entered_at, now),
+      tagIds: row.tag_ids ?? [],
+      customFields: needs.custom ? row.custom_fields : {},
+      nextTask: nextTasks.get(row.id) ?? null,
     })),
   };
+}
+
+export type BoardFields = { catalog: CatalogColumn[]; keys: string[]; fields: FieldDefinition[]; saved: boolean };
+
+/** The signed-in user's choice of card fields for the deals board (DEAL-09), with everything a card can show. */
+export async function getBoardFields(orgId: string): Promise<BoardFields> {
+  const supabase = await createClient();
+  const [fields, saved] = await Promise.all([
+    listFieldDefinitions(orgId, "deal"),
+    supabase.from("list_preferences").select("columns").eq("organization_id", orgId).eq("object_type", BOARD_PREFERENCE).maybeSingle(),
+  ]);
+  const row = must(saved, "board fields");
+  const catalog = boardCatalog(fields);
+  return { catalog, keys: resolveBoardFields(row?.columns ?? null, catalog), fields, saved: Boolean(row) };
 }
 
 export type RelatedDeal = {

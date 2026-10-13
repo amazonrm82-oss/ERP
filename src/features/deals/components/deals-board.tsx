@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
 import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -16,6 +15,7 @@ import { entersWon, type CloseWindowSetup } from "../close-window";
 import { DealLossDialog, type LossTarget } from "./deal-loss-dialog";
 import { DealWonDialog, type WonTarget } from "./deal-won-dialog";
 import { DealStageForm } from "./deal-stage-form";
+import { DealCardFields, type CardLookups } from "./deal-card-fields";
 
 const DRAG_TYPE = "application/x-deal-id";
 
@@ -31,6 +31,9 @@ type Props = {
   stuck: Record<string, string>;
   lossReasons: LossReasonOption[];
   closeWindow: CloseWindowSetup | null;
+  // DEAL-09: the fields each card shows, in order, and the names they need
+  cardFields: string[];
+  lookups: CardLookups;
 };
 
 /**
@@ -38,7 +41,7 @@ type Props = {
  * With a mouse, cards are dragged between columns; the stage menu on every card
  * does the same with a keyboard or a touch screen.
  */
-export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, closeWindow }: Props) {
+export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, closeWindow, cardFields, lookups }: Props) {
   const [deals, moveOptimistic] = useOptimistic(board.deals, (current: BoardDeal[], move: { dealId: string; stageId: string }) =>
     current.map((deal) => (deal.id === move.dealId ? { ...deal, stageId: move.stageId } : deal)),
   );
@@ -195,24 +198,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
                             >
                               {deal.name}
                             </Link>
-                            <p className="mt-0.5 text-md font-semibold tabular-nums">{formatMoney(deal.amountAgorot)}</p>
-                            {stuck[deal.id] ? (
-                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
-                                <Badge tone="warning">תקועה</Badge>
-                                <span>{stuck[deal.id]}</span>
-                              </p>
-                            ) : null}
-                            {deal.contactId && deal.contactName ? (
-                              <p className="mt-0.5 text-sm">
-                                <Link
-                                  href={paths.contact(orgId, deal.contactId)}
-                                  draggable={false}
-                                  className="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
-                                >
-                                  {deal.contactName}
-                                </Link>
-                              </p>
-                            ) : null}
+                            <DealCardFields orgId={orgId} deal={deal} keys={cardFields} stuck={stuck[deal.id]} lookups={lookups} />
                             {canWrite ? (
                               <DealStageForm
                                 key={deal.stageId}
