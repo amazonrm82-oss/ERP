@@ -161,6 +161,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "consent:method": "צריך לכתוב איך התקבלה ההסכמה.",
   "consent:no_address": "אין ברשומה טלפון או אימייל לערוץ הזה. הוסיפו אותו קודם, ואז רשמו את ההסכמה.",
   "consent:append_only": "אי אפשר לשנות רישום הסכמה קיים. אפשר לרשום מצב חדש.",
+  // CON-07: triggers companies_parent_check / companies_parent_tree
+  "company:parent_invalid": "אי אפשר לשייך לחברה הזו: היא נמחקה, נמצאת בסל המחזור או שאין לכם גישה אליה.",
+  "company:parent_cycle": "אי אפשר לשייך חברה לעצמה או לחברה שנמצאת תחתיה.",
+  "company:parent_depth": "מבנה החברות עמוק מדי: אפשר עד 10 רמות של חברות ששייכות זו לזו.",
   // USR-04 (function sample_data_add)
   "sample:exists": "נתוני הדוגמה כבר נמצאים במערכת. אפשר למחוק אותם ולהוסיף מחדש.",
   "sample:changed": "אחת מרשומות הדוגמה השתנתה בזמן המחיקה. נסו שוב: רשומות ששיניתם לא נמחקות.",

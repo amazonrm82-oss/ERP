@@ -12,8 +12,22 @@ import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
 import { typeIdFromForm } from "@/features/record-type-options/schema";
 import { pick } from "@/lib/validation";
+import { optionalTextArg, validArg } from "@/lib/action-args";
+import { personSearchFilter } from "@/lib/search";
 
-import { COMPANY_FIELD_NAMES, companySchema } from "./schema";
+import { COMPANY_FIELD_NAMES, companySchema, parentCompanySchema } from "./schema";
+
+/** CON-07: the parent company field, only when the form has it (absent = leave the parent as it is). */
+function parentFromForm(formData: FormData): { ok: true; patch: { parent_company_id?: string | null } } | { ok: false; message: string } {
+  if (!formData.has("parent_company_id")) {
+    return { ok: true, patch: {} };
+  }
+  const parsed = parentCompanySchema.safeParse({ parent_company_id: formData.get("parent_company_id") });
+  if (!parsed.success) {
+    return { ok: false, message: "החברה שנבחרה אינה תקינה." };
+  }
+  return { ok: true, patch: parsed.data };
+}
 
 function revalidateCompany(orgId: string, companyId?: string) {
   revalidatePath(paths.companies(orgId));
@@ -41,6 +55,10 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   if (!type.ok) {
     return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
   }
+  const parent = parentFromForm(formData);
+  if (!parent.ok) {
+    return fail(parent.message, { fieldErrors: { parent_company_id: parent.message }, values: formValues(formData) });
+  }
 
   // DQL-02: a company the user can see with the same tax id, name or phone is pointed out first;
   // the user may still create the new one.
@@ -57,7 +75,7 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   // owner_id is left out: the database assigns the company to its creator.
   const { data, error } = await context.supabase
     .from("companies")
-    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
+    .insert({ organization_id: orgId, ...parsed.data, ...type.patch, ...parent.patch, ...customFieldsPatch(custom.customFields) })
     .select("id")
     .single();
   if (error) {
@@ -92,10 +110,18 @@ export async function updateCompanyAction(
   if (!type.ok) {
     return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
   }
+  const parent = parentFromForm(formData);
+  if (!parent.ok) {
+    return fail(parent.message, { fieldErrors: { parent_company_id: parent.message }, values: formValues(formData) });
+  }
+  if (parent.patch.parent_company_id === companyId) {
+    const message = "חברה לא יכולה להיות שייכת לעצמה.";
+    return fail(message, { fieldErrors: { parent_company_id: message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("companies")
-    .update({ ...parsed.data, ...type.patch, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...type.patch, ...parent.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)
@@ -123,4 +149,39 @@ export async function trashCompanyAction(orgId: string, companyId: string): Prom
   }
   revalidateCompany(orgId, companyId);
   redirect(paths.companies(orgId));
+}
+
+export type ParentCompanyHit = { id: string; name: string; city: string | null };
+
+/**
+ * CON-07: live companies the user can read that match the query, for the parent company picker
+ * (up to 10, by name). `companyId` is the company being edited, left out of the answer; "" on the
+ * create form. Whether the pick is allowed (no cycle, depth) the database decides on save.
+ */
+export async function searchParentCompaniesAction(orgId: string, companyId: string, query: string): Promise<ParentCompanyHit[]> {
+  if (!validArg(optionalTextArg(100), query) || typeof query !== "string" || query.trim().length < 2) {
+    return [];
+  }
+  const context = await actionContext(orgId, ...(companyId ? [companyId] : []));
+  if (!context.ok) {
+    return [];
+  }
+  const filter = personSearchFilter(["name", "tax_id", "city"], query.trim());
+  if (!filter) {
+    return [];
+  }
+  let request = context.supabase
+    .from("companies")
+    .select("id, name, city")
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
+    .or(filter);
+  if (companyId) {
+    request = request.neq("id", companyId);
+  }
+  const { data, error } = await request.order("name", { ascending: true }).order("id").limit(10);
+  if (error) {
+    return [];
+  }
+  return data;
 }

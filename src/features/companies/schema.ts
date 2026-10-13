@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { INDUSTRIES } from "@/features/onboarding/options";
-import { optionalEmail, optionalPhone, optionalText, requiredText } from "@/lib/validation";
+import { optionalEmail, optionalId, optionalPhone, optionalText, requiredText } from "@/lib/validation";
 
 import { ISRAEL, isCountryCode } from "./countries";
 import { companyTaxId } from "./tax-id";
@@ -59,3 +59,10 @@ export const companySchema = z.object({
   }
   return { ...data, tax_id: taxId.value };
 });
+
+/**
+ * CON-07: the parent company picked on the company form ("" = none). Kept apart from
+ * companySchema, which the import also uses: an import never sets a parent.
+ * Whether the parent may be used (readable, not in the bin, no cycle, depth) the database decides.
+ */
+export const parentCompanySchema = z.object({ parent_company_id: optionalId });

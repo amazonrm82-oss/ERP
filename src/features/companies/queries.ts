@@ -102,7 +102,7 @@ export async function getCompany(orgId: string, companyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("companies")
-    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids")
+    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids, parent_company_id")
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)
@@ -161,4 +161,55 @@ export async function listContactsOfCompany(orgId: string, companyId: string): P
     jobTitle: row.job_title,
     phone: row.phone,
   }));
+}
+
+/** How many child companies the company page lists (CON-07). */
+export const CHILD_COMPANIES_SHOWN = 20;
+
+export type CompanyLink = { id: string; name: string; city: string | null };
+export type CompanyParent =
+  // a live company the user reads
+  | { state: "live"; id: string; name: string }
+  // the parent is in the recycle bin (the link stays until it is purged)
+  | { state: "trashed"; id: string; name: string }
+  // set, but the user may not read it
+  | { state: "hidden"; id: string };
+
+/**
+ * CON-07: the company's parent and its child companies, read with the user's rights:
+ * children the user may not read are not listed and not counted.
+ */
+export async function getCompanyFamily(
+  orgId: string,
+  companyId: string,
+  parentId: string | null,
+): Promise<{ parent: CompanyParent | null; children: CompanyLink[]; childCount: number }> {
+  const supabase = await createClient();
+  const [parentResult, childResult] = await Promise.all([
+    parentId
+      ? supabase.from("companies").select("id, name, deleted_at").eq("organization_id", orgId).eq("id", parentId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("companies")
+      .select("id, name, city", { count: "exact" })
+      .eq("organization_id", orgId)
+      .eq("parent_company_id", companyId)
+      .is("deleted_at", null)
+      .order("name", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(CHILD_COMPANIES_SHOWN),
+  ]);
+  if (parentResult.error) {
+    throw new Error(`parent company query failed: ${parentResult.error.message}`);
+  }
+  if (childResult.error) {
+    throw new Error(`child companies query failed: ${childResult.error.message}`);
+  }
+  const row = parentResult.data;
+  const parent: CompanyParent | null = !parentId
+    ? null
+    : !row
+      ? { state: "hidden", id: parentId }
+      : { state: row.deleted_at ? "trashed" : "live", id: row.id, name: row.name };
+  return { parent, children: childResult.data, childCount: childResult.count ?? childResult.data.length };
 }

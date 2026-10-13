@@ -18,7 +18,8 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
-import { getCompany, listContactsOfCompany } from "@/features/companies/queries";
+import { getCompany, getCompanyFamily, listContactsOfCompany } from "@/features/companies/queries";
+import { ChildCompaniesCard } from "@/features/companies/components/child-companies-card";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { listRelatedDeals } from "@/features/deals/queries";
@@ -63,6 +64,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
   if (!company) {
     notFound();
   }
+  // CON-07: the parent and the child companies the user may read
+  const family = await getCompanyFamily(orgId, company.id, company.parent_company_id);
 
   return (
     <>
@@ -110,6 +113,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             company={{
               ...company,
               createdAtText: formatDateTime(company.created_at),
+              parent: family.parent,
               custom: { definitions: fields, values: asCustomValues(company.custom_fields) },
             }}
           />
@@ -142,6 +146,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               )}
             </CardBody>
           </Card>
+
+          <ChildCompaniesCard orgId={orgId} items={family.children} total={family.childCount} />
 
           <RelatedDealsCard
             orgId={orgId}

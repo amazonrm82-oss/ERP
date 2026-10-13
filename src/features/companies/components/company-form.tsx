@@ -26,7 +26,7 @@ export function CompanyForm({ orgId, fields, types }: { orgId: string; fields: F
       <FormGuard state={state} />
       <FormError message={failure?.message} />
       {failure?.fieldErrors?.allow_duplicate ? <DuplicateNotice href={failure.fieldErrors.allow_duplicate} createLabel="ליצור חברה חדשה בכל זאת" /> : null}
-      <CompanyFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} types={types} />
+      <CompanyFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} types={types} parent={{ orgId, companyId: "", initial: null }} />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצרים חברה…">יצירת חברה</SubmitButton>

@@ -5,6 +5,7 @@ import { RecordTypeField } from "@/features/record-type-options/components/type-
 import type { RecordType } from "@/features/record-type-options/schema";
 
 import { CompanyNumberFields } from "./company-number-fields";
+import { ParentCompanyPicker, type ParentChoice } from "./parent-company-picker";
 
 export type CompanyValues = {
   name?: string | null;
@@ -27,10 +28,12 @@ type Props = {
   // the organization's company types, and the older free-text type of the company
   types: RecordType[];
   legacyType?: string | null;
+  // CON-07: the parent company picker; the company being edited ("" on the create form)
+  parent: { orgId: string; companyId: string; initial: ParentChoice };
 };
 
 /** The fields of a company, shared by the create form and the edit form. */
-export function CompanyFields({ values, errors, types, legacyType }: Props) {
+export function CompanyFields({ values, errors, types, legacyType, parent }: Props) {
   const industry = values.industry ?? "";
   return (
     <>
@@ -85,6 +88,7 @@ export function CompanyFields({ values, errors, types, legacyType }: Props) {
         />
       </div>
       <RecordTypeField types={types} value={values.type_id} legacy={legacyType} label="סוג חברה" error={errors.type_id} className="sm:max-w-xs" />
+      <ParentCompanyPicker orgId={parent.orgId} companyId={parent.companyId} initial={parent.initial} error={errors.parent_company_id} />
       <TextField
         label="אתר"
         name="website"

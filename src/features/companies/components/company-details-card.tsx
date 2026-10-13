@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
@@ -16,10 +17,13 @@ import { CustomFieldInputs } from "@/features/custom-fields/components/custom-fi
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { RecordType } from "@/features/record-type-options/schema";
 import type { FormState } from "@/lib/action-result";
+import { paths } from "@/lib/paths";
 
 import { updateCompanyAction } from "../actions";
 import { countryName, ISRAEL } from "../countries";
+import type { CompanyParent } from "../queries";
 import { CompanyFields, type CompanyValues } from "./company-fields";
+import type { ParentChoice } from "./parent-company-picker";
 
 export type CompanyDetailsView = CompanyValues & {
   id: string;
@@ -31,7 +35,35 @@ export type CompanyDetailsView = CompanyValues & {
   createdAtText: string;
   // active custom fields and the values stored on the record
   custom: { definitions: FieldDefinition[]; values: CustomValues };
+  // CON-07
+  parent: CompanyParent | null;
 };
+
+const HIDDEN_PARENT = "חברה שאין לכם גישה אליה";
+
+/** The parent as the picker starts with it: an unchanged pick is saved as it is. */
+function parentChoice(parent: CompanyParent | null): ParentChoice {
+  if (!parent) return null;
+  if (parent.state === "hidden") return { id: parent.id, name: HIDDEN_PARENT };
+  return { id: parent.id, name: parent.state === "trashed" ? `${parent.name} (בסל המחזור)` : parent.name };
+}
+
+function ParentValue({ orgId, parent }: { orgId: string; parent: CompanyParent | null }) {
+  if (!parent) return null;
+  if (parent.state === "hidden") return <span className="text-ink-soft">{HIDDEN_PARENT}</span>;
+  if (parent.state === "trashed") {
+    return (
+      <span>
+        <bdi>{parent.name}</bdi> <span className="text-ink-soft">(בסל המחזור)</span>
+      </span>
+    );
+  }
+  return (
+    <Link href={paths.company(orgId, parent.id)} className="text-accent underline underline-offset-4">
+      <bdi>{parent.name}</bdi>
+    </Link>
+  );
+}
 
 type Props = { orgId: string; company: CompanyDetailsView; types: RecordType[]; canEdit: boolean; focus?: string | null };
 
@@ -63,6 +95,7 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit, focus }: Pr
       <CardBody>
         <DetailList>
           <Detail label="סוג" value={company.typeName ?? company.company_type} />
+          <Detail label="שייכת ל" value={company.parent ? <ParentValue orgId={orgId} parent={company.parent} /> : null} />
           {/* CON-04: the country only when it is not Israel */}
           {israeli ? null : <Detail label="מדינת הרישום" value={countryName(company.country)} />}
           <Detail label={israeli ? "ח.פ." : "מספר רישום"} value={company.tax_id} ltr />
@@ -108,7 +141,13 @@ function CompanyEditForm({ orgId, company, types, onDone }: { orgId: string; com
         <form action={formAction} className="space-y-4" noValidate>
           <FormGuard state={state} />
           <FormError message={failure?.message} />
-          <CompanyFields values={failure?.values ?? company} errors={failure?.fieldErrors ?? {}} types={types} legacyType={company.company_type} />
+          <CompanyFields
+            values={failure?.values ?? company}
+            errors={failure?.fieldErrors ?? {}}
+            types={types}
+            legacyType={company.company_type}
+            parent={{ orgId, companyId: company.id, initial: parentChoice(company.parent) }}
+          />
           <CustomFieldInputs
             definitions={company.custom.definitions}
             stored={company.custom.values}
