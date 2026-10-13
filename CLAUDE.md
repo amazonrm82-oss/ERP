@@ -524,7 +524,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   used product is archived, not removed). The unit price rule is `unitPriceFor()` in `src/features/price-lists/price.ts` (no SQL
   mirror yet; PL-03 decides). Quota triggers start with `if auth.uid() is not null and not app.is_admin(org) then return new`,
   so an outsider gets RLS's plain 42501 and learns nothing about another org's plan; every new quota trigger does the same.
-  Owner: one "prices include VAT" setting per list (follow-up), defaulting to the business's setting, locked once it has prices.
+  Since 0169 `price_lists.prices_include_vat` (owner: one setting per list): defaults from the business setting on insert
+  (`price_lists_vat`, invoker), locked once the list has any line (hint `price_lists:vat_locked`, every writer); each line's
+  `price_includes_vat` is set from its list by `price_list_lines_vat` (definer, FOR SHARE on the list; clients no longer write it).
 - Response target and pass-on (CAP-10, SPD-03, migrations 0167, 0168): `public.lead_response_settings` (one row per org, no row =
   60 minutes and 'notify'; members read, owners/admins of a writable org write; audited): `target_minutes` 5..1440, `breach_action`
   notify|pass_on|none, `max_passes` 1..5 (default 2). 'pass_on' needs the flag `auto_reassign` when chosen (definer trigger with the
