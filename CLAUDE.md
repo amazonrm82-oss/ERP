@@ -505,6 +505,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `crm-rotation-waiting` (every minute, `app.assign_waiting_rotation_leads()`, fair per org: 50 per org, 500 per run, per-row
   exception block) gives it to the first member back in hours; a lead taken meanwhile is left alone; 14 days then given up.
   `take_lead` never moves the rotation pointer. A new redefinition of `intake_submit` must keep the `v_rotation_closed` lines.
+- Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
+  `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
+  `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
+  no row or 'auto' = the 0029 same-label rule, skipping any field a 'field' row claims; 'field' copies only to that field
+  while active and of the same type, no fall back. A deleted target: the FK clears it, the trigger sets mode 'none' and
+  `target_removed` (server-only), the screen and a settings reminder show it (owner); hiding a mapped target asks first.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
