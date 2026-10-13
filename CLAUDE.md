@@ -297,6 +297,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   clears the `lost_reason` text only on insert or a move out of lost, copies the picked reason's name into `lost_reason`, and
   lets a person pick only an active reason (hint `deal:lost_reason`). Picking is optional. `report_lost_reasons` adds
   `by_competitor`. Bulk undo of a stage change restores the reason.
+- New-lead push (SPD-01, migration 0122): `leads.taken_at` (server only; trigger `leads_reset_taken` clears it when the owner
+  changes). `public.take_lead(org, lead)` (security definer; active owner/admin/manager/member of a writable org who reads the
+  lead; open, unconverted, not in the bin): no owner → the caller becomes owner (first wins, `where owner_id is null`); own
+  lead → `taken_at` once; else `{ok:false, reason:'taken'|'closed'}`. `claim_push_notifications()` adds `type` and
+  `lead_actions`; `src/features/notifications/push-payload.ts` builds the payload (no phone); `public/sw.js` shows up to
+  `Notification.maxActions` buttons, "take" posts to `/o/[org]/leads/[id]/take` (user's cookies, header `x-crm-take: 1`),
+  a body tap opens `/o/[org]/leads/[id]/respond`. Waiting screen (owner, 13 October): a taken lead stays only for the taker,
+  owners/admins and managers of its team or a parent team (`takenLeadsFilter`), marked "נלקח על ידי …"; the clock and
+  "answered" are unchanged. A test that re-runs a migration must re-run the later ones that redefine the same function.
 - Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
   CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
