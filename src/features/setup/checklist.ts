@@ -41,7 +41,8 @@ const ITEMS: { key: ChecklistKey; title: string; hint: string; href: (orgId: str
   { key: "realDeal", title: "עסקה ראשונה", hint: "עסקה בפייפליין", href: paths.dealNew },
   { key: "teamInvited", title: "הזמנת הצוות", hint: "עובד אחד לפחות", href: paths.settingsUsers },
   { key: "importDone", title: "ייבוא מקובץ", hint: "לקוחות מאקסל או ממערכת קודמת", href: paths.importNew },
-  { key: "pushOn", title: "התראות בטלפון", hint: "ליד חדש מגיע אליכם מיד", href: paths.notifications },
+  // GAP-01: the item shows this device's state and a test button; it is done when the user has push on in any browser
+  { key: "pushOn", title: "קבלת התראות במכשיר הזה", hint: "ליד חדש מגיע אליכם מיד. אפשר לשלוח התראת בדיקה ולראות שהיא מגיעה.", href: paths.notifications },
 ];
 
 export const CHECKLIST_ITEM_COUNT = ITEMS.length;

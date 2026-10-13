@@ -1294,6 +1294,8 @@ export type Database = {
       calendar_feed_create: { Args: { p_org: string }; Returns: string };
       calendar_feed_revoke: { Args: { p_org: string }; Returns: undefined };
       calendar_feed_events: { Args: { p_token: string }; Returns: Json };
+      // GAP-01: a test notification to the caller; { ok: true } | { ok: false, reason: "rate", retry_seconds }
+      send_test_notification: { Args: { p_org: string }; Returns: Json };
       // FLD-05: adds an industry template's missing lists; { added: {...counts}, limits: ["limit:<key>"] }
       apply_industry_template: { Args: { p_org: string; p_industry: string }; Returns: Json };
       // REC-02: who a note on this record may mention (active members who may see it, not the caller)

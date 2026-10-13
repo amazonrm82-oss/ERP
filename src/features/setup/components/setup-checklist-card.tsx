@@ -26,7 +26,7 @@ export function SetupChecklistCard({ orgId, checklist }: Props) {
         }
       />
       <CardBody className="space-y-4">
-        <SetupChecklist items={checklist.items} labelledBy="setup-checklist-title" />
+        <SetupChecklist orgId={orgId} items={checklist.items} labelledBy="setup-checklist-title" />
         <div className="border-t border-line pt-4">
           <SampleDataControls orgId={orgId} removable={counts.removable} kept={counts.kept} />
         </div>

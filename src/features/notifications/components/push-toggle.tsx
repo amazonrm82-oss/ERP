@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 import { deletePushSubscriptionAction, savePushSubscriptionAction } from "../actions";
+import { PUSH_CHANGED_EVENT } from "../device";
 
 type State = "loading" | "unsupported" | "unconfigured" | "denied" | "off" | "on";
 
@@ -76,6 +77,8 @@ export function PushToggle({ orgId }: { orgId: string }) {
       setError("לא הצלחנו להפעיל התראות בדפדפן הזה. נסו שוב.");
     } finally {
       setBusy(false);
+      // the "this device will not get notifications" bar checks again (GAP-01)
+      window.dispatchEvent(new Event(PUSH_CHANGED_EVENT));
     }
   }
 
@@ -98,6 +101,8 @@ export function PushToggle({ orgId }: { orgId: string }) {
       setError("לא הצלחנו לבטל את ההתראות. נסו שוב.");
     } finally {
       setBusy(false);
+      // the "this device will not get notifications" bar checks again (GAP-01)
+      window.dispatchEvent(new Event(PUSH_CHANGED_EVENT));
     }
   }
 

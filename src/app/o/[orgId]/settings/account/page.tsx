@@ -11,6 +11,7 @@ import { CalendarFeedCard } from "@/features/calendar-feed/components/calendar-f
 import { getCalendarFeedStatus } from "@/features/calendar-feed/queries";
 import { getSignedVersion } from "@/features/legal/queries";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
+import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
 import { getNotificationSettings } from "@/features/notifications/queries";
 import { AvatarPicker } from "@/features/profile/components/avatar-picker";
 import { ProfileForm } from "@/features/profile/components/profile-form";
@@ -85,8 +86,15 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
 
       <Card aria-labelledby="account-notifications" className="lg:col-span-2">
         <CardHeader id="account-notifications" title="התראות" />
-        <CardBody>
+        <CardBody className="space-y-5">
           <NotificationSettingsForm orgId={orgId} settings={notificationSettings} />
+          {/* a support session is not a member: nothing to send to */}
+          {supportUntil ? null : (
+            <div className="space-y-2 border-t border-line pt-4">
+              <p className="text-sm text-ink-soft">רוצים לוודא שההתראות מגיעות? שלחו לעצמכם התראת בדיקה.</p>
+              <TestNotificationButton orgId={orgId} />
+            </div>
+          )}
         </CardBody>
       </Card>
 

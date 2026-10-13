@@ -1,14 +1,16 @@
 import Link from "next/link";
 
 import { CheckIcon } from "@/components/ui/icons";
+import { DeviceStatus } from "@/features/notifications/components/device-warning";
+import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
 import { cn } from "@/lib/cn";
 
 import { checklistProgress, type ChecklistItem } from "../checklist";
 
-type Props = { items: ChecklistItem[]; labelledBy: string };
+type Props = { orgId: string; items: ChecklistItem[]; labelledBy: string };
 
 /** The setup checklist (USR-04): a progress bar with the percentage, and each item with a link to where it is done. */
-export function SetupChecklist({ items, labelledBy }: Props) {
+export function SetupChecklist({ orgId, items, labelledBy }: Props) {
   const { done, total, percent } = checklistProgress(items);
   return (
     <div>
@@ -39,7 +41,7 @@ export function SetupChecklist({ items, labelledBy }: Props) {
             >
               <CheckIcon className="size-4" />
             </span>
-            <span className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1">
               {item.done ? (
                 <span className="block text-ink-soft line-through decoration-line-strong">{item.title}</span>
               ) : (
@@ -48,7 +50,14 @@ export function SetupChecklist({ items, labelledBy }: Props) {
                 </Link>
               )}
               <span className="block text-sm text-ink-soft">{item.hint}</span>
-            </span>
+              {/* GAP-01: whether this device gets notifications, and a test to prove it */}
+              {item.key === "pushOn" ? (
+                <div className="mt-2 space-y-2">
+                  <DeviceStatus />
+                  <TestNotificationButton orgId={orgId} />
+                </div>
+              ) : null}
+            </div>
             <span className="sr-only">{item.done ? "בוצע" : "עוד לא"}</span>
           </li>
         ))}

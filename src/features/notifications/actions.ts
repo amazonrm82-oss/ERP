@@ -10,6 +10,7 @@ import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
 import { NOTIFICATION_KINDS } from "./settings";
+import { parseTestSendResult, TEST_SENT_MESSAGE, testRateMessage } from "./test-send";
 
 function revalidateNotifications(orgId: string) {
   // the bell keeps its own state; only the full list is re-read
@@ -102,4 +103,29 @@ export async function saveNotificationSettingsAction(orgId: string, _prev: FormS
   }
   revalidatePath(paths.settingsAccount(orgId));
   return { ok: true, message: "ההעדפות נשמרו." };
+}
+
+/**
+ * GAP-01: sends the signed-in user a test notification in this organization.
+ * The database writes it (kind 'system', to the caller only) and limits it to
+ * 3 per 10 minutes; the bell and the phone push deliver it the normal way.
+ */
+export async function sendTestNotificationAction(orgId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase.rpc("send_test_notification", { p_org: orgId });
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשלוח התראת בדיקה. נסו שוב."));
+  }
+  const result = parseTestSendResult(data);
+  if (!result) {
+    return fail("לא הצלחנו לשלוח התראת בדיקה. נסו שוב.");
+  }
+  if (!result.ok) {
+    return fail(testRateMessage(result.retry_seconds));
+  }
+  revalidateNotifications(orgId);
+  return { ok: true, message: TEST_SENT_MESSAGE };
 }

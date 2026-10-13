@@ -12,6 +12,7 @@ import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { idleText, meetingSpanText } from "@/features/home/my-day";
 import { getMyDay } from "@/features/home/queries";
+import { DeviceWarning } from "@/features/notifications/components/device-warning";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -80,6 +81,7 @@ export default async function HomePage({ params }: Props) {
       <PageHeader title="היום שלי" description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`} />
       {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
       {checklist && !checklist.hidden ? <SetupChecklistCard orgId={orgId} checklist={checklist} /> : null}
+      <DeviceWarning orgId={orgId} />
 
       <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         {summary.map((item) => (

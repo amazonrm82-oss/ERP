@@ -46,7 +46,7 @@ export default async function SetupChecklistPage({ params }: Props) {
         />
         <CardBody>
           <p className="mb-4 text-md text-ink-soft">כל שלב מסומן לבד כשהוא נעשה. נתוני דוגמה לא נחשבים.</p>
-          <SetupChecklist items={checklist.items} labelledBy="checklist-title" />
+          <SetupChecklist orgId={orgId} items={checklist.items} labelledBy="checklist-title" />
         </CardBody>
       </Card>
 

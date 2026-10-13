@@ -109,6 +109,8 @@ const OWN_MESSAGES: Array<[RegExp, string]> = [
   // CAL-01: trigger meetings_check_links
   [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה."],
   [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק."],
+  // CAL-07, GAP-01: hint org:suspended (a suspended, cancelled or deleted organization)
+  [/the organization is not active/i, `העסק אינו פעיל כרגע. לבירור: ${SUPPORT_LINE}.`],
   [/not allowed to change the meeting organizer/i, "רק מי שמארגן את הפגישה, מי שקבע אותה, בעלי העסק ומנהלי המערכת יכולים לקבוע מי מארגן אותה."],
 ];
 

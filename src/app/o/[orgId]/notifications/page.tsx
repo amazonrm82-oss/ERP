@@ -7,8 +7,10 @@ import { BellIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { markNotificationsReadAction } from "@/features/notifications/actions";
+import { DeviceWarning } from "@/features/notifications/components/device-warning";
 import { NotificationList } from "@/features/notifications/components/notification-list";
 import { PushToggle } from "@/features/notifications/components/push-toggle";
+import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
 import { listNotifications } from "@/features/notifications/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
@@ -19,7 +21,7 @@ const SHOWN = 100;
 
 export default async function NotificationsPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { user } = await getOrgContext(orgId);
+  const { user, supportUntil } = await getOrgContext(orgId);
   const items = await listNotifications(orgId, user.id, SHOWN);
   const hasUnread = items.some((item) => !item.read);
 
@@ -36,6 +38,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
           ) : null
         }
       />
+      <DeviceWarning orgId={orgId} linkToSwitch={false} />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card aria-labelledby="notifications-list">
           <CardHeader id="notifications-list" title="אחרונות" />
@@ -51,6 +54,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
           <CardBody className="space-y-3">
             <p className="text-sm text-ink-soft">כל התראה כאן תקפוץ גם בטלפון או במחשב, גם כשהמערכת סגורה. ההגדרה היא לכל דפדפן בנפרד.</p>
             <PushToggle orgId={orgId} />
+            {supportUntil ? null : <TestNotificationButton orgId={orgId} />}
             <p className="text-sm">
               <Link href={paths.settingsAccount(orgId)} className="text-accent-strong underline underline-offset-4">
                 בחירה אילו התראות לקבל
