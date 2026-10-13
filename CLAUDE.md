@@ -301,9 +301,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `UTM_KEYS` = the trigger's `v_classic` (unit test). Click ids, referrer and landing URL stay server-only.
 - Activation (GAP-06, migration 0116): `app.org_activation` (one row per org, times only, no API access) is set once by
   trigger `activities_activation` (`app.mark_org_activation()`): a person's contact entry (rule of `stamp_last_contact`) on a
-  lead not imported and not in the bin, within 24 hours of `least(lead.created_at, now())`. Never cleared; the migration
+  lead not imported, not in the bin and not sample data (0118), within 24 hours of `least(lead.created_at, now())`. Never cleared; the migration
   filled it from the timeline. `platform_list_orgs` / `platform_org` / `platform_metrics` show it. USR-04 sample leads must
   be excluded once they have a marker.
+- Setup checklist and sample data (USR-04, migrations 0105, 010510 pasted by hand, 0118): `app.sample_records` notes each sample
+  row with a snapshot; `public.sample_data_add/records/remove(org)` (owner/admin, writable org). Removal deletes only rows that are
+  untouched (`app.sample_untouched()`: row equals its snapshot and nothing real links to it: activities, files, meetings,
+  non-sample tasks, form submissions, deal contacts, conversions, contact channels); guard triggers `*_guard_sample_removal`.
+  A new table that links to leads, contacts, companies or deals must also be checked in `app.sample_untouched()`. Sample leads
+  never count for activation (GAP-06).
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
