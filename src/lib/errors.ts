@@ -54,6 +54,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "reasons:max": "אפשר לשמור עד 50 סיבות. מחקו סיבה שלא בשימוש כדי להוסיף חדשה.",
   // DEAL-03 (migration deal_loss_reasons)
   "deal:lost_reason": "הסיבה שנבחרה כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
+  // DEAL-04 (migration deal_close_window)
+  "deal:closed_at": "תאריך הסגירה לא יכול להיות בעתיד.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

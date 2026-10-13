@@ -14,6 +14,7 @@ import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
+import { closeWindowSetup } from "@/features/deals/close-window";
 import { DealsTable } from "@/features/deals/components/deals-table";
 import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, FILTERED_TOTALS_LIMIT, getBoard, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
@@ -229,6 +230,14 @@ export default async function DealsPage({ params, searchParams }: Props) {
         canWrite={canWrite}
         stuck={stuck}
         lossReasons={activeLossReasons(lossReasons)}
+        closeWindow={
+          canWrite
+            ? closeWindowSetup(
+                members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+                context.org.timeZone,
+              )
+            : null
+        }
         hrefs={{
           showClosed: boardHref({ closed: "1" }),
           ...Object.fromEntries(board.stages.map((stage) => [stage.id, boardHref({ stage: stage.id })])),
@@ -350,6 +359,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           editing={editing}
           tags={tags}
           lossReasons={activeLossReasons(lossReasons).map((reason) => reason.name)}
+          closeWindow={context.canWrite ? closeWindowSetup(editing.owners, context.org.timeZone) : null}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

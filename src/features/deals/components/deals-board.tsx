@@ -12,7 +12,9 @@ import { paths } from "@/lib/paths";
 import { dropDealAction } from "../actions";
 import type { Board, BoardDeal } from "../queries";
 import { STAGE_RULE, stageTone } from "../stage-colors";
+import { entersWon, type CloseWindowSetup } from "../close-window";
 import { DealLossDialog, type LossTarget } from "./deal-loss-dialog";
+import { DealWonDialog, type WonTarget } from "./deal-won-dialog";
 import { DealStageForm } from "./deal-stage-form";
 
 const DRAG_TYPE = "application/x-deal-id";
@@ -20,14 +22,23 @@ const DRAG_TYPE = "application/x-deal-id";
 // links built by the page: "showClosed", and one per stage id that opens that stage in full
 // stuck: open deal id -> why it is stuck (DEAL-02)
 // lossReasons: the active loss reasons, asked for after a deal is dropped on a lost stage (DEAL-03)
-type Props = { orgId: string; board: Board; canWrite: boolean; hrefs: Record<string, string>; stuck: Record<string, string>; lossReasons: LossReasonOption[] };
+// closeWindow: what the close window needs when a deal moves into a won stage (DEAL-04); null for a viewer
+type Props = {
+  orgId: string;
+  board: Board;
+  canWrite: boolean;
+  hrefs: Record<string, string>;
+  stuck: Record<string, string>;
+  lossReasons: LossReasonOption[];
+  closeWindow: CloseWindowSetup | null;
+};
 
 /**
  * Kanban board: one column per stage, in pipeline order (first stage on the start side).
  * With a mouse, cards are dragged between columns; the stage menu on every card
  * does the same with a keyboard or a touch screen.
  */
-export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }: Props) {
+export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, closeWindow }: Props) {
   const [deals, moveOptimistic] = useOptimistic(board.deals, (current: BoardDeal[], move: { dealId: string; stageId: string }) =>
     current.map((deal) => (deal.id === move.dealId ? { ...deal, stageId: move.stageId } : deal)),
   );
@@ -37,6 +48,8 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }
   const [announcement, setAnnouncement] = useState("");
   // a deal just dropped on a lost stage: why it was lost, and to whom (optional)
   const [lossFor, setLossFor] = useState<LossTarget | null>(null);
+  // a deal dropped on a won stage: it moves only once the close window is confirmed (DEAL-04)
+  const [wonFor, setWonFor] = useState<WonTarget | null>(null);
 
   function onDrop(event: DragEvent, stageId: string) {
     event.preventDefault();
@@ -48,6 +61,11 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }
       return;
     }
     setError(null);
+    const fromKind = board.stages.find((item) => item.id === deal.stageId)?.kind;
+    if (closeWindow && entersWon(fromKind, stage.kind)) {
+      setWonFor({ dealId: deal.id, dealName: deal.name, stageId: stage.id, stageName: stage.name, amountAgorot: deal.amountAgorot, ownerId: deal.ownerId });
+      return;
+    }
     startTransition(async () => {
       moveOptimistic({ dealId, stageId });
       const result = await dropDealAction(orgId, dealId, stageId);
@@ -74,6 +92,15 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }
         {announcement}
       </p>
       <DealLossDialog orgId={orgId} target={lossFor} reasons={lossReasons} onClose={() => setLossFor(null)} />
+      {wonFor && closeWindow ? (
+        <DealWonDialog
+          orgId={orgId}
+          target={wonFor}
+          setup={closeWindow}
+          onClose={() => setWonFor(null)}
+          onDone={(target) => setAnnouncement(`העסקה ${target.dealName} נסגרה בהצלחה ועברה לשלב ${target.stageName}.`)}
+        />
+      ) : null}
       {/* Scrolls sideways on its own, so the page never does. Focusable for keyboard scrolling.
           `relative` matters: without it the visually-hidden (absolutely positioned)
           labels inside off-screen columns escape the scroller and widen the page. */}
@@ -197,6 +224,9 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons }
                                 lossReasons={lossReasons}
                                 competitor={deal.competitor}
                                 lossReason={deal.lossReason}
+                                closeWindow={closeWindow}
+                                amountAgorot={deal.amountAgorot}
+                                ownerId={deal.ownerId}
                               />
                             ) : null}
                           </li>

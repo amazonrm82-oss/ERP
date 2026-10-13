@@ -13,6 +13,8 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import { DEAL_STATUS } from "../display";
+import { DealStageCell } from "./deal-stage-cell";
+import type { CloseWindowSetup } from "./deal-won-dialog";
 import type { DealListItem, StageOption } from "../queries";
 
 type Props = {
@@ -29,10 +31,12 @@ type Props = {
   tags: TagOption[];
   // DEAL-03: the names of the active loss reasons, offered when a deal moves to a lost stage
   lossReasons: string[];
+  // DEAL-04: what the close window needs when a deal moves into a won stage; null for a viewer
+  closeWindow: CloseWindowSetup | null;
 };
 
 /** A pipeline's deals as a table (LST-09): the same columns, sorting, editing in the cell and bulk actions as the other lists. */
-export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags, lossReasons }: Props) {
+export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags, lossReasons, closeWindow }: Props) {
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   // a lost stage offers a reason, when the organization has any (optional)
   const stageOptions = stages.map((stage) => ({ value: stage.id, label: stage.name, needsReason: stage.kind === "lost" && lossReasons.length > 0 }));
@@ -88,20 +92,16 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
               return <span className="whitespace-nowrap">{formatMoney(deal.amountAgorot)}</span>;
             case "stage":
               return (
-                <InlineEdit
+                <DealStageCell
                   orgId={orgId}
-                  object="deal"
-                  id={deal.id}
-                  field="stage"
-                  kind="select"
-                  label={`שלב: ${deal.name}`}
-                  initial={{ id: deal.stageId }}
-                  options={stageOptions}
-                  reasons={lossReasons}
+                  deal={{ id: deal.id, name: deal.name, stageId: deal.stageId, amountAgorot: deal.amountAgorot, ownerId: deal.ownerId }}
+                  stages={stages}
+                  lossReasons={lossReasons}
+                  closeWindow={closeWindow}
                   canEdit={editing.canEdit(deal.ownerId)}
                 >
                   {stageById.get(deal.stageId)?.name ?? null}
-                </InlineEdit>
+                </DealStageCell>
               );
             case "status":
               return <Badge tone={DEAL_STATUS[deal.status].tone}>{DEAL_STATUS[deal.status].label}</Badge>;

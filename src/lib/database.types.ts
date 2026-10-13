@@ -821,6 +821,8 @@ export type DealInsert = {
   amount_agorot?: number;
   currency?: string;
   expected_close_date?: string | null;
+  // DEAL-04: the close window's date; cleared on an open deal, never more than a day ahead (deals_sync_stage_close)
+  closed_at?: string | null;
   lost_reason?: string | null;
   lost_reason_id?: string | null;
   competitor?: string | null;

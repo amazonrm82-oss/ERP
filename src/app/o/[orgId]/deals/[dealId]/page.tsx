@@ -27,10 +27,12 @@ import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
 import { stageTone } from "@/features/deals/stage-colors";
 import { getStuckDeals } from "@/features/deals/stuck";
+import { closeWindowSetup } from "@/features/deals/close-window";
+import { listMembers } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
-import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
@@ -62,9 +64,14 @@ export default async function DealPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, deal.owner_id);
-  const [contacts, companies] = canEdit
-    ? await Promise.all([listContactOptions(orgId), listCompanyOptions(orgId)])
-    : [[], []];
+  const [contacts, companies, members] = canEdit
+    ? await Promise.all([listContactOptions(orgId), listCompanyOptions(orgId), listMembers(orgId)])
+    : [[], [], []];
+  // DEAL-04: the close window of a move into a won stage; the onboarding task goes to an active member who writes
+  const closeWindow = closeWindowSetup(
+    members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+    context.org.timeZone,
+  );
   const stuckReason = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
@@ -137,6 +144,9 @@ export default async function DealPage({ params, searchParams }: Props) {
                   lossReasons={lossOptions}
                   competitor={deal.competitor}
                   lossReason={lossReason ? { id: lossReason.id, name: lossReason.name } : null}
+                  closeWindow={closeWindow}
+                  amountAgorot={amount}
+                  ownerId={deal.owner_id}
                 />
               ) : null}
             </CardBody>
@@ -163,7 +173,8 @@ export default async function DealPage({ params, searchParams }: Props) {
               amountInput: amount % 100 === 0 ? String(amount / 100) : (amount / 100).toFixed(2),
               expectedCloseDate: deal.expected_close_date,
               expectedCloseText: deal.expected_close_date ? formatDate(deal.expected_close_date) : null,
-              closedAtText: deal.closed_at ? formatDateTime(deal.closed_at) : null,
+              // DEAL-04: a day the close window picked is kept at midday, so the day is shown, not the hour
+              closedAtText: deal.closed_at ? formatDate(zoneDate(new Date(deal.closed_at), context.org.timeZone)) : null,
               ownerName: deal.ownerName,
               createdAtText: formatDateTime(deal.created_at),
               custom: { definitions: fields, values: asCustomValues(deal.custom_fields) },

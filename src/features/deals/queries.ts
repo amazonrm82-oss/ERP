@@ -18,6 +18,8 @@ export type BoardDeal = {
   stageId: string;
   contactId: string | null;
   contactName: string | null;
+  // DEAL-04: the onboarding task's default owner in the close window
+  ownerId: string | null;
   // DEAL-03: kept when the deal is moved to a lost stage from the board
   competitor: string | null;
   // DEAL-03: the picked loss reason (name as stored on the deal), the default when it moves again
@@ -145,7 +147,7 @@ export async function getBoard(
       narrow(
         supabase
           .from("deals")
-          .select("id, name, amount_agorot, stage_id, contact_id, competitor, lost_reason_id, lost_reason")
+          .select("id, name, amount_agorot, stage_id, contact_id, owner_id, competitor, lost_reason_id, lost_reason")
           .eq("organization_id", orgId)
           .eq("pipeline_id", pipeline.id)
           .eq("stage_id", stageId)
@@ -208,6 +210,7 @@ export async function getBoard(
       stageId: row.stage_id,
       contactId: row.contact_id,
       contactName: row.contact_id ? (contactNames.get(row.contact_id) ?? null) : null,
+      ownerId: row.owner_id,
       competitor: row.competitor,
       lossReason: row.lost_reason_id ? { id: row.lost_reason_id, name: row.lost_reason ?? "" } : null,
     })),

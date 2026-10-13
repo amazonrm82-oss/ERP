@@ -11,9 +11,12 @@ import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
 import { isUuid } from "@/lib/paths";
 import { pick } from "@/lib/validation";
+import { TIME_ZONE } from "@/lib/app";
+import { zoneDate, zonedIso } from "@/lib/format";
 
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 
+import { closedAtFor, parseCloseWon } from "./close-window";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 
 function revalidateDeal(orgId: string, dealId?: string) {
@@ -159,6 +162,89 @@ export async function setDealLossAction(orgId: string, dealId: string, _prev: Fo
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidateDeal(orgId, dealId);
+  return ok();
+}
+
+const CLOSE_TASK_FAILED = "העסקה סומנה כזכייה, אבל משימת הקליטה לא נוצרה. אפשר לנסות שוב, או לסגור ולהוסיף משימה מדף העסקה.";
+
+/**
+ * DEAL-04, the close window: moves a deal into a won stage with the confirmed
+ * amount and close date, then, when asked, adds an onboarding task linked to the
+ * deal (and to its contact and company when the user can see them), all with the
+ * user's session. The deal is not moved until the form is sent; cancelling leaves it.
+ */
+export async function closeDealWonAction(orgId: string, dealId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId, stageId);
+  if (!context.ok) {
+    return context;
+  }
+  const { supabase } = context;
+  const values = { values: formValues(formData) };
+
+  const [{ data: org, error: orgError }, { data: stage, error: stageError }] = await Promise.all([
+    supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(),
+    supabase.from("stages").select("id, kind").eq("organization_id", orgId).eq("id", stageId).maybeSingle(),
+  ]);
+  if (orgError) return fail(dbErrorMessage(orgError), values);
+  if (stageError) return fail(dbErrorMessage(stageError), values);
+  if (!org) return fail(NOT_FOUND_OR_FORBIDDEN);
+  if (!stage || stage.kind !== "won") return fail(STAGE_GONE, values);
+
+  const timeZone = org.timezone || TIME_ZONE;
+  const now = new Date();
+  const today = zoneDate(now, timeZone);
+  const parsed = parseCloseWon(formData, today);
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const close = parsed.data;
+
+  const { data: moved, error } = await supabase
+    .from("deals")
+    .update({ stage_id: stageId, amount_agorot: close.amount, closed_at: closedAtFor(close.closedDate, today, now, timeZone) })
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .is("deleted_at", null)
+    .select("id, contact_id, company_id");
+  if (error) {
+    return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו לסגור את העסקה. נסו שוב."), values);
+  }
+  if (moved.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateDeal(orgId, dealId);
+
+  if (close.task) {
+    const deal = moved[0];
+    // a task may link only records the user can see (tasks_insert, migration 0074): link the
+    // deal's contact and company only when they can be read with this session
+    const [contact, company] = await Promise.all([
+      deal.contact_id
+        ? supabase.from("contacts").select("id").eq("organization_id", orgId).eq("id", deal.contact_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      deal.company_id
+        ? supabase.from("companies").select("id").eq("organization_id", orgId).eq("id", deal.company_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    // the window offers the deal's owner first; no choice: the task is the user's (database default)
+    const owner = close.task.ownerId;
+    const { error: taskError } = await supabase.from("tasks").insert({
+      organization_id: orgId,
+      title: close.task.title,
+      task_type: "todo",
+      priority: 2,
+      // a day without a time is due at the start of the working day, like the task form
+      due_at: close.task.dueDate ? zonedIso(close.task.dueDate, "09:00:00", timeZone) : null,
+      deal_id: dealId,
+      contact_id: !contact.error && contact.data ? contact.data.id : null,
+      company_id: !company.error && company.data ? company.data.id : null,
+      ...(owner ? { owner_id: owner } : {}),
+    });
+    if (taskError) {
+      return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(taskError)})`, values);
+    }
+    revalidatePath(paths.tasks(orgId));
+  }
   return ok();
 }
 

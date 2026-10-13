@@ -10,7 +10,8 @@ import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/
 
 import { inlineEditAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
 
-export type InlineOption = { value: string; label: string; needsReason?: boolean };
+// opensWindow: saving this choice hands it to onWindow instead (a deal entering a won stage, DEAL-04)
+export type InlineOption = { value: string; label: string; needsReason?: boolean; opensWindow?: boolean };
 
 type Props = {
   orgId: string;
@@ -30,6 +31,8 @@ type Props = {
   canEdit: boolean;
   // a choice that needs a reason: the organization's list (LEAD-03); empty: typed in freely
   reasons?: string[];
+  // a choice marked opensWindow: the cell closes and this takes over (it saves, or not, itself)
+  onWindow?: (value: string) => void;
 };
 
 /**
@@ -37,7 +40,7 @@ type Props = {
  * Enter saves and Escape cancels. The database decides whether the change is
  * allowed; the pencil is only a hint for who may edit.
  */
-export function InlineEdit({ orgId, object, id, field, children, label, kind, initial, options = [], emptyOption, canEdit, reasons = [] }: Props) {
+export function InlineEdit({ orgId, object, id, field, children, label, kind, initial, options = [], emptyOption, canEdit, reasons = [], onWindow }: Props) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState<InlineValue>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -50,15 +53,23 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
 
   const chosen = options.find((option) => option.value === value.id);
 
-  function close() {
+  function close(then?: () => void) {
     setEditing(false);
     setError(null);
-    // back to the pencil, so the keyboard user stays in place
-    requestAnimationFrame(() => pencil.current?.focus());
+    // back to the pencil, so the keyboard user stays in place (and a window opened next returns there)
+    requestAnimationFrame(() => {
+      pencil.current?.focus();
+      then?.();
+    });
   }
 
   function save() {
     setError(null);
+    if (chosen?.opensWindow && onWindow) {
+      const choice = chosen.value;
+      close(() => onWindow(choice));
+      return;
+    }
     startTransition(async () => {
       const result = await inlineEditAction(orgId, object, id, field, value);
       if (result.ok) close();
@@ -143,7 +154,7 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
         <Button type="submit" size="sm" disabled={pending} aria-busy={pending || undefined}>
           {pending ? "שומרים…" : "שמירה"}
         </Button>
-        <Button variant="ghost" size="sm" disabled={pending} onClick={close}>
+        <Button variant="ghost" size="sm" disabled={pending} onClick={() => close()}>
           ביטול
         </Button>
       </div>
