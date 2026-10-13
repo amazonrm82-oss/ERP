@@ -207,6 +207,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - List columns (migration 0033): `public.list_preferences` (organization, user from the session, list,
   `columns` jsonb), own rows only. `src/features/list-columns/` holds the catalog (built-in + `cf:<key>`
   custom fields), the panel and `ListTable`; custom field columns sort by `custom_fields->key`.
+- Board card fields (DEAL-09, migration 0126): `list_preferences.object_type` also takes `'deal_board'` (same shape, own rows).
+  Catalog and rules in `src/features/deals/board-fields.ts` (max 8, default amount/stuck/contact); `ColumnsPanel` takes
+  `widths={false}`, `max` and `texts`; the list-columns actions accept `deal_board`. `getBoard` reads company names and next
+  tasks only for chosen fields.
 - Advanced filters (LST-05, no migration): `src/features/list-filters/`. The tree travels as JSON in `f=`;
   `filterToPostgrest()` checks every field/op/value against the list's fields and builds one PostgREST
   logic tree for `.or()`. Values are double-quoted with `"` and `\` removed; ids must be in the options.
