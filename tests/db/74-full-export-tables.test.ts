@@ -22,7 +22,6 @@ const LEFT_OUT: Record<string, string> = {
   list_preferences: "a person's screen settings",
   memberships: "people come in as names next to their ids",
   notifications: "a person's bell",
-  org_calendar_settings: "not yet (follow-up of CAL-03)",
   org_usage: "server counters",
   outbox_events: "engine queue",
   record_followers: "a person's choice",
@@ -82,6 +81,7 @@ describe("full export: tables (SPEC 12.4)", () => {
       await asUser(stranger.id, (q) =>
         q("insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'לא שלכם', now(), now() + interval '1 hour')", [otherOrg]),
       );
+      await asUser(stranger.id, (q) => q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [otherOrg]));
     });
 
     // the same read as fetchAll() in src/features/imports/export.ts
@@ -98,9 +98,20 @@ describe("full export: tables (SPEC 12.4)", () => {
       expect(Object.keys(participants[0])).toEqual(expect.arrayContaining(["id", "organization_id", "created_at", "user_id"]));
     });
 
+    it("sees the business's rest days, once set (CAL-03)", async () => {
+      expect(await read("org_calendar_settings", orgId)).toEqual([]);
+      await asUser(owner.id, (q) =>
+        q("insert into public.org_calendar_settings (organization_id, rest_weekdays, rest_occasions) values ($1, '{6}', '{mimouna}')", [orgId]),
+      );
+      const rows = await read("org_calendar_settings", orgId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ organization_id: orgId, rest_weekdays: [6], holidays_rest: true, holiday_eves_rest: false, rest_occasions: ["mimouna"] });
+    });
+
     it("sees nothing of another business", async () => {
       expect(await read("meetings", otherOrg)).toEqual([]);
       expect(await read("meeting_participants", otherOrg)).toEqual([]);
+      expect(await read("org_calendar_settings", otherOrg)).toEqual([]);
     });
   });
 });

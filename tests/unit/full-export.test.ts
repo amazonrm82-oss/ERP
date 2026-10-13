@@ -68,3 +68,39 @@ describe("full export: meetings and participants", () => {
     expect(row).toContain("'=HYPERLINK(1)");
   });
 });
+
+describe("full export: the rest days (CAL-03)", () => {
+  const settings = {
+    id: "s1",
+    organization_id: ORG,
+    rest_weekdays: [5, 6],
+    holidays_rest: true,
+    holiday_eves_rest: false,
+    rest_occasions: ["mimouna", "purim", "gone_key"],
+    updated_by: OWNER,
+    created_at: "2026-10-13T07:00:00+00:00",
+    updated_at: "2026-10-13T07:00:00+00:00",
+  };
+
+  it("is configuration in calendar_settings.csv, next to the pipelines, and the README explains it", () => {
+    const files = EXPORT_TABLES.map((t) => t.file);
+    expect(EXPORT_TABLES.find((t) => t.table === "org_calendar_settings")?.file).toBe("calendar_settings.csv");
+    expect(files).toContain("pipelines.csv");
+    expect(EXPORT_README).toContain("calendar_settings.csv");
+    expect(EXPORT_README).toContain("ברירת המחדל");
+  });
+
+  it("names the weekdays and the occasions next to their codes", () => {
+    const [header, row] = lines(toCsv([settings], new Map(), new Map()));
+    const cols = header.split(",");
+    expect(cols.slice(cols.indexOf("rest_weekdays"), cols.indexOf("rest_weekdays") + 2)).toEqual(["rest_weekdays", "rest_days"]);
+    expect(cols.slice(cols.indexOf("rest_occasions"), cols.indexOf("rest_occasions") + 2)).toEqual(["rest_occasions", "rest_occasion_names"]);
+    expect(row).toContain('"[5,6]",שישי; שבת,true,false');
+    expect(row).toContain("מימונה; פורים; gone_key");
+  });
+
+  it("an empty week and no occasions give empty names", () => {
+    const [, row] = lines(toCsv([{ ...settings, rest_weekdays: [], rest_occasions: [] }], new Map(), new Map()));
+    expect(row).toContain("[],,true,false,[],,");
+  });
+});

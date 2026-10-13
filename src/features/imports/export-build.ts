@@ -2,6 +2,8 @@
 // becomes a CSV, and the readable names put next to ids. No database here, so
 // the unit tests can check it; export.ts reads the rows and builds the ZIP.
 
+import { OCCASIONS } from "@/features/calendar-days/holidays";
+import { WEEKDAYS_LONG } from "@/lib/calendar-grid";
 import { csvText } from "@/lib/csv";
 import type { Database, Json } from "@/lib/database.types";
 
@@ -34,6 +36,7 @@ export const EXPORT_TABLES: ReadonlyArray<{ table: ExportTableName; file: string
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
   { table: "teams", file: "teams.csv" },
+  { table: "org_calendar_settings", file: "calendar_settings.csv" },
   { table: "files", file: "files.csv" },
 ];
 
@@ -54,6 +57,22 @@ export const LOOKUPS: Record<string, string> = {
 };
 
 export type ExportRow = Record<string, unknown>;
+
+const OCCASION_NAMES = new Map<string, string>(OCCASIONS.map((o) => [o.key, o.name]));
+
+// readable columns added next to these coded ones (the rest days of CAL-03)
+const READABLE: Record<string, { header: string; get: (value: unknown) => string }> = {
+  // 0 = Sunday … 6 = Saturday
+  rest_weekdays: {
+    header: "rest_days",
+    get: (value) => (Array.isArray(value) ? value.map((d) => WEEKDAYS_LONG[Number(d)] ?? String(d)).join("; ") : ""),
+  },
+  // a key the app no longer knows stays as it is
+  rest_occasions: {
+    header: "rest_occasion_names",
+    get: (value) => (Array.isArray(value) ? value.map((k) => OCCASION_NAMES.get(String(k)) ?? String(k)).join("; ") : ""),
+  },
+};
 
 // tables whose rows are named by their name column
 const NAMED_BY_NAME = new Set<string>(["lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams", "record_type_options"]);
@@ -96,6 +115,7 @@ export function toCsv(rows: ExportRow[], names: Map<string, string>, tagNames: M
   for (const k of base) {
     columns.push({ header: k, get: (r) => r[k] });
     if (LOOKUPS[k]) columns.push({ header: LOOKUPS[k], get: (r) => (typeof r[k] === "string" ? (names.get(r[k] as string) ?? "") : "") });
+    if (READABLE[k]) columns.push({ header: READABLE[k].header, get: (r) => READABLE[k].get(r[k]) });
     if (k === "tag_ids") columns.push({ header: "tags", get: (r) => ((r.tag_ids as string[] | null) ?? []).map((id) => tagNames.get(id) ?? id).join("; ") });
   }
   for (const k of customKeys) columns.push({ header: `custom:${k}`, get: (r) => ((r.custom_fields as Record<string, Json> | null) ?? {})[k] });
@@ -111,5 +131,6 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 עמודות custom:... הן השדות המותאמים. רשומות עם deleted_at נמצאות בסל המחזור.
 סכומים (amount_agorot) הם באגורות: מחלקים ב-100 לקבלת שקלים.
 הפגישות נמצאות ב-meetings.csv (owner הוא מי שקבע את הפגישה), והמשתתפים בכל פגישה ב-meeting_participants.csv.
+ימי המנוחה של העסק נמצאים ב-calendar_settings.csv: rest_weekdays הם ימי השבוע (0 = ראשון עד 6 = שבת), holidays_rest אומר אם החגים הם ימי מנוחה, holiday_eves_rest אם ערבי החג, ו-rest_occasions מועדים נוספים שבחרתם. אם הקובץ ריק, ההגדרות הן ברירת המחדל: שישי ושבת וחגים.
 הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;
