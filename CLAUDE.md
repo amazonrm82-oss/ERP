@@ -551,6 +551,21 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (start, 7 and 1 days before, read-only day, 1 day before closing), `read_only` at the local day start after day 14,
   `suspended` (= access closed until payment, owner) a week later; the plan is never touched. `trial_end_notice(org)` feeds the
   banner. A new redefinition of either platform function must keep its `app.mark_platform_assignment` line.
+- Closed business (BIL-08/BIL-09, migrations 0171-0174): `suspended` and `cancelled` are "closed" (`app.org_status_closed`).
+  `app.membership_role()` gives no role but the owner's in a closed business (the owner keeps it for the plan screen and the full
+  export; writes stay blocked by `app.org_writable`); `app.completeness_keys()` copies that line. Notifications, own saved views
+  and `app.shares_org()` follow it; trigger `notifications_closed_org` stores only `system` notices to the owner;
+  `claim_push_notifications()` pushes only those. `public.closed_orgs()` feeds the "access is closed" screen;
+  `leave_closed_organization(org)` sets the caller's membership to `suspended` (not the owner); an invitation reactivates a
+  suspended membership (`create_invitation` / `accept_invitation`, seat rules apply). Policies on organizations, memberships
+  (others), invitations and support grants refuse writes while closed (`app.org_closed`). Intake: `app.org_takes_leads` (suspended
+  and read-only take leads; cancelled/deleted do not), and `app.org_public_pages_open` is the one rule for every public page
+  (`intake_form()` answers `{"inactive": true}`). `app.org_suspensions` tracks each suspension (trigger
+  `organizations_track_suspension`); two OFF switches in `app.suspension_cancel_settings`, each changed only by its
+  `platform_set_*` function (platform owner, logged): cancel after 90 days with 14 and 3 day notices (`crm-suspension-cancel`,
+  nothing is ever deleted) and new-lead notices to the owner (count only, first at once, then daily, `app.leads_waiting_text`
+  mirrored by `leadsWaitingText()`; `crm-suspended-lead-notices`). A new redefinition of `intake_submit` must keep
+  `app.org_takes_leads` and the `v_rotation_closed` lines.
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
