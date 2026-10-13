@@ -7,9 +7,9 @@ import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { businessPlanCanOpen } from "@/features/plans/capabilities";
 import { annualPriceLabel, AVAILABILITY_LABELS, monthlyPriceLabel, VAT_NOTE } from "@/features/plans/price";
-import { setPlanAvailabilityAction, setSuspensionCancelAction, setTrialEndAction, updatePlanAction } from "@/features/platform/actions";
+import { setPlanAvailabilityAction, setSuspendedLeadNoticesAction, setSuspensionCancelAction, setTrialEndAction, updatePlanAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
-import { getPlanWaitlistCounts, getSuspensionCancelStatus, getTrialEndStatus, listPlans, platformReady } from "@/features/platform/queries";
+import { getPlanWaitlistCounts, getSuspendedLeadNoticesStatus, getSuspensionCancelStatus, getTrialEndStatus, listPlans, platformReady } from "@/features/platform/queries";
 import { formatDate, formatNumber } from "@/lib/format";
 
 export const metadata: Metadata = { title: "חבילות" };
@@ -19,7 +19,13 @@ const shekels = (agorot: number) => String(agorot / 100);
 export default async function AdminPlansPage() {
   const me = await platformReady();
   if (!me) return null;
-  const [plans, waiting, trialEnd, cancel] = await Promise.all([listPlans(), getPlanWaitlistCounts(), getTrialEndStatus(), getSuspensionCancelStatus()]);
+  const [plans, waiting, trialEnd, cancel, leadNotices] = await Promise.all([
+    listPlans(),
+    getPlanWaitlistCounts(),
+    getTrialEndStatus(),
+    getSuspensionCancelStatus(),
+    getSuspendedLeadNoticesStatus(),
+  ]);
   const canEdit = me.role === "owner";
   const business = plans.find((plan) => plan.key === "business");
 
@@ -121,6 +127,34 @@ export default async function AdminPlansPage() {
             )
           ) : (
             <p className="text-sm text-ink-soft">רק בעלי הפלטפורמה מדליקים או מכבים את הביטול.</p>
+          )}
+        </CardBody>
+      </Card>
+      {/* owner, 13 October 2026: a count of new leads to the owner of a suspended business, off until switched on */}
+      <Card aria-labelledby="suspended-lead-notices" className="mb-5">
+        <CardHeader id="suspended-lead-notices" title="התראת ליד חדש לעסק מושהה" />
+        <CardBody className="space-y-3">
+          <p className="flex flex-wrap items-center gap-2">
+            <Badge tone={leadNotices.enabled ? "warning" : "neutral"}>{leadNotices.enabled ? "דולק" : "כבוי"}</Badge>
+            {leadNotices.enabled && leadNotices.enabledAt ? <span className="text-sm text-ink-soft">מאז {formatDate(leadNotices.enabledAt)}</span> : null}
+          </p>
+          <p className="text-md text-ink-soft">
+            דולק: הבעלים של עסק מושהה מקבלים התראה על הליד הראשון שנכנס אחרי ההשעיה, ואחר כך לכל היותר אחת ביום עם מספר הלידים. בלי שום
+            פרט של הליד. אימייל יתווסף כשתהיה שכבת אימייל.
+          </p>
+          <p className="text-md">לידים שמחכים להתראה היומית: {formatNumber(leadNotices.waiting)}</p>
+          {canEdit ? (
+            <ConfirmButton
+              variant={leadNotices.enabled ? "secondary" : "danger"}
+              title={leadNotices.enabled ? "לכבות את התראות הליד לעסק מושהה?" : "להדליק את התראות הליד לעסק מושהה?"}
+              description={leadNotices.enabled ? "לא יישלחו עוד התראות על לידים חדשים לעסקים מושהים." : "מהרגע הזה, ליד שנכנס לעסק מושהה יגרום להתראה לבעלים שלו."}
+              confirmLabel={leadNotices.enabled ? "כיבוי" : "הדלקה"}
+              action={setSuspendedLeadNoticesAction.bind(null, !leadNotices.enabled)}
+            >
+              {leadNotices.enabled ? "כיבוי ההתראות" : "הדלקת ההתראות"}
+            </ConfirmButton>
+          ) : (
+            <p className="text-sm text-ink-soft">רק בעלי הפלטפורמה מדליקים או מכבים את ההתראות.</p>
           )}
         </CardBody>
       </Card>

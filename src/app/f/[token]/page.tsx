@@ -5,7 +5,7 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
-import { getPublicForm } from "@/features/intake/public-form";
+import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
 
@@ -21,7 +21,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
   const { token } = await params;
   const embed = (await searchParams).embed === "1";
   const form = await getPublicForm(token);
-  const found = form !== null && form !== "not-configured" ? form : null;
+  const found = form !== null && form !== "not-configured" && form !== "inactive" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;
 
   return (
@@ -30,7 +30,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
       <main className={cn("mx-auto w-full max-w-md px-5", embed ? "py-4" : "min-h-dvh py-10 sm:py-16")}>
         {!found ? (
           <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
-            {form === null ? "הטופס לא נמצא או שאינו פעיל כרגע." : "הטופס אינו זמין כרגע."}
+            {form === "inactive" ? INACTIVE_FORM_TEXT : form === null ? "הטופס לא נמצא או שאינו פעיל כרגע." : "הטופס אינו זמין כרגע."}
           </p>
         ) : (
           <>

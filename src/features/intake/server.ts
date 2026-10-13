@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { parseAttribution, safeText } from "./attribution";
 import { CALLBACK_INPUT } from "./callback";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
-import { readPublicForm } from "./public-form";
+import { INACTIVE_FORM_TEXT, readPublicForm } from "./public-form";
 import { checkSubmission, wrongField, type RawValues } from "./public-validate";
 
 export type IntakeKind = "form" | "webhook";
@@ -221,6 +221,10 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     // CAP-01: the form's own fields, conditions and custom fields, checked as
     // the hosted form checks them; the database checks again
     const form = await readPublicForm(service, token);
+    // a business whose public pages are closed: refused before intake_submit, so nothing is stored
+    if (form === "inactive") {
+      return respond(403, { ok: false, message: `${INACTIVE_FORM_TEXT}.` });
+    }
     if (!form) {
       return respond(404, { ok: false, message: MESSAGES.notFound });
     }

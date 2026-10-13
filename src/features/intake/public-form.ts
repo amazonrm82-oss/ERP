@@ -34,9 +34,21 @@ function isObject(value: unknown): value is Record<string, Json | undefined> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+/** The hosted form's text for a business whose public pages are closed (cancelled; owner, 13 October 2026). */
+export const INACTIVE_FORM_TEXT = "הטופס הזה אינו פעיל כרגע";
+
+/**
+ * intake_form() answers only {inactive: true} for a form of a business whose public pages are closed
+ * (app.org_public_pages_open(), migration 0163): no fields, no name, no logo. Every public page of a
+ * business (booking, business card, site widget, QR) follows the same rule when it is built.
+ */
+export function isInactiveForm(data: Json): boolean {
+  return isObject(data) && data.inactive === true;
+}
+
 /** The reply of public.intake_form() as the hosted form's fields (built-in labels added here). */
 export function publicFormFrom(data: Json): PublicForm | null {
-  if (!isObject(data)) {
+  if (!isObject(data) || isInactiveForm(data)) {
     return null;
   }
   const raw = Array.isArray(data.fields) ? data.fields : [];
@@ -83,9 +95,9 @@ export function publicFormFrom(data: Json): PublicForm | null {
 }
 
 /** The form by its public token, through public.intake_form() (display settings only). */
-export async function readPublicForm(service: ServiceClient, token: string): Promise<PublicForm | null> {
+export async function readPublicForm(service: ServiceClient, token: string): Promise<PublicForm | null | "inactive"> {
   const data = must(await service.rpc("intake_form", { p_token: token }), "intake_form");
-  return publicFormFrom(data);
+  return isInactiveForm(data) ? "inactive" : publicFormFrom(data);
 }
 
 /**
@@ -94,7 +106,7 @@ export async function readPublicForm(service: ServiceClient, token: string): Pro
  * turns it on, the WhatsApp number of the thank-you page (CAP-05); nothing else about
  * the organization or its data leaves the server.
  */
-export async function getPublicForm(token: string): Promise<PublicForm | null | "not-configured"> {
+export async function getPublicForm(token: string): Promise<PublicForm | null | "inactive" | "not-configured"> {
   if (!/^[0-9a-f]{32}$/.test(token)) {
     return null;
   }

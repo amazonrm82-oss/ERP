@@ -39,6 +39,8 @@ export default async function OrgLayout({ children, params }: Props) {
   // BIL-09: a business closed until payment gets a bare frame; its pages send everyone to the
   // closed screen (getOrgContext), except the owner's plan and full export
   if (context.closed) {
+    // the owner still gets 'system' notices here (new leads waiting, the cancel date); nobody else gets any
+    const ownerBell = context.role === "owner" ? await Promise.all([listNotifications(org.id, user.id, 8), countUnread(org.id, user.id)]) : null;
     return (
       <div className="min-h-dvh">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6">
@@ -48,17 +50,28 @@ export default async function OrgLayout({ children, params }: Props) {
             </Link>
             <p className="truncate font-semibold">{org.name}</p>
           </div>
-          <UserMenu
-            name={user.displayName}
-            email={user.email}
-            roleLabel={ROLE_LABELS[context.role]}
-            links={[
-              { href: paths.home, label: "החלפת עסק" },
-              { href: paths.help, label: "מרכז עזרה" },
-            ]}
-          >
-            <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
-          </UserMenu>
+          <div className="flex shrink-0 items-center gap-1">
+            {ownerBell ? (
+              <NotificationBell
+                key={`${ownerBell[1]}:${ownerBell[0][0]?.id ?? ""}`}
+                orgId={org.id}
+                userId={user.id}
+                initial={ownerBell[0]}
+                unread={ownerBell[1]}
+              />
+            ) : null}
+            <UserMenu
+              name={user.displayName}
+              email={user.email}
+              roleLabel={ROLE_LABELS[context.role]}
+              links={[
+                { href: paths.home, label: "החלפת עסק" },
+                { href: paths.help, label: "מרכז עזרה" },
+              ]}
+            >
+              <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />
+            </UserMenu>
+          </div>
         </header>
         <main id="main" className="mx-auto w-full max-w-3xl px-4 pt-5 pb-12 sm:px-6 sm:pt-7">
           {children}

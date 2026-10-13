@@ -1805,6 +1805,9 @@ export type Database = {
       // BIL-09 (0162): 'cancelled' 90 days after suspension, OFF by default
       platform_suspension_cancel_status: { Args: Record<string, never>; Returns: Json };
       platform_set_suspension_cancel: { Args: { p_enabled: boolean }; Returns: Json };
+      // new-lead notices to the owner of a suspended business (0163), OFF by default
+      platform_suspended_lead_notices_status: { Args: Record<string, never>; Returns: Json };
+      platform_set_suspended_lead_notices: { Args: { p_enabled: boolean }; Returns: Json };
       // null, or { phase: 'grace' | 'read_only', read_only_on, closes_on } (local YYYY-MM-DD days) for a member
       trial_end_notice: { Args: { p_org: string }; Returns: Json };
       platform_staff_list: { Args: Record<string, never>; Returns: Json };

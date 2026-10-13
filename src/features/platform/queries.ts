@@ -31,7 +31,8 @@ export async function platformReady(): Promise<PlatformMe | null> {
 }
 
 async function call(
-  name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health" | "platform_trial_end_status" | "platform_suspension_cancel_status",
+  name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health" | "platform_trial_end_status" | "platform_suspension_cancel_status"
+    | "platform_suspended_lead_notices_status",
 ): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
@@ -104,6 +105,18 @@ export async function getSuspensionCancelStatus(): Promise<SuspensionCancelStatu
     suspended: n(data.suspended),
     planned: n(data.planned),
     cancelled: n(data.cancelled),
+  };
+}
+
+/** New-lead notices to the owner of a suspended business (0163): the switch and the leads still waiting to be told. */
+export type SuspendedLeadNoticesStatus = { enabled: boolean; enabledAt: string | null; waiting: number };
+
+export async function getSuspendedLeadNoticesStatus(): Promise<SuspendedLeadNoticesStatus> {
+  const data = obj(await call("platform_suspended_lead_notices_status"));
+  return {
+    enabled: data.enabled === true,
+    enabledAt: typeof data.enabled_at === "string" ? data.enabled_at : null,
+    waiting: Number(data.waiting) || 0,
   };
 }
 

@@ -151,6 +151,17 @@ export async function setSuspensionCancelAction(enabled: boolean): Promise<Actio
   return { ok: true };
 }
 
+/** The platform owner turns the new-lead notices of suspended businesses on or off (logged in the database). */
+export async function setSuspendedLeadNoticesAction(enabled: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, enabled)) return fail(INVALID_ARGS);
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const { error } = await supabase.rpc("platform_set_suspended_lead_notices", { p_enabled: enabled });
+  if (error) return fail(platformError(error));
+  revalidatePath(paths.adminPlans);
+  return { ok: true };
+}
+
 export async function setStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await client();
   if (!supabase) return fail(SESSION_EXPIRED);

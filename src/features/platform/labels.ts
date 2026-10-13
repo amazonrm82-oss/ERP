@@ -31,6 +31,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "trial_end.restored": "סוף ניסיון: העסק חזר לעבוד",
   "suspension_cancel.switch": "הדלקה או כיבוי של הביטול אחרי השעיה",
   "suspension.cancelled": "ביטול מנוי אחרי 90 יום בהשעיה",
+  "suspended_lead_notices.switch": "הדלקה או כיבוי של התראות ליד חדש לעסק מושהה",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

@@ -27,6 +27,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // TAX-02 follow-up: a change of the bank details, seen by owners and admins
     case "org_bank_details":
       return documentSettingsPath(orgId);
+    // a new lead while the business is suspended (0163): choose a plan to see it; the id is the business
+    case "subscription":
+      return paths.settingsPlan(orgId);
     default:
       return null;
   }
