@@ -511,6 +511,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   no row or 'auto' = the 0029 same-label rule, skipping any field a 'field' row claims; 'field' copies only to that field
   while active and of the same type, no fall back. A deleted target: the FK clears it, the trigger sets mode 'none' and
   `target_removed` (server-only), the screen and a settings reminder show it (owner); hiding a mapped target asks first.
+- Duplicate and follow-up deals (DEAL-11, migration 0163; DEAL-10 no migration): `deals.previous_deal_id` (composite FK, on delete
+  set null of the column) is set once by a person on insert (trigger `deals_previous_check`, invoker: readable, not in the bin;
+  never changed later, hint `deal:previous_deal`). `duplicateDealAction` / `followUpDealAction` (src/features/deals/) insert with
+  the user's session; a copy leaves out custom values that no longer pass the form rules and names them (`?copy_fields=`).
+  Known: removing sample data removes a sample deal even when a real follow-up points at it (shared-ground follow-up).
+  Board moves (DEAL-10) by mouse, long press and keyboard all go through `requestMove()` (won window, loss question).
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
