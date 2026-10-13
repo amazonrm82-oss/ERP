@@ -8,7 +8,7 @@ type U = { id: string; email: string };
 
 // CON-01: a contact has a primary phone and email on its own row (contacts.phone / email, with a type each)
 // and further ones in public.contact_channels, each with a type. Duplicates, search and repeat inquiries
-// match on all of them; changes are audited on the contact; a merge keeps the duplicate's ones.
+// match on all of them; changes are audited on the contact; a merge moves the duplicate's ones (0109).
 describe("more phones and emails per contact (CON-01)", () => {
   let owner: U, member: U, other: U;
   let org: string;
@@ -231,6 +231,64 @@ describe("more phones and emails per contact (CON-01)", () => {
       (await q<{ actor_id: string }>("select actor_id from public.audit_log where entity_id = $1 and (changes ? 'extra_phone' or changes ? 'extra_email') and changes -> 'extra_phone' ->> 'old' is null and created_at > now() - interval '1 minute'", [keep])).rows,
     );
     expect(actors.length).toBeGreaterThanOrEqual(2);
+  });
+
+  const mergeContacts = (keep: string, dup: string, picks: Record<string, string> = {}) =>
+    asUser(owner.id, (q) => q("select public.merge_records($1, 'contact', $2, $3, $4)", [org, keep, dup, JSON.stringify(picks)]));
+
+  it("a merge moves the duplicate's rows (same ids); overlapping ones go with the duplicate", async () => {
+    const keep = await newContact(member, { first_name: "רון", phone: "050-8100001", email: "ron@example.test" });
+    await addChannel(member, keep, "email", "ron@work.example", "work");
+    const dup = await newContact(member, { first_name: "רון", last_name: "ב" });
+    const moved = await addChannel(member, dup, "phone", "052-8100002", "work", 3);
+    await addChannel(member, dup, "email", "RON@work.example", "home"); // the kept one has it as a further one
+    await addChannel(member, dup, "phone", "+972-50-8100001", "home"); // the kept one's primary, written differently
+    await mergeContacts(keep, dup);
+    expect(await channelsOf(keep)).toEqual([
+      { kind: "email", label: "work", value: "ron@work.example" },
+      { kind: "phone", label: "work", value: "052-8100002" },
+    ]);
+    const after = await asAdmin(async (q) => (await q<{ id: string; contact_id: string }>("select id, contact_id from public.contact_channels where id = $1", [moved.id])).rows[0]);
+    expect(after.contact_id).toBe(keep);
+    expect(await asAdmin((q) => count(q, "select 1 from public.contact_channels where contact_id = $1", [dup]))).toBe(0);
+    // the moved row is on the kept contact's history as an addition
+    expect(
+      await asAdmin((q) =>
+        count(q, "select 1 from public.audit_log where entity_id = $1 and changes -> 'extra_phone' ->> 'new' = '052-8100002 (עבודה)' and changes -> 'extra_phone' -> 'old' = 'null'::jsonb", [keep]),
+      ),
+    ).toBe(1);
+  });
+
+  it("a merge that picks the duplicate's primary does not add the kept contact's old one (known follow-up)", async () => {
+    const keep = await newContact(member, { first_name: "שני", phone: "050-8200001", phone_type: "work" });
+    const dup = await newContact(member, { first_name: "שני", phone: "054-8200002", phone_type: "mobile" });
+    await mergeContacts(keep, dup, { phone: "merge" });
+    const kept = await asAdmin(async (q) => (await q("select phone, phone_type from public.contacts where id = $1", [keep])).rows[0]);
+    // the type is not a merge column and stays as it was
+    expect(kept).toEqual({ phone: "054-8200002", phone_type: "work" });
+    expect(await channelsOf(keep)).toEqual([]);
+    // without a pick: the duplicate's primary ones become further ones, with their type
+    const keep2 = await newContact(member, { first_name: "יעל", phone: "050-8200003" });
+    const dup2 = await newContact(member, { first_name: "יעל", phone: "054-8200004", phone_type: "home", email: "yael@example.test" });
+    await mergeContacts(keep2, dup2);
+    expect(await channelsOf(keep2)).toEqual([
+      { kind: "email", label: "other", value: "yael@example.test" },
+      { kind: "phone", label: "home", value: "054-8200004" },
+    ]);
+    expect((await asAdmin(async (q) => (await q("select phone from public.contacts where id = $1", [keep2])).rows[0])).phone).toBe("050-8200003");
+  });
+
+  // Regression guard only: the old copy trigger (0108) also passed the limit; this pins it for the move.
+  it("a merge may pass 10 phones of a kind", async () => {
+    const keep = await newContact(member, { first_name: "גל" });
+    for (let i = 0; i < 10; i++) await addChannel(member, keep, "phone", `052-83000${String(i).padStart(2, "0")}`, "other", i);
+    const dup = await newContact(member, { first_name: "גל", phone: "054-8300099" });
+    await addChannel(member, dup, "phone", "053-8300001", "work");
+    await addChannel(member, dup, "phone", "052-8300000", "work"); // the kept one has it
+    await mergeContacts(keep, dup);
+    expect(await asAdmin((q) => count(q, "select 1 from public.contact_channels where contact_id = $1 and kind = 'phone'", [keep]))).toBe(12);
+    // a person still cannot add one more
+    expect((await pgError(addChannel(member, keep, "phone", "053-8300002"))).hint).toBe("contact_channel:max");
   });
 
   it("a timeline entry a person writes cannot copy someone's phones", async () => {
