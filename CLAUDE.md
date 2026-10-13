@@ -351,6 +351,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   not suspended, hint `org:suspended`) writes one `system` notification to the caller and wakes `app.dispatch_push()` (a
   failure there is swallowed; the cron sends it); 3 per user per 10 minutes in `app.push_tests`, answered `{ok:false,
   reason:'rate', retry_seconds}`. Device state (`src/features/notifications/device.ts`) drives the dismissible bar.
+- Card next action (REC-10 follow-up, no migration): `pickNextAction()` in `src/features/record-summary/summary.ts` picks the
+  earlier of `record_summary`'s `next_task` (due) and `next_meeting` (start; a planned meeting that has not ended); an undated
+  task comes last and a tie goes to the meeting. It links to the calendar day (`who=all`), or to the tasks list.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
