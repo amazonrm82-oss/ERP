@@ -2055,6 +2055,8 @@ try {
   const imageEntry = zipEntries.find((n) => n.startsWith("files/") && n.endsWith("תמונה.png"));
   console.log("export has files.csv:", zipEntries.includes("files.csv"), "and the uploaded image:", Boolean(imageEntry));
   if (!zipEntries.includes("files.csv") || !imageEntry) throw new Error("the full export is missing the files");
+  const missingCsv = ["meetings.csv", "meeting_participants.csv"].filter((name) => !zipEntries.includes(name));
+  if (missingCsv.length) throw new Error(`the full export is missing ${missingCsv.join(", ")}`);
   const danaZip = await invitee.context().request.get(`${orgUrl}/settings/import/export`);
   console.log("manager full export status:", danaZip.status());
   if (danaZip.status() !== 403) throw new Error("a team manager downloaded the full export");
