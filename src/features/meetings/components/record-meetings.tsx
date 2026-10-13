@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { TimelineSubject } from "@/features/activities/schema";
+import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
 import { listMembers } from "@/features/settings/queries";
 import { zoneDate } from "@/lib/format";
 
@@ -100,6 +101,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
           }}
         />
       ) : null}
+      <InviteFileLink orgId={orgId} meetingId={meeting.id} title={meeting.title} />
     </li>
   );
 

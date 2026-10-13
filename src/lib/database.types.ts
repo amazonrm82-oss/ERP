@@ -1175,6 +1175,11 @@ export type Database = {
         Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };
         Returns: Array<{ user_id: string; meeting_id: string | null; title: string | null; starts_at: string; ends_at: string }>;
       };
+      // CAL-07: the personal calendar link (migration 0102); calendar_feed_events is service_role only
+      calendar_feed_status: { Args: { p_org: string }; Returns: Json };
+      calendar_feed_create: { Args: { p_org: string }; Returns: string };
+      calendar_feed_revoke: { Args: { p_org: string }; Returns: undefined };
+      calendar_feed_events: { Args: { p_token: string }; Returns: Json };
       // REC-02: who a note on this record may mention (active members who may see it, not the caller)
       mention_candidates: { Args: { p_org: string; p_kind: string; p_id: string }; Returns: Array<{ user_id: string; name: string }> };
       // merging duplicates (migration 0020): picks = { column: "merge" }

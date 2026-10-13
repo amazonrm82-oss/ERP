@@ -41,7 +41,7 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // FXC-08: the service-role key has three uses only (CLAUDE.md, hard rule 5); a new one is the owner's decision
+  // FXC-08: the service-role key has only the uses listed (CLAUDE.md, hard rule 5); a new one is the owner's decision
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
     ignores: [
@@ -50,6 +50,8 @@ const eslintConfig = defineConfig([
       "src/features/intake/public-form.ts",
       "src/features/notifications/push-server.ts",
       "src/features/files/cleanup-server.ts",
+      // CAL-07: the personal calendar feed, approved public secret-link pattern (owner, 8 October 2026)
+      "src/features/calendar-feed/feed-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

@@ -22,6 +22,8 @@ const PUBLIC_PREFIXES = [
   "/api/in/",
   "/api/push/dispatch",
   "/api/files/cleanup",
+  // CAL-07: calendar apps fetch the personal feed with no session; the route checks its own secret token
+  "/api/calendar-feed/",
   "/sw.js",
   "/offline.html",
   "/manifest.webmanifest",

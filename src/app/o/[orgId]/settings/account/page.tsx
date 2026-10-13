@@ -7,6 +7,8 @@ import { signOutOthersAction } from "@/features/account/actions";
 import { MfaSettings } from "@/features/account/components/mfa-settings";
 import { describeDevice, getRecoveryCodesLeft, listMySessions } from "@/features/account/queries";
 import { NewPasswordForm } from "@/features/auth/components/new-password-form";
+import { CalendarFeedCard } from "@/features/calendar-feed/components/calendar-feed-card";
+import { getCalendarFeedStatus } from "@/features/calendar-feed/queries";
 import { getSignedVersion } from "@/features/legal/queries";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
 import { getNotificationSettings } from "@/features/notifications/queries";
@@ -23,15 +25,17 @@ export const metadata: Metadata = { title: "החשבון שלי" };
 
 export default async function AccountPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { user, org: orgContext } = await getOrgContext(orgId);
+  const { user, org: orgContext, supportUntil } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings] = await Promise.all([
+  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings, calendarFeed] = await Promise.all([
     getMyProfile(user.id),
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
     getRecoveryCodesLeft(),
     getSignedVersion(),
     getNotificationSettings(),
+    // a support session is not a member: it has no personal calendar link
+    supportUntil ? null : getCalendarFeedStatus(orgId),
   ]);
   const sessions = sessionsResult.ok ? sessionsResult.sessions : [];
 
@@ -85,6 +89,20 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
           <NotificationSettingsForm orgId={orgId} settings={notificationSettings} />
         </CardBody>
       </Card>
+
+      {calendarFeed ? (
+        <Card aria-labelledby="account-calendar-feed" className="lg:col-span-2">
+          <CardHeader id="account-calendar-feed" title="היומן שלי ב-Google, ב-Outlook ובטלפון" />
+          <CardBody>
+            <CalendarFeedCard
+              orgId={orgId}
+              active={calendarFeed.active}
+              createdText={formatDateTime(calendarFeed.createdAt)}
+              lastUsedText={formatDateTime(calendarFeed.lastUsedAt)}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card aria-labelledby="account-sessions" className="lg:col-span-2">
         <CardHeader

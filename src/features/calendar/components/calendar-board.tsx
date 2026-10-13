@@ -22,6 +22,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { BackIcon, CalendarIcon, CheckSquareIcon, ForwardIcon } from "@/components/ui/icons";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
 import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
+import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
 import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
 import type { MemberOption } from "@/features/meetings/components/meeting-form";
 import { meetingFormTimes } from "@/features/meetings/display";
@@ -950,6 +951,7 @@ function ItemDetails({
           onChanged={onChanged}
         />
       ) : null}
+      {meeting ? <InviteFileLink orgId={orgId} meetingId={meeting.id} title={meeting.title} /> : null}
       {canMove ? (
         <form onSubmit={submit} noValidate className="space-y-3 border-t border-line pt-4">
           <h3 className="text-md font-semibold">העברה למועד אחר</h3>
