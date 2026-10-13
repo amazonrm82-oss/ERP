@@ -290,6 +290,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
   1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
   use `stageTone()`.
+- Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
+  read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
+  `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
+  (`app.deal_loss_reason()`, security invoker, after `deals_sync_stage` by name) clears the id on a deal that is not lost,
+  clears the `lost_reason` text only on insert or a move out of lost, copies the picked reason's name into `lost_reason`, and
+  lets a person pick only an active reason (hint `deal:lost_reason`). Picking is optional. `report_lost_reasons` adds
+  `by_competitor`. Bulk undo of a stage change restores the reason.
 - Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
   CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
@@ -308,7 +315,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   row with a snapshot; `public.sample_data_add/records/remove(org)` (owner/admin, writable org). Removal deletes only rows that are
   untouched (`app.sample_untouched()`: row equals its snapshot and nothing real links to it: activities, files, meetings,
   non-sample tasks, form submissions, deal contacts, conversions, contact channels); guard triggers `*_guard_sample_removal`.
-  A new table that links to leads, contacts, companies or deals must also be checked in `app.sample_untouched()`. Sample leads
+  A new table that links to leads, contacts, companies or deals must also be checked in `app.sample_untouched()`. A new
+  column on those tables needs nothing: since 0121 `app.sample_row()` ignores a key missing from a note's snapshot while it is
+  null (a person who fills it makes the record kept). Test 64 re-runs the sample migrations and must end with the latest
+  migration that redefines `app.sample_row()`. Sample leads
   never count for activation (GAP-06).
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
