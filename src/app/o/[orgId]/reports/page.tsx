@@ -25,9 +25,15 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
         title="דוחות"
         description="כל דוח מציג רק את הרשומות שמותר לכם לראות."
         actions={
-          <ButtonLink href={paths.goals(orgId)} variant="secondary" size="sm">
-            יעדים
-          </ButtonLink>
+          <span className="flex flex-wrap gap-2">
+            {/* MNY-01 */}
+            <ButtonLink href={paths.moneyWaiting(orgId)} variant="secondary" size="sm">
+              כסף שמחכה
+            </ButtonLink>
+            <ButtonLink href={paths.goals(orgId)} variant="secondary" size="sm">
+              יעדים
+            </ButtonLink>
+          </span>
         }
       />
       {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} orgId={orgId} /> : null}

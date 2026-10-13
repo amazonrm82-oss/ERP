@@ -50,6 +50,8 @@ export const paths = {
   report: (orgId: string, key: string) => `/o/${orgId}/reports/${key}`,
   // GOL-02
   goals: (orgId: string) => `/o/${orgId}/reports/goals`,
+  // MNY-01: "כסף שמחכה" (owner=me: the user's own records)
+  moneyWaiting: (orgId: string, owner?: "me" | "all") => `/o/${orgId}/reports/money${owner ? `?owner=${owner}` : ""}`,
   settings: (orgId: string) => `/o/${orgId}/settings`,
   settingsBusiness: (orgId: string) => `/o/${orgId}/settings/business`,
   settingsUsers: (orgId: string) => `/o/${orgId}/settings/users`,

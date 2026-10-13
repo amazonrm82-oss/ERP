@@ -48,25 +48,32 @@ export async function getPipelineCleanup(orgId: string, ownerId: string | null):
     today: data.today,
     total: data.stuck.deals + data.overdue.deals,
     amount: data.stuck.amount + data.overdue.amount,
-    deals: data.deals.map((row) => ({
-      id: row.id,
-      name: row.name ?? "",
-      ownerId: row.owner_id,
-      ownerName: row.owner_id ? (names.get(row.owner_id) ?? null) : null,
-      pipelineId: row.pipeline_id,
-      stageId: row.stage_id,
-      stageName: row.stage_name,
-      stagePosition: row.stage_position,
-      amount: row.amount_agorot,
-      contactId: row.contact_id,
-      expected: row.expected_close_date ? row.expected_close_date.slice(0, 10) : null,
-      daysInStage: row.days_in_stage,
-      limitDays: row.limit_days,
-      lastActivityAt: row.last_activity_at,
-      idleDays: row.idle_days,
-      stuck: row.stuck,
-      overdue: row.overdue,
-    })),
+    deals: data.deals.map((row) => toCleanupDeal(row, names)),
+  };
+}
+
+type CleanupRow = ReportData<"report_pipeline_cleanup">["deals"][number];
+
+/** A row of the cleanup report (also inside report_money_waiting) as the screens use it. */
+export function toCleanupDeal(row: CleanupRow, names: Map<string, string>): CleanupDeal {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    ownerId: row.owner_id,
+    ownerName: row.owner_id ? (names.get(row.owner_id) ?? null) : null,
+    pipelineId: row.pipeline_id,
+    stageId: row.stage_id,
+    stageName: row.stage_name,
+    stagePosition: row.stage_position,
+    amount: row.amount_agorot,
+    contactId: row.contact_id,
+    expected: row.expected_close_date ? row.expected_close_date.slice(0, 10) : null,
+    daysInStage: row.days_in_stage,
+    limitDays: row.limit_days,
+    lastActivityAt: row.last_activity_at,
+    idleDays: row.idle_days,
+    stuck: row.stuck,
+    overdue: row.overdue,
   };
 }
 

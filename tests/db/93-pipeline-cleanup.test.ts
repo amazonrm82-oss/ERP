@@ -204,12 +204,13 @@ describe("pipeline cleanup in the organization's time zone (MNY-05)", () => {
     }
   });
 
-  it("stuck and overdue follow each business's own date, in the cleanup and the stuck report", async () => {
+  it("stuck and overdue follow each business's own date, in the cleanup, the money screen and the stuck report", async () => {
     expect(kiriToday > pagoToday).toBe(true);
     for (const zone of zones) {
       const inKiritimati = zone.tz === "Pacific/Kiritimati";
-      const [cleanupResult, stuck] = await asUser(zone.owner.id, async (q) => [
+      const [cleanupResult, money, stuck] = await asUser(zone.owner.id, async (q) => [
         (await q<{ r: Cleanup }>("select public.report_pipeline_cleanup($1) as r", [zone.org])).rows[0].r,
+        (await q<{ r: Cleanup }>("select public.report_money_waiting($1) as r", [zone.org])).rows[0].r,
         (await q<{ r: { id: string; stuck: boolean; postponed: boolean }[] }>("select public.report_stuck_deals($1) as r", [zone.org])).rows[0].r,
       ] as const);
       expect(cleanupResult.today).toBe(inKiritimati ? kiriToday : pagoToday);
@@ -225,6 +226,9 @@ describe("pipeline cleanup in the organization's time zone (MNY-05)", () => {
         expect(cleanupResult.stuck.deals).toBe(0);
         expect(cleanupResult.overdue.deals).toBe(0);
       }
+      // the money screen counts the same deals
+      expect(money.stuck).toEqual(cleanupResult.stuck);
+      expect(money.overdue).toEqual(cleanupResult.overdue);
       // and the stuck report agrees on the postponement
       expect(stuck.find((d) => d.id === zone.stuckId)).toMatchObject(inKiritimati ? { stuck: true } : { stuck: false, postponed: true });
     }

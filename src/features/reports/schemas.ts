@@ -30,6 +30,28 @@ const responseMeasures = {
 const forecastLine = z.object({ deals: count, amount, weighted: amount });
 const forecastSplit = { deals: count, amount, weighted: amount, month_weighted: amount, overdue_deals: count, overdue_weighted: amount };
 
+// MNY-05 / MNY-01: the open deals that need a decision (report_pipeline_cleanup's rows)
+const cleanupDeals = z.array(
+  z.object({
+    id: uuid,
+    name: text,
+    owner_id: id,
+    pipeline_id: uuid,
+    stage_id: uuid,
+    stage_name: text,
+    stage_position: z.number(),
+    amount_agorot: amount,
+    contact_id: id,
+    expected_close_date: day.nullable(),
+    days_in_stage: count,
+    limit_days: count,
+    last_activity_at: text,
+    idle_days: count,
+    stuck: z.boolean(),
+    overdue: z.boolean(),
+  }),
+);
+
 export const REPORT_SCHEMAS = {
   report_leads_by_source: z.array(
     z.object({ source_id: id, source_name: text, campaign: text, leads: count, converted: count, won: count, revenue: amount }),
@@ -134,24 +156,34 @@ export const REPORT_SCHEMAS = {
     today: day,
     stuck: z.object({ deals: count, amount }),
     overdue: z.object({ deals: count, amount }),
-    deals: z.array(
+    deals: cleanupDeals,
+  }),
+  // MNY-01: the main number (deals to close: the cleanup's stuck and overdue, each once) and, apart,
+  // the estimate of unhandled leads by the average won deal (null with fewer than five in 90 days)
+  report_money_waiting: z.object({
+    today: day,
+    to_close: z.object({ deals: count, amount }),
+    stuck: z.object({ deals: count, amount }),
+    overdue: z.object({ deals: count, amount }),
+    deals: cleanupDeals,
+    estimate: z.object({
+      leads: count,
+      won_deals: count,
+      average: amount.nullable(),
+      amount: amount.nullable(),
+      days: count,
+      min_deals: count,
+    }),
+    leads: z.array(
       z.object({
         id: uuid,
-        name: text,
+        full_name: text,
+        company_name: text,
+        phone: text,
+        phone_e164: text,
+        email: text,
         owner_id: id,
-        pipeline_id: uuid,
-        stage_id: uuid,
-        stage_name: text,
-        stage_position: z.number(),
-        amount_agorot: amount,
-        contact_id: id,
-        expected_close_date: day.nullable(),
-        days_in_stage: count,
-        limit_days: count,
-        last_activity_at: text,
-        idle_days: count,
-        stuck: z.boolean(),
-        overdue: z.boolean(),
+        created_at: z.string(),
       }),
     ),
   }),
