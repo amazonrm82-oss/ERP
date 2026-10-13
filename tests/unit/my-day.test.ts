@@ -6,12 +6,12 @@ import { dealsWithoutNextStep, idleText, meetingSpanText, myMeetings, STUCK_ROWS
 const TZ = "Asia/Jerusalem";
 
 function row(id: string, noNextStep: boolean, extra: Record<string, unknown> = {}) {
-  return { id, name: `עסקה ${id}`, stage_name: "הצעה", idle_days: 3, idle: false, no_next_step: noNextStep, ...extra };
+  return { id, name: `עסקה ${id}`, stage_name: "הצעה", idle_days: 3, stuck: false, no_next_step: noNextStep, ...extra };
 }
 
 describe("deals without a next action (TASK-09)", () => {
   it("keeps only the deals the database marked as having no task and no planned meeting, in its order", () => {
-    const result = dealsWithoutNextStep([row("a", true), row("b", false, { idle: true }), row("c", true, { idle_days: 0 })], 8);
+    const result = dealsWithoutNextStep([row("a", true), row("b", false, { stuck: true }), row("c", true, { idle_days: 0 })], 8);
     expect(result.deals.map((d) => d.id)).toEqual(["a", "c"]);
     expect(result.count).toBe(2);
     expect(result.truncated).toBe(false);

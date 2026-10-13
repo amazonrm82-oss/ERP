@@ -56,6 +56,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:lost_reason": "הסיבה שנבחרה כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
   // DEAL-04 (migration deal_close_window)
   "deal:closed_at": "תאריך הסגירה לא יכול להיות בעתיד.",
+  // stuck by time in stage (migration deal_stage_entered)
+  "deal:snoozed_until": "אפשר לדחות עסקה ליום שאחרי היום, עד שנה קדימה.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

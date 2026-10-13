@@ -847,7 +847,8 @@ try {
   await ownerDesk.getByRole("link", { name: "משה כהן" }).first().click();
   await ownerDesk.waitForURL(/\/deals\/[0-9a-f-]{36}$/);
   const dealUrl = ownerDesk.url();
-  await expectText(ownerDesk, "העסקה תקועה");
+  // a new deal has no next step; it is not stuck until its stage time passes rot_days (DEAL-01)
+  await expectText(ownerDesk, "אין צעד הבא");
   await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
   await ownerDesk.getByLabel("שווי (₪)").fill("15,000");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();

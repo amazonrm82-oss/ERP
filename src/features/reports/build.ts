@@ -2,7 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import type { Database, Json } from "@/lib/database.types";
-import { formatMoney, formatNumber, zoneDate } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -452,8 +452,8 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const name = await ownerNames(rows.map((r) => r.owner_id));
       return {
         kpis: [
-          { label: "עסקאות תקועות", value: formatNumber(rows.length) },
-          { label: "שווי", value: formatMoney(rows.reduce((s, r) => s + num(r.amount_agorot), 0)) },
+          { label: "עסקאות תקועות", value: formatNumber(rows.filter((r) => r.stuck === true).length) },
+          { label: "שווי התקועות", value: formatMoney(rows.filter((r) => r.stuck === true).reduce((s, r) => s + num(r.amount_agorot), 0)) },
           { label: "בלי צעד הבא", value: formatNumber(rows.filter((r) => r.no_next_step === true).length) },
         ],
         sections: [
@@ -464,7 +464,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
               { key: "stage", label: "שלב", kind: "text" },
               { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "amount", label: "סכום", kind: "money" },
-              { key: "idle_days", label: "ימים בלי פעילות", kind: "number" },
+              { key: "idle_days", label: "ימים מאז פעילות", kind: "number" },
               { key: "days_in_stage", label: "ימים בשלב", kind: "number" },
               { key: "why", label: "למה", kind: "text" },
             ],
@@ -477,11 +477,18 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
                 amount: num(r.amount_agorot),
                 idle_days: num(r.idle_days),
                 days_in_stage: num(r.days_in_stage),
-                why: [r.idle === true ? "אין פעילות" : null, r.no_next_step === true ? "אין משימה או פגישה הבאה" : null].filter(Boolean).join(", "),
+                why: [
+                  r.stuck === true ? `יותר מ-${formatNumber(num(r.limit_days))} ימים בשלב` : null,
+                  r.postponed === true && str(r.snoozed_until) ? `נדחתה עד ${formatDate(str(r.snoozed_until))}` : null,
+                  r.no_next_step === true ? "אין משימה או פגישה הבאה" : null,
+                  r.last_activity_at ? null : "אין פעילות",
+                ]
+                  .filter(Boolean)
+                  .join(", "),
               }),
             ),
             empty: "אין עסקאות תקועות. כל העסקאות הפתוחות מטופלות.",
-            note: "תקועה: אין פעילות יותר ממספר הימים שהוגדר לשלב (ברירת מחדל 14), או שאין לה משימה פתוחה וגם לא פגישה מתוכננת.",
+            note: "תקועה: נמצאת בשלב יותר מהימים שהוגדרו לו (ברירת מחדל 14), ולא נדחתה לתאריך. מופיעות גם עסקאות שנדחו ועסקאות בלי משימה פתוחה ובלי פגישה מתוכננת. התקועות ראשונות, ובתוכן אלה בלי פעילות.",
           },
         ],
       };

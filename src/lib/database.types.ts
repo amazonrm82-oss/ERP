@@ -794,7 +794,10 @@ export type DealRow = {
   status: StageKind;
   probability: number;
   expected_close_date: string | null;
+  // set by trigger on insert and on a change of stage; a person cannot write it (deals_sync_stage_entered)
   stage_entered_at: string;
+  // postponed: not stuck before this day (org time zone); whoever may edit the deal writes it
+  snoozed_until: string | null;
   closed_at: string | null;
   // the picked reason's name (a snapshot, set by trigger), or old free text
   lost_reason: string | null;
@@ -835,6 +838,7 @@ export type DealInsert = {
   team_id?: string | null;
   tag_ids?: string[];
   custom_fields?: Json;
+  snoozed_until?: string | null;
   deleted_at?: string | null;
 };
 

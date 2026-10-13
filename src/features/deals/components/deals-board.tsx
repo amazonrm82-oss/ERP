@@ -11,6 +11,7 @@ import { paths } from "@/lib/paths";
 import { dropDealAction } from "../actions";
 import type { Board, BoardDeal } from "../queries";
 import { STAGE_RULE, stageTone } from "../stage-colors";
+import type { StuckInfo } from "../stuck-text";
 import { entersWon, type CloseWindowSetup } from "../close-window";
 import { DealLossDialog, type LossTarget } from "./deal-loss-dialog";
 import { DealWonDialog, type WonTarget } from "./deal-won-dialog";
@@ -20,7 +21,7 @@ import { DealCardFields, type CardLookups } from "./deal-card-fields";
 const DRAG_TYPE = "application/x-deal-id";
 
 // links built by the page: "showClosed", and one per stage id that opens that stage in full
-// stuck: open deal id -> why it is stuck (DEAL-02)
+// stuck: open deal id -> stuck (time in stage) or no next step, and why (DEAL-01, DEAL-02)
 // lossReasons: the active loss reasons, asked for after a deal is dropped on a lost stage (DEAL-03)
 // closeWindow: what the close window needs when a deal moves into a won stage (DEAL-04); null for a viewer
 type Props = {
@@ -28,7 +29,7 @@ type Props = {
   board: Board;
   canWrite: boolean;
   hrefs: Record<string, string>;
-  stuck: Record<string, string>;
+  stuck: Record<string, StuckInfo>;
   lossReasons: LossReasonOption[];
   closeWindow: CloseWindowSetup | null;
   // DEAL-09: the fields each card shows, in order, and the names they need

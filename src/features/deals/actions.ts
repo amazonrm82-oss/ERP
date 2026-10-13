@@ -19,6 +19,7 @@ import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
 import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
+import { snoozeSchema } from "./snooze";
 
 function revalidateDeal(orgId: string, dealId?: string) {
   revalidatePath(paths.deals(orgId));
@@ -28,6 +29,7 @@ function revalidateDeal(orgId: string, dealId?: string) {
   }
 }
 
+const SNOOZE_CLOSED = "אפשר לדחות רק עסקה פתוחה.";
 const STAGE_GONE = "השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.";
 
 export async function createDealAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -299,6 +301,56 @@ export async function updateDealAction(
   }
   revalidateDeal(orgId, dealId);
   return { ok: true };
+}
+
+/**
+ * Postpones a deal to a day (it is not stuck before then), or clears the postponement
+ * (field clear = 1). Written with the user's session: whoever may edit the deal.
+ */
+export async function snoozeDealAction(orgId: string, dealId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data: org, error: orgError } = await context.supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
+  if (orgError) return fail(dbErrorMessage(orgError));
+  if (!org) return fail(NOT_FOUND_OR_FORBIDDEN);
+  // only an open deal is postponed; a closed one is never stuck
+  const { data: deal, error: dealError } = await context.supabase
+    .from("deals")
+    .select("status")
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (dealError) return fail(dbErrorMessage(dealError));
+  if (!deal) return fail(NOT_FOUND_OR_FORBIDDEN);
+  if (deal.status !== "open") return fail(SNOOZE_CLOSED);
+  let until: string | null = null;
+  if (formData.get("clear") !== "1") {
+    const parsed = snoozeSchema(zoneDate(new Date(), org.timezone || TIME_ZONE)).safeParse(pick(formData, ["snoozed_until"]));
+    if (!parsed.success) {
+      return invalid(parsed.error, formData);
+    }
+    until = parsed.data.snoozed_until;
+  }
+  const { data, error } = await context.supabase
+    .from("deals")
+    .update({ snoozed_until: until })
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .eq("status", "open")
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."), { values: formValues(formData) });
+  }
+  if (data.length === 0) {
+    // closed in the meantime, deleted, or not permitted
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateDeal(orgId, dealId);
+  return ok();
 }
 
 export async function trashDealAction(orgId: string, dealId: string): Promise<ActionResult> {

@@ -126,6 +126,9 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       // TASK-02: how the call ended, then the note
       const outcome = CALL_OUTCOME_LABEL[metaString(activity.metadata, "outcome") ?? ""];
       if (outcome) text = body ? `${outcome}. ${body}` : `${outcome}.`;
+    } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "snooze_cleared") {
+      // written by the database when a move to another stage cancels a postponement
+      isUserContent = false;
     } else if (activity.type === "conversion") {
       text = "הליד הומר לאיש קשר.";
       isUserContent = false;

@@ -10,6 +10,7 @@ import { paths } from "@/lib/paths";
 
 import { daysInStageLabel } from "../board-fields";
 import type { BoardDeal } from "../queries";
+import type { StuckInfo } from "../stuck-text";
 
 // names the page already has: owners and tags by id
 export type CardLookups = { owners: Record<string, string>; tags: Record<string, string>; fields: FieldDefinition[] };
@@ -30,7 +31,7 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
  * The fields a deal card shows, in the user's order (DEAL-09). An empty field is
  * left out, so a card stays short; the deal's name and the stage menu are drawn by the board.
  */
-export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: string; deal: BoardDeal; keys: string[]; stuck: string | undefined; lookups: CardLookups }) {
+export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: string; deal: BoardDeal; keys: string[]; stuck: StuckInfo | undefined; lookups: CardLookups }) {
   const fieldByKey = new Map(lookups.fields.map((field) => [`${CUSTOM_PREFIX}${field.key}`, field]));
   return (
     <>
@@ -43,10 +44,11 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
               </p>
             );
           case "stuck":
+            // stuck by time in stage gets the badge; a deal with only no next step gets the words
             return stuck ? (
               <p key={key} className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
-                <Badge tone="warning">תקועה</Badge>
-                <span>{stuck}</span>
+                {stuck.stuck ? <Badge tone="warning">תקועה</Badge> : null}
+                <span>{stuck.text}</span>
               </p>
             ) : null;
           case "contact":

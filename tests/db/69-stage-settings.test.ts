@@ -66,7 +66,7 @@ describe("stage settings (DEAL-01)", () => {
     expect(await update(member.id, "danger", 3)).toBe(0);
   });
 
-  it("the stuck report uses the stage's days", async () => {
+  it("the stuck report uses the stage's days (time in stage)", async () => {
     await update(owner.id, null, 1);
     const dealId = await asUser(owner.id, async (q) => {
       const pipeline = await defaultPipeline(org);
@@ -77,17 +77,18 @@ describe("stage settings (DEAL-01)", () => {
         )
       ).rows[0].id;
     });
-    // the last thing that happened with it was a call three days ago
+    // it entered the stage three days ago; a call today does not change that (owner, 13 October 2026)
+    await asAdmin((q) => q("update public.deals set stage_entered_at = now() - interval '3 days 1 hour' where id = $1", [dealId]));
     await asUser(owner.id, (q) =>
-      q("insert into public.activities (organization_id, deal_id, type, body, occurred_at) values ($1, $2, 'call', 'שיחה', now() - interval '3 days')", [org, dealId]),
+      q("insert into public.activities (organization_id, deal_id, type, body) values ($1, $2, 'call', 'שיחה')", [org, dealId]),
     );
-    const idle = async () =>
+    const stuck = async () =>
       asUser(owner.id, async (q) => {
-        const report = (await q<{ r: { id: string; idle: boolean }[] }>("select public.report_stuck_deals($1) as r", [org])).rows[0].r;
-        return report.find((row) => row.id === dealId)?.idle ?? false;
+        const report = (await q<{ r: { id: string; stuck: boolean }[] }>("select public.report_stuck_deals($1) as r", [org])).rows[0].r;
+        return report.find((row) => row.id === dealId)?.stuck ?? false;
       });
-    expect(await idle()).toBe(true);
+    expect(await stuck()).toBe(true);
     await update(owner.id, null, 10);
-    expect(await idle()).toBe(false);
+    expect(await stuck()).toBe(false);
   });
 });

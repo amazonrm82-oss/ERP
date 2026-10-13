@@ -35,6 +35,6 @@ export const STAGE_RULE: Record<StageColor, string> = {
   neutral: "border-t-line-strong",
 };
 
-/** Days a deal may sit in a stage before it counts as stuck, when the stage sets none (spec 22.9). */
+/** Days a deal may stay in a stage before it counts as stuck (time in stage, not idle time), when the stage sets none (spec 22.9). */
 export const DEFAULT_ROT_DAYS = 14;
 export const MAX_ROT_DAYS = 365;

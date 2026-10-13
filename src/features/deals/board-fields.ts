@@ -9,7 +9,7 @@ export const BOARD_PREFERENCE = "deal_board" as const;
 // The deal's name is always shown and is not in the catalog. The stage menu is a control, not a field.
 export const BOARD_FIELDS: CatalogColumn[] = [
   { key: "amount", label: "סכום" },
-  // DEAL-02: the "stuck" badge and why
+  // DEAL-01/02: the "stuck" badge (time in stage), no next step, and the last activity
   { key: "stuck", label: "תקועה" },
   { key: "contact", label: "איש קשר" },
   { key: "company", label: "חברה" },

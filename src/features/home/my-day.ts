@@ -33,7 +33,7 @@ function obj(value: unknown): Record<string, unknown> | null {
 
 /**
  * The deals of report_stuck_deals that have no next action, in the function's order
- * (longest idle first). `shown` caps the list; `count` counts them all.
+ * (deals without activity first, then the oldest last activity). `shown` caps the list; `count` counts them all.
  */
 export function dealsWithoutNextStep(raw: unknown, shown: number): DealsWithoutNextStep {
   const rows = Array.isArray(raw) ? raw : [];

@@ -290,7 +290,7 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
 function rotDaysText(rotDays: number | null): string {
   const days = rotDays ?? DEFAULT_ROT_DAYS;
   const text = days === 1 ? "יום אחד" : `${days} ימים`;
-  return `תקועה אחרי ${text} בלי פעילות${rotDays === null ? " (ברירת מחדל)" : ""}`;
+  return `תקועה אחרי ${text} בשלב${rotDays === null ? " (ברירת מחדל)" : ""}`;
 }
 
 type LookProps = {
@@ -303,8 +303,8 @@ type LookProps = {
   children: ReactNode;
 };
 
-// what report_stuck_deals measures: days since the deal's last activity
-const ROT_DAYS_LABEL = "ימים בלי פעילות עד סימון כתקועה";
+// what report_stuck_deals measures: days since the deal entered the stage (owner, 13 October 2026)
+const ROT_DAYS_LABEL = "ימים מרביים בשלב";
 
 /** DEAL-01: the stage's colour (from the design-system palette) and the days a deal may sit in it. */
 function StageLookFields({ stageName, kind, color, rotDays, errors, isNew, children }: LookProps) {

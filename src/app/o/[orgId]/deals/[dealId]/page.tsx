@@ -22,10 +22,12 @@ import { addableDealContacts } from "@/features/deal-contacts/options";
 import { listDealContacts } from "@/features/deal-contacts/queries";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
+import { DealSnoozeForm } from "@/features/deals/components/deal-snooze-form";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
 import { stageTone } from "@/features/deals/stage-colors";
+import { isSnoozed } from "@/features/deals/snooze";
 import { getStuckDeals } from "@/features/deals/stuck";
 import { DEFAULT_CALENDAR_SETTINGS } from "@/features/calendar-days/holidays";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
@@ -76,7 +78,8 @@ export default async function DealPage({ params, searchParams }: Props) {
     calendar,
     context.user.id,
   );
-  const stuckReason = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
+  const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
+  const today = zoneDate(new Date(), context.org.timeZone);
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
   const amount = deal.amount_agorot;
@@ -98,11 +101,11 @@ export default async function DealPage({ params, searchParams }: Props) {
         }
       />
 
-      {stuckReason ? (
+      {attention && (attention.stuck || attention.noNextStep) ? (
         <p role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          <span className="font-semibold">העסקה תקועה:</span>
-          <span>{stuckReason}.</span>
-          <span>כדאי לקבוע משימה הבאה או לתעד מה קרה.</span>
+          <span className="font-semibold">{attention.stuck ? "העסקה תקועה:" : "אין צעד הבא:"}</span>
+          <span>{attention.text}.</span>
+          <span>{attention.stuck ? "כדאי לקדם אותה, לדחות אותה לתאריך או לסגור." : "כדאי לקבוע משימה הבאה או לתעד מה קרה."}</span>
         </p>
       ) : null}
       <div className="mb-5">
@@ -151,6 +154,16 @@ export default async function DealPage({ params, searchParams }: Props) {
                   closeWindow={closeWindow}
                   amountAgorot={amount}
                   ownerId={deal.owner_id}
+                />
+              ) : null}
+              {canEdit && deal.status === "open" ? (
+                <DealSnoozeForm
+                  orgId={orgId}
+                  dealId={deal.id}
+                  snoozedUntil={deal.snoozed_until}
+                  snoozed={isSnoozed(deal.snoozed_until, today)}
+                  today={today}
+                  timeZone={context.org.timeZone}
                 />
               ) : null}
             </CardBody>
