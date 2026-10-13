@@ -26,6 +26,7 @@ import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
+import { utmValues } from "@/features/leads/schema";
 import { canEditRecordHint, getOrgContext, getUserNames } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
@@ -181,6 +182,9 @@ export default async function LeadPage({ params, searchParams }: Props) {
               lastContactText: lead.last_contacted_at ? formatDateTime(lead.last_contacted_at) : null,
               custom: { definitions: fields, values: asCustomValues(lead.custom_fields) },
               attribution: attributionRows(lead),
+              campaign: lead.campaign,
+              budgetAgorot: lead.budget_agorot,
+              utm: utmValues(lead.utm),
             }}
           />
 

@@ -15,7 +15,17 @@ import { normalizePhone } from "@/lib/phone";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
-import { changeStatusSchema, convertLeadSchema, createLeadSchema, LEAD_FIELD_NAMES, updateLeadSchema } from "./schema";
+import {
+  campaignInsert,
+  campaignUpdate,
+  changeStatusSchema,
+  convertLeadSchema,
+  createLeadSchema,
+  LEAD_CAMPAIGN_FIELD_NAMES,
+  LEAD_FIELD_NAMES,
+  leadCampaignSchema,
+  updateLeadSchema,
+} from "./schema";
 import { setLeadStatus, validateStatusChoice } from "./status";
 
 function revalidateLead(orgId: string, leadId?: string) {
@@ -102,6 +112,11 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+  // LEAD-01: campaign, budget and UTM
+  const campaign = leadCampaignSchema.safeParse(pick(formData, LEAD_CAMPAIGN_FIELD_NAMES));
+  if (!campaign.success) {
+    return invalid(campaign.error, formData);
+  }
 
   // RVW-9: the same rules as a status change (no "converted"; "not relevant" needs a reason)
   const choice = await validateStatusChoice(context.supabase, orgId, parsed.data.status_id, parsed.data.disqualify_reason ?? null);
@@ -130,7 +145,13 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   // owner_id is left out: the database assigns the lead to its creator.
   const { data, error } = await context.supabase
     .from("leads")
-    .insert({ organization_id: orgId, ...parsed.data, disqualify_reason: choice.reason, ...customFieldsPatch(custom.customFields) })
+    .insert({
+      organization_id: orgId,
+      ...parsed.data,
+      ...campaignInsert(campaign.data),
+      disqualify_reason: choice.reason,
+      ...customFieldsPatch(custom.customFields),
+    })
     .select("id")
     .single();
   if (error) {
@@ -155,6 +176,14 @@ export async function updateLeadAction(
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+  // LEAD-01: campaign, budget and UTM (utm is merged in the database, utm.extra stays).
+  // Written only when the form carries them, so a form without them never empties them.
+  const withCampaign = LEAD_CAMPAIGN_FIELD_NAMES.every((name) => formData.has(name));
+  const campaign = leadCampaignSchema.safeParse(pick(formData, LEAD_CAMPAIGN_FIELD_NAMES));
+  if (withCampaign && !campaign.success) {
+    return invalid(campaign.error, formData);
+  }
+  const campaignPatch = withCampaign && campaign.success ? campaignUpdate(campaign.data) : {};
 
   const custom = await customFieldsFromForm(orgId, "lead", formData, leadId);
   if (!custom.ok) {
@@ -163,7 +192,7 @@ export async function updateLeadAction(
 
   const { data, error } = await context.supabase
     .from("leads")
-    .update({ ...parsed.data, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...campaignPatch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

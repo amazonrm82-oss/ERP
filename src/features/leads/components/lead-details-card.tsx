@@ -14,9 +14,12 @@ import { CustomFieldInputs } from "@/features/custom-fields/components/custom-fi
 import type { AttributionRow } from "@/features/intake/attribution";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
+import { formatMoney } from "@/lib/format";
 
 import { updateLeadAction } from "../actions";
 import type { LeadSourceOption } from "../queries";
+import { budgetInputValue, LEAD_UTM_KEYS, type LeadUtmKey } from "../schema";
+import { LeadCampaignFields } from "./lead-campaign-fields";
 
 export type LeadDetailsView = {
   id: string;
@@ -36,6 +39,10 @@ export type LeadDetailsView = {
   custom: { definitions: FieldDefinition[]; values: CustomValues };
   // CAP-02: campaign, UTM, pages and ad click ids the lead arrived with (first touch); only lines with a value
   attribution?: AttributionRow[];
+  // LEAD-01: the editable part of it, plus the budget (agorot)
+  campaign?: string | null;
+  budgetAgorot?: number | null;
+  utm?: Partial<Record<LeadUtmKey, string>>;
 };
 
 type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean };
@@ -71,6 +78,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
           <Detail label="חברה" value={lead.companyName} />
           <Detail label="מקור" value={sourceName} />
           <Detail label="אחראי" value={lead.ownerName} />
+          <Detail label="תקציב" value={lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null} />
           <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
           <Detail label="נוצר" value={lead.createdAtText} />
           {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
@@ -172,6 +180,15 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             maxLength={5000}
             defaultValue={values?.message ?? lead.message ?? ""}
             error={errors.message}
+          />
+          <LeadCampaignFields
+            values={{
+              campaign: values?.campaign ?? lead.campaign ?? "",
+              budget: values?.budget ?? budgetInputValue(lead.budgetAgorot ?? null),
+              ...Object.fromEntries(LEAD_UTM_KEYS.map((key) => [key, values?.[key] ?? lead.utm?.[key] ?? ""])),
+            }}
+            errors={errors}
+            readOnlyNote
           />
           <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} />
           <div className="flex flex-wrap gap-2">

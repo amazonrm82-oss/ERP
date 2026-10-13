@@ -15,6 +15,7 @@ import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
 import { createLeadAction } from "../actions";
+import { LeadCampaignFields } from "./lead-campaign-fields";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
 // reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
@@ -124,6 +125,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
           error={errors.disqualify_reason}
         />
       ) : null}
+      <LeadCampaignFields values={values} errors={errors} />
       <TextareaField
         label="הודעה או הערה ראשונה"
         name="message"

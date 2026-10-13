@@ -35,7 +35,24 @@ function toChanges(action: string, changes: Json): AuditChange[] {
     // only {old, new} pairs are changes; a plain value is context (REC-05: which record a note was on)
     if (!value || typeof value !== "object" || Array.isArray(value) || !("old" in value || "new" in value)) return [];
     const pair = value as Record<string, Json>;
+    if (field === "utm") return utmChanges(pair.old ?? null, pair.new ?? null);
     return [{ field, old: pair.old ?? null, new: pair.new ?? null }];
+  });
+}
+
+function asObject(value: Json): Record<string, Json | undefined> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+/** LEAD-01: a change of leads.utm, key by key ("utm.utm_source"), only the keys that changed. */
+export function utmChanges(oldValue: Json, newValue: Json): AuditChange[] {
+  const before = asObject(oldValue);
+  const after = asObject(newValue);
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+  return keys.flatMap((key) => {
+    const o = before[key] ?? null;
+    const n = after[key] ?? null;
+    return JSON.stringify(o) === JSON.stringify(n) ? [] : [{ field: `utm.${key}`, old: o, new: n }];
   });
 }
 

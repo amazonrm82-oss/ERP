@@ -1230,7 +1230,7 @@ try {
 
   await ownerDesk.goto(`${orgUrl}/leads/new`);
   await ownerDesk.getByLabel("שם מלא").fill("רחל לוי");
-  await ownerDesk.getByLabel("תקציב").selectOption("10,000-50,000");
+  await ownerDesk.getByLabel("תקציב", { exact: true }).selectOption("10,000-50,000");
   await ownerDesk.getByLabel("ייעוץ", { exact: true }).check();
   await ownerDesk.getByLabel("תחזוקה", { exact: true }).check();
   await ownerDesk.getByLabel("מקדמה").fill("1,500");
