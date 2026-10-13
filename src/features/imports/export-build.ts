@@ -81,6 +81,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "member_leaves", file: "member_leaves.csv" },
   { table: "org_document_settings", file: "document_settings.csv" },
   { table: "org_bank_details", file: "bank_details.csv" },
+  // CAP-10
+  { table: "lead_response_settings", file: "response_settings.csv" },
   // DQL-01: the important fields per record type
   { table: "completeness_settings", file: "completeness_settings.csv" },
   { table: "files", file: "files.csv" },

@@ -2,8 +2,8 @@ import { formatNumber } from "@/lib/format";
 
 /**
  * Labels of the response time report (SPD-06), built from the target the
- * database returns (`target_minutes`), never hard-coded: 60 minutes by default
- * until CAP-10 lets each business set its own.
+ * database returns (`target_minutes`), never hard-coded: the business's own
+ * target (CAP-10, /settings/response), 60 minutes until it sets one.
  */
 export function responseTargetLabels(targetMinutes: number) {
   const minutes = formatNumber(targetMinutes);

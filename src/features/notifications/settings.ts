@@ -11,7 +11,7 @@ export const NOTIFICATION_KINDS = [
   { key: "inquiry", label: "ליד או איש קשר פנו שוב", group: "records", shown: true },
   { key: "mention", label: "הזכירו אותי בהערה", group: "records", shown: true },
   { key: "follow", label: "עדכונים ברשומות שבמעקב שלי", group: "records", shown: true },
-  { key: "response_overdue", label: "ליד מחכה למענה יותר מהזמן שנקבע", group: "records", shown: false },
+  { key: "response_overdue", label: "ליד מחכה למענה יותר מהזמן שנקבע", group: "records", shown: true },
   { key: "task_reminder", label: "תזכורות למשימות", group: "calendar", shown: true },
   { key: "meeting_scheduled", label: "נקבעה לי פגישה", group: "calendar", shown: true },
   { key: "meeting_reminder", label: "תזכורות לפגישות", group: "calendar", shown: true },

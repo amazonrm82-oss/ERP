@@ -129,6 +129,22 @@ export type OrgDocumentSettingsRow = {
   created_at: string;
   updated_at: string;
 };
+// CAP-10 (migration response_target): the response target for a new lead and what happens when it is missed;
+// at most one row per organization, no row = 60 minutes / notify
+export type LeadResponseSettingsRow = {
+  id: string;
+  organization_id: string;
+  // working minutes, 5..1440
+  target_minutes: number;
+  // text with a check: notify | none
+  breach_action: string;
+  created_at: string;
+  updated_at: string;
+};
+type LeadResponseSettingsWrite = {
+  target_minutes?: number;
+  breach_action?: string;
+};
 // TAX-02 follow-up (migration org_bank_details): owners and admins only
 export type OrgBankDetailsRow = {
   id: string;
@@ -1553,6 +1569,7 @@ export type Database = {
         { mode?: string; target_field_id?: string | null }
       >;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
+      lead_response_settings: Table<LeadResponseSettingsRow, LeadResponseSettingsWrite & { organization_id: string }, LeadResponseSettingsWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
     };

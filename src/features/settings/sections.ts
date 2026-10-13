@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 
 import {
+  BellIcon,
   BoardIcon,
   BoltIcon,
   ChartIcon,
@@ -23,6 +24,7 @@ import { priceListsPath } from "@/features/price-lists/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
+import { responseSettingsPath } from "@/features/response-target/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
 
@@ -94,12 +96,16 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
     },
     {
       label: "לידים ואוטומציות",
-      sections: access.admin
-        ? [
-            { href: paths.settingsIntake(orgId), label: "טפסים וחיבורים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon },
-            { href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon },
-          ]
-        : [],
+      sections: [
+        ...(access.admin
+          ? [
+              { href: paths.settingsIntake(orgId), label: "טפסים וחיבורים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon },
+              { href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon },
+            ]
+          : []),
+        // CAP-10: everyone reads it; owners and admins change it
+        { href: responseSettingsPath(orgId), label: "יעד זמן תגובה", description: "תוך כמה זמן עונים לליד חדש, ומה קורה כשלא", icon: BellIcon },
+      ],
     },
     {
       label: "נתונים",

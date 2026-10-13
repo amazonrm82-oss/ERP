@@ -721,6 +721,37 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("everyone reads the response target; only owners and admins set it, and the reports follow it (CAP-10)", async () => {
+    const insert = "insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(insert, [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(insert, [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.lead_response_settings where organization_id = $1", [org]), u.email).toBe(1);
+        expect((await q<{ t: number }>("select app.response_target_minutes($1) as t", [org])).rows[0].t, u.email).toBe(30);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.lead_response_settings set target_minutes = 90 where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("delete from public.lead_response_settings where organization_id = $1", [org])).rowCount).toBe(0);
+      });
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.lead_response_settings set target_minutes = 90 where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    expect(
+      await asAdmin(async (q) => (await q<{ t: number }>("select target_minutes as t from public.lead_response_settings where organization_id = $1", [org])).rows[0].t),
+    ).toBe(90);
+    await asUser(admin.id, async (q) => {
+      expect((await q("delete from public.lead_response_settings where organization_id = $1", [org])).rowCount).toBe(1);
+      // no row: the initial 60
+      expect((await q<{ t: number }>("select app.response_target_minutes($1) as t", [org])).rows[0].t).toBe(60);
+    });
+  });
+
   it("everyone reads the important fields; only owners and admins change them (DQL-01)", async () => {
     for (const u of [owner, admin, manager, m1, viewer]) {
       await asUser(u.id, async (q) => {

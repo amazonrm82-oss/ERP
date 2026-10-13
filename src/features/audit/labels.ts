@@ -56,6 +56,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   price_list_lines: "מחיר במחירון",
   // DQL-01
   completeness_settings: "שדות חשובים",
+  // CAP-10
+  lead_response_settings: "יעד זמן תגובה",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -90,6 +92,9 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
 export const FIELD_LABELS: Record<string, string> = {
   // CAP-09
   working_hours: "שעות עבודה",
+  // CAP-10
+  target_minutes: "יעד בדקות",
+  breach_action: "פעולה בחריגה",
   starts_on: "מתאריך",
   ends_on: "עד תאריך",
   full_name: "שם",
