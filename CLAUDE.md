@@ -274,6 +274,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `src/features/whatsapp/templates.ts` mirrors it (unit test). The record WhatsApp button (`whatsappLog` on `ContactActions`)
   fills a template with `fillTemplate()`, opens wa.me and logs a `whatsapp` activity (`metadata.via = 'link'`, mention
   tokens flattened) with the user's session. GAP-03 reuses `fillTemplate` and the `meeting_reminder` template, which may be gone.
+- Tomorrow's reminders (GAP-03, no migration): `/o/[org]/calendar/tomorrow` (`src/features/calendar/tomorrow*.ts`) lists the
+  user's meetings of tomorrow via `listCalendarItems` and their contact (else lead), read with the user's session; the WA-01
+  button opens with the `meeting_reminder` template preselected (`preselectId`) and fills {תאריך}/{שעה}.
+- New field while importing (IMP-01, no migration): owners/admins create a `field_definitions` row from an unmapped column
+  with `createImportFieldAction()` (same `createFieldSchema` and insert as the settings page; no `user` type); type guess and
+  list choices from the column in `src/features/imports/new-field.ts` (at most 50). Undoing the import keeps the field.
 - Deal contacts (CON-03, migration 0111): `deal_contacts.role` is null or `decision_maker|influencer|user|finance`
   (`deal_contacts_role_check`, mirrored by `src/features/deal-contacts/roles.ts`, unit test). Clients update only `role`
   (column grant); a new link needs an editable deal and a live contact the caller reads (`deal_contacts_insert`). Not audited.
