@@ -34,6 +34,9 @@ export function needsSecondStep(error: unknown): boolean {
 // means either "not found" or "not allowed"; the database does not say which.
 export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לכם הרשאה לערוך אותה.";
 
+// TAX-03: no VAT rate is known for a document's date (before the first row of public.vat_rates)
+export const VAT_BEFORE_TABLE = 'תאריך המסמך מוקדם מכל שיעורי המע"מ שבמערכת, ולכן אי אפשר לחשב לו מע"מ. בחרו תאריך מאוחר יותר.';
+
 const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_records": "הגעתם למספר הרשומות המרבי בחבילה. אפשר לפנות מקום, או לבקש מבעלי העסק חבילה גדולה יותר. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:max_users": "הגעתם למספר המשתמשים המרבי בחבילה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -58,6 +61,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:closed_at": "תאריך הסגירה לא יכול להיות בעתיד.",
   // stuck by time in stage (migration deal_stage_entered)
   "deal:snoozed_until": "אפשר לדחות עסקה ליום שאחרי היום, עד שנה קדימה.",
+  // TAX-03 (migration vat_rates, app.document_vat_rate): a document dated before the first VAT rate
+  "vat:before_table": VAT_BEFORE_TABLE,
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

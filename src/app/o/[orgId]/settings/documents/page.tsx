@@ -9,9 +9,11 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { DocumentDetailsForm } from "@/features/tax/components/document-details-form";
 import { TaxStatusForm } from "@/features/tax/components/tax-status-form";
-import { getDocumentDetails, getTaxSettings } from "@/features/tax/queries";
+import { VatRatesCard } from "@/features/tax/components/vat-rates-card";
+import { getDocumentDetails, getTaxSettings, getVatRates } from "@/features/tax/queries";
 import { bankTransferText, documentAddress } from "@/features/tax/settings";
 import { chargesVat, LEGAL_FORM_OPTIONS, vatStatusLabel } from "@/features/tax/status";
+import { zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: 'מע"מ ופרטים למסמכים' };
@@ -25,10 +27,12 @@ function chargesText(value: boolean | null): string {
 
 // TAX-01: the business's VAT status, apart from its legal form.
 // TAX-02: the business details printed on quotes and payment requests.
+// TAX-03: the VAT rate of today and its history (read only; the platform sets it).
 export default async function DocumentSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite, org } = await getOrgContext(orgId);
-  const [tax, details, branding] = await Promise.all([getTaxSettings(orgId), getDocumentDetails(orgId), getOrgBranding(orgId)]);
+  const [tax, details, branding, rates] = await Promise.all([getTaxSettings(orgId), getDocumentDetails(orgId), getOrgBranding(orgId), getVatRates()]);
+  const ratesCard = <VatRatesCard rates={rates} today={zoneDate(new Date(), org.timeZone)} charges={chargesVat(tax.vatStatus, tax.otherChargesVat)} />;
   const editable = isAdminRole(role) && canWrite;
 
   // the logo on documents is the business logo (FLD-04); it is changed with the branding
@@ -54,6 +58,7 @@ export default async function DocumentSettingsPage({ params }: Props) {
     return (
       <div className="space-y-5">
         <TaxStatusForm orgId={orgId} settings={tax} />
+        {ratesCard}
         <DocumentDetailsForm orgId={orgId} details={details} />
         {logoCard}
       </div>
@@ -72,6 +77,7 @@ export default async function DocumentSettingsPage({ params }: Props) {
           </DetailList>
         </CardBody>
       </Card>
+      {ratesCard}
       <Card aria-labelledby="doc-details-title">
         <CardHeader id="doc-details-title" title="פרטי העסק במסמכים" />
         <CardBody>

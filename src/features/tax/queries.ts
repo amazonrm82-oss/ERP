@@ -5,6 +5,7 @@ import { cache } from "react";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import type { VatRate } from "./rates";
 import { DETAILS_COLUMNS, documentDetailsFromRow, TAX_COLUMNS, taxSettingsFromRow, type DocumentDetails, type TaxSettings } from "./settings";
 
 /**
@@ -28,4 +29,11 @@ export const getDocumentDetails = cache(async (orgId: string): Promise<DocumentD
     "org document details",
   );
   return documentDetailsFromRow(row);
+});
+
+/** Every VAT rate of the platform (TAX-03), oldest first; a handful of rows. */
+export const getVatRates = cache(async (): Promise<VatRate[]> => {
+  const supabase = await createClient();
+  const rows = must(await supabase.from("vat_rates").select("effective_from, rate_bp").order("effective_from"), "vat rates");
+  return rows.map((row) => ({ effectiveFrom: row.effective_from, rateBp: row.rate_bp }));
 });

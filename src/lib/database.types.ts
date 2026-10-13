@@ -84,6 +84,16 @@ export type OrgDocumentSettingsRow = {
   created_at: string;
   updated_at: string;
 };
+// TAX-03 (migration vat_rates): platform table, read by every signed-in user, written by no client
+export type VatRateRow = {
+  id: string;
+  effective_from: string;
+  // basis points: 1800 = 18%
+  rate_bp: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
 type OrgDocumentSettingsWrite = {
   legal_form?: "individual" | "company" | "partnership" | "nonprofit" | "other" | null;
   vat_status?: "licensed" | "exempt" | "nonprofit" | "other" | null;
@@ -1279,6 +1289,7 @@ export type Database = {
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
+      vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
     };
     Views: { [_ in never]: never };
     Functions: {
