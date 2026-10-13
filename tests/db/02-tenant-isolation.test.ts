@@ -111,6 +111,7 @@ describe("tenant isolation", () => {
       ).rows[0].id;
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של א')", [orgA]);
       await q("insert into public.deal_loss_reasons (organization_id, name) values ($1, 'סיבת הפסד של א')", [orgA]);
+      await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-10-01', 'won_amount', 100000)", [orgA]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
     });
@@ -158,6 +159,8 @@ describe("tenant isolation", () => {
     "whatsapp_templates",
     // DEAL-03, also seeded
     "deal_loss_reasons",
+    // GOL-01
+    "goals",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -274,6 +277,7 @@ describe("tenant isolation", () => {
       contact_channels: "label = label",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
+      goals: "target = target",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -349,6 +353,7 @@ describe("tenant isolation", () => {
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -408,6 +413,7 @@ describe("tenant isolation", () => {
       ["contact_channels", "label = 'work'", "label = 'work'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
+      ["goals", "target = 777", "target = 777"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

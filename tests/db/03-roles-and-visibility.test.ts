@@ -242,6 +242,7 @@ describe("roles and record visibility", () => {
       "insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'x')",
       "insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')",
       "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
+      "insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-01-01', 'won_deals', 1)",
       "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'x', 'x', 'text')",
     ]) {
       expect((await pgError(asUser(m1.id, (q) => q(sql, [org])))).code, sql).toBe("42501");
@@ -259,6 +260,7 @@ describe("roles and record visibility", () => {
       await q("insert into public.tags (organization_id, name) values ($1, 'תגית של מנהל')", [org]);
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של מנהל')", [org]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'סוג של מנהל')", [org]);
+      await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'year', '2026-01-01', 'won_amount', 5000000)", [org]);
       await q(
         "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'contact', 'hobby', 'תחביב', 'text')",
         [org],
@@ -279,6 +281,7 @@ describe("roles and record visibility", () => {
       record_type_options: "name = name",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
+      goals: "target = target",
       field_definitions: "label = label",
       teams: "name = name",
       team_members: "is_manager = is_manager",

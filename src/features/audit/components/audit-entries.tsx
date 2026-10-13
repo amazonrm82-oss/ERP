@@ -3,7 +3,7 @@ import type { Json } from "@/lib/database.types";
 import { formatDateTime } from "@/lib/format";
 import { isUuid } from "@/lib/paths";
 
-import { ACTION_LABELS, ENTITY_LABELS, FIELD_LABELS, HIDDEN_FIELDS } from "../labels";
+import { ACTION_LABELS, ENTITY_LABELS, FIELD_LABELS, HIDDEN_FIELDS, VALUE_LABELS } from "../labels";
 import type { AuditItem } from "../queries";
 
 function show(value: Json, field: string, names: Map<string, string>): string {
@@ -14,6 +14,8 @@ function show(value: Json, field: string, names: Map<string, string>): string {
   if ((field === "phone_type" || field === "email_type") && typeof value === "string") {
     return channelTypeLabel(field === "phone_type" ? "phone" : "email", value) ?? value;
   }
+  // GOL-01: coded values (a goal's metric, scope and period) in Hebrew; an unknown code stays as it is
+  if (typeof value === "string" && VALUE_LABELS[field]?.[value]) return VALUE_LABELS[field][value];
   if (typeof value === "string") {
     const text: string = value;
     // isUuid() is a type guard ("is string"); a plain boolean keeps the string type afterwards

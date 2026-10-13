@@ -782,6 +782,22 @@ export type DealLossReasonRow = {
   updated_at: string;
 };
 
+// GOL-01: a target per person, team or organization, period and metric (migration goals).
+// scope, period and metric are text with check constraints (GoalScope, GoalPeriod, GoalMetric in src/features/goals/metrics.ts).
+export type GoalRow = {
+  id: string;
+  organization_id: string;
+  scope: string;
+  user_id: string | null;
+  team_id: string | null;
+  period: string;
+  period_start: string;
+  metric: string;
+  target: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealRow = {
   id: string;
   organization_id: string;
@@ -1201,6 +1217,12 @@ export type Database = {
       leads: Table<LeadRow, LeadInsert>;
       deals: Table<DealRow, DealInsert>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)
+      goals: Table<
+        GoalRow,
+        { organization_id: string; scope: string; user_id?: string | null; team_id?: string | null; period: string; period_start: string; metric: string; target: number },
+        { target?: number }
+      >;
       // CON-03: only the role changes (column-level update grant)
       deal_contacts: Table<
         DealContactRow,

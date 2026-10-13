@@ -1,5 +1,7 @@
 // Hebrew names for what the audit log records.
 
+import { GOAL_METRICS, GOAL_PERIOD_LABELS, GOAL_SCOPE_LABELS } from "@/features/goals/metrics";
+
 export const ENTITY_LABELS: Record<string, string> = {
   leads: "ליד",
   contacts: "איש קשר",
@@ -25,6 +27,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   deal_loss_reasons: "סיבת הפסד",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
+  // GOL-01
+  goals: "יעד",
   // CON-02
   record_type_options: "סוג איש קשר או חברה",
   subscriptions: "מנוי",
@@ -91,6 +95,12 @@ export const FIELD_LABELS: Record<string, string> = {
   expected_close_date: "תאריך סגירה צפוי",
   lost_reason: "סיבת הפסד",
   competitor: "מתחרה",
+  // GOL-01: a goal
+  target: "יעד",
+  metric: "מדד",
+  period: "תקופה",
+  period_start: "תחילת התקופה",
+  scope: "יעד של",
   message: "הודעה",
   campaign: "קמפיין",
   // LEAD-01: budget and the UTM values of a lead (a utm change is listed key by key)
@@ -151,4 +161,11 @@ export const FIELD_LABELS: Record<string, string> = {
   email_type: "סוג האימייל",
   extra_phone: "טלפון נוסף",
   extra_email: "אימייל נוסף",
+};
+
+/** Hebrew for coded values, by field (GOL-01: a goal's metric, scope and period). */
+export const VALUE_LABELS: Record<string, Record<string, string>> = {
+  metric: Object.fromEntries(GOAL_METRICS.map((m) => [m.key, m.label])),
+  scope: GOAL_SCOPE_LABELS,
+  period: GOAL_PERIOD_LABELS,
 };
