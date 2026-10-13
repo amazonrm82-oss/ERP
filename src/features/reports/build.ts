@@ -7,7 +7,7 @@ import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ReportRow, ReportView } from "./definitions";
-import { formatCell } from "./format";
+import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
 import { must } from "@/lib/db-read";
 
@@ -170,16 +170,38 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
     }
 
     case "response": {
-      const rows = list(await rpc("report_response_time", { ...range, p_owner: ownerId }));
+      const [ownerData, breakdownData] = await Promise.all([
+        rpc("report_response_time", { ...range, p_owner: ownerId }),
+        rpc("report_response_breakdown", { ...range, p_owner: ownerId }),
+      ]);
+      const rows = list(ownerData);
+      const breakdown = obj(breakdownData);
+      const target = num(breakdown.target_minutes);
+      const targetLabel = formatCell("minutes", target);
+      const shareNote = `האחוז בעמודת "תוך ${targetLabel}" הוא מתוך כל הלידים בתקופה, כולל לידים שעוד לא נוצר איתם מגע.`;
       const name = await ownerNames(rows.map((r) => r.owner_id));
       const leads = rows.reduce((s, r) => s + num(r.leads), 0);
       const contacted = rows.reduce((s, r) => s + num(r.contacted), 0);
-      const withinHour = rows.reduce((s, r) => s + num(r.within_hour), 0);
+      const withinTarget = rows.reduce((s, r) => s + num(r.within_target), 0);
       const weighted = rows.reduce((s, r) => s + num(r.avg_minutes) * num(r.contacted), 0);
+      const measures = (r: Obj) => ({
+        leads: num(r.leads),
+        contacted: num(r.contacted),
+        within_target: pct(num(r.within_target), num(r.leads)),
+        avg: numOrNull(r.avg_minutes),
+        median: numOrNull(r.median_minutes),
+      });
+      const measureColumns = [
+        { key: "leads", label: "לידים", kind: "number" as const },
+        { key: "contacted", label: "נוצר מגע", kind: "number" as const },
+        { key: "within_target", label: `תוך ${targetLabel}`, kind: "percent" as const },
+        { key: "avg", label: "ממוצע", kind: "minutes" as const },
+        { key: "median", label: "חציון", kind: "minutes" as const },
+      ];
       return {
         kpis: [
           { label: "זמן ממוצע עד מגע ראשון", value: contacted ? formatCell("minutes", weighted / contacted) : "—" },
-          { label: "טופלו תוך שעה", value: leads ? `${pct(withinHour, leads)}%` : "—" },
+          { label: "נענו בתוך היעד", value: leads ? `${pct(withinTarget, leads)}%` : "—", hint: `היעד: מגע ראשון תוך ${targetLabel}` },
           { label: "לידים בלי מגע", value: formatNumber(leads - contacted) },
         ],
         sections: [
@@ -187,22 +209,28 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי חבר צוות",
             columns: [
               { key: "owner", label: "חבר צוות", kind: "text" },
-              { key: "leads", label: "לידים", kind: "number" },
-              { key: "contacted", label: "נוצר מגע", kind: "number" },
-              { key: "avg", label: "ממוצע", kind: "minutes" },
-              { key: "median", label: "חציון", kind: "minutes" },
+              ...measureColumns,
               { key: "within_hour", label: "תוך שעה", kind: "percent" },
             ],
-            rows: rows.map((r) => ({
-              owner: name(r.owner_id),
-              leads: num(r.leads),
-              contacted: num(r.contacted),
-              avg: numOrNull(r.avg_minutes),
-              median: numOrNull(r.median_minutes),
-              within_hour: pct(num(r.within_hour), num(r.leads)),
-            })),
+            rows: rows.map((r) => ({ owner: name(r.owner_id), ...measures(r), within_hour: pct(num(r.within_hour), num(r.leads)) })),
             empty: "אין לידים בתקופה הזו.",
-            note: "מגע ראשון: השיחה, הפגישה, ההודעה או ההערה הראשונה שנרשמה בליד. בציר הזמן של הליד בוחרים את סוג הפעילות.",
+            note: `מגע ראשון: השיחה, הפגישה, ההודעה או ההערה הראשונה שנרשמה בליד (לא הערה פרטית). בציר הזמן של הליד בוחרים את סוג הפעילות. ${shareNote}`,
+          },
+          {
+            title: "לפי מקור",
+            columns: [{ key: "source", label: "מקור", kind: "text" }, ...measureColumns],
+            rows: list(breakdown.by_source as Json).map((r) => ({ source: str(r.source_name) ?? "ללא מקור", ...measures(r) })),
+            bar: "leads",
+            empty: "אין לידים בתקופה הזו.",
+            note: shareNote,
+          },
+          {
+            title: "לפי שעת ההגעה",
+            columns: [{ key: "hour", label: "הליד הגיע", kind: "text" }, ...measureColumns],
+            rows: list(breakdown.by_hour as Json).map((r) => ({ hour: hourLabel(num(r.hour)), ...measures(r) })),
+            bar: "leads",
+            empty: "אין לידים בתקופה הזו.",
+            note: `השעה לפי אזור הזמן של העסק. ${shareNote} הזמן נספר בשעון רגיל, גם מחוץ לשעות העבודה.`,
           },
         ],
       };

@@ -37,3 +37,10 @@ export function csvCell(kind: ColumnKind, value: string | number | null | undefi
   }
   return `"${defuseFormula(value).replace(/"/g, '""')}"`;
 }
+
+const twoDigits = (n: number) => String(n).padStart(2, "0");
+
+/** An hour of the day as a row label: "בין 08:00 ל-09:00". Hebrew words between the times keep their order in right-to-left text. */
+export function hourLabel(hour: number): string {
+  return `בין ${twoDigits(hour)}:00 ל-${twoDigits((hour + 1) % 24)}:00`;
+}

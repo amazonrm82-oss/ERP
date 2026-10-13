@@ -12,7 +12,7 @@ export type ReportDefinition = {
 export const REPORTS: ReportDefinition[] = [
   { key: "sources", title: "לידים לפי מקור", description: "כמות, אחוז המרה והכנסה לכל מקור וקמפיין.", filters: ["period", "owner"] },
   { key: "funnel", title: "משפך המרה", description: "כמה עברו מכל שלב לשלב הבא, והיכן נושרים.", filters: ["period", "owner", "pipeline"] },
-  { key: "response", title: "זמן תגובה לליד", description: "זמן ממוצע עד מגע ראשון, לפי אחראי.", filters: ["period", "owner"] },
+  { key: "response", title: "זמן תגובה לליד", description: "זמן עד מגע ראשון ואחוז הלידים שנענו בתוך היעד, לפי אחראי, מקור ושעה.", filters: ["period", "owner"] },
   { key: "reps", title: "ביצועי חברי הצוות", description: "עסקאות שנסגרו, סכום ואחוז סגירה בהצלחה לכל חבר צוות.", filters: ["period", "pipeline"] },
   { key: "activity", title: "פעילות", description: "שיחות, פגישות, הודעות ומשימות לחבר צוות וליום.", filters: ["period", "owner"] },
   { key: "forecast", title: "תחזית הכנסות", description: "שווי משוקלל של עסקאות פתוחות לפי חודש סגירה צפוי.", filters: ["owner", "pipeline"] },

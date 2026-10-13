@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { csvCell, formatCell } from "@/features/reports/format";
+import { csvCell, formatCell, hourLabel } from "@/features/reports/format";
 import { formatMoney, parseMoneyToAgorot } from "@/lib/format";
 
 // Intl puts direction marks and non-breaking spaces into Hebrew currency text
@@ -47,5 +47,13 @@ describe("report cells", () => {
     expect(csvCell("text", null)).toBe("");
     expect(csvCell("text", 'שם "מצוטט"')).toBe('"שם ""מצוטט"""');
     expect(csvCell("text", "=HYPERLINK(1)").startsWith("\"'")).toBe(true);
+  });
+});
+
+describe("response time by hour (SPD-06)", () => {
+  it("labels an hour of the day with its start and end", () => {
+    expect(hourLabel(8)).toBe("בין 08:00 ל-09:00");
+    expect(hourLabel(0)).toBe("בין 00:00 ל-01:00");
+    expect(hourLabel(23)).toBe("בין 23:00 ל-00:00");
   });
 });

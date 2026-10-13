@@ -1213,6 +1213,7 @@ export type Database = {
       report_leads_by_source: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_funnel: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null; p_pipeline?: string | null }; Returns: Json };
       report_response_time: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
+      report_response_breakdown: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_rep_performance: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null }; Returns: Json };
       report_activity: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
