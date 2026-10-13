@@ -54,6 +54,22 @@ export type CompletenessSettingsRow = {
   updated_at: string;
 };
 
+// LEAD-06: where a lead custom field goes on conversion. No row = mode "auto" (same label and type, 0029).
+export type ConversionFieldMapRow = {
+  id: string;
+  organization_id: string;
+  lead_field_id: string;
+  // "contact" | "deal" (check constraint)
+  target_type: string;
+  // "auto" (same-label rule) | "none" (not copied) | "field" (target_field_id)
+  mode: string;
+  target_field_id: string | null;
+  // server only: the picked field was deleted (FK set null) and no person has written the row since
+  target_removed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // CAL-03 (calendar settings migration): the organization's rest days; 0 = Sunday … 6 = Saturday
 export type OrgCalendarSettingsRow = {
   id: string;
@@ -1477,6 +1493,12 @@ export type Database = {
         { organization_id: string; user_id: string; starts_on: string; ends_on: string },
         { starts_on?: string; ends_on?: string }
       >;
+      // LEAD-06: clients insert the identity columns once and update only the target
+      conversion_field_maps: Table<
+        ConversionFieldMapRow,
+        { organization_id: string; lead_field_id: string; target_type: string; mode?: string; target_field_id?: string | null },
+        { mode?: string; target_field_id?: string | null }
+      >;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
@@ -1532,6 +1554,11 @@ export type Database = {
       };
       // GOL-04: forecast against the goal (migration goal_forecast)
       // DQL-01 (security invoker): [{ id, score, missing }] and { total, rows: [{ id, name, score, missing }] }
+      // LEAD-06: the whole conversion mapping screen in one transaction (security invoker)
+      save_conversion_field_map: {
+        Args: { p_org: string; p_map: Array<{ lead_field_id: string; target_type: string; choice: string }> };
+        Returns: { changed: number };
+      };
       record_completeness: { Args: { p_org: string; p_type: string; p_ids: string[] }; Returns: Json };
       incomplete_records: { Args: { p_org: string; p_type: string; p_owner: string; p_limit?: number }; Returns: Json };
       // computed field 0..100 on leads, contacts, companies and deals: used as `order=completeness`, not called as an RPC

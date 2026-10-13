@@ -73,9 +73,22 @@ describe("tenant isolation", () => {
       ids.tagA = (
         await q<{ id: string }>("insert into public.tags (organization_id, name) values ($1, 'VIP') returning id", [orgA])
       ).rows[0].id;
+      ids.leadFieldA = (
+        await q<{ id: string }>(
+          "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'budget_range', 'טווח תקציב', 'text') returning id",
+          [orgA],
+        )
+      ).rows[0].id;
+      ids.contactFieldA = (
+        await q<{ id: string }>(
+          "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'contact', 'budget_note', 'הערת תקציב', 'text') returning id",
+          [orgA],
+        )
+      ).rows[0].id;
+      // LEAD-06
       await q(
-        "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'budget_range', 'טווח תקציב', 'text')",
-        [orgA],
+        "insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, target_field_id) values ($1, $2, 'contact', $3)",
+        [orgA, ids.leadFieldA, ids.contactFieldA],
       );
       await q("insert into public.teams (organization_id, name) values ($1, 'מכירות')", [orgA]);
       await q("select public.create_invitation($1, 'someone@example.test')", [orgA]);
@@ -180,6 +193,8 @@ describe("tenant isolation", () => {
     "completeness_settings",
     // CAP-09
     "member_leaves",
+    // LEAD-06
+    "conversion_field_maps",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -308,6 +323,7 @@ describe("tenant isolation", () => {
       products: "name = name",
       completeness_settings: "fields = fields",
       member_leaves: "ends_on = ends_on",
+      conversion_field_maps: "target_field_id = target_field_id",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -393,6 +409,7 @@ describe("tenant isolation", () => {
       ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
+      ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -462,6 +479,7 @@ describe("tenant isolation", () => {
       ["products", "description = 'HACKED'", "description = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
       ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
+      ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>
@@ -598,6 +616,32 @@ describe("tenant isolation", () => {
       asUser(b.id, (q) => q("insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgB, ids.meetingA, b.id])),
     );
     expect(["42501", "23503"]).toContain(viaForeignMeeting.code);
+
+    // a conversion mapping in org B from and to org A's custom fields (LEAD-06)
+    const leadFieldB = await asUser(b.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'b_note', 'הערה', 'text') returning id",
+          [orgB],
+        )
+      ).rows[0].id,
+    );
+    for (const [lead, target] of [
+      [ids.leadFieldA, null],
+      [leadFieldB, ids.contactFieldA],
+    ]) {
+      const viaFieldMap = await pgError(
+        asUser(b.id, (q) =>
+          q("insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode, target_field_id) values ($1, $2, 'contact', $3, $4)", [
+            orgB,
+            lead,
+            target ? "field" : "none",
+            target,
+          ]),
+        ),
+      );
+      expect(["23514", "23503"]).toContain(viaFieldMap.code);
+    }
 
     // sanity: the same inserts work with org B's own ids
     await asUser(b.id, (q) =>

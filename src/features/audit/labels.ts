@@ -22,6 +22,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   pipelines: "תהליך מכירה",
   stages: "שלב",
   field_definitions: "שדה מותאם",
+  // LEAD-06
+  conversion_field_maps: "העברת שדה בהמרת ליד",
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
   deal_loss_reasons: "סיבת הפסד",
@@ -193,6 +195,10 @@ export const FIELD_LABELS: Record<string, string> = {
   is_active: "פעיל",
   archived_at: "ארכיון",
   parent_id: "קטגוריה ראשית",
+  // LEAD-06: a conversion mapping (ids; the screen names the fields)
+  lead_field_id: "שדה בליד",
+  target_type: "עובר אל",
+  target_field_id: "שדה יעד",
 };
 
 /** Hebrew for coded values, by field (GOL-01: a goal's metric, scope and period). */
@@ -200,4 +206,6 @@ export const VALUE_LABELS: Record<string, Record<string, string>> = {
   metric: Object.fromEntries(GOAL_METRICS.map((m) => [m.key, m.label])),
   scope: GOAL_SCOPE_LABELS,
   period: GOAL_PERIOD_LABELS,
+  // LEAD-06
+  target_type: { contact: "איש קשר", deal: "עסקה" },
 };

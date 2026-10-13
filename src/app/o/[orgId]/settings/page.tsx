@@ -3,6 +3,9 @@ import Link from "next/link";
 
 import { ForwardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
+import { conversionMapNeedsFix } from "@/features/conversion-map/queries";
+import { TARGET_REMOVED_REMINDER } from "@/features/conversion-map/rules";
 import { isAdminRole } from "@/features/settings/permissions";
 import { settingsGroups } from "@/features/settings/sections";
 import { getOrgContext } from "@/features/shell/queries";
@@ -18,10 +21,20 @@ export default async function SettingsPage({ params }: Props) {
   const { canDelete, canWrite, role } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const groups = settingsGroups(orgId, { admin, canImport: canWrite && (admin || role === "manager"), canDelete });
+  // LEAD-06: a picked conversion target was deleted; owners and admins see it until someone chooses again
+  const mappingNeedsFix = admin ? await conversionMapNeedsFix(orgId) : false;
 
   return (
     <>
       <PageHeader title="הגדרות" description="הגדרות העסק. ההגדרות האישיות שלכם נמצאות ב&quot;החשבון שלי&quot; בתפריט המשתמש." />
+      {mappingNeedsFix ? (
+        <p role="note" className="mb-6 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          {TARGET_REMOVED_REMINDER}
+          <Link href={conversionMapSettingsPath(orgId)} className="font-medium underline underline-offset-4">
+            לבחירת שדה אחר
+          </Link>
+        </p>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-2">
         {groups.map((group) => (
           <section key={group.label} aria-labelledby={`group-${group.label}`}>

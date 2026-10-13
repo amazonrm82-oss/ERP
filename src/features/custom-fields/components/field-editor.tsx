@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -64,9 +65,15 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
   );
 }
 
-type ListProps = { orgId: string; fields: FieldDefinition[]; editable: boolean };
+type ListProps = {
+  orgId: string;
+  fields: FieldDefinition[];
+  editable: boolean;
+  // LEAD-06: the question before hiding a field that receives a lead field's value on conversion, by field id
+  hideWarnings?: Record<string, string>;
+};
 
-export function FieldList({ orgId, fields, editable }: ListProps) {
+export function FieldList({ orgId, fields, editable, hideWarnings = {} }: ListProps) {
   return (
     <ol className="divide-y divide-line">
       {fields.map((field, index) => (
@@ -75,6 +82,7 @@ export function FieldList({ orgId, fields, editable }: ListProps) {
           orgId={orgId}
           field={field}
           editable={editable}
+          hideWarning={hideWarnings[field.id]}
           isFirst={index === 0}
           isLast={index === fields.length - 1}
         />
@@ -83,9 +91,9 @@ export function FieldList({ orgId, fields, editable }: ListProps) {
   );
 }
 
-type RowProps = { orgId: string; field: FieldDefinition; editable: boolean; isFirst: boolean; isLast: boolean };
+type RowProps = { orgId: string; field: FieldDefinition; editable: boolean; hideWarning?: string; isFirst: boolean; isLast: boolean };
 
-function FieldRow({ orgId, field, editable, isFirst, isLast }: RowProps) {
+function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowProps) {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -109,9 +117,22 @@ function FieldRow({ orgId, field, editable, isFirst, isLast }: RowProps) {
             <ActionButton action={moveFieldAction.bind(null, orgId, field.id, "down")} pendingText="מזיזים…" variant="ghost" srLabel={field.label} disabled={isLast}>
               למטה
             </ActionButton>
-            <ActionButton action={setFieldActiveAction.bind(null, orgId, field.id, !field.isActive)} pendingText="מעדכנים…" variant="ghost" srLabel={field.label}>
-              {field.isActive ? "הסתרה" : "הצגה"}
-            </ActionButton>
+            {field.isActive && hideWarning ? (
+              <ConfirmButton
+                variant="danger-ghost"
+                title={`להסתיר את "${field.label}"?`}
+                description={hideWarning}
+                confirmLabel="הסתרה"
+                action={setFieldActiveAction.bind(null, orgId, field.id, false)}
+              >
+                הסתרה
+                <span className="sr-only">: {field.label}</span>
+              </ConfirmButton>
+            ) : (
+              <ActionButton action={setFieldActiveAction.bind(null, orgId, field.id, !field.isActive)} pendingText="מעדכנים…" variant="ghost" srLabel={field.label}>
+                {field.isActive ? "הסתרה" : "הצגה"}
+              </ActionButton>
+            )}
           </span>
         ) : null}
       </div>

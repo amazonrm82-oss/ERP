@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PencilIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
+import { hideWarningsFor } from "@/features/conversion-map/queries";
 import { CreateFieldForm, FieldList } from "@/features/custom-fields/components/field-editor";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { FIELD_OBJECT_LABELS, FIELD_OBJECTS, type FieldObject } from "@/features/custom-fields/types";
@@ -26,7 +27,11 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
   const requested = firstParam((await searchParams).object);
   const objectType: FieldObject = (FIELD_OBJECTS as readonly string[]).includes(requested) ? (requested as FieldObject) : "lead";
   const editable = isAdminRole(role) && canWrite;
-  const fields = await listFieldDefinitions(orgId, objectType, { includeInactive: true });
+  const [fields, hideWarnings] = await Promise.all([
+    listFieldDefinitions(orgId, objectType, { includeInactive: true }),
+    // LEAD-06: hiding a field a lead field's value goes to asks first
+    editable && (objectType === "contact" || objectType === "deal") ? hideWarningsFor(orgId, objectType) : Promise.resolve({}),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -54,7 +59,7 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
         {fields.length === 0 ? (
           <EmptyState icon={<PencilIcon />} title="עוד אין שדות" description="שדה חדש מוסיפים בטופס שלמטה." />
         ) : (
-          <FieldList orgId={orgId} fields={fields} editable={editable} />
+          <FieldList orgId={orgId} fields={fields} editable={editable} hideWarnings={hideWarnings} />
         )}
       </Card>
 

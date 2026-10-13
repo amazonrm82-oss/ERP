@@ -60,6 +60,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "record_type_options", file: "record_types.csv" },
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
+  // LEAD-06: where each lead custom field goes on conversion
+  { table: "conversion_field_maps", file: "conversion_field_maps.csv" },
   { table: "teams", file: "teams.csv" },
   { table: "team_members", file: "team_members.csv", key: ["team_id", "user_id"] },
   { table: "whatsapp_templates", file: "whatsapp_templates.csv" },

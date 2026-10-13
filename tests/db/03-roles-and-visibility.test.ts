@@ -270,6 +270,17 @@ describe("roles and record visibility", () => {
         "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'contact', 'hobby', 'תחביב', 'text')",
         [org],
       );
+      // LEAD-06: a lead field and where it goes on conversion
+      const leadField = (
+        await q<{ id: string }>(
+          "insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'lead', 'lead_hobby', 'תחביב', 'text') returning id",
+          [org],
+        )
+      ).rows[0].id;
+      await q(
+        "insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, target_field_id) select $1, $2, 'contact', id from public.field_definitions where organization_id = $1 and object_type = 'contact' and key = 'hobby'",
+        [org, leadField],
+      );
       await q(
         "insert into public.saved_views (organization_id, object_type, name, scope, owner_id) values ($1, 'lead', 'כל הלידים', 'org', $2)",
         [org, admin.id],
@@ -292,6 +303,7 @@ describe("roles and record visibility", () => {
       products: "name = name",
       goals: "target = target",
       field_definitions: "label = label",
+      conversion_field_maps: "target_field_id = target_field_id",
       teams: "name = name",
       team_members: "is_manager = is_manager",
       tags: "name = name",
@@ -318,6 +330,16 @@ describe("roles and record visibility", () => {
         ),
       );
       expect(addToTeam.code).toBe("42501");
+      // nor add a conversion mapping (LEAD-06)
+      const mapped = await pgError(
+        asUser(u.id, (q) =>
+          q(
+            "insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) select $1, id, 'deal', 'none' from public.field_definitions where organization_id = $1 and key = 'lead_hobby'",
+            [org],
+          ),
+        ),
+      );
+      expect(mapped.code, "insert conversion_field_maps").toBe("42501");
     }
     const pending = await asAdmin((q) =>
       count(q, "select 1 from public.invitations where email = 'pending@example.test' and revoked_at is null"),
