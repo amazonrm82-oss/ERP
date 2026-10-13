@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agoText, buildSummaryView, dealLine, formatAmount, parseRecordSummary } from "@/features/record-summary/summary";
+import { agoText, buildSummaryView, dealLine, formatAmount, moreTasksText, nextActionHref, parseRecordSummary, pickNextAction } from "@/features/record-summary/summary";
 
 const TZ = "Asia/Jerusalem";
 // 12 October 2026, 10:00 in Jerusalem (UTC+3)
@@ -101,5 +101,60 @@ describe("record card summary (REC-10)", () => {
     // 11:30 in Jerusalem
     expect(view.nextMeeting?.dateText).toMatch(/11:30/);
     expect(parseRecordSummary({ next_meeting: { id: "m1", title: "x" } }).nextMeeting).toBeNull();
+  });
+
+  describe("the next action: the task or the meeting that comes first", () => {
+    const opts = { currency: "ILS", timeZone: TZ, now: NOW };
+    const task = (due: string | null) => ({ id: "t1", title: "להתקשר", task_type: "call", due_at: due });
+    const meeting = (start: string) => ({ id: "m1", title: "פגישת היכרות", starts_at: start });
+
+    it("a meeting before the task's due time comes first", () => {
+      const view = buildSummaryView(
+        parseRecordSummary({ next_task: task("2026-10-14T08:00:00Z"), open_tasks: 3, next_meeting: meeting("2026-10-13T08:30:00Z") }),
+        opts,
+      );
+      expect(view.nextAction).toMatchObject({ kind: "meeting", kindLabel: "פגישה", id: "m1", title: "פגישת היכרות", overdue: false });
+      expect(view.nextAction?.dateText).toMatch(/11:30/);
+      // all three open tasks are still waiting
+      expect(view.otherOpenTasks).toBe(3);
+    });
+
+    it("a task due earlier comes first, overdue or not", () => {
+      const soon = buildSummaryView(
+        parseRecordSummary({ next_task: task("2026-10-12T09:00:00Z"), open_tasks: 2, next_meeting: meeting("2026-10-13T08:30:00Z") }),
+        opts,
+      );
+      expect(soon.nextAction).toMatchObject({ kind: "task", kindLabel: "משימה", id: "t1", overdue: false });
+      expect(soon.otherOpenTasks).toBe(1);
+      const late = pickNextAction(parseRecordSummary({ next_task: task("2026-10-11T09:00:00Z"), next_meeting: meeting("2026-10-12T08:00:00Z") }), opts);
+      expect(late).toMatchObject({ kind: "task", overdue: true });
+    });
+
+    it("an undated task comes after any meeting; on the same minute the meeting wins", () => {
+      expect(pickNextAction(parseRecordSummary({ next_task: task(null), next_meeting: meeting("2027-01-01T08:00:00Z") }), opts)?.kind).toBe("meeting");
+      expect(pickNextAction(parseRecordSummary({ next_task: task("2026-10-13T08:30:00Z"), next_meeting: meeting("2026-10-13T08:30:00Z") }), opts)?.kind).toBe(
+        "meeting",
+      );
+      const alone = pickNextAction(parseRecordSummary({ next_task: task(null) }), opts);
+      expect(alone).toMatchObject({ kind: "task", dateText: null, iso: null, overdue: false });
+      expect(pickNextAction(parseRecordSummary({}), opts)).toBeNull();
+      expect(buildSummaryView(parseRecordSummary({}), opts)).toMatchObject({ nextAction: null, otherOpenTasks: 0 });
+    });
+
+    it("links to its day in the calendar, everyone's items; an undated task to the tasks list", () => {
+      const org = "00000000-0000-4000-8000-000000000001";
+      // 23:30 UTC on the 12th is already the 13th in Jerusalem
+      const evening = pickNextAction(parseRecordSummary({ next_meeting: meeting("2026-10-12T23:30:00Z") }), opts)!;
+      expect(nextActionHref(org, evening, TZ)).toBe(`/o/${org}/calendar?view=day&date=2026-10-13&who=all`);
+      const undated = pickNextAction(parseRecordSummary({ next_task: task(null) }), opts)!;
+      expect(nextActionHref(org, undated, TZ)).toBe(`/o/${org}/tasks`);
+    });
+
+    it("counts the open tasks that are not shown", () => {
+      expect(moreTasksText("task", 1)).toBe("ועוד משימה אחת");
+      expect(moreTasksText("task", 4)).toBe("ועוד 4 משימות");
+      expect(moreTasksText("meeting", 1)).toBe("ועוד משימה פתוחה אחת");
+      expect(moreTasksText("meeting", 2)).toBe("ועוד 2 משימות פתוחות");
+    });
   });
 });

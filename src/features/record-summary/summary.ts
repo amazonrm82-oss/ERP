@@ -3,8 +3,10 @@
 // this file turns its JSON into short Hebrew lines. Pure: no database, no clock
 // of its own (`now` is passed in), so it is unit tested.
 
+import { calendarPath } from "@/features/calendar/range";
 import { LOCALE } from "@/lib/app";
 import { zoneDate } from "@/lib/format";
+import { paths } from "@/lib/paths";
 
 export type DealTotal = { status: "open" | "won"; currency: string; count: number; sum: number };
 
@@ -130,12 +132,84 @@ function dateText(iso: string, timeZone: string, withTime: boolean): string {
   return new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", ...(withTime ? { timeStyle: "short" } : {}), timeZone }).format(date);
 }
 
+/**
+ * The one "next action" of the card: whichever comes first, the open task's due
+ * time or the planned meeting's start. An undated task comes after any meeting;
+ * on the same minute the meeting wins (a fixed time with the customer).
+ */
+export type NextAction = {
+  kind: "task" | "meeting";
+  kindLabel: "משימה" | "פגישה";
+  id: string;
+  title: string;
+  dateText: string | null;
+  iso: string | null;
+  overdue: boolean;
+};
+
+export function pickNextAction(data: RecordSummaryData, options: { timeZone: string; now: Date }): NextAction | null {
+  const { timeZone, now } = options;
+  const task = data.nextTask;
+  const meeting = data.nextMeeting;
+  const taskAt = task?.dueAt ? Date.parse(task.dueAt) : NaN;
+  const meetingFirst = meeting !== null && (task === null || Number.isNaN(taskAt) || Date.parse(meeting.startsAt) <= taskAt);
+  if (meeting && meetingFirst) {
+    return {
+      kind: "meeting",
+      kindLabel: "פגישה",
+      id: meeting.id,
+      title: meeting.title,
+      dateText: dateText(meeting.startsAt, timeZone, true),
+      iso: meeting.startsAt,
+      overdue: false,
+    };
+  }
+  if (task) {
+    return {
+      kind: "task",
+      kindLabel: "משימה",
+      id: task.id,
+      title: task.title,
+      dateText: task.dueAt ? dateText(task.dueAt, timeZone, true) : null,
+      iso: task.dueAt,
+      overdue: !Number.isNaN(taskAt) && taskAt < now.getTime(),
+    };
+  }
+  return null;
+}
+
+/**
+ * Where the next action opens: the calendar on its day, showing everyone the
+ * user may see (the item may be a colleague's); an undated task opens the tasks list.
+ */
+export function nextActionHref(orgId: string, action: NextAction, timeZone: string): string {
+  if (!action.iso) {
+    return paths.tasks(orgId);
+  }
+  const at = new Date(action.iso);
+  if (Number.isNaN(at.getTime())) {
+    return paths.tasks(orgId);
+  }
+  return calendarPath(orgId, { view: "day", date: zoneDate(at, timeZone), who: "all" });
+}
+
+/** The open tasks not shown, after the next action: "ועוד משימה אחת" / "ועוד 3 משימות פתוחות". */
+export function moreTasksText(shown: NextAction["kind"], count: number): string {
+  if (shown === "task") {
+    return count === 1 ? "ועוד משימה אחת" : `ועוד ${count} משימות`;
+  }
+  return count === 1 ? "ועוד משימה פתוחה אחת" : `ועוד ${count} משימות פתוחות`;
+}
+
 export type SummaryView = {
   won: DealLine;
   open: DealLine;
   lastTouch: { label: string; ago: string; dateText: string; iso: string } | null;
   nextTask: { title: string; dateText: string | null; iso: string | null; overdue: boolean; moreCount: number } | null;
   nextMeeting: { title: string; dateText: string; iso: string } | null;
+  // the task or meeting that comes first, and how many open tasks are not shown
+  nextAction: NextAction | null;
+  otherOpenTasks: number;
 };
 
 /** Everything the card shows, in the organization's currency and time zone. */
@@ -144,6 +218,7 @@ export function buildSummaryView(data: RecordSummaryData, options: { currency: s
   const touch = data.lastTouch;
   const task = data.nextTask;
   const meeting = data.nextMeeting;
+  const nextAction = pickNextAction(data, { timeZone, now });
   return {
     won: dealLine(data.deals, "won", currency),
     open: dealLine(data.deals, "open", currency),
@@ -165,5 +240,7 @@ export function buildSummaryView(data: RecordSummaryData, options: { currency: s
         }
       : null,
     nextMeeting: meeting ? { title: meeting.title, dateText: dateText(meeting.startsAt, timeZone, true), iso: meeting.startsAt } : null,
+    nextAction,
+    otherOpenTasks: Math.max(0, data.openTasks - (nextAction?.kind === "task" ? 1 : 0)),
   };
 }

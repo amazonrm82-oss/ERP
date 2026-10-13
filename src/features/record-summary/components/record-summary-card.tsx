@@ -1,8 +1,10 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 
 import { getRecordSummary } from "../queries";
-import { buildSummaryView, type DealLine } from "../summary";
+import { buildSummaryView, moreTasksText, nextActionHref, type DealLine } from "../summary";
 
 type Props = {
   orgId: string;
@@ -31,8 +33,8 @@ function Deals({ line, empty }: { line: DealLine; empty: string }) {
 
 /**
  * REC-10: the automatic summary of a contact or a company: won and open deals
- * (count and sum), the last logged touch, the next open task and the next
- * planned meeting.
+ * (count and sum), the last logged touch, and the next action: the open task or
+ * the planned meeting that comes first, with its kind, linking to its day in the calendar.
  */
 export async function RecordSummaryCard({ orgId, type, id, currency, timeZone }: Props) {
   const data = await getRecordSummary(orgId, type, id);
@@ -74,32 +76,30 @@ export async function RecordSummaryCard({ orgId, type, id, currency, timeZone }:
           <div className="col-span-2 min-w-0">
             <dt className="text-sm text-ink-soft">הפעולה הבאה</dt>
             <dd className="mt-0.5 break-words">
-              {view.nextTask ? (
+              {view.nextAction ? (
                 <>
-                  <span className="block font-medium">{view.nextTask.title}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Badge tone={view.nextAction.kind === "meeting" ? "accent" : "neutral"}>{view.nextAction.kindLabel}</Badge>
+                    <Link
+                      href={nextActionHref(orgId, view.nextAction, timeZone)}
+                      className="min-w-0 break-words font-medium text-accent underline underline-offset-4 hover:text-accent-strong"
+                    >
+                      {view.nextAction.title || (view.nextAction.kind === "meeting" ? "פגישה בלי כותרת" : "משימה בלי כותרת")}
+                    </Link>
+                  </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
-                    {view.nextTask.overdue ? <Badge tone="danger">באיחור</Badge> : null}
-                    {view.nextTask.iso && view.nextTask.dateText ? (
-                      <time dateTime={view.nextTask.iso}>{view.nextTask.dateText}</time>
+                    {view.nextAction.overdue ? <Badge tone="danger">באיחור</Badge> : null}
+                    {view.nextAction.iso && view.nextAction.dateText ? (
+                      <time dateTime={view.nextAction.iso}>{view.nextAction.dateText}</time>
                     ) : (
                       <span>בלי תאריך</span>
                     )}
-                    {view.nextTask.moreCount > 0 ? (
-                      <span>· {view.nextTask.moreCount === 1 ? "ועוד משימה אחת" : `ועוד ${view.nextTask.moreCount} משימות`}</span>
-                    ) : null}
+                    {view.otherOpenTasks > 0 ? <span>· {moreTasksText(view.nextAction.kind, view.otherOpenTasks)}</span> : null}
                   </span>
                 </>
-              ) : view.nextMeeting ? null : (
+              ) : (
                 <span className="text-ink-soft">אין משימה פתוחה או פגישה מתוכננת</span>
               )}
-              {view.nextMeeting ? (
-                <span className={`block${view.nextTask ? " mt-2" : ""}`}>
-                  <span className="block font-medium">פגישה: {view.nextMeeting.title}</span>
-                  <time dateTime={view.nextMeeting.iso} className="mt-0.5 block text-sm text-ink-soft">
-                    {view.nextMeeting.dateText}
-                  </time>
-                </span>
-              ) : null}
             </dd>
           </div>
         </dl>
