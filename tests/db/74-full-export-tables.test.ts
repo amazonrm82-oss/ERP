@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { EXPORT_TABLES } from "@/features/imports/export-build";
+import { EXPORT_TABLES, exportKey } from "@/features/imports/export-build";
 
-import { addMember, asAdmin, asUser, closePool, createOrg, createUser } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultPipeline } from "./helpers";
 
 afterAll(closePool);
 
@@ -13,8 +13,6 @@ const LEFT_OUT: Record<string, string> = {
   audit_log: "history; the audit log screen exports it",
   automations: "configuration that points at ids; not part of SPEC 12.4 yet",
   automation_runs: "engine log",
-  contact_channels: "further phones and emails of a contact; not yet (follow-up)",
-  deal_contacts: "links between deals and contacts; not yet (follow-up)",
   forms: "configuration with public tokens",
   form_submissions: "raw inquiries; the leads they made are exported",
   import_jobs: "engine bookkeeping",
@@ -28,8 +26,6 @@ const LEFT_OUT: Record<string, string> = {
   saved_views: "a person's screen settings",
   subscriptions: "billing, server only",
   support_access_grants: "platform support sessions",
-  team_members: "not yet (follow-up)",
-  whatsapp_templates: "not yet (follow-up)",
 };
 
 describe("full export: tables (SPEC 12.4)", () => {
@@ -50,6 +46,124 @@ describe("full export: tables (SPEC 12.4)", () => {
     // nothing is both, and nothing listed is gone
     expect(Object.keys(LEFT_OUT).filter((t) => exported.has(t) || !tables.includes(t))).toEqual([]);
     expect([...exported].filter((t) => !tables.includes(t))).toEqual([]);
+  });
+
+  it("every exported table pages by created_at and a key that is unique in it", async () => {
+    // a key that is not unique would let a row be skipped or repeated between pages (FXC-07)
+    const keys = await asAdmin(async (q) =>
+      (
+        await q<{ table_name: string; key: string[] }>(
+          `select rel.relname as table_name, array_agg(a.attname::text order by a.attname) as key
+             from pg_index i
+             join pg_class rel on rel.oid = i.indrelid
+             join pg_namespace n on n.oid = rel.relnamespace and n.nspname = 'public'
+             join pg_attribute a on a.attrelid = rel.oid and a.attnum = any (i.indkey)
+            where i.indisunique and i.indpred is null and i.indexprs is null
+            group by rel.relname, i.indexrelid`,
+        )
+      ).rows,
+    );
+    const columns = await asAdmin(async (q) =>
+      (await q<{ table_name: string; column_name: string }>("select table_name, column_name from information_schema.columns where table_schema = 'public'")).rows,
+    );
+    const problems: string[] = [];
+    for (const t of EXPORT_TABLES) {
+      const have = new Set(columns.filter((c) => c.table_name === t.table).map((c) => c.column_name));
+      for (const c of ["organization_id", "created_at", ...exportKey(t)]) if (!have.has(c)) problems.push(`${t.table}.${c} missing`);
+      const key = [...exportKey(t)].sort();
+      if (!keys.some((k) => k.table_name === t.table && k.key.length === key.length && k.key.every((c, i) => c === key[i]))) {
+        problems.push(`${t.table}: (${key.join(", ")}) is not unique`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  describe("the owner's read of contact channels, deal contacts, team members and WhatsApp templates", () => {
+    let owner: { id: string };
+    let orgId: string;
+    let otherOrg: string;
+    let contactId: string;
+    let dealId: string;
+    let teamId: string;
+    let member: { id: string };
+
+    beforeAll(async () => {
+      owner = await createUser("export-links-owner");
+      orgId = await createOrg(owner.id, "עסק קישורים");
+      member = await addMember(orgId, owner.id, "member", "export-links-member");
+      const pipe = await defaultPipeline(orgId);
+      // the member's own contact and deal; the owner reads them as an admin
+      ({ contactId, dealId } = await asUser(member.id, async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, last_name) values ($1, 'רות', 'לוי') returning id", [orgId])).rows[0].id;
+        const deal = (
+          await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקת ענן', $2, $3) returning id", [
+            orgId,
+            pipe.pipelineId,
+            pipe.stages[0].id,
+          ])
+        ).rows[0].id;
+        await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'work', '03-1234567')", [orgId, contact]);
+        await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'finance')", [orgId, deal, contact]);
+        return { contactId: contact, dealId: deal };
+      }));
+      teamId = await asUser(owner.id, async (q) => {
+        const team = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות דרום') returning id", [orgId])).rows[0].id;
+        await q("insert into public.team_members (organization_id, team_id, user_id, is_manager) values ($1, $2, $3, true)", [orgId, team, member.id]);
+        return team;
+      });
+
+      const stranger = await createUser("export-links-stranger");
+      otherOrg = await createOrg(stranger.id, "עסק זר");
+      const otherPipe = await defaultPipeline(otherOrg);
+      await asUser(stranger.id, async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'זר') returning id", [otherOrg])).rows[0].id;
+        const deal = (
+          await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'לא שלכם', $2, $3) returning id", [
+            otherOrg,
+            otherPipe.pipelineId,
+            otherPipe.stages[0].id,
+          ])
+        ).rows[0].id;
+        await q("insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.com')", [otherOrg, contact]);
+        await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [otherOrg, deal, contact]);
+        const team = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות זר') returning id", [otherOrg])).rows[0].id;
+        await q("insert into public.team_members (organization_id, team_id, user_id) values ($1, $2, $3)", [otherOrg, team, stranger.id]);
+      });
+    });
+
+    // the same read as fetchAll() in src/features/imports/export.ts, ordered by the table's key
+    const read = (table: string, org: string) => {
+      const entry = EXPORT_TABLES.find((t) => t.table === table);
+      if (!entry) throw new Error(`${table} is not exported`);
+      const order = ["created_at", ...exportKey(entry)].join(", ");
+      return asUser(owner.id, async (q) => (await q(`select * from public.${table} where organization_id = $1 order by ${order} limit 500 offset 0`, [org])).rows);
+    };
+
+    it("sees the further phones of the business's contacts", async () => {
+      const rows = await read("contact_channels", orgId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ organization_id: orgId, contact_id: contactId, kind: "phone", label: "work", value: "03-1234567" });
+    });
+
+    it("sees the contacts on each deal with their role", async () => {
+      const rows = await read("deal_contacts", orgId);
+      expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, deal_id: dealId, contact_id: contactId, role: "finance" })]);
+    });
+
+    it("sees the team members", async () => {
+      const rows = await read("team_members", orgId);
+      expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, team_id: teamId, user_id: member.id, is_manager: true })]);
+    });
+
+    it("sees the business's WhatsApp templates (the seeded defaults)", async () => {
+      const rows = await read("whatsapp_templates", orgId);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((r) => r.organization_id === orgId && typeof r.body === "string")).toBe(true);
+    });
+
+    it("sees nothing of another business", async () => {
+      for (const table of ["contact_channels", "deal_contacts", "team_members", "whatsapp_templates"]) expect(await read(table, otherOrg)).toEqual([]);
+    });
   });
 
   describe("the owner's read of meetings and participants", () => {

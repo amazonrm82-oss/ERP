@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EXPORT_README, EXPORT_TABLES, exportNames, toCsv } from "@/features/imports/export-build";
+import { EXPORT_README, EXPORT_TABLES, exportKey, exportNames, toCsv } from "@/features/imports/export-build";
 
 const ORG = "00000000-0000-0000-0000-00000000000a";
 const OWNER = "00000000-0000-0000-0000-0000000000a1";
@@ -102,5 +102,60 @@ describe("full export: the rest days (CAL-03)", () => {
   it("an empty week and no occasions give empty names", () => {
     const [, row] = lines(toCsv([{ ...settings, rest_weekdays: [], rest_occasions: [] }], new Map(), new Map()));
     expect(row).toContain("[],,true,false,[],,");
+  });
+});
+
+describe("full export: contact channels, deal contacts, team members, WhatsApp templates", () => {
+  const DEAL = "00000000-0000-0000-0000-0000000000d1";
+  const TEAM = "00000000-0000-0000-0000-0000000000e1";
+
+  it("each has its own CSV, keyed by id or by its primary key, and the README names them", () => {
+    const entry = (table: string) => EXPORT_TABLES.find((t) => t.table === table);
+    expect(entry("contact_channels")?.file).toBe("contact_channels.csv");
+    expect(entry("whatsapp_templates")?.file).toBe("whatsapp_templates.csv");
+    expect(exportKey(entry("contact_channels")!)).toEqual(["id"]);
+    expect(exportKey(entry("deal_contacts")!)).toEqual(["deal_id", "contact_id"]);
+    expect(exportKey(entry("team_members")!)).toEqual(["team_id", "user_id"]);
+    for (const file of ["contact_channels.csv", "deal_contacts.csv", "team_members.csv", "whatsapp_templates.csv"]) expect(EXPORT_README).toContain(file);
+  });
+
+  it("names the deal and the contact and reads the role in deal_contacts.csv", () => {
+    const { names, tagNames } = exportNames(
+      [
+        { table: "deals", rows: [{ id: DEAL, name: "עסקת ענן" }] },
+        { table: "contacts", rows: [{ id: CONTACT, full_name: "דנה כהן" }] },
+      ],
+      [],
+    );
+    const link = { organization_id: ORG, deal_id: DEAL, contact_id: CONTACT, role: "decision_maker", created_at: "2026-10-13T07:00:00+00:00" };
+    const csv = toCsv([link, { ...link, role: null }, { ...link, role: "gone" }], names, tagNames, "deal_contacts");
+    const [header, ...rows] = lines(csv);
+    expect(header).toBe("organization_id,deal_id,deal,contact_id,contact,role,role_name,created_at");
+    expect(rows[0]).toBe(`${ORG},${DEAL},עסקת ענן,${CONTACT},דנה כהן,decision_maker,מקבל החלטה,2026-10-13T07:00:00+00:00`);
+    expect(rows[1]).toContain(",דנה כהן,,,");
+    expect(rows[2]).toContain(",gone,,");
+  });
+
+  it("a role column of another table gets no Hebrew name", () => {
+    const [header] = lines(toCsv([{ id: "x", role: "user" }], new Map(), new Map(), "contacts"));
+    expect(header).toBe("id,role");
+  });
+
+  it("names the contact and the type of a further phone or email in contact_channels.csv", () => {
+    const { names, tagNames } = exportNames([{ table: "contacts", rows: [{ id: CONTACT, full_name: "דנה כהן" }] }], []);
+    const phone = { id: "c1", organization_id: ORG, contact_id: CONTACT, kind: "phone", label: "mobile", value: "050-1234567", value_e164: "+972501234567" };
+    const [header, first, second] = lines(toCsv([phone, { ...phone, kind: "email", label: "home", value: "dana@example.com", value_e164: null }], names, tagNames, "contact_channels"));
+    expect(header).toBe("id,organization_id,contact_id,contact,kind,label,label_name,value,value_e164");
+    expect(first).toBe(`c1,${ORG},${CONTACT},דנה כהן,phone,mobile,נייד,050-1234567,+972501234567`);
+    expect(second).toContain("email,home,אישי,dana@example.com,");
+  });
+
+  it("names the team and the member in team_members.csv", () => {
+    const { names, tagNames } = exportNames([{ table: "teams", rows: [{ id: TEAM, name: "צוות צפון" }] }], [{ id: GUEST, full_name: "רון", email: null }]);
+    const [header, row] = lines(
+      toCsv([{ organization_id: ORG, team_id: TEAM, user_id: GUEST, is_manager: true, is_primary: false, created_at: "t" }], names, tagNames, "team_members"),
+    );
+    expect(header).toBe("organization_id,team_id,team,user_id,user,is_manager,is_primary,created_at");
+    expect(row).toBe(`${ORG},${TEAM},צוות צפון,${GUEST},רון,true,false,t`);
   });
 });

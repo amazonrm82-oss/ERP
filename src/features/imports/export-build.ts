@@ -3,26 +3,48 @@
 // the unit tests can check it; export.ts reads the rows and builds the ZIP.
 
 import { OCCASIONS } from "@/features/calendar-days/holidays";
+import { channelTypeLabel } from "@/features/contacts/channels";
+import { dealContactRoleLabel } from "@/features/deal-contacts/roles";
 import { WEEKDAYS_LONG } from "@/lib/calendar-grid";
 import { csvText } from "@/lib/csv";
 import type { Database, Json } from "@/lib/database.types";
 
 type Tables = Database["public"]["Tables"];
 
-// Only a table whose rows carry organization_id, id and created_at can be
-// exported: the read filters by the first and pages in the order of the others.
-export type ExportTableName = {
-  [K in keyof Tables]: Tables[K]["Row"] extends { organization_id: string; id: string; created_at: string } ? K : never;
+type Row<K extends keyof Tables> = Tables[K]["Row"];
+
+// A table whose rows carry organization_id and created_at can be exported: the
+// read filters by the first and pages in created_at order, ties broken by the
+// row's key. Most tables are keyed by id; a link table without one (team_members,
+// deal_contacts) names its primary key columns instead.
+type WithId = {
+  [K in keyof Tables]: Row<K> extends { organization_id: string; id: string; created_at: string } ? K : never;
 }[keyof Tables];
+type WithoutId = {
+  [K in keyof Tables]: Row<K> extends { organization_id: string; created_at: string } ? (Row<K> extends { id: string } ? never : K) : never;
+}[keyof Tables];
+
+export type ExportTableName = WithId | WithoutId;
+
+export type ExportTable =
+  | { table: WithId; file: string }
+  | { [K in WithoutId]: { table: K; file: string; key: readonly [Extract<keyof Row<K>, string>, ...Extract<keyof Row<K>, string>[]] } }[WithoutId];
+
+/** The columns that, after created_at, order a table's rows deterministically. */
+export function exportKey(t: ExportTable): readonly string[] {
+  return "key" in t ? t.key : ["id"];
+}
 
 // Everything a customer owns, one CSV per table. Raw columns (ids included, so
 // files can be joined), plus readable names next to the ids that need them.
-// Every table here has organization_id, id and created_at (the read orders by them).
-export const EXPORT_TABLES: ReadonlyArray<{ table: ExportTableName; file: string }> = [
+// Every table here has organization_id, created_at and a key (the read orders by them).
+export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "leads", file: "leads.csv" },
   { table: "contacts", file: "contacts.csv" },
+  { table: "contact_channels", file: "contact_channels.csv" },
   { table: "companies", file: "companies.csv" },
   { table: "deals", file: "deals.csv" },
+  { table: "deal_contacts", file: "deal_contacts.csv", key: ["deal_id", "contact_id"] },
   { table: "tasks", file: "tasks.csv" },
   { table: "activities", file: "activities.csv" },
   { table: "meetings", file: "meetings.csv" },
@@ -36,6 +58,8 @@ export const EXPORT_TABLES: ReadonlyArray<{ table: ExportTableName; file: string
   { table: "tags", file: "tags.csv" },
   { table: "field_definitions", file: "custom_fields.csv" },
   { table: "teams", file: "teams.csv" },
+  { table: "team_members", file: "team_members.csv", key: ["team_id", "user_id"] },
+  { table: "whatsapp_templates", file: "whatsapp_templates.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   { table: "files", file: "files.csv" },
 ];
@@ -51,6 +75,7 @@ export const LOOKUPS: Record<string, string> = {
   pipeline_id: "pipeline",
   company_id: "company",
   contact_id: "contact",
+  deal_id: "deal",
   meeting_id: "meeting",
   team_id: "team",
   type_id: "type",
@@ -60,9 +85,9 @@ export type ExportRow = Record<string, unknown>;
 
 const OCCASION_NAMES = new Map<string, string>(OCCASIONS.map((o) => [o.key, o.name]));
 
-// readable columns added next to these coded ones (the rest days of CAL-03)
-const READABLE: Record<string, { header: string; get: (value: unknown) => string }> = {
-  // 0 = Sunday … 6 = Saturday
+// readable columns added next to these coded ones; `table` limits one to the table it was made for
+const READABLE: Record<string, { header: string; get: (value: unknown, row: ExportRow) => string; table?: ExportTableName }> = {
+  // the rest days of CAL-03; 0 = Sunday … 6 = Saturday
   rest_weekdays: {
     header: "rest_days",
     get: (value) => (Array.isArray(value) ? value.map((d) => WEEKDAYS_LONG[Number(d)] ?? String(d)).join("; ") : ""),
@@ -71,6 +96,15 @@ const READABLE: Record<string, { header: string; get: (value: unknown) => string
   rest_occasions: {
     header: "rest_occasion_names",
     get: (value) => (Array.isArray(value) ? value.map((k) => OCCASION_NAMES.get(String(k)) ?? String(k)).join("; ") : ""),
+  },
+  // CON-03: the contact's role in the deal; a code this version does not know stays empty
+  role: { header: "role_name", table: "deal_contacts", get: (value) => dealContactRoleLabel(typeof value === "string" ? value : null) ?? "" },
+  // CON-01: the type of a further phone or email (mobile, work…)
+  label: {
+    header: "label_name",
+    table: "contact_channels",
+    get: (value, row) =>
+      row.kind === "phone" || row.kind === "email" ? (channelTypeLabel(row.kind, typeof value === "string" ? value : null) ?? "") : "",
   },
 };
 
@@ -96,6 +130,7 @@ export function exportNames(
       if (NAMED_BY_NAME.has(t.table)) names.set(id, String(r.name ?? ""));
       if (t.table === "contacts") names.set(id, String(r.full_name ?? r.email ?? ""));
       if (t.table === "meetings") names.set(id, String(r.title ?? ""));
+      if (t.table === "deals") names.set(id, String(r.name ?? ""));
     }
   }
   return { names, tagNames };
@@ -107,7 +142,7 @@ function cell(value: unknown): string {
 }
 
 /** One table as CSV for Excel: BOM, CRLF, a name column after each id in LOOKUPS, custom fields as custom:<key>. */
-export function toCsv(rows: ExportRow[], names: Map<string, string>, tagNames: Map<string, string>): string {
+export function toCsv(rows: ExportRow[], names: Map<string, string>, tagNames: Map<string, string>, table?: ExportTableName): string {
   if (rows.length === 0) return "﻿";
   const customKeys = [...new Set(rows.flatMap((r) => (r.custom_fields && typeof r.custom_fields === "object" ? Object.keys(r.custom_fields as object) : [])))];
   const base = Object.keys(rows[0]).filter((k) => k !== "custom_fields");
@@ -115,7 +150,8 @@ export function toCsv(rows: ExportRow[], names: Map<string, string>, tagNames: M
   for (const k of base) {
     columns.push({ header: k, get: (r) => r[k] });
     if (LOOKUPS[k]) columns.push({ header: LOOKUPS[k], get: (r) => (typeof r[k] === "string" ? (names.get(r[k] as string) ?? "") : "") });
-    if (READABLE[k]) columns.push({ header: READABLE[k].header, get: (r) => READABLE[k].get(r[k]) });
+    const readable = READABLE[k];
+    if (readable && (!readable.table || readable.table === table)) columns.push({ header: readable.header, get: (r) => readable.get(r[k], r) });
     if (k === "tag_ids") columns.push({ header: "tags", get: (r) => ((r.tag_ids as string[] | null) ?? []).map((id) => tagNames.get(id) ?? id).join("; ") });
   }
   for (const k of customKeys) columns.push({ header: `custom:${k}`, get: (r) => ((r.custom_fields as Record<string, Json> | null) ?? {})[k] });
@@ -127,10 +163,13 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 
 כל קובץ CSV הוא טבלה אחת, ונפתח ב-Excel עם עברית תקינה.
 עמודות id מקשרות בין הקבצים (למשל company_id באנשי קשר הוא id בקובץ companies.csv).
-ליד כל מזהה של משתמש, סטטוס, מקור, שלב, חברה או פגישה מופיעה גם עמודה עם השם.
+ליד כל מזהה של משתמש, סטטוס, מקור, שלב, חברה, איש קשר, עסקה או פגישה מופיעה גם עמודה עם השם.
 עמודות custom:... הן השדות המותאמים. רשומות עם deleted_at נמצאות בסל המחזור.
 סכומים (amount_agorot) הם באגורות: מחלקים ב-100 לקבלת שקלים.
 הפגישות נמצאות ב-meetings.csv (owner הוא מי שקבע את הפגישה), והמשתתפים בכל פגישה ב-meeting_participants.csv.
 ימי המנוחה של העסק נמצאים ב-calendar_settings.csv: rest_weekdays הם ימי השבוע (0 = ראשון עד 6 = שבת), holidays_rest אומר אם החגים הם ימי מנוחה, holiday_eves_rest אם ערבי החג, ו-rest_occasions מועדים נוספים שבחרתם. אם הקובץ ריק, ההגדרות הן ברירת המחדל: שישי ושבת וחגים.
+טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
+אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
+חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.
 הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;
