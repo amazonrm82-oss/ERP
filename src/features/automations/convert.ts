@@ -3,7 +3,6 @@ import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
-export const NO_REASONS_IN_LIST = "אין סיבות פעילות ברשימת \"לא רלוונטי\". יש להוסיף סיבה בהגדרות, בעמוד \"סיבות לליד לא רלוונטי\", ואז לשמור.";
 
 export type DbRule = {
   name: string;
@@ -84,8 +83,13 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       const status = lookups.statuses.find((s) => s.id === action.status_id);
       if (!status || status.kind === "converted") return "יש לבחור סטטוס שאינו 'הומר'.";
       if (status.kind === "disqualified") {
-        // RVW-9: a rule that makes a lead "not relevant" says why, from the organization's list
-        if (lookups.reasons.length === 0) return NO_REASONS_IN_LIST;
+        // RVW-9: a rule that makes a lead "not relevant" says why, from the organization's list.
+        // Owner, 13 October 2026: while the list is empty the rule is saved without a reason
+        // (the engine leaves the reason empty); once the list has reasons, one is required.
+        if (lookups.reasons.length === 0) {
+          actions.push({ type: "set_lead_status", status_id: action.status_id });
+          continue;
+        }
         if (!action.reason_id) return REASON_REQUIRED;
         if (!has(lookups.reasons, action.reason_id)) return "הסיבה שנבחרה כבר לא ברשימה. יש לבחור סיבה אחרת.";
         actions.push({ type: "set_lead_status", status_id: action.status_id, reason_id: action.reason_id });
@@ -175,9 +179,12 @@ export function fromDbRule(rule: {
  * usable reason: none was set (rules saved before the reason was required), or
  * the reason is no longer an active one of the list. Such a rule still runs and
  * leaves the reason empty; the screens remind the admin to complete it.
+ * While the organization's list is empty there is nothing to pick, so nothing is
+ * reported (owner, 13 October 2026); the builder says the list is empty instead.
  * Returns the 0-based positions of those actions.
  */
 export function actionsMissingReason(actions: Array<Record<string, unknown>>, lookups: Pick<Lookups, "statuses" | "reasons">): number[] {
+  if (lookups.reasons.length === 0) return [];
   return actions.flatMap((action, index) => {
     if (action.type !== "set_lead_status") return [];
     const status = lookups.statuses.find((s) => s.id === action.status_id);

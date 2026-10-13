@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { actionsMissingReason, fromDbRule, NO_REASONS_IN_LIST, REASON_REQUIRED, toDbRule } from "@/features/automations/convert";
+import { actionsMissingReason, fromDbRule, REASON_REQUIRED, toDbRule } from "@/features/automations/convert";
 import type { Lookups } from "@/features/automations/queries";
 import { STEP_WARNINGS } from "@/features/automations/describe";
 import { ruleSchema } from "@/features/automations/schema";
@@ -44,9 +44,19 @@ describe("set_lead_status and the not-relevant reason", () => {
   it("a not-relevant status needs a reason from the active list", () => {
     expect(build({ type: "set_lead_status", status_id: DISQ })).toBe(REASON_REQUIRED);
     expect(build({ type: "set_lead_status", status_id: DISQ, reason_id: OTHER })).toMatch(/כבר לא ברשימה/);
-    expect(build({ type: "set_lead_status", status_id: DISQ, reason_id: REASON }, { ...lookups, reasons: [] })).toBe(NO_REASONS_IN_LIST);
     const ok = build({ type: "set_lead_status", status_id: DISQ, reason_id: REASON });
     expect(typeof ok === "object" && ok.actions).toEqual([{ type: "set_lead_status", status_id: DISQ, reason_id: REASON }]);
+  });
+
+  it("while the organization has no reasons, the rule saves without one (owner, 13 October 2026)", () => {
+    const empty = { ...lookups, reasons: [] };
+    const none = build({ type: "set_lead_status", status_id: DISQ }, empty);
+    expect(typeof none === "object" && none.actions).toEqual([{ type: "set_lead_status", status_id: DISQ }]);
+    // a stale reason sent by an old screen is dropped, not saved
+    const stale = build({ type: "set_lead_status", status_id: DISQ, reason_id: REASON }, empty);
+    expect(typeof stale === "object" && stale.actions).toEqual([{ type: "set_lead_status", status_id: DISQ }]);
+    // once the list has reasons, a new or edited rule needs one again
+    expect(build({ type: "set_lead_status", status_id: DISQ })).toBe(REASON_REQUIRED);
   });
 
   it("another status needs no reason and drops one that was sent", () => {
@@ -75,6 +85,8 @@ describe("set_lead_status and the not-relevant reason", () => {
       { type: "notify", to: "owner", title: "x" },
     ];
     expect(actionsMissingReason(actions, lookups)).toEqual([0, 2]);
+    // nothing to pick while the list is empty: no reminder
+    expect(actionsMissingReason(actions, { ...lookups, reasons: [] })).toEqual([]);
   });
 });
 

@@ -7,7 +7,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { Select, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { TextLink } from "@/components/ui/text-link";
 import type { FormState } from "@/lib/action-result";
+import { paths } from "@/lib/paths";
 
 import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
@@ -235,7 +237,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
                   </Button>
                 ) : null}
               </div>
-              <ActionFields action={action} index={index} lookups={lookups} onChange={(patch) => updateAction(index, patch)} />
+              <ActionFields orgId={orgId} action={action} index={index} lookups={lookups} onChange={(patch) => updateAction(index, patch)} />
             </fieldset>
           ))}
           {actions.length < 10 ? (
@@ -252,9 +254,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   );
 }
 
-type FieldsProps = { action: Draft; index: number; lookups: Lookups; onChange: (patch: Draft) => void };
+type FieldsProps = { orgId: string; action: Draft; index: number; lookups: Lookups; onChange: (patch: Draft) => void };
 
-function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
+function ActionFields({ orgId, action, index, lookups, onChange }: FieldsProps) {
   const n = index + 1;
   const memberSelect = (label: string) => (
     <SelectField label={label} value={action.user_id} onChange={(e) => onChange({ user_id: e.target.value })} controlSize="sm">
@@ -329,7 +331,8 @@ function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
     case "add_tag":
       return pick("תגית", "tag_id", lookups.tags);
     case "set_lead_status": {
-      // RVW-9: moving a lead to "not relevant" needs a reason from the organization's list
+      // RVW-9: moving a lead to "not relevant" needs a reason from the organization's list;
+      // while the list is empty the rule saves without one (owner, 13 October 2026)
       const disqualified = lookups.statuses.find((s) => s.id === action.status_id)?.kind === "disqualified";
       return (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -345,8 +348,13 @@ function ActionFields({ action, index, lookups, onChange }: FieldsProps) {
                 ))}
               </SelectField>
             ) : (
-              <p className="text-sm text-warning sm:self-end">
-                אין סיבות ברשימת &quot;לא רלוונטי&quot;. יש להוסיף סיבה בהגדרות, בעמוד &quot;סיבות לליד לא רלוונטי&quot;.
+              <p className="text-sm text-ink-soft sm:self-end">
+                אין סיבות מוגדרות בעסק.{" "}
+                <TextLink href={paths.settingsDisqualifyReasons(orgId)} target="_blank" className="font-medium">
+                  להוספת סיבות
+                  <span className="sr-only"> (נפתח בלשונית חדשה)</span>
+                </TextLink>{" "}
+                אחרי שמוסיפים, מרעננים את הדף ובוחרים סיבה.
               </p>
             )
           ) : null}
