@@ -12,7 +12,37 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
+import { canBeUnique, canHaveDefault } from "../settings";
 import { FIELD_TYPE_LABELS, FIELD_TYPES, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
+import { displayCustomFields } from "../values";
+import { CustomFieldInputs } from "./custom-field-inputs";
+
+const UNIQUE_HINT = "שתי רשומות לא יכולות לקבל אותו ערך. סל המחזור ושדה מוסתר לא נבדקים. ליד מטופס באתר נשמר תמיד, ומסומן אם הערך כבר קיים.";
+const READ_ONLY_HINT = "אפשר למלא פעם אחת, ואחר כך הערך נעול לכולם. כדי לשנות ערך, מבטלים זמנית את הסימון כאן.";
+
+/** FLD-07: the "unique" and "read-only" boxes of the field forms. */
+function SettingBoxes({ type, unique, onUnique, readOnly }: { type: FieldType; unique: boolean; onUnique: (value: boolean) => void; readOnly: boolean }) {
+  return (
+    <>
+      {canBeUnique(type) ? (
+        <label className="flex items-start gap-2.5 text-md">
+          <input type="checkbox" name="is_unique" checked={unique} onChange={(event) => onUnique(event.target.checked)} className="mt-1 size-4.5 shrink-0 accent-accent" />
+          <span>
+            ערך ייחודי
+            <span className="block text-sm text-ink-soft">{UNIQUE_HINT}</span>
+          </span>
+        </label>
+      ) : null}
+      <label className="flex items-start gap-2.5 text-md">
+        <input type="checkbox" name="is_read_only" defaultChecked={readOnly} className="mt-1 size-4.5 shrink-0 accent-accent" />
+        <span>
+          קריאה בלבד אחרי מילוי
+          <span className="block text-sm text-ink-soft">{READ_ONLY_HINT}</span>
+        </span>
+      </label>
+    </>
+  );
+}
 
 export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectType: FieldObject }) {
   const [state, formAction] = useActionState<FormState, FormData>(createFieldAction.bind(null, orgId), null);
@@ -20,6 +50,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
   const [type, setType] = useState(values?.field_type ?? "text");
+  const [unique, setUnique] = useState(values?.is_unique === "on");
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -60,6 +91,9 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
         <input type="checkbox" name="is_required" defaultChecked={values?.is_required === "on"} className="size-4.5 accent-accent" />
         שדה חובה
       </label>
+      <SettingBoxes type={type as FieldType} unique={unique} onUnique={setUnique} readOnly={values?.is_read_only === "on"} />
+      {errors.is_unique ? <p className="text-sm text-danger">{errors.is_unique}</p> : null}
+      <p className="text-sm text-ink-soft">ערך ברירת מחדל קובעים בכפתור &quot;עריכה&quot; של השדה, אחרי שמוסיפים אותו.</p>
       <SubmitButton pendingText="מוסיפים…">הוספת שדה</SubmitButton>
     </form>
   );
@@ -78,7 +112,7 @@ export function FieldList({ orgId, fields, editable, hideWarnings = {} }: ListPr
     <ol className="divide-y divide-line">
       {fields.map((field, index) => (
         <FieldRow
-          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.options.join("|")}`}
+          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.isUnique}-${field.isReadOnly}-${JSON.stringify(field.defaultValue ?? null)}-${field.options.join("|")}`}
           orgId={orgId}
           field={field}
           editable={editable}
@@ -103,6 +137,8 @@ function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowP
           <span className={field.isActive ? "font-medium" : "font-medium text-ink-soft"}>{field.label}</span>
           <Badge>{FIELD_TYPE_LABELS[field.type]}</Badge>
           {field.isRequired ? <Badge tone="warning">חובה</Badge> : null}
+          {field.isUnique ? <Badge>ייחודי</Badge> : null}
+          {field.isReadOnly ? <Badge>קריאה בלבד</Badge> : null}
           {field.isActive ? null : <Badge>מוסתר</Badge>}
         </p>
         {editable ? (
@@ -137,9 +173,18 @@ function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowP
         ) : null}
       </div>
       {TYPES_WITH_OPTIONS.includes(field.type) && !editing ? <p className="text-sm text-ink-soft">אפשרויות: {field.options.join(", ")}</p> : null}
+      {hasDefault(field) && !editing ? (
+        <p className="text-sm text-ink-soft">
+          ברירת מחדל: <span dir="auto">{displayCustomFields([field], { [field.key]: field.defaultValue ?? null })[0].text}</span>
+        </p>
+      ) : null}
       {editing ? <EditFieldForm orgId={orgId} field={field} onDone={() => setEditing(false)} /> : null}
     </li>
   );
+}
+
+function hasDefault(field: FieldDefinition): boolean {
+  return field.defaultValue !== null && field.defaultValue !== undefined;
 }
 
 function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDefinition; onDone: () => void }) {
@@ -153,6 +198,9 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
+  const [unique, setUnique] = useState(values ? values.is_unique === "on" : field.isUnique === true);
+  // the default is typed in the field's own input (a unique field has none)
+  const defaultInput: FieldDefinition = { ...field, label: "ערך ברירת מחדל (לא חובה)", isRequired: false, isReadOnly: false, helpText: "ממולא מראש ברשומה חדשה. מי שיוצר את הרשומה יכול לשנות אותו." };
 
   return (
     <form action={formAction} className="space-y-3 rounded-md border border-line p-3" noValidate>
@@ -178,6 +226,10 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
         />
         שדה חובה
       </label>
+      <SettingBoxes type={field.type} unique={unique} onUnique={setUnique} readOnly={values ? values.is_read_only === "on" : field.isReadOnly === true} />
+      {canHaveDefault(field.type) && !unique ? (
+        <CustomFieldInputs definitions={[defaultInput]} stored={{ [field.key]: field.defaultValue ?? null }} submitted={values} errors={errors} />
+      ) : null}
       <div className="flex gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>
         <Button variant="ghost" size="sm" onClick={onDone}>

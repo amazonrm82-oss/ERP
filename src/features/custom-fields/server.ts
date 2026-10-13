@@ -5,6 +5,7 @@ import type { Json } from "@/lib/database.types";
 
 import { listFieldDefinitions } from "./queries";
 import { inputName, type FieldObject } from "./types";
+import { customValuesForCreate, customValuesForUpdate } from "./settings";
 import { parseCustomFields } from "./values";
 
 /**
@@ -13,6 +14,7 @@ import { parseCustomFields } from "./values";
  * merges the form's fields into the row as it is now (FXD-04, migration 0042),
  * so fields the form does not show keep their values and two editors do not
  * overwrite each other. Returns a failure result when a field is invalid.
+ * A read-only field (FLD-07) is sent only when it is being filled (customValuesFor*).
  */
 export async function customFieldsFromForm(
   orgId: string,
@@ -35,16 +37,9 @@ export async function customFieldsFromForm(
   }
 
   if (recordId) {
-    // a null clears that field
-    return { ok: true, customFields: { $merge: values as Record<string, Json> } };
+    return { ok: true, customFields: { $merge: customValuesForUpdate(definitions, values) } };
   }
-  const merged: Record<string, Json> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (value !== null && value !== undefined) {
-      merged[key] = value;
-    }
-  }
-  return { ok: true, customFields: merged };
+  return { ok: true, customFields: customValuesForCreate(definitions, values) };
 }
 
 /** Spread into an insert or update: sets custom_fields only when the form had custom fields. */

@@ -10,6 +10,9 @@ type ErrorLike = {
   hint?: string | null;
   status?: number | null;
   name?: string | null;
+  // PostgREST calls Postgres' DETAIL "details"; node-postgres calls it "detail"
+  details?: string | null;
+  detail?: string | null;
 };
 
 export const GENERIC_ERROR = "משהו השתבש. נסו שוב בעוד רגע.";
@@ -246,6 +249,67 @@ function asErrorLike(error: unknown): ErrorLike | null {
   return error as ErrorLike;
 }
 
+const UNIQUE_VALUE_TAKEN = "אחד הערכים כבר קיים ברשומה אחרת, והשדה מוגדר כייחודי.";
+
+/** True for a refusal of a custom field marked unique (FLD-07), with or without the field's name. */
+export function isUniqueFieldClash(error: unknown): boolean {
+  const e = asErrorLike(error);
+  if (!e || e.code !== "23505") return false;
+  return (e.hint ?? "").trim() === "custom_field:unique" || /custom_unique_values_value/.test(e.message ?? "");
+}
+
+/**
+ * Lead conversion (convert_lead) refused because a value carried to the new contact or deal is
+ * already taken there (FLD-07): the clash is on the records the conversion creates, not on the lead.
+ */
+export function conversionErrorMessage(error: unknown, fallback: string): string {
+  if (isUniqueFieldClash(error)) {
+    const e = asErrorLike(error);
+    const label = (e?.details ?? e?.detail ?? "").trim();
+    const field = (e?.hint ?? "").trim() === "custom_field:unique" && label ? `בשדה "${label}" ` : "";
+    return `הערך ${field}כבר קיים ברשומה אחרת, והשדה מוגדר כייחודי, ולכן אי אפשר להעביר אותו לאיש הקשר או לעסקה שנוצרים בהמרה. שנו את הערך בליד ונסו שוב.`;
+  }
+  return dbErrorMessage(error, fallback);
+}
+
+/**
+ * FLD-07 (migration field_settings): custom field settings. The field's label, or a
+ * number of records, travels in the error's detail (the label is the business's own
+ * text, shown to its members anyway).
+ */
+export function customFieldMessage(error: unknown): string | null {
+  const e = asErrorLike(error);
+  if (!e) return null;
+  const detail = (e.details ?? e.detail ?? "").trim();
+  // two people saving the same value at the same moment: the constraint itself answers, without the field's name
+  if (e.code === "23505" && !e.hint && /custom_unique_values_value/.test(e.message ?? "")) {
+    return UNIQUE_VALUE_TAKEN;
+  }
+  switch ((e.hint ?? "").trim()) {
+    case "custom_field:unique":
+      return detail
+        ? `הערך בשדה "${detail}" כבר קיים ברשומה אחרת, והשדה מוגדר כייחודי. בדקו את הערך, או חפשו את הרשומה הקיימת.`
+        : UNIQUE_VALUE_TAKEN;
+    case "custom_field:read_only":
+      return detail
+        ? `השדה "${detail}" לקריאה בלבד: אחרי שמולא אי אפשר לשנות או למחוק אותו. רעננו את הדף כדי לראות את הערך שנשמר.`
+        : "אחד השדות לקריאה בלבד: אחרי שמולא אי אפשר לשנות או למחוק אותו. רעננו את הדף כדי לראות את הערך שנשמר.";
+    case "custom_field:unique_existing": {
+      const records = Number(detail);
+      const count = Number.isInteger(records) && records > 0 ? `${records.toLocaleString("he-IL")} רשומות` : "כמה רשומות";
+      return `אי אפשר להגדיר את השדה כייחודי: ${count} חולקות ערך עם רשומה אחרת. מתקנים או ממזגים אותן ומנסים שוב.`;
+    }
+    case "custom_field:unique_type":
+      return "אפשר להגדיר כייחודי רק שדה מסוג טקסט קצר, מספר, אימייל, טלפון, קישור, תעודת זהות או ח.פ.";
+    case "custom_field:unique_default":
+      return "לשדה ייחודי אין ערך ברירת מחדל, כי כל רשומה חדשה הייתה מקבלת אותו ערך.";
+    case "custom_field:default":
+      return "ערך ברירת המחדל אינו מתאים לסוג השדה או לאפשרויות שלו. אם הסרתם אפשרות, בחרו ברירת מחדל אחרת קודם.";
+    default:
+      return null;
+  }
+}
+
 function looksLikeNetworkFailure(error: ErrorLike): boolean {
   const text = `${error.name ?? ""} ${error.message ?? ""}`;
   return (
@@ -261,6 +325,11 @@ export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR)
     return fallback;
   }
   const code = e.code ?? "";
+
+  const fieldMessage = customFieldMessage(e);
+  if (fieldMessage) {
+    return fieldMessage;
+  }
 
   if (code === "P0001") {
     const hint = (e.hint ?? "").trim();

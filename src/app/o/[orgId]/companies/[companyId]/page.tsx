@@ -94,7 +94,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} filter={tl} />
           <RecordFiles orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          {context.canDelete ? <DuplicatesCard orgId={orgId} type="company" id={company.id} /> : null}
+          <DuplicatesCard orgId={orgId} type="company" id={company.id} canMerge={context.canDelete} />
           <RecordHistory orgId={orgId} entityType="companies" entityId={company.id} />
         </div>
 

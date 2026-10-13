@@ -120,7 +120,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} filter={tl} />
           <RecordFiles orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          {context.canDelete ? <DuplicatesCard orgId={orgId} type="contact" id={contact.id} /> : null}
+          <DuplicatesCard orgId={orgId} type="contact" id={contact.id} canMerge={context.canDelete} />
           <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />
         </div>
 

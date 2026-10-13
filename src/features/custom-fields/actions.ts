@@ -10,10 +10,13 @@ import { INVALID_ARGS, booleanArg, directionArg, validArg } from "@/lib/action-a
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
+import type { Json } from "@/lib/database.types";
 import { pick } from "@/lib/validation";
 
 import { createFieldSchema, updateFieldSchema } from "./schema";
-import { TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
+import { canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
+import { inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
+import { parseCustomFields } from "./values";
 
 function revalidateFields(orgId: string) {
   // the fields show in the forms and cards of every record type
@@ -26,7 +29,16 @@ function newKey(): string {
   return `f_${[...randomBytes(8)].map((byte) => alphabet[byte % alphabet.length]).join("")}`;
 }
 
-type NewField = { object_type: FieldObject; label: string; field_type: FieldType; options: string[]; help_text: string | null; is_required: boolean };
+type NewField = {
+  object_type: FieldObject;
+  label: string;
+  field_type: FieldType;
+  options: string[];
+  help_text: string | null;
+  is_required: boolean;
+  is_unique?: boolean;
+  is_read_only?: boolean;
+};
 type Context = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
 
 /** Adds a field at the end of its object's list; the database decides who may (owners and admins) and the plan limit. */
@@ -47,6 +59,8 @@ async function insertField(context: Context, orgId: string, field: NewField): Pr
     field_type: field.field_type,
     options: TYPES_WITH_OPTIONS.includes(field.field_type) ? field.options : [],
     is_required: field.is_required,
+    is_unique: field.is_unique === true && canBeUnique(field.field_type),
+    is_read_only: field.is_read_only === true,
     help_text: field.help_text,
     position: count ?? 0,
   });
@@ -61,7 +75,7 @@ export async function createFieldAction(orgId: string, _prev: FormState, formDat
   if (!context.ok) {
     return context;
   }
-  const parsed = createFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required", "object_type", "field_type"]));
+  const parsed = createFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required", "is_unique", "is_read_only", "object_type", "field_type"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
@@ -123,13 +137,13 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   if (!context.ok) {
     return context;
   }
-  const parsed = updateFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required"]));
+  const parsed = updateFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required", "is_unique", "is_read_only"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
   const { data: field, error: fieldError } = await context.supabase
     .from("field_definitions")
-    .select("field_type")
+    .select("field_type, key")
     .eq("organization_id", orgId)
     .eq("id", fieldId)
     .maybeSingle();
@@ -143,13 +157,41 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
       values: formValues(formData),
     });
   }
+  if (!isFieldType(field.field_type)) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  const type = field.field_type;
+  const withOptions = TYPES_WITH_OPTIONS.includes(type);
+  // FLD-07: the default value is typed in the field's own input and read like a record's value
+  let defaultValue: Json | null = null;
+  if (canHaveDefault(type)) {
+    const { values, errors } = parseCustomFields(
+      [{ id: fieldId, key: field.key, label: parsed.data.label, type, options: withOptions ? parsed.data.options : [], isRequired: false, isActive: true, helpText: null }],
+      formData,
+    );
+    const problem = errors[inputName(field.key)];
+    if (problem) {
+      return fail(problem, { fieldErrors: { [inputName(field.key)]: problem }, values: formValues(formData) });
+    }
+    const value = values[field.key];
+    // an unticked box is "no default", not "no"
+    defaultValue = value === undefined || value === null || (type === "checkbox" && value !== true) ? null : value;
+  }
+  const isUnique = parsed.data.is_unique && canBeUnique(type);
+  const settingsProblem = fieldSettingsProblem(type, isUnique, defaultValue);
+  if (settingsProblem) {
+    return fail(settingsProblem, { values: formValues(formData) });
+  }
   const { data, error } = await context.supabase
     .from("field_definitions")
     .update({
       label: parsed.data.label,
       help_text: parsed.data.help_text,
       is_required: parsed.data.is_required,
-      ...(TYPES_WITH_OPTIONS.includes(field.field_type as FieldType) ? { options: parsed.data.options } : {}),
+      is_unique: isUnique,
+      is_read_only: parsed.data.is_read_only,
+      default_value: defaultValue,
+      ...(withOptions ? { options: parsed.data.options } : {}),
     })
     .eq("organization_id", orgId)
     .eq("id", fieldId)

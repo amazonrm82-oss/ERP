@@ -6,6 +6,8 @@ import { EmptyState } from "@/components/ui/feedback";
 import { InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
+import { UniqueClashNote } from "@/features/data-quality/components/unique-clash-note";
+import { findUniqueFieldClashes, type UniqueClash } from "@/features/data-quality/duplicates";
 import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { WaitingClock } from "@/features/leads/components/waiting-clock";
 import { takenLabel } from "@/features/leads/take";
@@ -13,6 +15,7 @@ import { getWaitingLeads } from "@/features/leads/waiting";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { createClient } from "@/lib/supabase/server";
 import { waitingText } from "@/lib/waiting-time";
 
 export const metadata: Metadata = { title: "לידים שמחכים" };
@@ -30,6 +33,11 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   const { leads, truncated } = showAll
     ? await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role })
     : await getWaitingLeads(orgId, context.user.id);
+  // FLD-07: a lead from a public form whose unique field holds a value another record holds
+  const clashes = new Map<string, UniqueClash[]>();
+  for (const clash of await findUniqueFieldClashes(await createClient(), orgId, "lead", leads.map((lead) => lead.id))) {
+    clashes.set(clash.recordId, [...(clashes.get(clash.recordId) ?? []), clash]);
+  }
   // read once per request on the server; the clocks run on in the browser
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -79,6 +87,11 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
                     <span>{lead.ownerName ? `אחראי: ${lead.ownerName}` : "ללא אחראי"}</span>
                   ) : null}
                 </p>
+                {clashes.get(lead.id)?.map((clash) => (
+                  <p key={`${clash.label}-${clash.other?.href ?? ""}`} className="mt-0.5 text-sm">
+                    <UniqueClashNote clash={clash} />
+                  </p>
+                ))}
               </div>
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                 {/* SPD-01: a lead nobody has goes to the first one who takes it */}

@@ -116,7 +116,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} filter={tl} />
           <RecordFiles orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          {context.canDelete ? <DuplicatesCard orgId={orgId} type="lead" id={lead.id} /> : null}
+          <DuplicatesCard orgId={orgId} type="lead" id={lead.id} canMerge={context.canDelete} />
           <RecordHistory orgId={orgId} entityType="leads" entityId={lead.id} />
         </div>
 

@@ -1,33 +1,57 @@
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 
 import { inputName, type CustomValues, type FieldDefinition } from "../types";
-import { inputValue } from "../values";
+import { isEmptyCustomValue } from "../settings";
+import { displayCustomFields, inputValue } from "../values";
 
 type Props = {
   definitions: FieldDefinition[];
-  // stored values of the record (edit forms)
+  // stored values of the record (edit forms); absent on a create form, which shows the fields' default values
   stored?: CustomValues;
   // what the user typed, after a failed submit (keyed by input name)
   submitted?: Record<string, string>;
   errors?: Record<string, string>;
 };
 
+/** A read-only field (FLD-07) that holds a value, in an edit form: the value as text, never an input. */
+function ReadOnlyValue({ field, values }: { field: FieldDefinition; values: CustomValues }) {
+  const [shown] = displayCustomFields([field], values);
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-medium">{field.label}</p>
+      <p className="text-md" dir={shown.ltr && shown.text ? "ltr" : undefined}>
+        {shown.text}
+      </p>
+      <p className="text-sm text-ink-soft">שדה לקריאה בלבד</p>
+    </div>
+  );
+}
+
 /** Inputs for a record's active custom fields. Renders nothing when there are none. */
-export function CustomFieldInputs({ definitions, stored = {}, submitted, errors = {} }: Props) {
+export function CustomFieldInputs({ definitions, stored, submitted, errors = {} }: Props) {
   if (definitions.length === 0) {
     return null;
   }
+  const editing = stored !== undefined;
+  // FLD-07: a create form starts with the fields' default values
+  const initial: CustomValues = editing
+    ? stored
+    : Object.fromEntries(definitions.filter((field) => field.defaultValue !== null && field.defaultValue !== undefined).map((field) => [field.key, field.defaultValue]));
   return (
     <fieldset className="space-y-4 border-t border-line pt-4">
       <legend className="sr-only">שדות נוספים</legend>
       {definitions.map((field) => {
+        // FLD-07: open while empty (it may be filled once), locked once it holds a value
+        if (editing && field.isReadOnly && !isEmptyCustomValue(stored[field.key])) {
+          return <ReadOnlyValue key={field.id} field={field} values={stored} />;
+        }
         const name = inputName(field.key);
-        const value = submitted ? (submitted[name] ?? "") : inputValue(field, stored);
+        const value = submitted ? (submitted[name] ?? "") : inputValue(field, initial);
         const common = {
           label: field.label,
           name,
           required: field.isRequired,
-          hint: field.helpText ?? undefined,
+          hint: field.isReadOnly ? [field.helpText, "שדה לקריאה בלבד: אחרי שממלאים אותו אי אפשר לשנות."].filter(Boolean).join(" ") : (field.helpText ?? undefined),
           error: errors[name],
         };
         switch (field.type) {

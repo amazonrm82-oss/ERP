@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { checkbox, optionalText, requiredText } from "@/lib/validation";
 
+import { canBeUnique } from "./settings";
 import { FIELD_OBJECTS, FIELD_TYPES, TYPES_WITH_OPTIONS } from "./types";
 
 /** One choice per line; blank lines and repeats dropped. */
@@ -22,6 +23,9 @@ const fieldFields = {
   options: optionLines,
   help_text: optionalText(200, "ההסבר ארוך מדי (עד 200 תווים)."),
   is_required: checkbox,
+  // FLD-07 (the default value is read by updateFieldAction with the field's own parser)
+  is_unique: checkbox,
+  is_read_only: checkbox,
 };
 
 export const createFieldSchema = z
@@ -33,6 +37,10 @@ export const createFieldSchema = z
   .refine((field) => !TYPES_WITH_OPTIONS.includes(field.field_type) || field.options.length > 0, {
     path: ["options"],
     error: "יש לכתוב לפחות אפשרות אחת, כל אחת בשורה.",
+  })
+  .refine((field) => !field.is_unique || canBeUnique(field.field_type), {
+    path: ["is_unique"],
+    error: "אפשר להגדיר כייחודי רק שדה מסוג טקסט קצר, מספר, אימייל, טלפון, קישור, תעודת זהות או ח.פ.",
   });
 
 export const updateFieldSchema = z.object(fieldFields);

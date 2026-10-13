@@ -54,6 +54,10 @@ export type FieldDefinition = {
   isRequired: boolean;
   isActive: boolean;
   helpText: string | null;
+  // FLD-07 settings (src/features/custom-fields/settings.ts); absent = off / none
+  isUnique?: boolean;
+  isReadOnly?: boolean;
+  defaultValue?: Json | null;
 };
 
 export function isFieldType(value: string): value is FieldType {

@@ -9,7 +9,7 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { ConvertLeadResult } from "@/lib/database.types";
-import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { conversionErrorMessage, dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
@@ -226,7 +226,7 @@ export async function convertLeadAction(
     p_amount_agorot: parsed.data.create_deal ? parsed.data.amount : 0,
   });
   if (error || !isConvertResult(data)) {
-    return fail(dbErrorMessage(error, "לא הצלחנו להמיר את הליד. נסו שוב."), { values: formValues(formData) });
+    return fail(conversionErrorMessage(error, "לא הצלחנו להמיר את הליד. נסו שוב."), { values: formValues(formData) });
   }
 
   revalidateLead(orgId, leadId);

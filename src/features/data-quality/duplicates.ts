@@ -6,6 +6,7 @@ import type { Database } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 import { paths } from "@/lib/paths";
 import { normalizePhone } from "@/lib/phone";
+import { RECORD_TYPES, recordPage } from "@/lib/record-types";
 
 import { companyNamePattern, sameCompanyName } from "./company-name";
 
@@ -102,4 +103,49 @@ export async function findCompanyDuplicate(
     if (row) return found(row);
   }
   return null;
+}
+
+// FLD-07 (owner, 13 October 2026): a record that holds the value of a unique custom field that another
+// record holds (a public-form lead, one restored from the bin, a contact or deal made by conversion) is
+// marked "ערך כפול בשדה …", next to the phone / email duplicates. The database finds them
+// (public.custom_unique_clashes: only records the user reads, and the other record named only when the
+// user reads it too); its name is read here with the user's session, so RLS decides the link.
+
+export type UniqueFieldType = "lead" | "contact" | "company" | "deal";
+export type UniqueClash = { recordId: string; label: string; other: { name: string; href: string } | null };
+
+/** "ערך כפול בשדה …" */
+export function uniqueClashText(label: string): string {
+  return `ערך כפול בשדה ${label}`;
+}
+
+/** The unique-field clashes of these records (at most 200), in the order the database gives. */
+export async function findUniqueFieldClashes(supabase: Supabase, orgId: string, type: UniqueFieldType, ids: string[]): Promise<UniqueClash[]> {
+  const asked = [...new Set(ids)].slice(0, 200);
+  if (asked.length === 0) return [];
+  const { data, error } = await supabase.rpc("custom_unique_clashes", { p_org: orgId, p_type: type, p_ids: asked });
+  if (error) {
+    throw new Error(`unique field clashes: ${error.message}`);
+  }
+  if (!data?.length) return [];
+  const otherIds = [...new Set(data.map((row) => row.other_id).filter((id): id is string => Boolean(id)))];
+  const names = new Map<string, string>();
+  if (otherIds.length > 0) {
+    const rows = must(
+      await supabase.from(RECORD_TYPES[type].table).select("*").eq("organization_id", orgId).is("deleted_at", null).in("id", otherIds),
+      "unique field clashes",
+    ) as Array<Record<string, unknown>>;
+    const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+    for (const row of rows) {
+      names.set(String(row.id), text(row.full_name) ?? text(row.name) ?? text(row.email) ?? text(row.phone) ?? "ללא שם");
+    }
+  }
+  return data.map((row) => {
+    const name = row.other_id ? names.get(row.other_id) : undefined;
+    return {
+      recordId: row.record_id,
+      label: row.field_label,
+      other: row.other_id && name !== undefined ? { name, href: recordPage(type, orgId, row.other_id) } : null,
+    };
+  });
 }

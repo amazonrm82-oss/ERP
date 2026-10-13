@@ -500,6 +500,9 @@ export type FieldDefinitionRow = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  is_unique: boolean;
+  is_read_only: boolean;
+  default_value: Json | null;
 };
 
 export type SavedViewRow = {
@@ -1354,6 +1357,9 @@ export type Database = {
           is_active?: boolean;
           help_text?: string | null;
           position?: number;
+          is_unique?: boolean;
+          is_read_only?: boolean;
+          default_value?: Json | null;
         }
       >;
       saved_views: Table<
@@ -1762,6 +1768,11 @@ export type Database = {
           // null = cannot check (no hash key)
           current_address: boolean | null;
         }>;
+      };
+      // FLD-07 (migration field_settings): records holding a unique field's value another record holds
+      custom_unique_clashes: {
+        Args: { p_org: string; p_type: string; p_ids: string[] };
+        Returns: Array<{ record_id: string; field_key: string; field_label: string; other_id: string | null }>;
       };
       contact_channel_matches: {
         Args: { p_org: string; p_phones: string[]; p_emails: string[] };
