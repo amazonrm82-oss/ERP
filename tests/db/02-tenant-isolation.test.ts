@@ -117,6 +117,7 @@ describe("tenant isolation", () => {
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
+      await q("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000)", [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -170,6 +171,8 @@ describe("tenant isolation", () => {
     // PRD-04, seeded for every new organization
     "product_categories",
     "product_units",
+    // PRD-01
+    "products",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -293,6 +296,7 @@ describe("tenant isolation", () => {
       goals: "target = target",
       product_categories: "name = name",
       product_units: "name = name",
+      products: "name = name",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -374,6 +378,7 @@ describe("tenant isolation", () => {
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -439,6 +444,7 @@ describe("tenant isolation", () => {
       ["goals", "target = 777", "target = 777"],
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],
+      ["products", "description = 'HACKED'", "description = 'HACKED'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

@@ -883,6 +883,47 @@ export type ProductUnitRow = {
   updated_at: string;
 };
 
+// PRD-01: the product catalog (migration products). kind, vat_kind and billing are text with check
+// constraints (PRODUCT_KINDS, VAT_KINDS, BILLINGS in src/features/products/schema.ts). archived_at is stamped by trigger.
+export type ProductRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  sku: string | null;
+  category_id: string | null;
+  kind: string;
+  unit_id: string | null;
+  price_agorot: number;
+  price_includes_vat: boolean;
+  currency: string;
+  vat_kind: string;
+  billing: string;
+  duration_minutes: number | null;
+  barcode: string | null;
+  is_active: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ProductWrite = {
+  name: string;
+  description?: string | null;
+  sku?: string | null;
+  category_id?: string | null;
+  kind?: string;
+  unit_id?: string | null;
+  price_agorot?: number;
+  price_includes_vat?: boolean;
+  currency?: string;
+  vat_kind?: string;
+  billing?: string;
+  duration_minutes?: number | null;
+  barcode?: string | null;
+  is_active?: boolean;
+};
+
 // GOL-01: a target per person, team or organization, period and metric (migration goals).
 // scope, period and metric are text with check constraints (GoalScope, GoalPeriod, GoalMetric in src/features/goals/metrics.ts).
 export type GoalRow = {
@@ -1326,6 +1367,8 @@ export type Database = {
         { organization_id: string; name: string; parent_id?: string | null; position?: number },
         { name?: string; parent_id?: string | null; position?: number }
       >;
+      // PRD-01: column grants; organization_id is fixed once inserted, archived_at only on update (stamped by trigger)
+      products: Table<ProductRow, ProductWrite & { organization_id: string }, Partial<ProductWrite> & { archived_at?: string | null }>;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)
       goals: Table<
@@ -1437,6 +1480,9 @@ export type Database = {
       sort_contact: { Args: Record<string, never>; Returns: string | null };
       // contacts and companies by type (CON-02)
       sort_type: { Args: Record<string, never>; Returns: number | null };
+      // products by category name (PRD-01)
+      sort_category: { Args: Record<string, never>; Returns: string | null };
+      sort_unit: { Args: Record<string, never>; Returns: string | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

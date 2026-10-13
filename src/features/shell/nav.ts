@@ -9,9 +9,11 @@ import {
   HomeIcon,
   InboxIcon,
   SettingsIcon,
+  TagIcon,
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarPath } from "@/features/calendar/range";
+import { productsPath } from "@/features/products/paths";
 import { paths } from "@/lib/paths";
 
 export type NavItem = {
@@ -35,6 +37,8 @@ export function navItems(orgId: string): NavItem[] {
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },
     // CAL-02: under "עוד" on a phone; the four bottom-bar places stay as they are
     { key: "calendar", label: "יומן", href: calendarPath(orgId), icon: CalendarIcon, mobile: false },
+    // PRD-01: under "עוד" on a phone
+    { key: "products", label: "מוצרים", href: productsPath(orgId), icon: TagIcon, mobile: false },
     { key: "reports", label: "דוחות", href: paths.reports(orgId), icon: ChartIcon, mobile: false },
     { key: "settings", label: "הגדרות", href: paths.settings(orgId), icon: SettingsIcon, mobile: false },
   ];

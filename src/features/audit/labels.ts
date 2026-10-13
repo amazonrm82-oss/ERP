@@ -43,6 +43,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // PRD-04
   product_categories: "קטגוריית מוצרים",
   product_units: "יחידת מידה",
+  // PRD-01
+  products: "מוצר",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -168,6 +170,20 @@ export const FIELD_LABELS: Record<string, string> = {
   email_type: "סוג האימייל",
   extra_phone: "טלפון נוסף",
   extra_email: "אימייל נוסף",
+  // PRD-01, PRD-04 (products, product categories and units)
+  sku: 'מק"ט',
+  kind: "סוג",
+  barcode: "ברקוד",
+  category_id: "קטגוריה",
+  unit_id: "יחידת מידה",
+  vat_kind: 'מע"מ',
+  billing: "חיוב",
+  price_agorot: "מחיר",
+  price_includes_vat: 'המחיר כולל מע"מ',
+  duration_minutes: "משך בדקות",
+  is_active: "פעיל",
+  archived_at: "ארכיון",
+  parent_id: "קטגוריה ראשית",
 };
 
 /** Hebrew for coded values, by field (GOL-01: a goal's metric, scope and period). */

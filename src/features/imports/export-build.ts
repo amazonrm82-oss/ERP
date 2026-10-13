@@ -66,6 +66,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   // PRD-04
   { table: "product_categories", file: "product_categories.csv" },
   { table: "product_units", file: "product_units.csv" },
+  // PRD-01
+  { table: "products", file: "products.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   { table: "org_document_settings", file: "document_settings.csv" },
   { table: "org_bank_details", file: "bank_details.csv" },
@@ -89,6 +91,9 @@ export const LOOKUPS: Record<string, string> = {
   type_id: "type",
   // PRD-04: a subcategory's top category
   parent_id: "parent",
+  // PRD-01
+  category_id: "category",
+  unit_id: "unit",
 };
 
 export type ExportRow = Record<string, unknown>;
@@ -180,7 +185,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 ימי המנוחה של העסק נמצאים ב-calendar_settings.csv: rest_weekdays הם ימי השבוע (0 = ראשון עד 6 = שבת), holidays_rest אומר אם החגים הם ימי מנוחה, holiday_eves_rest אם ערבי החג, ו-rest_occasions מועדים נוספים שבחרתם. אם הקובץ ריק, ההגדרות הן ברירת המחדל: שישי ושבת וחגים.
 היעדים נמצאים ב-goals.csv: scope הוא user (חבר צוות), team (צוות) או org (כל העסק); period הוא month, quarter או year מ-period_start; metric הוא won_amount (הכנסה שנסגרה, target באגורות), won_deals, leads_handled או meetings_held.
 המעמד של העסק במע"מ נמצא ב-document_settings.csv: vat_status הוא licensed (עוסק מורשה או חברה בע"מ), exempt (עוסק פטור), nonprofit (עמותה או מלכ"ר) או other (מעמד אחר, ששמו ב-vat_status_other, ו-other_charges_vat אומר אם הוא גובה מע"מ). legal_form היא צורת ההתאגדות. באותו קובץ פרטי העסק שמופיעים במסמכים: legal_name (שם רשמי), tax_id (מספר עוסק או ח.פ., 9 ספרות), address_line, city ו-postal_code (כתובת), phone ו-email (פרטי קשר במסמכים, והאימייל גם בהזמנות ליומן). פרטי הבנק להעברה נמצאים ב-bank_details.csv: bank_name, bank_branch, bank_account ו-bank_account_name (רק בעלים ומנהלי מערכת רואים אותם במערכת).
-קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv.
+קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.
