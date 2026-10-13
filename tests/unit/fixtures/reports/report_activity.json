@@ -1,0 +1,27 @@
+{
+  "by_day": [
+    {
+      "day": "2026-10-13",
+      "activities": 1,
+      "tasks_done": 1
+    }
+  ],
+  "by_user": [
+    {
+      "call": 0,
+      "note": 0,
+      "meeting": 0,
+      "user_id": "00000000-0000-4000-8000-000000000007",
+      "messages": 0,
+      "tasks_done": 1
+    },
+    {
+      "call": 1,
+      "note": 0,
+      "meeting": 0,
+      "user_id": "00000000-0000-4000-8000-000000000008",
+      "messages": 0,
+      "tasks_done": 0
+    }
+  ]
+}

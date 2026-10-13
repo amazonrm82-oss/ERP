@@ -1,0 +1,21 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "name": "עסקה פתוחה",
+    "stuck": false,
+    "owner_id": "00000000-0000-4000-8000-000000000008",
+    "idle_days": 0,
+    "postponed": false,
+    "limit_days": 7,
+    "stage_name": "פנייה ראשונית",
+    "pipeline_id": "00000000-0000-4000-8000-000000000006",
+    "next_task_at": null,
+    "no_next_step": true,
+    "amount_agorot": 80000,
+    "days_in_stage": 0,
+    "snoozed_until": null,
+    "next_meeting_at": null,
+    "last_activity_at": null,
+    "stage_entered_at": "2026-10-13T10:38:52.916648+00:00"
+  }
+]

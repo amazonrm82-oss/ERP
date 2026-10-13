@@ -1,0 +1,23 @@
+{
+  "won": 1,
+  "stages": [
+    {
+      "name": "פנייה ראשונית",
+      "moves": 2,
+      "avg_days": 0,
+      "position": 0,
+      "stage_id": "00000000-0000-4000-8000-000000000002"
+    },
+    {
+      "name": "שיחת היכרות",
+      "moves": 1,
+      "avg_days": 0,
+      "position": 1,
+      "stage_id": "00000000-0000-4000-8000-000000000003"
+    }
+  ],
+  "avg_days": 0,
+  "from_lead": 1,
+  "median_days": 0,
+  "avg_days_from_lead": 0
+}

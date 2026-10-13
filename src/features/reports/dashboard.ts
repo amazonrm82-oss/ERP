@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buildReport } from "./build";
 import type { ReportSection } from "./definitions";
 import { parsePeriod } from "./period";
+import { parseReportData } from "./schemas";
 
 export type DashboardTile = { label: string; value: string; change: string | null; trend: "up" | "down" | "same" | null };
 
@@ -53,7 +54,7 @@ export async function getDashboard(orgId: string): Promise<Dashboard> {
   if (error) {
     throw new Error(`report_summary failed: ${error.message}`);
   }
-  const s = (data ?? {}) as Obj;
+  const s = parseReportData("report_summary", data) as Obj;
   const winRate = (won: number, lost: number) => (won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0);
   const percentText = (n: number) => `${formatNumber(n)}%`;
 

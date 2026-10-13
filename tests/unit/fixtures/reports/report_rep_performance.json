@@ -1,0 +1,18 @@
+[
+  {
+    "won": 1,
+    "lost": 1,
+    "owner_id": "00000000-0000-4000-8000-000000000007",
+    "open_count": 0,
+    "won_amount": 100000,
+    "open_amount": 0
+  },
+  {
+    "won": 0,
+    "lost": 1,
+    "owner_id": "00000000-0000-4000-8000-000000000008",
+    "open_count": 1,
+    "won_amount": 0,
+    "open_amount": 80000
+  }
+]

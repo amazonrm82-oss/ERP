@@ -1,0 +1,14 @@
+{
+  "won": 1,
+  "lost": 2,
+  "open": 1,
+  "leads": 3,
+  "won_prev": 0,
+  "lost_prev": 0,
+  "leads_prev": 0,
+  "won_amount": 100000,
+  "open_amount": 80000,
+  "overdue_tasks": 0,
+  "weighted_amount": 8000,
+  "won_amount_prev": 0
+}

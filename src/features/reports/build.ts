@@ -10,6 +10,7 @@ import type { ReportRow, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
 import { responseTargetLabels } from "./response-target";
+import { parseReportData, type ReportFunction } from "./schemas";
 import { must } from "@/lib/db-read";
 
 export type ReportFilters = { period: Period; ownerId: string | null; pipelineId: string | null };
@@ -34,12 +35,15 @@ function monthLabel(month: unknown): string {
 type Functions = Database["public"]["Functions"];
 type ReportFn = Extract<keyof Functions, `report_${string}`>;
 
-async function rpc<N extends ReportFn>(name: N, args: Functions[N]["Args"]): Promise<Json> {
+/** One report function with the user's session; its result is checked against its schema (FXC-12). */
+async function rpc<N extends ReportFn & ReportFunction>(name: N, args: Functions[N]["Args"]): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name, args);
   if (error) {
     throw new Error(`${name} failed: ${error.message}`);
   }
+  // a mismatch throws ReportShapeError; withReportShape() logs it and shows the message
+  parseReportData(name, data);
   return data as Json;
 }
 
@@ -392,7 +396,14 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
               { key: "stage", label: "השלב לפני ההפסד", kind: "text" },
               { key: "deals", label: "עסקאות", kind: "number" },
             ],
-            rows: byStage.map((r) => ({ stage: str(r.name) ?? "לא ידוע", deals: num(r.deals) })),
+            // stages in pipeline order; deals with no recorded stage move last
+            rows: [...byStage]
+              .sort((a, b) => {
+                const pa = numOrNull(a.position);
+                const pb = numOrNull(b.position);
+                return pa === pb ? 0 : pa === null ? 1 : pb === null ? -1 : pa - pb;
+              })
+              .map((r) => ({ stage: str(r.name) ?? (r.stage_id ? "שלב שנמחק" : "לא נרשם מעבר שלב"), deals: num(r.deals) })),
             bar: "deals",
             empty: "לא אבדו עסקאות בתקופה הזו.",
           },

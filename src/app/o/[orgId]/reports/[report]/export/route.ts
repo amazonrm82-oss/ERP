@@ -2,6 +2,7 @@ import { buildReport } from "@/features/reports/build";
 import { findReport } from "@/features/reports/definitions";
 import { csvCell } from "@/features/reports/format";
 import { canExport, reportFilters } from "@/features/reports/request";
+import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,7 +19,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   }
   const searchParams = Object.fromEntries(new URL(request.url).searchParams);
   const filters = reportFilters(definition, searchParams);
-  const view = await buildReport(orgId, definition.key, filters);
+  const built = await withReportShape(() => buildReport(orgId, definition.key, filters));
+  if (!built.ok) {
+    return new Response(built.message, { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  const view = built.value;
 
   const lines: string[] = [csvCell("text", definition.title)];
   if (definition.filters.includes("period")) {

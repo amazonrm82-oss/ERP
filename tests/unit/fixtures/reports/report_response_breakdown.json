@@ -1,0 +1,33 @@
+{
+  "by_hour": [
+    {
+      "hour": 13,
+      "leads": 3,
+      "contacted": 1,
+      "avg_minutes": 0,
+      "within_target": 1,
+      "median_minutes": 0
+    }
+  ],
+  "by_source": [
+    {
+      "leads": 2,
+      "contacted": 0,
+      "source_id": "00000000-0000-4000-8000-000000000001",
+      "avg_minutes": null,
+      "source_name": "WhatsApp",
+      "within_target": 0,
+      "median_minutes": null
+    },
+    {
+      "leads": 1,
+      "contacted": 1,
+      "source_id": null,
+      "avg_minutes": 0,
+      "source_name": null,
+      "within_target": 1,
+      "median_minutes": 0
+    }
+  ],
+  "target_minutes": 60
+}

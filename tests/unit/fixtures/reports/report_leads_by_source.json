@@ -1,0 +1,20 @@
+[
+  {
+    "won": 1,
+    "leads": 2,
+    "revenue": 100000,
+    "campaign": "חורף",
+    "converted": 1,
+    "source_id": "00000000-0000-4000-8000-000000000001",
+    "source_name": "WhatsApp"
+  },
+  {
+    "won": 0,
+    "leads": 1,
+    "revenue": 0,
+    "campaign": null,
+    "converted": 0,
+    "source_id": null,
+    "source_name": null
+  }
+]

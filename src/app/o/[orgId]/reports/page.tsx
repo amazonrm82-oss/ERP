@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
 import { REPORTS } from "@/features/reports/definitions";
+import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -14,12 +16,13 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   const { orgId } = await params;
   const { role } = await getOrgContext(orgId);
   // the dashboard is for people who manage others; reps get the reports list
-  const dashboard = role === "owner" || role === "admin" || role === "manager" ? await getDashboard(orgId) : null;
+  const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId)) : null;
 
   return (
     <>
       <PageHeader title="דוחות" description="כל דוח מציג רק את הרשומות שמותר לכם לראות." />
-      {dashboard ? <ManagerDashboard dashboard={dashboard} /> : null}
+      {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} /> : null}
+      {dashboard && !dashboard.ok ? <FormError message={dashboard.message} className="mb-6" /> : null}
       <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {REPORTS.map((report) => (

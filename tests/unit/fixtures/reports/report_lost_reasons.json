@@ -1,0 +1,47 @@
+{
+  "by_owner": [
+    {
+      "deals": 1,
+      "amount": 50000,
+      "owner_id": "00000000-0000-4000-8000-000000000008"
+    },
+    {
+      "deals": 1,
+      "amount": 20000,
+      "owner_id": "00000000-0000-4000-8000-000000000007"
+    }
+  ],
+  "by_stage": [
+    {
+      "name": "פנייה ראשונית",
+      "deals": 1,
+      "position": 0,
+      "stage_id": "00000000-0000-4000-8000-000000000002"
+    },
+    {
+      "name": null,
+      "deals": 1,
+      "position": null,
+      "stage_id": null
+    }
+  ],
+  "by_reason": [
+    {
+      "deals": 1,
+      "amount": 50000,
+      "reason": "מחיר"
+    },
+    {
+      "deals": 1,
+      "amount": 20000,
+      "reason": null
+    }
+  ],
+  "by_competitor": [
+    {
+      "deals": 1,
+      "amount": 50000,
+      "competitor": "מתחרה"
+    }
+  ]
+}

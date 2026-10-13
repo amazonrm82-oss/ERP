@@ -9,6 +9,7 @@ import { listCalendarItems } from "@/features/calendar/queries";
 import { rangeBounds } from "@/features/calendar/range";
 
 import { dealsWithoutNextStep, myMeetings, type DealsWithoutNextStep, type MyMeeting } from "./my-day";
+import { parseReportData } from "@/features/reports/schemas";
 
 // related: the record the task belongs to, when it has one (FXU-01)
 export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean; related: RelatedRecord | null };
@@ -106,7 +107,8 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     throw new Error(`my deals query failed: ${deals.error.message}`);
   }
 
-  const stuckRows = must(stuck, "stuck deals");
+  // FXC-12: checked before it is read; a mismatch throws (the page's error screen)
+  const stuckRows = parseReportData("report_stuck_deals", must(stuck, "stuck deals"));
 
   const related = await relatedRecords(orgId, tasks.data);
   return {

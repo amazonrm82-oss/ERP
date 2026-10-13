@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { buttonClasses } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { listPipelines } from "@/features/deals/queries";
 import { buildReport } from "@/features/reports/build";
@@ -9,6 +10,7 @@ import { ReportBody } from "@/features/reports/components/report-body";
 import { ReportFilters } from "@/features/reports/components/report-filters";
 import { findReport } from "@/features/reports/definitions";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
+import { withReportShape } from "@/features/reports/schemas";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, zonedIso } from "@/lib/format";
@@ -34,7 +36,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
   const filters = reportFilters(definition, await searchParams);
 
   const [view, members, pipelines] = await Promise.all([
-    buildReport(orgId, definition.key, filters),
+    withReportShape(() => buildReport(orgId, definition.key, filters)),
     definition.filters.includes("owner") ? listMembers(orgId) : Promise.resolve([]),
     definition.filters.includes("pipeline") ? listPipelines(orgId) : Promise.resolve([]),
   ]);
@@ -69,7 +71,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
         pipelines={pipelines.map((p) => ({ value: p.id, label: p.isDefault ? `${p.name} (ברירת מחדל)` : p.name }))}
         pipelineEmptyLabel={definition.key === "funnel" ? "ברירת המחדל" : "כל הפייפליינים"}
       />
-      <ReportBody view={view} />
+      {view.ok ? <ReportBody view={view.value} /> : <FormError message={view.message} />}
     </>
   );
 }

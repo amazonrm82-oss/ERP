@@ -1,0 +1,20 @@
+[
+  {
+    "leads": 2,
+    "owner_id": "00000000-0000-4000-8000-000000000007",
+    "contacted": 0,
+    "avg_minutes": null,
+    "within_hour": 0,
+    "within_target": 0,
+    "median_minutes": null
+  },
+  {
+    "leads": 1,
+    "owner_id": "00000000-0000-4000-8000-000000000008",
+    "contacted": 1,
+    "avg_minutes": 0,
+    "within_hour": 1,
+    "within_target": 1,
+    "median_minutes": 0
+  }
+]
