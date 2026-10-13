@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isHexColor } from "@/features/branding/color";
+import { builtWithVisible } from "@/features/built-with/visibility";
 import { isLogoPath } from "@/features/branding/logo";
 import { isFieldType } from "@/features/custom-fields/types";
 import type { Json } from "@/lib/database.types";
@@ -99,4 +100,22 @@ export async function getPublicForm(token: string): Promise<PublicForm | null | 
     return "not-configured";
   }
   return readPublicForm(service, token);
+}
+
+/**
+ * Whether the hosted form shows the "נבנה ב-Mexuz" line (FLD-04), through
+ * public.intake_form_built_with(): true unless the business's plan or override
+ * turns remove_built_with on. Anything but true (form not found, no service key)
+ * hides the line.
+ */
+export async function getPublicFormBuiltWith(token: string): Promise<boolean> {
+  if (!/^[0-9a-f]{32}$/.test(token)) {
+    return false;
+  }
+  const service = createServiceClient();
+  if (!service) {
+    return false;
+  }
+  const data = must(await service.rpc("intake_form_built_with", { p_token: token }), "intake_form_built_with");
+  return builtWithVisible(data);
 }

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
-import { getPublicForm } from "@/features/intake/public-form";
+import { getPublicForm, getPublicFormBuiltWith } from "@/features/intake/public-form";
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
 
@@ -19,7 +20,7 @@ type Props = {
 export default async function PublicFormPage({ params, searchParams }: Props) {
   const { token } = await params;
   const embed = (await searchParams).embed === "1";
-  const form = await getPublicForm(token);
+  const [form, builtWith] = await Promise.all([getPublicForm(token), getPublicFormBuiltWith(token)]);
   const found = form !== null && form !== "not-configured" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;
 
@@ -41,6 +42,8 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
             </div>
           </>
         )}
+        {/* FLD-04: the small "נבנה ב-Mexuz" line, unless the business's plan removes it */}
+        {found && builtWith ? <BuiltWithLine /> : null}
         <AccessibilityLink newTab={embed} />
       </main>
     </BrandScope>

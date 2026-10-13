@@ -1330,6 +1330,7 @@ export type Database = {
       // service-role only (the app's intake routes)
       // CAP-01 (migration 0054): what the hosted form shows; service_role only
       intake_form: { Args: { p_token: string }; Returns: Json };
+      intake_form_built_with: { Args: { p_token: string }; Returns: boolean | null };
       intake_submit: {
         Args: {
           p_token: string;
