@@ -517,6 +517,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the user's session; a copy leaves out custom values that no longer pass the form rules and names them (`?copy_fields=`).
   Known: removing sample data removes a sample deal even when a real follow-up points at it (shared-ground follow-up).
   Board moves (DEAL-10) by mouse, long press and keyboard all go through `requestMove()` (won window, loss question).
+- Price lists (PL-01/02, migrations 0164-0165; 0166 adds the same guard to `app.products_quota`): `public.price_lists` (name, valid
+  from/to inclusive, active; members read, owners/admins of a writable org write; capability `price_lists` and quota
+  `max_price_lists` by definer trigger with advisory lock) and `public.price_list_lines` (fixed `price_agorot` + VAT mode or
+  `discount_bp` off the product's price; tiers by `min_quantity`, max 20 per product; product FK with no on delete action, so a
+  used product is archived, not removed). The unit price rule is `unitPriceFor()` in `src/features/price-lists/price.ts` (no SQL
+  mirror yet; PL-03 decides). Quota triggers start with `if auth.uid() is not null and not app.is_admin(org) then return new`,
+  so an outsider gets RLS's plain 42501 and learns nothing about another org's plan; every new quota trigger does the same.
+  Owner: one "prices include VAT" setting per list (follow-up), defaulting to the business's setting, locked once it has prices.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
