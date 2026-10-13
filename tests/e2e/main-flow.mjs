@@ -1132,6 +1132,9 @@ try {
   if (expected && firstByStatus !== expected) throw new Error(`leads by status: first shown ${firstByStatus}, expected ${expected}`);
 
   step("privacy request: erase the purged lead from the audit log");
+  // the local stack has no consent hash key, so the erasure would pause (CNS); a local test key only
+  if (!/@(127\.0\.0\.1|localhost):/.test(DB)) throw new Error("the e2e writes a test consent key only to a local database");
+  await sql("insert into app.settings (key, value) values ('consent_hash_key', 'e2e-local-test-key') on conflict (key) do nothing");
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=privacy`);
   await ownerDesk.getByLabel("שם, טלפון או אימייל").fill("ליד למחיקה");
   await ownerDesk.getByRole("button", { name: "חיפוש", exact: true }).click();
