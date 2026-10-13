@@ -267,6 +267,16 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the kept contact has; a merge may exceed 10; `activities_merge_contact_channels` is a no-op. `merge_move_links()` holds no
   DELETE since 0109 (clashing deal_contacts and followers stay on the duplicate and cascade). A pick of the duplicate's
   primary still loses the kept contact's old one (follow-up: `merge_records()` must pass the pre-pick row).
+- WhatsApp templates (WA-01, migration 0110): `public.whatsapp_templates` is a managed list (members read; owners/admins of
+  a writable org write; 50 per org, hint `whatsapp_templates:max`; `kind = 'meeting_reminder'` is server-only, set by the
+  seed). Defaults come from `app.seed_whatsapp_templates()`, run by the after insert trigger
+  `organizations_seed_whatsapp_templates` (create_organization unchanged); `DEFAULT_TEMPLATES` in
+  `src/features/whatsapp/templates.ts` mirrors it (unit test). The record WhatsApp button (`whatsappLog` on `ContactActions`)
+  fills a template with `fillTemplate()`, opens wa.me and logs a `whatsapp` activity (`metadata.via = 'link'`, mention
+  tokens flattened) with the user's session. GAP-03 reuses `fillTemplate` and the `meeting_reminder` template, which may be gone.
+- Deal contacts (CON-03, migration 0111): `deal_contacts.role` is null or `decision_maker|influencer|user|finance`
+  (`deal_contacts_role_check`, mirrored by `src/features/deal-contacts/roles.ts`, unit test). Clients update only `role`
+  (column grant); a new link needs an editable deal and a live contact the caller reads (`deal_contacts_insert`). Not audited.
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
