@@ -50,7 +50,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
       seed[plan].features = { ...seed[plan].features, ...change.features };
     }
     expect(seed).toEqual(PLAN_VALUES);
-    expect(quoted(later, "json")).toEqual(PLAN_KEY_FALLBACK);
+    expect(quoted(migration("_plan_review_fixes.sql"), "json")).toEqual(PLAN_KEY_FALLBACK);
   });
 
   it("a wave 2 key a plan does not hold falls back to the most restrictive value", () => {

@@ -114,6 +114,30 @@ describe("plan prices and states", () => {
     expect(await planOf(org)).toBe("pro");
   });
 
+  it("monthly revenue counts a price per business once, a price per user once per seat", async () => {
+    const reader = await createUser("pricing-reader");
+    await makeStaff(reader.id, "readonly");
+    const mrr = async () =>
+      Number((await asMfaUser(reader.id, async (q) => (await q<{ r: { mrr_agorot: number } }>("select public.platform_metrics() as r")).rows[0].r)).mrr_agorot);
+    const customer = await createUser("pricing-mrr");
+    const paying = await createOrg(customer.id);
+    const before = await mrr();
+    await asAdmin(async (q) => {
+      await q("update public.organizations set status = 'active' where id = $1", [paying]);
+      await q("update public.subscriptions set plan_key = 'personal', status = 'active', seats = 2, billing_cycle = 'monthly' where organization_id = $1", [paying]);
+    });
+    try {
+      expect((await mrr()) - before).toBe(7900);
+      await asAdmin((q) => q("update public.subscriptions set plan_key = 'basic' where organization_id = $1", [paying]));
+      expect((await mrr()) - before).toBe(2 * 8900);
+    } finally {
+      await asAdmin(async (q) => {
+        await q("update public.subscriptions set plan_key = 'pro', status = 'trialing', seats = null where organization_id = $1", [paying]);
+        await q("update public.organizations set status = 'trial' where id = $1", [paying]);
+      });
+    }
+  });
+
   it("running the latest migration again changes no row; both again in order end at the same values", async () => {
     const pricing = migration("_plan_pricing.sql");
     const later = migration("_plan_trial_built_with.sql");

@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PLAN_FEATURE_KEYS, PLAN_KEY_FALLBACK, PLAN_LIMIT_KEYS, PLAN_VALUES, SOLD_PLANS } from "@/lib/plan-keys";
@@ -91,6 +94,30 @@ describe("plan keys: limits and flags", () => {
     }
   });
 
+  it("re-running the wave 2 seed only adds missing keys and never overwrites", async () => {
+    const dir = join(process.cwd(), "supabase/migrations");
+    const file = readdirSync(dir).find((name) => name.endsWith("_wave2_plan_keys.sql"));
+    const sql = readFileSync(join(dir, file as string), "utf8");
+    const seed = /^update public\.plans p[\s\S]*?;$/m.exec(sql)?.[0];
+    expect(seed).toBeDefined();
+    await asAdmin(async (q) => {
+      await q("savepoint s");
+      await q("update public.plans set features = features - 'goals', limits = (limits - 'max_products') || '{\"max_qr_codes\": 7}' where key = 'basic'");
+      // basic, and the free plan, which never got the keys added after wave 2
+      const res = await q(seed as string);
+      expect(res.rowCount).toBe(2);
+      const basic = (await q<Plan>("select key, features, limits from public.plans where key = 'basic'")).rows[0];
+      // added back, with the fallback value of the day
+      expect(basic.features).toHaveProperty("goals");
+      expect(basic.limits).toHaveProperty("max_products");
+      // a value set on the plan is kept
+      expect(basic.limits.max_qr_codes).toBe(7);
+      expect(basic.limits.max_records).toBe(PLAN_VALUES.basic.limits.max_records);
+      expect((await q(seed as string)).rowCount).toBe(0);
+      await q("rollback to savepoint s");
+    });
+  });
+
   it("a plan without a wave 2 key gets the most restrictive value; older keys keep their old meaning", async () => {
     expect(PLAN_KEY_FALLBACK.features.goals).toBe(false);
     await asAdmin(async (q) => {
@@ -108,6 +135,9 @@ describe("plan keys: limits and flags", () => {
       ).rows[0];
       expect(r.goals).toBe(false);
       expect(r.built).toBe(false);
+      // the AI quotas too (missing = 0, as orgAllowance counts it)
+      await q("update public.plans set limits = limits - 'ai_credits_per_user_per_month' where key = 'pro'");
+      expect(Number((await q<{ v: string }>("select app.org_limit($1, 'ai_credits_per_user_per_month') as v", [org])).rows[0].v)).toBe(0);
       expect(r.sso).toBe(false);
       expect(Number(r.products)).toBe(0);
       // a missing older limit is unlimited (as before)

@@ -12,13 +12,14 @@ const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 const MIGRATION_FILE = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith("_activation_metric.sql"));
 if (!MIGRATION_FILE) throw new Error("activation metric migration not found");
 const MIGRATION = readFileSync(join(MIGRATIONS_DIR, MIGRATION_FILE), "utf8");
-// Re-running this migration puts back its own app.mark_org_activation(); the later migrations that
-// redefine it (0118: sample leads never activate) run again after it, so no later test sees the old body.
+// Re-running this migration puts back its own functions; the later migrations that redefine one of
+// them (0118: sample leads never activate; plan_review_fixes: platform_metrics counts a price per
+// business once) run again after it, so no later test sees an old body.
 const LATER = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql") && f > MIGRATION_FILE)
   .sort()
   .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
-  .filter((sql) => /function\s+app\.mark_org_activation\s*\(/.test(sql));
+  .filter((sql) => /function\s+(app\.mark_org_activation|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql));
 const rerun = (): Promise<void> =>
   asAdmin(async (q) => {
     await q(MIGRATION);

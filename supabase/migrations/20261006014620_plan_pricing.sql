@@ -9,8 +9,9 @@
 --   Prices are before VAT.
 -- - plans.availability: 'hidden' | 'coming_soon' | 'available'. is_public is kept
 --   for the old readers and always equals availability = 'available' (trigger
---   plans_sync_public; a write of is_public alone is overruled). Only the platform
---   owner changes it, through platform_set_plan_availability(), logged.
+--   plans_sync_public; a write of is_public alone is overruled, so the p_is_public
+--   argument of platform_update_plan() is now ignored). Only the platform owner
+--   changes it, through platform_set_plan_availability(), logged.
 -- - New plan 'personal' (אישית): 79 / 69 per business, at most 2 users.
 --   basic 89 / 79, pro 139 / 119 per user; business 219 / 189 per user, coming
 --   soon; free stays hidden with its own values (this migration does not touch it).

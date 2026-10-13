@@ -1,9 +1,9 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
-// (the seed) and plan_trial_built_with (the changes of the owner's second decision,
-// and app.plan_key_defaults()): PLAN_VALUES = the seed with those changes,
-// PLAN_KEY_FALLBACK = the latest app.plan_key_defaults(). tests/unit/plan-keys.test.ts
-// reads both migrations and compares; keep them in step.
+// (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
+// plan_review_fixes (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
+// tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
 // Every limit and flag is its own key in plans.limits / plans.features, editable in
 // the admin panel without code, with per-organization overrides on subscriptions.
@@ -141,10 +141,10 @@ export const PLAN_VALUES: Record<SoldPlan, PlanValues> = Object.fromEntries(
 export const PLAN_LIMIT_KEYS = Object.keys(LIMITS);
 export const PLAN_FEATURE_KEYS = Object.keys(FEATURES);
 
-// Keys added since wave 2 (migrations wave2_plan_keys and plan_pricing). A plan that
-// does not hold one (a plan added later in the admin panel) gets the most restrictive
-// value: the flag off, the quota 0. Older keys keep their old meaning when missing
-// (a flag off, a limit unlimited).
+// Keys added since wave 2 (migrations wave2_plan_keys and plan_pricing), and the two AI
+// quotas. A plan that does not hold one (a plan added later in the admin panel) gets
+// the most restrictive value: the flag off, the quota 0. Other older keys keep their
+// old meaning when missing (a flag off, a limit unlimited).
 const WAVE2_FEATURE_LIST = [
   "products", "price_lists", "discounts", "quotes", "orders", "documents", "payments", "balances", "collection",
   "money_waiting", "consents", "segments", "goals", "granular_permissions", "booking_page", "business_card", "qr_codes",
@@ -156,6 +156,9 @@ const WAVE2_LIMIT_LIST = [
   "max_segments", "max_qr_codes", "max_pdf_per_month", "max_customer_emails_per_month", "max_customer_emails_per_day",
   "max_custom_reports", "max_custom_objects", "max_teams", "max_whatsapp_numbers", "view_seats_per_paid_seat",
   "max_site_widgets", "max_business_cards_per_user", "max_booking_team_pages",
+  // older keys, given the restrictive fallback too (migration plan_review_fixes) so the
+  // database and orgAllowance agree: a missing AI quota is 0, not unlimited
+  "ai_credits_per_month", "ai_credits_per_user_per_month",
 ] as const;
 
 export type Wave2FeatureKey = (typeof WAVE2_FEATURE_LIST)[number];

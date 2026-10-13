@@ -17,7 +17,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "goals", label: "יעד לעסק", built: false },
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: false },
   { feature: "orders", label: "מודול הזמנות", built: false },
-  { feature: "api", label: "API ו-webhooks", built: true },
+  { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },
   { feature: "dashboards", label: "דשבורדים", built: false },
   { feature: "goals_per_rep", label: "יעד לכל נציג ולכל צוות", built: false },
