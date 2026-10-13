@@ -496,6 +496,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   schema-qualified names and NO `SET` clause, so the planner inlines them; the advisor's 10 `function_search_path_mutable`
   warnings on them are expected. A key a list no longer knows is skipped, never missing. DQL-02 typing checks and duplicate
   notices are app-only (`src/features/data-quality/typing.ts`, `duplicates.ts`).
+- Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
+  `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
+  `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
+  constraint trigger `companies_parent_tree` (AFTER … DEFERRABLE INITIALLY IMMEDIATE, definer, advisory lock per org) judges the
+  end state of the statement and refuses a cycle (`company:parent_cycle`) or more than 10 levels (`company:parent_depth`), merges
+  included. A cycle/depth refusal may reveal that a hidden company exists above or below in the same org (accepted).
 - Trial end (BIL-08 partial, migration 0156): `app.trial_end_settings` holds one switch, OFF; only `platform_set_trial_end()`
   (platform owner, aal2) changes it, logged `trial_end.switch`. It covers trial/trialing businesses whose `trial_ends_at` passed
   and that staff did not assign by hand (`app.trial_end_candidates`; `app.platform_assignments` is set by
