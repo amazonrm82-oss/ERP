@@ -299,6 +299,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
   1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
   use `stageTone()`.
+- Stuck deals (DEAL-01, owner 13 October 2026, migration 0129): one definition everywhere. An open deal is stuck when whole days
+  since `stage_entered_at` exceed the stage's `rot_days` (null = 14), unless `deals.snoozed_until` is after today (org zone);
+  `report_stuck_deals` returns `stuck`, `postponed`, `no_next_step`, `days_in_stage`, `limit_days`, `idle_days`, `last_activity_at`
+  (stuck first, then no activity first; 200 rows). Trigger `deals_sync_stage_entered` keeps `stage_entered_at` on a browser
+  update that keeps the stage, refuses a person's snooze date that is not a day after today up to 366 days ahead or on a closed
+  deal (hint `deal:snoozed_until`), and clears the snooze on any stage or pipeline move; `deals_snooze_cleared` logs one
+  `system` activity (`metadata.kind = snooze_cleared`, no notification, not "last activity"). MNY-01 and MNY-05 read the same report.
 - Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
   read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
   `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
