@@ -296,7 +296,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`app.deal_loss_reason()`, security invoker, after `deals_sync_stage` by name) clears the id on a deal that is not lost,
   clears the `lost_reason` text only on insert or a move out of lost, copies the picked reason's name into `lost_reason`, and
   lets a person pick only an active reason (hint `deal:lost_reason`). Picking is optional. `report_lost_reasons` adds
-  `by_competitor`. Bulk undo of a stage change restores the reason.
+  `by_competitor`. Bulk undo of a stage change restores the reason and `closed_at`.
+- Close window (DEAL-04, migration 0123): a move into a won stage from an open or lost one (board drag, stage menu, table stage
+  cell; not bulk) opens `DealWonDialog`; `closeDealWonAction()` writes stage, `amount_agorot` and `closed_at` in one update
+  (today = now, a past day = 12:00 in the org's zone, `closedAtFor`) and may add an onboarding task linked to the deal (and to
+  its contact/company only when the user reads them). Trigger `deals_sync_stage_close` (`app.deal_close_date()`, security
+  invoker, between `deals_sync_stage` and `deals_sync_stage_loss` by name) clears `closed_at` on open deals, stamps now() on a
+  status change without a new date, and refuses a person's date more than a day ahead (hint `deal:closed_at`).
+  `InlineOption.opensWindow` + `onWindow` hand a table cell's choice to a window.
 - New-lead push (SPD-01, migration 0122): `leads.taken_at` (server only; trigger `leads_reset_taken` clears it when the owner
   changes). `public.take_lead(org, lead)` (security definer; active owner/admin/manager/member of a writable org who reads the
   lead; open, unconverted, not in the bin): no owner → the caller becomes owner (first wins, `where owner_id is null`); own
