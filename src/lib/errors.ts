@@ -65,6 +65,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "bank:invalid": "פרטי הבנק אינם תקינים. סניף: עד 4 ספרות. חשבון: 2 עד 20 ספרות, ויחד איתו שם הבנק והסניף.",
   // TAX-03 (migration vat_rates, app.document_vat_rate): a document dated before the first VAT rate
   "vat:before_table": VAT_BEFORE_TABLE,
+  // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
+  "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)
