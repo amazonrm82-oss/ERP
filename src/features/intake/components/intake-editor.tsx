@@ -10,6 +10,7 @@ import type { FormState } from "@/lib/action-result";
 import type { Json } from "@/lib/database.types";
 
 import { createIntakeAction, updateIntakeAction } from "../actions";
+import { CALLBACK_SLOTS, slotInputName, slotLabel } from "../callback";
 import { parseFieldsConfig, storedFields, type FormFieldConfig, type FormFieldOption } from "../fields";
 import { FormFieldsBuilder } from "./form-fields-builder";
 import type { IntakeDetails } from "../queries";
@@ -88,20 +89,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <TextField label="כותרת הטופס" name="title" maxLength={120} autoComplete="off" defaultValue={values?.title ?? intake.title ?? ""} error={errors.title} />
           <TextareaField label="טקסט מעל הטופס (לא חובה)" name="intro" rows={2} maxLength={500} defaultValue={values?.intro ?? intake.intro ?? ""} error={errors.intro} />
           <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
-          <label className="flex items-start gap-2.5 text-md">
-            <input
-              type="checkbox"
-              name="callback_choice"
-              defaultChecked={values ? values.callback_choice === "on" : intake.callbackChoice}
-              className="mt-1 size-4.5 accent-accent"
-            />
-            <span>
-              לשאול מתי נוח שנחזור
-              <span className="block text-sm text-ink-soft">
-                עכשיו, או שעה היום או מחר. כל בחירה יוצרת משימת שיחה למי שמטפל בליד, ומופיעה בהתראה.
-              </span>
-            </span>
-          </label>
+          <CallbackSettings intake={intake} values={values} />
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>
@@ -183,6 +171,62 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
       <FormNotice message={state?.ok ? state.message : null} />
       <SubmitButton>שמירה</SubmitButton>
     </form>
+  );
+}
+
+/**
+ * SPD-05: ask when to call back, and which slots to offer (all on by default).
+ * The form shows "now" from 08:00 to 20:00 and the slots of today and of the
+ * next working day; a switched-off slot is never offered.
+ */
+function CallbackSettings({ intake, values }: { intake: IntakeDetails; values?: Record<string, string> }) {
+  const [on, setOn] = useState(values ? values.callback_choice === "on" : intake.callbackChoice);
+  const legendId = useId();
+  return (
+    <div className="space-y-3">
+      <label className="flex items-start gap-2.5 text-md">
+        <input
+          type="checkbox"
+          name="callback_choice"
+          checked={on}
+          onChange={(event) => setOn(event.target.checked)}
+          className="mt-1 size-4.5 accent-accent"
+        />
+        <span>
+          לשאול מתי נוח שנחזור
+          <span className="block text-sm text-ink-soft">
+            עכשיו (בין 8:00 ל-20:00), או שעה היום או ביום העבודה הבא. כל בחירה יוצרת משימת שיחה למי שמטפל בליד, ומופיעה בהתראה.
+          </span>
+        </span>
+      </label>
+      {on ? (
+        <fieldset aria-labelledby={legendId} className="space-y-2 rounded-md border border-line p-3 ms-7">
+          <legend id={legendId} className="px-1 text-sm font-medium">
+            שעות שמוצעות בטופס
+          </legend>
+          <p className="text-sm text-ink-soft">
+            ביום מנוחה של העסק מוצג רק יום העבודה הבא. ביום שישי, בערב חג וביום הזיכרון, כשלמחרת יום מנוחה, מוצגות רק השעות עד 15:00, ואחר כך רק יום
+            העבודה הבא.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {CALLBACK_SLOTS.map((slot) => {
+              const name = slotInputName(slot.start);
+              return (
+                <label key={slot.start} className="flex items-center gap-2 text-md">
+                  <input
+                    type="checkbox"
+                    name={name}
+                    defaultChecked={values ? values[name] === "on" : !intake.callbackSlotsOff.includes(slot.start)}
+                    className="size-4.5 accent-accent"
+                  />
+                  <span dir="ltr">{slotLabel(slot)}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
+    </div>
   );
 }
 

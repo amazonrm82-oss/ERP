@@ -35,6 +35,18 @@ const tasksOf = (column: "lead_id" | "contact_id", id: string) =>
     ).rows,
   );
 
+// A zone where it is now about noon (Etc/GMT-3 is UTC+3), so "now" and the
+// afternoon slots are offered whenever the test runs (SPD-05 follow-ups: "now"
+// only from 08:00 to 20:00; on a Friday or an eve only slots ending by 15:00).
+function noonZone(at = new Date()): string {
+  const offset = 12 - at.getUTCHours();
+  return offset === 0 ? "UTC" : offset > 0 ? `Etc/GMT-${offset}` : `Etc/GMT+${-offset}`;
+}
+
+// a slot's value: the business date (days from today in the zone) and the start hour
+const slot = async (zone: string, days: number, hour: string) =>
+  `${await asAdmin(async (q) => (await q<{ d: string }>("select to_char((now() at time zone $1)::date + $2::int, 'YYYY-MM-DD') as d", [zone, days])).rows[0].d)}-${hour}`;
+
 const zoned = (iso: string) => asAdmin(async (q) => (await q<{ t: Date }>("select $1::timestamptz as t", [iso])).rows[0].t);
 
 // SPD-05: the public form asks "when should we call you back?" (now, or a slot
@@ -43,6 +55,7 @@ describe("call-back time on the public form (SPD-05)", () => {
   let owner: U, admin: U, member: U, rep: U, outsider: U;
   let org: string;
   let form: { id: string; token: string };
+  const zone = noonZone();
 
   beforeAll(async () => {
     owner = await createUser("cb-owner");
@@ -50,6 +63,11 @@ describe("call-back time on the public form (SPD-05)", () => {
     admin = await addMember(org, owner.id, "admin", "cb-admin");
     member = await addMember(org, owner.id, "member", "cb-member");
     rep = await addMember(org, owner.id, "member", "cb-rep");
+    // noon in the business's zone, and every day a working day, so "tomorrow" is tomorrow
+    await asUser(owner.id, async (q) => {
+      await q("update public.organizations set timezone = $2 where id = $1", [org, zone]);
+      await q("insert into public.org_calendar_settings (organization_id, rest_weekdays, holidays_rest) values ($1, '{}', false)", [org]);
+    });
     outsider = await createUser("cb-outsider");
     await createOrg(outsider.id, "עסק אחר");
     form = await asUser(owner.id, async (q) =>
@@ -65,7 +83,11 @@ describe("call-back time on the public form (SPD-05)", () => {
   const setForm = (user: U, set: string) =>
     asUser(user.id, async (q) => (await q(`update public.forms set ${set} where id = $1`, [form.id])).rowCount ?? 0);
   const callback = async () =>
-    asService(async (q) => (await q<{ r: { callback: { time_zone: string } | null } }>("select public.intake_form($1) as r", [form.token])).rows[0].r.callback);
+    asService(async (q) =>
+      (await q<{ r: { callback: { time_zone: string; now: boolean; groups: { label: string; options: { value: string }[] }[] } | null } }>(
+        "select public.intake_form($1) as r",
+        [form.token],
+      )).rows[0].r.callback);
 
   it("is off by default: the form offers nothing and a sent choice is ignored", async () => {
     expect(await callback()).toBeNull();
@@ -91,10 +113,13 @@ describe("call-back time on the public form (SPD-05)", () => {
       ).rows.map((r) => r.privilege_type),
     );
     expect(grants).toEqual(["INSERT", "SELECT", "UPDATE"]);
-    expect(await callback()).toEqual({ time_zone: "Asia/Jerusalem" });
+    const offer = await callback();
+    expect(offer).toMatchObject({ time_zone: zone, now: true });
+    expect(offer?.groups.map((g) => g.label)).toEqual(["היום", "מחר"]);
+    expect(offer?.groups[0].options.map((o) => o.value)).toContain(await slot(zone, 0, "12"));
   });
 
-  it("'now' creates a high-priority call task due now for the new lead's owner, and the notification says so", async () => {
+  it("'now' creates a high-priority call task due now for the new lead's owner, and the lead's notification says so", async () => {
     const r = await submit(form.token, { full_name: "דנה לוי", phone: "050-7000003", callback: "now" });
     expect(r.status).toBe("accepted");
     const [task, ...more] = await tasksOf("lead_id", r.lead_id!);
@@ -117,19 +142,18 @@ describe("call-back time on the public form (SPD-05)", () => {
         )
       ).rows,
     );
-    expect(notes).toEqual([
-      { entity_type: "lead", body: "ביקשו שנחזור אליהם עכשיו" },
-      { entity_type: "task", body: "ביקשו שנחזור אליהם עכשיו" },
-    ]);
+    // the owner was told about the lead; the task is not announced again (owner, 13 October 2026)
+    expect(notes).toEqual([{ entity_type: "lead", body: "ביקשו שנחזור אליהם עכשיו" }]);
   });
 
   it("a slot creates a task due at the slot's start in the business's time zone, with a reminder then", async () => {
-    const r = await submit(form.token, { full_name: "מיכל", phone: "050-7000004", callback: "tomorrow-15" });
+    const r = await submit(form.token, { full_name: "מיכל", phone: "050-7000004", callback: await slot(zone, 1, "09") });
     const [task] = await tasksOf("lead_id", r.lead_id!);
     const expected = await asAdmin(async (q) =>
       (
         await q<{ t: Date }>(
-          "select ((now() at time zone 'Asia/Jerusalem')::date + 1 + time '15:00') at time zone 'Asia/Jerusalem' as t",
+          "select ((now() at time zone $1)::date + 1 + time '09:00') at time zone $1 as t",
+          [zone],
         )
       ).rows[0].t,
     );
@@ -137,15 +161,15 @@ describe("call-back time on the public form (SPD-05)", () => {
     expect(task.due_at.getTime()).toBe(expected.getTime());
     expect(task.remind_at?.getTime()).toBe(expected.getTime());
     expect(
-      await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1 and body = 'ביקשו שנחזור אליהם מחר בין 15:00 ל-18:00'", [r.lead_id])),
+      await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1 and body = 'ביקשו שנחזור אליהם מחר בין 09:00 ל-12:00'", [r.lead_id])),
     ).toBe(1);
   });
 
   it("follows the business's time zone", async () => {
     await asUser(owner.id, (q) => q("update public.organizations set timezone = 'America/New_York' where id = $1", [org]));
     try {
-      expect(await callback()).toEqual({ time_zone: "America/New_York" });
-      const r = await submit(form.token, { full_name: "יוסי", phone: "050-7000005", callback: "tomorrow-09" });
+      expect(await callback()).toMatchObject({ time_zone: "America/New_York" });
+      const r = await submit(form.token, { full_name: "יוסי", phone: "050-7000005", callback: await slot("America/New_York", 1, "09") });
       const [task] = await tasksOf("lead_id", r.lead_id!);
       const expected = await asAdmin(async (q) =>
         (
@@ -156,25 +180,27 @@ describe("call-back time on the public form (SPD-05)", () => {
       );
       expect(task.due_at.getTime()).toBe(expected.getTime());
     } finally {
-      await asUser(owner.id, (q) => q("update public.organizations set timezone = 'Asia/Jerusalem' where id = $1", [org]));
+      await asUser(owner.id, (q) => q("update public.organizations set timezone = $2 where id = $1", [org, zone]));
     }
   });
 
   it("a repeat inquiry onto an existing lead creates the task for that lead's owner", async () => {
     const lead = await insertLead(member.id, org, { full_name: "לקוח קיים", phone: "050-7000006" });
-    const r = await submit(form.token, { full_name: "לקוח קיים", phone: "0507000006", callback: "tomorrow-18" });
+    const r = await submit(form.token, { full_name: "לקוח קיים", phone: "0507000006", callback: await slot(zone, 1, "12") });
     expect(r).toMatchObject({ status: "duplicate", lead_id: lead });
     const [task] = await tasksOf("lead_id", lead);
     expect(task).toMatchObject({ owner_id: member.id, lead_id: lead, contact_id: null, title: "שיחה חוזרת: לקוח קיים" });
     // the inquiry notification and the inquiry entry carry the time
     expect(
       await asAdmin((q) =>
-        count(q, "select 1 from public.notifications where user_id = $1 and entity_id = $2 and type = 'inquiry' and body = 'ביקשו שנחזור אליהם מחר בין 18:00 ל-20:00'", [member.id, lead]),
+        count(q, "select 1 from public.notifications where user_id = $1 and entity_id = $2 and type = 'inquiry' and body = 'ביקשו שנחזור אליהם מחר בין 12:00 ל-15:00'", [member.id, lead]),
       ),
     ).toBe(1);
     expect(
       await asAdmin((q) => count(q, "select 1 from public.activities where lead_id = $1 and type = 'inquiry' and metadata ? 'callback_at'", [lead])),
     ).toBe(1);
+    // told by the inquiry notification: no separate one about the task
+    expect(await asAdmin((q) => count(q, "select 1 from public.notifications where user_id = $1 and entity_type = 'task' and entity_id = $2", [member.id, task.id]))).toBe(0);
   });
 
   it("a repeat inquiry onto an unassigned contact gives the task to the form's owner", async () => {
@@ -187,6 +213,12 @@ describe("call-back time on the public form (SPD-05)", () => {
     expect(r).toMatchObject({ status: "duplicate", contact_id: contact });
     const [task] = await tasksOf("contact_id", contact);
     expect(task).toMatchObject({ owner_id: rep.id, lead_id: null, contact_id: contact, priority: 1 });
+    // the form's owner was not told about this contact: the task is announced to them, with the time
+    expect(
+      await asAdmin((q) =>
+        count(q, "select 1 from public.notifications where user_id = $1 and type = 'assigned' and entity_type = 'task' and entity_id = $2 and body = 'ביקשו שנחזור אליהם עכשיו'", [rep.id, task.id]),
+      ),
+    ).toBe(1);
   });
 
   it("a repeat inquiry onto a suspended member's lead gives the task to the form's owner", async () => {
@@ -201,7 +233,7 @@ describe("call-back time on the public form (SPD-05)", () => {
     const viewer = await addMember(org, owner.id, "viewer", "cb-viewer");
     const lead2 = await insertLead(owner.id, org, { full_name: "לקוח של צופה", phone: "050-7000011" });
     await asAdmin((q) => q("update public.leads set owner_id = $2 where id = $1", [lead2, viewer.id]));
-    await submit(form.token, { full_name: "לקוח של צופה", phone: "050-7000011", callback: "tomorrow-09" });
+    await submit(form.token, { full_name: "לקוח של צופה", phone: "050-7000011", callback: await slot(zone, 1, "09") });
     expect((await tasksOf("lead_id", lead2))[0].owner_id).toBe(rep.id);
   });
 
@@ -224,7 +256,8 @@ describe("call-back time on the public form (SPD-05)", () => {
 
   it("refuses a choice that is not on the list, and writes nothing", async () => {
     const before = await asAdmin((q) => count(q, "select 1 from public.leads where organization_id = $1", [org]));
-    for (const bad of ["later", "today-10", "nextweek-09", "NOW", { at: "now" }]) {
+    // the relative values of 0119 too: a slot travels with its date
+    for (const bad of ["later", "today-10", "nextweek-09", "NOW", { at: "now" }, "today-12", "tomorrow-09", "2026-02-30-09", "2026-10-15-10"]) {
       const err = await pgError(submit(form.token, { full_name: "שגוי", phone: "050-7000007", callback: bad }));
       expect(err).toMatchObject({ code: "22023", hint: "callback:invalid" });
     }
@@ -272,6 +305,17 @@ describe("call-back time on the public form (SPD-05)", () => {
       "select app.intake_callback_label('now')",
       "select app.intake_zone('Asia/Jerusalem')",
       "select app.intake_callback_task(gen_random_uuid(), null, null, null, 'now', now(), 'x', 'y')",
+      "select app.intake_call_task(gen_random_uuid(), null, null, null, true, now(), 'x', 'y', 'z')",
+      "select app.intake_callback_offer(gen_random_uuid(), '{}', now())",
+      "select * from app.intake_callback_pick(gen_random_uuid(), '{}', 'now', now())",
+      "select * from app.intake_callback_options(gen_random_uuid(), '{}', now())",
+      "select app.intake_callback_now_open(gen_random_uuid(), now())",
+      "select app.intake_callback_closed_today(gen_random_uuid(), now())",
+      "select app.intake_callback_rest_today(gen_random_uuid(), now())",
+      "select app.short_work_day(gen_random_uuid(), current_date)",
+      "select app.org_rest_day(gen_random_uuid(), current_date)",
+      "select * from app.israel_occasions(current_date)",
+      "select * from app.hebrew_date(current_date)",
     ]) {
       expect((await pgError(asUser(owner.id, (q) => q(sql)))).code).toBe("42501");
     }

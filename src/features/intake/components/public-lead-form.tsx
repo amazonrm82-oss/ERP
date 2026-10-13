@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
@@ -9,13 +10,13 @@ import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 
 import { collectAttribution } from "../attribution";
-import { CALLBACK_INPUT, type CallbackGroup } from "../callback";
+import { CALLBACK_INPUT, type CallbackOffer } from "../callback";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
 
 // whatsappUrl: CAP-05, the thank-you state's chat with the business (wa.me), or null for no button
-// callback: SPD-05, the slots still open when the page was made, or null when the form does not ask
-type Props = { token: string; fields: PublicField[]; submitLabel: string; whatsappUrl: string | null; callback: CallbackGroup[] | null };
+// callback: SPD-05, what the form offered when the page was made, or null when the form does not ask
+type Props = { token: string; fields: PublicField[]; submitLabel: string; whatsappUrl: string | null; callback: CallbackOffer | null };
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
 function rawValues(form: HTMLFormElement): RawValues {
@@ -30,12 +31,15 @@ function rawValues(form: HTMLFormElement): RawValues {
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
 export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback }: Props) {
+  const router = useRouter();
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // one message per wrong field, next to it (FXA-02)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState<string | null>(null);
+  // SPD-05: a refused call-back choice empties the select (the offer is fetched again)
+  const [callbackRound, setCallbackRound] = useState(0);
   // what is typed so far, for the conditional fields (CAP-01)
   const [values, setValues] = useState<RawValues>({});
   const visible = useMemo(() => checkSubmission(fields, values).visible, [fields, values]);
@@ -63,6 +67,12 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
       const reply = (await res.json()) as { ok: boolean; message: string; redirectUrl?: string | null; field?: string };
       if (!reply.ok && reply.field && (reply.field === CALLBACK_INPUT || fields.some((field) => formInputName(field.key) === reply.field))) {
         setFieldErrors({ [reply.field]: reply.message });
+        // SPD-05: the call-back times on the page are stale (a slot ended, midnight passed):
+        // fetch the current ones; what was typed stays in the fields
+        if (reply.field === CALLBACK_INPUT) {
+          setCallbackRound((n) => n + 1);
+          router.refresh();
+        }
       } else if (!reply.ok) {
         setError(reply.message);
       } else if (reply.redirectUrl) {
@@ -88,7 +98,19 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
       {fields.map((field) =>
         visible.has(field.key) ? <PublicInput key={field.key} field={field} error={fieldErrors[formInputName(field.key)]} /> : null,
       )}
-      {callback ? <CallbackChoice groups={callback} error={fieldErrors[CALLBACK_INPUT]} /> : null}
+      {callback && (callback.now || callback.groups.length > 0) ? <CallbackChoice
+          key={callbackRound}
+          offer={callback}
+          error={fieldErrors[CALLBACK_INPUT]}
+          // the refusal stays until another time is picked
+          onPick={() =>
+            setFieldErrors((errors) => {
+              const rest = { ...errors };
+              delete rest[CALLBACK_INPUT];
+              return rest;
+            })
+          }
+        /> : null}
       {/* honeypot: hidden from people and from screen readers; bots fill it */}
       <div aria-hidden="true" className="absolute -start-[10000px] h-px w-px overflow-hidden">
         <label>
@@ -131,13 +153,14 @@ function ThankYou({ message, whatsappUrl }: { message: string; whatsappUrl: stri
   );
 }
 
-/** SPD-05: "now", or a slot today or tomorrow (the business's time zone); no choice = no preference. */
-function CallbackChoice({ groups, error }: { groups: CallbackGroup[]; error?: string }) {
+/** SPD-05: "now" (in working hours), or a slot today or on the next working day; no choice = no preference. Closed today: only the next working day. */
+function CallbackChoice({ offer, error, onPick }: { offer: CallbackOffer; error?: string; onPick: () => void }) {
   return (
-    <SelectField label="מתי נוח שנחזור אליכם?" name={CALLBACK_INPUT} defaultValue="" error={error}>
+    // SPD-05: on a rest day the question names the next working day ("היום אנחנו סגורים. …")
+    <SelectField label={offer.closedLine ?? "מתי נוח שנחזור אליכם?"} name={CALLBACK_INPUT} defaultValue="" error={error} onChange={onPick}>
       <option value="">לא משנה</option>
-      <option value="now">עכשיו</option>
-      {groups.map((group) => (
+      {offer.now ? <option value="now">עכשיו</option> : null}
+      {offer.groups.map((group) => (
         <optgroup key={group.label} label={group.label}>
           {group.options.map((option) => (
             <option key={option.value} value={option.value}>

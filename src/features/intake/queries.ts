@@ -4,6 +4,7 @@ import type { FormKind } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { isCallbackSlotStart, type CallbackSlotStart } from "./callback";
 import { parseFieldsConfig, type FormFieldConfig } from "./fields";
 
 export type IntakeSummary = {
@@ -66,15 +67,16 @@ export type IntakeDetails = {
   whatsappButton: boolean;
   whatsappPhone: string | null;
   whatsappText: string | null;
-  // SPD-05: the hosted form asks when to call back
+  // SPD-05: the hosted form asks when to call back; the slots switched off
   callbackChoice: boolean;
+  callbackSlotsOff: CallbackSlotStart[];
 };
 
 export async function getIntake(orgId: string, formId: string): Promise<IntakeDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off")
     .eq("organization_id", orgId)
     .eq("id", formId)
     .maybeSingle();
@@ -104,6 +106,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     whatsappPhone: data.whatsapp_phone,
     whatsappText: data.whatsapp_text,
     callbackChoice: data.callback_choice,
+    callbackSlotsOff: (data.callback_slots_off ?? []).filter(isCallbackSlotStart),
   };
 }
 

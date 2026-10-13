@@ -401,6 +401,8 @@ export type FormRow = {
   whatsapp_text: string | null;
   // SPD-05: the hosted form asks when to call back; the choice creates a call task
   callback_choice: boolean;
+  // SPD-05: slots switched off on this form, by start hour ('09', '12', '15', '18')
+  callback_slots_off: string[];
 };
 
 export type FormSubmissionRow = {
@@ -1089,6 +1091,7 @@ export type Database = {
           whatsapp_phone?: string | null;
           whatsapp_text?: string | null;
           callback_choice?: boolean;
+          callback_slots_off?: string[];
         },
         {
           name?: string;
@@ -1107,6 +1110,7 @@ export type Database = {
           whatsapp_phone?: string | null;
           whatsapp_text?: string | null;
           callback_choice?: boolean;
+          callback_slots_off?: string[];
         }
       >;
       // written only by intake_submit()

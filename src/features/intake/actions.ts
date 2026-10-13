@@ -13,7 +13,7 @@ import { isFieldType, type FieldType } from "@/features/custom-fields/types";
 import type { Json } from "@/lib/database.types";
 
 import { formFieldOptions, storedFields } from "./fields";
-import { createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
+import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 import { whatsappNumber } from "./whatsapp";
 
 export async function createIntakeAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -122,8 +122,10 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
   const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, ...settings } = parsed.data;
   const thanks =
     current.kind !== "form" ? {} : whatsapp_button ? { whatsapp_button, whatsapp_phone, whatsapp_text } : { whatsapp_button };
-  // SPD-05: a webhook has no form to ask on; its switch stays as it is
-  const formOnly = current.kind === "form" ? { callback_choice } : {};
+  // SPD-05: a webhook has no form to ask on; its switch stays as it is. The slot
+  // switches are saved only while the question is on, so turning it off keeps them
+  const formOnly =
+    current.kind !== "form" ? {} : callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice };
   const { data, error } = await context.supabase
     .from("forms")
     .update({ ...settings, ...thanks, ...formOnly, ...(fields !== undefined ? { fields } : {}) })

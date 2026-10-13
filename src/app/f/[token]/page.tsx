@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { callbackGroups } from "@/features/intake/callback";
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
 import { getPublicForm } from "@/features/intake/public-form";
 import { AccessibilityLink } from "@/components/accessibility-link";
@@ -23,8 +22,6 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
   const form = await getPublicForm(token);
   const found = form !== null && form !== "not-configured" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;
-  // SPD-05: the call-back slots still open now, in the business's time zone
-  const callback = found?.callback ? callbackGroups(new Date(), found.callback.timeZone) : null;
 
   return (
     // FLD-04 / DSN-17: the business's colour (corrected for contrast) on its own page
@@ -40,7 +37,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
             <h1 className="text-2xl font-semibold">{found.title}</h1>
             {found.intro ? <p className="mt-1 whitespace-pre-wrap text-ink-soft">{found.intro}</p> : null}
             <div className="mt-6">
-              <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} whatsappUrl={found.thanks.whatsappUrl} callback={callback} />
+              <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} whatsappUrl={found.thanks.whatsappUrl} callback={found.callback} />
             </div>
           </>
         )}

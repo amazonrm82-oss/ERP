@@ -3,68 +3,83 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { callbackGroups, callbackLabel, CALLBACK_SLOTS } from "@/features/intake/callback";
+import { CALLBACK_CHOICE, callbackOfferFrom, CALLBACK_SLOTS, isCallbackSlotStart, slotInputName, slotLabel } from "@/features/intake/callback";
 import { publicFormFrom } from "@/features/intake/public-form";
+import { callbackSlotsOff } from "@/features/intake/schema";
 
 // found by name, so renumbering the migration at merge does not break the test
-const MIGRATION = path.join(
-  "supabase/migrations",
-  readdirSync(path.join(process.cwd(), "supabase/migrations")).find((name) => name.endsWith("_callback_time.sql")) ?? "missing",
-);
+const migration = (suffix: string) =>
+  path.join(
+    "supabase/migrations",
+    readdirSync(path.join(process.cwd(), "supabase/migrations")).find((name) => name.endsWith(suffix)) ?? "missing",
+  );
 
 describe("call-back slots on the public form (SPD-05)", () => {
-  it("offers today's slots that have not ended, and all of tomorrow's, in the business's zone", () => {
-    // 10:30 in Jerusalem (summer, UTC+3)
-    const groups = callbackGroups(new Date("2026-07-01T07:30:00Z"), "Asia/Jerusalem");
-    expect(groups.map((g) => [g.label, g.options.map((o) => o.value)])).toEqual([
-      ["היום", ["today-09", "today-12", "today-15", "today-18"]],
-      ["מחר", ["tomorrow-09", "tomorrow-12", "tomorrow-15", "tomorrow-18"]],
-    ]);
-    expect(groups[0].options[1].label).toBe("12:00–15:00");
-    // 17:59: the 15-18 and 18-20 slots are still open
-    expect(callbackGroups(new Date("2026-07-01T14:59:00Z"), "Asia/Jerusalem")[0].options.map((o) => o.value)).toEqual(["today-15", "today-18"]);
-    // 18:00: the 15-18 slot has ended
-    expect(callbackGroups(new Date("2026-07-01T15:00:00Z"), "Asia/Jerusalem")[0].options.map((o) => o.value)).toEqual(["today-18"]);
-    // 20:00: nothing is left today
-    expect(callbackGroups(new Date("2026-07-01T17:00:00Z"), "Asia/Jerusalem").map((g) => g.label)).toEqual(["מחר"]);
-    // the same instant is still morning in New York
-    expect(callbackGroups(new Date("2026-07-01T17:00:00Z"), "America/New_York")[0].options.map((o) => o.value)).toEqual(["today-12", "today-15", "today-18"]);
-    // a name Intl refuses or the database does not let through: Jerusalem
-    const jerusalem = callbackGroups(new Date("2026-07-01T07:30:00Z"), "Asia/Jerusalem");
-    for (const zone of ["Factory", "localtime", "Mars/Base", "", "EST5EDT,M3.2.0"]) {
-      expect(callbackGroups(new Date("2026-07-01T07:30:00Z"), zone)).toEqual(jerusalem);
-    }
-  });
-
-  it("names a choice the way the database does", () => {
-    expect(callbackLabel("now")).toBe("עכשיו");
-    expect(callbackLabel("today-09")).toBe("היום בין 09:00 ל-12:00");
-    expect(callbackLabel("tomorrow-18")).toBe("מחר בין 18:00 ל-20:00");
-    expect(callbackLabel("today-10")).toBeNull();
-    expect(callbackLabel("later")).toBeNull();
-  });
-
-  it("uses the same slots as the migration", () => {
-    const sql = readFileSync(path.join(process.cwd(), MIGRATION), "utf8");
-    const starts = CALLBACK_SLOTS.map((s) => s.start).join("|");
-    // the pattern of both functions
-    expect(sql.match(new RegExp(`\\^\\(today\\|tomorrow\\)-\\(${starts.replace(/\|/g, "\\|")}\\)\\$`, "g"))).toHaveLength(2);
-    // the end of each slot in app.intake_callback_label() and app.intake_callback_at()
-    const label = sql.slice(sql.indexOf("create or replace function app.intake_callback_label"), sql.indexOf("create or replace function app.intake_callback_at"));
-    const at = sql.slice(sql.indexOf("create or replace function app.intake_callback_at"), sql.indexOf("create or replace function app.intake_callback_task"));
-    for (const slot of CALLBACK_SLOTS.slice(0, -1)) {
-      expect(label).toContain(`when '${slot.start}' then '${slot.end}'`);
-      expect(at).toContain(`when ${Number(slot.start)} then ${Number(slot.end)}`);
-    }
-    const last = CALLBACK_SLOTS[CALLBACK_SLOTS.length - 1];
-    expect(label).toContain(`else '${last.end}' end`);
-    expect(at).toContain(`else ${Number(last.end)} end`);
+  it("reads what intake_form() offers, dropping anything unexpected", () => {
+    expect(callbackOfferFrom(null)).toBeNull();
+    expect(callbackOfferFrom("x")).toBeNull();
+    expect(
+      callbackOfferFrom({
+        time_zone: "Asia/Jerusalem",
+        now: true,
+        groups: [
+          { label: "היום", options: [{ value: "2026-10-15-12", label: "12:00–15:00" }, { value: "2026-10-15-10", label: "x" }, { value: "now", label: "y" }, { value: "today-12", label: "z" }] },
+          { label: "יום ראשון", options: [{ value: "2026-10-18-09", label: "09:00–12:00" }] },
+          { label: "", options: [{ value: "2026-10-18-12", label: "12:00–15:00" }] },
+          { label: "ריק", options: [] },
+          "junk",
+        ],
+      }),
+    ).toEqual({
+      now: true,
+      closedLine: null,
+      groups: [
+        { label: "היום", options: [{ value: "2026-10-15-12", label: "12:00–15:00" }] },
+        { label: "יום ראשון", options: [{ value: "2026-10-18-09", label: "09:00–12:00" }] },
+      ],
+    });
+    // "now" only when the database says so
+    expect(callbackOfferFrom({ now: "yes", groups: [] })).toEqual({ now: false, closedLine: null, groups: [] });
+    // a rest day: the line above the next working day's slots
+    expect(callbackOfferFrom({ now: false, closed_line: "היום אנחנו סגורים. מתי נוח שנחזור אליך ביום ראשון?", groups: [] })?.closedLine).toBe(
+      "היום אנחנו סגורים. מתי נוח שנחזור אליך ביום ראשון?",
+    );
   });
 
   it("reads the form's call-back setting from intake_form()", () => {
     const base = { title: "t", fields: [] };
     expect(publicFormFrom(base)?.callback).toBeNull();
     expect(publicFormFrom({ ...base, callback: null })?.callback).toBeNull();
-    expect(publicFormFrom({ ...base, callback: { time_zone: "Asia/Jerusalem" } })?.callback).toEqual({ timeZone: "Asia/Jerusalem" });
+    expect(publicFormFrom({ ...base, callback: { time_zone: "Asia/Jerusalem", now: false, groups: [] } })?.callback).toEqual({ now: false, closedLine: null, groups: [] });
+  });
+
+  it("uses the same slots as the migrations", () => {
+    const starts = CALLBACK_SLOTS.map((s) => s.start);
+    // the slot list of app.intake_callback_options() and the column's check
+    const rules = readFileSync(path.join(process.cwd(), migration("_callback_slot_rules.sql")), "utf8");
+    const values = CALLBACK_SLOTS.map((s) => `(${Number(s.start)}, ${Number(s.end)})`).join(", ");
+    expect(rules).toContain(`(values ${values}) s(h_from, h_to)`);
+    expect(rules).toContain(`callback_slots_off <@ array[${starts.map((s) => `'${s}'`).join(", ")}]::text[]`);
+    // the shape of a slot's value: its business date and start hour
+    expect(rules).toContain(`'^[0-9]{4}-[0-9]{2}-[0-9]{2}-(${starts.join("|")})$'`);
+    expect(CALLBACK_CHOICE.test("2026-10-15-09")).toBe(true);
+    expect(CALLBACK_CHOICE.test("now")).toBe(true);
+    expect(CALLBACK_CHOICE.test("tomorrow-09")).toBe(false);
+    // the TS pattern is the SQL one, plus "now"
+    expect(CALLBACK_CHOICE.source).toBe(`^(now|\\d{4}-\\d{2}-\\d{2}-(${starts.join("|")}))$`);
+  });
+
+  it("the settings switches: one per slot, all on = nothing off", () => {
+    expect(CALLBACK_SLOTS.map(slotLabel)).toEqual(["09:00–12:00", "12:00–15:00", "15:00–18:00", "18:00–20:00"]);
+    expect(isCallbackSlotStart("09")).toBe(true);
+    expect(isCallbackSlotStart("10")).toBe(false);
+    const form = (on: string[]) => {
+      const data = new FormData();
+      for (const start of on) data.set(slotInputName(start as "09"), "on");
+      return data;
+    };
+    expect(callbackSlotsOff(form(["09", "12", "15", "18"]))).toEqual([]);
+    expect(callbackSlotsOff(form(["12", "15"]))).toEqual(["09", "18"]);
+    expect(callbackSlotsOff(form([]))).toEqual(["09", "12", "15", "18"]);
   });
 });

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { checkbox, optionalId, optionalText, requiredText } from "@/lib/validation";
 
+import { CALLBACK_SLOT_STARTS, slotInputName, type CallbackSlotStart } from "./callback";
+
 import {
   FORM_EXCLUDED_TYPES,
   isFormFieldKey,
@@ -55,6 +57,14 @@ export const updateIntakeSchema = z.object({
   // SPD-05: ask when to call back
   callback_choice: checkbox,
 });
+
+const slotsOffSchema = z.array(z.enum(CALLBACK_SLOT_STARTS as [CallbackSlotStart, ...CallbackSlotStart[]])).max(CALLBACK_SLOT_STARTS.length);
+
+/** SPD-05: the slots whose switch is off in the form settings (forms.callback_slots_off), in order. */
+export function callbackSlotsOff(formData: FormData): CallbackSlotStart[] {
+  const off = CALLBACK_SLOT_STARTS.filter((start) => !checkbox.parse(formData.get(slotInputName(start))));
+  return slotsOffSchema.parse(off);
+}
 
 const fieldsJsonSchema = z
   .array(
