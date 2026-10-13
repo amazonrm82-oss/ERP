@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { fail, formValues, type FormState } from "@/lib/action-result";
+import { fail, formValues, type ActionResult, type FormState } from "@/lib/action-result";
+import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { getSessionUser } from "@/lib/auth";
 import type { OrgStatus } from "@/lib/database.types";
 import { dbErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
@@ -126,6 +127,17 @@ export async function setPlanAvailabilityAction(planKey: string, _prev: FormStat
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminPlans);
   return { ok: true, message: "נשמר." };
+}
+
+/** BIL-08: the platform owner turns the trial-end transition on or off (logged in the database). */
+export async function setTrialEndAction(enabled: boolean): Promise<ActionResult> {
+  if (!validArg(booleanArg, enabled)) return fail(INVALID_ARGS);
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const { error } = await supabase.rpc("platform_set_trial_end", { p_enabled: enabled });
+  if (error) return fail(platformError(error));
+  revalidatePath(paths.adminPlans);
+  return { ok: true };
 }
 
 export async function setStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {

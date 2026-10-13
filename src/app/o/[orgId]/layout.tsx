@@ -18,6 +18,8 @@ import { UserMenu } from "@/features/shell/components/user-menu";
 import { isAdminRole } from "@/features/settings/permissions";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
 import { getOrgContext } from "@/features/shell/queries";
+import { trialEndBannerText } from "@/features/trial-end/notice";
+import { getTrialEndNotice } from "@/features/trial-end/queries";
 import { daysUntil, formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -34,12 +36,14 @@ export default async function OrgLayout({ children, params }: Props) {
   // 404s unless the signed-in user is an active member of this organization
   const context = await getOrgContext(orgId);
   const { org, user, subscription } = context;
-  const notice = ORG_STATUS_NOTICES[org.status];
-  const [notifications, unread, branding] = await Promise.all([
+  const [notifications, unread, branding, trialEnd] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
+    getTrialEndNotice(org.id),
   ]);
+  // BIL-08: while the business is in the trial-end transition its line says what comes next
+  const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
 
   return (
     <div className="min-h-dvh md:ps-60">
@@ -67,7 +71,7 @@ export default async function OrgLayout({ children, params }: Props) {
           {/* FLD-04: the business's own logo; the name next to it says who it is */}
           {branding.logoUrl ? <OrgLogo url={branding.logoUrl} alt="" className="h-7 max-w-16 sm:max-w-24" /> : null}
           <p className="truncate font-semibold">{org.name}</p>
-          {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} /> : null}
+          {subscription ? <PlanBadge subscription={subscription} trialDaysLeft={daysUntil(subscription.trialEndsAt)} trialEndNotice={trialEnd !== null} /> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {/* REC-08: create anything from any screen, for who may write */}

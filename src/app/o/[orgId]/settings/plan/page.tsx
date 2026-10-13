@@ -8,6 +8,8 @@ import { listPlanCards } from "@/features/plans/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getPlanUsage } from "@/features/settings/plan-usage";
 import { getOrgContext } from "@/features/shell/queries";
+import { trialEndBannerText } from "@/features/trial-end/notice";
+import { getTrialEndNotice } from "@/features/trial-end/queries";
 import { SupportContact } from "@/features/support/components/support-contact";
 import { cn } from "@/lib/cn";
 import { daysUntil, formatDate, formatNumber } from "@/lib/format";
@@ -39,7 +41,10 @@ export default async function PlanUsagePage({ params }: Props) {
     return null;
   }
   const trialDays = plan.status === "trialing" ? daysUntil(plan.trialEndsAt) : null;
-  const cards = await listPlanCards(orgId, plan.planKey);
+  const [cards, trialEnd] = await Promise.all([listPlanCards(orgId, plan.planKey), getTrialEndNotice(orgId)]);
+  // BIL-08: an ended trial says so only while the trial-end switch covers the business; else it is just the plan
+  const trialOver = trialDays !== null && trialDays <= 0;
+  const statusKey = trialOver && !trialEnd ? "active" : plan.status;
 
   return (
     <div className="space-y-5">
@@ -48,13 +53,12 @@ export default async function PlanUsagePage({ params }: Props) {
         <CardBody className="space-y-2">
           <p className="flex flex-wrap items-center gap-2 text-lead font-semibold">
             {plan.planName}
-            <Badge tone={plan.status === "past_due" ? "danger" : plan.status === "trialing" ? "accent" : "success"}>{STATUS[plan.status] ?? plan.status}</Badge>
+            <Badge tone={statusKey === "past_due" ? "danger" : statusKey === "trialing" ? "accent" : "success"}>{STATUS[statusKey] ?? statusKey}</Badge>
           </p>
-          {trialDays !== null ? (
-            <p className="text-md text-ink-soft">
-              {trialDays > 0 ? `נשארו ${formatNumber(trialDays)} ימי ניסיון, עד ${formatDate(plan.trialEndsAt)}.` : "תקופת הניסיון הסתיימה."}
-            </p>
+          {trialDays !== null && trialDays > 0 ? (
+            <p className="text-md text-ink-soft">{`נשארו ${formatNumber(trialDays)} ימי ניסיון, עד ${formatDate(plan.trialEndsAt)}.`}</p>
           ) : null}
+          {trialEnd ? <p className="text-md font-medium">{trialEndBannerText(trialEnd)}</p> : null}
           <p className="text-md text-ink-soft">תשלום ושינוי חבילה מתוך המערכת עוד לא זמינים. כדי לשנות חבילה, דברו איתנו:</p>
           <SupportContact />
         </CardBody>

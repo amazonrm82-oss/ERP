@@ -30,7 +30,7 @@ export async function platformReady(): Promise<PlatformMe | null> {
   return me && !me.needsMfa ? me : null;
 }
 
-async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health"): Promise<Json> {
+async function call(name: "platform_metrics" | "platform_staff_list" | "platform_plan_waitlist" | "platform_consent_health" | "platform_trial_end_status"): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
   if (error) throw new Error(`${name} failed: ${error.message}`);
@@ -71,6 +71,23 @@ export function consentHealthWarnings(h: ConsentHealth): string[] {
   if (h.erasuresStopped > 0) lines.push(`${h.erasuresStopped} מחיקות שהפסיקו לנסות להשלים (נדרש טיפול)`);
   if (h.unhashedOptOuts > 0) lines.push(`${h.unhashedOptOuts} בקשות הסרה שעוד לא ניתן לבדוק`);
   return lines;
+}
+
+/** BIL-08: the trial-end switch and how many businesses it covers. */
+export type TrialEndStatus = { enabled: boolean; enabledAt: string | null; waiting: number; inGrace: number; readOnly: number; closed: number; assigned: number };
+
+export async function getTrialEndStatus(): Promise<TrialEndStatus> {
+  const data = obj(await call("platform_trial_end_status"));
+  const n = (value: unknown) => Number(value) || 0;
+  return {
+    enabled: data.enabled === true,
+    enabledAt: typeof data.enabled_at === "string" ? data.enabled_at : null,
+    waiting: n(data.waiting),
+    inGrace: n(data.in_grace),
+    readOnly: n(data.read_only),
+    closed: n(data.closed),
+    assigned: n(data.assigned),
+  };
 }
 
 export async function listPlatformStaff(): Promise<Obj[]> {

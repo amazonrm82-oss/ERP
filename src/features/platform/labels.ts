@@ -24,6 +24,11 @@ export const ACTION_LABELS: Record<string, string> = {
   "staff.set": "שינוי בצוות הפלטפורמה",
   "support.open": "כניסת תמיכה לארגון",
   "user.mfa_reset": "איפוס אימות דו-שלבי למשתמש",
+  "plan.availability": "שינוי מצב חבילה",
+  "trial_end.switch": "הדלקה או כיבוי של המעבר בסוף הניסיון",
+  "trial_end.read_only": "סוף ניסיון: מעבר לקריאה בלבד",
+  "trial_end.closed": "סוף ניסיון: סגירת העסק",
+  "trial_end.restored": "סוף ניסיון: העסק חזר לעבוד",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

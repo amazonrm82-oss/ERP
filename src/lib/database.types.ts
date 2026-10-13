@@ -1643,6 +1643,11 @@ export type Database = {
       platform_plan_waitlist: { Args: Record<string, never>; Returns: Json };
       // CNS: hash key and paused erasures, for the panel's alert (platform owner and support)
       platform_consent_health: { Args: Record<string, never>; Returns: Json };
+      // BIL-08: the trial-end switch (owner changes it; every platform role reads it)
+      platform_trial_end_status: { Args: Record<string, never>; Returns: Json };
+      platform_set_trial_end: { Args: { p_enabled: boolean }; Returns: Json };
+      // null, or { phase: 'grace' | 'read_only', read_only_on, closes_on } (local YYYY-MM-DD days) for a member
+      trial_end_notice: { Args: { p_org: string }; Returns: Json };
       platform_staff_list: { Args: Record<string, never>; Returns: Json };
       platform_set_staff: { Args: { p_email: string; p_role: PlatformRole | null }; Returns: undefined };
       platform_log_list: { Args: { p_org?: string | null; p_limit?: number }; Returns: Json };
