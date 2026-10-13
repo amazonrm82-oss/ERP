@@ -6,12 +6,13 @@ import { z } from "zod";
 
 import { fail, formValues, type FormState } from "@/lib/action-result";
 import { getSessionUser } from "@/lib/auth";
-import type { Json, OrgStatus } from "@/lib/database.types";
-import { SESSION_EXPIRED } from "@/lib/errors";
+import type { OrgStatus } from "@/lib/database.types";
+import { dbErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { IDENTITY_CHECKS } from "./labels";
+import { parsePlanJson } from "./plan-json";
 import { isCalendarDate } from "@/lib/calendar-date";
 
 const ORG_STATUSES = ["trial", "active", "past_due", "read_only", "suspended", "cancelled"] as const;
@@ -22,6 +23,8 @@ function platformError(error: { code?: string; hint?: string; message?: string }
   if (error.hint === "platform:last_owner") return "אי אפשר להסיר את בעל הפלטפורמה האחרון.";
   if (error.code === "P0002") return error.message?.includes("email") ? "אין משתמש עם האימייל הזה. הוא צריך להירשם קודם." : "לא נמצא.";
   if (error.code === "22023") return "הנתונים אינם תקינים. בדקו את השדות ונסו שוב.";
+  // hints the app already words (plan:hidden and the like)
+  if (error.code === "P0001" && error.hint) return dbErrorMessage(error);
   return "הפעולה נכשלה. נסו שוב.";
 }
 
@@ -34,16 +37,6 @@ const text = (formData: FormData, name: string) => {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
 };
-
-function parseJsonObject(raw: string): Json | null {
-  if (raw === "") return {};
-  try {
-    const value = JSON.parse(raw) as Json;
-    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function updateSubscriptionAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await client();
@@ -73,12 +66,11 @@ export async function updateSubscriptionAction(orgId: string, _prev: FormState, 
 export async function setOverridesAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await client();
   if (!supabase || !isUuid(orgId)) return fail(SESSION_EXPIRED);
-  const limits = parseJsonObject(text(formData, "limits"));
-  const features = parseJsonObject(text(formData, "features"));
-  if (limits === null || features === null) {
-    return fail('יש לכתוב JSON של אובייקט, למשל {"max_users": 50}.', { values: formValues(formData) });
-  }
-  const { error } = await supabase.rpc("platform_set_overrides", { p_org: orgId, p_limits: limits, p_features: features, p_reason: text(formData, "reason") });
+  const limits = parsePlanJson(text(formData, "limits"), "limits");
+  if (!limits.ok) return fail(limits.message, { values: formValues(formData) });
+  const features = parsePlanJson(text(formData, "features"), "features");
+  if (!features.ok) return fail(features.message, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_set_overrides", { p_org: orgId, p_limits: limits.value, p_features: features.value, p_reason: text(formData, "reason") });
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminOrg(orgId));
   return { ok: true, message: "נשמר." };
@@ -105,17 +97,18 @@ export async function updatePlanAction(planKey: string, _prev: FormState, formDa
   if (!supabase) return fail(SESSION_EXPIRED);
   const monthly = shekels(text(formData, "price_monthly"));
   const annual = shekels(text(formData, "price_annual"));
-  const limits = parseJsonObject(text(formData, "limits"));
-  const features = parseJsonObject(text(formData, "features"));
+  const limits = parsePlanJson(text(formData, "limits"), "limits");
+  const features = parsePlanJson(text(formData, "features"), "features");
   if (monthly === null || annual === null) return fail("המחיר אינו תקין.", { values: formValues(formData) });
-  if (limits === null || features === null) return fail("המגבלות והיכולות צריכות להיות JSON של אובייקט.", { values: formValues(formData) });
+  if (!limits.ok) return fail(limits.message, { values: formValues(formData) });
+  if (!features.ok) return fail(features.message, { values: formValues(formData) });
   const { error } = await supabase.rpc("platform_update_plan", {
     p_key: planKey,
     p_name_he: text(formData, "name_he"),
     p_price_monthly_agorot: monthly,
     p_price_annual_agorot: annual,
-    p_limits: limits,
-    p_features: features,
+    p_limits: limits.value,
+    p_features: features.value,
     p_is_public: formData.get("is_public") === "on",
   });
   if (error) return fail(platformError(error), { values: formValues(formData) });
