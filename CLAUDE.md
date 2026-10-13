@@ -242,6 +242,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   365 ahead, at most 2,000, no notes; nothing for a suspended member or a suspended/cancelled/deleted org; read-only keeps
   working; 60 fetches per 10 minutes. The invite file `/o/[org]/calendar/invite/[meeting]` uses the user's session and
   the organizer's own address (or no ORGANIZER line). ICS builder: `src/features/calendar-feed/ics.ts`.
+- Branding (FLD-04, migration 0103): `organizations.logo_path` (object in the PUBLIC bucket `org-logos`, `<org>/<uuid>`,
+  owners/admins write, trigger `organizations_branding_check`, hint `branding:logo`) and `brand_color` (`#rrggbb`), column
+  grants. `src/features/branding/`: `getOrgBranding()` (read separately, not via org_context); `BrandScope` replaces the
+  accent roles on customer-facing pages only, corrected to the nearest shade that passes 4.5:1 (`brandPalette`, both themes;
+  `BRAND_THEMES` must match globals.css, unit test). `intake_form()` returns `brand {logo, color}`. Never apply the
+  business colour inside the app.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
