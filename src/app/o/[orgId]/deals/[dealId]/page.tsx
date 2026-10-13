@@ -27,6 +27,8 @@ import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
 import { stageTone } from "@/features/deals/stage-colors";
 import { getStuckDeals } from "@/features/deals/stuck";
+import { DEFAULT_CALENDAR_SETTINGS } from "@/features/calendar-days/holidays";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { listMembers } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -64,13 +66,15 @@ export default async function DealPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, deal.owner_id);
-  const [contacts, companies, members] = canEdit
-    ? await Promise.all([listContactOptions(orgId), listCompanyOptions(orgId), listMembers(orgId)])
-    : [[], [], []];
+  const [contacts, companies, members, calendar] = canEdit
+    ? await Promise.all([listContactOptions(orgId), listCompanyOptions(orgId), listMembers(orgId), getCalendarSettings(orgId)])
+    : [[], [], [], DEFAULT_CALENDAR_SETTINGS];
   // DEAL-04: the close window of a move into a won stage; the onboarding task goes to an active member who writes
   const closeWindow = closeWindowSetup(
     members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
     context.org.timeZone,
+    calendar,
+    context.user.id,
   );
   const stuckReason = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
   const stage = deal.stages.find((option) => option.id === deal.stage_id);

@@ -16,7 +16,7 @@ import { zoneDate, zonedIso } from "@/lib/format";
 
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 
-import { closedAtFor, parseCloseWon } from "./close-window";
+import { closedAtFor, ONBOARDING_EXISTS, ONBOARDING_PREFIX, parseCloseWon } from "./close-window";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 
 function revalidateDeal(orgId: string, dealId?: string) {
@@ -173,6 +173,38 @@ const CLOSE_TASK_FAILED = "העסקה סומנה כזכייה, אבל משימת
  * deal (and to its contact and company when the user can see them), all with the
  * user's session. The deal is not moved until the form is sent; cancelling leaves it.
  */
+type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
+
+/**
+ * DEAL-04: does the deal already have an open onboarding task (ONBOARDING_PREFIX).
+ * Read with the user's session, so a task the user may not see does not count.
+ */
+async function openOnboardingTask(supabase: Supabase, orgId: string, dealId: string) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("deal_id", dealId)
+    .eq("status", "open")
+    .is("deleted_at", null)
+    .like("title", `${ONBOARDING_PREFIX}%`)
+    .limit(1);
+  return error ? { error } : { open: data.length > 0 };
+}
+
+/** DEAL-04: the close window asks, when it opens, whether to offer the onboarding task at all. */
+export async function dealOnboardingTaskAction(orgId: string, dealId: string): Promise<ActionResult<{ open: boolean }>> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const found = await openOnboardingTask(context.supabase, orgId, dealId);
+  if ("error" in found) {
+    return fail(dbErrorMessage(found.error));
+  }
+  return ok({ open: found.open });
+}
+
 export async function closeDealWonAction(orgId: string, dealId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
@@ -215,6 +247,14 @@ export async function closeDealWonAction(orgId: string, dealId: string, stageId:
   revalidateDeal(orgId, dealId);
 
   if (close.task) {
+    // one open onboarding task per deal: another window may have created one meanwhile
+    const existing = await openOnboardingTask(supabase, orgId, dealId);
+    if ("error" in existing) {
+      return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(existing.error)})`, values);
+    }
+    if (existing.open) {
+      return { ok: true, message: ONBOARDING_EXISTS };
+    }
     const deal = moved[0];
     // a task may link only records the user can see (tasks_insert, migration 0074): link the
     // deal's contact and company only when they can be read with this session

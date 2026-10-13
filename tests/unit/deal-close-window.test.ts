@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_CALENDAR_SETTINGS, type CalendarSettings } from "@/features/calendar-days/holidays";
 import {
   amountInputValue,
+  closeDateIsOld,
   closedAtFor,
   closeWindowSetup,
   entersWon,
+  isOnboardingTitle,
+  onboardingChoiceFromStored,
+  onboardingChoiceKey,
   ONBOARDING_TITLE_MAX,
   onboardingDueDate,
   onboardingTitle,
+  oldCloseDateQuestion,
   parseCloseWon,
+  storedOnboardingChoice,
 } from "@/features/deals/close-window";
 
 const TODAY = "2026-10-13";
@@ -36,9 +43,88 @@ describe("deal close window (DEAL-04)", () => {
     expect(onboardingTitle("א".repeat(400))).toHaveLength(ONBOARDING_TITLE_MAX);
   });
 
-  it("dates the onboarding task the next day, across a month's end", () => {
+  it("dates the onboarding task the next working day, across a month's end", () => {
+    // Tuesday to Wednesday
     expect(onboardingDueDate(TODAY)).toBe("2026-10-14");
+    // Thursday: Friday and Saturday are the default days off
+    expect(onboardingDueDate("2026-10-15")).toBe("2026-10-18");
+    // Friday 30 October to Sunday 1 November
+    expect(onboardingDueDate("2026-10-30")).toBe("2026-11-01");
+    // a Saturday close still lands on Sunday
     expect(onboardingDueDate("2026-10-31")).toBe("2026-11-01");
+  });
+
+  it("skips the holidays the business closes on, and only those", () => {
+    // erev Rosh Hashana (Friday) -> Rosh Hashana on Saturday and Sunday -> Monday
+    expect(onboardingDueDate("2026-09-11")).toBe("2026-09-14");
+    // erev Pesach 2027 (Wednesday): Pesach Thursday, then the weekend; chol hamoed is a working day by default
+    expect(onboardingDueDate("2027-04-21")).toBe("2027-04-25");
+    // a business that closes on chol hamoed opens again on erev shvi'i shel Pesach (an eve is a working day by default)
+    const cholHamoedOff: CalendarSettings = { ...DEFAULT_CALENDAR_SETTINGS, restOccasions: ["chol_hamoed_pesach"] };
+    expect(onboardingDueDate("2027-04-21", cholHamoedOff)).toBe("2027-04-27");
+    // eves off as well: Monday -> erev and shvi'i shel Pesach closed -> Thursday
+    const evesOff: CalendarSettings = { ...DEFAULT_CALENDAR_SETTINGS, holidayEvesRest: true };
+    expect(onboardingDueDate("2027-04-26", evesOff)).toBe("2027-04-29");
+    // holidays not off: Pesach itself is a working day
+    expect(onboardingDueDate("2027-04-21", { ...DEFAULT_CALENDAR_SETTINGS, holidaysRest: false })).toBe("2027-04-22");
+  });
+
+  it("follows the business's own weekly days off", () => {
+    const saturdayOnly: CalendarSettings = { ...DEFAULT_CALENDAR_SETTINGS, restWeekdays: [6] };
+    expect(onboardingDueDate("2026-10-15", saturdayOnly)).toBe("2026-10-16");
+    expect(onboardingDueDate("2026-10-16", saturdayOnly)).toBe("2026-10-18");
+    const noDaysOff: CalendarSettings = { restWeekdays: [], holidaysRest: false, holidayEvesRest: false, restOccasions: [] };
+    expect(onboardingDueDate("2026-10-16", noDaysOff)).toBe("2026-10-17");
+  });
+
+  it("gives the window the next working day of the organization's day", () => {
+    // Thursday 22:30 UTC is already Friday in Jerusalem: next working day is Sunday
+    const setup = closeWindowSetup([], ZONE, DEFAULT_CALENDAR_SETTINGS, "u1", new Date("2026-10-15T22:30:00Z"));
+    expect(setup.today).toBe("2026-10-16");
+    expect(setup.nextWorkingDay).toBe("2026-10-18");
+    expect(setup.userId).toBe("u1");
+  });
+
+  it("recognises an onboarding task by its title prefix", () => {
+    expect(isOnboardingTitle(onboardingTitle("אתר"))).toBe(true);
+    expect(isOnboardingTitle("קליטת לקוח: משהו אחר")).toBe(true);
+    expect(isOnboardingTitle("להתקשר ללקוח")).toBe(false);
+    expect(isOnboardingTitle("קליטת לקוח")).toBe(false);
+  });
+
+  it("starts checked unless this user last chose not to create the task", () => {
+    expect(onboardingChoiceFromStored(null)).toBe(true);
+    expect(onboardingChoiceFromStored(undefined)).toBe(true);
+    expect(onboardingChoiceFromStored("garbage")).toBe(true);
+    expect(onboardingChoiceFromStored(storedOnboardingChoice(true))).toBe(true);
+    expect(onboardingChoiceFromStored(storedOnboardingChoice(false))).toBe(false);
+  });
+
+  it("keeps the choice per user and organization", () => {
+    const key = onboardingChoiceKey("org-1", "user-1");
+    expect(key).not.toBe(onboardingChoiceKey("org-1", "user-2"));
+    expect(key).not.toBe(onboardingChoiceKey("org-2", "user-1"));
+  });
+
+  it("asks before saving a close date more than three calendar months back", () => {
+    // three months before 13 October is 13 July: that day is fine, the day before asks
+    expect(closeDateIsOld("2026-07-13", TODAY)).toBe(false);
+    expect(closeDateIsOld("2026-07-12", TODAY)).toBe(true);
+    expect(closeDateIsOld(TODAY, TODAY)).toBe(false);
+    expect(closeDateIsOld("2020-01-01", TODAY)).toBe(true);
+    // month ends: 31 May -> 28 February; 31 March -> 31 December; a leap year's 29 February
+    expect(closeDateIsOld("2026-02-28", "2026-05-31")).toBe(false);
+    expect(closeDateIsOld("2026-02-27", "2026-05-31")).toBe(true);
+    expect(closeDateIsOld("2025-12-31", "2026-03-31")).toBe(false);
+    expect(closeDateIsOld("2025-12-30", "2026-03-31")).toBe(true);
+    expect(closeDateIsOld("2028-02-29", "2028-05-31")).toBe(false);
+    expect(closeDateIsOld("2028-02-28", "2028-05-31")).toBe(true);
+    // no lower limit otherwise, and nothing to ask about a malformed day
+    expect(closeDateIsOld("", TODAY)).toBe(false);
+  });
+
+  it("words the question with the day in Hebrew", () => {
+    expect(oldCloseDateQuestion("2026-07-09")).toBe("תאריך הסגירה הוא 9 ביולי 2026, לפני יותר מ-3 חודשים. לשמור?");
   });
 
   it("shows the amount as the deal form does", () => {
@@ -58,9 +144,9 @@ describe("deal close window (DEAL-04)", () => {
 
   it("takes the organization's day for today", () => {
     // 22:30 UTC is already the next day in Jerusalem
-    const setup = closeWindowSetup([], ZONE, new Date("2026-10-13T22:30:00Z"));
+    const setup = closeWindowSetup([], ZONE, DEFAULT_CALENDAR_SETTINGS, "u1", new Date("2026-10-13T22:30:00Z"));
     expect(setup.today).toBe("2026-10-14");
-    expect(closeWindowSetup([], "UTC", new Date("2026-10-13T22:30:00Z")).today).toBe("2026-10-13");
+    expect(closeWindowSetup([], "UTC", DEFAULT_CALENDAR_SETTINGS, "u1", new Date("2026-10-13T22:30:00Z")).today).toBe("2026-10-13");
   });
 
   it("confirms amount and date without a task", () => {

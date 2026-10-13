@@ -14,6 +14,7 @@ import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { getStuckDeals } from "@/features/deals/stuck";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { DealsTable } from "@/features/deals/components/deals-table";
 import { BOARD_PREFERENCE, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
@@ -134,7 +135,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
   };
   // DEAL-09: the user's card fields decide what the board reads
   const cardFieldsRead = getBoardFields(orgId);
-  const [cardFields, board, pipelines, members, teams, tags, lossReasons] = await Promise.all([
+  const [cardFields, board, pipelines, members, teams, tags, lossReasons, calendar] = await Promise.all([
     cardFieldsRead,
     cardFieldsRead.then((fields) => getBoard(orgId, requested, { showClosed, fullStage, filter, cardFields: fields.keys })),
     listPipelines(orgId),
@@ -142,6 +143,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
     listTeams(orgId),
     listTags(orgId),
     canWrite ? listLossReasons(orgId) : Promise.resolve([]),
+    // DEAL-04: the onboarding task is due the business's next working day
+    canWrite ? getCalendarSettings(orgId) : Promise.resolve(null),
   ]);
 
   if (!board) {
@@ -258,10 +261,12 @@ export default async function DealsPage({ params, searchParams }: Props) {
           fields: cardFields.fields.filter((field) => cardFields.keys.includes(`${CUSTOM_PREFIX}${field.key}`)),
         }}
         closeWindow={
-          canWrite
+          canWrite && calendar
             ? closeWindowSetup(
                 members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
                 context.org.timeZone,
+                calendar,
+                context.user.id,
               )
             : null
         }
@@ -296,12 +301,13 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
   const sort = parseSort(firstParam(query.sort), sortKeys, DEAL_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const pipelineParam = pipelines.find((p) => p.id === pipeline.id)?.isDefault ? null : pipeline.id;
 
-  const [editing, tags, viewData, { deals, hasMore }, lossReasons] = await Promise.all([
+  const [editing, tags, viewData, { deals, hasMore }, lossReasons, calendar] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "deal", context),
     listDeals(orgId, { pipelineId: pipeline.id, search, tagId, page, sort, filter: filter.logic }),
     context.canWrite ? listLossReasons(orgId) : Promise.resolve([]),
+    context.canWrite ? getCalendarSettings(orgId) : Promise.resolve(null),
   ]);
   const views = viewData.chips;
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
@@ -386,7 +392,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           editing={editing}
           tags={tags}
           lossReasons={activeLossReasons(lossReasons).map((reason) => reason.name)}
-          closeWindow={context.canWrite ? closeWindowSetup(editing.owners, context.org.timeZone) : null}
+          closeWindow={context.canWrite && calendar ? closeWindowSetup(editing.owners, context.org.timeZone, calendar, context.user.id) : null}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

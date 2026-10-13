@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-import { addDays } from "@/lib/calendar-grid";
+import { type CalendarSettings, DEFAULT_CALENDAR_SETTINGS, isRestDay } from "@/features/calendar-days/holidays";
+import { addDays, addMonths, MONTHS } from "@/lib/calendar-grid";
+import { isCalendarDate } from "@/lib/calendar-date";
 import { zoneDate, zonedIso } from "@/lib/format";
 import type { StageKind } from "@/lib/database.types";
 import { checkbox, moneyField, optionalDate, optionalId, pick, requiredText } from "@/lib/validation";
@@ -18,14 +20,77 @@ export function entersWon(fromKind: StageKind | null | undefined, toKind: StageK
 
 export const ONBOARDING_TITLE_MAX = 300;
 
+/**
+ * How an onboarding task is recognised: tasks have no marker column, so an
+ * onboarding task is an open task (status open, not deleted) linked to the deal
+ * whose title starts with this prefix. A title edited away from the prefix is no
+ * longer one (owner's answer of 13 October 2026: one open onboarding task per deal).
+ */
+export const ONBOARDING_PREFIX = "קליטת לקוח:";
+
+/** Shown instead of the checkbox when the deal has an open onboarding task. */
+export const ONBOARDING_EXISTS = "יש כבר משימת קליטה פתוחה לעסקה, לכן לא תיווצר משימה נוספת.";
+
 /** The onboarding task's title until the user changes it. */
 export function onboardingTitle(dealName: string): string {
-  return `קליטת לקוח: ${dealName}`.slice(0, ONBOARDING_TITLE_MAX);
+  return `${ONBOARDING_PREFIX} ${dealName}`.slice(0, ONBOARDING_TITLE_MAX);
 }
 
-/** The onboarding task is due the next day by default. */
-export function onboardingDueDate(today: string): string {
+/** Does a task title mark an onboarding task (see ONBOARDING_PREFIX; titles are stored trimmed, the server matches with like). */
+export function isOnboardingTitle(title: string): boolean {
+  return title.startsWith(ONBOARDING_PREFIX);
+}
+
+/** The longest run of days off searched for the next working day; past it, plain tomorrow. */
+const MAX_DAYS_OFF = 60;
+
+/**
+ * The onboarding task is due the next working day of the business: the first
+ * day after today that is not a weekly rest day nor a holiday or occasion it
+ * closes on (CAL-03 settings).
+ */
+export function onboardingDueDate(today: string, calendar: CalendarSettings = DEFAULT_CALENDAR_SETTINGS): string {
+  let day = addDays(today, 1);
+  for (let i = 0; i < MAX_DAYS_OFF; i++) {
+    if (!isRestDay(day, calendar)) return day;
+    day = addDays(day, 1);
+  }
   return addDays(today, 1);
+}
+
+/**
+ * The user's last choice of the onboarding checkbox is kept per device, per user
+ * and organization (browser storage). A new user, or a browser without storage,
+ * starts checked (owner's answer, 13 October 2026).
+ */
+export function onboardingChoiceKey(orgId: string, userId: string): string {
+  return `crm:deal-won-onboarding:${orgId}:${userId}`;
+}
+
+export function onboardingChoiceFromStored(stored: string | null | undefined): boolean {
+  return stored !== "off";
+}
+
+export function storedOnboardingChoice(checked: boolean): "on" | "off" {
+  return checked ? "on" : "off";
+}
+
+/**
+ * A close date may be any past day (no lower limit by the deal's creation: deals
+ * entered or imported later really closed earlier), but one more than three
+ * calendar months before today asks for confirmation first (owner's answer,
+ * 13 October 2026). App side only. Both days are the organization's calendar days.
+ */
+export const OLD_CLOSE_MONTHS = 3;
+
+export function closeDateIsOld(day: string, today: string): boolean {
+  return isCalendarDate(day) && isCalendarDate(today) && day < addMonths(today, -OLD_CLOSE_MONTHS);
+}
+
+/** "תאריך הסגירה הוא 9 ביולי 2026, לפני יותר מ-3 חודשים. לשמור?" */
+export function oldCloseDateQuestion(day: string): string {
+  const shown = `${Number(day.slice(8, 10))} ב${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+  return `תאריך הסגירה הוא ${shown}, לפני יותר מ-${OLD_CLOSE_MONTHS} חודשים. לשמור?`;
 }
 
 /**
@@ -88,10 +153,24 @@ export function amountInputValue(agorot: number): string {
   return agorot % 100 === 0 ? String(agorot / 100) : (agorot / 100).toFixed(2);
 }
 
-// what every close window of a page needs: who can take the onboarding task, and the organization's day
-export type CloseWindowSetup = { owners: { value: string; label: string }[]; today: string; timeZone: string };
+// what every close window of a page needs: who can take the onboarding task, the organization's day,
+// its next working day (the task's default due date), and whose last choice to remember
+export type CloseWindowSetup = {
+  owners: { value: string; label: string }[];
+  today: string;
+  nextWorkingDay: string;
+  timeZone: string;
+  userId: string;
+};
 
 /** Built on the server for a page that may close deals: owners are the active members who write. */
-export function closeWindowSetup(owners: { value: string; label: string }[], timeZone: string, now: Date = new Date()): CloseWindowSetup {
-  return { owners, today: zoneDate(now, timeZone), timeZone };
+export function closeWindowSetup(
+  owners: { value: string; label: string }[],
+  timeZone: string,
+  calendar: CalendarSettings,
+  userId: string,
+  now: Date = new Date(),
+): CloseWindowSetup {
+  const today = zoneDate(now, timeZone);
+  return { owners, today, nextWorkingDay: onboardingDueDate(today, calendar), timeZone, userId };
 }
