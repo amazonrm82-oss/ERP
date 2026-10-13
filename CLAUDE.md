@@ -348,6 +348,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the builder (`toDbRule`) on every save; the engine reads the active reason of the rule's organization by id and writes
   its current name with the status in one update; a missing or unusable reason runs with an empty reason and logs the
   step `ok` with `warning` (keys of `STEP_WARNINGS`). `actionsMissingReason()` drives the reminders.
+  Owner, 13 October 2026: while the organization has no active reasons, `toDbRule` saves the action without `reason_id`
+  and the builder shows "אין סיבות מוגדרות בעסק" with a link to `/settings/lead-reasons`; `actionsMissingReason()` reports
+  nothing until the list has a reason.
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).
