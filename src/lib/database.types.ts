@@ -157,6 +157,8 @@ export type OrganizationRow = {
   brand_color: string | null;
   // FLD-05: industry templates applied (keys); written only by apply_industry_template()
   industry_templates: string[];
+  // USR-04: when an owner or admin closed the setup checklist on the home page; null = shown
+  setup_checklist_hidden_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -935,6 +937,7 @@ export type Database = {
           setup_step?: number | null;
           logo_path?: string | null;
           brand_color?: string | null;
+          setup_checklist_hidden_at?: string | null;
         }
       >;
       profiles: Table<
@@ -1271,6 +1274,12 @@ export type Database = {
       // handover (migration 0024): { leads, contacts, companies, deals, tasks } moved
       set_primary_team: { Args: { p_org: string; p_team: string; p_user: string; p_primary: boolean }; Returns: undefined };
       transfer_records: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
+      // sample data (USR-04), owners and admins: { created }; refused while it is there (hint sample:exists)
+      sample_data_add: { Args: { p_org: string }; Returns: Json };
+      // the records that are sample data, live or in the recycle bin (ids only); removable = still untouched
+      // removes the untouched sample records in one transaction (separate, hand-pasted migration): { removed, kept }
+      sample_data_remove: { Args: { p_org: string }; Returns: Json };
+      sample_data_records: { Args: { p_org: string }; Returns: Array<{ record_type: string; record_id: string; removable: boolean }> };
       // busy times of people in a meeting (CAL-05): id and title only of meetings the caller may read
       meeting_busy: {
         Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };

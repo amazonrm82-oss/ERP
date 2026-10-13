@@ -63,6 +63,8 @@ export const paths = {
   settingsAccount: (orgId: string) => `/o/${orgId}/settings/account`,
   settingsTrash: (orgId: string) => `/o/${orgId}/settings/trash`,
   settingsPlan: (orgId: string) => `/o/${orgId}/settings/plan`,
+  // the setup checklist and sample data (USR-04)
+  settingsSetupChecklist: (orgId: string) => `/o/${orgId}/settings/setup-checklist`,
   settingsTeams: (orgId: string) => `/o/${orgId}/settings/teams`,
   settingsTeam: (orgId: string, teamId: string) => `/o/${orgId}/settings/teams/${teamId}`,
   invite: (token: string) => `/invite/${token}`,

@@ -7,6 +7,7 @@ import {
   ChatIcon,
   BuildingIcon,
   CalendarIcon,
+  CheckSquareIcon,
   FormIcon,
   InboxIcon,
   LockIcon,
@@ -53,7 +54,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
         { href: calendarSettingsPath(orgId), label: "ימי מנוחה וחגים", description: "הימים שהעסק לא עובד בהם, והחגים של השנה", icon: CalendarIcon },
         ...(access.admin
-          ? [{ href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon }]
+          ? [
+              { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },
+              { href: paths.settingsSetupChecklist(orgId), label: "רשימת הקמה", description: "מה כבר מוכן בעסק, ונתוני דוגמה", icon: CheckSquareIcon },
+            ]
           : []),
       ],
     },

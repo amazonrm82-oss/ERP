@@ -76,6 +76,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-01 (trigger contact_channels_payload_check)
   "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר.",
   "contact_channel:max": "אפשר לשמור עד 10 טלפונים נוספים ו-10 אימיילים נוספים לאיש קשר.",
+  // USR-04 (function sample_data_add)
+  "sample:exists": "נתוני הדוגמה כבר נמצאים במערכת. אפשר למחוק אותם ולהוסיף מחדש.",
+  "sample:changed": "אחת מרשומות הדוגמה השתנתה בזמן המחיקה. נסו שוב: רשומות ששיניתם לא נמחקות.",
+  "sample:no_status": "אין סטטוס פתוח ללידים. הוסיפו סטטוס ב\"הגדרות > סטטוסים ומקורות\" ונסו שוב.",
 };
 
 // P0001 raised without a hint: recognised by the (stable) English message.

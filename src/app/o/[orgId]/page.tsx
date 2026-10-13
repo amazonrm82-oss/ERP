@@ -15,8 +15,9 @@ import { getMyDay } from "@/features/home/queries";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { isAdminRole } from "@/features/settings/permissions";
+import { SetupChecklistCard } from "@/features/setup/components/setup-checklist-card";
 import { SetupResumeCard } from "@/features/setup/components/setup-resume-card";
-import { getSetupStep } from "@/features/setup/queries";
+import { getSetupChecklist, getSetupStep } from "@/features/setup/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
@@ -39,11 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function HomePage({ params }: Props) {
   const { orgId } = await params;
   const { user, canWrite, org, role } = await getOrgContext(orgId);
-  // owners and admins see where the setup wizard stopped (USR-03) until it is finished
+  // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
+  // and then the setup checklist (USR-04) until they close it
+  const setupOwner = isAdminRole(role) && canWrite;
   const [day, setupStep] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
-    isAdminRole(role) && canWrite ? getSetupStep(orgId) : Promise.resolve(null),
+    setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
   ]);
+  const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
   const firstName = user.displayName.split(" ")[0];
@@ -75,6 +79,7 @@ export default async function HomePage({ params }: Props) {
     <>
       <PageHeader title="היום שלי" description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`} />
       {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
+      {checklist && !checklist.hidden ? <SetupChecklistCard orgId={orgId} checklist={checklist} /> : null}
 
       <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         {summary.map((item) => (
