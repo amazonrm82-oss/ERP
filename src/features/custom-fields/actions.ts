@@ -3,6 +3,7 @@
 import { randomBytes } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, booleanArg, directionArg, validArg } from "@/lib/action-args";
@@ -12,7 +13,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { createFieldSchema, updateFieldSchema } from "./schema";
-import { TYPES_WITH_OPTIONS, type FieldType } from "./types";
+import { TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
 
 function revalidateFields(orgId: string) {
   // the fields show in the forms and cards of every record type
@@ -25,6 +26,36 @@ function newKey(): string {
   return `f_${[...randomBytes(8)].map((byte) => alphabet[byte % alphabet.length]).join("")}`;
 }
 
+type NewField = { object_type: FieldObject; label: string; field_type: FieldType; options: string[]; help_text: string | null; is_required: boolean };
+type Context = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
+
+/** Adds a field at the end of its object's list; the database decides who may (owners and admins) and the plan limit. */
+async function insertField(context: Context, orgId: string, field: NewField): Promise<{ key: string; error: null } | { key: null; error: string }> {
+  const { count } = await context.supabase
+    .from("field_definitions")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("object_type", field.object_type);
+
+  const key = newKey();
+  // the plan's limit per object type is enforced by a trigger (hint limit:max_custom_fields_per_object)
+  const { error } = await context.supabase.from("field_definitions").insert({
+    organization_id: orgId,
+    object_type: field.object_type,
+    key,
+    label: field.label,
+    field_type: field.field_type,
+    options: TYPES_WITH_OPTIONS.includes(field.field_type) ? field.options : [],
+    is_required: field.is_required,
+    help_text: field.help_text,
+    position: count ?? 0,
+  });
+  if (error) {
+    return { key: null, error: dbErrorMessage(error, "לא הצלחנו להוסיף את השדה. נסו שוב.") };
+  }
+  return { key, error: null };
+}
+
 export async function createFieldAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
   if (!context.ok) {
@@ -34,29 +65,57 @@ export async function createFieldAction(orgId: string, _prev: FormState, formDat
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const { count } = await context.supabase
-    .from("field_definitions")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId)
-    .eq("object_type", parsed.data.object_type);
-
-  // the plan's limit per object type is enforced by a trigger (hint limit:max_custom_fields_per_object)
-  const { error } = await context.supabase.from("field_definitions").insert({
-    organization_id: orgId,
-    object_type: parsed.data.object_type,
-    key: newKey(),
-    label: parsed.data.label,
-    field_type: parsed.data.field_type,
-    options: TYPES_WITH_OPTIONS.includes(parsed.data.field_type) ? parsed.data.options : [],
-    is_required: parsed.data.is_required,
-    help_text: parsed.data.help_text,
-    position: count ?? 0,
-  });
-  if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את השדה. נסו שוב."), { values: formValues(formData) });
+  const created = await insertField(context, orgId, parsed.data);
+  if (created.error !== null) {
+    return fail(created.error, { values: formValues(formData) });
   }
   revalidateFields(orgId);
   return { ok: true, message: "השדה נוסף. הוא מופיע עכשיו בטפסים ובכרטיסים." };
+}
+
+const importFieldArgs = z.object({
+  objectType: z.string(),
+  label: z.string().max(1000),
+  fieldType: z.string(),
+  // one choice per line, as in the field settings
+  options: z.string().max(20_000),
+});
+
+/**
+ * IMP-01: a new field made while mapping the columns of an import. The same checks as the
+ * field settings page (createFieldSchema, owners and admins only by RLS, the plan limit);
+ * never required. Returns the new key, which the wizard maps the column to.
+ */
+export async function createImportFieldAction(
+  orgId: string,
+  input: { objectType: string; label: string; fieldType: string; options: string },
+): Promise<ActionResult<{ key: string; label: string }>> {
+  if (!validArg(importFieldArgs, input)) return fail(INVALID_ARGS);
+  const context = await actionContext(orgId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = createFieldSchema.safeParse({
+    label: input.label,
+    options: input.options,
+    help_text: "",
+    is_required: null,
+    object_type: input.objectType,
+    field_type: input.fieldType,
+  });
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? "השדה אינו תקין.");
+  }
+  // a "user" field holds a member's id, which a file does not have
+  if (parsed.data.field_type === "user") {
+    return fail("אי אפשר ליצור שדה מסוג משתמש מתוך ייבוא.");
+  }
+  const created = await insertField(context, orgId, parsed.data);
+  if (created.error !== null) {
+    return fail(created.error);
+  }
+  revalidateFields(orgId);
+  return ok({ key: created.key, label: parsed.data.label });
 }
 
 export async function updateFieldAction(orgId: string, fieldId: string, _prev: FormState, formData: FormData): Promise<FormState> {

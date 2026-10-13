@@ -25,10 +25,13 @@ import {
   type ImportEntityKey,
 } from "../fields";
 import type { RowOutcome } from "../server";
+import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
+import { NewFieldForm } from "./new-field-form";
 
 type CustomField = { key: string; label: string };
-type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]> };
+// canCreateFields: owners and admins may add a custom field while mapping (IMP-01)
+type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]>; canCreateFields: boolean };
 
 type Sheet = { fileName: string; headers: string[]; rows: string[][] };
 type Step = "file" | "map" | "preview" | "running" | "done";
@@ -90,7 +93,10 @@ const OUTCOME_LABEL: Record<RowOutcome["status"], string> = {
   failed: "שגיאה",
 };
 
-export function ImportWizard({ orgId, customFields }: Props) {
+export function ImportWizard({ orgId, customFields: initialFields, canCreateFields }: Props) {
+  const [customFields, setCustomFields] = useState(initialFields);
+  // the column whose "new field" form is open
+  const [newFieldFor, setNewFieldFor] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("file");
   const [entity, setEntity] = useState<ImportEntityKey>("lead");
   const [mode, setMode] = useState<DuplicateModeKey>("skip");
@@ -197,6 +203,7 @@ export function ImportWizard({ orgId, customFields }: Props) {
 
   function reset() {
     setStep("file");
+    setNewFieldFor(null);
     setSheet(null);
     setMapping([]);
     setPreview([]);
@@ -276,18 +283,40 @@ export function ImportWizard({ orgId, customFields }: Props) {
                   <span className="truncate text-sm text-ink-soft" dir="auto">
                     {sheet.rows.find((r) => r[index])?.[index] ?? ""}
                   </span>
-                  <Select
-                    aria-label={`שדה לעמודה ${header}`}
-                    value={mapping[index] ?? ""}
-                    onChange={(e) => setMapping((m) => m.map((v, i) => (i === index ? e.target.value : v)))}
-                  >
-                    <option value="">לא לייבא</option>
-                    {targets.map((t) => (
-                      <option key={t.key} value={t.key} disabled={mapping.includes(t.key) && mapping[index] !== t.key}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </Select>
+                  <div className="space-y-1">
+                    <Select
+                      aria-label={`שדה לעמודה ${header}`}
+                      value={mapping[index] ?? ""}
+                      onChange={(e) => setMapping((m) => m.map((v, i) => (i === index ? e.target.value : v)))}
+                    >
+                      <option value="">לא לייבא</option>
+                      {targets.map((t) => (
+                        <option key={t.key} value={t.key} disabled={mapping.includes(t.key) && mapping[index] !== t.key}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </Select>
+                    {canCreateFields && !mapping[index] && newFieldFor !== index ? (
+                      <Button variant="ghost" size="sm" onClick={() => setNewFieldFor(index)} aria-label={`שדה חדש לעמודה ${header}`}>
+                        + שדה חדש
+                      </Button>
+                    ) : null}
+                  </div>
+                  {newFieldFor === index ? (
+                    <NewFieldForm
+                      orgId={orgId}
+                      entity={entity}
+                      entityLabel={entityLabel}
+                      header={header}
+                      values={columnValues(sheet.rows, index)}
+                      onCancel={() => setNewFieldFor(null)}
+                      onCreated={(field) => {
+                        setCustomFields((all) => ({ ...all, [entity]: [...all[entity], field] }));
+                        setMapping((m) => m.map((v, i) => (i === index ? `${CUSTOM_PREFIX}${field.key}` : v)));
+                        setNewFieldFor(null);
+                      }}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>

@@ -26,7 +26,11 @@ export default async function NewImportPage({ params }: { params: Promise<{ orgI
   return (
     <>
       <PageHeader title="ייבוא מקובץ" back={{ href: paths.imports(orgId), label: "ייבוא וייצוא" }} />
-      <ImportWizard orgId={orgId} customFields={{ lead: short(lead), contact: short(contact), company: short(company) }} />
+      <ImportWizard
+        orgId={orgId}
+        customFields={{ lead: short(lead), contact: short(contact), company: short(company) }}
+        canCreateFields={isAdminRole(role)}
+      />
     </>
   );
 }
