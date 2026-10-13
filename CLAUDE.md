@@ -313,6 +313,18 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   update that keeps the stage, refuses a person's snooze date that is not a day after today up to 366 days ahead or on a closed
   deal (hint `deal:snoozed_until`), and clears the snooze on any stage or pipeline move; `deals_snooze_cleared` logs one
   `system` activity (`metadata.kind = snooze_cleared`, no notification, not "last activity"). MNY-01 and MNY-05 read the same report.
+- Tax and documents settings (TAX-01..03, migrations 0135-0138): `public.org_document_settings` (one row per org; members read,
+  owners/admins of a writable org write; audited) holds `vat_status` (licensed|exempt|nonprofit|other, null = not set; Hebrew
+  labels per owner), `legal_form` (informational only) and the business details for documents (legal_name, tax_id with
+  `app.valid_israeli_id`, address, phone, email; the email is also the ICS ORGANIZER). Whether VAT is charged:
+  `app.vat_status_charges()` / `app.org_charges_vat()` = `chargesVat()` in `src/features/tax/status.ts`. `public.vat_rates`
+  (platform table, read by all, no client writes): `app.vat_rate_at(date)` and `app.document_vat_rate(date)` (refuses a date
+  before the first row, hint `vat:before_table`); trigger `vat_rates_guard` refuses changing, removing or adding a rate on a
+  day that has begun in Israel (hint `vat:rate_in_force`): a change is a new future row added by migration. A document
+  stores its own rate and totals when made. `public.org_bank_details` is owners/admins only (RLS); values checked by trigger
+  (hint `bank:invalid`, no value in errors); audit masks the account (`app.mask_bank_account`); every change notifies all
+  active owners/admins with kind `system`; documents store `app.document_bank_snapshot(org)` (service_role only) when made.
+  Business name rule (owner): customer-facing communication uses the display name; documents use the registered name when set.
 - Business days (HEB-03, migration 0134): `app.add_business_days(org, from, n)` (app only) counts n working days after a date by
   the CAL-03 rest days, read once and decided by `app.rest_day_with()` (the rule of `app.org_rest_day()` with the settings passed
   in; keep the two in step); n = 0 is the day itself or the next working day; n outside 0..1000 → hint `business_days:range`;
