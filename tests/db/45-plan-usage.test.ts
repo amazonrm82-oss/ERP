@@ -30,7 +30,7 @@ describe("plan and usage for the 'חבילה ושימוש' page (FXU-04)", () =>
     expect(by.max_users.used).toBe(2);
     expect(Number(by.max_records.used)).toBeGreaterThanOrEqual(2);
     expect(by.max_pipelines.used).toBe(1);
-    expect(Object.keys(by).sort()).toEqual(["max_active_automations", "max_forms", "max_pipelines", "max_records", "max_users", "storage_gb"]);
+    expect(Object.keys(by).sort()).toEqual(["max_active_automations", "max_forms", "max_pipelines", "max_products", "max_records", "max_users", "storage_gb"]);
   });
 
   it("a member sees the same numbers, even of records they may not see", async () => {

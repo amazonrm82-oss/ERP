@@ -13,6 +13,7 @@ const LABELS: Record<string, { label: string; unit?: string }> = {
   max_forms: { label: "טפסים לקליטת לידים" },
   max_active_automations: { label: "אוטומציות פעילות" },
   storage_gb: { label: "אחסון קבצים", unit: "GB" },
+  max_products: { label: "מוצרים בקטלוג (כולל מוצרים בארכיון)" },
 };
 
 /** The business's plan, trial and usage against each limit (FXU-04, migration 0046). */
