@@ -63,11 +63,31 @@ export type OrgCalendarSettingsRow = {
   holiday_eves_rest: boolean;
   // CAL-03 (migration 0094): occasions chosen as rest days one by one (keys of OCCASIONS)
   rest_occasions: string[];
+  // CAP-09 (migration working_hours_leave): the business's weekly hours (shape of profiles.working_hours); null = no hours limit
+  working_hours: Json | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
-type OrgCalendarSettingsWrite = { rest_weekdays?: number[]; holidays_rest?: boolean; holiday_eves_rest?: boolean; rest_occasions?: string[] };
+type OrgCalendarSettingsWrite = {
+  rest_weekdays?: number[];
+  holidays_rest?: boolean;
+  holiday_eves_rest?: boolean;
+  rest_occasions?: string[];
+  working_hours?: Json | null;
+};
+
+// CAP-09 (migration working_hours_leave): leave / absence of a member, dates in the person's zone, both ends included
+export type MemberLeaveRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  starts_on: string;
+  ends_on: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 // TAX-01 (migration tax_status): the business's tax status, at most one row per organization
 export type OrgDocumentSettingsRow = {
@@ -1451,6 +1471,12 @@ export type Database = {
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // DQL-01: the important fields per record type; seeded per organization, no delete grant
       completeness_settings: Table<CompletenessSettingsRow, { organization_id: string; object_type: string; fields?: string[] }, { fields?: string[] }>;
+      // CAP-09: the user and the dates are inserted once; only the dates change (column-level update grant)
+      member_leaves: Table<
+        MemberLeaveRow,
+        { organization_id: string; user_id: string; starts_on: string; ends_on: string },
+        { starts_on?: string; ends_on?: string }
+      >;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
@@ -1533,6 +1559,8 @@ export type Database = {
       // reset of two-step verification (migration 0016)
       org_members_mfa: { Args: { p_org: string }; Returns: Json };
       org_reset_member_mfa: { Args: { p_org: string; p_user: string }; Returns: undefined };
+      // CAP-09: an owner or admin sets a member's working hours (null = the business's)
+      set_member_working_hours: { Args: { p_org: string; p_user: string; p_hours: Json | null }; Returns: undefined };
       platform_find_user: { Args: { p_email: string }; Returns: Json };
       platform_reset_mfa: { Args: { p_user: string; p_reason: string; p_check: string }; Returns: undefined };
       // signed agreement (migration 0016)

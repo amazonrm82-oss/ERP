@@ -11,7 +11,7 @@ import { paths } from "@/lib/paths";
 import { optionalPhone, optionalText, requiredText } from "@/lib/validation";
 
 import { AVATARS_BUCKET, isOwnAvatarPath } from "./avatar";
-import { isTimeZone, parseWorkingHours } from "./working-hours";
+import { isTimeZone } from "./working-hours";
 
 const profileSchema = z.object({
   full_name: requiredText(120, "יש להזין שם מלא.", "השם ארוך מדי. אפשר עד 120 תווים."),
@@ -26,7 +26,7 @@ const profileSchema = z.object({
   signature: optionalText(500, "החתימה ארוכה מדי. אפשר עד 500 תווים."),
 });
 
-/** Saves the signed-in user's own profile (USR-01). Applies in every organization. */
+/** Saves the signed-in user's own profile (USR-01). Applies in every organization. Working hours: saveMemberHoursAction (CAP-09). */
 export async function saveProfileAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
   if (!context.ok) return context;
@@ -38,10 +38,6 @@ export async function saveProfileAction(orgId: string, _prev: FormState, formDat
     signature: formData.get("signature"),
   });
   if (!parsed.success) return invalid(parsed.error, formData);
-  const hours = parseWorkingHours(formData);
-  if (!hours.ok) {
-    return fail(hours.message, { fieldErrors: { working_hours: hours.message }, values: formValues(formData) });
-  }
   const { data, error } = await context.supabase
     .from("profiles")
     .update({
@@ -50,8 +46,6 @@ export async function saveProfileAction(orgId: string, _prev: FormState, formDat
       locale: parsed.data.locale,
       timezone: parsed.data.timezone,
       signature: parsed.data.signature,
-      // no working day ticked: not set
-      working_hours: Object.keys(hours.hours).length > 0 ? hours.hours : null,
     })
     .eq("id", context.user.id)
     .select("id");

@@ -35,7 +35,10 @@ export const ENTITY_LABELS: Record<string, string> = {
   support_access_grants: "גישת תמיכה",
   automations: "אוטומציה",
   forms: "טופס",
-  org_calendar_settings: "ימי מנוחה וחגים",
+  org_calendar_settings: "שעות וימי מנוחה",
+  // CAP-09
+  member_leaves: "חופשה של משתמש",
+  profiles: "פרופיל משתמש",
   // TAX-01, TAX-02
   org_document_settings: "מע\"מ ופרטים למסמכים",
   // TAX-02 follow-up (the account number is stored masked)
@@ -79,6 +82,10 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "lost_reason_id"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // CAP-09
+  working_hours: "שעות עבודה",
+  starts_on: "מתאריך",
+  ends_on: "עד תאריך",
   full_name: "שם",
   first_name: "שם פרטי",
   last_name: "שם משפחה",

@@ -107,6 +107,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
   "reasons:max": "אפשר לשמור עד 50 סיבות. מחקו סיבה שלא בשימוש כדי להוסיף חדשה.",
+  // CAP-09 (migration working_hours_leave)
+  "member_hours:other_orgs": "המשתמש שייך גם לעסק אחר, ולכן רק הוא יכול לשנות את שעות העבודה שלו, מהחשבון שלו.",
+  "member_hours:invalid": "שעות העבודה אינן תקינות. בדקו שכל טווח מתחיל לפני שהוא נגמר ושהטווחים לא חופפים.",
+  "member_leaves:max": "אפשר לשמור עד 100 חופשות נוכחיות ועתידיות לכל משתמש. חופשות שכבר עברו לא נספרות.",
   // DEAL-03 (migration deal_loss_reasons)
   "deal:lost_reason": "הסיבה שנבחרה כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
   // DEAL-04 (migration deal_close_window)

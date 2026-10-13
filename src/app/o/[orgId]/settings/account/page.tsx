@@ -7,6 +7,7 @@ import { signOutOthersAction } from "@/features/account/actions";
 import { MfaSettings } from "@/features/account/components/mfa-settings";
 import { describeDevice, getRecoveryCodesLeft, listMySessions } from "@/features/account/queries";
 import { NewPasswordForm } from "@/features/auth/components/new-password-form";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { CalendarFeedCard } from "@/features/calendar-feed/components/calendar-feed-card";
 import { getCalendarFeedStatus } from "@/features/calendar-feed/queries";
 import { getSignedVersion } from "@/features/legal/queries";
@@ -18,6 +19,8 @@ import { ProfileForm } from "@/features/profile/components/profile-form";
 import { getMyProfile } from "@/features/profile/queries";
 import { timeZones } from "@/features/profile/working-hours";
 import { getOrgContext } from "@/features/shell/queries";
+import { MemberHoursSection } from "@/features/work-hours/components/member-hours-section";
+import { getMemberHours, getOrgHours } from "@/features/work-hours/queries";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -26,9 +29,11 @@ export const metadata: Metadata = { title: "החשבון שלי" };
 
 export default async function AccountPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const { user, org: orgContext, supportUntil } = await getOrgContext(orgId);
+  const { user, org: orgContext, supportUntil, role, canWrite, isAvailable } = await getOrgContext(orgId);
   const supabase = await createClient();
-  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings, calendarFeed] = await Promise.all([
+  // CAP-09: a support session is not a member, and a viewer gets no leads
+  const showHours = !supportUntil && role !== "viewer";
+  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings, calendarFeed, hours] = await Promise.all([
     getMyProfile(user.id),
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
@@ -37,6 +42,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
     getNotificationSettings(),
     // a support session is not a member: it has no personal calendar link
     supportUntil ? null : getCalendarFeedStatus(orgId),
+    showHours ? Promise.all([getMemberHours(orgId, user.id, orgContext.timeZone), getOrgHours(orgId), getCalendarSettings(orgId)]) : null,
   ]);
   const sessions = sessionsResult.ok ? sessionsResult.sessions : [];
 
@@ -54,6 +60,25 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
           />
         </CardBody>
       </Card>
+
+      {hours ? (
+        <Card aria-labelledby="account-hours" className="lg:col-span-2">
+          <CardHeader id="account-hours" title="שעות עבודה וחופשה" />
+          <CardBody>
+            <MemberHoursSection
+              orgId={orgId}
+              userId={user.id}
+              name={null}
+              member={hours[0]}
+              orgHours={hours[1]}
+              calendar={hours[2]}
+              orgTimeZone={orgContext.timeZone}
+              canEdit={canWrite}
+              outOfRotation={isAvailable ? null : "unavailable"}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card aria-labelledby="account-mfa">
         <CardHeader id="account-mfa" title="אימות דו-שלבי" />

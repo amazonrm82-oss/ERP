@@ -10,6 +10,7 @@ import { FormError } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ROLE_LABELS } from "@/features/shell/labels";
+import { memberHoursPath } from "@/features/work-hours/paths";
 import type { FormState } from "@/lib/action-result";
 import type { MembershipRole } from "@/lib/database.types";
 import { paths } from "@/lib/paths";
@@ -96,6 +97,14 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
               איפוס אימות דו-שלבי
             </ActionButton>
           ) : null}
+          {suspended || member.role === "viewer" ? null : (
+            <Link
+              href={memberHoursPath(orgId, member.userId)}
+              className="inline-flex min-h-9 items-center px-2 text-sm text-accent-strong underline underline-offset-4"
+            >
+              שעות וחופשה<span className="sr-only">: {member.name}</span>
+            </Link>
+          )}
           <Link
             href={paths.transferRecords(orgId, member.userId)}
             className="inline-flex min-h-9 items-center px-2 text-sm text-accent-strong underline underline-offset-4"

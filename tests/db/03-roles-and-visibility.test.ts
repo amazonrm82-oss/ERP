@@ -607,6 +607,42 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("leave: everyone reads it; each role writes its own; the owner anyone's, an admin all but the owner's (CAP-09)", async () => {
+    const add = (actor: U, user: U) =>
+      asUser(actor.id, async (q) =>
+        (await q<{ id: string }>("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02') returning id", [org, user.id])).rows[0].id,
+      );
+    const ids: Record<string, string> = {};
+    for (const u of [owner, admin, manager, m1, viewer]) ids[u.id] = await add(u, u);
+    // a manager or a member never for someone else, not even their own team
+    for (const [actor, target] of [[manager, m1], [m1, m2], [viewer, m1], [m1, owner]] as const) {
+      expect((await pgError(add(actor, target))).code, actor.email).toBe("42501");
+    }
+    ids.byAdmin = await add(admin, m2);
+    ids.byOwner = await add(owner, admin);
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.member_leaves where organization_id = $1", [org]), u.email).toBe(7);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        // only their own row changes
+        expect((await q("update public.member_leaves set ends_on = '2026-12-03' where organization_id = $1", [org])).rowCount, u.email).toBe(1);
+        expect((await q("delete from public.member_leaves where organization_id = $1 and id <> $2", [org, ids[u.id]])).rowCount, u.email).toBe(0);
+      });
+    }
+    // an admin: everyone's but the owner's (and other admins', none here besides themselves)
+    await asUser(admin.id, async (q) => {
+      expect((await q("update public.member_leaves set ends_on = '2026-12-04' where organization_id = $1", [org])).rowCount).toBe(6);
+      expect((await q("delete from public.member_leaves where organization_id = $1", [org])).rowCount).toBe(6);
+    });
+    expect((await pgError(add(admin, owner))).code).toBe("42501");
+    await asUser(owner.id, async (q) => {
+      expect((await q("delete from public.member_leaves where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+  });
+
   it("everyone reads the VAT status; only owners and admins set it (TAX-01)", async () => {
     const insert = "insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')";
     for (const u of [manager, m1, viewer]) {

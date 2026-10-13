@@ -55,7 +55,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsBusiness(orgId), label: "פרטי העסק", description: "שם, ענף, טלפון, אבטחה וגישת תמיכה", icon: BuildingIcon },
         { href: paths.settingsUsers(orgId), label: "משתמשים", description: "הזמנת עובדים, תפקידים והרשאות", icon: UsersIcon },
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
-        { href: calendarSettingsPath(orgId), label: "ימי מנוחה וחגים", description: "הימים שהעסק לא עובד בהם, והחגים של השנה", icon: CalendarIcon },
+        { href: calendarSettingsPath(orgId), label: "שעות וימי מנוחה", description: "שעות העבודה של העסק, הימים שהוא לא עובד בהם והחגים", icon: CalendarIcon },
         { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
         ...(access.admin
           ? [
