@@ -340,7 +340,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   rate (half up, like `app.document_totals`). `archived_at` is stamped by `products_archive_stamp`. Document modules offer only
   `is_active and archived_at is null` (`isOfferable`), and every document-lines table references products with `(organization_id,
   product_id)` and NO on delete action, so a product on a line can only be archived (test 98). Sort fields `sort_category`,
-  `sort_unit`. No custom fields, image or saved columns yet; PRD-08 adds the `max_products` cap trigger.
+  `sort_unit`. No custom fields, image or saved columns yet. Since 0158 (PRD-08) trigger `products_quota` (definer, advisory lock per
+  org) needs the `products` flag (hint `feature:products`, also in `products_insert`) and counts every product, archived included,
+  against `max_products`. Since 0159 (PRD-05) products import like leads (`import_jobs.entity_type` 'product', `products.import_job_id`
+  guarded by `app.guard_import_tag('product')`, `product_sku_matches()` invoker; owners/admins only; undo archives a product a
+  document uses) and export through `log_list_export('product')`. PRD-07 price history reads `audit_log` (owners/admins).
 - Business days (HEB-03, migration 0134): `app.add_business_days(org, from, n)` (app only) counts n working days after a date by
   the CAL-03 rest days, read once and decided by `app.rest_day_with()` (the rule of `app.org_rest_day()` with the settings passed
   in; keep the two in step); n = 0 is the day itself or the next working day; n outside 0..1000 → hint `business_days:range`;
