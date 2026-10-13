@@ -11,7 +11,7 @@ import { responseSettingsFrom, type ResponseSettings } from "./settings";
 export const getResponseSettings = cache(async (orgId: string): Promise<ResponseSettings> => {
   const supabase = await createClient();
   const row = must(
-    await supabase.from("lead_response_settings").select("target_minutes, breach_action").eq("organization_id", orgId).maybeSingle(),
+    await supabase.from("lead_response_settings").select("target_minutes, breach_action, max_passes").eq("organization_id", orgId).maybeSingle(),
     "lead response settings",
   );
   return responseSettingsFrom(row);

@@ -136,14 +136,17 @@ export type LeadResponseSettingsRow = {
   organization_id: string;
   // working minutes, 5..1440
   target_minutes: number;
-  // text with a check: notify | none
+  // text with a check: notify | pass_on | none
   breach_action: string;
+  // SPD-03 (migration lead_pass_on): passes per lead before the managers are only notified, 1..5
+  max_passes: number;
   created_at: string;
   updated_at: string;
 };
 type LeadResponseSettingsWrite = {
   target_minutes?: number;
   breach_action?: string;
+  max_passes?: number;
 };
 // TAX-02 follow-up (migration org_bank_details): owners and admins only
 export type OrgBankDetailsRow = {

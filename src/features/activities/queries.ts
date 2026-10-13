@@ -129,6 +129,9 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
     } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "snooze_cleared") {
       // written by the database when a move to another stage cancels a postponement
       isUserContent = false;
+    } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "response_pass") {
+      // SPD-03: written by the database when a lead nobody answered in time went to the next rep
+      isUserContent = false;
     } else if (activity.type === "conversion") {
       text = "הליד הומר לאיש קשר.";
       isUserContent = false;

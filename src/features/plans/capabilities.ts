@@ -15,7 +15,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
   { feature: "whatsapp_inbox", label: "תיבת WhatsApp (ההודעות מהארנק)", built: false },
   { feature: "goals", label: "יעד לעסק", built: true },
-  { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: false },
+  { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },
   { feature: "orders", label: "מודול הזמנות", built: false },
   { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },

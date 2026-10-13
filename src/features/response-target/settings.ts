@@ -10,15 +10,21 @@ export const TARGET_MIN = 5;
 export const TARGET_MAX = 1440;
 export const DEFAULT_TARGET_MINUTES = 60;
 
-export const BREACH_ACTIONS = ["notify", "none"] as const;
+export const BREACH_ACTIONS = ["notify", "pass_on", "none"] as const;
 export type BreachAction = (typeof BREACH_ACTIONS)[number];
 export const DEFAULT_BREACH_ACTION: BreachAction = "notify";
 
-export type ResponseSettings = { targetMinutes: number; breachAction: BreachAction };
+// SPD-03: how many times one lead may be passed on, then the managers are only notified
+export const PASSES_MIN = 1;
+export const PASSES_MAX = 5;
+export const DEFAULT_MAX_PASSES = 2;
+
+export type ResponseSettings = { targetMinutes: number; breachAction: BreachAction; maxPasses: number };
 
 export const DEFAULT_RESPONSE_SETTINGS: ResponseSettings = {
   targetMinutes: DEFAULT_TARGET_MINUTES,
   breachAction: DEFAULT_BREACH_ACTION,
+  maxPasses: DEFAULT_MAX_PASSES,
 };
 
 export const BREACH_ACTION_OPTIONS: { value: BreachAction; label: string; description: string }[] = [
@@ -26,6 +32,12 @@ export const BREACH_ACTION_OPTIONS: { value: BreachAction; label: string; descri
     value: "notify",
     label: "התראה למנהל",
     description: "מנהל הצוות של הליד מקבל התראה, פעם אחת לכל ליד. בלי מנהל צוות: הבעלים ומנהלי המערכת.",
+  },
+  {
+    value: "pass_on",
+    label: "העברה לנציג הבא",
+    description:
+      "הליד עובר לנציג הבא בתור שזמין ובשעות העבודה, והנציג הקודם והמנהל מקבלים התראה. ליד שמישהו לחץ עליו \"לקחתי\" לא עובר, ואז רק המנהל מקבל התראה.",
   },
   { value: "none", label: "בלי פעולה", description: "רק דוח זמן התגובה מראה מה נענה בזמן." },
 ];
@@ -35,12 +47,18 @@ export function isBreachAction(value: unknown): value is BreachAction {
 }
 
 /** A row of the table (or none) as the screen uses it; an unknown action reads as the default. */
-export function responseSettingsFrom(row: { target_minutes: number; breach_action: string } | null): ResponseSettings {
+export function responseSettingsFrom(row: { target_minutes: number; breach_action: string; max_passes: number } | null): ResponseSettings {
   if (!row) return DEFAULT_RESPONSE_SETTINGS;
   return {
     targetMinutes: row.target_minutes,
     breachAction: isBreachAction(row.breach_action) ? row.breach_action : DEFAULT_BREACH_ACTION,
+    maxPasses: row.max_passes,
   };
+}
+
+/** The action the job really runs: passing on needs the plan flag, else the managers are notified. */
+export function effectiveBreachAction(action: BreachAction, canPassOn: boolean): BreachAction {
+  return action === "pass_on" && !canPassOn ? "notify" : action;
 }
 
 /** The target in words: minutes under two hours, else hours (and minutes). */

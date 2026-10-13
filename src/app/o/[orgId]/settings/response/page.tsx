@@ -6,7 +6,8 @@ import { TextLink } from "@/components/ui/text-link";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { ResponseSettingsForm } from "@/features/response-target/components/response-settings-form";
 import { getResponseSettings } from "@/features/response-target/queries";
-import { breachActionLabel, clockNote, TARGET_SCOPE_NOTE, targetText } from "@/features/response-target/settings";
+import { breachActionLabel, clockNote, effectiveBreachAction, TARGET_SCOPE_NOTE, targetText } from "@/features/response-target/settings";
+import { orgHasFeature } from "@/features/settings/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { getOrgHours } from "@/features/work-hours/queries";
@@ -19,7 +20,8 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function ResponseSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  const [settings, hours] = await Promise.all([getResponseSettings(orgId), getOrgHours(orgId)]);
+  const [settings, hours, canPassOn] = await Promise.all([getResponseSettings(orgId), getOrgHours(orgId), orgHasFeature(orgId, "auto_reassign")]);
+  const action = effectiveBreachAction(settings.breachAction, canPassOn);
   const note = clockNote(hours !== null);
   const editable = isAdminRole(role) && canWrite;
 
@@ -41,7 +43,7 @@ export default async function ResponseSettingsPage({ params }: Props) {
   if (editable) {
     return (
       <div className="space-y-5">
-        <ResponseSettingsForm orgId={orgId} settings={settings} clockNote={note} />
+        <ResponseSettingsForm orgId={orgId} settings={settings} clockNote={note} canPassOn={canPassOn} />
         {scope}
       </div>
     );
@@ -54,7 +56,8 @@ export default async function ResponseSettingsPage({ params }: Props) {
         <CardBody>
           <DetailList>
             <Detail label="היעד" value={targetText(settings.targetMinutes)} />
-            <Detail label="כשליד לא נענה בזמן" value={breachActionLabel(settings.breachAction)} />
+            <Detail label="כשליד לא נענה בזמן" value={breachActionLabel(action)} />
+            {action === "pass_on" ? <Detail label="העברות לכל ליד, לכל היותר" value={String(settings.maxPasses)} /> : null}
           </DetailList>
           <p className="mt-4 text-sm text-ink-soft">
             {isAdminRole(role) ? "העסק במצב קריאה בלבד, ולכן אי אפשר לשנות כרגע." : "רק בעלים ומנהלי מערכת יכולים לשנות את היעד."}
