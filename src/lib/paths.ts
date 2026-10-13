@@ -36,6 +36,8 @@ export const paths = {
   deals: (orgId: string) => `/o/${orgId}/deals`,
   dealNew: (orgId: string) => `/o/${orgId}/deals/new`,
   deal: (orgId: string, dealId: string) => `/o/${orgId}/deals/${dealId}`,
+  // MNY-05: the weekly pipeline cleanup (owner=me: the user's own deals)
+  dealsCleanup: (orgId: string, owner?: "me" | "all") => `/o/${orgId}/deals/cleanup${owner ? `?owner=${owner}` : ""}`,
   vcard: (orgId: string, kind: "lead" | "contact", id: string) => `/o/${orgId}/vcard/${kind}/${id}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
   // the tasks list with the "new task" form open and focused (REC-08)

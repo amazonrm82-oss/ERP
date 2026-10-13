@@ -1359,6 +1359,8 @@ export type Database = {
       };
       // GOL-04: forecast against the goal (migration goal_forecast)
       report_goal_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // MNY-05: open deals that need a decision, stuck or past their close date (migration pipeline_cleanup)
+      report_pipeline_cleanup: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
       // GOL-03: progress against the goals the caller reads (migration goal_progress)
       report_goal_progress: {
         Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };

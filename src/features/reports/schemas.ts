@@ -128,6 +128,33 @@ export const REPORT_SCHEMAS = {
       z.object({ id: uuid, name: text, owner_id: id, pipeline_id: uuid, stage_name: text, amount_agorot: amount, weighted: amount, expected_close_date: day }),
     ),
   }),
+  // MNY-05: open deals that need a decision (stuck, or past the expected close date; postponed ones left out),
+  // each once; the totals split them once each (overdue = overdue and not stuck)
+  report_pipeline_cleanup: z.object({
+    today: day,
+    stuck: z.object({ deals: count, amount }),
+    overdue: z.object({ deals: count, amount }),
+    deals: z.array(
+      z.object({
+        id: uuid,
+        name: text,
+        owner_id: id,
+        pipeline_id: uuid,
+        stage_id: uuid,
+        stage_name: text,
+        stage_position: z.number(),
+        amount_agorot: amount,
+        contact_id: id,
+        expected_close_date: day.nullable(),
+        days_in_stage: count,
+        limit_days: count,
+        last_activity_at: text,
+        idle_days: count,
+        stuck: z.boolean(),
+        overdue: z.boolean(),
+      }),
+    ),
+  }),
   // GOL-03: one row per goal the caller reads, with what was done in its period
   report_goal_progress: z.array(
     z.object({

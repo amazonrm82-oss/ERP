@@ -138,6 +138,7 @@ describe("report result shapes (FXC-12)", () => {
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],
       report_goal_progress: ["public.report_goal_progress($1)", [org]],
       report_goal_forecast: ["public.report_goal_forecast($1)", [org]],
+      report_pipeline_cleanup: ["public.report_pipeline_cleanup($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

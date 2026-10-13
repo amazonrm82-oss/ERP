@@ -175,12 +175,20 @@ export default async function DealsPage({ params, searchParams }: Props) {
     return qs ? `${paths.deals(orgId)}?${qs}` : paths.deals(orgId);
   };
 
-  const newDealButton = canWrite ? (
-    <ButtonLink href={`${paths.dealNew(orgId)}?pipeline=${board.pipeline.id}`}>
-      <PlusIcon className="size-4.5" />
-      עסקה חדשה
-    </ButtonLink>
-  ) : null;
+  const newDealButton = (
+    <span className="flex flex-wrap gap-2">
+      {/* MNY-05: the weekly cleanup of stuck and overdue deals */}
+      <ButtonLink href={paths.dealsCleanup(orgId)} variant="secondary">
+        ניקוי שבועי
+      </ButtonLink>
+      {canWrite ? (
+        <ButtonLink href={`${paths.dealNew(orgId)}?pipeline=${board.pipeline.id}`}>
+          <PlusIcon className="size-4.5" />
+          עסקה חדשה
+        </ButtonLink>
+      ) : null}
+    </span>
+  );
 
   return (
     <>

@@ -1,0 +1,31 @@
+{
+  "deals": [
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "עסקה באיחור",
+      "stuck": false,
+      "overdue": true,
+      "owner_id": "00000000-0000-4000-8000-000000000008",
+      "stage_id": "00000000-0000-4000-8000-000000000002",
+      "idle_days": 0,
+      "contact_id": null,
+      "limit_days": 7,
+      "stage_name": "פנייה ראשונית",
+      "pipeline_id": "00000000-0000-4000-8000-000000000006",
+      "amount_agorot": 30000,
+      "days_in_stage": 0,
+      "stage_position": 0,
+      "last_activity_at": null,
+      "expected_close_date": "2026-09-23"
+    }
+  ],
+  "stuck": {
+    "deals": 0,
+    "amount": 0
+  },
+  "today": "2026-10-13",
+  "overdue": {
+    "deals": 1,
+    "amount": 30000
+  }
+}

@@ -21,6 +21,9 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { SetupChecklistCard } from "@/features/setup/components/setup-checklist-card";
 import { SetupResumeCard } from "@/features/setup/components/setup-resume-card";
 import { getSetupChecklist, getSetupStep } from "@/features/setup/queries";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
+import { readPipelineCleanup } from "@/features/pipeline-cleanup/queries";
+import { cleanupCountText, isCleanupDay } from "@/features/pipeline-cleanup/rules";
 import { leadDisplayName } from "@/features/leads/display";
 import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
@@ -54,6 +57,12 @@ export default async function HomePage({ params }: Props) {
     withReportShape(() => getGoalProgress(orgId, { userId: user.id })),
   ]);
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
+  // MNY-05: once a week, on the business's first working day of the week, the cleanup with a count
+  // (a rep counts their own deals, others everything they see); nothing to decide, no card
+  const cleanup = canWrite && isCleanupDay(day.today, await getCalendarSettings(orgId))
+    ? await withReportShape(() => readPipelineCleanup(orgId, role === "member" ? user.id : null))
+    : null;
+  const cleanupCount = cleanup?.ok && cleanup.value ? cleanup.value.stuck.deals + cleanup.value.overdue.deals : 0;
   // no goal to show: the person's own closings this month, with no goal and no percent (owner, 13 October 2026)
   const closings = goals.ok && goals.value.length === 0 ? await withReportShape(() => getMyMonthClosings(orgId, user.id, org.timeZone)) : null;
 
@@ -89,6 +98,22 @@ export default async function HomePage({ params }: Props) {
       {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
       {checklist && !checklist.hidden ? <SetupChecklistCard orgId={orgId} checklist={checklist} /> : null}
       <DeviceWarning orgId={orgId} />
+      {cleanupCount > 0 ? (
+        <Card aria-labelledby="weekly-cleanup-title" className="mb-5">
+          <CardHeader
+            id="weekly-cleanup-title"
+            title="ניקוי שבועי של העסקאות"
+            action={
+              <ButtonLink href={paths.dealsCleanup(orgId)} size="sm">
+                לניקוי
+              </ButtonLink>
+            }
+          />
+          <CardBody>
+            <p>{cleanupCountText(cleanupCount, formatNumber)}: תקועות בשלב, או שתאריך הסגירה שלהן עבר. לכל אחת: לקדם, לדחות, או לסגור.</p>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         {summary.map((item) => (
