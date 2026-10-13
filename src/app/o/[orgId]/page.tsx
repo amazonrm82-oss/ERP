@@ -59,7 +59,9 @@ export default async function HomePage({ params }: Props) {
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
   // MNY-05: once a week, on the business's first working day of the week, the cleanup with a count
   // (a rep counts their own deals, others everything they see); nothing to decide, no card
-  const cleanup = canWrite && isCleanupDay(day.today, await getCalendarSettings(orgId))
+  // HEB-02: the same settings tell the quick add when its date is a rest day
+  const calendar = canWrite ? await getCalendarSettings(orgId) : null;
+  const cleanup = calendar && isCleanupDay(day.today, calendar)
     ? await withReportShape(() => readPipelineCleanup(orgId, role === "member" ? user.id : null))
     : null;
   const cleanupCount = cleanup?.ok && cleanup.value ? cleanup.value.stuck.deals + cleanup.value.overdue.deals : 0;
@@ -241,7 +243,7 @@ export default async function HomePage({ params }: Props) {
           <CardBody>
             {canWrite ? (
               <div className="mb-4">
-                <TaskQuickAdd orgId={orgId} today={day.today} />
+                <TaskQuickAdd orgId={orgId} today={day.today} calendar={calendar ?? undefined} />
               </div>
             ) : null}
             {day.tasks.length === 0 ? (

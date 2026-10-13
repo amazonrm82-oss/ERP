@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { WEEKDAYS_LONG } from "@/lib/calendar-grid";
 
-import { TOTAL_MAX, TOTAL_MIN, type RepeatValues } from "../recurrence";
+import { TOTAL_MAX, TOTAL_MIN, weeklyRestNote, type RepeatValues } from "../recurrence";
 
 export const REPEAT_OPTIONS = [
   { value: "none", label: "בלי חזרה" },
@@ -28,19 +28,27 @@ function weekdayList(text: string | null | undefined): number[] {
     .map(Number);
 }
 
-type Props = { values: RepeatValues; errors: Record<string, string> };
+type Props = {
+  values: RepeatValues;
+  errors: Record<string, string>;
+  /** HEB-02: the business's weekly rest days (CAL-03), to explain a weekly rule on them while it is edited */
+  restWeekdays?: readonly number[];
+};
 
 /**
  * "חזרה" in the task form (TASK-04): none, every day, chosen weekdays, a day of
  * the month, or N days after completion; optionally until a date or a number of
  * times. Only the fields of the chosen kind are shown; the server ignores the rest.
  */
-export function RecurrenceFields({ values, errors }: Props) {
+export function RecurrenceFields({ values, errors, restWeekdays }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const weekdaysErrorId = useId();
   const [kind, setKind] = useState(values.repeat || "none");
   const [weekdays, setWeekdays] = useState<number[]>(() => weekdayList(values.repeat_weekdays));
   const [end, setEnd] = useState(values.repeat_end || "never");
+  // HEB-02: ticked for a new rule; a saved rule (or a form sent back with an error) keeps its own choice
+  const workdaysDefault = !values.repeat || values.repeat === "none" ? true : values.repeat_workdays === "on";
+  const [workdays, setWorkdays] = useState(workdaysDefault);
 
   // the new-task form clears itself after a save; the choices go back with it
   useEffect(() => {
@@ -50,10 +58,12 @@ export function RecurrenceFields({ values, errors }: Props) {
       setKind(values.repeat || "none");
       setWeekdays(weekdayList(values.repeat_weekdays));
       setEnd(values.repeat_end || "never");
+      setWorkdays(workdaysDefault);
     };
     form.addEventListener("reset", reset);
     return () => form.removeEventListener("reset", reset);
-  }, [values.repeat, values.repeat_weekdays, values.repeat_end]);
+  }, [values.repeat, values.repeat_weekdays, values.repeat_end, workdaysDefault]);
+
 
   const toggleDay = (day: number, on: boolean) =>
     setWeekdays((current) => (on ? [...new Set([...current, day])].sort((a, b) => a - b) : current.filter((d) => d !== day)));
@@ -119,6 +129,22 @@ export function RecurrenceFields({ values, errors }: Props) {
           defaultValue={values.repeat_days ?? ""}
           error={errors.repeat_days}
         />
+      ) : null}
+
+      {kind === "none" ? null : (
+        <Checkbox
+          name="repeat_workdays"
+          value="on"
+          label="רק בימי עבודה"
+          hint="משימה שהייתה נופלת ביום מנוחה או בחג של העסק תיקבע ליום העבודה הבא."
+          checked={workdays}
+          onChange={(event) => setWorkdays(event.target.checked)}
+        />
+      )}
+      {kind === "weekly" && workdays && restWeekdays ? (
+        <p className="text-sm text-ink-soft empty:hidden" aria-live="polite">
+          {weeklyRestNote(weekdays, restWeekdays)}
+        </p>
       ) : null}
 
       {kind === "none" ? null : (

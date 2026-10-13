@@ -7,10 +7,16 @@ import { TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
-import { createTaskAction } from "../actions";
+import type { CalendarSettings } from "@/features/calendar-days/holidays";
 
-/** One-line "add a task for myself" form. `today` is the default due date (YYYY-MM-DD, organization time zone). */
-export function TaskQuickAdd({ orgId, today }: { orgId: string; today: string }) {
+import { createTaskAction } from "../actions";
+import { RestDayWarning } from "./rest-day-warning";
+
+/**
+ * One-line "add a task for myself" form. `today` is the default due date (YYYY-MM-DD, organization time zone).
+ * With `calendar`, a date on a rest day of the business gets a warning and the next working day (HEB-02).
+ */
+export function TaskQuickAdd({ orgId, today, calendar }: { orgId: string; today: string; calendar?: CalendarSettings }) {
   const [state, formAction] = useActionState<FormState, FormData>(createTaskAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -39,6 +45,7 @@ export function TaskQuickAdd({ orgId, today }: { orgId: string; today: string })
           הוספה
         </SubmitButton>
       </div>
+      {calendar ? <RestDayWarning key={failure?.values?.due_date ?? today} calendar={calendar} initial={failure?.values?.due_date ?? today} /> : null}
       <FormError message={failure?.message} />
     </form>
   );

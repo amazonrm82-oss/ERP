@@ -4,6 +4,7 @@ import { ActionButton } from "@/components/action-button";
 import { Detail, DetailList } from "@/components/detail-list";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { BusinessCalendarEffects } from "@/features/calendar-days/components/business-calendar-effects";
 import { CalendarSettingsForm } from "@/features/calendar-days/components/calendar-settings-form";
 import {
   HOLIDAY_KIND_LABELS,
@@ -36,7 +37,7 @@ function dayText(day: string): string {
 }
 
 // CAL-03: the business's weekly rest days and holidays, and the holidays of the year ahead.
-// CAP-09: the business's weekly working hours.
+// CAP-09: the business's weekly working hours. HEB-02: what the calendar affects.
 export default async function CalendarSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite, org } = await getOrgContext(orgId);
@@ -77,6 +78,8 @@ export default async function CalendarSettingsPage({ params }: Props) {
           </CardBody>
         </Card>
       )}
+
+      <BusinessCalendarEffects />
 
       <Card aria-labelledby="org-hours-title">
         <CardHeader id="org-hours-title" title="שעות העבודה של העסק" />

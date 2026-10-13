@@ -14,6 +14,9 @@ import { recordPage } from "@/lib/record-types";
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
+import { nextWorkingDay } from "@/features/calendar-days/business-days";
+import { movedToWorkingDayNotice } from "@/features/calendar-days/rest-day-note";
+import { calendarSettingsFromRow, type CalendarSettings } from "@/features/calendar-days/holidays";
 
 import { REPEAT_FIELD_NAMES, repeatFormSchema } from "./recurrence";
 import { TASK_FIELD_NAMES, taskSchema } from "./schema";
@@ -26,8 +29,8 @@ function revalidateTasks(orgId: string) {
   revalidatePath(paths.tasks(orgId));
 }
 
-function dueAt(date: string | null, time: string | null): string | null {
-  return date ? zonedIso(date, `${time ?? DEFAULT_DUE_TIME}:00`) : null;
+function dueAt(date: string | null, time: string | null, timeZone?: string): string | null {
+  return date ? zonedIso(date, `${time ?? DEFAULT_DUE_TIME}:00`, timeZone) : null;
 }
 
 function remindAt(due: string | null, remind: string): string | null {
@@ -37,6 +40,29 @@ function remindAt(due: string | null, remind: string): string | null {
 function schedule(data: { due_date: string | null; due_time: string | null; remind: string }) {
   const due = dueAt(data.due_date, data.due_time);
   return { due_at: due, remind_at: remindAt(due, data.remind) };
+}
+
+type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
+
+/**
+ * HEB-02: the business's rest days (the defaults while nobody saved them) and its time zone, read with the user's session.
+ * Reads the same columns as getCalendarSettings() in src/features/calendar-days/queries.ts; keep the two in step.
+ */
+async function readCalendar(
+  supabase: Supabase,
+  orgId: string,
+): Promise<{ calendar: CalendarSettings; timeZone: string | undefined } | { error: string }> {
+  const [settings, org] = await Promise.all([
+    supabase
+      .from("org_calendar_settings")
+      .select("rest_weekdays, holidays_rest, holiday_eves_rest, rest_occasions")
+      .eq("organization_id", orgId)
+      .maybeSingle(),
+    supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(),
+  ]);
+  const error = settings.error ?? org.error;
+  if (error) return { error: dbErrorMessage(error) };
+  return { calendar: calendarSettingsFromRow(settings.data), timeZone: org.data?.timezone || undefined };
 }
 
 /** The task form: its fields and its repeat rule (TASK-04), with the errors of both. */
@@ -185,7 +211,21 @@ export async function addRecordTaskAction(orgId: string, subject: TimelineSubjec
   }
   const whenKey = String(formData.get("when") ?? "none");
   const days = whenKey in QUICK_WHEN ? QUICK_WHEN[whenKey as keyof typeof QUICK_WHEN] : null;
-  const due = days === null ? null : dueAt(addDays(zoneDate(new Date()), days), null);
+  // HEB-02: "tomorrow" or "in a week" that is a rest day of the business becomes the next working day
+  let day: string | null = null;
+  let moved = false;
+  let timeZone: string | undefined;
+  if (days !== null) {
+    const read = await readCalendar(context.supabase, orgId);
+    if ("error" in read) {
+      return fail(read.error, { values: formValues(formData) });
+    }
+    timeZone = read.timeZone;
+    const plain = addDays(zoneDate(new Date(), timeZone), days);
+    day = nextWorkingDay(read.calendar, plain);
+    moved = day !== plain;
+  }
+  const due = day === null ? null : dueAt(day, null, timeZone);
 
   const row: TaskInsert = { organization_id: orgId, title: parsed.data.title, task_type: "todo", due_at: due };
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
@@ -196,7 +236,7 @@ export async function addRecordTaskAction(orgId: string, subject: TimelineSubjec
   }
   revalidateTasks(orgId);
   revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
-  return ok();
+  return moved && day ? { ok: true, message: movedToWorkingDayNotice(day) } : ok();
 }
 
 const SNOOZE_DAYS = { tomorrow: 1, week: 7 } as const;
@@ -228,8 +268,15 @@ export async function snoozeTaskAction(orgId: string, taskId: string, when: Snoo
   if (!task) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  const time = task.due_at ? zoneTime(new Date(task.due_at)) : DEFAULT_DUE_TIME;
-  const due = dueAt(addDays(zoneDate(new Date()), SNOOZE_DAYS[when]), time);
+  // HEB-02: a day the business does not work moves to the next working day (in the business's zone)
+  const read = await readCalendar(context.supabase, orgId);
+  if ("error" in read) {
+    return fail(read.error);
+  }
+  const time = task.due_at ? zoneTime(new Date(task.due_at), read.timeZone) : DEFAULT_DUE_TIME;
+  const plain = addDays(zoneDate(new Date(), read.timeZone), SNOOZE_DAYS[when]);
+  const day = nextWorkingDay(read.calendar, plain);
+  const due = dueAt(day, time, read.timeZone);
   const remind = task.due_at && task.remind_at && due ? new Date(Date.parse(due) - (Date.parse(task.due_at) - Date.parse(task.remind_at))).toISOString() : null;
 
   const { data, error } = await context.supabase
@@ -246,7 +293,7 @@ export async function snoozeTaskAction(orgId: string, taskId: string, when: Snoo
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidateTasks(orgId);
-  return ok();
+  return day !== plain ? { ok: true, message: movedToWorkingDayNotice(day) } : ok();
 }
 
 const outcomeSchema = z.string().trim().max(500, { error: "התוצאה ארוכה מדי (עד 500 תווים)." });

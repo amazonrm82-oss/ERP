@@ -60,6 +60,19 @@ export function addBusinessDays(settings: CalendarSettings, from: string, n: num
   }
 }
 
+/**
+ * HEB-02: `day` itself when the business works on it, else the next working day
+ * (addBusinessDays with n = 0, the same as app.add_business_days(org, day, 0)).
+ * A day for which no working day can be found stays as it is.
+ */
+export function nextWorkingDay(settings: CalendarSettings, day: string): string {
+  try {
+    return addBusinessDays(settings, day, 0);
+  } catch {
+    return day;
+  }
+}
+
 /** The free number of business days typed by a user: a whole number 1..BUSINESS_DAYS_FREE_MAX, else null. */
 export function parseBusinessDays(value: string): number | null {
   const text = value.trim();

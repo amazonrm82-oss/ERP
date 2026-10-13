@@ -1,9 +1,11 @@
 import { z } from "zod";
 
-import { addDays, weekday, WEEKDAYS_SHORT } from "@/lib/calendar-grid";
+import { addDays, weekday, WEEKDAYS_LONG, WEEKDAYS_SHORT } from "@/lib/calendar-grid";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
+import { nextWorkingDay } from "@/features/calendar-days/business-days";
+import { DEFAULT_CALENDAR_SETTINGS, type CalendarSettings } from "@/features/calendar-days/holidays";
 
 /**
  * Recurring tasks (TASK-04). The rule is stored in tasks.recurrence; the shape
@@ -16,11 +18,16 @@ import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
  * "left" = how many more tasks completing this one may create, so the form
  * stores X - 1 and shows left + 1. Rows saved before the change therefore keep
  * their behaviour, and the database needed no change.
+ *
+ * Working days only (HEB-02, migration recurring_workdays): "workdays": true
+ * moves a next task that would land on a day the business does not work (its
+ * CAL-03 rest days, holidays and occasions) to the next working day. A rule
+ * without the key keeps the old behaviour. The form ticks it for a new rule.
  */
 
 const until = z.string().refine(isCalendarDate);
 const left = z.number().int().min(1).max(999);
-const end = { until: until.optional(), left: left.optional() };
+const end = { until: until.optional(), left: left.optional(), workdays: z.literal(true).optional() };
 
 export const recurrenceSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("daily"), ...end }),
@@ -76,13 +83,16 @@ export type NextTask = { dueAt: string; remindAt: string | null; recurrence: Rec
 /**
  * The task that completing this one creates, or null when the series ends.
  * Same local time of day in the zone; a fixed schedule never lands before today;
- * a task without a due date counts from today at 09:00.
+ * a task without a due date counts from today at 09:00. With "workdays" the
+ * date moves to the next working day of the business (`calendar`), and "until"
+ * is checked on the moved date (no task after that date).
  */
 export function nextTask(
   rule: Recurrence,
   task: { dueAt: string | null; remindAt: string | null },
   now: Date = new Date(),
   timeZone: string = TIME_ZONE,
+  calendar: CalendarSettings = DEFAULT_CALENDAR_SETTINGS,
 ): NextTask | null {
   const today = zoneDate(now, timeZone);
   const from = task.dueAt ? zoneDate(new Date(task.dueAt), timeZone) : today;
@@ -95,6 +105,7 @@ export function nextTask(
     next = nextDate(rule, from);
     for (let steps = 0; next < today && steps < 5000; steps++) next = nextDate(rule, next);
   }
+  if (rule.workdays) next = nextWorkingDay(calendar, next);
   if (rule.until && next > rule.until) return null;
 
   let recurrence: Recurrence | null = rule;
@@ -103,6 +114,23 @@ export function nextTask(
   const dueAt = zonedIso(next, `${time}:00`, timeZone);
   const remindAt = task.dueAt && task.remindAt ? new Date(Date.parse(dueAt) - (Date.parse(task.dueAt) - Date.parse(task.remindAt))).toISOString() : null;
   return { dueAt, remindAt, recurrence };
+}
+
+function weekdayName(day: number): string {
+  return day === 6 ? "שבת" : `יום ${WEEKDAYS_LONG[day]}`;
+}
+
+/**
+ * HEB-02, in the rule form: a weekly rule with "workdays" whose chosen weekdays include the
+ * business's weekly rest days (CAL-03) says, while it is edited, that those tasks move to the next
+ * working day. Null when nothing moves. Holidays are dates, not weekdays, and are not named here.
+ */
+export function weeklyRestNote(weekdays: readonly number[], restWeekdays: readonly number[]): string | null {
+  const rest = [...new Set(weekdays)].filter((d) => restWeekdays.includes(d)).sort((a, b) => a - b);
+  if (rest.length === 0) return null;
+  if (rest.length === 1) return `${weekdayName(rest[0])} הוא יום מנוחה בעסק, לכן המשימה תיקבע ליום העבודה הבא.`;
+  const names = rest.map(weekdayName);
+  return `${names.slice(0, -1).join(", ")} ו${names[names.length - 1]} הם ימי מנוחה בעסק, לכן המשימות בימים האלה ייקבעו ליום העבודה הבא.`;
 }
 
 function weekdaysText(days: number[]): string {
@@ -126,6 +154,7 @@ export function describeRecurrence(rule: Recurrence): string {
       text = rule.days === 1 ? "יום אחרי ההשלמה" : `${rule.days} ימים אחרי ההשלמה`;
       break;
   }
+  if (rule.workdays) text += ", בימי עבודה בלבד";
   if (rule.until) {
     const [y, m, d] = rule.until.split("-");
     text += `, עד ${Number(d)}.${Number(m)}.${y}`;
@@ -139,7 +168,7 @@ export function describeRecurrence(rule: Recurrence): string {
 // The form ("חזרה" in the task form)
 // ---------------------------------------------------------------------------
 
-export const REPEAT_FIELD_NAMES = ["repeat", "repeat_weekdays", "repeat_day", "repeat_days", "repeat_end", "repeat_until", "repeat_count"] as const;
+export const REPEAT_FIELD_NAMES = ["repeat", "repeat_weekdays", "repeat_day", "repeat_days", "repeat_end", "repeat_until", "repeat_count", "repeat_workdays"] as const;
 
 export type RepeatValues = Partial<Record<(typeof REPEAT_FIELD_NAMES)[number], string | null>>;
 
@@ -165,6 +194,8 @@ export const repeatFormSchema = z
     repeat_end: z.preprocess((value) => (value === null || value === undefined || value === "" ? "never" : value), z.enum(["never", "until", "count"], { error: "יש לבחור מתי החזרה נגמרת." })),
     repeat_until: text,
     repeat_count: text,
+    // HEB-02: a ticked box sends "on"; an unticked one sends nothing
+    repeat_workdays: text,
   })
   .transform((form, ctx): Recurrence | null => {
     if (form.repeat === "none") return null;
@@ -205,12 +236,14 @@ export const repeatFormSchema = z
       if (!total.success) return issue("repeat_count", message);
       rule.left = total.data - 1;
     }
+    if (form.repeat_workdays === "on") rule.workdays = true;
     return rule;
   });
 
 /** A saved rule as the form's values (for the edit form). */
 export function repeatValues(rule: Recurrence | null): RepeatValues {
   if (!rule) return { repeat: "none" };
+  // repeat_workdays: "on" ticked, "" not (an old rule without the key stays as it was)
   return {
     repeat: rule.kind,
     repeat_weekdays: rule.kind === "weekly" ? rule.weekdays.join(",") : "",
@@ -220,5 +253,6 @@ export function repeatValues(rule: Recurrence | null): RepeatValues {
     repeat_until: rule.until ?? "",
     // the form counts tasks in total, this one included
     repeat_count: rule.left !== undefined ? String(rule.left + 1) : "",
+    repeat_workdays: rule.workdays ? "on" : "",
   };
 }

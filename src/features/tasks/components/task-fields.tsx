@@ -1,8 +1,10 @@
 import { SelectField, TextField } from "@/components/ui/field";
+import { restDays } from "@/features/calendar-days/holidays";
 
 import type { RepeatValues } from "../recurrence";
 import { BusinessDaysPicker, type BusinessDaysContext } from "./business-days-picker";
 import { RecurrenceFields } from "./recurrence-fields";
+import { RestDayWarning } from "./rest-day-warning";
 
 export type AssigneeOption = { userId: string; name: string };
 
@@ -82,7 +84,13 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId, business
           error={errors.due_time}
         />
       </div>
-      {businessDays ? <BusinessDaysPicker calendar={businessDays.calendar} today={businessDays.today} /> : null}
+      {businessDays ? (
+        <>
+          {/* key: a new starting date (a failed save, another task) starts the warning over */}
+          <RestDayWarning key={values.due_date ?? ""} calendar={businessDays.calendar} initial={values.due_date ?? ""} />
+          <BusinessDaysPicker calendar={businessDays.calendar} today={businessDays.today} />
+        </>
+      ) : null}
       <SelectField key={`priority-${values.priority ?? "2"}`} label="עדיפות" name="priority" defaultValue={values.priority ?? "2"} error={errors.priority}>
         {PRIORITY_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -105,7 +113,7 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId, business
           </option>
         ))}
       </SelectField>
-      <RecurrenceFields values={values} errors={errors} />
+      <RecurrenceFields values={values} errors={errors} restWeekdays={businessDays ? restDays(businessDays.calendar) : undefined} />
       <SelectField key={`owner-${owner}`} label="באחריות" name="owner_id" defaultValue={owner} error={errors.owner_id}>
         {assignees.map((assignee) => (
           <option key={assignee.userId} value={assignee.userId}>

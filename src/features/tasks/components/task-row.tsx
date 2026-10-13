@@ -12,6 +12,8 @@ import type { FormState } from "@/lib/action-result";
 import { cn } from "@/lib/cn";
 
 import { inlineEditAction } from "@/features/inline-edit/actions";
+import { isRestDay } from "@/features/calendar-days/holidays";
+import { addDays } from "@/lib/calendar-grid";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
 import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
@@ -55,16 +57,22 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // HEB-02: the server says when a snooze moved past a rest day
+  const [notice, setNotice] = useState<string | null>(null);
 
   // TASK-05: put off in one tap, or hand over to someone else, without opening the form
   function run(action: () => Promise<{ ok: boolean; message?: string }>) {
     setError(null);
+    setNotice(null);
     startTransition(async () => {
       const result = await action();
       if (!result.ok) setError(result.message ?? null);
+      else setNotice(result.message ?? null);
     });
   }
   const snooze = (when: SnoozeWhen) => run(() => snoozeTaskAction(orgId, task.id, when));
+  // HEB-02: the server moves "tomorrow" past the business's rest days; say so on the button
+  const tomorrowOff = businessDays ? isRestDay(addDays(businessDays.today, 1), businessDays.calendar) : false;
   const reassign = (ownerId: string) => run(() => inlineEditAction(orgId, "task", task.id, "owner", { id: ownerId }));
   const owners =
     task.ownerId && !assignees.some((a) => a.userId === task.ownerId) ? [{ userId: task.ownerId, name: task.ownerName ?? "משתמש" }, ...assignees] : assignees;
@@ -123,6 +131,9 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
             {error}
           </p>
         ) : null}
+        <p role="status" className="mt-1 text-sm text-ink-soft empty:hidden">
+          {notice}
+        </p>
       </div>
       {canEdit ? (
         <div className="flex shrink-0 gap-2">
@@ -142,7 +153,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
         <div className="flex w-full flex-wrap items-center gap-2" role="group" aria-label={`פעולות מהירות: ${task.title}`}>
           <span className="text-sm text-ink-soft">דחייה:</span>
           <Button variant="ghost" size="sm" onClick={() => snooze("tomorrow")} disabled={pending}>
-            למחר
+            {tomorrowOff ? "ליום העבודה הבא" : "למחר"}
             <span className="sr-only">: {task.title}</span>
           </Button>
           <Button variant="ghost" size="sm" onClick={() => snooze("week")} disabled={pending}>

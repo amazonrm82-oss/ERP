@@ -948,7 +948,8 @@ try {
     await ownerDesk.getByRole("button", { name: "הוספת משימה" }).click();
     const row = ownerDesk.locator("li", { has: ownerDesk.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }) });
     await row.getByText(/^חוזרת$/).waitFor({ timeout: 15000 });
-    await row.getByText(/כל שבוע בימים א׳, ד׳, עוד 4 משימות כולל זו/).waitFor();
+    // a new rule is "workdays only" by default (owner, HEB-02)
+    await row.getByText(/כל שבוע בימים א׳, ד׳, בימי עבודה בלבד, עוד 4 משימות כולל זו/).waitFor();
     await row.getByRole("button", { name: new RegExp(`^בוצע.*${title}`) }).click();
     let next;
     for (let i = 0; i < 60 && !next; i++) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeRecurrence, nextDate, nextTask, parseRecurrence, repeatFormSchema, repeatValues, type Recurrence } from "@/features/tasks/recurrence";
+import { describeRecurrence, nextDate, nextTask, parseRecurrence, repeatFormSchema, repeatValues, weeklyRestNote, type Recurrence } from "@/features/tasks/recurrence";
 
 // TASK-04: mirrors app.recurrence_next_date() / app.spawn_recurring_task() (tests/db/53-recurring-tasks.test.ts)
 describe("nextDate", () => {
@@ -131,5 +131,54 @@ describe("the form", () => {
       const values = Object.fromEntries(Object.entries(repeatValues(rule)).map(([k, v]) => [k, v ?? ""]));
       expect(parse(values).data).toEqual(rule);
     }
+  });
+});
+
+// HEB-02: "workdays" moves the next task off the business's rest days (tests/db/103 compares with the database)
+describe("working days only", () => {
+  const now = new Date("2030-01-01T05:00:00Z");
+  const fridaySaturday = { restWeekdays: [5, 6] as (0 | 1 | 2 | 3 | 4 | 5 | 6)[], holidaysRest: true, holidayEvesRest: false, restOccasions: [] };
+  const local = (iso: string | undefined) => (iso ? new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" }).slice(0, 16) : null);
+
+  it("a daily task done on Thursday comes back on Sunday, at the same time; without the key on Friday", () => {
+    // Thursday 28.3.2030 09:00; summer time starts on Friday 29.3
+    const task = { dueAt: "2030-03-28T07:00:00Z", remindAt: null };
+    expect(local(nextTask({ kind: "daily", workdays: true }, task, now, "Asia/Jerusalem", fridaySaturday)?.dueAt)).toBe("2030-03-31 09:00");
+    expect(local(nextTask({ kind: "daily" }, task, now, "Asia/Jerusalem", fridaySaturday)?.dueAt)).toBe("2030-03-29 09:00");
+  });
+
+  it("a holiday the business closes on is skipped (Yom Kippur, Monday 7.10.2030)", () => {
+    const task = { dueAt: "2030-10-06T07:00:00Z", remindAt: null };
+    expect(local(nextTask({ kind: "daily", workdays: true }, task, now, "Asia/Jerusalem", fridaySaturday)?.dueAt)).toBe("2030-10-08 10:00");
+    expect(local(nextTask({ kind: "daily", workdays: true }, task, now, "Asia/Jerusalem", { ...fridaySaturday, holidaysRest: false })?.dueAt)).toBe("2030-10-07 10:00");
+  });
+
+  it("the end date is checked on the moved day", () => {
+    expect(nextTask({ kind: "daily", workdays: true, until: "2030-03-29" }, { dueAt: "2030-03-28T07:00:00Z", remindAt: null }, now, "Asia/Jerusalem", fridaySaturday)).toBeNull();
+  });
+
+  it("is stored only as true, reads as Hebrew and round-trips through the form", () => {
+    expect(parseRecurrence({ kind: "daily", workdays: true })).toEqual({ kind: "daily", workdays: true });
+    expect(parseRecurrence({ kind: "daily", workdays: false })).toBeNull();
+    expect(describeRecurrence({ kind: "weekly", weekdays: [0], workdays: true })).toBe("כל שבוע ביום א׳, בימי עבודה בלבד");
+    const parse = (values: Record<string, string>) => repeatFormSchema.safeParse(values).data;
+    expect(parse({ repeat: "daily", repeat_workdays: "on" })).toEqual({ kind: "daily", workdays: true });
+    expect(parse({ repeat: "daily" })).toEqual({ kind: "daily" });
+    expect(parse({ repeat: "none", repeat_workdays: "on" })).toBeNull();
+    const rule: Recurrence = { kind: "monthly", day: 31, workdays: true, left: 2 };
+    expect(repeatValues(rule).repeat_workdays).toBe("on");
+    expect(repeatValues({ kind: "daily" }).repeat_workdays).toBe("");
+    const values = Object.fromEntries(Object.entries(repeatValues(rule)).map(([k, v]) => [k, v ?? ""]));
+    expect(parse(values)).toEqual(rule);
+  });
+});
+
+describe("weeklyRestNote (the rule form, while it is edited)", () => {
+  it("explains a chosen weekday that is a rest day of the business, and nothing otherwise", () => {
+    expect(weeklyRestNote([0, 3], [5, 6])).toBeNull();
+    expect(weeklyRestNote([6], [5, 6])).toBe("שבת הוא יום מנוחה בעסק, לכן המשימה תיקבע ליום העבודה הבא.");
+    expect(weeklyRestNote([1, 5], [5, 6])).toBe("יום שישי הוא יום מנוחה בעסק, לכן המשימה תיקבע ליום העבודה הבא.");
+    expect(weeklyRestNote([6, 5, 0], [5, 6])).toBe("יום שישי ושבת הם ימי מנוחה בעסק, לכן המשימות בימים האלה ייקבעו ליום העבודה הבא.");
+    expect(weeklyRestNote([6], [])).toBeNull();
   });
 });

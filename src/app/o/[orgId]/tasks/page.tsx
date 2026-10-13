@@ -123,11 +123,12 @@ export default async function TasksPage({ params, searchParams }: Props) {
   const [groups, members, calendar] = await Promise.all([
     listTaskGroups(orgId, showAll ? null : user.id),
     listMembers(orgId),
-    canWrite ? getCalendarSettings(orgId) : null,
+    // HEB-02: always read, so every row's snooze label knows the rest days
+    getCalendarSettings(orgId),
   ]);
   // HEB-03: "in N business days" counts from today in the business's zone
   const today = zoneDate(new Date(), context.org.timeZone);
-  const businessDays = calendar ? { calendar, today } : undefined;
+  const businessDays = { calendar, today };
   const assignees = members
     .filter((member) => member.status === "active" && member.role !== "viewer")
     .map((member) => ({ userId: member.userId, name: member.userId === user.id ? `${member.name} (אני)` : member.name }));
