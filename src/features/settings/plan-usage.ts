@@ -14,6 +14,8 @@ const LABELS: Record<string, { label: string; unit?: string }> = {
   max_active_automations: { label: "אוטומציות פעילות" },
   storage_gb: { label: "אחסון קבצים", unit: "GB" },
   max_products: { label: "מוצרים בקטלוג (כולל מוצרים בארכיון)" },
+  // PL-01: besides the default price list (the products' own prices)
+  max_price_lists: { label: "מחירונים (נוסף על מחירי המוצרים)" },
 };
 
 /** The business's plan, trial and usage against each limit (FXU-04, migration 0046). */

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/icons";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
+import { priceListsPath } from "@/features/price-lists/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -41,6 +42,8 @@ export type SettingsAccess = {
   canImport: boolean;
   // owners, admins and team managers (recycle bin)
   canDelete: boolean;
+  // PL-01: the plan holds the 'price_lists' capability (orgHasFeature); without it the section is hidden
+  priceLists?: boolean;
 };
 
 /**
@@ -58,6 +61,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
         { href: calendarSettingsPath(orgId), label: "שעות וימי מנוחה", description: "שעות העבודה של העסק, הימים שהוא לא עובד בהם והחגים", icon: CalendarIcon },
         { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
+        // PL-01: everyone reads the price lists; owners and admins edit them. Hidden without the capability.
+        ...(access.priceLists
+          ? [{ href: priceListsPath(orgId), label: "מחירונים", description: "מחירים אחרים או הנחות לחלק מהמוצרים, לתקופה מסוימת", icon: TagIcon }]
+          : []),
         ...(access.admin
           ? [
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },

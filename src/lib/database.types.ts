@@ -962,6 +962,19 @@ export type ProductUnitRow = {
   updated_at: string;
 };
 
+// PL-01: further price lists (migration price_lists). The default price list is the product's own price.
+// valid_from / valid_to are calendar dates (inclusive, both optional).
+export type PriceListRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // PRD-01: the product catalog (migration products). kind, vat_kind and billing are text with check
 // constraints (PRODUCT_KINDS, VAT_KINDS, BILLINGS in src/features/products/schema.ts). archived_at is stamped by trigger.
 export type ProductRow = {
@@ -1470,6 +1483,12 @@ export type Database = {
       >;
       // PRD-01: column grants; organization_id is fixed once inserted, archived_at only on update (stamped by trigger)
       products: Table<ProductRow, ProductWrite & { organization_id: string; import_job_id?: string | null }, Partial<ProductWrite> & { archived_at?: string | null }>;
+      // PL-01: column grants; organization_id is fixed once inserted
+      price_lists: Table<
+        PriceListRow,
+        { organization_id: string; name: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean },
+        { name?: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean }
+      >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)
       goals: Table<

@@ -50,6 +50,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   product_units: "יחידת מידה",
   // PRD-01
   products: "מוצר",
+  // PL-01
+  price_lists: "מחירון",
   // DQL-01
   completeness_settings: "שדות חשובים",
   reports: "דוח",

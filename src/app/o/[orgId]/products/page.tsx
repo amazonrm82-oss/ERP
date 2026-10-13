@@ -9,6 +9,7 @@ import { PlusIcon, SearchIcon, TagIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
+import { priceListsPath } from "@/features/price-lists/paths";
 import { ProductsTable, ProductStatusBadge } from "@/features/products/components/products-table";
 import { billingSuffix, productPriceText } from "@/features/products/display";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
@@ -25,6 +26,7 @@ import {
 import { PRODUCT_KIND_LABELS, PRODUCT_KINDS, type ProductKind } from "@/features/products/schema";
 import { canExport } from "@/features/reports/request";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
@@ -55,7 +57,11 @@ export default async function ProductsPage({ params, searchParams }: Props) {
   const page = parsePage(query.page);
   const sort = parseSort(firstParam(query.sort), Object.keys(PRODUCT_SORT_COLUMNS) as ProductSortKey[], PRODUCT_DEFAULT_SORT);
 
-  const [categories, units] = await Promise.all([listProductCategories(orgId), listProductUnits(orgId)]);
+  const [categories, units, hasPriceLists] = await Promise.all([
+    listProductCategories(orgId),
+    listProductUnits(orgId),
+    orgHasFeature(orgId, "price_lists"),
+  ]);
   const categoryId = isUuid(categoryParam) && categories.some((c) => c.id === categoryParam) ? categoryParam : null;
   const { products, hasMore } = await listProducts(orgId, {
     search,
@@ -98,8 +104,15 @@ export default async function ProductsPage({ params, searchParams }: Props) {
         title="מוצרים"
         description="המוצרים והשירותים שהעסק מוכר, עם המחיר, היחידה והמע״מ של כל אחד."
         actions={
-          newButton || canExport(context.role) ? (
-            <>
+          <>
+            {/* PL-01: the further price lists, readable by everyone, when the plan holds them */}
+            {hasPriceLists ? (
+              <ButtonLink href={priceListsPath(orgId)} variant="ghost">
+                מחירונים
+              </ButtonLink>
+            ) : null}
+            {newButton || canExport(context.role) ? (
+              <>
               {/* PRD-05: export with the list's filters; import through the import wizard */}
               {canExport(context.role) ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
               {canEdit ? (
@@ -108,8 +121,9 @@ export default async function ProductsPage({ params, searchParams }: Props) {
                 </ButtonLink>
               ) : null}
               {newButton}
-            </>
-          ) : null
+              </>
+            ) : null}
+          </>
         }
       />
 
