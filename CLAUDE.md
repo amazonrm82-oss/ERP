@@ -328,6 +328,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
+- Full export (SPEC 12.4, no migration): `src/features/imports/export-build.ts` lists the tables (`EXPORT_TABLES`; a table
+  needs organization_id, id, created_at) and builds the CSVs; `export.ts` reads them with the owner's session through
+  `readAllPages`. A new public table with `organization_id` must be added there or to `LEFT_OUT` in
+  `tests/db/74-full-export-tables.test.ts` with a reason.
 - List export (LST-08, migration 0034): `/o/[org]/{leads,contacts,companies}/export` → `exportList()`
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
