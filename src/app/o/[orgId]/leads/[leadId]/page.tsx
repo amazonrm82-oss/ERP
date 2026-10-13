@@ -1,3 +1,5 @@
+import { FollowButton } from "@/features/followers/components/follow-button";
+import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -51,11 +53,12 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [lead, lookups, fields, reasons] = await Promise.all([
+  const [lead, lookups, fields, reasons, follow] = await Promise.all([
     getLead(orgId, leadId),
     getLeadLookups(orgId),
     listFieldDefinitions(orgId, "lead"),
     activeReasonNames(orgId),
+    getFollowState(orgId, { kind: "lead", id: leadId }, context.user.id),
   ]);
   const tags = await listTags(orgId);
   if (!lead) {
@@ -72,7 +75,12 @@ export default async function LeadPage({ params, searchParams }: Props) {
       <PageHeader
         title={name}
         back={{ href: paths.leads(orgId), label: "לידים" }}
-        actions={<Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>}
+        actions={
+          <>
+            <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
+            <FollowButton orgId={orgId} subject={{ kind: "lead", id: lead.id }} state={follow} />
+          </>
+        }
       />
       <div className="mb-5">
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)}

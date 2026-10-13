@@ -93,6 +93,7 @@ describe("tenant isolation", () => {
       await q("insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'leads.csv', 'skip')", [orgA]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]);
       await q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '[{\"key\": \"phone\"}]')", [orgA]);
+      await q("insert into public.record_followers (organization_id, lead_id) values ($1, $2)", [orgA, ids.leadA]);
       await q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')", [orgA]);
       ids.meetingA = (
         await q<{ id: string }>(
@@ -144,6 +145,7 @@ describe("tenant isolation", () => {
     "support_access_grants",
     "files",
     "list_preferences",
+    "record_followers",
     "meetings",
     "meeting_participants",
     "disqualify_reasons",
@@ -254,6 +256,8 @@ describe("tenant isolation", () => {
       support_access_grants: "revoked_at = revoked_at",
       files: "name = name",
       list_preferences: "columns = columns",
+      // no update grant at all: a permission error is the expected outcome
+      record_followers: "user_id = user_id",
       meetings: "title = title",
       // no update grant at all: a permission error is the expected outcome
       meeting_participants: "user_id = user_id",
@@ -325,6 +329,7 @@ describe("tenant isolation", () => {
       ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
       ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
+      ["insert into public.record_followers (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       // no organizer: the policy, not the organizer trigger, has to refuse it
       ["insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour')", [orgA]],
       ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
@@ -381,6 +386,7 @@ describe("tenant isolation", () => {
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
       ["files", "name = 'HACKED'", "name = 'HACKED'"],
       ["list_preferences", "columns = '[{\"key\": \"HACKED\"}]'", "columns::text like '%HACKED%'"],
+      ["record_followers", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["meetings", "outcome = 'HACKED'", "outcome = 'HACKED'"],
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["disqualify_reasons", "is_active = false", "not is_active"],

@@ -128,6 +128,52 @@ describe("roles and record visibility", () => {
     await asAdmin((q) => q("delete from public.activities where id = $1", [id]));
   });
 
+  it("followers: whoever reads a record may follow it, for themselves only, and removes only their own row (REC-03)", async () => {
+    await setVisibility("own");
+    const follow = (u: U, lead: string) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string; user_id: string }>("insert into public.record_followers (organization_id, lead_id) values ($1, $2) returning id, user_id", [org, lead])).rows[0],
+      );
+    const followersSeen = (u: U, lead: string) => asUser(u.id, (q) => count(q, "select 1 from public.record_followers where lead_id = $1", [lead]));
+
+    // a record the caller does not see cannot be followed
+    expect((await pgError(follow(m2, leadM1))).code).toBe("42501");
+    expect((await pgError(follow(viewer, leadM1))).code).toBe("42501");
+    // the row is the caller's own: user_id comes from the session and cannot be sent
+    const mine = await follow(m1, leadM1);
+    expect(mine.user_id).toBe(m1.id);
+    const forged = await pgError(
+      asUser(m1.id, (q) => q("insert into public.record_followers (organization_id, lead_id, user_id) values ($1, $2, $3)", [org, leadM2, m2.id])),
+    );
+    expect(forged.code).toBe("42501");
+    // following twice is refused
+    expect((await pgError(follow(m1, leadM1))).code).toBe("23505");
+    // the manager of the lead's team and a viewer (under 'org') may follow
+    await follow(manager, leadM1);
+    await setVisibility("org");
+    const viewerRow = await follow(viewer, leadM1);
+
+    // who follows is seen by whoever sees the record, and by nobody else
+    expect(await followersSeen(m2, leadM1)).toBe(3);
+    await setVisibility("own");
+    expect(await followersSeen(m2, leadM1)).toBe(0);
+    expect(await followersSeen(manager, leadM1)).toBe(3);
+    expect(await followersSeen(owner, leadM1)).toBe(3);
+
+    // nobody changes a follow row; nobody removes someone else's, not even an admin
+    const update = await pgError(asUser(m1.id, (q) => q("update public.record_followers set created_at = now() where id = $1", [mine.id])));
+    expect(update.code).toBe("42501");
+    await setVisibility("org");
+    for (const u of [m2, manager, admin, owner]) {
+      await asUser(u.id, async (q) => expect((await q("delete from public.record_followers where id = $1", [mine.id])).rowCount, u.email).toBe(0));
+    }
+    // their own row goes, even when they no longer see the record
+    await setVisibility("own");
+    await asUser(viewer.id, async (q) => expect((await q("delete from public.record_followers where id = $1", [viewerRow.id])).rowCount).toBe(1));
+    await asUser(m1.id, async (q) => expect((await q("delete from public.record_followers where id = $1", [mine.id])).rowCount).toBe(1));
+    await asAdmin((q) => q("delete from public.record_followers where organization_id = $1", [org]));
+  });
+
   it("a viewer cannot create or change anything", async () => {
     await setVisibility("org");
     const insert = await pgError(insertLead(viewer.id, org));

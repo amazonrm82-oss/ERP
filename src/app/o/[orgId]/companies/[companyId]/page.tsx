@@ -1,3 +1,5 @@
+import { FollowButton } from "@/features/followers/components/follow-button";
+import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -44,13 +46,14 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals, fields, tags, types] = await Promise.all([
+  const [company, contacts, deals, fields, tags, types, follow] = await Promise.all([
     getCompany(orgId, companyId),
     listContactsOfCompany(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
     listFieldDefinitions(orgId, "company"),
     listTags(orgId),
     listRecordTypes(orgId, "company"),
+    getFollowState(orgId, { kind: "company", id: companyId }, context.user.id),
   ]);
   if (!company) {
     notFound();
@@ -58,7 +61,11 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title={company.name} back={{ href: paths.companies(orgId), label: "חברות" }} />
+      <PageHeader
+        title={company.name}
+        back={{ href: paths.companies(orgId), label: "חברות" }}
+        actions={<FollowButton orgId={orgId} subject={{ kind: "company", id: company.id }} state={follow} />}
+      />
       <div className="mb-5">
         <ContactActions phone={company.phone} phoneE164={company.phone_e164} email={company.email} />
         {context.canWrite ? <QuickNote orgId={orgId} subject={{ kind: "company", id: company.id }} className="mt-4 lg:hidden" /> : null}

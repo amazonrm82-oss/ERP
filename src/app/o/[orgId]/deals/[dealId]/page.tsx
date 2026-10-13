@@ -1,3 +1,5 @@
+import { FollowButton } from "@/features/followers/components/follow-button";
+import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -43,7 +45,12 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
-  const [deal, fields, tags] = await Promise.all([getDeal(orgId, dealId), listFieldDefinitions(orgId, "deal"), listTags(orgId)]);
+  const [deal, fields, tags, follow] = await Promise.all([
+    getDeal(orgId, dealId),
+    listFieldDefinitions(orgId, "deal"),
+    listTags(orgId),
+    getFollowState(orgId, { kind: "deal", id: dealId }, context.user.id),
+  ]);
   if (!deal) {
     notFound();
   }
@@ -62,7 +69,12 @@ export default async function DealPage({ params, searchParams }: Props) {
         title={deal.name}
         description={deal.pipelineName ? `תהליך המכירה "${deal.pipelineName}"` : undefined}
         back={{ href: paths.deals(orgId), label: "עסקאות" }}
-        actions={<Badge tone={status.tone}>{status.label}</Badge>}
+        actions={
+          <>
+            <Badge tone={status.tone}>{status.label}</Badge>
+            <FollowButton orgId={orgId} subject={{ kind: "deal", id: deal.id }} state={follow} />
+          </>
+        }
       />
 
       {stuckReason ? (

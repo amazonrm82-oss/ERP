@@ -489,6 +489,18 @@ export type FileRow = {
   created_at: string;
 };
 
+// REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
+export type RecordFollowerRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  created_at: string;
+};
+
 export type PlatformRole = "owner" | "support" | "finance" | "readonly";
 
 export type AuditLogRow = {
@@ -1069,6 +1081,12 @@ export type Database = {
       >;
       // read your own row; written through set_notification_settings() (migration 0031)
       notification_settings: ReadOnlyTable<NotificationSettingsRow>;
+      // followers of a record (migration 0104, REC-03): insert and delete your own rows, no updates
+      record_followers: Table<
+        RecordFollowerRow,
+        { organization_id: string; lead_id?: string | null; contact_id?: string | null; company_id?: string | null; deal_id?: string | null },
+        Record<string, never>
+      >;
       // each user's columns per list (migration 0033); user_id comes from the session
       list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
       companies: Table<CompanyRow, CompanyInsert>;

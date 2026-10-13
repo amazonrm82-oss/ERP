@@ -1,3 +1,5 @@
+import { FollowButton } from "@/features/followers/components/follow-button";
+import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -46,10 +48,11 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, deals, fields] = await Promise.all([
+  const [contact, deals, fields, follow] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
     listFieldDefinitions(orgId, "contact"),
+    getFollowState(orgId, { kind: "contact", id: contactId }, context.user.id),
   ]);
   const tags = await listTags(orgId);
   if (!contact) {
@@ -65,6 +68,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
         title={name}
         description={[contact.job_title, contact.companyName].filter(Boolean).join(", ") || undefined}
         back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
+        actions={<FollowButton orgId={orgId} subject={{ kind: "contact", id: contact.id }} state={follow} />}
       />
       <div className="mb-5">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}
