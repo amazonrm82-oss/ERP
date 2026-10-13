@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -23,6 +23,10 @@ type Props = {
   // GAP-03: the template chosen when the window opens (the meeting reminder); one that is
   // gone by then is simply not chosen, and the window offers the rest
   preselectId?: string | null;
+  // SPD-01: full width and 44px tall (the short new-lead screen)
+  wide?: boolean;
+  // SPD-01: open the window once on arrival ("WhatsApp" pressed on the push)
+  autoStart?: boolean;
 };
 
 const NO_TEMPLATE = "";
@@ -32,7 +36,7 @@ const NO_TEMPLATE = "";
  * lets the person change the text, opens wa.me with it, and logs the message on the
  * timeline. One message, sent by the person from their own WhatsApp; nothing is sent by us.
  */
-export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null }: Props) {
+export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null, wide, autoStart }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<TemplateChoice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,6 +70,16 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values, presel
     }
   }
 
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    // after the first paint, like a press of the button
+    const timer = setTimeout(openWindow, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, [autoStart]);
+
   function pick(id: string) {
     choose(templates ?? [], id);
   }
@@ -92,7 +106,12 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values, presel
 
   return (
     <>
-      <button type="button" className={buttonClasses("secondary", "sm")} onClick={openWindow} aria-haspopup="dialog">
+      <button
+        type="button"
+        className={wide ? buttonClasses("secondary", "md", "w-full") : buttonClasses("secondary", "sm")}
+        onClick={openWindow}
+        aria-haspopup="dialog"
+      >
         <ChatIcon className="size-4.5 text-accent" />
         <span dir="ltr">WhatsApp</span>
       </button>

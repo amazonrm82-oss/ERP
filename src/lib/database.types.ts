@@ -740,6 +740,8 @@ export type LeadRow = {
   fbclid: string | null;
   ctwa_clid: string | null;
   meta_lead_id: string | null;
+  // SPD-01: when someone pressed "I took it" (take_lead() only; cleared when the owner changes)
+  taken_at: string | null;
 };
 
 export type LeadInsert = {
@@ -1314,6 +1316,8 @@ export type Database = {
       calendar_feed_events: { Args: { p_token: string }; Returns: Json };
       // GAP-01: a test notification to the caller; { ok: true } | { ok: false, reason: "rate", retry_seconds }
       send_test_notification: { Args: { p_org: string }; Returns: Json };
+      // SPD-01: "I took it": { ok: true, result: 'taken' | 'acknowledged' } | { ok: false, reason: 'taken', owner_name } | { ok: false, reason: 'closed' }
+      take_lead: { Args: { p_org: string; p_lead: string }; Returns: Json };
       // FLD-05: adds an industry template's missing lists; { added: {...counts}, limits: ["limit:<key>"] }
       apply_industry_template: { Args: { p_org: string; p_industry: string }; Returns: Json };
       // REC-02: who a note on this record may mention (active members who may see it, not the caller)
@@ -1374,7 +1378,7 @@ export type Database = {
       // service-role only (the app's push dispatcher)
       claim_push_notifications: {
         Args: { p_limit?: number };
-        // [{ id, organization_id, user_id, title, body, entity_type, entity_id, organization_name }]
+        // [{ id, organization_id, user_id, title, body, entity_type, entity_id, organization_name, type, lead_actions }]
         Returns: Json;
       };
       // stored files of deleted rows (migration 0021), service role only

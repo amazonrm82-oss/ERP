@@ -6,7 +6,9 @@ import { EmptyState } from "@/components/ui/feedback";
 import { InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
+import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { WaitingClock } from "@/features/leads/components/waiting-clock";
+import { takenLabel } from "@/features/leads/take";
 import { getWaitingLeads } from "@/features/leads/waiting";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
@@ -25,7 +27,9 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
   const showAll = (await searchParams).who === "all";
-  const { leads, truncated } = await getWaitingLeads(orgId, showAll ? null : context.user.id);
+  const { leads, truncated } = showAll
+    ? await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role })
+    : await getWaitingLeads(orgId, context.user.id);
   // read once per request on the server; the clocks run on in the browser
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -69,10 +73,18 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
                   <span>נכנס {formatDateTime(lead.createdAt)}</span>
                   {lead.sourceName ? <span>{lead.sourceName}</span> : null}
                   {lead.companyName ? <bdi>{lead.companyName}</bdi> : null}
-                  {showAll ? <span>{lead.ownerName ? `אחראי: ${lead.ownerName}` : "ללא אחראי"}</span> : null}
+                  {takenLabel(lead, context.user.id) ? (
+                    <span className="font-medium text-ink">{takenLabel(lead, context.user.id)}</span>
+                  ) : showAll ? (
+                    <span>{lead.ownerName ? `אחראי: ${lead.ownerName}` : "ללא אחראי"}</span>
+                  ) : null}
                 </p>
               </div>
-              <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: lead.name }} />
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {/* SPD-01: a lead nobody has goes to the first one who takes it */}
+                {context.canWrite && lead.ownerId === null ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} size="sm" /> : null}
+                <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: lead.name }} />
+              </div>
             </li>
           ))}
         </ul>

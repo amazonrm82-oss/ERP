@@ -6,18 +6,7 @@ import webpush from "web-push";
 
 import { createServiceClient } from "@/lib/supabase/service";
 
-import { notificationHref } from "./links";
-
-type ClaimedNotification = {
-  id: string;
-  organization_id: string;
-  user_id: string;
-  title: string;
-  body: string | null;
-  entity_type: string | null;
-  entity_id: string | null;
-  organization_name: string;
-};
+import { pushPayload, type ClaimedNotification } from "./push-payload";
 
 /** The settings Web Push needs on the server, or null when any is missing. */
 function pushConfig() {
@@ -85,13 +74,7 @@ export async function dispatchPush(request: Request): Promise<Response> {
 
   await Promise.all(
     batch.flatMap((notification) => {
-      const path = notificationHref(notification.organization_id, notification.entity_type, notification.entity_id) ?? `/o/${notification.organization_id}/notifications`;
-      const payload = JSON.stringify({
-        title: notification.title,
-        body: notification.body ? `${notification.organization_name}: ${notification.body}` : notification.organization_name,
-        url: path,
-        tag: notification.id,
-      });
+      const payload = JSON.stringify(pushPayload(notification));
       return (subscriptions ?? [])
         .filter((s) => s.user_id === notification.user_id)
         .map(async (s) => {

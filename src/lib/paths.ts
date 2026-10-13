@@ -22,6 +22,11 @@ export const paths = {
   leadsWaiting: (orgId: string) => `/o/${orgId}/leads/waiting`,
   leadNew: (orgId: string) => `/o/${orgId}/leads/new`,
   lead: (orgId: string, leadId: string) => `/o/${orgId}/leads/${leadId}`,
+  // SPD-01: the short screen a new-lead push opens (call, WhatsApp, "I took it")
+  leadRespond: (orgId: string, leadId: string, act?: "call" | "whatsapp") =>
+    `/o/${orgId}/leads/${leadId}/respond${act ? `?do=${act}` : ""}`,
+  // SPD-01: "I took it" from the push itself (the service worker posts here with the user's cookies)
+  leadTake: (orgId: string, leadId: string) => `/o/${orgId}/leads/${leadId}/take`,
   contacts: (orgId: string) => `/o/${orgId}/contacts`,
   contactNew: (orgId: string) => `/o/${orgId}/contacts/new`,
   contact: (orgId: string, contactId: string) => `/o/${orgId}/contacts/${contactId}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -13,20 +13,37 @@ import type { FormState } from "@/lib/action-result";
 import { logCallAction } from "../actions";
 import { CALL_OUTCOMES, NEXT_STEPS, type TimelineSubject } from "../schema";
 
-type Props = { tel: string; orgId: string; subject: TimelineSubject; name: string };
+type Props = {
+  tel: string;
+  orgId: string;
+  subject: TimelineSubject;
+  name: string;
+  // SPD-01: full width and 44px tall (the short new-lead screen)
+  wide?: boolean;
+  // SPD-01: dial once on arrival ("חיוג" pressed on the push), then offer to log the call as usual
+  autoStart?: boolean;
+};
 
 /**
  * "חיוג" that also offers to log the call (TASK-02): the phone dials, and the
  * page opens a short window for how it ended, a note and the next step.
  */
-export function CallLogButton({ tel, orgId, subject, name }: Props) {
+export function CallLogButton({ tel, orgId, subject, name, wide, autoStart }: Props) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    window.location.assign(tel);
+    const timer = setTimeout(() => setOpen(true), 300);
+    return () => clearTimeout(timer);
+  }, [autoStart, tel]);
   return (
     <>
       <a
         href={tel}
-        className={buttonClasses("secondary", "sm")}
+        className={wide ? buttonClasses("secondary", "md", "w-full") : buttonClasses("secondary", "sm")}
         onClick={() => {
           setSaved(false);
           // let the dialler open first; the window waits for the person to come back
