@@ -110,7 +110,8 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
             <CardBody>
               <PlatformForm action={updateSubscriptionAction.bind(null, orgId)} submitLabel="שמירה">
                 <SelectField label="חבילה" name="plan_key" defaultValue={str(sub.plan_key)}>
-                  {plans.map((p) => (
+                  {/* a hidden plan is offered only to the business already on it (migration hide_free_plan) */}
+                  {plans.filter((p) => p.is_public || p.key === str(sub.plan_key)).map((p) => (
                     <option key={p.key} value={p.key}>
                       {p.name_he}
                     </option>

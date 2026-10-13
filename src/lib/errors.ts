@@ -80,6 +80,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // per use; emails a business sends to its own customers (wave 3 provider layer)
   "limit:max_customer_emails_per_month": `הגעתם למכסת האימיילים ללקוחות לחודש. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   "limit:max_customer_emails_per_day": `הגעתם למכסת האימיילים ללקוחות להיום. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
+  // hidden plans cannot be chosen (migration hide_free_plan)
+  "plan:hidden": "החבילה הזו לא זמינה יותר לבחירה.",
   // not limits, but raised the same way (migrations 0026, 0027)
   "erase:exists": "הרשומה עדיין קיימת. קודם מעבירים אותה לסל המחזור ומוחקים משם לצמיתות.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
