@@ -126,8 +126,13 @@ describe("lead intake (forms and webhooks)", () => {
     expect(submissions.code).toBe("42501");
   });
 
-  it("a read-only organization takes no leads", async () => {
-    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+  it("a read-only or suspended organization keeps taking leads; a cancelled one takes none", async () => {
+    // owner's decisions of 8 and 13 October 2026 (BIL-09): forms keep working in the background until payment
+    for (const [state, phone] of [["read_only", "050-1234561"], ["suspended", "050-1234562"]]) {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [state, org]));
+      expect((await submit(form.token, { full_name: `ליד ${state}`, phone })).status, state).toBe("accepted");
+    }
+    await asAdmin((q) => q("update public.organizations set status = 'cancelled' where id = $1", [org]));
     const err = await pgError(submit(form.token, { full_name: "x", phone: "050-1234567" }));
     expect(err.hint).toBe("org:read_only");
     await asAdmin((q) => q("update public.organizations set status = 'trial' where id = $1", [org]));

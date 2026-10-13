@@ -1652,6 +1652,8 @@ export type Database = {
       };
       // account security (migration 0014)
       mfa_required_orgs: { Args: Record<string, never>; Returns: Json };
+      // businesses closed to the caller until payment (0161): [{ id, name, status, role }]
+      closed_orgs: { Args: Record<string, never>; Returns: Json };
       // { enrolled: boolean, aal: string }
       mfa_status: { Args: Record<string, never>; Returns: Json };
       // backup codes (migration 0015): create needs aal2 and returns string[] once;

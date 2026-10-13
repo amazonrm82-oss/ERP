@@ -152,7 +152,9 @@ describe("personal calendar feed (CAL-07)", () => {
     expect((await feed(token)).ok).toBe(true);
     await asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [org]));
     expect(await feed(token)).toEqual({ ok: false });
-    expect((await pgError(create(rep, org))).hint).toBe("org:suspended");
+    // a member of a suspended business has no access at all (0161); its owner is told why
+    expect((await pgError(create(rep, org))).code).toBe("42501");
+    expect((await pgError(create(owner, org))).hint).toBe("org:suspended");
     await asAdmin((q) => q("update public.organizations set status = 'trial' where id = $1", [org]));
     expect((await feed(token)).ok).toBe(true);
   });
