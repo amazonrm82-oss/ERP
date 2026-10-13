@@ -3,15 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { duplicateMessage, findPersonDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
-import { must } from "@/lib/db-read";
 import type { ConvertLeadResult } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
-import { normalizePhone } from "@/lib/phone";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
@@ -34,73 +33,6 @@ function revalidateLead(orgId: string, leadId?: string) {
   if (leadId) {
     revalidatePath(paths.lead(orgId, leadId));
   }
-}
-
-type Existing = { kind: "lead" | "contact"; name: string; href: string };
-
-/** The newest live, unconverted lead, else contact, with this phone (normalized) or email. */
-async function findExisting(
-  supabase: Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"],
-  orgId: string,
-  phone: string | null,
-  email: string | null,
-): Promise<Existing | null> {
-  const e164 = normalizePhone(phone);
-  // emails are stored lower-cased; quoting keeps "," and ")" in a value harmless
-  const filters = [e164 ? `phone_e164.eq."${e164}"` : null, email ? `email.eq."${email.toLowerCase().replace(/"/g, "")}"` : null].filter(Boolean);
-  if (filters.length === 0) {
-    return null;
-  }
-  for (const kind of ["lead", "contact"] as const) {
-    let query = supabase
-      .from(kind === "lead" ? "leads" : "contacts")
-      .select("id, full_name, phone, email")
-      .eq("organization_id", orgId)
-      .is("deleted_at", null);
-    // a converted lead lives on as its contact, which is the record to open
-    if (kind === "lead") {
-      query = query.is("converted_at", null);
-    }
-    const data = must(await query
-      .or(filters.join(","))
-      .order("created_at", { ascending: false })
-      .limit(1), "duplicate search");
-    const row = data?.[0];
-    if (row) {
-      return {
-        kind,
-        name: row.full_name || row.email || row.phone || "ללא שם",
-        href: kind === "lead" ? paths.lead(orgId, row.id) : paths.contact(orgId, row.id),
-      };
-    }
-  }
-  // CON-01: a contact's further phone or email counts too
-  const { data: matches, error } = await supabase.rpc("contact_channel_matches", {
-    p_org: orgId,
-    p_phones: e164 ? [e164] : [],
-    p_emails: email ? [email.toLowerCase()] : [],
-  });
-  if (error) {
-    throw new Error(`duplicate search: ${error.message}`);
-  }
-  const ids = [...new Set(matches.map((m) => m.contact_id))];
-  if (ids.length > 0) {
-    const contact = must(
-      await supabase
-        .from("contacts")
-        .select("id, full_name, phone, email")
-        .eq("organization_id", orgId)
-        .is("deleted_at", null)
-        .in("id", ids)
-        .order("created_at", { ascending: false })
-        .limit(1),
-      "duplicate search",
-    )?.[0];
-    if (contact) {
-      return { kind: "contact", name: contact.full_name || contact.email || contact.phone || "ללא שם", href: paths.contact(orgId, contact.id) };
-    }
-  }
-  return null;
 }
 
 export async function createLeadAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -133,9 +65,9 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   // A repeat lead (same phone or email as a lead or contact the user can see)
   // is pointed out first; the user may still create a new one.
   if (formData.get("allow_duplicate") !== "on") {
-    const duplicate = await findExisting(context.supabase, orgId, parsed.data.phone, parsed.data.email);
+    const duplicate = await findPersonDuplicate(context.supabase, orgId, [parsed.data.phone], [parsed.data.email]);
     if (duplicate) {
-      return fail(`כבר קיים ${duplicate.kind === "lead" ? "ליד" : "איש קשר"} עם הטלפון או האימייל האלה: ${duplicate.name}.`, {
+      return fail(duplicateMessage(duplicate, "הטלפון או האימייל האלה"), {
         fieldErrors: { allow_duplicate: duplicate.href },
         values: formValues(formData),
       });

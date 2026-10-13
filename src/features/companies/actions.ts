@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { duplicateMessage, findCompanyDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
@@ -39,6 +40,18 @@ export async function createCompanyAction(orgId: string, _prev: FormState, formD
   const type = typeIdFromForm(formData);
   if (!type.ok) {
     return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
+
+  // DQL-02: a company the user can see with the same tax id, name or phone is pointed out first;
+  // the user may still create the new one.
+  if (formData.get("allow_duplicate") !== "on") {
+    const duplicate = await findCompanyDuplicate(context.supabase, orgId, { name: parsed.data.name, taxId: parsed.data.tax_id, phone: parsed.data.phone });
+    if (duplicate) {
+      return fail(duplicateMessage(duplicate, "השם, המספר או הטלפון האלה"), {
+        fieldErrors: { allow_duplicate: duplicate.href },
+        values: formValues(formData),
+      });
+    }
   }
 
   // owner_id is left out: the database assigns the company to its creator.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { duplicateMessage, findPersonDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
@@ -113,6 +114,20 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
   const type = typeIdFromForm(formData);
   if (!type.ok) {
     return fail(type.message, { fieldErrors: { type_id: type.message }, values: formValues(formData) });
+  }
+
+  // DQL-02: as in the lead form, a lead or contact the user can see with one of these phones or
+  // emails is pointed out first; the user may still create the new contact.
+  if (formData.get("allow_duplicate") !== "on") {
+    const phones = [parsed.phones.primary?.value ?? null, ...parsed.phones.extras.map((row) => row.value)];
+    const emails = [parsed.emails.primary?.value ?? null, ...parsed.emails.extras.map((row) => row.value)];
+    const duplicate = await findPersonDuplicate(context.supabase, orgId, phones, emails);
+    if (duplicate) {
+      return fail(duplicateMessage(duplicate, "אחד הטלפונים או האימיילים האלה"), {
+        fieldErrors: { allow_duplicate: duplicate.href },
+        values: formValues(formData),
+      });
+    }
   }
 
   // owner_id is left out: the database assigns the contact to its creator.

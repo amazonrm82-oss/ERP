@@ -6,6 +6,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
+import { TypingWarningLine, warningFor } from "@/features/data-quality/components/checked-field";
 
 import { channelTypeLabel, channelTypes, defaultType, MAX_EXTRA_CHANNELS, type ChannelDraft, type ChannelKind } from "../channels";
 
@@ -33,6 +34,8 @@ export function ChannelsEditor({ kind, initial, error }: Props) {
     const start = initial.length > 0 ? initial : [{ id: null, type: defaultType(kind), value: "", primary: true }];
     return start.map((draft, key) => ({ ...draft, key }));
   });
+  // rows whose box the user has left (their warnings show from then on)
+  const [left, setLeft] = useState<Set<number>>(() => new Set());
   // a new row's key: one past the largest in use
   const make = (list: Row[], draft: ChannelDraft): Row => ({ ...draft, key: list.reduce((max, r) => Math.max(max, r.key), -1) + 1 });
   // the first row is primary when none is marked
@@ -67,6 +70,8 @@ export function ChannelsEditor({ kind, initial, error }: Props) {
         {rows.map((row, index) => {
           const name = `${text.noun} ${index + 1}`;
           const isPrimary = row.key === primaryKey;
+          // DQL-02: a warning once the box was left; never blocks saving
+          const warning = !error && left.has(row.key) ? warningFor(kind, row.value) : null;
           return (
             <li key={row.key} className="rounded-md border border-line p-2">
               <div className="flex gap-2">
@@ -97,10 +102,13 @@ export function ChannelsEditor({ kind, initial, error }: Props) {
                   maxLength={kind === "phone" ? 40 : 254}
                   value={row.value}
                   onChange={(e) => change(row.key, { value: e.target.value })}
+                  onBlur={() => setLeft((set) => (set.has(row.key) ? set : new Set(set).add(row.key)))}
                   aria-invalid={error ? true : undefined}
+                  {...(warning ? { "aria-describedby": `${id}-warning-${row.key}` } : {})}
                   className="min-w-0 flex-1"
                 />
               </div>
+              {warning ? <TypingWarningLine id={`${id}-warning-${row.key}`} warning={warning} onFix={(value) => change(row.key, { value })} /> : null}
               <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2">
                 <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink">
                   <input

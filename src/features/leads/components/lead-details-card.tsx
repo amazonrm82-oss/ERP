@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { CheckedTextField } from "@/features/data-quality/components/checked-field";
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
 import { Detail, DetailList } from "@/components/detail-list";
@@ -141,7 +142,8 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             defaultValue={values?.full_name ?? lead.fullName ?? ""}
             error={errors.full_name}
           />
-          <TextField
+          <CheckedTextField
+            check="phone"
             label="טלפון"
             name="phone"
             type="tel"
@@ -151,7 +153,8 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             defaultValue={values?.phone ?? lead.phone ?? ""}
             error={errors.phone}
           />
-          <TextField
+          <CheckedTextField
+            check="email"
             label="אימייל"
             name="email"
             type="email"

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { ButtonLink } from "@/components/ui/button";
@@ -8,6 +7,8 @@ import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import { CheckedTextField } from "@/features/data-quality/components/checked-field";
+import { DuplicateNotice } from "@/features/data-quality/components/duplicate-notice";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import type { FieldDefinition } from "@/features/custom-fields/types";
@@ -41,17 +42,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure?.message} />
-      {errors.allow_duplicate ? (
-        <div className="space-y-2 rounded-md border border-line p-3">
-          <Link href={errors.allow_duplicate} className="text-md font-medium text-accent underline underline-offset-4">
-            לפתוח את הרשומה הקיימת
-          </Link>
-          <label className="flex items-center gap-2.5 text-md">
-            <input type="checkbox" name="allow_duplicate" className="size-4.5 accent-accent" />
-            ליצור ליד חדש בכל זאת
-          </label>
-        </div>
-      ) : null}
+      {errors.allow_duplicate ? <DuplicateNotice href={errors.allow_duplicate} createLabel="ליצור ליד חדש בכל זאת" /> : null}
       <TextField
         label="שם מלא"
         name="full_name"
@@ -62,7 +53,8 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
         error={errors.full_name}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
+        <CheckedTextField
+          check="phone"
           label="טלפון"
           name="phone"
           type="tel"
@@ -72,7 +64,8 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons }: Props) {
           defaultValue={values.phone}
           error={errors.phone}
         />
-        <TextField
+        <CheckedTextField
+          check="email"
           label="אימייל"
           name="email"
           type="email"

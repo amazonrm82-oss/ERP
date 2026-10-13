@@ -1,4 +1,5 @@
 import { SelectField, TextField } from "@/components/ui/field";
+import { CheckedTextField } from "@/features/data-quality/components/checked-field";
 import { INDUSTRIES } from "@/features/onboarding/options";
 import { RecordTypeField } from "@/features/record-type-options/components/type-field";
 import type { RecordType } from "@/features/record-type-options/schema";
@@ -60,7 +61,8 @@ export function CompanyFields({ values, errors, types, legacyType }: Props) {
         ))}
       </SelectField>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
+        <CheckedTextField
+          check="phone"
           label="טלפון"
           name="phone"
           type="tel"
@@ -70,7 +72,8 @@ export function CompanyFields({ values, errors, types, legacyType }: Props) {
           defaultValue={values.phone ?? ""}
           error={errors.phone}
         />
-        <TextField
+        <CheckedTextField
+          check="email"
           label="אימייל"
           name="email"
           type="email"
