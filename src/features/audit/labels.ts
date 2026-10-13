@@ -97,6 +97,8 @@ export const FIELD_LABELS: Record<string, string> = {
   deal_id: "עסקה",
   lead_id: "ליד",
   probability: "סיכוי",
+  color: "צבע",
+  rot_days: "ימים בלי פעילות עד סימון כתקועה",
   closed_at: "נסגרה",
   completed_at: "הושלמה",
   is_available: "זמין ללידים",

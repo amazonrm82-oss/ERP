@@ -24,6 +24,7 @@ import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
 import { getDeal } from "@/features/deals/queries";
+import { stageTone } from "@/features/deals/stage-colors";
 import { getStuckDeals } from "@/features/deals/stuck";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -116,9 +117,9 @@ export default async function DealPage({ params, searchParams }: Props) {
           <Card aria-labelledby="deal-stage-title">
             <CardHeader id="deal-stage-title" title="שלב" />
             <CardBody>
-              <p className="text-md">
-                <span className="font-medium">{stage?.name ?? "ללא שלב"}</span>
-                <span className="text-ink-soft">, {formatMoney(amount)}</span>
+              <p className="flex flex-wrap items-center gap-2 text-md">
+                {stage ? <Badge tone={stageTone(stage)}>{stage.name}</Badge> : <span className="font-medium">ללא שלב</span>}
+                <span className="text-ink-soft">{formatMoney(amount)}</span>
               </p>
               {canEdit ? (
                 <DealStageForm

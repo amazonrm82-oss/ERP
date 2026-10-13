@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MAX_ROT_DAYS, STAGE_COLOR_VALUES } from "@/features/deals/stage-colors";
 import { TAG_COLOR_VALUES } from "@/features/tags/types";
 
 import { checkbox, requiredText } from "@/lib/validation";
@@ -20,11 +21,37 @@ const probability = z.preprocess(
     .refine((value) => value <= 100, { error: "יש להזין מספר בין 0 ל-100." }),
 );
 
+// DEAL-01: empty means "by the stage's kind"
+const stageColorField = z.preprocess(
+  (value) => (value === null || value === undefined || value === "" ? null : value),
+  z.enum(STAGE_COLOR_VALUES, { error: "יש לבחור צבע מהרשימה." }).nullable(),
+);
+
+// DEAL-01: days a deal may sit in the stage; empty means the default (14)
+const ROT_DAYS_ERROR = `יש להזין מספר ימים בין 1 ל-${MAX_ROT_DAYS}, או להשאיר ריק.`;
+const rotDays = z.preprocess(
+  (value) => {
+    const text = typeof value === "string" ? value.trim() : "";
+    if (text === "") return null;
+    return /^\d{1,3}$/.test(text) ? Number(text) : text;
+  },
+  z
+    .number({ error: ROT_DAYS_ERROR })
+    .int({ error: ROT_DAYS_ERROR })
+    .min(1, { error: ROT_DAYS_ERROR })
+    .max(MAX_ROT_DAYS, { error: ROT_DAYS_ERROR })
+    .nullable(),
+);
+
 export const stageSchema = z.object({
   name: requiredText(80, "יש להזין שם לשלב.", "השם ארוך מדי (עד 80 תווים)."),
   kind: z.enum(STAGE_KINDS, { error: "יש לבחור סוג שלב." }),
   probability,
+  color: stageColorField,
+  rot_days: rotDays,
 });
+
+export const STAGE_FIELDS = ["name", "kind", "probability", "color", "rot_days"] as const;
 
 export const statusSchema = z.object({
   name: requiredText(60, "יש להזין שם לסטטוס.", "השם ארוך מדי (עד 60 תווים)."),

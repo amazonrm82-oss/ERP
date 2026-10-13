@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
 
-export type StageOption = { id: string; name: string; kind: StageKind };
+// color: a key of STAGE_COLORS or null (DEAL-01; see stage-colors.ts)
+export type StageOption = { id: string; name: string; kind: StageKind; color: string | null };
 
 export type BoardDeal = {
   id: string;
@@ -82,7 +83,7 @@ export async function getPipeline(
   const supabase = await createClient();
   const { data: stages, error: stagesError } = await supabase
     .from("stages")
-    .select("id, name, kind")
+    .select("id, name, kind, color")
     .eq("organization_id", orgId)
     .eq("pipeline_id", pipeline.id)
     .order("position", { ascending: true });
@@ -284,7 +285,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const [stages, pipeline, contact, company, owners] = await Promise.all([
     supabase
       .from("stages")
-      .select("id, name, kind")
+      .select("id, name, kind, color")
       .eq("organization_id", orgId)
       .eq("pipeline_id", data.pipeline_id)
       .order("position", { ascending: true }),

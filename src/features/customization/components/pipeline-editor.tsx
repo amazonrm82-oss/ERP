@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { DEFAULT_ROT_DAYS, MAX_ROT_DAYS, STAGE_COLORS, stageColor, stageTone } from "@/features/deals/stage-colors";
+import type { StageKind } from "@/lib/database.types";
 import type { FormState } from "@/lib/action-result";
 
 import {
@@ -90,7 +92,7 @@ export function PipelineCard({ orgId, pipeline, editable, isOnly }: CardProps) {
           <ol className="divide-y divide-line rounded-md border border-line">
             {pipeline.stages.map((stage, index) => (
               <StageRow
-                key={`${stage.id}-${stage.name}-${stage.kind}-${stage.probability}`}
+                key={`${stage.id}-${stage.name}-${stage.kind}-${stage.probability}-${stage.color}-${stage.rotDays}`}
                 orgId={orgId}
                 stage={stage}
                 editable={editable}
@@ -140,60 +142,70 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
 
   if (!editable) {
     return (
-      <li className="flex items-center justify-between gap-3 px-3 py-2.5">
-        <span className="font-medium">{stage.name}</span>
+      <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2.5">
+        <Badge tone={stageTone(stage)}>{stage.name}</Badge>
         <span className="text-sm text-ink-soft">
-          {STAGE_KIND_LABELS[stage.kind]}, {stage.probability}%
+          {STAGE_KIND_LABELS[stage.kind]}, {stage.probability}%{stage.kind === "open" ? `, ${rotDaysText(stage.rotDays)}` : null}
         </span>
       </li>
     );
   }
 
-  const kind = values?.kind ?? stage.kind;
+  const kind = (values?.kind as StageKind | undefined) ?? stage.kind;
   return (
     <li className="space-y-2 px-3 py-3">
-      <form action={formAction} className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem_auto]" noValidate>
-        <TextField
-          label={`שם השלב`}
-          hideLabel
-          name="name"
-          required
-          maxLength={80}
-          autoComplete="off"
-          controlSize="sm"
-          className="col-span-2 sm:col-span-1"
-          defaultValue={values?.name ?? stage.name}
-          error={errors.name}
-        />
-        <SelectField
-          key={`kind-${kind}`}
-          label={`סוג השלב ${stage.name}`}
-          hideLabel
-          name="kind"
-          controlSize="sm"
-          defaultValue={kind}
-          error={errors.kind}
+      <form action={formAction} className="space-y-2" noValidate>
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem]">
+          <TextField
+            label={`שם השלב`}
+            hideLabel
+            name="name"
+            required
+            maxLength={80}
+            autoComplete="off"
+            controlSize="sm"
+            className="col-span-2 sm:col-span-1"
+            defaultValue={values?.name ?? stage.name}
+            error={errors.name}
+          />
+          <SelectField
+            key={`kind-${kind}`}
+            label={`סוג השלב ${stage.name}`}
+            hideLabel
+            name="kind"
+            controlSize="sm"
+            defaultValue={kind}
+            error={errors.kind}
+          >
+            {STAGE_KINDS.map((option) => (
+              <option key={option} value={option}>
+                {STAGE_KIND_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            label={`הסתברות לסגירה בשלב ${stage.name} (באחוזים)`}
+            hideLabel
+            name="probability"
+            dir="ltr"
+            inputMode="numeric"
+            controlSize="sm"
+            defaultValue={values?.probability ?? String(stage.probability)}
+            error={errors.probability}
+          />
+        </div>
+        <StageLookFields
+          stageName={stage.name}
+          kind={kind}
+          color={values?.color ?? stage.color ?? ""}
+          rotDays={values?.rot_days ?? (stage.rotDays === null ? "" : String(stage.rotDays))}
+          errors={errors}
         >
-          {STAGE_KINDS.map((option) => (
-            <option key={option} value={option}>
-              {STAGE_KIND_LABELS[option]}
-            </option>
-          ))}
-        </SelectField>
-        <TextField
-          label={`הסתברות לסגירה בשלב ${stage.name} (באחוזים)`}
-          hideLabel
-          name="probability"
-          dir="ltr"
-          inputMode="numeric"
-          controlSize="sm"
-          defaultValue={values?.probability ?? String(stage.probability)}
-          error={errors.probability}
-        />
-        <SubmitButton size="sm" variant="secondary" className="col-span-2 sm:col-span-1">
-          שמירה
-          <span className="sr-only">: {stage.name}</span>
-        </SubmitButton>
+          <SubmitButton size="sm" variant="secondary" className="col-span-2 sm:col-span-1 sm:mt-6.5">
+            שמירה
+            <span className="sr-only">: {stage.name}</span>
+          </SubmitButton>
+        </StageLookFields>
       </form>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
@@ -225,7 +237,7 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
   return (
     <form action={formAction} className="space-y-2" noValidate>
       <h3 className="text-sm font-medium text-ink-soft">שלב חדש</h3>
-      <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem_auto]">
+      <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem]">
         <TextField
           label="שם השלב החדש"
           hideLabel
@@ -257,11 +269,88 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
           defaultValue={values?.probability ?? "20"}
           error={errors.probability}
         />
-        <SubmitButton size="sm" className="col-span-2 sm:col-span-1" pendingText="מוסיפים…">
+      </div>
+      <StageLookFields
+        stageName="השלב החדש"
+        kind={(values?.kind as StageKind | undefined) ?? "open"}
+        color={values?.color ?? ""}
+        rotDays={values?.rot_days ?? ""}
+        errors={errors}
+        isNew
+      >
+        <SubmitButton size="sm" className="col-span-2 sm:col-span-1 sm:mt-6.5" pendingText="מוסיפים…">
           הוספת שלב
         </SubmitButton>
-      </div>
+      </StageLookFields>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
     </form>
+  );
+}
+
+function rotDaysText(rotDays: number | null): string {
+  const days = rotDays ?? DEFAULT_ROT_DAYS;
+  const text = days === 1 ? "יום אחד" : `${days} ימים`;
+  return `תקועה אחרי ${text} בלי פעילות${rotDays === null ? " (ברירת מחדל)" : ""}`;
+}
+
+type LookProps = {
+  stageName: string;
+  kind: StageKind;
+  color: string;
+  rotDays: string;
+  errors: Record<string, string | undefined>;
+  isNew?: boolean;
+  children: ReactNode;
+};
+
+// what report_stuck_deals measures: days since the deal's last activity
+const ROT_DAYS_LABEL = "ימים בלי פעילות עד סימון כתקועה";
+
+/** DEAL-01: the stage's colour (from the design-system palette) and the days a deal may sit in it. */
+function StageLookFields({ stageName, kind, color, rotDays, errors, isNew, children }: LookProps) {
+  const [picked, setPicked] = useState(color);
+  const of = isNew ? "של השלב החדש" : `של השלב ${stageName}`;
+  return (
+    <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[9rem_14rem_auto_auto]">
+      <SelectField
+        label="צבע"
+        name="color"
+        controlSize="sm"
+        aria-label={`צבע ${of}`}
+        defaultValue={color}
+        onChange={(event) => setPicked(event.target.value)}
+        error={errors.color}
+      >
+        <option value="">לפי סוג השלב</option>
+        {STAGE_COLORS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
+      {kind === "open" ? (
+        <TextField
+          label={ROT_DAYS_LABEL}
+          name="rot_days"
+          aria-label={`${ROT_DAYS_LABEL}, ${of}`}
+          dir="ltr"
+          inputMode="numeric"
+          maxLength={3}
+          autoComplete="off"
+          controlSize="sm"
+          placeholder={String(DEFAULT_ROT_DAYS)}
+          hint={`ריק = ${DEFAULT_ROT_DAYS} ימים. עד ${MAX_ROT_DAYS}.`}
+          defaultValue={rotDays}
+          error={errors.rot_days}
+        />
+      ) : (
+        // won and lost stages are never stuck: keep what is stored
+        <input type="hidden" name="rot_days" value={rotDays} />
+      )}
+      <p className="col-span-2 flex items-center gap-2 text-sm text-ink-soft sm:col-span-1 sm:mt-7.5" aria-hidden="true">
+        <Badge tone={stageTone({ kind, color: stageColor(picked) })}>{isNew ? "שלב חדש" : stageName}</Badge>
+      </p>
+      {children}
+    </div>
   );
 }

@@ -5,20 +5,13 @@ import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import type { StageKind } from "@/lib/database.types";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { dropDealAction } from "../actions";
 import type { Board, BoardDeal } from "../queries";
+import { STAGE_RULE, stageTone } from "../stage-colors";
 import { DealStageForm } from "./deal-stage-form";
-
-// The coloured rule on top of a column says what kind of stage it is.
-const columnRule: Record<StageKind, string> = {
-  open: "border-t-accent",
-  won: "border-t-success",
-  lost: "border-t-line-strong",
-};
 
 const DRAG_TYPE = "application/x-deal-id";
 
@@ -115,7 +108,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck }: Props) {
                   }}
                   onDrop={canWrite ? (event) => onDrop(event, stage.id) : undefined}
                 >
-                  <header className={cn("rounded-t-lg border border-t-[3px] border-line bg-surface px-3.5 py-2.5", columnRule[stage.kind])}>
+                  <header className={cn("rounded-t-lg border border-t-[3px] border-line bg-surface px-3.5 py-2.5", STAGE_RULE[stageTone(stage)])}>
                     <h2 id={headingId} className="flex items-baseline justify-between gap-2 font-semibold">
                       <span className="truncate">{stage.name}</span>
                       <span className="text-sm font-normal text-ink-soft">

@@ -3,7 +3,17 @@ import "server-only";
 import type { LeadStatusKind, StageKind } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-export type StageSetting = { id: string; name: string; kind: StageKind; probability: number; position: number; dealCount: number };
+export type StageSetting = {
+  id: string;
+  name: string;
+  kind: StageKind;
+  probability: number;
+  position: number;
+  dealCount: number;
+  // DEAL-01: a palette key or null (by kind); days allowed in the stage or null (the default)
+  color: string | null;
+  rotDays: number | null;
+};
 export type PipelineSetting = { id: string; name: string; isDefault: boolean; stages: StageSetting[]; liveDealCount: number };
 
 /** Live pipelines with their stages and how many deals (trashed included) sit in each stage. */
@@ -20,7 +30,7 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
       .order("created_at", { ascending: true }),
     supabase
       .from("stages")
-      .select("id, pipeline_id, name, kind, probability, position")
+      .select("id, pipeline_id, name, kind, probability, position, color, rot_days")
       .eq("organization_id", orgId)
       .order("position", { ascending: true }),
   ]);
@@ -64,6 +74,8 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
         kind: stage.kind,
         probability: stage.probability,
         position: stage.position,
+        color: stage.color,
+        rotDays: stage.rot_days,
         dealCount: perStage.get(stage.id) ?? 0,
       })),
   }));
