@@ -266,6 +266,13 @@ describe("roles and record visibility", () => {
       await q("insert into public.tags (organization_id, name) values ($1, 'תגית של מנהל')", [org]);
       await q("insert into public.products (organization_id, name) values ($1, 'מוצר של מנהל')", [org]);
       await q("insert into public.price_lists (organization_id, name) values ($1, 'מחירון של מנהל')", [org]);
+      // PL-02: a price in that list for that product
+      await q(
+        `insert into public.price_list_lines (organization_id, price_list_id, product_id, price_agorot)
+         select $1, l.id, p.id, 5000 from public.price_lists l, public.products p
+          where l.organization_id = $1 and l.name = 'מחירון של מנהל' and p.organization_id = $1 and p.name = 'מוצר של מנהל'`,
+        [org],
+      );
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של מנהל')", [org]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'סוג של מנהל')", [org]);
       await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'year', '2026-01-01', 'won_amount', 5000000)", [org]);
@@ -305,6 +312,7 @@ describe("roles and record visibility", () => {
       product_units: "name = name",
       products: "name = name",
       price_lists: "name = name",
+      price_list_lines: "min_quantity = min_quantity",
       goals: "target = target",
       field_definitions: "label = label",
       conversion_field_maps: "target_field_id = target_field_id",
@@ -344,6 +352,21 @@ describe("roles and record visibility", () => {
         ),
       );
       expect(mapped.code, "insert conversion_field_maps").toBe("42501");
+      // nor add a price to a price list (PL-02)
+      const line = await asAdmin(
+        async (q) =>
+          (await q<{ price_list_id: string; product_id: string }>("select price_list_id, product_id from public.price_list_lines where organization_id = $1 limit 1", [org])).rows[0],
+      );
+      const addPrice = await pgError(
+        asUser(u.id, (q) =>
+          q("insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 50, 100)", [
+            org,
+            line.price_list_id,
+            line.product_id,
+          ]),
+        ),
+      );
+      expect(addPrice.code).toBe("42501");
     }
     const pending = await asAdmin((q) =>
       count(q, "select 1 from public.invitations where email = 'pending@example.test' and revoked_at is null"),

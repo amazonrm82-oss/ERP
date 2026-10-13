@@ -130,8 +130,17 @@ describe("tenant isolation", () => {
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
-      await q("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000)", [orgA]);
-      await q("insert into public.price_lists (organization_id, name, valid_from) values ($1, 'מחירון של א', '2026-01-01')", [orgA]);
+      ids.productA = (
+        await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
+      ).rows[0].id;
+      ids.priceListA = (
+        await q<{ id: string }>("insert into public.price_lists (organization_id, name, valid_from) values ($1, 'מחירון של א', '2026-01-01') returning id", [orgA])
+      ).rows[0].id;
+      await q("insert into public.price_list_lines (organization_id, price_list_id, product_id, price_agorot) values ($1, $2, $3, 9000)", [
+        orgA,
+        ids.priceListA,
+        ids.productA,
+      ]);
       await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
       await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02')", [orgA, a.id]);
     });
@@ -192,6 +201,8 @@ describe("tenant isolation", () => {
     "products",
     // PL-01
     "price_lists",
+    // PL-02
+    "price_list_lines",
     // DQL-01, seeded for every new organization
     "completeness_settings",
     // CAP-09
@@ -325,6 +336,7 @@ describe("tenant isolation", () => {
       product_units: "name = name",
       products: "name = name",
       price_lists: "name = name",
+      price_list_lines: "min_quantity = min_quantity",
       completeness_settings: "fields = fields",
       member_leaves: "ends_on = ends_on",
       conversion_field_maps: "target_field_id = target_field_id",
@@ -412,6 +424,7 @@ describe("tenant isolation", () => {
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.price_lists (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
@@ -483,6 +496,7 @@ describe("tenant isolation", () => {
       ["product_units", "position = 777", "position = 777"],
       ["products", "description = 'HACKED'", "description = 'HACKED'"],
       ["price_lists", "is_active = false", "not is_active"],
+      ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
       ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],

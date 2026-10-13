@@ -975,6 +975,22 @@ export type PriceListRow = {
   updated_at: string;
 };
 
+// PL-02: a price list line (migration price_list_lines): a fixed price (typed with its mode, like a product's price)
+// or a discount in basis points off the product's own price, from min_quantity (0 = any quantity).
+export type PriceListLineRow = {
+  id: string;
+  organization_id: string;
+  price_list_id: string;
+  product_id: string;
+  min_quantity: number;
+  price_agorot: number | null;
+  price_includes_vat: boolean;
+  discount_bp: number | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // PRD-01: the product catalog (migration products). kind, vat_kind and billing are text with check
 // constraints (PRODUCT_KINDS, VAT_KINDS, BILLINGS in src/features/products/schema.ts). archived_at is stamped by trigger.
 export type ProductRow = {
@@ -1488,6 +1504,21 @@ export type Database = {
         PriceListRow,
         { organization_id: string; name: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean },
         { name?: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean }
+      >;
+      // PL-02: column grants; the list and the product are fixed once inserted
+      price_list_lines: Table<
+        PriceListLineRow,
+        {
+          organization_id: string;
+          price_list_id: string;
+          product_id: string;
+          min_quantity?: number;
+          price_agorot?: number | null;
+          price_includes_vat?: boolean;
+          discount_bp?: number | null;
+          currency?: string;
+        },
+        { min_quantity?: number; price_agorot?: number | null; price_includes_vat?: boolean; discount_bp?: number | null; currency?: string }
       >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)

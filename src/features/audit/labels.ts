@@ -52,6 +52,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   products: "מוצר",
   // PL-01
   price_lists: "מחירון",
+  // PL-02
+  price_list_lines: "מחיר במחירון",
   // DQL-01
   completeness_settings: "שדות חשובים",
   reports: "דוח",

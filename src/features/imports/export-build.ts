@@ -74,6 +74,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "products", file: "products.csv" },
   // PL-01
   { table: "price_lists", file: "price_lists.csv" },
+  // PL-02
+  { table: "price_list_lines", file: "price_list_lines.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   // CAP-09
   { table: "member_leaves", file: "member_leaves.csv" },
@@ -207,7 +209,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 היעדים נמצאים ב-goals.csv: scope הוא user (חבר צוות), team (צוות) או org (כל העסק); period הוא month, quarter או year מ-period_start; metric הוא won_amount (הכנסה שנסגרה, target באגורות), won_deals, leads_handled או meetings_held.
 המעמד של העסק במע"מ נמצא ב-document_settings.csv: vat_status הוא licensed (עוסק מורשה או חברה בע"מ), exempt (עוסק פטור), nonprofit (עמותה או מלכ"ר) או other (מעמד אחר, ששמו ב-vat_status_other, ו-other_charges_vat אומר אם הוא גובה מע"מ). legal_form היא צורת ההתאגדות. באותו קובץ פרטי העסק שמופיעים במסמכים: legal_name (שם רשמי), tax_id (מספר עוסק או ח.פ., 9 ספרות), address_line, city ו-postal_code (כתובת), phone ו-email (פרטי קשר במסמכים, והאימייל גם בהזמנות ליומן). פרטי הבנק להעברה נמצאים ב-bank_details.csv: bank_name, bank_branch, bank_account ו-bank_account_name (רק בעלים ומנהלי מערכת רואים אותם במערכת).
 קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון.
-המחירונים נמצאים ב-price_lists.csv: valid_from ו-valid_to הם התאריכים שבהם המחירון בתוקף (ריק = בלי הגבלה), ו-is_active אומר אם הוא פעיל. מחירון ברירת המחדל הוא המחיר שבכל מוצר.
+המחירונים נמצאים ב-price_lists.csv: valid_from ו-valid_to הם התאריכים שבהם המחירון בתוקף (ריק = בלי הגבלה), ו-is_active אומר אם הוא פעיל. מחירון ברירת המחדל הוא המחיר שבכל מוצר. המחירים שבכל מחירון נמצאים ב-price_list_lines.csv: min_quantity היא הכמות שממנה השורה חלה (0 = כל כמות), ובכל שורה יש מחיר קבוע באגורות (price_agorot, ו-price_includes_vat אומר אם הוא כולל מע"מ) או הנחה מהמחיר של המוצר (discount_bp, ב-1/100 של אחוז: 1000 = 10%).
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.
