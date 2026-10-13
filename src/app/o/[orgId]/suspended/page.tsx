@@ -3,9 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Card, CardBody } from "@/components/ui/card";
 import { LockIcon } from "@/components/ui/icons";
 import { getOrgContextAllowClosed } from "@/features/shell/queries";
+import { leaveClosedOrganizationAction } from "@/features/suspended/actions";
 import { SupportContact } from "@/features/support/components/support-contact";
 import { paths } from "@/lib/paths";
 
@@ -53,7 +55,18 @@ export default async function SuspendedPage({ params }: Props) {
               <SupportContact />
             </div>
           </>
-        ) : null}
+        ) : (
+          // owner's answer of 13 October 2026: anyone but the owner may leave a closed business
+          <ConfirmButton
+            variant="secondary"
+            size="md"
+            title={`לעזוב את ${org.name}? לא תוכלו לחזור אליו בלי הזמנה חדשה.`}
+            confirmLabel="עזיבת העסק"
+            action={leaveClosedOrganizationAction.bind(null, orgId)}
+          >
+            עזיבת העסק
+          </ConfirmButton>
+        )}
 
         <p className="text-sm">
           <Link href={paths.home} className="text-accent underline underline-offset-4 hover:text-accent-strong">

@@ -1654,6 +1654,8 @@ export type Database = {
       mfa_required_orgs: { Args: Record<string, never>; Returns: Json };
       // businesses closed to the caller until payment (0161): [{ id, name, status, role }]
       closed_orgs: { Args: Record<string, never>; Returns: Json };
+      // a member who is not the owner leaves a business closed until payment (0164)
+      leave_closed_organization: { Args: { p_org: string }; Returns: undefined };
       // { enrolled: boolean, aal: string }
       mfa_status: { Args: Record<string, never>; Returns: Json };
       // backup codes (migration 0015): create needs aal2 and returns string[] once;
