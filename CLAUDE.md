@@ -306,6 +306,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   update that keeps the stage, refuses a person's snooze date that is not a day after today up to 366 days ahead or on a closed
   deal (hint `deal:snoozed_until`), and clears the snooze on any stage or pipeline move; `deals_snooze_cleared` logs one
   `system` activity (`metadata.kind = snooze_cleared`, no notification, not "last activity"). MNY-01 and MNY-05 read the same report.
+- Goals (GOL-01/02, migration 0133): `public.goals` (scope user|team|org, period month|quarter|year, metric won_amount|won_deals|
+  leads_handled|meetings_held mirrored by `src/features/goals/metrics.ts`; clients insert identity columns once and update only
+  `target`). Owners/admins write every goal; a manager (role, not team flag) only goals of teams they manage and of their
+  `member`-role people, never owners/admins/managers/themselves/org (owner, 13 October 2026; `app.goals_manager_may_write`).
+  Members read org goals, their own and their teams'; managers also their teams' people; a support session reads all.
+  The grid shows "את היעד הזה קובעים בעלים ומנהלי מערכת" on rows a manager cannot set. Report results are parsed through
+  zod schemas before shaping (FXC-12, `src/features/reports/schemas.ts`, fixtures in `tests/unit/fixtures/reports/`; test
+  89-report-shapes compares SQL output with them): a new or changed report function updates its schema and fixture.
 - Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
   read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
   `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
