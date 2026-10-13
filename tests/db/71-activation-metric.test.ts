@@ -12,6 +12,18 @@ const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 const MIGRATION_FILE = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith("_activation_metric.sql"));
 if (!MIGRATION_FILE) throw new Error("activation metric migration not found");
 const MIGRATION = readFileSync(join(MIGRATIONS_DIR, MIGRATION_FILE), "utf8");
+// Re-running this migration puts back its own app.mark_org_activation(); the later migrations that
+// redefine it (0118: sample leads never activate) run again after it, so no later test sees the old body.
+const LATER = readdirSync(MIGRATIONS_DIR)
+  .filter((f) => f.endsWith(".sql") && f > MIGRATION_FILE)
+  .sort()
+  .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
+  .filter((sql) => /function\s+app\.mark_org_activation\s*\(/.test(sql));
+const rerun = (): Promise<void> =>
+  asAdmin(async (q) => {
+    await q(MIGRATION);
+    for (const sql of LATER) await q(sql);
+  });
 
 type U = { id: string; email: string };
 type Activation = { activated_at: Date; lead_created_at: Date } | undefined;
@@ -137,7 +149,7 @@ describe("activation metric (GAP-06)", () => {
       await q("insert into public.activities (organization_id, type, body, lead_id, occurred_at, created_by) values ($1, 'call', 'x', $2, now(), $3)", [backfillOrg, oldLeadId, owner.id]);
     });
     expect(await activation(backfillOrg)).toBeUndefined();
-    await asAdmin((q) => q(MIGRATION));
+    await rerun();
     const filled = await activation(backfillOrg);
     expect(filled).toBeDefined();
     expect(filled!.lead_created_at.getTime()).toBeLessThanOrEqual(Date.now());
@@ -218,14 +230,14 @@ describe("activation metric (GAP-06)", () => {
     await logOld(slow, slowLead, 10); // 62 hours after the lead
     expect(await activation(org)).toBeUndefined();
 
-    await asAdmin((q) => q(MIGRATION));
+    await rerun();
     const row = await activation(org);
     expect(row).toBeDefined();
     expect(row!.activated_at.getTime() - row!.lead_created_at.getTime()).toBeGreaterThan(1.9 * 3_600_000);
     expect(row!.activated_at.getTime() - row!.lead_created_at.getTime()).toBeLessThan(2.1 * 3_600_000);
     expect(await activation(slow)).toBeUndefined();
 
-    await asAdmin((q) => q(MIGRATION));
+    await rerun();
     expect(await activation(org)).toEqual(row);
   });
 });
