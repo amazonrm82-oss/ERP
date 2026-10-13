@@ -12,6 +12,7 @@ import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadCards } from "@/features/leads/components/lead-cards";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
+import { getScoreNumbers } from "@/features/data-quality/queries";
 import { LeadsTable } from "@/features/leads/components/leads-table";
 import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
@@ -89,6 +90,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   // a saved view in use (LST-04): its columns replace the user's own while it is open
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
   const shownColumns = activeView?.config.columns ? resolveColumns("lead", activeView.config.columns, listColumns.catalog) : listColumns.columns;
+  // DQL-01: scores only when the column is shown
+  const completeness = shownColumns.some((c) => c.key === "completeness") && leads.length > 0 ? await getScoreNumbers(orgId, "lead", leads.map((l) => l.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -204,6 +207,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               editing={editing}
               tags={tags}
               reasons={reasons}
+              completeness={completeness}
             />
           </div>
         </>

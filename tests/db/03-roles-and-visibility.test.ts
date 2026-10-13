@@ -636,6 +636,29 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("everyone reads the important fields; only owners and admins change them (DQL-01)", async () => {
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.completeness_settings where organization_id = $1", [org]), u.email).toBe(4);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.completeness_settings set fields = '{phone}' where organization_id = $1 and object_type = 'lead'", [org])).rowCount, u.email).toBe(0);
+      });
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.completeness_settings where organization_id = $1", [org])))).code, u.email).toBe("42501");
+    }
+    for (const u of [owner, admin]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.completeness_settings set fields = '{phone,owner_id}' where organization_id = $1 and object_type = 'lead'", [org])).rowCount, u.email).toBe(1);
+      });
+    }
+    expect(
+      await asAdmin(async (q) => (await q<{ fields: string[] }>("select fields from public.completeness_settings where organization_id = $1 and object_type = 'lead'", [org])).rows[0].fields),
+    ).toEqual(["phone", "owner_id"]);
+    await asUser(owner.id, (q) => q("update public.completeness_settings set fields = app.completeness_default_keys('lead') where organization_id = $1 and object_type = 'lead'", [org]));
+  });
+
   it("only owners and admins read and write the bank details (TAX-02 follow-up)", async () => {
     const insert = "insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק לאומי', '800', '7654321')";
     for (const u of [manager, m1, viewer]) {

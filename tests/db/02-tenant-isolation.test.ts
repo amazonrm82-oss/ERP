@@ -175,6 +175,8 @@ describe("tenant isolation", () => {
     "product_units",
     // PRD-01
     "products",
+    // DQL-01, seeded for every new organization
+    "completeness_settings",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -301,6 +303,7 @@ describe("tenant isolation", () => {
       product_categories: "name = name",
       product_units: "name = name",
       products: "name = name",
+      completeness_settings: "fields = fields",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -384,6 +387,7 @@ describe("tenant isolation", () => {
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -451,6 +455,7 @@ describe("tenant isolation", () => {
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],
       ["products", "description = 'HACKED'", "description = 'HACKED'"],
+      ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

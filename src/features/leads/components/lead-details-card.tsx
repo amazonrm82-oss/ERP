@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 
+import { useEditFocus } from "@/features/data-quality/use-edit-focus";
+
 import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -45,11 +47,13 @@ export type LeadDetailsView = {
   utm?: Partial<Record<LeadUtmKey, string>>;
 };
 
-type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean };
+type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null };
 
 /** Lead details that switch in place between reading and editing. */
-export function LeadDetailsCard({ orgId, lead, sources, canWrite }: Props) {
-  const [editing, setEditing] = useState(false);
+export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props) {
+  // DQL-01: a missing field on the completeness card opens the card for editing at that input
+  const [editing, setEditing] = useState(Boolean(focus) && canWrite);
+  useEditFocus("lead-details-title", focus, editing);
   const sourceName = sources.find((source) => source.id === lead.sourceId)?.name ?? null;
 
   if (editing) {

@@ -43,6 +43,17 @@ export type ListPreferencesRow = {
   updated_at: string;
 };
 
+// DQL-01 (migration record_completeness): one row per organization and record type (lead | contact | company | deal);
+// fields = built-in keys or "cf:<key>" (src/features/data-quality/completeness.ts)
+export type CompletenessSettingsRow = {
+  id: string;
+  organization_id: string;
+  object_type: string;
+  fields: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 // CAL-03 (calendar settings migration): the organization's rest days; 0 = Sunday … 6 = Saturday
 export type OrgCalendarSettingsRow = {
   id: string;
@@ -1436,6 +1447,8 @@ export type Database = {
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
+      // DQL-01: the important fields per record type; seeded per organization, no delete grant
+      completeness_settings: Table<CompletenessSettingsRow, { organization_id: string; object_type: string; fields?: string[] }, { fields?: string[] }>;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
@@ -1490,6 +1503,11 @@ export type Database = {
         Returns: Json;
       };
       // GOL-04: forecast against the goal (migration goal_forecast)
+      // DQL-01 (security invoker): [{ id, score, missing }] and { total, rows: [{ id, name, score, missing }] }
+      record_completeness: { Args: { p_org: string; p_type: string; p_ids: string[] }; Returns: Json };
+      incomplete_records: { Args: { p_org: string; p_type: string; p_owner: string; p_limit?: number }; Returns: Json };
+      // computed field 0..100 on leads, contacts, companies and deals: used as `order=completeness`, not called as an RPC
+      completeness: { Args: Record<string, never>; Returns: number | null };
       report_goal_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // MNY-05: open deals that need a decision, stuck or past their close date (migration pipeline_cleanup)
       report_pipeline_cleanup: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };

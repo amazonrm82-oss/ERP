@@ -37,6 +37,8 @@ import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
 import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
+import { editFocusParam } from "@/features/data-quality/completeness";
+import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 
 export const metadata: Metadata = { title: "איש קשר" };
 
@@ -44,11 +46,13 @@ type Props = {
   params: Promise<{ orgId: string; contactId: string }>;
   // REC-06: tl = the timeline filter
   // CON-01: channels=failed after a create whose further phones or emails were not saved
-  searchParams: Promise<{ tl?: string | string[]; channels?: string | string[] }>;
+  searchParams: Promise<{ tl?: string | string[]; channels?: string | string[]; edit?: string | string[] }>;
 };
 
 export default async function ContactPage({ params, searchParams }: Props) {
-  const [{ orgId, contactId }, { tl, channels }] = await Promise.all([params, searchParams]);
+  const [{ orgId, contactId }, { tl, channels, edit }] = await Promise.all([params, searchParams]);
+  // DQL-01: open the details for editing at this input
+  const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
   if (!isUuid(contactId)) {
     notFound();
@@ -125,7 +129,10 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordSummaryCard orgId={orgId} type="contact" id={contact.id} currency={context.org.currency} timeZone={context.org.timeZone} />
           <RecordTasks orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
           <RecordMeetings orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
+          <CompletenessCard orgId={orgId} type="contact" id={contact.id} editBase={canEdit ? paths.contact(orgId, contact.id) : null} />
           <ContactDetailsCard
+            key={focus ?? "view"}
+            focus={focus}
             orgId={orgId}
             canEdit={canEdit}
             companies={companies}

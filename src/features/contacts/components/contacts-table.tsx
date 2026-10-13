@@ -28,10 +28,12 @@ type Props = {
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
   tags: TagOption[];
+  // DQL-01: the score of each row, read only when the column is shown
+  completeness?: Map<string, number>;
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -116,6 +118,10 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
                   {contact.ownerName}
                 </InlineEdit>
               );
+            case "completeness": {
+              const score = completeness?.get(contact.id);
+              return score === undefined ? null : <span className="tabular-nums">{score}%</span>;
+            }
             case "created":
               return (
                 <time dateTime={contact.createdAt} className="whitespace-nowrap text-ink-soft">

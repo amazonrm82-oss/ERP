@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { useEditFocus } from "@/features/data-quality/use-edit-focus";
+
 import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -50,13 +52,15 @@ export type DealDetailsView = {
 };
 
 // lossReasons: the organization's active loss reasons (DEAL-03)
-type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; canEdit: boolean };
+type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; canEdit: boolean; focus?: string | null };
 
 const linkClass = "text-accent underline underline-offset-4";
 
 /** Deal details that switch in place between reading and editing. */
-export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit }: Props) {
-  const [editing, setEditing] = useState(false);
+export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus }: Props) {
+  // DQL-01: a missing field on the completeness card opens the card for editing at that input
+  const [editing, setEditing] = useState(Boolean(focus) && canEdit);
+  useEditFocus("deal-details-title", focus, editing);
 
   if (editing) {
     return <DealEditForm orgId={orgId} deal={deal} contacts={contacts} companies={companies} lossReasons={lossReasons} onDone={() => setEditing(false)} />;

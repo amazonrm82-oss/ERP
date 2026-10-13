@@ -11,6 +11,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
+import { getScoreNumbers } from "@/features/data-quality/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
@@ -65,6 +66,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   // a saved view in use (LST-04): its columns replace the user's own while it is open
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
   const shownColumns = activeView?.config.columns ? resolveColumns("contact", activeView.config.columns, listColumns.catalog) : listColumns.columns;
+  // DQL-01: scores only when the column is shown
+  const completeness = shownColumns.some((c) => c.key === "completeness") && contacts.length > 0 ? await getScoreNumbers(orgId, "contact", contacts.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -174,6 +177,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               sortHref={sortHref}
               editing={editing}
               tags={tags}
+              completeness={completeness}
             />
           </div>
         </>

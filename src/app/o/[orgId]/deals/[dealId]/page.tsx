@@ -41,17 +41,21 @@ import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
 import { isAdminRole } from "@/features/settings/permissions";
+import { editFocusParam } from "@/features/data-quality/completeness";
+import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 
 export const metadata: Metadata = { title: "עסקה" };
 
 type Props = {
   params: Promise<{ orgId: string; dealId: string }>;
   // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[] }>;
+  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[] }>;
 };
 
 export default async function DealPage({ params, searchParams }: Props) {
-  const [{ orgId, dealId }, { tl }] = await Promise.all([params, searchParams]);
+  const [{ orgId, dealId }, { tl, edit }] = await Promise.all([params, searchParams]);
+  // DQL-01: open the details for editing at this input
+  const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
   if (!isUuid(dealId)) {
     notFound();
@@ -169,7 +173,11 @@ export default async function DealPage({ params, searchParams }: Props) {
             </CardBody>
           </Card>
 
+          {/* DQL-01: what is still missing matters while the deal is open */}
+          {deal.status === "open" ? <CompletenessCard orgId={orgId} type="deal" id={deal.id} editBase={canEdit ? paths.deal(orgId, deal.id) : null} /> : null}
           <DealDetailsCard
+            key={focus ?? "view"}
+            focus={focus}
             orgId={orgId}
             canEdit={canEdit}
             contacts={contacts}

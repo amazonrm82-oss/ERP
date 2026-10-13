@@ -57,6 +57,8 @@ export const CONTACT_SORT_COLUMNS = {
   type: "sort_type",
   owner: "sort_owner",
   created: "created_at",
+  // DQL-01: computed field public.completeness(contacts)
+  completeness: "completeness",
 } as const;
 export type ContactSortKey = keyof typeof CONTACT_SORT_COLUMNS;
 export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", ascending: false };

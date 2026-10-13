@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { useEditFocus } from "@/features/data-quality/use-edit-focus";
+
 import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -37,11 +39,13 @@ export type ContactDetailsView = ContactValues & {
   custom: { definitions: FieldDefinition[]; values: CustomValues };
 };
 
-type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; canEdit: boolean };
+type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; canEdit: boolean; focus?: string | null };
 
 /** Contact details that switch in place between reading and editing. */
-export function ContactDetailsCard({ orgId, contact, companies, types, canEdit }: Props) {
-  const [editing, setEditing] = useState(false);
+export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, focus }: Props) {
+  // DQL-01: a missing field on the completeness card opens the card for editing at that input
+  const [editing, setEditing] = useState(Boolean(focus) && canEdit);
+  useEditFocus("contact-details-title", focus, editing);
 
   if (editing) {
     // mounted only while editing, so every edit starts with a clean form state

@@ -31,17 +31,21 @@ import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
 import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
+import { editFocusParam } from "@/features/data-quality/completeness";
+import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 
 export const metadata: Metadata = { title: "חברה" };
 
 type Props = {
   params: Promise<{ orgId: string; companyId: string }>;
   // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[] }>;
+  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[] }>;
 };
 
 export default async function CompanyPage({ params, searchParams }: Props) {
-  const [{ orgId, companyId }, { tl }] = await Promise.all([params, searchParams]);
+  const [{ orgId, companyId }, { tl, edit }] = await Promise.all([params, searchParams]);
+  // DQL-01: open the details for editing at this input
+  const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
   if (!isUuid(companyId)) {
     notFound();
@@ -96,7 +100,10 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <RecordSummaryCard orgId={orgId} type="company" id={company.id} currency={context.org.currency} timeZone={context.org.timeZone} />
           <RecordTasks orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
           <RecordMeetings orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
+          <CompletenessCard orgId={orgId} type="company" id={company.id} editBase={canEditRecordHint(context, company.owner_id) ? paths.company(orgId, company.id) : null} />
           <CompanyDetailsCard
+            key={focus ?? "view"}
+            focus={focus}
             orgId={orgId}
             canEdit={canEditRecordHint(context, company.owner_id)}
             types={types}

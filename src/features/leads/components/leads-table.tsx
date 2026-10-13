@@ -33,10 +33,12 @@ type Props = {
   tags: TagOption[];
   // the organization's active "not relevant" reasons (LEAD-03)
   reasons: string[];
+  // DQL-01: the score of each row, read only when the column is shown
+  completeness?: Map<string, number>;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -156,6 +158,10 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
               ) : (
                 <span className="text-ink-soft">אין עדיין</span>
               );
+            case "completeness": {
+              const score = completeness?.get(lead.id);
+              return score === undefined ? null : <span className="tabular-nums">{score}%</span>;
+            }
             case "created":
               return (
                 <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">

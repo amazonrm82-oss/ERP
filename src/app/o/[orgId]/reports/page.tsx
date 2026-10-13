@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { toCompletePath } from "@/features/data-quality/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
 import { REPORTS } from "@/features/reports/definitions";
@@ -32,6 +33,10 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
             </ButtonLink>
             <ButtonLink href={paths.goals(orgId)} variant="secondary" size="sm">
               יעדים
+            </ButtonLink>
+            {/* DQL-01 */}
+            <ButtonLink href={toCompletePath(orgId)} variant="secondary" size="sm">
+              רשומות להשלמה
             </ButtonLink>
           </span>
         }

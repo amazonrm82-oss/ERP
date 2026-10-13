@@ -37,19 +37,22 @@ import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
 import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
+import { editFocusParam } from "@/features/data-quality/completeness";
+import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 
 export const metadata: Metadata = { title: "ליד" };
 
 type Props = {
   params: Promise<{ orgId: string; leadId: string }>;
-  // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[] }>;
+  // REC-06: tl = the timeline filter; DQL-01: edit = open the details for editing at this input
+  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[] }>;
 };
 
 const linkClass = "font-medium text-accent underline underline-offset-4 hover:text-accent-strong";
 
 export default async function LeadPage({ params, searchParams }: Props) {
-  const [{ orgId, leadId }, { tl }] = await Promise.all([params, searchParams]);
+  const [{ orgId, leadId }, { tl, edit }] = await Promise.all([params, searchParams]);
+  const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
   const { canWrite, canDelete } = context;
   if (!isUuid(leadId)) {
@@ -164,7 +167,14 @@ export default async function LeadPage({ params, searchParams }: Props) {
             </Card>
           ) : null}
 
+          {/* DQL-01: a converted lead lives on as its contact and deal */}
+          {!isConverted ? (
+            <CompletenessCard orgId={orgId} type="lead" id={lead.id} editBase={canWrite && canEditRecordHint(context, lead.owner_id) ? paths.lead(orgId, lead.id) : null} />
+          ) : null}
+
           <LeadDetailsCard
+            key={focus ?? "view"}
+            focus={focus}
             orgId={orgId}
             canWrite={canWrite}
             sources={lookups.sources}

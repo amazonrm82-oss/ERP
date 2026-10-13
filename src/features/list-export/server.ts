@@ -7,6 +7,7 @@ import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getPipeline, listDeals } from "@/
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { displayCustomFields } from "@/features/custom-fields/values";
+import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
 import { CUSTOM_PREFIX, resolveColumns, type ListObject } from "@/features/list-columns/columns";
@@ -88,6 +89,9 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   const sourceName = new Map(lookups?.sources.map((s) => [s.id, s.name]) ?? []);
   const stageName = new Map(pipeline?.stages.map((s) => [s.id, s.name]) ?? []);
   const created = (iso: string) => formatDate(iso);
+  // DQL-01: the completeness column is read only when it is exported
+  const withScores = columns.some((column) => column.key === "completeness");
+  const percent = (score: number | undefined) => (score === undefined ? null : `${score}%`);
 
   // one page of the list as export rows; read page after page until a short page (RVW-2: a read
   // returns at most 1,000 rows, so asking for more and stopping when fewer came back lost rows)
@@ -96,6 +100,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
     const rows: ExportRow[] = [];
     if (object === "lead") {
       const page = await listLeads(orgId, { ...options, statusId: scope === "selected" ? null : statusId, chunk });
+      const scores = withScores ? await getScoreNumbers(orgId, "lead", page.leads.map((lead) => lead.id)) : null;
       for (const lead of page.leads) {
         rows.push({
           name: leadDisplayName(lead),
@@ -109,11 +114,13 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             owner: lead.ownerName,
             last_contact: lead.lastContactedAt ? created(lead.lastContactedAt) : null,
             created: created(lead.createdAt),
+            completeness: percent(scores?.get(lead.id)),
           },
         });
       }
     } else if (object === "contact") {
       const page = await listContacts(orgId, { ...options, chunk });
+      const scores = withScores ? await getScoreNumbers(orgId, "contact", page.contacts.map((contact) => contact.id)) : null;
       for (const contact of page.contacts) {
         rows.push({
           name: contactDisplayName(contact),
@@ -126,6 +133,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             type: contact.typeName,
             owner: contact.ownerName,
             created: created(contact.createdAt),
+            completeness: percent(scores?.get(contact.id)),
           },
         });
       }

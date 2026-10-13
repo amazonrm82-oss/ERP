@@ -23,6 +23,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       // LEAD-02: set from the timeline
       { key: "last_contact", label: "מגע אחרון" },
       { key: "created", label: "נוצר" },
+      // DQL-01: share of the important fields that are filled
+      { key: "completeness", label: "שלמות" },
     ],
     defaults: ["phone", "email", "status", "source", "owner", "last_contact", "created"],
   },
@@ -36,6 +38,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "type", label: "סוג" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
+      // DQL-01
+      { key: "completeness", label: "שלמות" },
     ],
     defaults: ["phone", "email", "company", "owner", "created"],
   },

@@ -68,6 +68,8 @@ export const LEAD_SORT_COLUMNS = {
   owner: "sort_owner",
   last_contact: "last_contacted_at",
   created: "created_at",
+  // DQL-01: computed field public.completeness(leads)
+  completeness: "completeness",
 } as const;
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
 export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
