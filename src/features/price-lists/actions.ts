@@ -23,8 +23,17 @@ function writeError(error: { code?: string; message?: string }, fallback: string
   return dbErrorMessage(error, fallback);
 }
 
+// prices_include_vat is sent only when the form offered it: a locked list (one with prices) leaves it as it is, and a new
+// list without it starts from the business's setting (trigger price_lists_vat). A change once the list has prices is
+// refused by the database (hint price_lists:vat_locked).
 function columns(input: PriceListInput) {
-  return { name: input.name, valid_from: input.valid_from, valid_to: input.valid_to, is_active: input.is_active };
+  return {
+    name: input.name,
+    valid_from: input.valid_from,
+    valid_to: input.valid_to,
+    is_active: input.is_active,
+    ...(input.prices_include_vat === null ? {} : { prices_include_vat: input.prices_include_vat }),
+  };
 }
 
 /** A new price list; on success opens it, to add its lines. */
@@ -77,8 +86,9 @@ export async function deletePriceListAction(orgId: string, listId: string): Prom
 /**
  * Saves the price of one product from one quantity in a price list: a new
  * line, or the line that already holds that product and quantity is replaced.
- * Only a product that can be offered (active, not archived) gets a new price;
- * "including VAT" is kept only for a taxable product.
+ * Only a product that can be offered (active, not archived) gets a new price.
+ * A fixed price is typed in the list's VAT mode; the database copies the
+ * list's flag onto the line (trigger price_list_lines_vat).
  */
 export async function savePriceListLineAction(orgId: string, listId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, listId);
@@ -90,7 +100,7 @@ export async function savePriceListLineAction(orgId: string, listId: string, _pr
 
   const { data: product, error: productError } = await context.supabase
     .from("products")
-    .select("id, vat_kind, is_active, archived_at")
+    .select("id, is_active, archived_at")
     .eq("organization_id", orgId)
     .eq("id", input.product_id)
     .maybeSingle();
@@ -98,11 +108,7 @@ export async function savePriceListLineAction(orgId: string, listId: string, _pr
   if (!product || !isOfferable({ isActive: product.is_active, archivedAt: product.archived_at })) {
     return fail("המוצר שנבחר לא פעיל או בארכיון. רעננו את הדף ובחרו מוצר אחר.", { fieldErrors: { product_id: "יש לבחור מוצר פעיל." }, values });
   }
-  const price = {
-    price_agorot: input.price_agorot,
-    discount_bp: input.discount_bp,
-    price_includes_vat: product.vat_kind === "taxable" && input.price_includes_vat,
-  };
+  const price = { price_agorot: input.price_agorot, discount_bp: input.discount_bp };
 
   const { data: existing, error: findError } = await context.supabase
     .from("price_list_lines")

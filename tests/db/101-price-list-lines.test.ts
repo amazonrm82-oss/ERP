@@ -38,7 +38,8 @@ describe("price list lines (PL-02)", () => {
   });
 
   it("a fixed price or a discount, from a quantity; members read them", async () => {
-    const fixed = await insertLine(owner.id, { price_agorot: 9000, price_includes_vat: true });
+    // the mode comes from the list (here the business's setting: before VAT); see 102-price-list-vat
+    const fixed = await insertLine(owner.id, { price_agorot: 9000 });
     const bulk = await insertLine(owner.id, { min_quantity: 10, discount_bp: 1500 });
     const rows = await asUser(member.id, async (q) =>
       (await q<Record<string, unknown>>(
@@ -47,16 +48,16 @@ describe("price list lines (PL-02)", () => {
       )).rows,
     );
     expect(rows).toEqual([
-      { id: fixed, m: "0.000", p: 9000, v: true, d: null, currency: "ILS" },
+      { id: fixed, m: "0.000", p: 9000, v: false, d: null, currency: "ILS" },
       { id: bulk, m: "10.000", p: null, v: false, d: 1500, currency: "ILS" },
     ]);
   });
 
-  it("exactly one of price and discount; a mode only on a fixed price; values in range", async () => {
+  // a mode only on a fixed price (price_list_lines_vat_mode) is now also set by trigger from the list; 102-price-list-vat
+  it("exactly one of price and discount; values in range", async () => {
     const bad = [
       { min_quantity: 1 },
       { min_quantity: 2, price_agorot: 100, discount_bp: 100 },
-      { min_quantity: 3, discount_bp: 100, price_includes_vat: true },
       { min_quantity: 4, discount_bp: 0 },
       { min_quantity: 5, discount_bp: 10001 },
       { min_quantity: 6, price_agorot: -1 },

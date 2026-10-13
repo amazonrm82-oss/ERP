@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 
-import { Checkbox, SelectField, TextField } from "@/components/ui/field";
+import { SelectField, TextField } from "@/components/ui/field";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
@@ -17,14 +17,17 @@ type Props = {
   listId: string;
   // products that can get a new price (isOfferable), by name
   products: PricingProduct[];
+  // the list's VAT setting: every fixed price is typed in this mode
+  pricesIncludeVat: boolean;
 };
 
 /**
  * Adds a price to the list, or replaces the price of the same product from the
- * same quantity (PL-02). A fixed price is typed like a product's price, with
- * its own mode; a discount is a percentage off the product's own price.
+ * same quantity (PL-02). A fixed price is typed in the list's VAT mode (the
+ * database copies the list's flag onto the line); a discount is a percentage
+ * off the product's own price.
  */
-export function PriceListLineForm({ orgId, listId, products }: Props) {
+export function PriceListLineForm({ orgId, listId, products, pricesIncludeVat }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(savePriceListLineAction.bind(null, orgId, listId), null);
   const failure = state && !state.ok ? state : null;
   const errors = failure?.fieldErrors ?? {};
@@ -32,7 +35,7 @@ export function PriceListLineForm({ orgId, listId, products }: Props) {
   const [productId, setProductId] = useState(typed?.product_id ?? "");
   const [rule, setRule] = useState<LineRule>(typed?.rule === "discount" ? "discount" : "price");
   const product = products.find((p) => p.id === productId) ?? null;
-  const taxable = product?.vatKind === "taxable";
+  const taxable = product === null || product.vatKind === "taxable";
 
   if (products.length === 0) {
     return <p className="text-md text-ink-soft">אין מוצרים פעילים בקטלוג. מוסיפים מוצר בעמוד המוצרים, ואז קובעים לו מחיר כאן.</p>;
@@ -79,30 +82,19 @@ export function PriceListLineForm({ orgId, listId, products }: Props) {
         </SelectField>
       </div>
       {rule === "price" ? (
-        <>
-          <TextField
-            label="מחיר (₪)"
-            name="price_agorot"
-            required
-            dir="ltr"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="0"
-            className="sm:max-w-64"
-            defaultValue={typed?.price_agorot ?? ""}
-            error={errors.price_agorot}
-          />
-          {taxable && product ? (
-            <Checkbox
-              // a new product starts from how its own price is typed
-              key={product.id}
-              name="price_includes_vat"
-              label='המחיר כולל מע"מ'
-              hint='בלי סימון, המחיר הוא לפני מע"מ.'
-              defaultChecked={typed ? typed.price_includes_vat === "on" : product.priceIncludesVat}
-            />
-          ) : null}
-        </>
+        <TextField
+          label={pricesIncludeVat ? 'מחיר (₪, כולל מע"מ)' : 'מחיר (₪, לפני מע"מ)'}
+          name="price_agorot"
+          required
+          dir="ltr"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="0"
+          className="sm:max-w-64"
+          hint={taxable ? undefined : 'המוצר לא חייב במע"מ, והמחיר הוא המחיר הסופי.'}
+          defaultValue={typed?.price_agorot ?? ""}
+          error={errors.price_agorot}
+        />
       ) : (
         <TextField
           label="אחוז הנחה מהמחיר במוצר"

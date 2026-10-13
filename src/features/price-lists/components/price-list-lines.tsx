@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { productPath } from "@/features/products/paths";
 
 import { deletePriceListLineAction } from "../actions";
-import { percentText, tierText, unitPriceText } from "../display";
+import { discountPriceShown, percentText, tierText, unitPriceText } from "../display";
 import { discountedPrice } from "../price";
 import type { PriceListLine, PricingProduct } from "../queries";
 
@@ -15,10 +15,14 @@ type Props = {
   lines: PriceListLine[];
   products: Map<string, PricingProduct>;
   editable: boolean;
+  // the list's VAT setting, and today's rate (documentVatRateBp: 0 = no VAT, null = not known) to show a
+  // discount's resulting price in that mode
+  pricesIncludeVat: boolean;
+  rateBp: number | null;
 };
 
 /** The prices of one price list (PL-02), grouped by product, each product's tiers by quantity. */
-export function PriceListLines({ orgId, listId, lines, products, editable }: Props) {
+export function PriceListLines({ orgId, listId, lines, products, editable, pricesIncludeVat, rateBp }: Props) {
   const groups = new Map<string, PriceListLine[]>();
   for (const line of lines) {
     const group = groups.get(line.productId);
@@ -49,7 +53,12 @@ export function PriceListLines({ orgId, listId, lines, products, editable }: Pro
                   const price =
                     line.priceAgorot !== null
                       ? { priceAgorot: line.priceAgorot, priceIncludesVat: line.priceIncludesVat }
-                      : { priceAgorot: discountedPrice(product.priceAgorot, line.discountBp ?? 0), priceIncludesVat: product.priceIncludesVat };
+                      : discountPriceShown(
+                          { priceAgorot: discountedPrice(product.priceAgorot, line.discountBp ?? 0), priceIncludesVat: product.priceIncludesVat },
+                          product.vatKind,
+                          pricesIncludeVat,
+                          rateBp,
+                        );
                   const label = tierText(line.minQuantity);
                   return (
                     <li key={line.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md bg-canvas px-3 py-2">

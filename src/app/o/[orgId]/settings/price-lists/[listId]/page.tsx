@@ -12,11 +12,15 @@ import { PriceListStatusBadge } from "@/features/price-lists/components/price-li
 import { priceListsPath } from "@/features/price-lists/paths";
 import { getPriceList, listPriceListLines, listPricingProducts } from "@/features/price-lists/queries";
 import { validityText } from "@/features/price-lists/status";
-import { PRICE_LISTS_NOT_IN_PLAN } from "@/features/price-lists/schema";
+import { PRICE_LISTS_NOT_IN_PLAN, priceHeading } from "@/features/price-lists/schema";
 import { isOfferable } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
+import { documentVatRateBp } from "@/features/tax/calc";
+import { getPricesIncludeVat, getTaxSettings, getVatRates } from "@/features/tax/queries";
+import { documentVat } from "@/features/tax/rates";
+import { chargesVat } from "@/features/tax/status";
 import { zoneDate } from "@/lib/format";
 import { isUuid } from "@/lib/paths";
 
@@ -35,10 +39,18 @@ export default async function PriceListPage({ params }: Props) {
   const list = await getPriceList(orgId, listId);
   if (!list) notFound();
   const editable = isAdminRole(role) && canWrite;
-  const [lines, inPlan] = await Promise.all([listPriceListLines(orgId, list.id), orgHasFeature(orgId, "price_lists")]);
+  const [lines, inPlan, businessIncludesVat, tax, rates] = await Promise.all([
+    listPriceListLines(orgId, list.id),
+    orgHasFeature(orgId, "price_lists"),
+    getPricesIncludeVat(orgId),
+    getTaxSettings(orgId),
+    getVatRates(),
+  ]);
   const products = await listPricingProducts(orgId, lines.map((line) => line.productId));
   const byId = new Map(products.map((product) => [product.id, product]));
   const today = zoneDate(new Date(), org.timeZone);
+  // today's rate, as a document of today would use it (0 = no VAT, null = not known)
+  const rateBp = documentVatRateBp(documentVat(chargesVat(tax.vatStatus, tax.otherChargesVat), rates, today));
 
   return (
     <div className="space-y-5">
@@ -58,9 +70,22 @@ export default async function PriceListPage({ params }: Props) {
       </div>
 
       <Card aria-labelledby="price-list-lines-title">
-        <CardHeader id="price-list-lines-title" title={`מחירים במחירון (${lines.length})`} />
+        <CardHeader
+          id="price-list-lines-title"
+          title={`מחירים במחירון (${lines.length})`}
+          // owner, 13 October 2026: the heading says how the list's prices are typed
+          action={<span className="text-sm font-medium text-ink-soft">{priceHeading(list.pricesIncludeVat)}</span>}
+        />
         {lines.length > 0 ? (
-          <PriceListLines orgId={orgId} listId={list.id} lines={lines} products={byId} editable={editable} />
+          <PriceListLines
+            orgId={orgId}
+            listId={list.id}
+            lines={lines}
+            products={byId}
+            editable={editable}
+            pricesIncludeVat={list.pricesIncludeVat}
+            rateBp={rateBp}
+          />
         ) : (
           <CardBody>
             <p className="text-md text-ink-soft">עוד אין מחירים במחירון הזה. כל המוצרים נמכרים בו במחיר שבמוצר.</p>
@@ -75,7 +100,7 @@ export default async function PriceListPage({ params }: Props) {
         ) : editable ? (
           <CardBody className="border-t border-line">
             <h3 className="mb-3 text-md font-semibold">הוספת מחיר</h3>
-            <PriceListLineForm orgId={orgId} listId={list.id} products={products.filter(isOfferable)} />
+            <PriceListLineForm orgId={orgId} listId={list.id} products={products.filter(isOfferable)} pricesIncludeVat={list.pricesIncludeVat} />
           </CardBody>
         ) : null}
       </Card>
@@ -84,7 +109,13 @@ export default async function PriceListPage({ params }: Props) {
         <Card aria-labelledby="price-list-edit-title">
           <CardHeader id="price-list-edit-title" title="פרטי המחירון" />
           <CardBody>
-            <PriceListForm orgId={orgId} list={list} timeZone={org.timeZone} />
+            <PriceListForm
+              orgId={orgId}
+              list={list}
+              timeZone={org.timeZone}
+              businessIncludesVat={businessIncludesVat}
+              locked={lines.length > 0}
+            />
           </CardBody>
         </Card>
       ) : null}

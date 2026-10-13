@@ -132,6 +132,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "product_categories:depth": "אפשר לשים קטגוריה רק בתוך קטגוריה ראשית, ורק אם אין בתוכה קטגוריות אחרות (עד שתי רמות).",
   "product_units:max": "אפשר לשמור עד 50 יחידות מידה. מחקו יחידה שלא בשימוש כדי להוסיף חדשה.",
   // PL-02
+  // PL-01 follow-up (migration price_list_vat): the VAT setting of a list that has prices
+  "price_lists:vat_locked": "אי אפשר לשנות את הגדרת המע\"מ של מחירון שיש בו מחירים. כדי לעבוד אחרת, צרו מחירון חדש.",
   "price_list_lines:tiers": "אפשר לשמור עד 20 מדרגות כמות למוצר אחד במחירון. מחקו מדרגה כדי להוסיף חדשה.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",

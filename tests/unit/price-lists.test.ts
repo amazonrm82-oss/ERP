@@ -3,7 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { LINE_PRICE_MAX_AGOROT, priceListLineSchema, priceListSchema, TIERS_PER_PRODUCT } from "@/features/price-lists/schema";
+import { LINE_PRICE_MAX_AGOROT, priceHeading, priceListLineSchema, priceListSchema, TIERS_PER_PRODUCT, VAT_CHOICE } from "@/features/price-lists/schema";
+import { discountPriceShown, unitPriceText } from "@/features/price-lists/display";
 import { priceListApplies, priceListStatus, validityText } from "@/features/price-lists/status";
 
 // PL-01: a price list applies while it is active and the day is within its dates (both inclusive, both optional).
@@ -39,7 +40,22 @@ describe("price list status (PL-01)", () => {
 describe("price list form (PL-01)", () => {
   it("accepts a name with empty dates, and trims it", () => {
     const parsed = priceListSchema.safeParse({ name: "  סיטונאים ", valid_from: "", valid_to: "", is_active: "on" });
-    expect(parsed.success && parsed.data).toEqual({ name: "סיטונאים", valid_from: null, valid_to: null, is_active: true });
+    // no VAT choice in the form: null (the business's setting on a new list, unchanged on a locked one)
+    expect(parsed.success && parsed.data).toEqual({ name: "סיטונאים", valid_from: null, valid_to: null, is_active: true, prices_include_vat: null });
+  });
+
+  it("one VAT setting per list, read only when the form offers it (owner, 13 October 2026)", () => {
+    const base = { name: "x", valid_from: "", valid_to: "", is_active: "on" };
+    expect(priceListSchema.parse({ ...base, vat_choice: VAT_CHOICE, prices_include_vat: "on" }).prices_include_vat).toBe(true);
+    expect(priceListSchema.parse({ ...base, vat_choice: VAT_CHOICE, prices_include_vat: null }).prices_include_vat).toBe(false);
+    // locked: the disabled checkbox sends nothing, and a forged value without the marker is ignored
+    expect(priceListSchema.parse({ ...base, prices_include_vat: "on" }).prices_include_vat).toBeNull();
+    expect(priceListSchema.parse({ ...base, vat_choice: "yes", prices_include_vat: "on" }).prices_include_vat).toBeNull();
+  });
+
+  it("the heading over the prices says the list's mode", () => {
+    expect(priceHeading(true)).toBe('מחיר (כולל מע"מ)');
+    expect(priceHeading(false)).toBe('מחיר (לפני מע"מ)');
   });
 
   it("refuses an end before the start, on the end field, but takes a one-day list", () => {
@@ -58,16 +74,17 @@ describe("price list form (PL-01)", () => {
 
 describe("price list line form (PL-02)", () => {
   const product = "11111111-1111-4111-8111-111111111111";
-  const base = { product_id: product, min_quantity: "", rule: "price", price_agorot: "", discount: "", price_includes_vat: null };
+  const base = { product_id: product, min_quantity: "", rule: "price", price_agorot: "", discount: "" };
 
-  it("a fixed price from any quantity, with its mode", () => {
+  it("a fixed price from any quantity, with no mode of its own (it takes the list's)", () => {
+    // a per-price VAT choice sent anyway is not read
     const parsed = priceListLineSchema.safeParse({ ...base, price_agorot: "1,250.5", price_includes_vat: "on" });
-    expect(parsed.success && parsed.data).toEqual({ product_id: product, min_quantity: 0, price_agorot: 125050, price_includes_vat: true, discount_bp: null });
+    expect(parsed.success && parsed.data).toEqual({ product_id: product, min_quantity: 0, price_agorot: 125050, discount_bp: null });
   });
 
-  it("a discount in percent becomes basis points and never carries a mode", () => {
-    const parsed = priceListLineSchema.safeParse({ ...base, rule: "discount", discount: "12.5", min_quantity: "10", price_includes_vat: "on", price_agorot: "999" });
-    expect(parsed.success && parsed.data).toEqual({ product_id: product, min_quantity: 10, price_agorot: null, price_includes_vat: false, discount_bp: 1250 });
+  it("a discount in percent becomes basis points", () => {
+    const parsed = priceListLineSchema.safeParse({ ...base, rule: "discount", discount: "12.5", min_quantity: "10", price_agorot: "999" });
+    expect(parsed.success && parsed.data).toEqual({ product_id: product, min_quantity: 10, price_agorot: null, discount_bp: 1250 });
     expect(priceListLineSchema.safeParse({ ...base, rule: "discount", discount: "100" }).success).toBe(true);
     expect(priceListLineSchema.safeParse({ ...base, rule: "discount", discount: "0.01" }).success).toBe(true);
   });
@@ -98,5 +115,26 @@ describe("price list line form (PL-02)", () => {
     expect(sql).toContain("min_quantity       numeric(12, 3)");
     expect(sql).toContain(`price_agorot between 0 and ${LINE_PRICE_MAX_AGOROT}`);
     expect(sql).toContain(`) >= ${TIERS_PER_PRODUCT} then`);
+  });
+});
+
+// Owner, 13 October 2026: a discount's resulting price is shown in the list's VAT mode at today's rate (display only).
+describe("a discount's price in the list's mode", () => {
+  const net = { priceAgorot: 9000, priceIncludesVat: false };
+  const gross = { priceAgorot: 10620, priceIncludesVat: true };
+
+  it("converts into the list's mode at today's rate, half up", () => {
+    expect(discountPriceShown(net, "taxable", true, 1800)).toEqual({ priceAgorot: 10620, priceIncludesVat: true });
+    expect(discountPriceShown(gross, "taxable", false, 1800)).toEqual({ priceAgorot: 9000, priceIncludesVat: false });
+    // same mode: unchanged
+    expect(discountPriceShown(net, "taxable", false, 1800)).toEqual(net);
+    expect(unitPriceText(discountPriceShown(net, "taxable", true, 1800), "taxable")).toContain('כולל מע"מ');
+  });
+
+  it("as is for a product without VAT, a business that charges none, or a status or rate not known", () => {
+    expect(discountPriceShown(net, "exempt", true, 1800)).toEqual(net);
+    expect(discountPriceShown(net, "zero_rate", true, 1800)).toEqual(net);
+    expect(discountPriceShown(net, "taxable", true, 0)).toEqual(net);
+    expect(discountPriceShown(net, "taxable", true, null)).toEqual(net);
   });
 });

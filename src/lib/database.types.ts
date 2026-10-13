@@ -990,12 +990,16 @@ export type PriceListRow = {
   valid_from: string | null;
   valid_to: string | null;
   is_active: boolean;
+  // owner, 13 October 2026: one VAT mode for every price in the list; starts from the business's setting
+  // (trigger price_lists_vat) and is locked once the list has lines (hint price_lists:vat_locked)
+  prices_include_vat: boolean;
   created_at: string;
   updated_at: string;
 };
 
 // PL-02: a price list line (migration price_list_lines): a fixed price (typed with its mode, like a product's price)
 // or a discount in basis points off the product's own price, from min_quantity (0 = any quantity).
+// price_includes_vat is the list's prices_include_vat for a fixed price, false for a discount (set by trigger).
 export type PriceListLineRow = {
   id: string;
   organization_id: string;
@@ -1521,10 +1525,11 @@ export type Database = {
       // PL-01: column grants; organization_id is fixed once inserted
       price_lists: Table<
         PriceListRow,
-        { organization_id: string; name: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean },
-        { name?: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean }
+        { organization_id: string; name: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean; prices_include_vat?: boolean },
+        { name?: string; valid_from?: string | null; valid_to?: string | null; is_active?: boolean; prices_include_vat?: boolean }
       >;
-      // PL-02: column grants; the list and the product are fixed once inserted
+      // PL-02: column grants; the list and the product are fixed once inserted; price_includes_vat comes from the list
+      // (trigger price_list_lines_vat), never from the client
       price_list_lines: Table<
         PriceListLineRow,
         {
@@ -1533,11 +1538,10 @@ export type Database = {
           product_id: string;
           min_quantity?: number;
           price_agorot?: number | null;
-          price_includes_vat?: boolean;
           discount_bp?: number | null;
           currency?: string;
         },
-        { min_quantity?: number; price_agorot?: number | null; price_includes_vat?: boolean; discount_bp?: number | null; currency?: string }
+        { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)

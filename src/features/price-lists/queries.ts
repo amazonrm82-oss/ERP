@@ -13,15 +13,33 @@ export type PriceList = {
   validFrom: string | null;
   validTo: string | null;
   isActive: boolean;
+  // every price in the list is typed and shown in this mode (owner, 13 October 2026)
+  pricesIncludeVat: boolean;
   createdAt: string;
 };
 
-type Row = { id: string; name: string; valid_from: string | null; valid_to: string | null; is_active: boolean; created_at: string };
+type Row = {
+  id: string;
+  name: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_active: boolean;
+  prices_include_vat: boolean;
+  created_at: string;
+};
 
-const COLUMNS = "id, name, valid_from, valid_to, is_active, created_at";
+const COLUMNS = "id, name, valid_from, valid_to, is_active, prices_include_vat, created_at";
 
 function toPriceList(row: Row): PriceList {
-  return { id: row.id, name: row.name, validFrom: row.valid_from, validTo: row.valid_to, isActive: row.is_active, createdAt: row.created_at };
+  return {
+    id: row.id,
+    name: row.name,
+    validFrom: row.valid_from,
+    validTo: row.valid_to,
+    isActive: row.is_active,
+    pricesIncludeVat: row.prices_include_vat,
+    createdAt: row.created_at,
+  };
 }
 
 /** Every price list of the organization, by name (at most the plan's quota, well under 1,000). */

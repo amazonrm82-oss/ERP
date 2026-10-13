@@ -12,20 +12,40 @@ export const PRICE_LIST_NAME_MAX = 120;
 export const PRICE_LISTS_NOT_IN_PLAN =
   'מחירונים אינם כלולים בחבילה הנוכחית. מחירונים שכבר קיימים נשארים לקריאה. בעלי העסק רואים את השימוש ב"הגדרות > חבילה ושימוש", ושם גם איך מגדילים את החבילה.';
 
+// the value of the hidden "vat_choice" field next to an editable VAT setting
+export const VAT_CHOICE = "1";
+
 export const priceListSchema = z
   .object({
     name: requiredText(PRICE_LIST_NAME_MAX, "יש להזין שם למחירון.", `השם ארוך מדי (עד ${PRICE_LIST_NAME_MAX} תווים).`),
     valid_from: optionalDate,
     valid_to: optionalDate,
     is_active: checkbox,
+    prices_include_vat: checkbox,
+    // "1" when the form offers the VAT setting; absent when it is locked (the list has prices)
+    vat_choice: z.unknown().optional(),
   })
   // price_lists_valid_range; "YYYY-MM-DD" compares as text
   .refine((value) => value.valid_from === null || value.valid_to === null || value.valid_to >= value.valid_from, {
     path: ["valid_to"],
     error: "תאריך הסיום מוקדם מתאריך ההתחלה.",
-  });
+  })
+  // null: leave the setting as it is (locked list), or the business's setting on a new list (trigger price_lists_vat)
+  .transform(({ vat_choice, prices_include_vat, ...rest }) => ({
+    ...rest,
+    prices_include_vat: vat_choice === VAT_CHOICE ? prices_include_vat : null,
+  }));
 
-export const PRICE_LIST_FIELD_NAMES = ["name", "valid_from", "valid_to", "is_active"] as const;
+export const PRICE_LIST_FIELD_NAMES = ["name", "valid_from", "valid_to", "is_active", "prices_include_vat", "vat_choice"] as const;
+
+// Owner, 13 October 2026: one VAT setting per list, changeable only while it has no prices.
+export const PRICES_VAT_LABEL = 'המחירים במחירון זה כוללים מע"מ';
+export const PRICES_VAT_LOCKED = "יש כבר מחירים במחירון, ולכן אי אפשר לשנות את ההגדרה. כדי לעבוד אחרת, צרו מחירון חדש.";
+
+/** The heading over a list's prices: "מחיר (כולל מע"מ)" or "מחיר (לפני מע"מ)". */
+export function priceHeading(pricesIncludeVat: boolean): string {
+  return pricesIncludeVat ? 'מחיר (כולל מע"מ)' : 'מחיר (לפני מע"מ)';
+}
 
 export type PriceListInput = z.infer<typeof priceListSchema>;
 
@@ -73,7 +93,6 @@ const lineBase = z.object({
   rule: z.preprocess((value) => (typeof value === "string" ? value : ""), z.enum(LINE_RULES, { error: "יש לבחור מחיר קבוע או הנחה." })),
   price_agorot: z.unknown(),
   discount: z.unknown(),
-  price_includes_vat: checkbox,
 });
 
 const priceRequired = text.transform((value, ctx) => {
@@ -90,10 +109,11 @@ const priceRequired = text.transform((value, ctx) => {
 });
 
 /**
- * One tier of one product: a fixed price (with its mode) or a discount off the
- * product's own price, from a quantity. Exactly one of price_agorot and
- * discount_bp comes out set (price_list_lines_one_rule); a discount never
- * carries a mode (price_list_lines_vat_mode).
+ * One tier of one product: a fixed price or a discount off the product's own
+ * price, from a quantity. Exactly one of price_agorot and discount_bp comes out
+ * set (price_list_lines_one_rule). A fixed price is typed in the list's VAT
+ * mode; the database copies the list's flag onto the line (trigger
+ * price_list_lines_vat), so the form carries no mode of its own.
  */
 export const priceListLineSchema = lineBase.transform((value, ctx) => {
   if (value.rule === "price") {
@@ -106,7 +126,6 @@ export const priceListLineSchema = lineBase.transform((value, ctx) => {
       product_id: value.product_id,
       min_quantity: value.min_quantity,
       price_agorot: price.data,
-      price_includes_vat: value.price_includes_vat,
       discount_bp: null,
     };
   }
@@ -115,9 +134,9 @@ export const priceListLineSchema = lineBase.transform((value, ctx) => {
     ctx.addIssue({ code: "custom", path: ["discount"], message: discount.error.issues[0]?.message ?? "יש להזין אחוז הנחה." });
     return z.NEVER;
   }
-  return { product_id: value.product_id, min_quantity: value.min_quantity, price_agorot: null, price_includes_vat: false, discount_bp: discount.data };
+  return { product_id: value.product_id, min_quantity: value.min_quantity, price_agorot: null, discount_bp: discount.data };
 });
 
-export const PRICE_LIST_LINE_FIELD_NAMES = ["product_id", "min_quantity", "rule", "price_agorot", "discount", "price_includes_vat"] as const;
+export const PRICE_LIST_LINE_FIELD_NAMES = ["product_id", "min_quantity", "rule", "price_agorot", "discount"] as const;
 
 export type PriceListLineInput = z.infer<typeof priceListLineSchema>;

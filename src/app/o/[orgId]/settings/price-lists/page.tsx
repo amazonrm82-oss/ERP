@@ -13,6 +13,7 @@ import { PRICE_LISTS_NOT_IN_PLAN } from "@/features/price-lists/schema";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { getPricesIncludeVat } from "@/features/tax/queries";
 import { zoneDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "מחירונים" };
@@ -25,7 +26,11 @@ export default async function PriceListsPage({ params }: Props) {
   const { org, role, canWrite } = await getOrgContext(orgId);
   const timeZone = org.timeZone;
   const editable = isAdminRole(role) && canWrite;
-  const [lists, inPlan] = await Promise.all([listPriceLists(orgId), orgHasFeature(orgId, "price_lists")]);
+  const [lists, inPlan, businessIncludesVat] = await Promise.all([
+    listPriceLists(orgId),
+    orgHasFeature(orgId, "price_lists"),
+    getPricesIncludeVat(orgId),
+  ]);
   const today = zoneDate(new Date(), timeZone);
 
   return (
@@ -52,6 +57,7 @@ export default async function PriceListsPage({ params }: Props) {
                     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
                       <PriceListStatusBadge list={list} today={today} />
                       <span>{validityText(list)}</span>
+                      <span>· {list.pricesIncludeVat ? 'כולל מע"מ' : 'לפני מע"מ'}</span>
                     </span>
                   </span>
                   <ForwardIcon className="size-4 shrink-0 text-ink-soft" aria-hidden="true" />
@@ -74,7 +80,7 @@ export default async function PriceListsPage({ params }: Props) {
         <Card aria-labelledby="price-list-new-title">
           <CardHeader id="price-list-new-title" title="מחירון חדש" />
           <CardBody>
-            <PriceListForm orgId={orgId} list={null} timeZone={timeZone} />
+            <PriceListForm orgId={orgId} list={null} timeZone={timeZone} businessIncludesVat={businessIncludesVat} locked={false} />
           </CardBody>
         </Card>
       ) : null}
