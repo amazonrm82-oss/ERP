@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { applyTemplate } from "@/features/industry-templates/apply";
+import { describeApplyResult } from "@/features/industry-templates/schema";
+import { industryTemplate } from "@/features/industry-templates/templates";
 import { ORG_STATUS_NOTICES } from "@/features/shell/labels";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
@@ -77,8 +80,10 @@ async function writeProgress(supabase: Supabase, orgId: string, done: SetupStep)
 }
 
 /**
- * Saves the changes of a step (if any), then moves the progress forward, and
- * goes on to the next step (or `goTo`).
+ * Saves the changes of a step (if any), runs `afterSave` (if any), moves the
+ * progress forward, and goes on to the next step (or `goTo`). When `afterSave`
+ * returns a notice, the step stays on screen to show it (the progress has
+ * still moved forward).
  */
 async function saveStep(
   orgId: string,
@@ -87,6 +92,7 @@ async function saveStep(
   formData?: FormData,
   // where to go afterwards; default: the next step, or the home page after the last one
   goTo?: string,
+  afterSave?: (supabase: Supabase) => Promise<{ ok: false; message: string } | { ok: true; notice: string | null }>,
 ): Promise<FormState> {
   const context = await actionContext(orgId);
   if (!context.ok) {
@@ -107,6 +113,10 @@ async function saveStep(
       return fail(NOT_FOUND_OR_FORBIDDEN, { values });
     }
   }
+  const extra = afterSave ? await afterSave(context.supabase) : null;
+  if (extra && !extra.ok) {
+    return fail(extra.message, { values });
+  }
   const progressError = await writeProgress(context.supabase, orgId, done);
   if (progressError) {
     return fail(progressError, { values });
@@ -114,6 +124,9 @@ async function saveStep(
 
   // the name shows in the header of every page, and the home page shows the progress
   revalidatePath(paths.org(orgId), "layout");
+  if (extra?.notice) {
+    return { ok: true, message: extra.notice };
+  }
   const next = stepAfter(done);
   redirect(goTo ?? (next ? paths.setup(orgId, next) : paths.org(orgId)));
 }
@@ -137,13 +150,31 @@ export async function saveSetupDetailsAction(orgId: string, _prev: FormState, fo
   );
 }
 
-/** Step 2: the industry. */
+/**
+ * Step 2: the industry, and with "apply" its template (FLD-05). When a plan
+ * limit left part of the template out, the step stays on screen to say so.
+ */
 export async function saveSetupIndustryAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = setupIndustrySchema.safeParse(pick(formData, ["industry"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  return saveStep(orgId, 2, { industry: parsed.data.industry || null }, formData);
+  const industry = parsed.data.industry || null;
+  const template = formData.get("apply") === "1" ? industryTemplate(industry) : null;
+  if (formData.get("apply") === "1" && !template) {
+    const message = "יש לבחור ענף כדי להחיל את התבנית שלו.";
+    return fail(message, { fieldErrors: { industry: message }, values: formValues(formData) });
+  }
+  const afterSave = template
+    ? async (supabase: Supabase) => {
+        const result = await applyTemplate(supabase, orgId, template.industry);
+        if (!result.ok) {
+          return result;
+        }
+        return { ok: true as const, notice: result.data!.limits.length > 0 ? describeApplyResult(result.data!) : null };
+      }
+    : undefined;
+  return saveStep(orgId, 2, { industry }, formData, undefined, afterSave);
 }
 
 /** Skips a step, or moves on from a step that has nothing to save (3, and 4 = finish). */

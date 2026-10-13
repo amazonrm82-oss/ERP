@@ -155,6 +155,8 @@ export type OrganizationRow = {
   // FLD-04: logo object in the public bucket org-logos (<org id>/<uuid>) and main colour (#rrggbb)
   logo_path: string | null;
   brand_color: string | null;
+  // FLD-05: industry templates applied (keys); written only by apply_industry_template()
+  industry_templates: string[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1213,6 +1215,8 @@ export type Database = {
       calendar_feed_create: { Args: { p_org: string }; Returns: string };
       calendar_feed_revoke: { Args: { p_org: string }; Returns: undefined };
       calendar_feed_events: { Args: { p_token: string }; Returns: Json };
+      // FLD-05: adds an industry template's missing lists; { added: {...counts}, limits: ["limit:<key>"] }
+      apply_industry_template: { Args: { p_org: string; p_industry: string }; Returns: Json };
       // REC-02: who a note on this record may mention (active members who may see it, not the caller)
       mention_candidates: { Args: { p_org: string; p_kind: string; p_id: string }; Returns: Array<{ user_id: string; name: string }> };
       // merging duplicates (migration 0020): picks = { column: "merge" }

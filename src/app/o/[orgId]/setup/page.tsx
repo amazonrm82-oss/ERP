@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPipeline } from "@/features/deals/queries";
+import { getTemplatePreviews } from "@/features/industry-templates/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { InviteForm } from "@/features/settings/components/invite-form";
 import { assignableRoles, isAdminRole } from "@/features/settings/permissions";
@@ -73,7 +74,12 @@ async function DetailsStep({ orgId }: { orgId: string }) {
 }
 
 async function IndustryStep({ orgId }: { orgId: string }) {
-  const [settings, pipeline, lookups] = await Promise.all([getOrganizationSettings(orgId), getPipeline(orgId), getLeadLookups(orgId)]);
+  const [settings, pipeline, lookups, previews] = await Promise.all([
+    getOrganizationSettings(orgId),
+    getPipeline(orgId),
+    getLeadLookups(orgId),
+    getTemplatePreviews(orgId),
+  ]);
   if (!settings) {
     notFound();
   }
@@ -84,7 +90,7 @@ async function IndustryStep({ orgId }: { orgId: string }) {
   ];
   return (
     <>
-      <IndustryStepForm orgId={orgId} industry={settings.industry} />
+      <IndustryStepForm orgId={orgId} industry={settings.industry} previews={previews} />
       <section aria-labelledby="setup-lists-title" className="mt-6 border-t border-line pt-5">
         <h3 id="setup-lists-title" className="font-semibold">
           מה כבר מוכן בשבילכם
