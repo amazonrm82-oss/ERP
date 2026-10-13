@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { Checkbox, SelectField } from "@/components/ui/field";
-import { BackIcon, ForwardIcon } from "@/components/ui/icons";
+import { BackIcon, ChatIcon, ForwardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 import { CalendarBoard, type CalendarEntry } from "@/features/calendar/components/calendar-board";
@@ -24,6 +24,7 @@ import {
   VIEW_LABEL,
   type CalendarQuery,
 } from "@/features/calendar/range";
+import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { parsePeople, pickPeople, PEOPLE_MAX, teammatesOf, teamPeople, visibleTeams } from "@/features/calendar/team";
 import { holidaysByDay } from "@/features/calendar-days/holidays";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
@@ -131,7 +132,16 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title="יומן" description={`פגישות ומשימות עם מועד${whose}.`} />
+      <PageHeader
+        title="יומן"
+        description={`פגישות ומשימות עם מועד${whose}.`}
+        actions={
+          <Link href={tomorrowPath(orgId)} className={buttonClasses("secondary")}>
+            <ChatIcon className="size-5 text-accent" />
+            תזכורות למחר
+          </Link>
+        }
+      />
 
       <Tabs
         label="תצוגת היומן"

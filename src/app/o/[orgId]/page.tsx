@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { calendarPath } from "@/features/calendar/range";
+import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { idleText, meetingSpanText } from "@/features/home/my-day";
 import { getMyDay } from "@/features/home/queries";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
@@ -103,9 +104,14 @@ export default async function HomePage({ params }: Props) {
             id="my-meetings-title"
             title="הפגישות שלי היום"
             action={
-              <ButtonLink href={calendarPath(orgId, { view: "day" })} variant="ghost" size="sm">
-                ליומן
-              </ButtonLink>
+              <span className="flex flex-wrap gap-1">
+                <ButtonLink href={tomorrowPath(orgId)} variant="ghost" size="sm">
+                  תזכורות למחר
+                </ButtonLink>
+                <ButtonLink href={calendarPath(orgId, { view: "day" })} variant="ghost" size="sm">
+                  ליומן
+                </ButtonLink>
+              </span>
             }
           />
           <CardBody>

@@ -20,6 +20,9 @@ type Props = {
   name: string;
   // what the placeholders of a template become on this record
   values: TemplateValues;
+  // GAP-03: the template chosen when the window opens (the meeting reminder); one that is
+  // gone by then is simply not chosen, and the window offers the rest
+  preselectId?: string | null;
 };
 
 const NO_TEMPLATE = "";
@@ -29,7 +32,7 @@ const NO_TEMPLATE = "";
  * lets the person change the text, opens wa.me with it, and logs the message on the
  * timeline. One message, sent by the person from their own WhatsApp; nothing is sent by us.
  */
-export function WhatsappButton({ phoneE164, orgId, subject, name, values }: Props) {
+export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<TemplateChoice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,6 +42,12 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values }: Prop
   const [loading, startLoading] = useTransition();
   const [, startLogging] = useTransition();
 
+  function choose(list: TemplateChoice[], id: string) {
+    setChoice(id);
+    const template = list.find((item) => item.id === id);
+    setText(template ? fillTemplate(template.body, values) : "");
+  }
+
   function openWindow() {
     setResult(null);
     setOpen(true);
@@ -46,16 +55,19 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values }: Prop
       setLoadError(null);
       startLoading(async () => {
         const answer = await loadWhatsappTemplatesAction(orgId);
-        if (answer.ok) setTemplates(answer.data ?? []);
-        else setLoadError(answer.message);
+        if (answer.ok) {
+          const list = answer.data ?? [];
+          setTemplates(list);
+          if (preselectId && list.some((item) => item.id === preselectId)) choose(list, preselectId);
+        } else setLoadError(answer.message);
       });
+    } else if (preselectId && choice === NO_TEMPLATE && text === "" && templates.some((item) => item.id === preselectId)) {
+      choose(templates, preselectId);
     }
   }
 
   function pick(id: string) {
-    setChoice(id);
-    const template = templates?.find((item) => item.id === id);
-    setText(template ? fillTemplate(template.body, values) : "");
+    choose(templates ?? [], id);
   }
 
   const tooLong = text.trim().length > MESSAGE_MAX;
