@@ -1,10 +1,12 @@
 import "server-only";
 
+import { getUserNames } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { ilikeAny, PAGE_SIZE } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
+import { PRICE_FIELDS, priceHistory, type PriceChange } from "./price-history";
 import type { Billing, ProductKind, VatKind } from "./schema";
 
 export type Product = {
@@ -138,4 +140,33 @@ export async function getProduct(orgId: string, productId: string): Promise<Prod
   const supabase = await createClient();
   const row = must(await supabase.from("products").select(COLUMNS).eq("organization_id", orgId).eq("id", productId).maybeSingle(), "product");
   return row ? toProduct(row) : null;
+}
+
+/**
+ * PRD-07: the price changes of one product, newest first (at most 50), from the audit log.
+ * Read with the user's session: audit_log RLS lets owners and admins read it, so anyone else
+ * gets an empty list (the page shows the section to owners and admins only).
+ */
+export async function listProductPriceHistory(orgId: string, product: Product): Promise<PriceChange[]> {
+  const supabase = await createClient();
+  const rows =
+    must(
+      await supabase
+        .from("audit_log")
+        .select("id, created_at, actor_id, changes")
+        .eq("organization_id", orgId)
+        .eq("entity_type", "products")
+        .eq("entity_id", product.id)
+        .eq("action", "update")
+        .or(PRICE_FIELDS.map((field) => `changes->${field}.not.is.null`).join(","))
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(50),
+      "audit_log",
+    ) ?? [];
+  const names = await getUserNames(rows.map((r) => r.actor_id));
+  return priceHistory(
+    product,
+    rows.map((r) => ({ id: r.id, createdAt: r.created_at, actorName: r.actor_id ? (names.get(r.actor_id) ?? "משתמש") : null, changes: r.changes })),
+  );
 }

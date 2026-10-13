@@ -5,11 +5,12 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProductActions } from "@/features/products/components/product-actions";
 import { ProductDetails } from "@/features/products/components/product-details";
+import { PriceHistory } from "@/features/products/components/price-history";
 import { ProductForm } from "@/features/products/components/product-form";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
 import { categoryLabel, categoryOptions } from "@/features/products/lists";
 import { productsPath } from "@/features/products/paths";
-import { getProduct } from "@/features/products/queries";
+import { getProduct, listProductPriceHistory } from "@/features/products/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { getPricesIncludeVat } from "@/features/tax/queries";
@@ -19,12 +20,17 @@ export const metadata: Metadata = { title: "מוצר" };
 
 type Props = { params: Promise<{ orgId: string; productId: string }> };
 
-/** PRD-01, PRD-02: one product. Everyone reads it; owners and admins of a writable organization edit, copy, archive and remove. */
+/**
+ * PRD-01, PRD-02: one product. Everyone reads it; owners and admins of a writable organization edit, copy, archive and remove.
+ * PRD-07: owners and admins also see its price changes (from the audit log).
+ */
 export default async function ProductPage({ params }: Props) {
   const { orgId, productId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
   if (!isUuid(productId)) notFound();
   const canEdit = isAdminRole(role) && canWrite;
+  // PRD-07: the audit log is readable by owners and admins only (RLS), so only they see the price history
+  const canSeeHistory = isAdminRole(role);
   const [product, categories, units, pricesIncludeVat] = await Promise.all([
     getProduct(orgId, productId),
     listProductCategories(orgId),
@@ -32,6 +38,7 @@ export default async function ProductPage({ params }: Props) {
     canEdit ? getPricesIncludeVat(orgId) : Promise.resolve(false),
   ]);
   if (!product) notFound();
+  const priceChanges = canSeeHistory ? await listProductPriceHistory(orgId, product) : [];
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -54,6 +61,14 @@ export default async function ProductPage({ params }: Props) {
           />
         </CardBody>
       </Card>
+      {canSeeHistory ? (
+        <Card aria-labelledby="product-price-history-title">
+          <CardHeader id="product-price-history-title" title="היסטוריית מחיר" />
+          <CardBody>
+            <PriceHistory changes={priceChanges} />
+          </CardBody>
+        </Card>
+      ) : null}
       {canEdit ? (
         <Card aria-labelledby="product-edit-title">
           <CardHeader id="product-edit-title" title="עריכת המוצר" />
