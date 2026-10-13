@@ -111,8 +111,9 @@ describe("two-step verification guards the personal tables too (FXS-03)", () => 
     const codes = (run: typeof asUser, userId: string) =>
       run(userId, async (q) => (await q<{ r: { remaining: number } }>("select public.mfa_recovery_codes_status() as r")).rows[0].r);
 
-    for (const read of [agreement(asUser, owner.id), codes(asUser, owner.id)]) {
-      const refused = await pgError(read);
+    // started one at a time: a second promise created up front rejects before it is awaited
+    for (const read of [() => agreement(asUser, owner.id), () => codes(asUser, owner.id)]) {
+      const refused = await pgError(read());
       expect(refused.code).toBe("42501");
       expect(refused.hint).toBe("mfa:aal2_required");
     }
