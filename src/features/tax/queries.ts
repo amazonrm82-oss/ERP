@@ -41,6 +41,16 @@ export const getDocumentDetails = cache(async (orgId: string): Promise<DocumentD
   return documentDetailsFromRow(row);
 });
 
+/** Whether the business types and shows prices including VAT (TAX-04); no row = before VAT. */
+export const getPricesIncludeVat = cache(async (orgId: string): Promise<boolean> => {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("org_document_settings").select("prices_include_vat").eq("organization_id", orgId).maybeSingle(),
+    "org prices mode",
+  );
+  return row?.prices_include_vat === true;
+});
+
 /** Every VAT rate of the platform (TAX-03), oldest first; a handful of rows. */
 export const getVatRates = cache(async (): Promise<VatRate[]> => {
   const supabase = await createClient();

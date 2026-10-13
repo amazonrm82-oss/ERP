@@ -76,6 +76,8 @@ export type OrgDocumentSettingsRow = {
   postal_code: string | null;
   phone: string | null;
   email: string | null;
+  // TAX-04 (migration prices_include_vat): prices typed and shown including VAT
+  prices_include_vat: boolean;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -113,6 +115,7 @@ type OrgDocumentSettingsWrite = {
   vat_status?: "licensed" | "exempt" | "nonprofit" | "other" | null;
   vat_status_other?: string | null;
   other_charges_vat?: boolean | null;
+  prices_include_vat?: boolean;
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { israeliIdNumber } from "@/lib/israeli-id";
 import { optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
 
+import { PRICES_MODE_OPTIONS } from "./prices";
 import { LEGAL_FORMS, VAT_STATUS_OTHER_MAX, VAT_STATUSES } from "./status";
 
 export const TAX_FIELD_NAMES = ["legal_form", "vat_status", "vat_status_other", "other_charges_vat"] as const;
@@ -119,3 +120,12 @@ export const bankDetailsSchema = z
   });
 
 export type BankDetailsInput = z.infer<typeof bankDetailsSchema>;
+
+export const PRICES_FIELD_NAMES = ["prices_mode"] as const;
+
+const PRICES_MODES = PRICES_MODE_OPTIONS.map((option) => option.value) as ["net", "gross"];
+
+/** Prices before VAT or including VAT (TAX-04). */
+export const pricesModeSchema = z
+  .object({ prices_mode: z.enum(PRICES_MODES, { error: "יש לבחור איך מקלידים מחירים." }) })
+  .transform((data) => ({ prices_include_vat: data.prices_mode === "gross" }));

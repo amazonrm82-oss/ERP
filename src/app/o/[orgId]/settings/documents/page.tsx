@@ -9,9 +9,11 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { BankDetailsForm } from "@/features/tax/components/bank-details-form";
 import { DocumentDetailsForm } from "@/features/tax/components/document-details-form";
+import { PricesModeForm } from "@/features/tax/components/prices-mode-form";
 import { TaxStatusForm } from "@/features/tax/components/tax-status-form";
 import { VatRatesCard } from "@/features/tax/components/vat-rates-card";
-import { getBankDetails, getDocumentDetails, getTaxSettings, getVatRates } from "@/features/tax/queries";
+import { PRICES_NO_VAT_NOTE, pricesModeLabel } from "@/features/tax/prices";
+import { getBankDetails, getDocumentDetails, getPricesIncludeVat, getTaxSettings, getVatRates } from "@/features/tax/queries";
 import { bankTransferText, documentAddress } from "@/features/tax/settings";
 import { chargesVat, LEGAL_FORM_OPTIONS, vatStatusLabel } from "@/features/tax/status";
 import { zoneDate } from "@/lib/format";
@@ -29,12 +31,20 @@ function chargesText(value: boolean | null): string {
 // TAX-01: the business's VAT status, apart from its legal form.
 // TAX-02: the business details printed on quotes and payment requests.
 // Bank details: owners and admins only (owner, 13 October 2026); others get one line.
+// TAX-04: prices typed and shown before VAT or including VAT.
 // TAX-03: the VAT rate of today and its history (read only; the platform sets it).
 export default async function DocumentSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite, org } = await getOrgContext(orgId);
-  const [tax, details, branding, rates] = await Promise.all([getTaxSettings(orgId), getDocumentDetails(orgId), getOrgBranding(orgId), getVatRates()]);
-  const ratesCard = <VatRatesCard rates={rates} today={zoneDate(new Date(), org.timeZone)} charges={chargesVat(tax.vatStatus, tax.otherChargesVat)} />;
+  const [tax, details, branding, rates, pricesIncludeVat] = await Promise.all([
+    getTaxSettings(orgId),
+    getDocumentDetails(orgId),
+    getOrgBranding(orgId),
+    getVatRates(),
+    getPricesIncludeVat(orgId),
+  ]);
+  const charges = chargesVat(tax.vatStatus, tax.otherChargesVat);
+  const ratesCard = <VatRatesCard rates={rates} today={zoneDate(new Date(), org.timeZone)} charges={charges} />;
   const editable = isAdminRole(role) && canWrite;
   // the database gives the bank row to owners and admins only; nobody else is even asked
   const bank = isAdminRole(role) ? await getBankDetails(orgId) : null;
@@ -63,6 +73,7 @@ export default async function DocumentSettingsPage({ params }: Props) {
       <div className="space-y-5">
         <TaxStatusForm orgId={orgId} settings={tax} />
         {ratesCard}
+        <PricesModeForm orgId={orgId} pricesIncludeVat={pricesIncludeVat} charges={charges} />
         <DocumentDetailsForm orgId={orgId} details={details} />
         {bank ? <BankDetailsForm orgId={orgId} details={bank} /> : null}
         {logoCard}
@@ -77,9 +88,11 @@ export default async function DocumentSettingsPage({ params }: Props) {
         <CardBody>
           <DetailList>
             <Detail label="המעמד" value={vatStatusLabel(tax.vatStatus, tax.vatStatusOther)} />
-            <Detail label='גובה מע"מ' value={chargesText(chargesVat(tax.vatStatus, tax.otherChargesVat))} />
+            <Detail label='גובה מע"מ' value={chargesText(charges)} />
+            <Detail label="מחירים במסמכים" value={pricesModeLabel(pricesIncludeVat)} />
             <Detail label="צורת ההתאגדות" value={LEGAL_FORM_OPTIONS.find((option) => option.value === tax.legalForm)?.label} />
           </DetailList>
+          {charges === false ? <p className="mt-4 text-sm text-ink-soft">{PRICES_NO_VAT_NOTE}</p> : null}
         </CardBody>
       </Card>
       {ratesCard}
