@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { asAdmin, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
 
@@ -112,6 +112,27 @@ describe("product quota (PRD-08)", () => {
     // reading and editing what exists still works
     const n = await asUser(owner.id, async (q) => (await q("select id from public.products where organization_id = $1", [org])).rowCount);
     expect(n).toBeGreaterThan(0);
+    await setOverrides(org, {});
+  });
+
+  it("an outsider or a member gets a plain 42501, never the business's plan state", async () => {
+    const member = await addMember(org, owner.id, "member", "quota-member");
+    // the capability is off
+    await setOverrides(org, {}, { products: false });
+    for (const u of [owner2, member]) {
+      const err = await pgError(insert(u.id, "מבחוץ"));
+      expect(err.code).toBe("42501");
+      expect(err.hint ?? null).toBeNull();
+    }
+    // the business is at its quota
+    const used = (await usage(owner.id))!.used;
+    await setOverrides(org, { max_products: used });
+    expect((await pgError(insert(owner.id, "מעבר"))).hint).toBe("limit:max_products");
+    for (const u of [owner2, member]) {
+      const err = await pgError(insert(u.id, "מבחוץ"));
+      expect(err.code).toBe("42501");
+      expect(err.hint ?? null).toBeNull();
+    }
     await setOverrides(org, {});
   });
 
