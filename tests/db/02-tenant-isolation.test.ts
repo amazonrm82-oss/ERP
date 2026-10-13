@@ -95,6 +95,7 @@ describe("tenant isolation", () => {
       await q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '[{\"key\": \"phone\"}]')", [orgA]);
       await q("insert into public.record_followers (organization_id, lead_id) values ($1, $2)", [orgA, ids.leadA]);
       await q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')", [orgA]);
+      await q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed')", [orgA]);
       ids.meetingA = (
         await q<{ id: string }>(
           "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'פגישת היכרות', now() + interval '1 day', now() + interval '1 day 1 hour', $2) returning id",
@@ -153,6 +154,7 @@ describe("tenant isolation", () => {
     "meeting_participants",
     "disqualify_reasons",
     "org_calendar_settings",
+    "org_document_settings",
     "record_type_options",
     "contact_channels",
     // seeded for every new organization (WA-01)
@@ -273,6 +275,7 @@ describe("tenant isolation", () => {
       meeting_participants: "user_id = user_id",
       disqualify_reasons: "name = name",
       org_calendar_settings: "holidays_rest = holidays_rest",
+      org_document_settings: "vat_status = vat_status",
       record_type_options: "name = name",
       contact_channels: "label = label",
       whatsapp_templates: "name = name",
@@ -349,6 +352,7 @@ describe("tenant isolation", () => {
       ["insert into public.meeting_participants (organization_id, meeting_id, user_id) values ($1, $2, $3)", [orgA, ids.meetingA2, a.id]],
       ["insert into public.disqualify_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [orgA]],
+      ["insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')", [orgA]],
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
@@ -409,6 +413,7 @@ describe("tenant isolation", () => {
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["disqualify_reasons", "is_active = false", "not is_active"],
       ["org_calendar_settings", "holiday_eves_rest = true", "holiday_eves_rest"],
+      ["org_document_settings", "vat_status = 'exempt'", "vat_status = 'exempt'"],
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],

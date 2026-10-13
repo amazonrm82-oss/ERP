@@ -58,6 +58,27 @@ export type OrgCalendarSettingsRow = {
 };
 type OrgCalendarSettingsWrite = { rest_weekdays?: number[]; holidays_rest?: boolean; holiday_eves_rest?: boolean; rest_occasions?: string[] };
 
+// TAX-01 (migration tax_status): the business's tax status, at most one row per organization
+export type OrgDocumentSettingsRow = {
+  id: string;
+  organization_id: string;
+  // text with a check: individual | company | partnership | nonprofit | other
+  legal_form: string | null;
+  // text with a check: licensed | exempt | nonprofit | other; null = not set yet
+  vat_status: string | null;
+  vat_status_other: string | null;
+  other_charges_vat: boolean | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type OrgDocumentSettingsWrite = {
+  legal_form?: "individual" | "company" | "partnership" | "nonprofit" | "other" | null;
+  vat_status?: "licensed" | "exempt" | "nonprofit" | "other" | null;
+  vat_status_other?: string | null;
+  other_charges_vat?: boolean | null;
+};
+
 // CAL-01 (meetings migration): a meeting and its team participants
 export type MeetingType = "in_person" | "phone" | "video" | "other";
 export type MeetingStatus = "planned" | "held" | "cancelled" | "no_show";
@@ -1234,6 +1255,7 @@ export type Database = {
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
+      org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
     };
     Views: { [_ in never]: never };
     Functions: {

@@ -18,6 +18,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
+import { documentSettingsPath } from "@/features/tax/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
 
@@ -53,6 +54,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsUsers(orgId), label: "משתמשים", description: "הזמנת עובדים, תפקידים והרשאות", icon: UsersIcon },
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
         { href: calendarSettingsPath(orgId), label: "ימי מנוחה וחגים", description: "הימים שהעסק לא עובד בהם, והחגים של השנה", icon: CalendarIcon },
+        { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
         ...(access.admin
           ? [
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },

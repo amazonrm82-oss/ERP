@@ -598,6 +598,35 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("everyone reads the VAT status; only owners and admins set it (TAX-01)", async () => {
+    const insert = "insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(insert, [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(insert, [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.org_document_settings where organization_id = $1", [org]), u.email).toBe(1);
+        expect((await q<{ v: boolean }>("select app.org_charges_vat($1) as v", [org])).rows[0].v, u.email).toBe(false);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.org_document_settings set vat_status = 'licensed' where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("delete from public.org_document_settings where organization_id = $1", [org])).rowCount).toBe(0);
+      });
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.org_document_settings set vat_status = 'licensed' where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    expect(
+      await asAdmin(async (q) => (await q<{ vat_status: string }>("select vat_status from public.org_document_settings where organization_id = $1", [org])).rows[0].vat_status),
+    ).toBe("licensed");
+    await asUser(admin.id, async (q) => {
+      expect((await q("delete from public.org_document_settings where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+  });
+
   it("meetings follow the record they are about; organizer, creator and participants always see them (CAL-01)", async () => {
     await setVisibility("own");
     const lead = await insertLead(m1.id, org, { full_name: "ליד לפגישה", team_id: team });

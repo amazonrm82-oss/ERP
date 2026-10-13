@@ -36,6 +36,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   automations: "אוטומציה",
   forms: "טופס",
   org_calendar_settings: "ימי מנוחה וחגים",
+  // TAX-01, TAX-02
+  org_document_settings: "מע\"מ ופרטים למסמכים",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
