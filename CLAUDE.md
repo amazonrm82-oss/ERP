@@ -369,6 +369,26 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Card next action (REC-10 follow-up, no migration): `pickNextAction()` in `src/features/record-summary/summary.ts` picks the
   earlier of `record_summary`'s `next_task` (due) and `next_meeting` (start; a planned meeting that has not ended); an undated
   task comes last and a tie goes to the meeting. It links to the calendar day (`who=all`), or to the tasks list.
+- Call-back rules (SPD-05 follow-ups, migration 0127): slot values are `YYYY-MM-DD-HH` business dates (or `now`), booked on
+  that date or refused, never moved. The rules live in the database only (`app.intake_callback_options/offer/pick`; the form
+  renders `intake_form().callback`): "now" 08:00-20:00; on a rest day (`app.org_rest_day`, CAL-03 settings) and on a short
+  working day from 15:00 only the next working day's slots under `closed_line`; short working day = `app.short_work_day(org,
+  day)`: Friday, `erev` or `short` (Yom HaZikaron) occasion with a rest day after it, slots and "now" until 15:00;
+  `forms.callback_slots_off` switches slots off. `app.hebrew_date` / `app.israel_occasions` port
+  `src/features/calendar-days/holidays.ts` (test 78 compares day by day; keep the two in step). The call task
+  (`app.intake_call_task`) is not announced to a person this request already told (`app.intake_quiet_task`).
+- New-lead notifications (SPD-01, migration 0128): `intake_submit` sets `app.intake` around its lead insert, so
+  `notify_assignment` sends `lead_new`; a lead with no owner is sent as `lead_new` to `app.intake_unowned_recipients(org, form
+  team)` (active full-seat writers of the team who read it, else owners/admins). `app.intake_callback_tasks` marks intake's call
+  tasks (they carry the lead's team); `app.intake_callback_task_follow()` (triggers `leads_callback_task_follow`,
+  `tasks_callback_task_follow`, `take_lead`, `send_task_reminders`) moves a lead's marked open unowned call tasks to the lead's
+  usable owner silently (`app.intake_follow`); a task still unowned at the slot's start reminds the would-be takers as
+  `lead_new`, once.
+- Consent hash key (owner, 13 October 2026): suppression and consent hashes are HMAC-SHA256 with the secret
+  `app.settings` key `consent_hash_key` (filled by the owner, never by a migration or the agent), with the organization id in
+  the input. Never replace that key without a process that recomputes every stored hash first: after an erasure the phone or
+  email is gone, so a hash made with an old key can no longer be matched, and a person who opted out could be contacted again.
+  If the key is missing at run time, marketing sends nothing and logs a clear error; never fall back to a plain hash.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
