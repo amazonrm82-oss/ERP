@@ -248,6 +248,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   accent roles on customer-facing pages only, corrected to the nearest shade that passes 4.5:1 (`brandPalette`, both themes;
   `BRAND_THEMES` must match globals.css, unit test). `intake_form()` returns `brand {logo, color}`. Never apply the
   business colour inside the app.
+- Followers (REC-03, migration 0104): `public.record_followers` (one row per user and record; `user_id` from the session;
+  cascades with the record and the membership; own rows always visible, others' to whoever reads the record). Triggers
+  `*_notify_followers` (status/stage/owner; skipped during `app.bulk_transfer` and for records in the bin) and
+  `activities_notify_followers` (a person's own logged entry, `current_user = 'authenticated'`, not private) send kind
+  `follow` to followers who may read the record (`app.user_can_read_record`), never to the actor, never to the new owner
+  about the owner change, never to someone the entry mentions; no entry text. `app.merge_move_links()` does not move
+  followers yet (follow-up).
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
