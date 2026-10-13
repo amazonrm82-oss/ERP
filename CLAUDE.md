@@ -378,6 +378,11 @@ that back.
   is added to the gallery `/admin/design` (`src/features/design-gallery/`), which the e2e photographs.
   Icons only from `src/components/ui/icons.tsx`; direction arrows are `BackIcon` / `ForwardIcon` (they flip with
   the reading direction), never a hand-rotated chevron.
+- Unsaved changes (REC-11): put `<FormGuard state={state} />` inside a record form (`src/components/ui/unsaved-changes.tsx`,
+  logic in `src/lib/form-dirty.ts`). It compares with the starting values, asks via `LeaveDialog` before a link leaves the
+  page (then navigates by href), uses beforeunload, and marks the form `data-unsaved` so a `Dialog` asks before closing.
+  It does not cover the back button or `router.push` from code. A Button with `autoFocus` in a Dialog gets focus after
+  `showModal` (`data-autofocus`), and a Dialog returns focus to its opener when it closes.
 - App shell (DSN-11, FXU-13): `src/features/shell/nav.ts` lists the destinations; four have `mobile: true` and the
   rest sit under "עוד" (a sheet) in the phone bottom bar. Settings sections are listed once in
   `src/features/settings/sections.ts` (settings page, computer side list, section titles); a new settings page is
