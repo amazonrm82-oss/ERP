@@ -75,6 +75,20 @@ describe("conversion carries open tasks and meetings (RVW-5)", () => {
     }
   });
 
+  it("without a deal, every meeting gets the contact only; a contact it already had is kept", async () => {
+    const lead = await insertLead(owner.id, org);
+    const plain = await meeting(lead, "planned", 30);
+    const other = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'קיים') returning id", [org])).rows[0].id,
+    );
+    const linked = await meeting(lead, "planned", 40);
+    await asUser(owner.id, (q) => q("update public.meetings set contact_id = $2 where id = $1", [linked, other]));
+    const result = await convert(lead, false);
+    expect(result.deal_id).toBeNull();
+    expect(await links("meetings", plain)).toEqual({ lead_id: lead, contact_id: result.contact_id, deal_id: null });
+    expect(await links("meetings", linked)).toEqual({ lead_id: lead, contact_id: other, deal_id: null });
+  });
+
   it("the new deal is not stuck and the contact's card shows the next task", async () => {
     const lead = await insertLead(owner.id, org);
     const open = await task(lead, "לחזור אליו מחר");
