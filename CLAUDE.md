@@ -313,6 +313,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   update that keeps the stage, refuses a person's snooze date that is not a day after today up to 366 days ahead or on a closed
   deal (hint `deal:snoozed_until`), and clears the snooze on any stage or pipeline move; `deals_snooze_cleared` logs one
   `system` activity (`metadata.kind = snooze_cleared`, no notification, not "last activity"). MNY-01 and MNY-05 read the same report.
+- Business days (HEB-03, migration 0134): `app.add_business_days(org, from, n)` (app only) counts n working days after a date by
+  the CAL-03 rest days, read once and decided by `app.rest_day_with()` (the rule of `app.org_rest_day()` with the settings passed
+  in; keep the two in step); n = 0 is the day itself or the next working day; n outside 0..1000 → hint `business_days:range`;
+  more than 366 rest days in a row → `business_days:no_working_day`. Mirrored by `addBusinessDays()` in
+  `src/features/calendar-days/business-days.ts` (test 92 compares them day by day). Automations: `create_task` may carry
+  `due_in_business_days` (0..60, due at the current local time); another value is ignored with the step warning "the
+  business-day offset is invalid". `app.run_automation_actions` was last redefined in 0134. QUO / PAY use the same function.
 - Goals (GOL-01/02, migration 0133): `public.goals` (scope user|team|org, period month|quarter|year, metric won_amount|won_deals|
   leads_handled|meetings_held mirrored by `src/features/goals/metrics.ts`; clients insert identity columns once and update only
   `target`). Owners/admins write every goal; a manager (role, not team flag) only goals of teams they manage and of their
