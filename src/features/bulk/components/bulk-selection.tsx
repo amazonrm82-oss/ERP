@@ -5,13 +5,16 @@ import { createContext, useContext, useId, useState, useTransition, type ReactNo
 import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/field";
+import { bulkTasksNotice, pickedTotal } from "@/features/deals/close-window";
+import { BulkWonDialog, type BulkWonChoice, type BulkWonSetup } from "@/features/deals/components/bulk-won-dialog";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { bulkAction, undoBulkAction, type BulkChange, type BulkObject, type BulkUndo } from "../actions";
 
-type Option = { value: string; label: string; needsReason?: boolean };
+// won: a deal stage of kind won, which opens the bulk close window (DEAL-04)
+type Option = { value: string; label: string; needsReason?: boolean; won?: boolean };
 
 type Selection = {
   picked: Set<string>;
@@ -53,6 +56,8 @@ type Props = {
   // leads: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely.
   // deals: the active loss reasons, offered (not required) for a lost stage (DEAL-03)
   reasons?: string[];
+  // deals: the organization's day and zone, and the amounts of the deals on the page, for the bulk close window (DEAL-04)
+  wonWindow?: (BulkWonSetup & { amounts: Record<string, number> }) | null;
   children: ReactNode;
 };
 
@@ -77,7 +82,7 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], children }: Props) {
+export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], wonWindow = null, children }: Props) {
   // a task has a "state" (מצב) rather than a status, and an assignee rather than an owner
   const labels: Record<Kind, string> =
     object === "task" ? { ...KIND_LABELS, status: "שינוי מצב", owner: "שינוי אחראי" } : KIND_LABELS;
@@ -91,6 +96,8 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   // FXU-06: asked in the page before it runs, and undoable after
   const [confirming, setConfirming] = useState(false);
   const [lastUndo, setLastUndo] = useState<BulkUndo | null>(null);
+  // DEAL-04: a move into a won stage asks for one close date first, in a window
+  const [wonOpen, setWonOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // rows that left the page (another page, a filter, a refresh) drop out of the selection
@@ -118,6 +125,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
   );
   const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
   const needsReason = (kind === "status" || kind === "stage") && options.find((o) => o.value === value)?.needsReason;
+  const toWon = kind === "stage" && wonWindow !== null && options.find((o) => o.value === value)?.won === true;
   // a deal's loss reason is optional; a lead's "not relevant" reason is not
   const ready = kind === "trash" || (kind !== "" && value !== "" && (!needsReason || kind === "stage" || reason.trim() !== ""));
 
@@ -141,7 +149,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 ? `ייצוא ${many} לקובץ ${chosen}`
                 : "";
 
-  function run() {
+  function run(close?: BulkWonChoice) {
     if (!kind) return;
     if (kind === "export") {
       if (!exportPath) return;
@@ -159,7 +167,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
         : kind === "status"
           ? { kind, statusId: value, reason }
           : kind === "stage"
-            ? { kind, stageId: value, reason: needsReason ? reason : undefined }
+            ? { kind, stageId: value, reason: needsReason ? reason : undefined, ...(close ? { close } : {}) }
             : kind === "tag"
               ? { kind, tagId: value }
               : { kind: "trash" };
@@ -173,10 +181,12 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
         setError(result.message);
         return;
       }
-      const { done, skipped, undo } = result.data!;
+      const { done, skipped, undo, tasks } = result.data!;
+      const taskText = bulkTasksNotice(tasks);
       setNotice(
         (done === 1 ? "רשומה אחת עודכנה." : `${done} רשומות עודכנו.`) +
-          (skipped > 0 ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : ""),
+          (skipped > 0 ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : "") +
+          (taskText ? ` ${taskText}` : ""),
       );
       setLastUndo(undo.rows.length > 0 ? undo : null);
       setPicked(new Set());
@@ -295,8 +305,8 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 variant={kind === "trash" ? "danger" : "primary"}
                 disabled={pending || !ready}
                 aria-busy={pending || undefined}
-                // export changes nothing, so it runs at once; every change is asked first
-                onClick={() => (kind === "export" ? run() : setConfirming(true))}
+                // export changes nothing, so it runs at once; a move into won asks in its window; every other change is asked first
+                onClick={() => (kind === "export" ? run() : toWon ? setWonOpen(true) : setConfirming(true))}
               >
                 {pending ? "מעדכנים…" : actionText || `ביצוע על ${count}`}
               </Button>
@@ -311,13 +321,27 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             <span className="text-md">
               {actionText}?{kind === "trash" ? " אפשר לשחזר מסל המחזור במשך 30 יום." : " אפשר לבטל מיד אחרי."}
             </span>
-            <Button size="sm" variant={kind === "trash" ? "danger" : "primary"} onClick={run} loading={pending}>
+            <Button size="sm" variant={kind === "trash" ? "danger" : "primary"} onClick={() => run()} loading={pending}>
               כן, לבצע
             </Button>
             <Button size="sm" variant="secondary" autoFocus onClick={() => setConfirming(false)} disabled={pending}>
               לא עכשיו
             </Button>
           </div>
+        ) : null}
+        {wonWindow && toWon ? (
+          <BulkWonDialog
+            open={wonOpen}
+            count={count}
+            totalAgorot={pickedTotal(shown, wonWindow.amounts)}
+            stageName={chosen}
+            setup={wonWindow}
+            onConfirm={(close) => {
+              setWonOpen(false);
+              run(close);
+            }}
+            onClose={() => setWonOpen(false)}
+          />
         ) : null}
         <FormError message={error} className="w-full" />
         {notice ? (

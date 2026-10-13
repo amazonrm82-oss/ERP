@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
+import { closedAtFor, closeDateError } from "@/features/deals/close-window";
+import { addBulkOnboardingTasks } from "@/features/deals/onboarding-server";
 import { setLeadStatus } from "@/features/leads/status";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { isUuid } from "@/lib/paths";
+import { TIME_ZONE } from "@/lib/app";
+import { zoneDate } from "@/lib/format";
+import { isUuid, paths } from "@/lib/paths";
 import { setTrashed, type TrashableTable } from "@/lib/record-trash";
 import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
@@ -21,7 +25,8 @@ export type BulkChange =
   | { kind: "owner"; ownerId: string | null }
   // a lead's status (lead_statuses id), or a task's status (open | done | cancelled)
   | { kind: "status"; statusId: string; reason?: string }
-  | { kind: "stage"; stageId: string; reason?: string }
+  // close: a move into a won stage (DEAL-04 bulk window): one close date for all, and onboarding tasks when asked
+  | { kind: "stage"; stageId: string; reason?: string; close?: BulkClose }
   | { kind: "tag"; tagId: string }
   | { kind: "trash" };
 // what each changed row was before, so the change can be undone (FXU-06)
@@ -38,8 +43,10 @@ export type BulkUndoRow = {
   closedAt?: string | null;
   tag?: string;
 };
+export type BulkClose = { closedDate: string; onboarding: boolean };
 export type BulkUndo = { kind: BulkChange["kind"]; rows: BulkUndoRow[] };
-export type BulkOutcome = { done: number; skipped: number; undo: BulkUndo };
+// tasks: the onboarding tasks of a bulk move into a won stage, when they were asked for
+export type BulkOutcome = { done: number; skipped: number; undo: BulkUndo; tasks?: { created: number; existing: number; failed: number } };
 
 const TASK_STATUSES = ["open", "done", "cancelled"] as const;
 // one page of a list; more than that is not picked at once
@@ -63,11 +70,14 @@ const BEFORE_COLUMNS: Record<BulkObject, string> = {
   lead: "id, tag_ids, owner_id, status_id, disqualify_reason",
   contact: "id, tag_ids, owner_id",
   company: "id, tag_ids, owner_id",
-  deal: "id, tag_ids, owner_id, stage_id, lost_reason_id, lost_reason, closed_at",
+  deal: "id, name, tag_ids, owner_id, stage_id, lost_reason_id, lost_reason, closed_at, contact_id, company_id",
   task: "id, owner_id, status",
 };
 type BeforeRow = {
   id: string;
+  name?: string;
+  contact_id?: string | null;
+  company_id?: string | null;
   tag_ids?: string[];
   owner_id?: string | null;
   status_id?: string;
@@ -85,7 +95,12 @@ const LOSS_TEXT_MAX = 2000;
 const changeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("owner"), ownerId: z.string().nullable() }),
   z.object({ kind: z.literal("status"), statusId: z.string(), reason: z.string().max(2000).nullish() }),
-  z.object({ kind: z.literal("stage"), stageId: z.string(), reason: z.string().max(2000).nullish() }),
+  z.object({
+    kind: z.literal("stage"),
+    stageId: z.string(),
+    reason: z.string().max(2000).nullish(),
+    close: z.object({ closedDate: z.string().max(10), onboarding: z.boolean() }).optional(),
+  }),
   z.object({ kind: z.literal("tag"), tagId: z.string() }),
   z.object({ kind: z.literal("trash") }),
 ]);
@@ -131,6 +146,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
 
   let changed: BeforeRow[] = [];
   let undoRows: BulkUndoRow[] = [];
+  let tasks: BulkOutcome["tasks"];
   switch (change.kind) {
     case "owner": {
       if (change.ownerId !== null && !isUuid(change.ownerId)) return fail("יש לבחור אחראי.");
@@ -185,11 +201,15 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
       // DEAL-03: an optional loss reason, by name; the database drops it unless the stage is a lost one
       const lossReason = await lossReasonIdByName(supabase, orgId, change.reason);
       if (!lossReason.ok) return fail(lossReason.message);
+      // DEAL-04: a move into a won stage carries one close date for the deals that enter it
+      const won = await wonMove(supabase, orgId, change.stageId, change.close, live);
+      if (!won.ok) return fail(won.message);
       // a stage of another pipeline is refused by the (pipeline_id, stage_id) foreign key, and that deal is skipped
       changed = await eachLimited(live, async (row) => {
+        const closedAt = won.move && won.move.entering.has(row.id) ? { closed_at: won.move.closedAt } : {};
         const { data, error: rowError } = await supabase
           .from("deals")
-          .update({ stage_id: change.stageId, ...(lossReason.id ? { lost_reason_id: lossReason.id } : {}) })
+          .update({ stage_id: change.stageId, ...(lossReason.id ? { lost_reason_id: lossReason.id } : {}), ...closedAt })
           .eq("organization_id", orgId)
           .eq("id", row.id)
           .is("deleted_at", null)
@@ -203,6 +223,18 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
         lossText: row.lost_reason && row.lost_reason.length > LOSS_TEXT_MAX ? undefined : (row.lost_reason ?? null),
         closedAt: row.closed_at ?? null,
       }));
+      if (won.move && change.close?.onboarding) {
+        // only for the deals that moved into won now; the move stands even when a task fails
+        const entered = changed.filter((row) => won.move!.entering.has(row.id));
+        tasks = await addBulkOnboardingTasks(
+          supabase,
+          orgId,
+          entered.map((row) => ({ id: row.id, name: row.name ?? "", ownerId: row.owner_id ?? null, contactId: row.contact_id ?? null, companyId: row.company_id ?? null })),
+          won.move.today,
+          won.move.timeZone,
+        );
+        revalidatePath(paths.tasks(orgId));
+      }
       break;
     }
     case "tag": {
@@ -231,7 +263,43 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   }
 
   revalidatePath(RECORD_TYPES[object].list(orgId));
-  return ok({ done: changed.length, skipped: unique.length - changed.length, undo: { kind: change.kind, rows: undoRows } });
+  return ok({ done: changed.length, skipped: unique.length - changed.length, undo: { kind: change.kind, rows: undoRows }, ...(tasks ? { tasks } : {}) });
+}
+
+type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
+type WonMove = { entering: Set<string>; closedAt: string; today: string; timeZone: string };
+
+/**
+ * DEAL-04: when the target stage is a won one, the close date of the bulk window
+ * (required, not in the future, in the organization's zone) and the picked deals
+ * that enter won now (from an open or lost stage); a won to won move keeps its date.
+ */
+async function wonMove(
+  supabase: Supabase,
+  orgId: string,
+  stageId: string,
+  close: BulkClose | undefined,
+  rows: BeforeRow[],
+): Promise<{ ok: true; move: WonMove | null } | { ok: false; message: string }> {
+  const { data: target, error } = await supabase.from("stages").select("kind").eq("organization_id", orgId).eq("id", stageId).maybeSingle();
+  if (error) return { ok: false, message: dbErrorMessage(error) };
+  if (target?.kind !== "won") return { ok: true, move: null };
+  const fromIds = [...new Set(rows.map((row) => row.stage_id).filter((id): id is string => Boolean(id)))];
+  const [{ data: org, error: orgError }, { data: from, error: fromError }] = await Promise.all([
+    supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(),
+    fromIds.length > 0 ? supabase.from("stages").select("id, kind").eq("organization_id", orgId).in("id", fromIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (orgError) return { ok: false, message: dbErrorMessage(orgError) };
+  if (fromError) return { ok: false, message: dbErrorMessage(fromError) };
+  const timeZone = org?.timezone || TIME_ZONE;
+  const now = new Date();
+  const today = zoneDate(now, timeZone);
+  const day = close?.closedDate ?? "";
+  const dateError = closeDateError(day, today);
+  if (dateError) return { ok: false, message: dateError };
+  const wonStages = new Set((from ?? []).filter((stage) => stage.kind === "won").map((stage) => stage.id));
+  const entering = new Set(rows.filter((row) => !row.stage_id || !wonStages.has(row.stage_id)).map((row) => row.id));
+  return { ok: true, move: { entering, closedAt: closedAtFor(day, today, now, timeZone), today, timeZone } };
 }
 
 const undoSchema = z.object({

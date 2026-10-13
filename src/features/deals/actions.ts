@@ -12,11 +12,12 @@ import { setTrashed } from "@/lib/record-trash";
 import { isUuid } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 import { TIME_ZONE } from "@/lib/app";
-import { zoneDate, zonedIso } from "@/lib/format";
+import { zoneDate } from "@/lib/format";
 
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 
-import { closedAtFor, ONBOARDING_EXISTS, ONBOARDING_PREFIX, parseCloseWon } from "./close-window";
+import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
+import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 
 function revalidateDeal(orgId: string, dealId?: string) {
@@ -167,31 +168,6 @@ export async function setDealLossAction(orgId: string, dealId: string, _prev: Fo
 
 const CLOSE_TASK_FAILED = "העסקה סומנה כזכייה, אבל משימת הקליטה לא נוצרה. אפשר לנסות שוב, או לסגור ולהוסיף משימה מדף העסקה.";
 
-/**
- * DEAL-04, the close window: moves a deal into a won stage with the confirmed
- * amount and close date, then, when asked, adds an onboarding task linked to the
- * deal (and to its contact and company when the user can see them), all with the
- * user's session. The deal is not moved until the form is sent; cancelling leaves it.
- */
-type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
-
-/**
- * DEAL-04: does the deal already have an open onboarding task (ONBOARDING_PREFIX).
- * Read with the user's session, so a task the user may not see does not count.
- */
-async function openOnboardingTask(supabase: Supabase, orgId: string, dealId: string) {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("deal_id", dealId)
-    .eq("status", "open")
-    .is("deleted_at", null)
-    .like("title", `${ONBOARDING_PREFIX}%`)
-    .limit(1);
-  return error ? { error } : { open: data.length > 0 };
-}
-
 /** DEAL-04: the close window asks, when it opens, whether to offer the onboarding task at all. */
 export async function dealOnboardingTaskAction(orgId: string, dealId: string): Promise<ActionResult<{ open: boolean }>> {
   const context = await actionContext(orgId, dealId);
@@ -205,6 +181,12 @@ export async function dealOnboardingTaskAction(orgId: string, dealId: string): P
   return ok({ open: found.open });
 }
 
+/**
+ * DEAL-04, the close window: moves a deal into a won stage with the confirmed
+ * amount and close date, then, when asked, adds an onboarding task linked to the
+ * deal (and to its contact and company when the user can see them), all with the
+ * user's session. The deal is not moved until the form is sent; cancelling leaves it.
+ */
 export async function closeDealWonAction(orgId: string, dealId: string, stageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
@@ -256,30 +238,13 @@ export async function closeDealWonAction(orgId: string, dealId: string, stageId:
       return { ok: true, message: ONBOARDING_EXISTS };
     }
     const deal = moved[0];
-    // a task may link only records the user can see (tasks_insert, migration 0074): link the
-    // deal's contact and company only when they can be read with this session
-    const [contact, company] = await Promise.all([
-      deal.contact_id
-        ? supabase.from("contacts").select("id").eq("organization_id", orgId).eq("id", deal.contact_id).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      deal.company_id
-        ? supabase.from("companies").select("id").eq("organization_id", orgId).eq("id", deal.company_id).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
     // the window offers the deal's owner first; no choice: the task is the user's (database default)
-    const owner = close.task.ownerId;
-    const { error: taskError } = await supabase.from("tasks").insert({
-      organization_id: orgId,
-      title: close.task.title,
-      task_type: "todo",
-      priority: 2,
-      // a day without a time is due at the start of the working day, like the task form
-      due_at: close.task.dueDate ? zonedIso(close.task.dueDate, "09:00:00", timeZone) : null,
-      deal_id: dealId,
-      contact_id: !contact.error && contact.data ? contact.data.id : null,
-      company_id: !company.error && company.data ? company.data.id : null,
-      ...(owner ? { owner_id: owner } : {}),
-    });
+    const taskError = await insertOnboardingTask(
+      supabase,
+      orgId,
+      { dealId, contactId: deal.contact_id, companyId: deal.company_id, title: close.task.title, dueDate: close.task.dueDate, ownerId: close.task.ownerId },
+      timeZone,
+    );
     if (taskError) {
       return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(taskError)})`, values);
     }

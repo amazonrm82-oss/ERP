@@ -39,7 +39,12 @@ type Props = {
 export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags, lossReasons, closeWindow }: Props) {
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   // a lost stage offers a reason, when the organization has any (optional)
-  const stageOptions = stages.map((stage) => ({ value: stage.id, label: stage.name, needsReason: stage.kind === "lost" && lossReasons.length > 0 }));
+  const stageOptions = stages.map((stage) => ({
+    value: stage.id,
+    label: stage.name,
+    needsReason: stage.kind === "lost" && lossReasons.length > 0,
+    won: stage.kind === "won",
+  }));
 
   return (
     <BulkSelection
@@ -50,6 +55,8 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
       statuses={null}
       stages={stageOptions}
       reasons={lossReasons}
+      // DEAL-04: a bulk move into a won stage asks for one close date (amounts are shown, not changed)
+      wonWindow={closeWindow ? { today: closeWindow.today, timeZone: closeWindow.timeZone, amounts: Object.fromEntries(deals.map((deal) => [deal.id, deal.amountAgorot ?? 0])) } : null}
       tags={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
       canTrash={editing.bulk?.trash ?? false}
       exportPath={editing.bulk?.exportable ? `${paths.deals(orgId)}/export` : null}

@@ -16,13 +16,19 @@ export function useOldCloseDate(today: string) {
   const confirmed = useRef<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    const day = String(new FormData(event.currentTarget).get("closed_date") ?? "");
+  // true: go on and save; false: the question is shown first
+  function check(day: string): boolean {
     if (closeDateIsOld(day, today) && confirmed.current !== day) {
-      event.preventDefault();
       setAsking(day);
-    } else {
-      setAsking(null);
+      return false;
+    }
+    setAsking(null);
+    return true;
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!check(String(new FormData(event.currentTarget).get("closed_date") ?? ""))) {
+      event.preventDefault();
     }
   }
 
@@ -33,7 +39,7 @@ export function useOldCloseDate(today: string) {
     event.currentTarget.form?.requestSubmit();
   }
 
-  return { onSubmit, asking, confirm, cancel: () => setAsking(null) };
+  return { onSubmit, check, asking, confirm, cancel: () => setAsking(null) };
 }
 
 export function OldCloseDateQuestion({ day, onConfirm, onCancel }: { day: string | null; onConfirm: (event: MouseEvent<HTMLButtonElement>) => void; onCancel: () => void }) {

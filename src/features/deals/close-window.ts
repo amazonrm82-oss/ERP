@@ -105,6 +105,7 @@ export function closedAtFor(day: string, today: string, now: Date, timeZone: str
 export const CLOSE_WON_FIELD_NAMES = ["amount", "closed_date", "onboarding", "task_title", "task_due_date", "task_owner_id"] as const;
 
 const CLOSED_DATE_MISSING = "יש לבחור תאריך סגירה.";
+const CLOSED_DATE_FUTURE = "תאריך הסגירה לא יכול להיות בעתיד.";
 
 /** The close window's form; today is the organization's calendar day. */
 export function closeWonSchema(today: string) {
@@ -122,7 +123,7 @@ export function closeWonSchema(today: string) {
       if (form.closed_date === null) {
         ctx.addIssue({ code: "custom", path: ["closed_date"], message: CLOSED_DATE_MISSING });
       } else if (form.closed_date > today) {
-        ctx.addIssue({ code: "custom", path: ["closed_date"], message: "תאריך הסגירה לא יכול להיות בעתיד." });
+        ctx.addIssue({ code: "custom", path: ["closed_date"], message: CLOSED_DATE_FUTURE });
       }
     })
     .transform((form, ctx) => {
@@ -146,6 +147,35 @@ export type CloseWon = z.output<ReturnType<typeof closeWonSchema>>;
 
 export function parseCloseWon(formData: FormData, today: string) {
   return closeWonSchema(today).safeParse(pick(formData, CLOSE_WON_FIELD_NAMES));
+}
+
+/**
+ * DEAL-04, the bulk close window (owner's answer, 13 October 2026): one close
+ * date for every picked deal; the same rule as the single window.
+ */
+export function closeDateError(day: string, today: string): string | null {
+  if (!isCalendarDate(day)) return CLOSED_DATE_MISSING;
+  if (day > today) return CLOSED_DATE_FUTURE;
+  return null;
+}
+
+/** The total amount of the picked deals, in agorot (a deal the page does not show counts as 0). */
+export function pickedTotal(ids: Iterable<string>, amounts: Readonly<Record<string, number>>): number {
+  let total = 0;
+  for (const id of ids) total += amounts[id] ?? 0;
+  return total;
+}
+
+/** What the bulk window says about the onboarding tasks it made, or "" when none were asked for. */
+export function bulkTasksNotice(tasks: { created: number; existing: number; failed: number } | undefined): string {
+  if (!tasks) return "";
+  const parts: string[] = [];
+  if (tasks.created > 0) parts.push(tasks.created === 1 ? "נוצרה משימת קליטה אחת." : `נוצרו ${tasks.created} משימות קליטה.`);
+  if (tasks.existing > 0) {
+    parts.push(tasks.existing === 1 ? "לעסקה אחת כבר יש משימת קליטה פתוחה." : `ל-${tasks.existing} עסקאות כבר יש משימת קליטה פתוחה.`);
+  }
+  if (tasks.failed > 0) parts.push(tasks.failed === 1 ? "משימת קליטה אחת לא נוצרה." : `${tasks.failed} משימות קליטה לא נוצרו.`);
+  return parts.join(" ");
 }
 
 /** Agorot as the amount field shows them: "12500" or "12500.50". */
