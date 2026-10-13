@@ -32,7 +32,8 @@ const MAX_SHOWN = 200;
 
 /**
  * Leads that no one has answered yet (SPD-02), oldest first: open status, not
- * converted, not imported, and no contact activity logged by a person. Read
+ * converted, not imported, and no contact activity logged by a person that is not
+ * a private note (the rule of report_money_waiting, MNY-01). Read
  * with the user's session, so each person sees the leads they may see.
  * `ownerId` narrows to one person's leads. `viewer` (SPD-01) leaves out leads
  * someone else already took ("לקחתי"), except for owners, admins and the
@@ -83,6 +84,8 @@ export async function getWaitingLeads(
               .in("lead_id", batch.map((row) => row.id))
               .in("type", [...CONTACT_TYPES])
               .not("created_by", "is", null)
+              // a private note is not an answer: otherwise a lead would be waiting for some people and not others
+              .eq("is_private", false)
               .order("id", { ascending: true })
               .range(from, to),
             "lead activities",
