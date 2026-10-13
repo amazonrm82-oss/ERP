@@ -16,6 +16,7 @@ import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
@@ -119,7 +120,14 @@ export default async function TasksPage({ params, searchParams }: Props) {
     return <TasksTableView orgId={orgId} context={context} query={query} showAll={showAll} />;
   }
 
-  const [groups, members] = await Promise.all([listTaskGroups(orgId, showAll ? null : user.id), listMembers(orgId)]);
+  const [groups, members, calendar] = await Promise.all([
+    listTaskGroups(orgId, showAll ? null : user.id),
+    listMembers(orgId),
+    canWrite ? getCalendarSettings(orgId) : null,
+  ]);
+  // HEB-03: "in N business days" counts from today in the business's zone
+  const today = zoneDate(new Date(), context.org.timeZone);
+  const businessDays = calendar ? { calendar, today } : undefined;
   const assignees = members
     .filter((member) => member.status === "active" && member.role !== "viewer")
     .map((member) => ({ userId: member.userId, name: member.userId === user.id ? `${member.name} (אני)` : member.name }));
@@ -186,6 +194,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                         canEdit={canWrite}
                         showOwner={showAll}
                         assignees={assignees}
+                        businessDays={businessDays}
                       />
                     ))}
                   </ul>
@@ -205,6 +214,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                     canEdit={canWrite}
                     showOwner={showAll}
                     assignees={assignees}
+                    businessDays={businessDays}
                   />
                 ))}
               </ul>
@@ -220,7 +230,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
               <Card aria-labelledby="new-task-title">
                 <CardHeader id="new-task-title" title="משימה חדשה" />
                 <CardBody>
-                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={zoneDate(new Date(), context.org.timeZone)} />
+                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} />
                 </CardBody>
               </Card>
             </NewTaskPanel>

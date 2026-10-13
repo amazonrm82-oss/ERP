@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -91,10 +91,17 @@ describe("set_lead_status and the not-relevant reason", () => {
 });
 
 describe("run log warnings", () => {
-  it("every warning the engine writes (migration 0098) has a Hebrew text", () => {
-    const sql = readFileSync(join(process.cwd(), "supabase/migrations/20261006009500_automation_disqualify_reason.sql"), "utf8");
+  it("every warning the engine writes has a Hebrew text (the latest app.run_automation_actions)", () => {
+    // the newest migration that redefines the engine's action runner (0095, then HEB-03)
+    const dir = join(process.cwd(), "supabase/migrations");
+    const latest = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.run_automation_actions"))
+      .at(-1)!;
+    const sql = readFileSync(join(dir, latest), "utf8");
     const written = [...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]);
-    expect([...new Set(written)].sort()).toEqual(["no reason is set", "the reason no longer exists"]);
+    expect([...new Set(written)].sort()).toEqual(["no reason is set", "the business-day offset is invalid", "the reason no longer exists"]);
     for (const warning of written) {
       expect(STEP_WARNINGS[warning]).toBeTruthy();
     }

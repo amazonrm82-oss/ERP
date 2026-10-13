@@ -1,6 +1,7 @@
 import { SelectField, TextField } from "@/components/ui/field";
 
 import type { RepeatValues } from "../recurrence";
+import { BusinessDaysPicker, type BusinessDaysContext } from "./business-days-picker";
 import { RecurrenceFields } from "./recurrence-fields";
 
 export type AssigneeOption = { userId: string; name: string };
@@ -47,10 +48,17 @@ export function remindOption(dueAt: string | null, remindAt: string | null): str
   return REMIND_OPTIONS.some((option) => option.value === minutes) ? minutes : "";
 }
 
-type Props = { values: TaskValues; errors: Record<string, string>; assignees: AssigneeOption[]; defaultOwnerId: string };
+type Props = {
+  values: TaskValues;
+  errors: Record<string, string>;
+  assignees: AssigneeOption[];
+  defaultOwnerId: string;
+  /** HEB-03: the quick "in N business days" choice next to the date; left out where the settings are not at hand */
+  businessDays?: BusinessDaysContext;
+};
 
 /** Title, due date and time, reminder, repeat, assignee. Shared by the new-task form and the edit form. */
-export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props) {
+export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
     <>
@@ -74,6 +82,7 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId }: Props)
           error={errors.due_time}
         />
       </div>
+      {businessDays ? <BusinessDaysPicker calendar={businessDays.calendar} today={businessDays.today} /> : null}
       <SelectField key={`priority-${values.priority ?? "2"}`} label="עדיפות" name="priority" defaultValue={values.priority ?? "2"} error={errors.priority}>
         {PRIORITY_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>

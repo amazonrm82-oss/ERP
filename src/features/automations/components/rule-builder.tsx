@@ -288,9 +288,10 @@ function ActionFields({ orgId, action, index, lookups, onChange }: FieldsProps) 
             <option value="none">בלי מועד</option>
             <option value="minutes">בעוד X דקות</option>
             <option value="days">בעוד X ימים</option>
+            <option value="business_days">בעוד X ימי עסקים</option>
           </SelectField>
           {action.due_unit !== "none" ? (
-            <TextField label={action.due_unit === "minutes" ? "דקות" : "ימים"} value={action.due_amount} onChange={(e) => onChange({ due_amount: e.target.value })} dir="ltr" inputMode="numeric" controlSize="sm" />
+            <TextField label={action.due_unit === "minutes" ? "דקות" : action.due_unit === "business_days" ? "ימי עסקים (עד 60)" : "ימים"} value={action.due_amount} onChange={(e) => onChange({ due_amount: e.target.value })} dir="ltr" inputMode="numeric" controlSize="sm" />
           ) : null}
           <SelectField label="סוג" value={action.task_type} onChange={(e) => onChange({ task_type: e.target.value })} controlSize="sm">
             {TASK_TYPES.map((t) => (

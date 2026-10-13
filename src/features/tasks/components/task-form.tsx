@@ -7,12 +7,13 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { createTaskAction } from "../actions";
+import type { BusinessDaysContext } from "./business-days-picker";
 import { TaskFields, type AssigneeOption } from "./task-fields";
 
-type Props = { orgId: string; assignees: AssigneeOption[]; myUserId: string; today: string };
+type Props = { orgId: string; assignees: AssigneeOption[]; myUserId: string; today: string; calendar?: BusinessDaysContext["calendar"] };
 
 /** New task, for oneself or for a colleague. The form clears itself after a successful save. */
-export function TaskForm({ orgId, assignees, myUserId, today }: Props) {
+export function TaskForm({ orgId, assignees, myUserId, today, calendar }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createTaskAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   return (
@@ -23,6 +24,7 @@ export function TaskForm({ orgId, assignees, myUserId, today }: Props) {
         errors={failure?.fieldErrors ?? {}}
         assignees={assignees}
         defaultOwnerId={myUserId}
+        businessDays={calendar ? { calendar, today } : undefined}
       />
       <SubmitButton pendingText="מוסיפים…">הוספת משימה</SubmitButton>
       {/* FXU-10: say that it worked; the form has cleared itself */}

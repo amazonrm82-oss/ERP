@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
+
 import { CONDITIONS, TASK_TYPES, TRIGGERS } from "./definitions";
 
 const id = z.guid({ error: "יש לבחור ערך." });
@@ -10,7 +12,7 @@ const actionSchema = z.discriminatedUnion("type", [
     type: z.literal("create_task"),
     title: text(300, "יש לכתוב כותרת למשימה."),
     due_amount: z.coerce.number().int().min(0).max(10_000).default(0),
-    due_unit: z.enum(["none", "minutes", "days"]).default("none"),
+    due_unit: z.enum(["none", "minutes", "days", "business_days"]).default("none"),
     assign: z.enum(["owner", "user"]).default("owner"),
     user_id: id.optional(),
     task_type: z.enum(TASK_TYPES.map((t) => t.value)).default("todo"),
@@ -55,6 +57,10 @@ export const ruleSchema = z
         (action.type === "assign_owner" && action.mode === "user");
       if (needsUser && !("user_id" in action && action.user_id)) {
         ctx.addIssue({ code: "custom", path: ["actions", index], message: "יש לבחור משתמש." });
+      }
+      // HEB-03: the engine accepts 0..60 business days
+      if (action.type === "create_task" && action.due_unit === "business_days" && action.due_amount > BUSINESS_DAYS_FREE_MAX) {
+        ctx.addIssue({ code: "custom", path: ["actions", index], message: `עד ${BUSINESS_DAYS_FREE_MAX} ימי עסקים.` });
       }
     });
     rule.conditions.forEach((condition, index) => {

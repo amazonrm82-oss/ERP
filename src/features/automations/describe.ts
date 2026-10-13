@@ -46,7 +46,16 @@ export function describeRule(
     const label = ACTION_LABELS[a.type as ActionType] ?? "פעולה";
     switch (a.type) {
       case "create_task": {
-        const due = a.due_in_minutes ? `, בעוד ${a.due_in_minutes} דקות` : a.due_in_days ? `, בעוד ${a.due_in_days} ימים` : "";
+        const due =
+          typeof a.due_in_business_days === "number"
+            ? a.due_in_business_days === 0
+              ? ", ביום העבודה הקרוב"
+              : `, בעוד ${a.due_in_business_days} ימי עסקים`
+            : a.due_in_minutes
+              ? `, בעוד ${a.due_in_minutes} דקות`
+              : a.due_in_days
+                ? `, בעוד ${a.due_in_days} ימים`
+                : "";
         const who = a.assign === "user" ? `, ל${nameIn(lookups.members, a.user_id)}` : ", לאחראי";
         return `${label}: "${a.title}"${due}${who}`;
       }
@@ -89,4 +98,5 @@ export const STEP_ERRORS: Record<string, string> = {
 export const STEP_WARNINGS: Record<string, string> = {
   "no reason is set": "בוצע בלי סיבה: לאוטומציה לא נבחרה סיבה",
   "the reason no longer exists": "בוצע בלי סיבה: הסיבה שנבחרה כבר לא ברשימה",
+  "the business-day offset is invalid": "המשימה נוצרה בלי מועד: מספר ימי העסקים לא תקין",
 };

@@ -1,3 +1,5 @@
+import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
+
 import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
@@ -61,6 +63,10 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       const out: Record<string, string | number> = { type: "create_task", title: action.title, task_type: action.task_type, assign: action.assign };
       if (action.due_unit === "minutes") out.due_in_minutes = action.due_amount;
       if (action.due_unit === "days") out.due_in_days = action.due_amount;
+      if (action.due_unit === "business_days") {
+        if (action.due_amount > BUSINESS_DAYS_FREE_MAX) return `עד ${BUSINESS_DAYS_FREE_MAX} ימי עסקים.`;
+        out.due_in_business_days = action.due_amount;
+      }
       if (action.assign === "user" && action.user_id) out.user_id = action.user_id;
       actions.push(out);
     } else if (action.type === "notify") {
@@ -137,13 +143,27 @@ export function fromDbRule(rule: {
   const actions = rule.actions.flatMap((a): Array<Record<string, string>> => {
     switch (a.type) {
       case "create_task": {
-        const unit = a.due_in_minutes !== undefined ? "minutes" : a.due_in_days !== undefined ? "days" : "none";
+        const unit =
+          typeof a.due_in_business_days === "number"
+            ? "business_days"
+            : a.due_in_minutes !== undefined
+              ? "minutes"
+              : a.due_in_days !== undefined
+                ? "days"
+                : "none";
         return [
           {
             type: "create_task",
             title: str(a.title),
             due_unit: unit,
-            due_amount: unit === "minutes" ? str(a.due_in_minutes) : unit === "days" ? str(a.due_in_days) : "0",
+            due_amount:
+              unit === "business_days"
+                ? str(a.due_in_business_days)
+                : unit === "minutes"
+                  ? str(a.due_in_minutes)
+                  : unit === "days"
+                    ? str(a.due_in_days)
+                    : "0",
             assign: str(a.assign) || "owner",
             user_id: str(a.user_id),
             task_type: str(a.task_type) || "todo",

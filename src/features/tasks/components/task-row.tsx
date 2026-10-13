@@ -15,6 +15,7 @@ import { inlineEditAction } from "@/features/inline-edit/actions";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
 import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
+import type { BusinessDaysContext } from "./business-days-picker";
 import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
 export type TaskRowView = {
@@ -40,9 +41,17 @@ export type TaskRowView = {
   related: { href: string; label: string } | null;
 };
 
-type Props = { orgId: string; task: TaskRowView; canEdit: boolean; showOwner: boolean; assignees: AssigneeOption[] };
+type Props = {
+  orgId: string;
+  task: TaskRowView;
+  canEdit: boolean;
+  showOwner: boolean;
+  assignees: AssigneeOption[];
+  /** HEB-03: the "in N business days" choice in the edit form */
+  businessDays?: BusinessDaysContext;
+};
 
-export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
+export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +82,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
   if (editing) {
     return (
       <li className="px-4 py-3.5 sm:px-5">
-        <TaskEditForm orgId={orgId} task={task} assignees={assignees} onDone={() => setEditing(false)} />
+        <TaskEditForm orgId={orgId} task={task} assignees={assignees} businessDays={businessDays} onDone={() => setEditing(false)} />
       </li>
     );
   }
@@ -163,9 +172,9 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees }: Props) {
   );
 }
 
-type EditProps = { orgId: string; task: TaskRowView; assignees: AssigneeOption[]; onDone: () => void };
+type EditProps = { orgId: string; task: TaskRowView; assignees: AssigneeOption[]; businessDays?: BusinessDaysContext; onDone: () => void };
 
-function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
+function TaskEditForm({ orgId, task, assignees, businessDays, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateTaskAction(orgId, task.id, prev, formData);
     if (result?.ok) {
@@ -199,6 +208,7 @@ function TaskEditForm({ orgId, task, assignees, onDone }: EditProps) {
         errors={failure?.fieldErrors ?? {}}
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}
+        businessDays={businessDays}
       />
       <div className="flex flex-wrap gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>
