@@ -567,6 +567,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
   reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
   `app.export_choice_values()` (last redefined in 0183) lists the fixed choice codes kept in an export's audit filters.
+- Conditional fields (FLD-09, migration 0184): `field_definitions.condition` = {field, op, value, effect show|require} (one per
+  field, no chains, controller of the same type or `builtin:status|source|stage|type`), checked by the invoker trigger
+  `field_definitions_condition_check` (hint `custom_field:condition`, advisory lock per org and type, re-checked on key/type
+  change). The effect is app-only (`src/features/custom-fields/conditions.ts`): a hidden field keeps its value (a disabled
+  fieldset with a `cond_shown_<key>` marker; the server skips a field whose marker did not arrive); "require" is checked by the
+  record forms, and by board drag / table cell (`RequiredFieldsDialog`) and bulk (skipped "חסר שדה חובה: …"), never by the database.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
