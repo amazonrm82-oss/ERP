@@ -14,6 +14,8 @@ import { TrashRecordButton } from "@/components/trash-record-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
@@ -84,17 +86,20 @@ export default async function LeadPage({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* GAP-11: the card on paper (business name, printed at; the screen tools are left out) */}
+      <PrintHeader orgName={context.org.name} timeZone={context.org.timeZone} />
       <PageHeader
         title={name}
         back={{ href: paths.leads(orgId), label: "לידים" }}
         actions={
           <>
             <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
+            <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "lead", id: lead.id }} state={follow} />
           </>
         }
       />
-      <div className="mb-5">
+      <div className="mb-5 print:hidden">
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "lead", id: lead.id }, name } : undefined}
           whatsappLog={
@@ -121,9 +126,12 @@ export default async function LeadPage({ params, searchParams }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} filter={tl} />
+          {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          <DuplicatesCard orgId={orgId} type="lead" id={lead.id} canMerge={context.canDelete} />
-          <RecordHistory orgId={orgId} entityType="leads" entityId={lead.id} />
+          <div className="space-y-5 print:hidden empty:hidden">
+            <DuplicatesCard orgId={orgId} type="lead" id={lead.id} canMerge={context.canDelete} />
+            <RecordHistory orgId={orgId} entityType="leads" entityId={lead.id} />
+          </div>
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
@@ -150,7 +158,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               </CardBody>
             </Card>
           ) : canWrite ? (
-            <Card aria-labelledby="status-title">
+            <Card aria-labelledby="status-title" className="print:hidden">
               <CardHeader id="status-title" title="סטטוס והמרה" />
               <CardBody className="space-y-5">
                 <LeadStatusForm
@@ -175,7 +183,9 @@ export default async function LeadPage({ params, searchParams }: Props) {
 
           {/* DQL-01: a converted lead lives on as its contact and deal */}
           {!isConverted ? (
-            <CompletenessCard orgId={orgId} type="lead" id={lead.id} editBase={canWrite && canEditRecordHint(context, lead.owner_id) ? paths.lead(orgId, lead.id) : null} />
+            <div className="print:hidden empty:hidden">
+              <CompletenessCard orgId={orgId} type="lead" id={lead.id} editBase={canWrite && canEditRecordHint(context, lead.owner_id) ? paths.lead(orgId, lead.id) : null} />
+            </div>
           ) : null}
 
           <LeadDetailsCard
@@ -215,19 +225,21 @@ export default async function LeadPage({ params, searchParams }: Props) {
             canEdit={canEditRecordHint(context, lead.owner_id)}
           />
 
-          <RecordConsents
-            orgId={orgId}
-            subject={{ kind: "lead", id: lead.id }}
-            canEdit={canEditRecordHint(context, lead.owner_id)}
-            hasPhone={Boolean(lead.phone_e164)}
-            hasEmail={Boolean(lead.email?.trim())}
-            canLift={isAdminRole(context.role)}
-          />
+          <div className="print:hidden">
+            <RecordConsents
+              orgId={orgId}
+              subject={{ kind: "lead", id: lead.id }}
+              canEdit={canEditRecordHint(context, lead.owner_id)}
+              hasPhone={Boolean(lead.phone_e164)}
+              hasEmail={Boolean(lead.email?.trim())}
+              canLift={isAdminRole(context.role)}
+            />
+          </div>
 
         </div>
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
-      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+      <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
         {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
       </div>
     </>

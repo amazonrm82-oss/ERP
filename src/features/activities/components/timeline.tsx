@@ -4,6 +4,7 @@ import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { getMentionCandidates } from "@/features/mentions/queries";
 import { mentionIds } from "@/features/mentions/token";
+import { printsTimelineEntry } from "@/features/print/print";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
@@ -52,14 +53,14 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
       <CardHeader id="timeline-title" title="ציר זמן" />
       <CardBody>
         {canWrite ? (
-          <div className="mb-6">
+          <div className="mb-6 print:hidden">
             <NoteForm orgId={orgId} subject={subject} mentions={mentions} />
           </div>
         ) : null}
 
         <Tabs
           label="סינון ציר הזמן לפי סוג"
-          className="mb-5"
+          className="mb-5 print:hidden"
           items={TIMELINE_FILTERS.map((option) => ({
             href: timelineFilterHref(recordHref, option.key),
             label: option.label,
@@ -76,7 +77,11 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
         ) : (
           <ol className="space-y-5">
             {items.map((item) => (
-              <li key={item.id} className={cn("relative", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5")}>
+              <li
+                key={item.id}
+                // GAP-11: someone else's private note stays off paper, even for owners/admins who see it here
+                className={cn("relative", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5", !printsTimelineEntry(item, context.user.id) && "print:hidden")}
+              >
                 <span
                   aria-hidden="true"
                   className={cn(

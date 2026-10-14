@@ -15,6 +15,8 @@ import { getMyDay } from "@/features/home/queries";
 import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
 import { getGoalProgress, getMyMonthClosings } from "@/features/goals/progress-queries";
 import { DeviceWarning } from "@/features/notifications/components/device-warning";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -96,12 +98,21 @@ export default async function HomePage({ params }: Props) {
 
   return (
     <>
-      <PageHeader title="היום שלי" description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`} />
-      {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
-      {checklist && !checklist.hidden ? <SetupChecklistCard orgId={orgId} checklist={checklist} /> : null}
-      <DeviceWarning orgId={orgId} />
+      <PrintHeader orgName={org.name} timeZone={org.timeZone} />
+      <PageHeader
+        title="היום שלי"
+        description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`}
+        // GAP-11: the day on paper
+        actions={<PrintButton />}
+      />
+      {/* setup, device and weekly cleanup prompts are for the screen only (GAP-11) */}
+      <div className="print:hidden">
+        {setupStep ? <SetupResumeCard orgId={orgId} step={setupStep} /> : null}
+        {checklist && !checklist.hidden ? <SetupChecklistCard orgId={orgId} checklist={checklist} /> : null}
+        <DeviceWarning orgId={orgId} />
+      </div>
       {cleanupCount > 0 ? (
-        <Card aria-labelledby="weekly-cleanup-title" className="mb-5">
+        <Card aria-labelledby="weekly-cleanup-title" className="mb-5 print:hidden">
           <CardHeader
             id="weekly-cleanup-title"
             title="ניקוי שבועי של העסקאות"
@@ -159,7 +170,7 @@ export default async function HomePage({ params }: Props) {
               id="my-goals-title"
               title="היעדים שלי"
               action={
-                <ButtonLink href={paths.goals(orgId)} variant="ghost" size="sm">
+                <ButtonLink href={paths.goals(orgId)} variant="ghost" size="sm" className="print:hidden">
                   לכל היעדים
                 </ButtonLink>
               }
@@ -173,7 +184,7 @@ export default async function HomePage({ params }: Props) {
             id="my-meetings-title"
             title="הפגישות שלי היום"
             action={
-              <span className="flex flex-wrap gap-1">
+              <span className="flex flex-wrap gap-1 print:hidden">
                 <ButtonLink href={tomorrowPath(orgId)} variant="ghost" size="sm">
                   תזכורות למחר
                 </ButtonLink>
@@ -235,14 +246,14 @@ export default async function HomePage({ params }: Props) {
             id="my-tasks-title"
             title="משימות להיום ובאיחור"
             action={
-              <ButtonLink href={paths.tasks(orgId)} variant="ghost" size="sm">
+              <ButtonLink href={paths.tasks(orgId)} variant="ghost" size="sm" className="print:hidden">
                 לכל המשימות
               </ButtonLink>
             }
           />
           <CardBody>
             {canWrite ? (
-              <div className="mb-4">
+              <div className="mb-4 print:hidden">
                 <TaskQuickAdd orgId={orgId} today={day.today} calendar={calendar ?? undefined} />
               </div>
             ) : null}
@@ -281,7 +292,7 @@ export default async function HomePage({ params }: Props) {
             id="my-leads-title"
             title="לידים חדשים שמחכים לי"
             action={
-              <ButtonLink href={paths.leads(orgId)} variant="ghost" size="sm">
+              <ButtonLink href={paths.leads(orgId)} variant="ghost" size="sm" className="print:hidden">
                 לכל הלידים
               </ButtonLink>
             }
@@ -303,7 +314,9 @@ export default async function HomePage({ params }: Props) {
                           נוצר ב-<time dateTime={lead.createdAt}>{formatDate(lead.createdAt)}</time>
                         </span>
                       </span>
-                      <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: leadDisplayName(lead) }} />
+                      <span className="print:hidden">
+                        <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: leadDisplayName(lead) }} />
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -314,7 +327,7 @@ export default async function HomePage({ params }: Props) {
                 ) : null}
               </>
             )}
-            <p className="mt-3 text-sm">
+            <p className="mt-3 text-sm print:hidden">
               <Link href={paths.leadsWaiting(orgId)} className="text-accent-strong underline underline-offset-4">
                 לידים שעוד לא קיבלו מענה
               </Link>
@@ -327,7 +340,7 @@ export default async function HomePage({ params }: Props) {
             id="my-no-next-step-title"
             title="עסקאות בלי פעולה הבאה"
             action={
-              <ButtonLink href={stuckReportHref} variant="ghost" size="sm">
+              <ButtonLink href={stuckReportHref} variant="ghost" size="sm" className="print:hidden">
                 לדוח המלא
               </ButtonLink>
             }

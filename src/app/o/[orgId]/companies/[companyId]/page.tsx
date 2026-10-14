@@ -10,6 +10,8 @@ import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
@@ -73,12 +75,19 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* GAP-11: the card on paper (business name, printed at; the screen tools are left out) */}
+      <PrintHeader orgName={context.org.name} timeZone={context.org.timeZone} />
       <PageHeader
         title={company.name}
         back={{ href: paths.companies(orgId), label: "חברות" }}
-        actions={<FollowButton orgId={orgId} subject={{ kind: "company", id: company.id }} state={follow} />}
+        actions={
+          <>
+            <PrintButton />
+            <FollowButton orgId={orgId} subject={{ kind: "company", id: company.id }} state={follow} />
+          </>
+        }
       />
-      <div className="mb-5">
+      <div className="mb-5 print:hidden">
         <ContactActions
           phone={company.phone}
           phoneE164={company.phone_e164}
@@ -97,9 +106,12 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} filter={tl} />
+          {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          <DuplicatesCard orgId={orgId} type="company" id={company.id} canMerge={context.canDelete} />
-          <RecordHistory orgId={orgId} entityType="companies" entityId={company.id} />
+          <div className="space-y-5 print:hidden empty:hidden">
+            <DuplicatesCard orgId={orgId} type="company" id={company.id} canMerge={context.canDelete} />
+            <RecordHistory orgId={orgId} entityType="companies" entityId={company.id} />
+          </div>
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
@@ -107,7 +119,9 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <RecordSummaryCard orgId={orgId} type="company" id={company.id} currency={context.org.currency} timeZone={context.org.timeZone} />
           <RecordTasks orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} />
           <RecordMeetings orgId={orgId} subject={{ kind: "company", id: company.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
-          <CompletenessCard orgId={orgId} type="company" id={company.id} editBase={canEditRecordHint(context, company.owner_id) ? paths.company(orgId, company.id) : null} />
+          <div className="print:hidden empty:hidden">
+            <CompletenessCard orgId={orgId} type="company" id={company.id} editBase={canEditRecordHint(context, company.owner_id) ? paths.company(orgId, company.id) : null} />
+          </div>
           <CompanyDetailsCard
             key={focus ?? "view"}
             focus={focus}
@@ -174,7 +188,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         </div>
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
-      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+      <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
         {context.canDelete ? (
           <TrashRecordButton noun="החברה" action={trashCompanyAction.bind(null, orgId, company.id)} />
         ) : null}

@@ -1,6 +1,7 @@
 import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { TimelineSubject } from "@/features/activities/schema";
+import { printedFileLine } from "@/features/print/print";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -16,10 +17,16 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
   const files = await listFiles(orgId, subject);
 
   return (
-    <Card aria-labelledby="files-title">
+    // GAP-11 (owner, 14 October 2026): on paper, name, date and uploader of each file, no content
+    // or links; a record with no files prints no files section
+    <Card aria-labelledby="files-title" className={files.length === 0 ? "print:hidden" : undefined}>
       <CardHeader id="files-title" title={files.length ? `קבצים (${files.length})` : "קבצים"} />
       <CardBody className="space-y-4">
-        {canWrite ? <FileUploader orgId={orgId} subject={subject} /> : null}
+        {canWrite ? (
+          <div className="print:hidden">
+            <FileUploader orgId={orgId} subject={subject} />
+          </div>
+        ) : null}
         {files.length === 0 ? (
           <p className="text-md text-ink-soft">אין קבצים.</p>
         ) : (
@@ -30,9 +37,9 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
                 <li key={file.id} className="flex flex-wrap items-center gap-3 py-2.5">
                   {file.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link
-                    <img src={file.thumbnailUrl} alt="" className="size-11 shrink-0 rounded-md border border-line object-cover" />
+                    <img src={file.thumbnailUrl} alt="" className="size-11 shrink-0 rounded-md border border-line object-cover print:hidden" />
                   ) : (
-                    <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-md bg-canvas text-xs font-semibold text-ink-soft">
+                    <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-md bg-canvas text-xs font-semibold text-ink-soft print:hidden">
                       {ALLOWED_TYPES[file.mimeType] ?? "קובץ"}
                     </span>
                   )}
@@ -41,11 +48,13 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
                       href={`${paths.file(orgId, file.id)}${viewable ? "?view=1" : ""}`}
                       target={viewable ? "_blank" : undefined}
                       rel="noopener"
-                      className="block truncate font-medium text-accent-strong underline-offset-4 hover:underline"
+                      className="block truncate font-medium text-accent-strong underline-offset-4 hover:underline print:hidden"
                     >
                       {file.name}
                     </a>
-                    <p className="text-sm text-ink-soft">
+                    <p className="hidden break-words font-medium print:block">{file.name}</p>
+                    <p className="hidden text-sm text-ink-soft print:block">{printedFileLine(formatDateTime(file.createdAt), file.uploaderName)}</p>
+                    <p className="text-sm text-ink-soft print:hidden">
                       {formatBytes(file.sizeBytes)} · {formatDateTime(file.createdAt)}
                       {file.uploaderName ? ` · ${file.uploaderName}` : ""}
                     </p>

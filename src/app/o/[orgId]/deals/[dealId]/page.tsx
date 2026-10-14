@@ -7,6 +7,8 @@ import { TrashRecordButton } from "@/components/trash-record-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { ShareSummary } from "@/features/share/components/share-summary";
 import { recordSummary } from "@/features/share/summary";
@@ -103,6 +105,8 @@ export default async function DealPage({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* GAP-11: the card on paper (business name, printed at; the screen tools are left out) */}
+      <PrintHeader orgName={context.org.name} timeZone={context.org.timeZone} />
       <PageHeader
         title={deal.name}
         description={deal.pipelineName ? `תהליך המכירה "${deal.pipelineName}"` : undefined}
@@ -110,6 +114,7 @@ export default async function DealPage({ params, searchParams }: Props) {
         actions={
           <>
             <Badge tone={status.tone}>{status.label}</Badge>
+            <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "deal", id: deal.id }} state={follow} />
           </>
         }
@@ -127,7 +132,7 @@ export default async function DealPage({ params, searchParams }: Props) {
           <span>{attention.stuck ? "כדאי לקדם אותה, לדחות אותה לתאריך או לסגור." : "כדאי לקבוע משימה הבאה או לתעד מה קרה."}</span>
         </p>
       ) : null}
-      <div className="mb-5">
+      <div className="mb-5 print:hidden">
         <ShareSummary
           text={recordSummary(deal.name, [
             ["איש קשר", deal.contactName],
@@ -144,8 +149,11 @@ export default async function DealPage({ params, searchParams }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
+          {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          <RecordHistory orgId={orgId} entityType="deals" entityId={deal.id} />
+          <div className="space-y-5 print:hidden empty:hidden">
+            <RecordHistory orgId={orgId} entityType="deals" entityId={deal.id} />
+          </div>
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
@@ -189,7 +197,9 @@ export default async function DealPage({ params, searchParams }: Props) {
           </Card>
 
           {/* DQL-01: what is still missing matters while the deal is open */}
-          {deal.status === "open" ? <CompletenessCard orgId={orgId} type="deal" id={deal.id} editBase={canEdit ? paths.deal(orgId, deal.id) : null} /> : null}
+          <div className="print:hidden empty:hidden">
+            {deal.status === "open" ? <CompletenessCard orgId={orgId} type="deal" id={deal.id} editBase={canEdit ? paths.deal(orgId, deal.id) : null} /> : null}
+          </div>
           <DealDetailsCard
             key={focus ?? "view"}
             focus={focus}
@@ -245,7 +255,7 @@ export default async function DealPage({ params, searchParams }: Props) {
         </div>
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
-      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+      <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
         {context.canDelete ? <TrashRecordButton noun="העסקה" action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
       </div>
     </>

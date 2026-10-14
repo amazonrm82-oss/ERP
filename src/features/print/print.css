@@ -1,0 +1,89 @@
+/*
+  GAP-11: print layout of the day agenda and the record card.
+  Loaded only by pages that render PrintHeader, and every rule is scoped to a document that holds
+  its [data-print-page] marker, so after client navigation it changes nothing on other pages.
+  Colours are the design roles, set to their light values for paper (black on white, also when the
+  screen is dark). Base values are used only to name those light values, as globals.css does.
+*/
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+
+  html:has([data-print-page]),
+  html[data-theme]:has([data-print-page]),
+  html:has([data-print-page]) [data-theme] {
+    color-scheme: light;
+    --color-canvas: var(--mx-white);
+    --color-surface: var(--mx-white);
+    --color-line: var(--mx-grey-200);
+    --color-line-strong: var(--mx-grey-400);
+    --color-line-control: var(--mx-grey-400);
+    --color-ink: var(--mx-grey-900);
+    --color-ink-soft: var(--mx-grey-600);
+    --color-accent: var(--mx-grey-900);
+    --color-accent-strong: var(--mx-grey-900);
+    --color-accent-soft: var(--mx-white);
+    --color-on-accent: var(--mx-grey-900);
+    --color-danger: var(--mx-grey-900);
+    --color-danger-strong: var(--mx-grey-900);
+    --color-danger-soft: var(--mx-white);
+    --color-warning: var(--mx-grey-900);
+    --color-warning-soft: var(--mx-white);
+    --color-success: var(--mx-grey-900);
+    --color-success-soft: var(--mx-white);
+  }
+
+  html:has([data-print-page]) body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    min-height: 0;
+  }
+
+  /* the app shell: everything next to <main> (skip link, side bar, top bar, notices, bottom bar) */
+  html:has([data-print-page]) :has(> #main) > :not(#main) {
+    display: none !important;
+  }
+  html:has([data-print-page]) :has(> #main) {
+    min-height: 0;
+    padding: 0 !important;
+  }
+  html:has([data-print-page]) #main {
+    max-width: none;
+    margin: 0;
+    padding: 0 !important;
+  }
+
+  /* what only works on a screen: buttons, forms, windows, menus, messages */
+  html:has([data-print-page]) #main button,
+  html:has([data-print-page]) #main form,
+  html:has([data-print-page]) #main input,
+  html:has([data-print-page]) #main select,
+  html:has([data-print-page]) #main textarea,
+  html:has([data-print-page]) dialog,
+  html:has([data-print-page]) [popover],
+  html:has([data-print-page]) .mx-toast {
+    display: none !important;
+  }
+
+  html:has([data-print-page]) a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* cards lose their shadow; items stay whole on one page */
+  html:has([data-print-page]) #main * {
+    box-shadow: none !important;
+  }
+  html:has([data-print-page]) #main li,
+  html:has([data-print-page]) #main tr,
+  html:has([data-print-page]) #main dl > div,
+  html:has([data-print-page]) #main [data-print-keep] {
+    break-inside: avoid;
+  }
+  html:has([data-print-page]) #main h1,
+  html:has([data-print-page]) #main h2,
+  html:has([data-print-page]) #main h3 {
+    break-after: avoid;
+  }
+}

@@ -12,6 +12,8 @@ import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
@@ -83,16 +85,23 @@ export default async function ContactPage({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* GAP-11: the card on paper (business name, printed at; the screen tools are left out) */}
+      <PrintHeader orgName={context.org.name} timeZone={context.org.timeZone} />
       <PageHeader
         title={name}
         description={[contact.job_title, contact.companyName].filter(Boolean).join(", ") || undefined}
         back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
-        actions={<FollowButton orgId={orgId} subject={{ kind: "contact", id: contact.id }} state={follow} />}
+        actions={
+          <>
+            <PrintButton />
+            <FollowButton orgId={orgId} subject={{ kind: "contact", id: contact.id }} state={follow} />
+          </>
+        }
       />
       {channels === "failed" ? (
         <FormError className="mb-4" message="איש הקשר נוצר, אבל לא כל הטלפונים והאימיילים הנוספים נשמרו. אפשר להוסיף אותם בעריכה." />
       ) : null}
-      <div className="mb-5">
+      <div className="mb-5 print:hidden">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "contact", id: contact.id }, name } : undefined}
           whatsappLog={
@@ -123,9 +132,12 @@ export default async function ContactPage({ params, searchParams }: Props) {
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
           <Timeline orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} filter={tl} />
+          {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
-          <DuplicatesCard orgId={orgId} type="contact" id={contact.id} canMerge={context.canDelete} />
-          <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />
+          <div className="space-y-5 print:hidden empty:hidden">
+            <DuplicatesCard orgId={orgId} type="contact" id={contact.id} canMerge={context.canDelete} />
+            <RecordHistory orgId={orgId} entityType="contacts" entityId={contact.id} />
+          </div>
         </div>
 
         <div className="order-1 space-y-5 lg:order-2">
@@ -133,7 +145,9 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordSummaryCard orgId={orgId} type="contact" id={contact.id} currency={context.org.currency} timeZone={context.org.timeZone} />
           <RecordTasks orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} />
           <RecordMeetings orgId={orgId} subject={{ kind: "contact", id: contact.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
-          <CompletenessCard orgId={orgId} type="contact" id={contact.id} editBase={canEdit ? paths.contact(orgId, contact.id) : null} />
+          <div className="print:hidden empty:hidden">
+            <CompletenessCard orgId={orgId} type="contact" id={contact.id} editBase={canEdit ? paths.contact(orgId, contact.id) : null} />
+          </div>
           <ContactDetailsCard
             key={focus ?? "view"}
             focus={focus}
@@ -153,14 +167,16 @@ export default async function ContactPage({ params, searchParams }: Props) {
 
           <TagPicker orgId={orgId} kind="contact" recordId={contact.id} allTags={tags} selectedIds={contact.tag_ids} canEdit={canEdit} />
 
-          <RecordConsents
-            orgId={orgId}
-            subject={{ kind: "contact", id: contact.id }}
-            canEdit={canEdit}
-            hasPhone={Boolean(contact.phone_e164)}
-            hasEmail={Boolean(contact.email?.trim())}
-            canLift={isAdminRole(context.role)}
-          />
+          <div className="print:hidden">
+            <RecordConsents
+              orgId={orgId}
+              subject={{ kind: "contact", id: contact.id }}
+              canEdit={canEdit}
+              hasPhone={Boolean(contact.phone_e164)}
+              hasEmail={Boolean(contact.email?.trim())}
+              canLift={isAdminRole(context.role)}
+            />
+          </div>
 
           <RelatedDealsCard
             orgId={orgId}
@@ -172,7 +188,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
         </div>
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
-      <div className="mt-8 border-t border-line pt-5 empty:hidden">
+      <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
         {context.canDelete ? (
           <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
         ) : null}

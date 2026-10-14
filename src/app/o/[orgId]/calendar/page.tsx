@@ -28,6 +28,9 @@ import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { parsePeople, pickPeople, PEOPLE_MAX, teammatesOf, teamPeople, visibleTeams } from "@/features/calendar/team";
 import { holidaysByDay } from "@/features/calendar-days/holidays";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
+import { PrintAgenda } from "@/features/print/components/print-agenda";
+import { PrintButton } from "@/features/print/components/print-button";
+import { PrintHeader } from "@/features/print/components/print-header";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
@@ -132,20 +135,25 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   return (
     <>
+      <PrintHeader orgName={context.org.name} timeZone={timeZone} />
       <PageHeader
         title="יומן"
         description={`פגישות ומשימות עם מועד${whose}.`}
         actions={
-          <Link href={tomorrowPath(orgId)} className={buttonClasses("secondary")}>
-            <ChatIcon className="size-5 text-accent" />
-            תזכורות למחר
-          </Link>
+          <>
+            {/* GAP-11: the shown days as a plain list on paper */}
+            <PrintButton />
+            <Link href={tomorrowPath(orgId)} className={buttonClasses("secondary", "md", "print:hidden")}>
+              <ChatIcon className="size-5 text-accent" />
+              תזכורות למחר
+            </Link>
+          </>
         }
       />
 
       <Tabs
         label="תצוגת היומן"
-        className="mb-4"
+        className="mb-4 print:hidden"
         items={CALENDAR_VIEWS.map((option) => ({
           href: calendarPath(orgId, { view: option, date: day === today ? undefined : day, ...(option === "people" || view === "people" ? { team: team?.id, done } : scope) }),
           label: VIEW_LABEL[option],
@@ -153,7 +161,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         }))}
       />
 
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div className="flex items-center gap-1">
           <Link href={href({ date: stepDay(view, day, -1) })} aria-label={stepLabel[0]} title={stepLabel[0]} className={iconButtonClasses("secondary")}>
             <BackIcon className="size-5" />
@@ -208,7 +216,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         </Form>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 print:hidden">
         <CalendarDoneToggle
           checked={showDone}
           onHref={calendarPath(orgId, { view: requestedView ?? undefined, date: day === today ? undefined : day, ...linkScope, done: true })}
@@ -217,7 +225,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
       </div>
 
       {side ? (
-        <details className="mb-4 rounded-lg border border-line bg-surface">
+        <details className="mb-4 rounded-lg border border-line bg-surface print:hidden">
           <summary className="flex min-h-11 cursor-pointer items-center px-4 text-md font-medium">
             בחירת אנשים ({formatNumber(side.people.length)} מוצגים)
           </summary>
@@ -253,23 +261,32 @@ export default async function CalendarPage({ params, searchParams }: Props) {
         </p>
       ) : null}
 
-      <CalendarBoard
-        orgId={orgId}
-        view={view}
-        focusDay={day}
+      <PrintAgenda
+        title={viewTitle(view, day)}
         days={days}
-        today={today}
         items={entries}
         timeZone={timeZone}
-        canMove={context.canWrite}
-        scope={scope}
-        people={side?.people ?? []}
-        autoView={requestedView === null}
-        holidays={holidays}
-        members={context.canWrite ? members.map((member) => ({ userId: member.id, name: member.id === me ? `${member.name} (אני)` : member.name })) : []}
+        peopleNames={side ? Object.fromEntries(side.people.map((p) => [p.id, p.name])) : undefined}
       />
+      <div className="print:hidden">
+        <CalendarBoard
+          orgId={orgId}
+          view={view}
+          focusDay={day}
+          days={days}
+          today={today}
+          items={entries}
+          timeZone={timeZone}
+          canMove={context.canWrite}
+          scope={scope}
+          people={side?.people ?? []}
+          autoView={requestedView === null}
+          holidays={holidays}
+          members={context.canWrite ? members.map((member) => ({ userId: member.id, name: member.id === me ? `${member.name} (אני)` : member.name })) : []}
+        />
+      </div>
 
-      {side ? <p className="mt-3 text-sm text-ink-soft">בכל עמודה מוצג רק מה שמותר לך לראות.</p> : null}
+      {side ? <p className="mt-3 text-sm text-ink-soft print:hidden">בכל עמודה מוצג רק מה שמותר לך לראות.</p> : null}
     </>
   );
 }
