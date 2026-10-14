@@ -547,6 +547,13 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `PLAN_CAPABILITIES` `core`); neither is in merge picks yet (shared-ground follow-up).
   Since 0179 the due date is `app.payment_due_date(date, terms, days)` (immutable, Gregorian, no rest-day skip; 22023 hint
   `payment_terms:invalid`), mirrored by `paymentDueDate()` (test 105 compares them day by day); shortcuts and wording per owner.
+- Recurring revenue (DEAL-07, migration 0181; owner: core, no plan key): nullable `deals.billing_kind` (null = one-time, monthly|
+  yearly), `recurring_amount_agorot`, `recurring_start_date`, `renewal_date` (constraint `deals_recurring_shape`). The deal value
+  follows the first year while `deals.amount_auto` is true (true|null, server-derived for every writer by trigger
+  `deals_amount_auto` through pure `app.deal_value()`, mirrored by `dealValueRule()` in `src/features/deals/recurring.ts`, both
+  checked against `tests/unit/fixtures/deal-value.json`): empty value = first year (12 x monthly, the yearly amount), flag on;
+  a typed or changed value is kept and turns it off; unchanged while on recomputes; one-time is never computed. Over 2^53-1
+  agorot: hint `deal:amount_too_big`. Not in merge picks yet (shared-ground follow-up).
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
