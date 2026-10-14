@@ -136,7 +136,7 @@ export type RunItem = {
   entityType: string;
   entityId: string;
   createdAt: string;
-  steps: Array<{ action: string | null; status: string; error?: string; warning?: string }>;
+  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string }>;
 };
 
 export async function listRuns(orgId: string, automationId: string): Promise<RunItem[]> {
@@ -162,6 +162,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
       status: String(s.status ?? ""),
       error: typeof s.error === "string" ? s.error : undefined,
       warning: typeof s.warning === "string" ? s.warning : undefined,
+      warningName: typeof s.warning_name === "string" ? s.warning_name : undefined,
     })),
   }));
 }

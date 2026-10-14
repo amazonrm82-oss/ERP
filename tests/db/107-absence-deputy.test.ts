@@ -252,10 +252,22 @@ describe("absence with a deputy (HEB-08)", () => {
     const lastSteps = (id: string) =>
       asAdmin(async (q) => (await q<{ steps: Array<{ action: string; status: string; warning?: string }> }>("select steps from public.automation_runs where automation_id = $1 order by created_at desc limit 1", [id])).rows[0].steps);
     await asAdmin((q) => q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date - 1, current_date + 1)", [org, deputy.id]));
-    // a lead that has an owner keeps it
+    // a lead that has an owner keeps it, and the step says who it stays with (owner, 14 October 2026)
     expect(await run(toAway)).toBe("success");
     expect(await ownerOf(lead)).toBe(deputy.id);
-    expect(await lastSteps(toAway)).toEqual([{ action: "assign_owner", status: "ok", warning: "the owner is away, the lead has no owner" }]);
+    expect(await lastSteps(toAway)).toEqual([
+      { action: "assign_owner", status: "ok", warning: "the requested owner is away, the lead stays with its owner", warning_name: "dp-deputy" },
+    ]);
+    // a later step of the same run does not inherit the name
+    const twoSteps = await rule([
+      { type: "assign_owner", mode: "user", user_id: away.id },
+      { type: "create_task", title: "לחזור", due_in_business_days: 99, assign: "user", user_id: owner.id },
+    ]);
+    expect(await run(twoSteps)).toBe("success");
+    expect(await lastSteps(twoSteps)).toEqual([
+      { action: "assign_owner", status: "ok", warning: "the requested owner is away, the lead stays with its owner", warning_name: "dp-deputy" },
+      { action: "create_task", status: "ok", warning: "the business-day offset is invalid" },
+    ]);
     // a lead with no owner stays unowned: whoever may take it is told, and it waits for the person's return
     const unowned = await asAdmin(async (q) =>
       (await q<{ id: string }>("insert into public.leads (organization_id, status_id, full_name, team_id) values ($1, (select id from public.lead_statuses where organization_id = $1 and kind = 'open' order by is_default desc, position limit 1), 'ליד בלי אחראי', $2) returning id", [org, team])).rows[0].id,

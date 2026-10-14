@@ -11,7 +11,7 @@ import { deleteAutomationAction, setAutomationActiveAction } from "@/features/au
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
 import { actionsMissingReason } from "@/features/automations/convert";
-import { describeRule, STEP_ERRORS, STEP_WARNINGS } from "@/features/automations/describe";
+import { describeRule, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
@@ -155,7 +155,7 @@ export default async function AutomationPage({ params }: Props) {
                           {step.status !== "ok"
                             ? (STEP_ERRORS[step.error ?? ""] ?? step.error ?? "נכשל")
                             : step.warning
-                              ? (STEP_WARNINGS[step.warning] ?? step.warning)
+                              ? stepWarningText(step.warning, step.warningName)
                               : "בוצע"}
                         </li>
                       ))}

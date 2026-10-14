@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { actionsMissingReason, fromDbRule, REASON_REQUIRED, toDbRule } from "@/features/automations/convert";
 import type { Lookups } from "@/features/automations/queries";
-import { STEP_WARNINGS } from "@/features/automations/describe";
+import { STEP_WARNINGS, stepWarningText } from "@/features/automations/describe";
 import { ruleSchema } from "@/features/automations/schema";
 
 // RVW-9 (owner, 12 October 2026): an automation that makes a lead "not relevant" gives a reason from the list.
@@ -92,7 +92,7 @@ describe("set_lead_status and the not-relevant reason", () => {
 
 describe("run log warnings", () => {
   it("every warning the engine writes has a Hebrew text (the latest app.run_automation_actions)", () => {
-    // the newest migration that redefines the engine's action runner (0095, then HEB-03, then HEB-08)
+    // the newest migration that redefines the engine's action runner (0095, then HEB-03, then HEB-08 and its follow-up)
     const dir = join(process.cwd(), "supabase/migrations");
     const latest = readdirSync(dir)
       .filter((name) => name.endsWith(".sql"))
@@ -101,10 +101,28 @@ describe("run log warnings", () => {
       .at(-1)!;
     const sql = readFileSync(join(dir, latest), "utf8");
     const written = [...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]);
-    expect([...new Set(written)].sort()).toEqual(["no reason is set", "the business-day offset is invalid", "the owner is away, the lead has no owner", "the reason no longer exists"]);
+    expect([...new Set(written)].sort()).toEqual([
+      "no reason is set",
+      "the business-day offset is invalid",
+      "the owner is away, the lead has no owner",
+      "the reason no longer exists",
+      "the requested owner is away, the lead stays with its owner",
+    ]);
     for (const warning of written) {
       expect(STEP_WARNINGS[warning]).toBeTruthy();
     }
     expect(Object.keys(STEP_WARNINGS).sort()).toEqual([...new Set(written)].sort());
+  });
+
+  it("the kept-owner warning names the owner the engine stored (HEB-08, owner's wording)", () => {
+    expect(stepWarningText("the requested owner is away, the lead stays with its owner", "דנה כהן")).toBe(
+      "האחראי המבוקש נעדר, הליד נשאר אצל דנה כהן",
+    );
+    // an old entry without a name still reads as a sentence
+    expect(stepWarningText("the requested owner is away, the lead stays with its owner")).toBe(
+      "האחראי המבוקש נעדר, הליד נשאר אצל האחראי הנוכחי",
+    );
+    expect(stepWarningText("the owner is away, the lead has no owner", "דנה")).toBe("האחראי נעדר, הליד נכנס בלי אחראי");
+    expect(stepWarningText("something new")).toBe("something new");
   });
 });
