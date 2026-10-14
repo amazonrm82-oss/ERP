@@ -5,13 +5,19 @@ export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
   { value: "contact", label: "אנשי קשר" },
   { value: "company", label: "חברות" },
+  // IMP-03
+  { value: "deal", label: "עסקאות" },
+  { value: "task", label: "משימות" },
   // PRD-05: owners and admins only (they write the catalog)
   { value: "product", label: "מוצרים" },
 ] as const;
 
 export type ImportEntityKey = (typeof IMPORT_ENTITIES)[number]["value"];
-/** The objects imported as CRM records (custom fields, owner, recycle bin); products have their own path (PRD-05). */
-export type RecordImportEntity = Exclude<ImportEntityKey, "product">;
+/**
+ * The objects imported with duplicate detection (leads, contacts, companies). Products (PRD-05),
+ * deals and tasks (IMP-03) have their own paths.
+ */
+export type RecordImportEntity = Exclude<ImportEntityKey, "product" | "deal" | "task">;
 
 export const DUPLICATE_MODES = [
   { value: "skip", label: "לדלג עליהן", hint: "רשומה שכבר קיימת (לפי טלפון או אימייל; בחברות לפי ח.פ. או שם) לא תיובא." },
@@ -24,13 +30,29 @@ export type DuplicateModeKey = (typeof DUPLICATE_MODES)[number]["value"];
 /** PRD-05: a product whose SKU is already in the catalog (or earlier in the file) is skipped; there is no other choice. */
 export const PRODUCT_DUPLICATE_HINT = 'מוצר עם מק"ט שכבר קיים בקטלוג, או שכבר הופיע בקובץ, לא ייובא. מוצר בלי מק"ט תמיד נוצר.';
 
+/**
+ * IMP-03: deals and tasks have no key that tells two rows are the same record (names repeat),
+ * so every row creates one; there is no other choice.
+ */
+export const DEAL_DUPLICATE_HINT = "כל שורה יוצרת עסקה חדשה. אין בדיקת כפילויות, כי לעסקאות אין מזהה קבוע כמו טלפון או מק\"ט.";
+export const TASK_DUPLICATE_HINT = "כל שורה יוצרת משימה חדשה. אין בדיקת כפילויות.";
+
 /** The duplicate rules an object offers in the wizard. */
 export function duplicateModesFor(entity: ImportEntityKey): DuplicateModeKey[] {
-  return entity === "product" ? ["skip"] : DUPLICATE_MODES.map((m) => m.value);
+  if (entity === "product") return ["skip"];
+  if (entity === "deal" || entity === "task") return ["create"];
+  return DUPLICATE_MODES.map((m) => m.value);
 }
 
 /** The table an import of the object writes into. */
-export const IMPORT_TABLES = { lead: "leads", contact: "contacts", company: "companies", product: "products" } as const satisfies Record<ImportEntityKey, string>;
+export const IMPORT_TABLES = {
+  lead: "leads",
+  contact: "contacts",
+  company: "companies",
+  product: "products",
+  deal: "deals",
+  task: "tasks",
+} as const satisfies Record<ImportEntityKey, string>;
 
 export type ImportTarget = { key: string; label: string; synonyms: string[] };
 
@@ -42,6 +64,9 @@ const EMAIL = ["אימייל", "מייל", "דואל", "דוא\"ל", "email", "e
 const COMPANY = ["חברה", "שם החברה", "עסק", "company", "company name", "organization", "ארגון"];
 const JOB = ["תפקיד", "job title", "title", "position", "role"];
 const OWNER = ["אחראי", "בעלים", "נציג", "owner", "assigned to", "sales rep", "rep"];
+// IMP-03: the record a deal or a task is linked to, by a key the file has
+const CONTACT_KEY = ["איש קשר", "איש הקשר", "טלפון איש קשר", "אימייל איש קשר", "contact", "contact email", "contact phone", "לקוח"];
+const COMPANY_KEY = ["חברה", "שם החברה", "עסק", "company", "company name", "organization", "ארגון", "דומיין", "domain"];
 
 export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
   lead: [
@@ -101,6 +126,39 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "duration_minutes", label: "משך בדקות", synonyms: ["משך", "משך בדקות", "דקות", "duration", "minutes"] },
     { key: "barcode", label: "ברקוד", synonyms: ["ברקוד", "barcode", "ean", "upc"] },
     { key: "is_active", label: "פעיל (כן / לא)", synonyms: ["פעיל", "active", "is active", "status", "מצב"] },
+  ],
+  // IMP-03: the headers of the deals list export map back to these
+  deal: [
+    { key: "name", label: "שם העסקה", synonyms: ["שם", "שם עסקה", "עסקה", "deal", "deal name", "name", "title"] },
+    { key: "amount", label: "ערך (₪)", synonyms: ["ערך", "סכום", "שווי", "amount", "value", "deal value", "price"] },
+    { key: "pipeline", label: "פייפליין (לפי שם)", synonyms: ["פייפליין", "צנרת", "pipeline", "תהליך מכירה"] },
+    { key: "stage", label: "שלב (לפי שם, בפייפליין)", synonyms: ["שלב", "stage", "deal stage", "מצב"] },
+    { key: "expected_close_date", label: "תאריך סגירה צפוי", synonyms: ["תאריך סגירה צפוי", "סגירה צפויה", "expected close", "expected close date", "close date"] },
+    { key: "closed_date", label: "תאריך סגירה בפועל (לעסקה שנסגרה)", synonyms: ["תאריך סגירה בפועל", "נסגרה בתאריך", "closed", "closed at", "closed date", "won date", "lost date"] },
+    { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+    { key: "contact", label: "איש קשר (אימייל או טלפון)", synonyms: CONTACT_KEY },
+    { key: "company", label: "חברה (שם או דומיין)", synonyms: COMPANY_KEY },
+    { key: "source", label: "מקור (לפי שם)", synonyms: ["מקור", "source", "lead source", "ערוץ"] },
+    { key: "tags", label: "תגיות (מופרדות בפסיק)", synonyms: ["תגיות", "תגית", "tags", "tag", "labels"] },
+    { key: "billing_kind", label: "סוג עסקה (חד-פעמית, חודשית, שנתית)", synonyms: ["סוג עסקה", "חיוב", "billing", "billing kind", "recurring"] },
+    { key: "recurring_amount", label: "סכום חוזר (₪)", synonyms: ["סכום חוזר", "סכום חודשי", "סכום שנתי", "recurring amount", "mrr"] },
+    { key: "recurring_start_date", label: "תאריך התחלה (עסקה חוזרת)", synonyms: ["תאריך התחלה", "התחלה", "start date", "start"] },
+    { key: "renewal_date", label: "תאריך חידוש", synonyms: ["תאריך חידוש", "חידוש", "renewal", "renewal date"] },
+  ],
+  // IMP-03: tasks have no custom fields and no tags
+  task: [
+    { key: "title", label: "מה צריך לעשות (כותרת)", synonyms: ["כותרת", "משימה", "מה לעשות", "נושא", "title", "task", "subject", "name"] },
+    { key: "description", label: "פירוט", synonyms: ["פירוט", "תיאור", "הערות", "description", "details", "notes"] },
+    { key: "task_type", label: "סוג (משימה, שיחה, פגישה, מעקב)", synonyms: ["סוג", "סוג משימה", "type", "task type"] },
+    { key: "due_date", label: "תאריך יעד (אפשר עם שעה)", synonyms: ["תאריך יעד", "תאריך", "יעד", "due", "due date", "date", "deadline"] },
+    { key: "due_time", label: "שעת יעד", synonyms: ["שעה", "שעת יעד", "time", "due time"] },
+    { key: "priority", label: "עדיפות (גבוהה, רגילה, נמוכה)", synonyms: ["עדיפות", "דחיפות", "priority"] },
+    { key: "status", label: "מצב (פתוחה, בוצעה)", synonyms: ["מצב", "סטטוס", "status", "done", "בוצעה"] },
+    { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+    { key: "lead", label: "ליד (טלפון או אימייל)", synonyms: ["ליד", "טלפון ליד", "אימייל ליד", "lead", "lead phone", "lead email"] },
+    { key: "contact", label: "איש קשר (אימייל או טלפון)", synonyms: CONTACT_KEY },
+    { key: "company", label: "חברה (שם או דומיין)", synonyms: COMPANY_KEY },
+    { key: "deal", label: "עסקה (שם מדויק)", synonyms: ["עסקה", "שם עסקה", "deal", "deal name"] },
   ],
 };
 

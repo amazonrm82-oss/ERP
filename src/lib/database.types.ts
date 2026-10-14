@@ -611,7 +611,7 @@ export type NotificationRow = {
   created_at: string;
 };
 
-export type ImportEntity = "lead" | "contact" | "company" | "product";
+export type ImportEntity = "lead" | "contact" | "company" | "product" | "deal" | "task";
 export type DuplicateMode = "skip" | "update" | "create";
 export type ImportStatus = "running" | "done" | "failed" | "undone";
 
@@ -1192,6 +1192,8 @@ export type DealRow = {
   renewal_date: string | null;
   // DEAL-07: true while the value is the computed first-year value; set by trigger only (deals_amount_auto)
   amount_auto: boolean | null;
+  // IMP-03: the import that created the deal; set on insert only (deals_import_tag)
+  import_job_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1298,6 +1300,8 @@ export type TaskRow = {
   recurrence: Json | null;
   // the completed task this one was created from; written by the database only
   recurrence_source_id: string | null;
+  // IMP-03: the import that created the task; set on insert only (tasks_import_tag, insert grant only)
+  import_job_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1609,7 +1613,7 @@ export type Database = {
         },
         Record<string, never>
       >;
-      deals: Table<DealRow, DealInsert>;
+      deals: Table<DealRow, DealInsert & { import_job_id?: string | null }, Partial<DealInsert>>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
       // PRD-04: organization_id is fixed once inserted (column grants)
       product_categories: Table<
@@ -1688,7 +1692,7 @@ export type Database = {
         { role?: string | null }
       >;
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
-      tasks: Table<TaskRow, TaskInsert>;
+      tasks: Table<TaskRow, TaskInsert & { import_job_id?: string | null }, Partial<TaskInsert>>;
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
@@ -1880,6 +1884,8 @@ export type Database = {
       };
       // PRD-05: products whose SKU (without case) is one of these; security invoker
       product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };
+      // IMP-03: live deals the caller reads whose name equals one of the given ones; security invoker
+      deal_name_matches: { Args: { p_org: string; p_names: string[] }; Returns: Array<{ id: string; name: string }> };
       // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
       // CNS-01: the latest entry per channel of a lead or contact (security invoker)
       consent_current: {

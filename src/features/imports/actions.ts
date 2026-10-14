@@ -23,10 +23,12 @@ import {
   type DuplicateModeKey,
   type RecordImportEntity,
 } from "./fields";
+import { DealImportStopped, loadDealLookups, processDealChunk, type DealImportContext } from "./deal-server";
 import { loadProductLookups, processProductChunk, ProductImportStopped, type ProductImportContext } from "./product-server";
+import { loadTaskLookups, processTaskChunk, TaskImportStopped, type TaskImportContext } from "./task-server";
 import { ImportStopped, loadLookups, processChunk, type ImportContext, type RowOutcome } from "./server";
 
-const entitySchema = z.enum(["lead", "contact", "company", "product"]);
+const entitySchema = z.enum(["lead", "contact", "company", "product", "deal", "task"]);
 const modeSchema = z.enum(["skip", "update", "create"]);
 const cellsSchema = z.array(z.array(z.string().max(10_000)).max(200)).max(CHUNK_SIZE);
 const mappingSchema = z.array(z.string().max(100)).max(200);
@@ -67,6 +69,57 @@ async function productContext(orgId: string, mapping: string[]) {
   return { ok: true as const, ctx };
 }
 
+const MAPPING_LOST = "בחירת השדות לא נשמרה. בחרו שוב לאיזה שדה כל עמודה נכנסת.";
+
+/** IMP-03: a deals import maps the deal's own columns and its custom fields; the name is required. */
+async function dealContext(orgId: string, mapping: string[]) {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const definitions = await listFieldDefinitions(orgId, "deal");
+  const allowed = new Set([...IMPORT_TARGETS.deal.map((t) => t.key), ...definitions.map((d) => `${CUSTOM_PREFIX}${d.key}`), ""]);
+  if (!mapping.every((target) => allowed.has(target))) return fail(MAPPING_LOST);
+  if (!mapping.includes("name")) return fail("יש לבחור את העמודה של שם העסקה.");
+  const ctx: DealImportContext = { supabase: context.supabase, orgId, mapping, definitions };
+  return { ok: true as const, ctx };
+}
+
+/** IMP-03: tasks have no custom fields; the title is required. */
+async function taskContext(orgId: string, mapping: string[]) {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const allowed = new Set([...IMPORT_TARGETS.task.map((t) => t.key), ""]);
+  if (!mapping.every((target) => allowed.has(target))) return fail(MAPPING_LOST);
+  if (!mapping.includes("title")) return fail("יש לבחור את העמודה של כותרת המשימה.");
+  const ctx: TaskImportContext = { supabase: context.supabase, orgId, mapping };
+  return { ok: true as const, ctx };
+}
+
+/** Runs one chunk of a deals or tasks import (preview when jobId is null). */
+async function dealOrTaskChunk(
+  orgId: string,
+  entity: "deal" | "task",
+  mapping: string[],
+  rows: string[][],
+  firstRow: number,
+  jobId: string | null,
+): Promise<ActionResult<{ outcomes: RowOutcome[]; stopped: string | null }>> {
+  try {
+    if (entity === "deal") {
+      const prepared = await dealContext(orgId, mapping);
+      if (!prepared.ok) return prepared;
+      return ok(await processDealChunk(prepared.ctx, jobId ? await loadDealLookups(prepared.ctx) : null, rows, firstRow, jobId));
+    }
+    const prepared = await taskContext(orgId, mapping);
+    if (!prepared.ok) return prepared;
+    return ok(await processTaskChunk(prepared.ctx, jobId ? await loadTaskLookups(prepared.ctx) : null, rows, firstRow, jobId));
+  } catch (error) {
+    if (error instanceof DealImportStopped || error instanceof TaskImportStopped) {
+      return jobId ? ok({ outcomes: [], stopped: error.message }) : fail(error.message);
+    }
+    throw error;
+  }
+}
+
 async function importContext(orgId: string, entity: RecordImportEntity, mode: DuplicateModeKey, mapping: string[]) {
   const context = await actionContext(orgId);
   if (!context.ok) return context;
@@ -93,6 +146,10 @@ export async function previewImportAction(
   const rows = cellsSchema.safeParse(input.rows);
   if (!entity.success || !mode.success || !mapping.success || !rows.success) {
     return fail("הקובץ או המיפוי אינם תקינים.");
+  }
+  if (entity.data === "deal" || entity.data === "task") {
+    const result = await dealOrTaskChunk(orgId, entity.data, mapping.data, rows.data, 1, null);
+    return result.ok ? ok(result.data?.outcomes ?? []) : result;
   }
   if (entity.data === "product") {
     const product = await productContext(orgId, mapping.data);
@@ -196,6 +253,9 @@ export async function importChunkAction(
     return fail("הייבוא נעצר כי לא התקבלו נתונים כמה דקות. אפשר לבטל אותו בהיסטוריית הייבוא ולייבא שוב.");
   }
   const entity = entitySchema.parse(job.entity_type);
+  if (entity === "deal" || entity === "task") {
+    return dealOrTaskChunk(orgId, entity, mapping.data, rows.data, input.firstRow, jobId);
+  }
   if (entity === "product") {
     const product = await productContext(orgId, mapping.data);
     if (!product.ok) return product;
@@ -365,6 +425,25 @@ async function removeImportedProducts(supabase: Supabase, orgId: string, jobId: 
   return null;
 }
 
+/**
+ * IMP-03: the imported deals or tasks still in place after the undo (one that is no longer the
+ * user's to change, e.g. passed to another team meanwhile). null when none is left.
+ * Known limit: the count runs with the user's session, so a row the user can no longer read at all
+ * is not counted, and the import is then marked undone with that row still in place.
+ */
+async function importedLeft(supabase: Supabase, orgId: string, entity: "deal" | "task", jobId: string): Promise<string | null> {
+  const { count, error } = await supabase
+    .from(IMPORT_TABLES[entity])
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("import_job_id", jobId)
+    .is("deleted_at", null);
+  if (error) return dbErrorMessage(error, "לא הצלחנו לבדוק שהייבוא בוטל.");
+  if (!count) return null;
+  const what = entity === "deal" ? (count === 1 ? "עסקה אחת" : `${count} עסקאות`) : count === 1 ? "משימה אחת" : `${count} משימות`;
+  return `${what} מהייבוא לא הוסרו, כי כבר אין לכם הרשאה לשנות אותן. הייבוא לא סומן כמבוטל.`;
+}
+
 /** Moves the records an import created to the recycle bin (within 7 days). Updates are not reverted. */
 export async function undoImportAction(orgId: string, jobId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
@@ -402,6 +481,11 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
     .eq("import_job_id", jobId)
     .is("deleted_at", null);
   if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
+  if (entity === "deal" || entity === "task") {
+    // IMP-03: an update RLS filters out answers no error; say so instead of marking the import undone
+    const left = await importedLeft(context.supabase, orgId, entity, jobId);
+    if (left) return fail(left);
+  }
   if (entity === "contact") {
     const companiesError = await trashImportedCompanies(context.supabase, orgId, jobId);
     if (companiesError) return fail(companiesError);

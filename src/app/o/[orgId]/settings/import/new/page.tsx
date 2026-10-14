@@ -14,16 +14,18 @@ type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<Record<
 
 export default async function NewImportPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  // "?entity=product" from the products list (PRD-05)
-  const initialEntity = (await searchParams).entity === "product" ? "product" : "lead";
+  // "?entity=product" from the products list (PRD-05); deals and tasks (IMP-03)
+  const asked = (await searchParams).entity;
+  const initialEntity = asked === "product" || asked === "deal" || asked === "task" ? asked : "lead";
   const { role, canWrite } = await getOrgContext(orgId);
   if (!canWrite || !(isAdminRole(role) || role === "manager")) {
     notFound();
   }
-  const [lead, contact, company] = await Promise.all([
+  const [lead, contact, company, deal] = await Promise.all([
     listFieldDefinitions(orgId, "lead"),
     listFieldDefinitions(orgId, "contact"),
     listFieldDefinitions(orgId, "company"),
+    listFieldDefinitions(orgId, "deal"),
   ]);
   const short = (defs: typeof lead) => defs.map((d) => ({ key: d.key, label: d.label }));
 
@@ -32,10 +34,10 @@ export default async function NewImportPage({ params, searchParams }: Props) {
       <PageHeader title="ייבוא מקובץ" back={{ href: paths.imports(orgId), label: "ייבוא וייצוא" }} />
       <ImportWizard
         orgId={orgId}
-        customFields={{ lead: short(lead), contact: short(contact), company: short(company), product: [] }}
+        customFields={{ lead: short(lead), contact: short(contact), company: short(company), deal: short(deal), task: [], product: [] }}
         canCreateFields={isAdminRole(role)}
         canImportProducts={isAdminRole(role)}
-        initialEntity={initialEntity === "product" && isAdminRole(role) ? "product" : "lead"}
+        initialEntity={initialEntity === "product" && !isAdminRole(role) ? "lead" : initialEntity}
       />
     </>
   );

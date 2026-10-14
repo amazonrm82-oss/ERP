@@ -40,7 +40,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
         <Card aria-labelledby="import-title">
           <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
           {jobs.length === 0 ? (
-            <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר, חברות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
+            <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר, חברות, עסקאות, משימות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
           ) : (
             <ul className="divide-y divide-line">
               {jobs.map((job) => {
@@ -67,7 +67,9 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
                         confirm={
                           job.entity_type === "product"
                             ? `למחוק את ${formatNumber(job.created_count)} המוצרים שנוצרו? מוצר שכבר מופיע במסמך יעבור לארכיון במקום להימחק.`
-                            : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
+                            : job.entity_type === "task"
+                              ? `להסיר את ${formatNumber(job.created_count)} המשימות שנוצרו?`
+                              : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
                         }
                         srLabel={job.file_name}
                       >

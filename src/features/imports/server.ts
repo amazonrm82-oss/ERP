@@ -16,6 +16,7 @@ import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/
 import { readAllPagesByIds } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { customCellValue } from "./record-cells";
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
 
@@ -65,7 +66,8 @@ export function restorePhone(value: string): string {
 
 /** "31/12/1980", "31.12.1980" or "1980-12-31" -> "1980-12-31"; anything else is returned as is (and fails validation). */
 export function normalizeDate(value: string): string {
-  const v = value.trim();
+  // a time after the day is dropped (an Excel date cell with a time of day, IMP-03 cellText)
+  const v = value.trim().replace(/(?:[T\s]+)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/, "");
   const dmy = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
   if (dmy) {
     return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
@@ -158,7 +160,8 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     if (!target) return;
     const value = String(cells[index] ?? "").trim();
     if (target.startsWith(CUSTOM_PREFIX)) {
-      custom.set(inputName(target.slice(CUSTOM_PREFIX.length)), value);
+      const fieldKey = target.slice(CUSTOM_PREFIX.length);
+      custom.set(inputName(fieldKey), customCellValue(ctx.definitions.find((d) => d.key === fieldKey)?.type, value));
     } else if (value !== "") {
       raw[target] = target === "phone" ? restorePhone(value) : value;
     }

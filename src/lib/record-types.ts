@@ -67,7 +67,8 @@ export const RECORD_TYPES = {
     tags: true,
     customFields: true,
     recycleBin: true,
-    importable: false,
+    // IMP-03
+    importable: true,
     mergeable: false,
   },
   task: {
@@ -79,7 +80,8 @@ export const RECORD_TYPES = {
     tags: false,
     customFields: false,
     recycleBin: false,
-    importable: false,
+    // IMP-03
+    importable: true,
     mergeable: false,
   },
 } as const satisfies Record<string, RecordTypeInfo>;

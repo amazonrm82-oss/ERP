@@ -18,6 +18,7 @@ import { finishImportAction, importChunkAction, previewImportAction, startImport
 import {
   CHUNK_SIZE,
   CUSTOM_PREFIX,
+  DEAL_DUPLICATE_HINT,
   DUPLICATE_MODES,
   duplicateModesFor,
   IMPORT_ENTITIES,
@@ -25,10 +26,12 @@ import {
   MAX_IMPORT_ROWS,
   PRODUCT_DUPLICATE_HINT,
   suggestMapping,
+  TASK_DUPLICATE_HINT,
   type DuplicateModeKey,
   type ImportEntityKey,
 } from "../fields";
 import type { RowOutcome } from "../server";
+import { cellText } from "../cell-text";
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
 import { NewFieldForm } from "./new-field-form";
@@ -44,13 +47,6 @@ type Totals = { created: number; updated: number; skipped: number; failed: numbe
 
 const PREVIEW_ROWS = 20;
 const WARNINGS_SHOWN = 10;
-
-function cellText(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
-  if (typeof value === "number") return Number.isInteger(value) ? value.toFixed(0) : String(value);
-  return String(value).trim();
-}
 
 /** UTF-8 first; a file Excel saved as "CSV" in Hebrew Windows is Windows-1255. */
 function decode(buffer: ArrayBuffer): string {
@@ -89,6 +85,16 @@ async function readFile(file: File): Promise<Sheet> {
 function csvLine(cells: string[]): string {
   return cells.map((c) => `"${defuseFormula(c).replace(/"/g, '""')}"`).join(",");
 }
+
+// PRD-05, IMP-03: a products, deals or tasks file needs this column mapped
+const REQUIRED_COLUMN: Record<ImportEntityKey, { key: string; hint: string } | null> = {
+  lead: null,
+  contact: null,
+  company: null,
+  product: { key: "name", hint: "בחרו את העמודה של שם המוצר." },
+  deal: { key: "name", hint: "בחרו את העמודה של שם העסקה." },
+  task: { key: "title", hint: "בחרו את העמודה של כותרת המשימה." },
+};
 
 const OUTCOME_LABEL: Record<RowOutcome["status"], string> = {
   ok: "ייווצר",
@@ -232,14 +238,18 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   const entityLabel = IMPORT_ENTITIES.find((e) => e.value === entity)?.label ?? "";
   const entities = IMPORT_ENTITIES.filter((e) => e.value !== "product" || canImportProducts);
   const isProduct = entity === "product";
-  // products: no custom fields; their name column is required (PRD-05)
-  const canAddField = canCreateFields && !isProduct;
+  // products and tasks: no custom fields (PRD-05, IMP-03)
+  const canAddField = canCreateFields && !isProduct && entity !== "task";
+  // the column a row cannot do without, and what to say until it is mapped
+  const required = REQUIRED_COLUMN[entity];
+  const missingRequired = required !== null && !mapping.includes(required.key);
+  const ownHint = entity === "product" ? PRODUCT_DUPLICATE_HINT : entity === "deal" ? DEAL_DUPLICATE_HINT : entity === "task" ? TASK_DUPLICATE_HINT : null;
   const modes = DUPLICATE_MODES.filter((m) => duplicateModesFor(entity).includes(m.value));
   const listHref = isProduct ? productsPath(orgId) : RECORD_TYPES[entity].list(orgId);
 
   function chooseEntity(next: ImportEntityKey) {
     setEntity(next);
-    if (!duplicateModesFor(next).includes(mode)) setMode("skip");
+    if (!duplicateModesFor(next).includes(mode)) setMode(duplicateModesFor(next)[0]);
   }
 
   return (
@@ -344,11 +354,23 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               ))}
             </ul>
           </div>
-          {isProduct ? (
+          {ownHint ? (
             <div className="rounded-lg border border-line bg-surface p-4 text-sm sm:p-5">
-              <p className="font-medium">מוצר שכבר קיים</p>
-              <p className="mt-1 text-ink-soft">{PRODUCT_DUPLICATE_HINT}</p>
-              <p className="mt-1 text-ink-soft">כל מוצר שנוצר נספר במכסת המוצרים של החבילה. כשמגיעים למכסה הייבוא נעצר, והשורות שלא נכנסו מופיעות ברשימת השורות שנכשלו.</p>
+              <p className="font-medium">{isProduct ? "מוצר שכבר קיים" : "כפילויות"}</p>
+              <p className="mt-1 text-ink-soft">{ownHint}</p>
+              {isProduct ? (
+                <p className="mt-1 text-ink-soft">כל מוצר שנוצר נספר במכסת המוצרים של החבילה. כשמגיעים למכסה הייבוא נעצר, והשורות שלא נכנסו מופיעות ברשימת השורות שנכשלו.</p>
+              ) : null}
+              {entity === "deal" ? (
+                <>
+                  <p className="mt-1 text-ink-soft">פייפליין ושלב נמצאים לפי השם. שם שלא קיים הוא שגיאה בשורה, ושלב חדש לא נוצר. בלי עמודת שלב העסקה נכנסת לשלב הפתוח הראשון.</p>
+                  <p className="mt-1 text-ink-soft">עסקה בשלב זכייה או הפסד נסגרת בתאריך הסגירה בפועל. בלעדיו, בתאריך הסגירה הצפוי אם כבר עבר, ואם אין, בתאריך הייבוא.</p>
+                  <p className="mt-1 text-ink-soft">איש קשר נמצא לפי אימייל או טלפון, וחברה לפי שם או דומיין. כשלא נמצאה רשומה אחת בדיוק, השורה לא מיובאת.</p>
+                </>
+              ) : null}
+              {entity === "task" ? (
+                <p className="mt-1 text-ink-soft">ליד ואיש קשר נמצאים לפי טלפון או אימייל, חברה לפי שם או דומיין, ועסקה לפי השם המדויק. כשלא נמצאה רשומה אחת בדיוק, השורה לא מיובאת. שעות היעד הן לפי שעון העסק.</p>
+              ) : null}
             </div>
           ) : (
             <fieldset className="rounded-lg border border-line bg-surface p-4 sm:p-5">
@@ -366,9 +388,9 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               </div>
             </fieldset>
           )}
-          {isProduct && !mapping.includes("name") ? <p className="text-sm text-ink-soft">בחרו את העמודה של שם המוצר.</p> : null}
+          {required && missingRequired ? <p className="text-sm text-ink-soft">{required.hint}</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={check} disabled={busy || mappedCount === 0 || (isProduct && !mapping.includes("name"))} aria-busy={busy || undefined}>
+            <Button onClick={check} disabled={busy || mappedCount === 0 || missingRequired} aria-busy={busy || undefined}>
               {busy ? "בודקים…" : "בדיקת 20 השורות הראשונות"}
             </Button>
             <Button variant="ghost" onClick={reset}>
