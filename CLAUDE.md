@@ -607,6 +607,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `nextTask(…, calendar)`. The "מחר" / "בעוד שבוע" buttons and snoozes move to the next working day and say so
   (`movedToWorkingDayNotice()`, "נקבע ליום ראשון, 19 באוקטובר (יום העבודה הבא)"); a date a person picks only warns
   (`RestDayWarning`). The weekly rule form explains a picked rest weekday (`weeklyRestNote()`).
+- Printing (GAP-11, no migration): `PrintButton` (window.print) and `PrintHeader` (business name, "הודפס ב-…" in the org zone,
+  refreshed on beforeprint) on My day, the calendar (a plain `PrintAgenda` list) and the record pages. `src/features/print/print.css`
+  is one `@media print` block scoped to `html:has([data-print-page])`, imported only by `PrintHeader`. Screen-only parts carry
+  `print:hidden`; someone else's private note never prints (`printsTimelineEntry`); files print as name, date and uploader only
+  (owner); consents never print.
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
