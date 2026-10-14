@@ -31,6 +31,8 @@ type Ctx = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
 
 function revalidateDeal(orgId: string, dealId: string) {
   revalidatePath(paths.deal(orgId, dealId));
+  // DLI-03: a line change may move the deal's value, shown on the board and the lists
+  revalidatePath(paths.deals(orgId));
 }
 
 function writeError(error: { code?: string; message?: string; hint?: string }): string {

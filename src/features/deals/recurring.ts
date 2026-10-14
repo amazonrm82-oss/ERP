@@ -9,9 +9,11 @@ import { formatMoney, parseMoneyToAgorot } from "@/lib/format";
 // have a renewal date on or after the start (constraint deals_recurring_shape).
 //
 // The deal's value and the first-year rule (owner, 14 October 2026) live in the database:
-// trigger deals_amount_auto applies app.deal_value() to every writer and derives
-// deals.amount_auto (true = the value is computed, 12 x monthly or the yearly amount).
-// dealValueRule() below mirrors app.deal_value(); tests/unit/fixtures/deal-value.json is
+// trigger deals_amount_auto applies app.deal_amount_rule() to every writer and derives
+// deals.amount_auto (true = the value is computed) and deals.amount_source (DLI-03: "lines",
+// the before-VAT sum of the product lines, or "first_year", 12 x monthly or the yearly amount),
+// and fills recurring_amount_agorot from the lines while nobody typed it (recurring_amount_auto).
+// dealValueRule() below mirrors app.deal_amount_rule(); tests/unit/fixtures/deal-value.json is
 // checked against both. The app sends amount_agorot = null for an empty value field.
 
 export const BILLING_KINDS = ["one_time", "monthly", "yearly"] as const;
@@ -82,6 +84,8 @@ export function firstYearValue(kind: string | null, recurringAgorot: number | nu
   return null;
 }
 
+export type DealValueSource = "lines" | "first_year";
+
 export type DealValueInput = {
   kind: string | null;
   recurring: number | null;
@@ -90,25 +94,78 @@ export type DealValueInput = {
   oldAmount: number | null;
   oldAuto: boolean | null;
   insert: boolean;
+  // DLI-03: the before-VAT sum of the deal's product lines (dealLinesNet()); null = no lines
+  lines?: number | null;
+  oldRecurring?: number | null;
+  oldRecurringAuto?: boolean | null;
+  oldSource?: string | null;
 };
-export type DealValueResult = { amount: number; auto: true | null } | { error: "deal:amount_too_big" };
+export type DealValueResult =
+  | {
+      amount: number;
+      auto: true | null;
+      source: DealValueSource | null;
+      recurring: number | null;
+      recurringAuto: true | null;
+    }
+  | { error: "deal:amount_too_big" };
 
 /**
- * Mirror of app.deal_value() (migration deal_recurring): the stored value and flag.
- * Empty, or unchanged while computed: follows the recurring terms (0 and no flag on a
- * one-time deal). Anything else (typed, given on insert, or unchanged and not computed):
- * kept, flag off; a typed value turns the flag off even when it equals the first-year value.
+ * Mirror of app.deal_amount_rule() (migrations deal_recurring, deal_value_from_lines): the stored
+ * value, its flag and source, and the recurring amount. Owner's order (DLI-03): a typed value; the
+ * lines' sum (before VAT); a recurring deal's first year; empty (0).
+ * - The recurring amount (recurring deal only) follows the lines when sent empty, or unchanged
+ *   while it was following; with no lines it keeps what it had (0 when empty). Else kept as typed.
+ * - Computed: a recurring deal, the first year of its recurring amount (source "lines" while that
+ *   amount follows existing lines, else "first_year"); a one-time deal with lines, their sum.
+ * - The value follows it when sent empty, or unchanged while computed; an unchanged 0 nobody
+ *   computed follows the lines too ("0 is empty"). An unchanged value computed from lines with
+ *   nothing left to compute becomes empty. Anything else is kept, flag off; a typed value turns
+ *   the flag off even when it equals the computed one.
  */
 export function dealValueRule(input: DealValueInput): DealValueResult {
-  const computed = firstYearValue(input.kind, input.recurring);
-  const follows =
-    input.amount === null || (!input.insert && input.amount === input.oldAmount && input.oldAuto === true && computed !== null);
-  if (follows) {
-    if (computed === null) return { amount: 0, auto: null };
-    if (!Number.isSafeInteger(computed)) return { error: "deal:amount_too_big" };
-    return { amount: computed, auto: true };
+  const lines = input.lines ?? null;
+  let recurring = input.recurring;
+  let recurringAuto: true | null = null;
+  if (
+    input.kind !== null &&
+    (input.recurring === null || (!input.insert && input.recurring === (input.oldRecurring ?? null) && input.oldRecurringAuto === true))
+  ) {
+    recurring = lines ?? input.recurring ?? 0;
+    recurringAuto = true;
   }
-  return { amount: input.amount as number, auto: null };
+
+  let computed: number | null = null;
+  let source: DealValueSource | null = null;
+  if (input.kind !== null) {
+    // an amount waiting for lines (following, none yet, 0) is nothing to compute from: empty
+    computed = recurringAuto === true && lines === null && recurring === 0 ? null : firstYearValue(input.kind, recurring);
+    source = recurringAuto === true && lines !== null ? "lines" : "first_year";
+  } else if (lines !== null) {
+    computed = lines;
+    source = "lines";
+  }
+
+  const unchanged = !input.insert && input.amount === input.oldAmount;
+  const follows =
+    input.amount === null ||
+    (unchanged && input.oldAuto === true && computed !== null) ||
+    (unchanged && input.amount === 0 && input.oldAuto !== true && lines !== null && computed !== null);
+  if (follows) {
+    if (computed === null) return { amount: 0, auto: null, source: null, recurring, recurringAuto };
+    if (!Number.isSafeInteger(computed)) return { error: "deal:amount_too_big" };
+    return { amount: computed, auto: true, source, recurring, recurringAuto };
+  }
+  if (unchanged && input.oldAuto === true && input.oldSource === "lines") {
+    return { amount: 0, auto: null, source: null, recurring, recurringAuto };
+  }
+  return {
+    amount: input.amount as number,
+    auto: null,
+    source: null,
+    recurring,
+    recurringAuto,
+  };
 }
 
 /** Agorot as a shekel input value ("1200", "1200.50"); "" for none. */
@@ -117,8 +174,51 @@ export function agorotInput(agorot: number | null | undefined): string {
   return agorot % 100 === 0 ? String(agorot / 100) : (agorot / 100).toFixed(2);
 }
 
-// shown next to a value the system computed (deals.amount_auto)
+// shown next to a value the system computed (deals.amount_auto, deals.amount_source)
 export const FIRST_YEAR_NOTE = "(לפי שנה ראשונה)";
+export const LINES_NOTE = "(לפי שורות המוצר)";
+
+/**
+ * The mark next to a computed value; null for a typed or empty one. A value computed before
+ * DLI-03 has the flag and no source: it was a first-year value.
+ */
+export function dealValueNote(auto: boolean | null | undefined, source: string | null | undefined): string | null {
+  if (auto !== true) return null;
+  return source === "lines" ? LINES_NOTE : FIRST_YEAR_NOTE;
+}
+
+/**
+ * DLI-03: what the deal value does with the product lines, for the lines card. A recurring deal's
+ * recurring amount follows the lines while nobody typed it; the value follows the lines (or the
+ * first year of that amount) while nobody typed it.
+ */
+export function linesValueNote(deal: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean }): string {
+  const typed = "שווי העסקה הוקלד ביד ולא משתנה לפי השורות. כדי לחשב אותו מהשורות, מרוקנים את השווי בפרטי העסקה.";
+  if (deal.kind === "monthly" || deal.kind === "yearly") {
+    const per = deal.kind === "monthly" ? "הסכום החודשי" : "הסכום השנתי";
+    if (!deal.recurringAuto) {
+      return `${per} הוקלד ביד ולא משתנה לפי השורות. כדי לחשב אותו מהשורות, מרוקנים אותו בפרטי העסקה.`;
+    }
+    const recurring = `${per} מחושב מסכום השורות לפני מע"מ.`;
+    return deal.auto ? `${recurring} שווי העסקה לפי שנה ראשונה.` : `${recurring} ${typed}`;
+  }
+  return deal.auto && deal.source === "lines" ? 'שווי העסקה מחושב מסכום השורות לפני מע"מ.' : typed;
+}
+
+/** The value field's hint in the deal form, by what the value follows now. */
+export function dealValueHint(auto: boolean, source: string | null): string {
+  if (auto && source === "lines") return "מחושב לפי שורות המוצר, לפני מע\"מ. ערך שתקלידו יישאר קבוע; שדה ריק יחזיר את החישוב.";
+  if (auto) return "מחושב לפי שנה ראשונה. ערך שתקלידו יישאר קבוע; שדה ריק יחזיר את החישוב.";
+  return "שדה ריק יחושב לפי שורות המוצר, או בעסקה חוזרת לפי שנה ראשונה.";
+}
+
+/**
+ * DLI-03: the recurring amount as shown. An amount that follows the product lines while the
+ * deal has none holds 0 and means "empty, waiting for lines": shown as no amount.
+ */
+export function shownRecurringAmount(amountAgorot: number | null, following: boolean | null | undefined): number | null {
+  return following === true && amountAgorot === 0 ? null : amountAgorot;
+}
 
 /** "₪500 לחודש" / "₪6,000 לשנה"; null for a one-time deal. */
 export function recurringText(stored: string | null | undefined, amountAgorot: number | null | undefined): string | null {
@@ -142,55 +242,93 @@ const text = z.preprocess((value) => (typeof value === "string" ? value.trim() :
  * The recurring fields of a deal form. A one-time deal clears every recurring field
  * (whatever the hidden inputs held); a recurring one needs an amount and a start date,
  * and a renewal date, when given, on or after the start.
+ * DLI-03: the deal form may leave the amount empty (sent as null): the database then fills it
+ * from the product lines (0 while there are none). An import still needs it (no lines there).
  */
-export const recurringSchema = z
-  .object({
-    billing_kind: text,
-    recurring_amount: text,
-    recurring_start_date: text,
-    renewal_date: text,
-  })
-  .transform((input, ctx): RecurringPatch => {
-    const kind = (BILLING_KINDS as readonly string[]).includes(input.billing_kind) ? (input.billing_kind as BillingKind) : null;
-    if (kind === null) {
-      ctx.addIssue({ code: "custom", path: ["billing_kind"], message: "יש לבחור סוג עסקה." });
-      return z.NEVER;
-    }
-    if (kind === "one_time") {
-      return { billing_kind: null, recurring_amount_agorot: null, recurring_start_date: null, renewal_date: null };
-    }
-    let ok = true;
-    const amount = input.recurring_amount === "" ? null : parseMoneyToAgorot(input.recurring_amount);
-    if (input.recurring_amount === "") {
-      ctx.addIssue({ code: "custom", path: ["recurring_amount"], message: kind === "monthly" ? "יש להזין סכום חודשי." : "יש להזין סכום שנתי." });
-      ok = false;
-    } else if (amount === null) {
-      ctx.addIssue({ code: "custom", path: ["recurring_amount"], message: "יש להזין סכום בשקלים, למשל 1,200." });
-      ok = false;
-    }
-    if (!isCalendarDate(input.recurring_start_date)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["recurring_start_date"],
-        message: input.recurring_start_date === "" ? "יש לבחור תאריך התחלה." : "התאריך אינו תקין.",
-      });
-      ok = false;
-    }
-    if (input.renewal_date !== "" && !isCalendarDate(input.renewal_date)) {
-      ctx.addIssue({ code: "custom", path: ["renewal_date"], message: "התאריך אינו תקין." });
-      ok = false;
-    } else if (input.renewal_date !== "" && isCalendarDate(input.recurring_start_date) && input.renewal_date < input.recurring_start_date) {
-      ctx.addIssue({ code: "custom", path: ["renewal_date"], message: "תאריך החידוש לא יכול להיות לפני תאריך ההתחלה." });
-      ok = false;
-    }
-    if (!ok || amount === null) return z.NEVER;
-    return {
-      billing_kind: kind,
-      recurring_amount_agorot: amount,
-      recurring_start_date: input.recurring_start_date,
-      renewal_date: input.renewal_date === "" ? null : input.renewal_date,
-    };
-  });
+export const recurringSchema = makeRecurringSchema(false);
+export const recurringFormSchema = makeRecurringSchema(true);
+
+function makeRecurringSchema(emptyAmountFollowsLines: boolean) {
+  return z
+    .object({
+      billing_kind: text,
+      recurring_amount: text,
+      recurring_start_date: text,
+      renewal_date: text,
+    })
+    .transform((input, ctx): RecurringPatch => {
+      const kind = (BILLING_KINDS as readonly string[]).includes(input.billing_kind) ? (input.billing_kind as BillingKind) : null;
+      if (kind === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["billing_kind"],
+          message: "יש לבחור סוג עסקה.",
+        });
+        return z.NEVER;
+      }
+      if (kind === "one_time") {
+        return {
+          billing_kind: null,
+          recurring_amount_agorot: null,
+          recurring_start_date: null,
+          renewal_date: null,
+        };
+      }
+      let ok = true;
+      const amount = input.recurring_amount === "" ? null : parseMoneyToAgorot(input.recurring_amount);
+      if (input.recurring_amount === "" && emptyAmountFollowsLines) {
+        // the database fills it from the lines
+      } else if (input.recurring_amount === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["recurring_amount"],
+          message: kind === "monthly" ? "יש להזין סכום חודשי." : "יש להזין סכום שנתי.",
+        });
+        ok = false;
+      } else if (amount === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["recurring_amount"],
+          message: "יש להזין סכום בשקלים, למשל 1,200.",
+        });
+        ok = false;
+      }
+      if (!isCalendarDate(input.recurring_start_date)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["recurring_start_date"],
+          message: input.recurring_start_date === "" ? "יש לבחור תאריך התחלה." : "התאריך אינו תקין.",
+        });
+        ok = false;
+      }
+      if (input.renewal_date !== "" && !isCalendarDate(input.renewal_date)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["renewal_date"],
+          message: "התאריך אינו תקין.",
+        });
+        ok = false;
+      } else if (
+        input.renewal_date !== "" &&
+        isCalendarDate(input.recurring_start_date) &&
+        input.renewal_date < input.recurring_start_date
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["renewal_date"],
+          message: "תאריך החידוש לא יכול להיות לפני תאריך ההתחלה.",
+        });
+        ok = false;
+      }
+      if (!ok || (amount === null && !emptyAmountFollowsLines)) return z.NEVER;
+      return {
+        billing_kind: kind,
+        recurring_amount_agorot: amount,
+        recurring_start_date: input.recurring_start_date,
+        renewal_date: input.renewal_date === "" ? null : input.renewal_date,
+      };
+    });
+}
 
 /** The value field as sent: null when it was left empty (the database then decides). */
 export function typedDealValue(amountRaw: unknown, typedAgorot: number): number | null {

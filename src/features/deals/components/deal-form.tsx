@@ -62,7 +62,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
           placeholder="0"
           defaultValue={values.amount}
           error={errors.amount}
-          hint="שדה ריק בעסקה חוזרת יחושב לפי שנה ראשונה."
+          hint="שדה ריק יחושב לפי שורות המוצר שתוסיפו, או בעסקה חוזרת לפי שנה ראשונה."
         />
         <SelectField key={`stage-${stageValue}`} label="שלב" name="stage_id" required defaultValue={stageValue} error={errors.stage_id}>
           {stages.map((stage) => (

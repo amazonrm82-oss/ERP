@@ -93,8 +93,17 @@ describe("recurring revenue on deals (DEAL-07)", () => {
   });
 
   it("a recurring deal needs an amount of zero or more and a start date; renewal not before the start", async () => {
+    // DLI-03: an empty recurring amount is no longer refused; it follows the product lines (0 while there are none),
+    // and an empty value stays empty: no flag and no source while there is nothing to compute from
+    const empty = await insert(member.id, { billing_kind: "monthly", recurring_start_date: "2026-01-01", amount_agorot: null });
+    await asAdmin(async (q) => {
+      const r = await q<{ recurring_amount_agorot: string; recurring_amount_auto: boolean | null; amount_agorot: string; amount_auto: boolean | null; amount_source: string | null }>(
+        "select recurring_amount_agorot::text, recurring_amount_auto, amount_agorot::text, amount_auto, amount_source from public.deals where id = $1",
+        [empty],
+      );
+      expect(r.rows[0]).toEqual({ recurring_amount_agorot: "0", recurring_amount_auto: true, amount_agorot: "0", amount_auto: null, amount_source: null });
+    });
     const cases: Array<Record<string, unknown>> = [
-      { billing_kind: "monthly", recurring_start_date: "2026-01-01" },
       { billing_kind: "monthly", recurring_amount_agorot: 100 },
       { billing_kind: "yearly", recurring_amount_agorot: -1, recurring_start_date: "2026-01-01" },
       { billing_kind: "yearly", recurring_amount_agorot: 100, recurring_start_date: "2026-01-02", renewal_date: "2026-01-01" },
@@ -208,8 +217,11 @@ describe("recurring revenue on deals (DEAL-07)", () => {
     const file = fs.readdirSync(dir).find((name) => name.endsWith("_deal_recurring.sql"));
     expect(file).toBeTruthy();
     const sql = fs.readFileSync(path.join(dir, file!), "utf8");
+    // DLI-03 redefines app.deal_value() and the trigger function: re-run it after, so later tests see the latest rule
+    const later = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find((name) => name.endsWith("_deal_value_from_lines.sql"))!), "utf8");
     await asAdmin((q) => q(sql));
     await asAdmin((q) => q(sql));
+    await asAdmin((q) => q(later));
     await asAdmin(async (q) => {
       expect(await count(q, "select 1 from pg_constraint where conrelid = 'public.deals'::regclass and conname in ('deals_billing_kind', 'deals_recurring_shape', 'deals_amount_auto_true')")).toBe(3);
     });
@@ -224,7 +236,11 @@ type Fixture = {
   old_amount: number | null;
   old_auto: boolean | null;
   insert: boolean;
-  expect: { amount: number; auto: true | null } | { error: string };
+  lines?: number | null;
+  old_recurring?: number | null;
+  old_recurring_auto?: boolean | null;
+  old_source?: string | null;
+  expect: { amount: number; auto: true | null; source?: string | null; recurring?: number | null; recurring_auto?: true | null } | { error: string };
 };
 
 // the same cases run against dealValueRule() in tests/unit/deal-recurring.test.ts
@@ -232,15 +248,12 @@ const FIXTURES = JSON.parse(readFileSync(path.resolve(__dirname, "../unit/fixtur
 
 describe("first-year value: app.deal_value() matches the shared fixtures", () => {
   it.each(FIXTURES.map((f) => [f.name, f] as const))("%s", async (_name, f) => {
+    // DLI-03: the full rule (app.deal_value() is the same rule without lines)
     const run = asAdmin((q) =>
-      q<{ amount: string; auto: boolean | null }>("select amount::text, auto from app.deal_value($1, $2, $3, $4, $5, $6)", [
-        f.kind,
-        f.recurring,
-        f.amount,
-        f.old_amount,
-        f.old_auto,
-        f.insert,
-      ]),
+      q<{ amount: string; auto: boolean | null; source: string | null; recurring: string | null; recurring_auto: boolean | null }>(
+        "select amount::text, auto, source, recurring::text, recurring_auto from app.deal_amount_rule($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        [f.kind, f.recurring, f.amount, f.old_amount, f.old_auto, f.insert, f.lines ?? null, f.old_recurring ?? null, f.old_recurring_auto ?? null, f.old_source ?? null],
+      ),
     );
     if ("error" in f.expect) {
       const e = await pgError(run);
@@ -248,7 +261,25 @@ describe("first-year value: app.deal_value() matches the shared fixtures", () =>
       expect(e.hint).toBe(f.expect.error);
     } else {
       const row = (await run).rows[0];
-      expect({ amount: Number(row.amount), auto: row.auto }).toEqual(f.expect);
+      const shaped: Record<string, unknown> = { amount: Number(row.amount), auto: row.auto };
+      if ("source" in f.expect) shaped.source = row.source;
+      if ("recurring" in f.expect) shaped.recurring = row.recurring === null ? null : Number(row.recurring);
+      if ("recurring_auto" in f.expect) shaped.recurring_auto = row.recurring_auto;
+      expect(shaped).toEqual(f.expect);
+      // a case without lines answers the same through DEAL-07's entry point
+      if (f.lines == null && f.old_recurring == null && f.old_source == null) {
+        const old = await asAdmin((q) =>
+          q<{ amount: string; auto: boolean | null }>("select amount::text, auto from app.deal_value($1, $2, $3, $4, $5, $6)", [
+            f.kind,
+            f.recurring,
+            f.amount,
+            f.old_amount,
+            f.old_auto,
+            f.insert,
+          ]),
+        );
+        expect({ amount: Number(old.rows[0].amount), auto: old.rows[0].auto }).toEqual({ amount: shaped.amount, auto: shaped.auto });
+      }
     }
   });
 });

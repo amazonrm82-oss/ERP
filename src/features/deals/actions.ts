@@ -23,7 +23,7 @@ import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
 import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
-import { RECURRING_FIELD_NAMES, recurringSchema, typedDealValue, type RecurringPatch } from "./recurring";
+import { RECURRING_FIELD_NAMES, recurringFormSchema, shownRecurringAmount, typedDealValue, type RecurringPatch } from "./recurring";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 import { snoozeSchema } from "./snooze";
 import {
@@ -50,7 +50,8 @@ function revalidateDeal(orgId: string, dealId?: string) {
 /**
  * DEAL-07: the deal fields and the recurring fields of a form, parsed together so every
  * field error shows at once. An empty value field is sent as null: the database then
- * fills the first-year value of a recurring deal (trigger deals_amount_auto).
+ * fills the value from the product lines, or the first-year value of a recurring deal
+ * (trigger deals_amount_auto, DLI-03).
  */
 function parseDealForm<T extends { amount: number }>(
   schema: { safeParse: (input: unknown) => { success: true; data: T } | { success: false; error: ZodError } },
@@ -58,7 +59,7 @@ function parseDealForm<T extends { amount: number }>(
   formData: FormData,
 ): { ok: true; data: T; recurring: RecurringPatch; amount: number | null } | { ok: false; state: FormState } {
   const base = schema.safeParse(pick(formData, names));
-  const recurring = recurringSchema.safeParse(pick(formData, RECURRING_FIELD_NAMES));
+  const recurring = recurringFormSchema.safeParse(pick(formData, RECURRING_FIELD_NAMES));
   if (!base.success || !recurring.success) {
     const issues = [...(base.success ? [] : base.error.issues), ...(recurring.success ? [] : recurring.error.issues)];
     return { ok: false, state: invalid(new ZodError(issues), formData) };
@@ -469,7 +470,7 @@ export async function duplicateDealAction(orgId: string, dealId: string, _prev: 
 
   const { data: deal, error: dealError } = await supabase
     .from("deals")
-    .select("id, pipeline_id, stage_id, amount_agorot, contact_id, company_id, source_id, expected_close_date, tag_ids, custom_fields, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto")
+    .select("id, pipeline_id, stage_id, amount_agorot, contact_id, company_id, source_id, expected_close_date, tag_ids, custom_fields, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto")
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)
@@ -498,11 +499,13 @@ export async function duplicateDealAction(orgId: string, dealId: string, _prev: 
     name: parsed.data.name,
     pipeline_id: deal.pipeline_id,
     stage_id: stage.id,
-    // DEAL-07: a computed value is sent empty, so the copy is computed and stays automatic
-    amount_agorot: deal.amount_auto === true ? null : deal.amount_agorot,
+    // DEAL-07: a computed value is sent empty, so the copy is computed and stays automatic.
+    // DLI-03: a copy has no product lines, so a value computed from lines is kept as a value.
+    amount_agorot: deal.amount_auto === true && deal.amount_source !== "lines" ? null : deal.amount_agorot,
     // DEAL-07: a copy keeps the deal's recurring terms as they are
     billing_kind: deal.billing_kind,
-    recurring_amount_agorot: deal.recurring_amount_agorot,
+    // DLI-03: an amount still empty and waiting for lines stays empty (null) in the copy
+    recurring_amount_agorot: shownRecurringAmount(deal.recurring_amount_agorot, deal.recurring_amount_auto),
     recurring_start_date: deal.recurring_start_date,
     renewal_date: deal.renewal_date,
     contact_id: deal.contact_id,

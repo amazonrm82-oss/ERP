@@ -5,10 +5,17 @@ import { describe, expect, it } from "vitest";
 import {
   agorotInput,
   billingKindOf,
+  dealValueHint,
+  dealValueNote,
   dealValueRule,
+  FIRST_YEAR_NOTE,
   firstYearValue,
+  LINES_NOTE,
+  linesValueNote,
+  recurringFormSchema,
   recurringSchema,
   recurringText,
+  shownRecurringAmount,
   storedBillingKind,
   suggestRenewalDate,
   typedDealValue,
@@ -124,7 +131,14 @@ type Fixture = {
   old_amount: number | null;
   old_auto: boolean | null;
   insert: boolean;
-  expect: { amount: number; auto: true | null } | { error: "deal:amount_too_big" };
+  // DLI-03 cases also carry the lines' sum and the old recurring state, and expect the source and the recurring amount
+  lines?: number | null;
+  old_recurring?: number | null;
+  old_recurring_auto?: boolean | null;
+  old_source?: string | null;
+  expect:
+    | { amount: number; auto: true | null; source?: string | null; recurring?: number | null; recurring_auto?: true | null }
+    | { error: "deal:amount_too_big" };
 };
 
 // the same cases run against app.deal_value() in tests/db/106-deal-recurring.test.ts
@@ -139,9 +153,45 @@ describe("deal value and first-year value (mirror of app.deal_value)", () => {
   });
 
   it.each(FIXTURES.map((f) => [f.name, f] as const))("%s", (_name, f) => {
-    expect(
-      dealValueRule({ kind: f.kind, recurring: f.recurring, amount: f.amount, oldAmount: f.old_amount, oldAuto: f.old_auto, insert: f.insert }),
-    ).toEqual(f.expect);
+    const result = dealValueRule({
+      kind: f.kind,
+      recurring: f.recurring,
+      amount: f.amount,
+      oldAmount: f.old_amount,
+      oldAuto: f.old_auto,
+      insert: f.insert,
+      lines: f.lines ?? null,
+      oldRecurring: f.old_recurring ?? null,
+      oldRecurringAuto: f.old_recurring_auto ?? null,
+      oldSource: f.old_source ?? null,
+    });
+    if ("error" in result || "error" in f.expect) {
+      expect(result).toEqual(f.expect);
+      return;
+    }
+    // the DEAL-07 cases expect the value and the flag; the DLI-03 cases also the source and the recurring amount
+    const shaped: Record<string, unknown> = { amount: result.amount, auto: result.auto };
+    if ("source" in f.expect) shaped.source = result.source;
+    if ("recurring" in f.expect) shaped.recurring = result.recurring;
+    if ("recurring_auto" in f.expect) shaped.recurring_auto = result.recurringAuto;
+    expect(shaped).toEqual(f.expect);
+  });
+
+  it("the fixtures cover every DLI-03 case the owner named", () => {
+    const names = FIXTURES.map((f) => f.name).join("\n");
+    for (const part of [
+      "no lines",
+      "lines added",
+      "monthly, recurring following",
+      "yearly, recurring following",
+      "typed recurring amount plus lines",
+      "a typed value survives",
+      "value cleared",
+      "all lines removed: empty",
+      "all lines removed: the first year",
+    ]) {
+      expect(names, part).toContain(part);
+    }
   });
 
   it("an empty value field is sent as null; a typed one as typed", () => {
@@ -150,5 +200,58 @@ describe("deal value and first-year value (mirror of app.deal_value)", () => {
     expect(typedDealValue(null, 0)).toBeNull();
     expect(typedDealValue("0", 0)).toBe(0);
     expect(typedDealValue("2,000", 200000)).toBe(200000);
+  });
+});
+
+// DLI-03: the deal value from the product lines (owner, 14 October 2026)
+describe("deal value from product lines (DLI-03)", () => {
+  it("the mark says which source a computed value follows; a value computed before DLI-03 was a first year", () => {
+    expect(LINES_NOTE).toBe("(לפי שורות המוצר)");
+    expect(FIRST_YEAR_NOTE).toBe("(לפי שנה ראשונה)");
+    expect(dealValueNote(true, "lines")).toBe(LINES_NOTE);
+    expect(dealValueNote(true, "first_year")).toBe(FIRST_YEAR_NOTE);
+    expect(dealValueNote(true, null)).toBe(FIRST_YEAR_NOTE);
+    expect(dealValueNote(false, null)).toBeNull();
+    expect(dealValueNote(null, "lines")).toBeNull();
+  });
+
+  it("the form's hint follows the source", () => {
+    expect(dealValueHint(true, "lines")).toContain("שורות המוצר");
+    expect(dealValueHint(true, null)).toContain("שנה ראשונה");
+    expect(dealValueHint(false, null)).toContain("שדה ריק");
+  });
+
+  it("the lines card says what the value does with the lines", () => {
+    expect(linesValueNote({ kind: null, auto: true, source: "lines", recurringAuto: false })).toBe('שווי העסקה מחושב מסכום השורות לפני מע"מ.');
+    expect(linesValueNote({ kind: null, auto: false, source: null, recurringAuto: false })).toContain("הוקלד ביד");
+    expect(linesValueNote({ kind: "monthly", auto: true, source: "lines", recurringAuto: true })).toBe(
+      'הסכום החודשי מחושב מסכום השורות לפני מע"מ. שווי העסקה לפי שנה ראשונה.',
+    );
+    expect(linesValueNote({ kind: "yearly", auto: true, source: "first_year", recurringAuto: false })).toContain("הסכום השנתי הוקלד ביד");
+    expect(linesValueNote({ kind: "monthly", auto: false, source: null, recurringAuto: true })).toContain("שווי העסקה הוקלד ביד");
+  });
+
+  it("the deal form may leave a recurring amount empty (it follows the lines); an import may not", () => {
+    const input = form({ billing_kind: "monthly", recurring_amount: "", recurring_start_date: "2026-01-01" });
+    expect(recurringFormSchema.parse(input)).toEqual({
+      billing_kind: "monthly",
+      recurring_amount_agorot: null,
+      recurring_start_date: "2026-01-01",
+      renewal_date: null,
+    });
+    expect(errorsOf(input).recurring_amount).toBe("יש להזין סכום חודשי.");
+    // a bad amount is still refused by both
+    const bad = form({ billing_kind: "monthly", recurring_amount: "abc", recurring_start_date: "2026-01-01" });
+    expect(recurringFormSchema.safeParse(bad).success).toBe(false);
+    // and the start date is still needed
+    expect(recurringFormSchema.safeParse(form({ billing_kind: "yearly" })).success).toBe(false);
+  });
+
+  it("an amount still waiting for lines shows as empty, never as ₪0 לחודש", () => {
+    expect(shownRecurringAmount(0, true)).toBeNull();
+    expect(recurringText("monthly", shownRecurringAmount(0, true))).toBeNull();
+    expect(shownRecurringAmount(0, null)).toBe(0);
+    expect(shownRecurringAmount(30000, true)).toBe(30000);
+    expect(shownRecurringAmount(null, true)).toBeNull();
   });
 });

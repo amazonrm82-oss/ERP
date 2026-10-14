@@ -13,6 +13,8 @@ type Props = {
   // the values sent with a failed submit win over the stored ones
   submitted?: Record<string, string>;
   errors: Record<string, string>;
+  // DLI-03: the stored recurring amount follows the product lines
+  amountAuto?: boolean;
 };
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * the start date and the renewal date. The renewal date follows the start (one month or
  * one year on) until the person types a date of their own.
  */
-export function RecurringFields({ initial, submitted, errors }: Props) {
+export function RecurringFields({ initial, submitted, errors, amountAuto = false }: Props) {
   const startKind = billingKindOf(submitted?.billing_kind ?? initial.kind);
   const startStart = submitted?.recurring_start_date ?? initial.start;
   const startRenewal = submitted?.renewal_date ?? initial.renewal;
@@ -60,13 +62,17 @@ export function RecurringFields({ initial, submitted, errors }: Props) {
           <TextField
             label={kind === "monthly" ? "סכום חודשי (₪)" : "סכום שנתי (₪)"}
             name="recurring_amount"
-            required
             dir="ltr"
             inputMode="decimal"
             autoComplete="off"
             placeholder="0"
             defaultValue={submitted?.recurring_amount ?? initial.amount}
             error={errors.recurring_amount}
+            hint={
+              amountAuto
+                ? "מחושב לפי שורות המוצר, לפני מע\"מ. סכום שתקלידו יישאר קבוע; שדה ריק יחזיר את החישוב."
+                : "שדה ריק יחושב לפי שורות המוצר בעסקה."
+            }
           />
           <TextField
             label="תאריך התחלה"

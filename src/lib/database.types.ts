@@ -1203,8 +1203,12 @@ export type DealRow = {
   recurring_amount_agorot: number | null;
   recurring_start_date: string | null;
   renewal_date: string | null;
-  // DEAL-07: true while the value is the computed first-year value; set by trigger only (deals_amount_auto)
+  // DEAL-07: true while the value is computed; set by trigger only (deals_amount_auto)
   amount_auto: boolean | null;
+  // DLI-03: what a computed value follows, 'lines' | 'first_year' (null on a row computed before DLI-03: first year)
+  amount_source: string | null;
+  // DLI-03: true while the recurring amount follows the product lines; set by trigger only
+  recurring_amount_auto: boolean | null;
   // IMP-03: the import that created the deal; set on insert only (deals_import_tag)
   import_job_id: string | null;
   created_by: string | null;
@@ -1219,7 +1223,7 @@ export type DealInsert = {
   name: string;
   pipeline_id: string;
   stage_id: string;
-  // null = empty: the database fills the first-year value of a recurring deal, else 0 (deals_amount_auto)
+  // null = empty: the database fills it from the product lines or a recurring deal's first year, else 0 (deals_amount_auto)
   amount_agorot?: number | null;
   currency?: string;
   expected_close_date?: string | null;
@@ -1238,6 +1242,7 @@ export type DealInsert = {
   snoozed_until?: string | null;
   previous_deal_id?: string | null;
   billing_kind?: string | null;
+  // null on a recurring deal = follows the product lines (0 while there are none; DLI-03)
   recurring_amount_agorot?: number | null;
   recurring_start_date?: string | null;
   renewal_date?: string | null;

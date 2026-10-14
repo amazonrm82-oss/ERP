@@ -114,6 +114,17 @@ export function dealLinesTotals(lines: readonly DealLineAmounts[], rateBp: numbe
   return documentTotals(lines, { rateBp: rateBp ?? 0, pricesIncludeVat });
 }
 
+/**
+ * DLI-03: the lines' sum the deal value follows, before VAT (mirror of app.deal_lines_net): the
+ * net total of documentTotals() over all the lines in the deal's mode, carried back by the
+ * conversion rate (conversionRateBp()); exempt lines count at their amount. null = no lines.
+ */
+export function dealLinesNet(lines: readonly DealLineAmounts[], conversionRateBp: number, pricesIncludeVat: boolean): number | null {
+  if (lines.length === 0) return null;
+  const result = documentTotals(lines, { rateBp: pricesIncludeVat ? conversionRateBp : 0, pricesIncludeVat });
+  return result.ok ? result.totals.netTotalAgorot : null;
+}
+
 /** One line's amount after its own discount, as typed: the line part of documentTotals(). */
 export function lineTotal(line: DealLineAmounts, pricesIncludeVat: boolean): TotalsResult {
   return documentTotals([line], { rateBp: 0, pricesIncludeVat });

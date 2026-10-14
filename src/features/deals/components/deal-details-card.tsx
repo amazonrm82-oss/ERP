@@ -23,7 +23,7 @@ import type { StageKind } from "@/lib/database.types";
 import { paths } from "@/lib/paths";
 
 import { updateDealAction } from "../actions";
-import { FIRST_YEAR_NOTE } from "../recurring";
+import { dealValueHint, dealValueNote } from "../recurring";
 import { RecurringFields } from "./recurring-fields";
 
 type Option = { id: string; name: string };
@@ -44,8 +44,9 @@ export type DealDetailsView = {
   // formatted on the server so server and browser output cannot differ
   amountText: string;
   amountInput: string;
-  // DEAL-07: the value is the computed first-year value (deals.amount_auto)
+  // DEAL-07: the value is computed (deals.amount_auto); DLI-03: from the lines or the first year
   amountAuto: boolean;
+  amountSource: string | null;
   expectedCloseDate: string | null;
   expectedCloseText: string | null;
   // DEAL-07: recurring revenue (kind null = one-time); texts formatted on the server
@@ -54,6 +55,8 @@ export type DealDetailsView = {
     kindText: string;
     amountText: string | null;
     amountInput: string;
+    // DLI-03: the recurring amount follows the product lines (deals.recurring_amount_auto)
+    amountAuto: boolean;
     startDate: string | null;
     startText: string | null;
     renewalDate: string | null;
@@ -78,6 +81,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
   const [notice, setNotice] = useState<string | null>(null);
   useEditFocus("deal-details-title", focus, editing);
+  const note = dealValueNote(deal.amountAuto, deal.amountSource);
 
   if (editing) {
     return (
@@ -111,7 +115,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
       <CardBody>
         <FormNotice message={notice} className="mb-4" />
         <DetailList>
-          <Detail label="שווי" value={deal.amountAuto ? `${deal.amountText} ${FIRST_YEAR_NOTE}` : deal.amountText} />
+          <Detail label="שווי" value={note ? `${deal.amountText} ${note}` : deal.amountText} />
           <Detail
             label="איש קשר"
             value={
@@ -193,7 +197,7 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
             autoComplete="off"
             defaultValue={values?.amount ?? deal.amountInput}
             error={errors.amount}
-            hint={deal.amountAuto ? "מחושב לפי שנה ראשונה. ערך שתקלידו יישאר קבוע; שדה ריק יחזיר את החישוב." : "שדה ריק בעסקה חוזרת יחושב לפי שנה ראשונה."}
+            hint={dealValueHint(deal.amountAuto, deal.amountSource)}
           />
           <SelectField key={`contact-${contactValue}`} label="איש קשר" name="contact_id" defaultValue={contactValue} error={errors.contact_id}>
             <option value="">ללא איש קשר</option>
@@ -222,6 +226,7 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
             initial={{ kind: deal.recurring.kind, amount: deal.recurring.amountInput, start: deal.recurring.startDate ?? "", renewal: deal.recurring.renewalDate ?? "" }}
             submitted={values}
             errors={errors}
+            amountAuto={deal.recurring.amountAuto}
           />
           {deal.status === "lost" ? (
             <LossFields

@@ -110,8 +110,8 @@ describe("deal product lines (DLI-01)", () => {
     // a changed quantity or discount recomputes the line
     await asUser(member.id, (q) => q("update public.deal_lines set quantity = 1.5, discount_bp = null, discount_agorot = 500 where id = $1", [created.id]));
     expect(Number((await line(created.id)).total_agorot)).toBe(14500);
-    // the deal's value is not computed from the lines (DLI-03 is later)
-    expect(await asAdmin((q) => count(q, "select 1 from public.deals where id = $1 and amount_agorot = 0", [deal]))).toBe(1);
+    // DLI-03: the deal's empty value follows the lines' sum before VAT (tests/db/110-deal-value-lines.test.ts)
+    expect(await asAdmin((q) => count(q, "select 1 from public.deals where id = $1 and amount_agorot = 14500 and amount_source = 'lines'", [deal]))).toBe(1);
   });
 
   it("each line's total is the line part of the one totals rule, the same in SQL and in the app (lineTotal)", async () => {

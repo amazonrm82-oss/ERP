@@ -12,6 +12,7 @@ import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { CatalogColumn } from "@/features/list-columns/columns";
 
 import { BOARD_PREFERENCE, boardCatalog, boardNeeds, daysSince, resolveBoardFields } from "./board-fields";
+import { shownRecurringAmount } from "./recurring";
 
 // color: a key of STAGE_COLORS or null (DEAL-01; see stage-colors.ts)
 export type StageOption = { id: string; name: string; kind: StageKind; color: string | null };
@@ -37,8 +38,9 @@ export type BoardDeal = {
   billingKind: string | null;
   recurringAmountAgorot: number | null;
   renewalDate: string | null;
-  // the value is the computed first-year value
+  // the value is computed (DEAL-07); amountSource says from what (DLI-03: lines or first year)
   amountAuto: boolean;
+  amountSource: string | null;
   daysInStage: number;
   tagIds: string[];
   // only when a custom field is shown (else {})
@@ -167,7 +169,7 @@ export async function getBoard(
       narrow(
         supabase
           .from("deals")
-          .select("id, name, amount_agorot, stage_id, contact_id, owner_id, competitor, lost_reason_id, lost_reason, company_id, expected_close_date, stage_entered_at, tag_ids, custom_fields, billing_kind, recurring_amount_agorot, renewal_date, amount_auto")
+          .select("id, name, amount_agorot, stage_id, contact_id, owner_id, competitor, lost_reason_id, lost_reason, company_id, expected_close_date, stage_entered_at, tag_ids, custom_fields, billing_kind, recurring_amount_agorot, renewal_date, amount_auto, amount_source, recurring_amount_auto")
           .eq("organization_id", orgId)
           .eq("pipeline_id", pipeline.id)
           .eq("stage_id", stageId)
@@ -272,9 +274,10 @@ export async function getBoard(
       companyName: row.company_id ? (companyNames.get(row.company_id) ?? null) : null,
       expectedCloseDate: row.expected_close_date,
       billingKind: row.billing_kind,
-      recurringAmountAgorot: row.recurring_amount_agorot,
+      recurringAmountAgorot: shownRecurringAmount(row.recurring_amount_agorot, row.recurring_amount_auto),
       renewalDate: row.renewal_date,
       amountAuto: row.amount_auto === true,
+      amountSource: row.amount_source,
       daysInStage: daysSince(row.stage_entered_at, now),
       tagIds: row.tag_ids ?? [],
       customFields: needs.custom ? row.custom_fields : {},
@@ -358,7 +361,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)
@@ -460,7 +463,7 @@ export async function listDeals(
 
   let query = supabase
     .from("deals")
-    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, created_at, custom_fields")
+    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_amount_auto, recurring_start_date, renewal_date, created_at, custom_fields")
     .eq("organization_id", orgId)
     .eq("pipeline_id", options.pipelineId)
     .is("deleted_at", null);
@@ -513,7 +516,7 @@ export async function listDeals(
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       expectedCloseDate: row.expected_close_date,
       billingKind: row.billing_kind,
-      recurringAmountAgorot: row.recurring_amount_agorot,
+      recurringAmountAgorot: shownRecurringAmount(row.recurring_amount_agorot, row.recurring_amount_auto),
       recurringStartDate: row.recurring_start_date,
       renewalDate: row.renewal_date,
       createdAt: row.created_at,

@@ -9,7 +9,7 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { daysInStageLabel } from "../board-fields";
-import { FIRST_YEAR_NOTE, recurringText } from "../recurring";
+import { dealValueNote, recurringText } from "../recurring";
 import type { BoardDeal } from "../queries";
 import type { StuckInfo } from "../stuck-text";
 
@@ -42,7 +42,9 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
             return (
               <p key={key} className="mt-0.5 text-md font-semibold tabular-nums">
                 {formatMoney(deal.amountAgorot)}
-                {deal.amountAuto ? <span className="ms-1 text-sm font-normal text-ink-soft">{FIRST_YEAR_NOTE}</span> : null}
+                {dealValueNote(deal.amountAuto, deal.amountSource) ? (
+                  <span className="ms-1 text-sm font-normal text-ink-soft">{dealValueNote(deal.amountAuto, deal.amountSource)}</span>
+                ) : null}
               </p>
             );
           case "stuck":

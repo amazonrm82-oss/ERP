@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
+import { linesValueNote } from "@/features/deals/recurring";
 import { documentVatRateBp } from "@/features/tax/calc";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -36,6 +37,8 @@ type Props = {
   canEdit: boolean;
   features: { products: boolean; discounts: boolean };
   canCreateProducts: boolean;
+  // DLI-03: what the deal value follows (deals.amount_auto, amount_source, recurring_amount_auto)
+  dealValue: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean };
 };
 
 function discountText(line: DealLine): string | null {
@@ -46,10 +49,10 @@ function discountText(line: DealLine): string | null {
 
 /**
  * DLI-01: the "מוצרים" section of a deal: its lines in order, each with quantity, unit price,
- * discount and amount, and the totals with VAT under them by the one totals rule (TAX-05). The deal's
- * value is not computed from them (DLI-03 is a later requirement).
+ * discount and amount, and the totals with VAT under them by the one totals rule (TAX-05). DLI-03: the
+ * deal's value follows their sum before VAT unless a person typed it; the card says which.
  */
-export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts }: Props) {
+export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue }: Props) {
   const [editing, setEditing] = useState<DealLine | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -179,7 +182,7 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
         {lines.length > 0 && vatMissing ? <p className="text-sm text-ink-soft">{vatMissing}</p> : null}
         {lines.length > 0 ? (
           <p className="text-sm text-ink-soft">
-            {pricing.includesVat ? 'המחירים בשורות כוללים מע"מ.' : 'המחירים בשורות לפני מע"מ.'} סכום העסקה לא משתנה לפי השורות.
+            {pricing.includesVat ? 'המחירים בשורות כוללים מע"מ.' : 'המחירים בשורות לפני מע"מ.'} {linesValueNote(dealValue)}
           </p>
         ) : null}
         {canEdit && full ? <p className="text-sm text-ink-soft">{`בעסקה יש ${DEAL_LINES_MAX} שורות, המספר המרבי.`}</p> : null}

@@ -133,7 +133,10 @@ export const FIELD_LABELS: Record<string, string> = {
   recurring_amount_agorot: "סכום חוזר",
   recurring_start_date: "תאריך התחלה",
   renewal_date: "תאריך חידוש",
-  amount_auto: "שווי לפי שנה ראשונה",
+  amount_auto: "שווי מחושב",
+  // DLI-03: the deal value from its product lines
+  amount_source: "מקור השווי",
+  recurring_amount_auto: "סכום חוזר לפי שורות המוצר",
   // GOL-01: a goal
   target: "יעד",
   metric: "מדד",
@@ -233,4 +236,5 @@ export const VALUE_LABELS: Record<string, Record<string, string>> = {
   target_type: { contact: "איש קשר", deal: "עסקה" },
   // DEAL-07 (null = one-time shows as empty)
   billing_kind: { monthly: "חודשית", yearly: "שנתית" },
+  amount_source: { lines: "שורות המוצר", first_year: "שנה ראשונה" },
 };
