@@ -695,6 +695,10 @@ that back.
   missing; `alter table … drop constraint if exists` passed); a function that must contain a `delete` goes
   into its own small migration file, which the owner pastes in the SQL Editor (fallback below). Never
   disguise the SQL to get past this check. After a timeout, check read-only what exists before retrying.
+- Changing a function's signature without `drop` (RPT-02, migration 0180): a `do` block that runs only while the old signature
+  exists renames it (`<name>_<migration>_retired`), moves it into schema `app` and revokes every grant (service_role included),
+  then `create or replace` makes the new signature (one function with defaults, never two overloads: test 07 keys functions by
+  name). `public.log_export` now takes `p_format` csv|xlsx.
 - If the connector is not available in a session, fall back to the old way: hand the migration over in
   parts (`node scripts/split-for-sql-editor.mjs <migration>`; a paste over ~4,000 chars was cut off)
   and push code only after the owner confirms it ran.
