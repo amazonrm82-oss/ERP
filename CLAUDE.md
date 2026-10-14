@@ -812,6 +812,9 @@ that back.
 - Managed lists (owner's rule, 12 October 2026): every list an organization manages (types, reasons, statuses and the like)
   starts with default values the business can rename or delete. `create_organization()` seeds them; there is no "add the
   suggested values" button. A new list ships with its defaults and seeds organizations whose list is still empty.
+  One exception (owner, 14 October 2026, LEAD-05): lead score rules. New organizations are seeded; an existing organization with no
+  rules gets an "add the suggested rules" button with a warning, because adding rules rescores all its leads (a bulk change
+  that must not happen behind its back in a migration).
 - Record types (FXC-06): `src/lib/record-types.ts` (`RECORD_TYPES`, `isRecordType`, `recordPage`) says each
   type's table, pages, Hebrew names and features. Use it instead of a local map; a new type is added there.
 - Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with
