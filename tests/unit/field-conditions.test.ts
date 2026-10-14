@@ -16,6 +16,8 @@ import {
   opsForType,
   parseCondition,
   sameAsStored,
+  missingFieldsMessage,
+  missingRequiredAfter,
   shownMarkerName,
   type FieldCondition,
 } from "@/features/custom-fields/conditions";
@@ -284,6 +286,47 @@ describe("the shown marker on an edit (review fix)", () => {
     const stored = { custom: {}, builtins: { "builtin:status": STATUS_WON } };
     expect(effectiveDefinitions("lead", all, data, stored, true, []).map((f) => f.key)).toEqual(["budget", "note"]);
     expect(effectiveDefinitions("lead", all, data, stored, true, ["builtin:status"]).map((f) => f.key)).toEqual(["note"]);
+  });
+});
+
+describe("missingRequiredAfter (board, table cell, bulk)", () => {
+  const STAGE_A = "33333333-3333-4333-8333-333333333333";
+  const STAGE_WON = "44444444-4444-4444-8444-444444444444";
+  const signed = def("signed", "date", { label: "תאריך חתימה", condition: { field: "builtin:stage", op: "equals", value: STAGE_WON, effect: "require" } });
+  const contract = def("contract", "checkbox", { label: "חוזה נחתם", condition: { field: "builtin:stage", op: "in", value: [STAGE_WON], effect: "require" } });
+  const shownRequired = def("po", "text", { label: "מספר הזמנה", isRequired: true, condition: { field: "builtin:stage", op: "equals", value: STAGE_WON, effect: "show" } });
+  const plainRequired = def("plain", "text", { label: "רגיל", isRequired: true });
+  const onTier = def("budget", "number", { label: "תקציב", condition: { field: "tier", op: "equals", value: "זהב", effect: "require" } });
+  const all = [signed, contract, shownRequired, plainRequired, onTier, tier];
+
+  it("names the conditional fields the target makes required and the record leaves empty", () => {
+    const missing = missingRequiredAfter(all, { "builtin:stage": STAGE_A }, "deal", { "builtin:stage": STAGE_WON });
+    expect(missing.map((field) => field.key)).toEqual(["signed", "contract", "po"]);
+  });
+
+  it("a filled value, a ticked box, or a target that requires nothing: none", () => {
+    expect(missingRequiredAfter(all, { signed: "2026-10-14", contract: true, po: "77" }, "deal", { "builtin:stage": STAGE_WON })).toEqual([]);
+    expect(missingRequiredAfter(all, { contract: false }, "deal", { "builtin:stage": STAGE_A }).map((f) => f.key)).toEqual([]);
+    // an unticked box is missing
+    expect(missingRequiredAfter(all, { signed: "2026-10-14", po: "1", contract: false }, "deal", { "builtin:stage": STAGE_WON }).map((f) => f.key)).toEqual(["contract"]);
+  });
+
+  it("a field required by its own box alone, or by a condition the change does not touch, counts only when its condition holds", () => {
+    // plain required without a condition never counts here (the record form's business)
+    expect(missingRequiredAfter(all, {}, "deal", { "builtin:stage": STAGE_A }).some((f) => f.key === "plain")).toBe(false);
+    // a custom-field condition that already holds is reported too: the record would be left without it
+    expect(missingRequiredAfter(all, { tier: "זהב" }, "deal", { "builtin:stage": STAGE_A }).map((f) => f.key)).toEqual(["budget"]);
+  });
+
+  it("a condition on a hidden or deleted controlling field is ignored", () => {
+    const hiddenTier = { ...tier, isActive: false };
+    expect(missingRequiredAfter([onTier, hiddenTier], { tier: "זהב" }, "deal", {})).toEqual([]);
+    expect(missingRequiredAfter([onTier], { tier: "זהב" }, "deal", {})).toEqual([]);
+  });
+
+  it("the owner's wording", () => {
+    expect(missingFieldsMessage([{ label: "תקציב" }])).toBe("חסר שדה חובה: תקציב");
+    expect(missingFieldsMessage([{ label: "תקציב" }, { label: "תאריך חתימה" }])).toBe("חסר שדה חובה: תקציב, תאריך חתימה");
   });
 });
 

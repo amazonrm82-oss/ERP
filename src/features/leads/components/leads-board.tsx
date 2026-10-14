@@ -10,7 +10,9 @@ import type { LeadStatusKind } from "@/lib/database.types";
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
-import { dropLeadAction } from "../actions";
+import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
+
+import { dropLeadAction, moveLeadWithFieldsAction } from "../actions";
 import type { LeadBoard, LeadBoardCard } from "../queries";
 import { LeadStatusMenu } from "./lead-status-menu";
 
@@ -41,6 +43,8 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
   // a drop on "not relevant" waits here for its reason
   const [asking, setAsking] = useState<{ card: LeadBoardCard; statusId: string } | null>(null);
   const [reason, setReason] = useState("");
+  // FLD-09: a status that would leave required fields empty: asked for, saved with the move
+  const [ask, setAsk] = useState<RequiredAsk | null>(null);
 
   const nameOf = (card: LeadBoardCard) => card.fullName || card.companyName || "ליד ללא שם";
 
@@ -51,8 +55,17 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
     startTransition(async () => {
       moveOptimistic({ leadId: card.id, statusId });
       const result = await dropLeadAction(orgId, card.id, statusId, why);
+      const moved = () => setAnnouncement(`הליד ${nameOf(card)} הועבר לסטטוס ${status.name}.`);
       if (result.ok) {
-        setAnnouncement(`הליד ${nameOf(card)} הועבר לסטטוס ${status.name}.`);
+        moved();
+      } else if ("missing" in result) {
+        // the card goes back until the window is saved; cancel leaves it there
+        setAsk({
+          description: `הליד ${nameOf(card)} עובר לסטטוס ${status.name}`,
+          fields: result.missing,
+          save: (formData) => moveLeadWithFieldsAction(orgId, card.id, statusId, why, formData),
+          onSaved: moved,
+        });
       } else {
         // the optimistic move is dropped when the transition ends
         setError(result.message);
@@ -84,6 +97,7 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
+      <RequiredFieldsDialog ask={ask} onClose={() => setAsk(null)} />
       {asking ? (
         <form
           aria-label="סיבה לליד לא רלוונטי"

@@ -146,6 +146,12 @@ export function conditionApplies(condition: FieldCondition, definitions: FieldDe
 
 export type FieldState = { visible: boolean; required: boolean };
 
+/**
+ * A move (status, stage) refused because it would leave conditionally required fields empty: the
+ * board or the table cell opens a window that asks for them (missing, as the window shows them).
+ */
+export type MissingResult = { ok: false; message: string; missing: FieldDefinition[] };
+
 /** Whether a field shows and whether it is required, for these values. */
 export function fieldState(field: FieldDefinition, definitions: FieldDefinition[], values: ConditionValues, objectType?: FieldObject): FieldState {
   const condition = field.condition ?? null;
@@ -323,4 +329,39 @@ export function sameAsStored(stored: FieldCondition | null | undefined, input: {
   const a = [...valueToChoices(stored)].sort();
   const b = [...new Set(input.choices)].sort();
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** A required custom field's value is missing (same rule as parseCustomFields: a box must be ticked). */
+function requiredValueMissing(field: FieldDefinition, value: Json | undefined): boolean {
+  if (field.type === "checkbox") return value !== true;
+  if (Array.isArray(value)) return value.length === 0;
+  return isEmptyCustomValue(value ?? null);
+}
+
+/**
+ * FLD-09 (owner, 14 October 2026): the fields a change of a built-in field (a lead's status, a deal's
+ * stage) would leave required by their condition and empty on the record. Only fields with a
+ * condition that applies count; a field required by its own box alone is the record form's business.
+ * Used by the board, the table cells (which then ask for the values) and bulk actions (which skip).
+ */
+export function missingRequiredAfter(
+  definitions: FieldDefinition[],
+  values: ConditionValues,
+  objectType: FieldObject,
+  change: ConditionValues,
+): FieldDefinition[] {
+  const after: ConditionValues = { ...values, ...change };
+  return definitions.filter(
+    (field) =>
+      field.condition !== null &&
+      field.condition !== undefined &&
+      conditionApplies(field.condition, definitions, objectType) &&
+      fieldState(field, definitions, after, objectType).required &&
+      requiredValueMissing(field, after[field.key]),
+  );
+}
+
+/** "חסר שדה חובה: תקציב, תאריך חתימה" (the owner's wording) */
+export function missingFieldsMessage(fields: Array<{ label: string }>): string {
+  return `חסר שדה חובה: ${fields.map((field) => field.label).join(", ")}`;
 }

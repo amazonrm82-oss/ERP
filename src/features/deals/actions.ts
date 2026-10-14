@@ -5,8 +5,13 @@ import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { missingFieldsMessage, type MissingResult } from "@/features/custom-fields/conditions";
+import { askedField, missingAfterChange, requiredFieldsMerge } from "@/features/custom-fields/required-server";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
+import type { Json } from "@/lib/database.types";
 import { actionContext } from "@/lib/action-context";
+import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
+import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
@@ -135,7 +140,7 @@ function lossFromForm(formData: FormData): { ok: true; loss: DealLoss | undefine
 }
 
 // expectOpen: the move is only for a deal that is still open (the forecast's overdue list, GOL-04)
-async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: DealLoss, expectOpen = false): Promise<ActionResult> {
+async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: Partial<DealLoss>, expectOpen = false, customFields?: Json): Promise<ActionResult> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
     return context;
@@ -145,7 +150,7 @@ async function moveDeal(orgId: string, dealId: string, stageId: string, loss?: D
   // that is not lost is dropped by the database (deals_sync_stage_loss).
   let update = context.supabase
     .from("deals")
-    .update({ stage_id: stageId, ...(loss ?? {}) })
+    .update({ stage_id: stageId, ...(loss ?? {}), ...(customFields === undefined ? {} : { custom_fields: customFields }) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null);
@@ -270,6 +275,12 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
     return invalid(parsed.error, formData);
   }
   const close = parsed.data;
+  // FLD-09: the won stage may make custom fields required; the close window does not ask for them, so
+  // a deal still missing one is not closed here (the deal's card is where they are filled)
+  const required = await requiredFieldsMerge(orgId, "deal", dealId, { "builtin:stage": stageId }, formData);
+  if (!required.ok) {
+    return fail(required.missing.length > 0 ? `${missingFieldsMessage(required.missing)}. ממלאים בכרטיס העסקה ומנסים שוב.` : required.message, values);
+  }
 
   let update = supabase
     .from("deals")
@@ -313,12 +324,45 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
   return ok();
 }
 
-/** Same move, from drag and drop on the board. */
-export async function dropDealAction(orgId: string, dealId: string, stageId: string): Promise<ActionResult> {
+/**
+ * Same move, from drag and drop on the board. FLD-09: when the stage would leave conditionally required
+ * fields empty, nothing is saved and the answer names them (missing): the board asks for them and
+ * saves with moveDealWithFieldsAction.
+ */
+export async function dropDealAction(orgId: string, dealId: string, stageId: string): Promise<ActionResult | MissingResult> {
   if (!isUuid(stageId)) {
     return fail(STAGE_GONE);
   }
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) return context;
+  const missing = await missingDealFields(orgId, dealId, stageId);
+  if (missing) return missing;
   return moveDeal(orgId, dealId, stageId);
+}
+
+/** FLD-09: the fields the new stage would leave required and empty, as a refusal; null when none. */
+async function missingDealFields(orgId: string, dealId: string, stageId: string): Promise<MissingResult | ActionResult | null> {
+  const found = await missingAfterChange(orgId, "deal", [dealId], { "builtin:stage": stageId });
+  if (!found.ok) return fail(dbErrorMessage(found.error));
+  const fields = found.missing.get(dealId);
+  return fields ? { ok: false, message: missingFieldsMessage(fields), missing: fields.map(askedField) } : null;
+}
+
+/**
+ * FLD-09: the window's answer: the stage (with a loss reason by name, from a table cell) and the values
+ * the stage makes required, in one update. Refuses with field errors while a value is missing or invalid.
+ */
+export async function moveDealWithFieldsAction(orgId: string, dealId: string, stageId: string, lossReason: string | null, formData: FormData): Promise<ActionResult> {
+  if (!validArg(optionalTextArg(200), lossReason)) return fail(INVALID_ARGS);
+  if (!isUuid(stageId)) return fail(STAGE_GONE);
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) return context;
+  const merge = await requiredFieldsMerge(orgId, "deal", dealId, { "builtin:stage": stageId }, formData);
+  if (!merge.ok) return fail(merge.message, { fieldErrors: merge.fieldErrors, values: formValues(formData) });
+  const reason = await lossReasonIdByName(context.supabase, orgId, lossReason ?? undefined);
+  if (!reason.ok) return fail(reason.message);
+  const result = await moveDeal(orgId, dealId, stageId, reason.id ? { lost_reason_id: reason.id } : undefined, false, merge.merge);
+  return result.ok ? result : fail(result.message, { values: formValues(formData) });
 }
 
 export async function updateDealAction(

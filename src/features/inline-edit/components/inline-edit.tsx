@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 import { PencilIcon } from "@/components/ui/icons";
+import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 
-import { inlineEditAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
+import { inlineEditAction, inlineMoveWithFieldsAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
 
 // opensWindow: saving this choice hands it to onWindow instead (a deal entering a won stage, DEAL-04)
 export type InlineOption = { value: string; label: string; needsReason?: boolean; opensWindow?: boolean };
@@ -46,6 +47,8 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const pencil = useRef<HTMLButtonElement>(null);
+  // FLD-09: a status / stage that would leave required fields empty asks for them in a window; cancel saves nothing
+  const [ask, setAsk] = useState<RequiredAsk | null>(null);
 
   if (!canEdit) {
     return <>{children}</>;
@@ -73,7 +76,17 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
     startTransition(async () => {
       const result = await inlineEditAction(orgId, object, id, field, value);
       if (result.ok) close();
-      else setError(result.message);
+      else if ("missing" in result) {
+        const chosenValue = value;
+        const target = options.find((option) => option.value === chosenValue.id)?.label ?? "";
+        close(() =>
+          setAsk({
+            description: `${label}: ${target}`,
+            fields: result.missing,
+            save: (formData) => inlineMoveWithFieldsAction(orgId, object, id, field, chosenValue, formData),
+          }),
+        );
+      } else setError(result.message);
     });
   }
 
@@ -87,6 +100,7 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
   if (!editing) {
     return (
       <span className="inline-flex max-w-full items-start gap-1">
+        <RequiredFieldsDialog ask={ask} onClose={() => setAsk(null)} />
         <span className="min-w-0">{children}</span>
         <button
           ref={pencil}

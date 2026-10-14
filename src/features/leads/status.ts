@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, LeadStatusKind } from "@/lib/database.types";
+import type { Database, Json, LeadStatusKind } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 
 export type StatusResult = { ok: true } | { ok: false; message: string; needsReason?: boolean };
@@ -60,13 +60,17 @@ export async function validateStatusChoice(
   return checkStatusChoice(status?.kind ?? null, reason, reasons);
 }
 
-/** A status change from the status form and the leads board. */
+/**
+ * A status change from the status form and the leads board. customFields: {"$merge": …} saved in the
+ * same update (FLD-09: the values a conditionally required field was missing).
+ */
 export async function setLeadStatus(
   supabase: SupabaseClient<Database>,
   orgId: string,
   leadId: string,
   statusId: string,
   reason: string | null,
+  customFields?: Json,
 ): Promise<StatusResult> {
   const choice = await validateStatusChoice(supabase, orgId, statusId, reason);
   if (!choice.ok) {
@@ -74,7 +78,7 @@ export async function setLeadStatus(
   }
   const { data, error } = await supabase
     .from("leads")
-    .update({ status_id: statusId, disqualify_reason: choice.reason })
+    .update({ status_id: statusId, disqualify_reason: choice.reason, ...(customFields === undefined ? {} : { custom_fields: customFields }) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

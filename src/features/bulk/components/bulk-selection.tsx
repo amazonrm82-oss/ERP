@@ -181,11 +181,15 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
         setError(result.message);
         return;
       }
-      const { done, skipped, undo, tasks } = result.data!;
+      const { done, skipped, undo, tasks, missing } = result.data!;
       const taskText = bulkTasksNotice(tasks);
+      // FLD-09: records left out because a required field would stay empty, said apart from the rest
+      const missingCount = missing?.count ?? 0;
+      const otherSkipped = skipped - missingCount;
       setNotice(
         (done === 1 ? "רשומה אחת עודכנה." : `${done} רשומות עודכנו.`) +
-          (skipped > 0 ? ` ${skipped === 1 ? "רשומה אחת דולגה" : `${skipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : "") +
+          (missing && missingCount > 0 ? ` ${missingCount === 1 ? "רשומה אחת דולגה" : `${missingCount} דולגו`}: ${missing.reason}. ממלאים בכרטיס הרשומה ומנסים שוב.` : "") +
+          (otherSkipped > 0 ? ` ${otherSkipped === 1 ? "רשומה אחת דולגה" : `${otherSkipped} דולגו`}: אין הרשאה, או שכבר לא קיימות.` : "") +
           (taskText ? ` ${taskText}` : ""),
       );
       setLastUndo(undo.rows.length > 0 ? undo : null);

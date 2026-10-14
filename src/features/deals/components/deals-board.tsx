@@ -22,7 +22,9 @@ import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
-import { dropDealAction } from "../actions";
+import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
+
+import { dropDealAction, moveDealWithFieldsAction } from "../actions";
 import { edgeStep, moveTexts, stepStage } from "../board-drag";
 import type { Board, BoardDeal } from "../queries";
 import { STAGE_RULE, stageTone } from "../stage-colors";
@@ -78,6 +80,8 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
   const [lossFor, setLossFor] = useState<LossTarget | null>(null);
   // a deal dropped on a won stage: it moves only once the close window is confirmed (DEAL-04)
   const [wonFor, setWonFor] = useState<WonTarget | null>(null);
+  // FLD-09: a move the new stage would leave with empty required fields: asked for, saved with the move
+  const [ask, setAsk] = useState<RequiredAsk | null>(null);
   // the keyboard move (DEAL-10): the lifted deal and the stage it would be dropped on
   const [lifted, setLifted] = useState<{ dealId: string; stageId: string } | null>(null);
   // the finger move (DEAL-10); the ref is the truth for the window listeners, the state draws it
@@ -107,11 +111,22 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
     startTransition(async () => {
       moveOptimistic({ dealId, stageId });
       const result = await dropDealAction(orgId, dealId, stageId);
-      if (result.ok) {
+      const afterMove = () => {
         setAnnouncement(moveTexts.moved(deal.name, stage.name));
         if (stage.kind === "lost") {
           setLossFor({ dealId: deal.id, dealName: deal.name, competitor: deal.competitor, lossReason: deal.lossReason });
         }
+      };
+      if (result.ok) {
+        afterMove();
+      } else if ("missing" in result) {
+        // the card goes back until the window is saved; cancel leaves it there
+        setAsk({
+          description: `העסקה ${deal.name} עוברת לשלב ${stage.name}`,
+          fields: result.missing,
+          save: (formData) => moveDealWithFieldsAction(orgId, dealId, stageId, null, formData),
+          onSaved: afterMove,
+        });
       } else {
         // the optimistic move is dropped when the transition ends
         setError(result.message);
@@ -410,6 +425,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
           }
         }}
       />
+      <RequiredFieldsDialog ask={ask} onClose={() => setAsk(null)} />
       {wonFor && closeWindow ? (
         <DealWonDialog
           orgId={orgId}

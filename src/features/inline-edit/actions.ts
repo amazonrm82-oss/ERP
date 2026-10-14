@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { askedField, missingAfterChange, requiredFieldsMerge } from "@/features/custom-fields/required-server";
+import { missingFieldsMessage, type MissingResult } from "@/features/custom-fields/conditions";
 import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
 import { setLeadStatus } from "@/features/leads/status";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
-import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { fail, formValues, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import type { Database } from "@/lib/database.types";
 import { isUuid } from "@/lib/paths";
@@ -40,7 +42,11 @@ const valueSchema = z.object({
   reason: z.string().max(2000).optional(),
 });
 
-export async function inlineEditAction(orgId: string, object: InlineObject, id: string, field: InlineField, value: InlineValue): Promise<ActionResult> {
+/**
+ * FLD-09: a lead status or deal stage chosen in a cell that would leave conditionally required fields
+ * empty is not saved: the answer names them (missing), and the cell's window asks for them.
+ */
+export async function inlineEditAction(orgId: string, object: InlineObject, id: string, field: InlineField, value: InlineValue): Promise<ActionResult | MissingResult> {
   if (!validArg(valueSchema, value) || typeof object !== "string" || typeof field !== "string") {
     return fail(INVALID_ARGS);
   }
@@ -53,6 +59,16 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
 
   // the columns differ per table, so the patch is typed loosely and the table name picks the shape
+  if ((field === "status" && object === "lead") || (field === "stage" && object === "deal")) {
+    if (isUuid(value.id ?? "")) {
+      const kind = object === "lead" ? "lead" : "deal";
+      const found = await missingAfterChange(orgId, kind, [id], { [kind === "lead" ? "builtin:status" : "builtin:stage"]: value.id! });
+      if (!found.ok) return fail(dbErrorMessage(found.error));
+      const fields = found.missing.get(id);
+      if (fields) return { ok: false, message: missingFieldsMessage(fields), missing: fields.map(askedField) };
+    }
+  }
+
   let patch: { owner_id?: string | null; first_name?: string | null; last_name?: string | null; name?: string; full_name?: string | null; title?: string; stage_id?: string; lost_reason_id?: string };
   if (field === "status") {
     if (!isUuid(value.id ?? "")) return fail("יש לבחור סטטוס.");
@@ -106,6 +122,53 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(RECORD_TYPES[object].list(orgId));
+  revalidatePath(recordPage(object, orgId, id));
+  return ok();
+}
+
+/**
+ * FLD-09: the cell's window answer: the lead status or deal stage chosen in the cell, with the values
+ * it makes required, in one update ({"$merge": …}). Field errors while a value is missing or invalid.
+ */
+export async function inlineMoveWithFieldsAction(
+  orgId: string,
+  object: InlineObject,
+  id: string,
+  field: InlineField,
+  value: InlineValue,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!validArg(valueSchema, value) || typeof object !== "string" || typeof field !== "string") {
+    return fail(INVALID_ARGS);
+  }
+  const lead = object === "lead" && field === "status";
+  const deal = object === "deal" && field === "stage";
+  if (!lead && !deal) return fail("אי אפשר לערוך את השדה הזה מהרשימה.");
+  if (!isUuid(value.id ?? "")) return fail(lead ? "יש לבחור סטטוס." : "יש לבחור שלב.");
+  const context = await actionContext(orgId, id);
+  if (!context.ok) return context;
+  const target = value.id!;
+  const merge = await requiredFieldsMerge(orgId, lead ? "lead" : "deal", id, { [lead ? "builtin:status" : "builtin:stage"]: target }, formData);
+  if (!merge.ok) return fail(merge.message, { fieldErrors: merge.fieldErrors, values: formValues(formData) });
+  if (lead) {
+    const result = await setLeadStatus(context.supabase, orgId, id, target, value.reason?.trim().slice(0, 500) || null, merge.merge);
+    if (!result.ok) return fail(result.message, { values: formValues(formData) });
+  } else {
+    const reason = await lossReasonIdByName(context.supabase, orgId, value.reason);
+    if (!reason.ok) return fail(reason.message);
+    const { data, error } = await context.supabase
+      .from("deals")
+      .update({ stage_id: target, ...(reason.id ? { lost_reason_id: reason.id } : {}), ...(merge.merge === undefined ? {} : { custom_fields: merge.merge }) })
+      .eq("organization_id", orgId)
+      .eq("id", id)
+      .is("deleted_at", null)
+      .select("id");
+    if (error) {
+      return fail(error.code === "23503" ? "השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב." : dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."), { values: formValues(formData) });
+    }
+    if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidatePath(RECORD_TYPES[object].list(orgId));
   revalidatePath(recordPage(object, orgId, id));

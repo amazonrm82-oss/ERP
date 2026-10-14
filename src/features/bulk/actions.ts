@@ -7,6 +7,8 @@ import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
 import { closedAtFor, closeDateError } from "@/features/deals/close-window";
 import { addBulkOnboardingTasks } from "@/features/deals/onboarding-server";
 import { setLeadStatus } from "@/features/leads/status";
+import { missingFieldsMessage } from "@/features/custom-fields/conditions";
+import { missingAfterChange } from "@/features/custom-fields/required-server";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
@@ -46,7 +48,15 @@ export type BulkUndoRow = {
 export type BulkClose = { closedDate: string; onboarding: boolean };
 export type BulkUndo = { kind: BulkChange["kind"]; rows: BulkUndoRow[] };
 // tasks: the onboarding tasks of a bulk move into a won stage, when they were asked for
-export type BulkOutcome = { done: number; skipped: number; undo: BulkUndo; tasks?: { created: number; existing: number; failed: number } };
+// missing (FLD-09): records skipped because the new status / stage would leave a conditionally required
+// field empty (counted in skipped too), with the reason to show
+export type BulkOutcome = {
+  done: number;
+  skipped: number;
+  undo: BulkUndo;
+  tasks?: { created: number; existing: number; failed: number };
+  missing?: { count: number; reason: string };
+};
 
 const TASK_STATUSES = ["open", "done", "cancelled"] as const;
 // one page of a list; more than that is not picked at once
@@ -142,6 +152,25 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
     if (openError) return fail(dbErrorMessage(openError));
     const openIds = new Set(open.map((row) => row.id));
     live = rows.filter((row) => openIds.has(row.id));
+  }
+
+  // FLD-09 (owner, 14 October 2026): a record the new status or stage would leave with an empty
+  // conditionally required field is skipped and reported; nothing asks for the values here
+  let missing: BulkOutcome["missing"];
+  const conditionalChange: Record<string, string> | null =
+    object === "lead" && change.kind === "status" && isUuid(change.statusId)
+      ? { "builtin:status": change.statusId }
+      : object === "deal" && change.kind === "stage" && isUuid(change.stageId)
+        ? { "builtin:stage": change.stageId }
+        : null;
+  if (conditionalChange) {
+    const found = await missingAfterChange(orgId, object as "lead" | "deal", live.map((row) => row.id), conditionalChange);
+    if (!found.ok) return fail(dbErrorMessage(found.error));
+    if (found.missing.size > 0) {
+      const labels = [...new Set([...found.missing.values()].flat().map((field) => field.label))];
+      missing = { count: found.missing.size, reason: missingFieldsMessage(labels.map((label) => ({ label }))) };
+      live = live.filter((row) => !found.missing.has(row.id));
+    }
   }
 
   let changed: BeforeRow[] = [];
@@ -263,7 +292,13 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   }
 
   revalidatePath(RECORD_TYPES[object].list(orgId));
-  return ok({ done: changed.length, skipped: unique.length - changed.length, undo: { kind: change.kind, rows: undoRows }, ...(tasks ? { tasks } : {}) });
+  return ok({
+    done: changed.length,
+    skipped: unique.length - changed.length,
+    undo: { kind: change.kind, rows: undoRows },
+    ...(tasks ? { tasks } : {}),
+    ...(missing ? { missing } : {}),
+  });
 }
 
 type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
