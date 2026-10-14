@@ -599,6 +599,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
   `grant insert, update (col) on public.tasks to authenticated`, or every client write that sends it fails with 42501.
   `src/features/tasks/recurrence.ts` mirrors the date rules; keep the two in step.
+- Business calendar for tasks (HEB-02, migration 0178; owner 14 October 2026): a recurring rule may carry `"workdays": true`
+  (constraint `tasks_recurrence_shape`; ticked by default for a new rule, old rules unchanged); `app.spawn_recurring_task()` (last
+  redefined in 0178) moves the next date with `app.add_business_days(org, day, 0)`, `until` checked on the moved date; mirrored by
+  `nextTask(…, calendar)`. The "מחר" / "בעוד שבוע" buttons and snoozes move to the next working day and say so
+  (`movedToWorkingDayNotice()`, "נקבע ליום ראשון, 19 באוקטובר (יום העבודה הבא)"); a date a person picks only warns
+  (`RestDayWarning`). The weekly rule form explains a picked rest weekday (`weeklyRestNote()`).
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
