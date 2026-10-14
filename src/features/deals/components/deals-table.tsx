@@ -16,6 +16,7 @@ import { DEAL_STATUS } from "../display";
 import { DealStageCell } from "./deal-stage-cell";
 import type { CloseWindowSetup } from "./deal-won-dialog";
 import type { DealListItem, StageOption } from "../queries";
+import { BILLING_KIND_LABELS, billingKindOf, recurringText } from "../recurring";
 
 type Props = {
   orgId: string;
@@ -139,6 +140,14 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
               );
             case "expected_close":
               return deal.expectedCloseDate ? <time dateTime={deal.expectedCloseDate} className="whitespace-nowrap">{formatDate(deal.expectedCloseDate)}</time> : null;
+            case "billing_kind":
+              return BILLING_KIND_LABELS[billingKindOf(deal.billingKind)];
+            case "recurring_amount":
+              return <span className="whitespace-nowrap">{recurringText(deal.billingKind, deal.recurringAmountAgorot)}</span>;
+            case "recurring_start":
+              return deal.recurringStartDate ? <time dateTime={deal.recurringStartDate} className="whitespace-nowrap">{formatDate(deal.recurringStartDate)}</time> : null;
+            case "renewal":
+              return deal.renewalDate ? <time dateTime={deal.renewalDate} className="whitespace-nowrap">{formatDate(deal.renewalDate)}</time> : null;
             case "created":
               return (
                 <time dateTime={deal.createdAt} className="whitespace-nowrap text-ink-soft">

@@ -1146,6 +1146,13 @@ export type DealRow = {
   custom_fields: Json;
   // DEAL-11: the deal this follow-up continues; set once by a person (deals_previous_check)
   previous_deal_id: string | null;
+  // DEAL-07: null = one-time, 'monthly' | 'yearly'; a recurring deal has an amount (deal's currency) and a start date
+  billing_kind: string | null;
+  recurring_amount_agorot: number | null;
+  recurring_start_date: string | null;
+  renewal_date: string | null;
+  // DEAL-07: true while the value is the computed first-year value; set by trigger only (deals_amount_auto)
+  amount_auto: boolean | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1158,7 +1165,8 @@ export type DealInsert = {
   name: string;
   pipeline_id: string;
   stage_id: string;
-  amount_agorot?: number;
+  // null = empty: the database fills the first-year value of a recurring deal, else 0 (deals_amount_auto)
+  amount_agorot?: number | null;
   currency?: string;
   expected_close_date?: string | null;
   // DEAL-04: the close window's date; cleared on an open deal, never more than a day ahead (deals_sync_stage_close)
@@ -1175,6 +1183,10 @@ export type DealInsert = {
   custom_fields?: Json;
   snoozed_until?: string | null;
   previous_deal_id?: string | null;
+  billing_kind?: string | null;
+  recurring_amount_agorot?: number | null;
+  recurring_start_date?: string | null;
+  renewal_date?: string | null;
   deleted_at?: string | null;
 };
 

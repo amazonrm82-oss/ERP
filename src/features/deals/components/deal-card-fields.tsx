@@ -9,6 +9,7 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { daysInStageLabel } from "../board-fields";
+import { FIRST_YEAR_NOTE, recurringText } from "../recurring";
 import type { BoardDeal } from "../queries";
 import type { StuckInfo } from "../stuck-text";
 
@@ -41,6 +42,7 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
             return (
               <p key={key} className="mt-0.5 text-md font-semibold tabular-nums">
                 {formatMoney(deal.amountAgorot)}
+                {deal.amountAuto ? <span className="ms-1 text-sm font-normal text-ink-soft">{FIRST_YEAR_NOTE}</span> : null}
               </p>
             );
           case "stuck":
@@ -79,6 +81,20 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
                 <time dateTime={deal.expectedCloseDate}>{formatDate(deal.expectedCloseDate)}</time>
               </Line>
             ) : null;
+          case "recurring": {
+            const text = recurringText(deal.billingKind, deal.recurringAmountAgorot);
+            return text ? (
+              <Line key={key} label="הכנסה חוזרת">
+                {text}
+                {deal.renewalDate ? (
+                  <>
+                    {" · חידוש "}
+                    <time dateTime={deal.renewalDate}>{formatDate(deal.renewalDate)}</time>
+                  </>
+                ) : null}
+              </Line>
+            ) : null;
+          }
           case "days_in_stage":
             return (
               <p key={key} className="mt-0.5 text-sm text-ink-soft">

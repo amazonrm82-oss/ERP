@@ -15,6 +15,8 @@ export const BOARD_FIELDS: CatalogColumn[] = [
   { key: "company", label: "חברה" },
   { key: "owner", label: "אחראי" },
   { key: "expected_close", label: "צפי סגירה" },
+  // DEAL-07: shown only on a recurring deal ("₪500 לחודש · חידוש 12.11.2026")
+  { key: "recurring", label: "הכנסה חוזרת" },
   { key: "days_in_stage", label: "ימים בשלב" },
   { key: "next_task", label: "המשימה הבאה" },
   { key: "tags", label: "תגיות" },

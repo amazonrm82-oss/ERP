@@ -9,7 +9,7 @@ import type { AuditItem } from "../queries";
 function show(value: Json, field: string, names: Map<string, string>): string {
   if (value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "כן" : "לא";
-  if ((field === "amount_agorot" || field === "budget_agorot") && typeof value === "number") return `₪${(value / 100).toLocaleString("he-IL")}`;
+  if ((field === "amount_agorot" || field === "budget_agorot" || field === "recurring_amount_agorot") && typeof value === "number") return `₪${(value / 100).toLocaleString("he-IL")}`;
   // CON-01: the type of a contact's primary phone or email
   if ((field === "phone_type" || field === "email_type") && typeof value === "string") {
     return channelTypeLabel(field === "phone_type" ? "phone" : "email", value) ?? value;

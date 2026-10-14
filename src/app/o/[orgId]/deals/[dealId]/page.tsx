@@ -24,6 +24,7 @@ import { addableDealContacts } from "@/features/deal-contacts/options";
 import { listDealContacts } from "@/features/deal-contacts/queries";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
+import { agorotInput, BILLING_KIND_LABELS, billingKindOf, recurringText } from "@/features/deals/recurring";
 import { DealSnoozeForm } from "@/features/deals/components/deal-snooze-form";
 import { DealStageForm } from "@/features/deals/components/deal-stage-form";
 import { DEAL_STATUS } from "@/features/deals/display";
@@ -141,6 +142,8 @@ export default async function DealPage({ params, searchParams }: Props) {
             ["שלב", stage?.name],
             ["סכום", amount ? formatMoney(amount) : null],
             ["תאריך סגירה צפוי", deal.expected_close_date ? formatDate(deal.expected_close_date) : null],
+            ["הכנסה חוזרת", recurringText(deal.billing_kind, deal.recurring_amount_agorot)],
+            ["תאריך חידוש", deal.renewal_date ? formatDate(deal.renewal_date) : null],
           ])}
         />
       </div>
@@ -220,9 +223,21 @@ export default async function DealPage({ params, searchParams }: Props) {
               lossReason: lossReason ? { id: lossReason.id, name: lossReason.name } : null,
               competitor: deal.competitor,
               amountText: formatMoney(amount),
-              amountInput: amount % 100 === 0 ? String(amount / 100) : (amount / 100).toFixed(2),
+              // a one-time deal's 0 is "empty" (DEAL-07): left empty, a deal made recurring gets its first-year value
+              amountInput: amount === 0 && !deal.billing_kind ? "" : agorotInput(amount),
+              amountAuto: deal.amount_auto === true,
               expectedCloseDate: deal.expected_close_date,
               expectedCloseText: deal.expected_close_date ? formatDate(deal.expected_close_date) : null,
+              recurring: {
+                kind: deal.billing_kind,
+                kindText: BILLING_KIND_LABELS[billingKindOf(deal.billing_kind)],
+                amountText: recurringText(deal.billing_kind, deal.recurring_amount_agorot),
+                amountInput: agorotInput(deal.recurring_amount_agorot),
+                startDate: deal.recurring_start_date,
+                startText: deal.recurring_start_date ? formatDate(deal.recurring_start_date) : null,
+                renewalDate: deal.renewal_date,
+                renewalText: deal.renewal_date ? formatDate(deal.renewal_date) : null,
+              },
               // DEAL-04: a day the close window picked is kept at midday, so the day is shown, not the hour
               closedAtText: deal.closed_at ? formatDate(zoneDate(new Date(deal.closed_at), context.org.timeZone)) : null,
               ownerName: deal.ownerName,

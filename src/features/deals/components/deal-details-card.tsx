@@ -23,6 +23,8 @@ import type { StageKind } from "@/lib/database.types";
 import { paths } from "@/lib/paths";
 
 import { updateDealAction } from "../actions";
+import { FIRST_YEAR_NOTE } from "../recurring";
+import { RecurringFields } from "./recurring-fields";
 
 type Option = { id: string; name: string };
 
@@ -42,8 +44,21 @@ export type DealDetailsView = {
   // formatted on the server so server and browser output cannot differ
   amountText: string;
   amountInput: string;
+  // DEAL-07: the value is the computed first-year value (deals.amount_auto)
+  amountAuto: boolean;
   expectedCloseDate: string | null;
   expectedCloseText: string | null;
+  // DEAL-07: recurring revenue (kind null = one-time); texts formatted on the server
+  recurring: {
+    kind: string | null;
+    kindText: string;
+    amountText: string | null;
+    amountInput: string;
+    startDate: string | null;
+    startText: string | null;
+    renewalDate: string | null;
+    renewalText: string | null;
+  };
   closedAtText: string | null;
   ownerName: string | null;
   createdAtText: string;
@@ -81,7 +96,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
       />
       <CardBody>
         <DetailList>
-          <Detail label="שווי" value={deal.amountText} />
+          <Detail label="שווי" value={deal.amountAuto ? `${deal.amountText} ${FIRST_YEAR_NOTE}` : deal.amountText} />
           <Detail
             label="איש קשר"
             value={
@@ -103,6 +118,14 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
             }
           />
           <Detail label="סגירה צפויה" value={deal.expectedCloseText} />
+          <Detail label="סוג עסקה" value={deal.recurring.kindText} />
+          {deal.recurring.kind ? (
+            <>
+              <Detail label="סכום חוזר" value={deal.recurring.amountText} />
+              <Detail label="תאריך התחלה" value={deal.recurring.startText} />
+              <Detail label="תאריך חידוש" value={deal.recurring.renewalText} />
+            </>
+          ) : null}
           {deal.closedAtText ? <Detail label="נסגרה" value={deal.closedAtText} /> : null}
           {deal.status === "lost" ? <Detail label="סיבת הפסד" value={deal.lostReason} /> : null}
           {deal.competitor || deal.status === "lost" ? <Detail label="מתחרה" value={deal.competitor} /> : null}
@@ -155,6 +178,7 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
             autoComplete="off"
             defaultValue={values?.amount ?? deal.amountInput}
             error={errors.amount}
+            hint={deal.amountAuto ? "מחושב לפי שנה ראשונה. ערך שתקלידו יישאר קבוע; שדה ריק יחזיר את החישוב." : "שדה ריק בעסקה חוזרת יחושב לפי שנה ראשונה."}
           />
           <SelectField key={`contact-${contactValue}`} label="איש קשר" name="contact_id" defaultValue={contactValue} error={errors.contact_id}>
             <option value="">ללא איש קשר</option>
@@ -178,6 +202,11 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
             type="date"
             defaultValue={values?.expected_close_date ?? deal.expectedCloseDate ?? ""}
             error={errors.expected_close_date}
+          />
+          <RecurringFields
+            initial={{ kind: deal.recurring.kind, amount: deal.recurring.amountInput, start: deal.recurring.startDate ?? "", renewal: deal.recurring.renewalDate ?? "" }}
+            submitted={values}
+            errors={errors}
           />
           {deal.status === "lost" ? (
             <LossFields

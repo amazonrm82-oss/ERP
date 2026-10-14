@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ZodError } from "zod";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
@@ -19,6 +20,7 @@ import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
 import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
+import { RECURRING_FIELD_NAMES, recurringSchema, typedDealValue, type RecurringPatch } from "./recurring";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 import { snoozeSchema } from "./snooze";
 import {
@@ -42,6 +44,25 @@ function revalidateDeal(orgId: string, dealId?: string) {
   }
 }
 
+/**
+ * DEAL-07: the deal fields and the recurring fields of a form, parsed together so every
+ * field error shows at once. An empty value field is sent as null: the database then
+ * fills the first-year value of a recurring deal (trigger deals_amount_auto).
+ */
+function parseDealForm<T extends { amount: number }>(
+  schema: { safeParse: (input: unknown) => { success: true; data: T } | { success: false; error: ZodError } },
+  names: readonly string[],
+  formData: FormData,
+): { ok: true; data: T; recurring: RecurringPatch; amount: number | null } | { ok: false; state: FormState } {
+  const base = schema.safeParse(pick(formData, names));
+  const recurring = recurringSchema.safeParse(pick(formData, RECURRING_FIELD_NAMES));
+  if (!base.success || !recurring.success) {
+    const issues = [...(base.success ? [] : base.error.issues), ...(recurring.success ? [] : recurring.error.issues)];
+    return { ok: false, state: invalid(new ZodError(issues), formData) };
+  }
+  return { ok: true, data: base.data, recurring: recurring.data, amount: typedDealValue(formData.get("amount"), base.data.amount) };
+}
+
 const SNOOZE_CLOSED = "אפשר לדחות רק עסקה פתוחה.";
 const NO_LONGER_OPEN = "העסקה כבר לא פתוחה. רעננו את הדף.";
 const STAGE_GONE = "השלב שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.";
@@ -51,9 +72,9 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
   if (!context.ok) {
     return context;
   }
-  const parsed = createDealSchema.safeParse(pick(formData, DEAL_FIELD_NAMES));
-  if (!parsed.success) {
-    return invalid(parsed.error, formData);
+  const parsed = parseDealForm(createDealSchema, DEAL_FIELD_NAMES, formData);
+  if (!parsed.ok) {
+    return parsed.state;
   }
 
   const custom = await customFieldsFromForm(orgId, "deal", formData);
@@ -78,7 +99,8 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
   const { data, error } = await context.supabase.from("deals").insert({
     organization_id: orgId,
     name: parsed.data.name,
-    amount_agorot: parsed.data.amount,
+    amount_agorot: parsed.amount,
+    ...parsed.recurring,
     pipeline_id: stage.pipeline_id,
     stage_id: stage.id,
     contact_id: parsed.data.contact_id,
@@ -251,7 +273,8 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
 
   let update = supabase
     .from("deals")
-    .update({ stage_id: stageId, amount_agorot: close.amount, closed_at: closedAtFor(close.closedDate, today, now, timeZone) })
+    // DEAL-07: an emptied value field is sent as null, so a recurring deal gets its first-year value back
+    .update({ stage_id: stageId, amount_agorot: typedDealValue(formData.get("amount"), close.amount), closed_at: closedAtFor(close.closedDate, today, now, timeZone) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null);
@@ -308,9 +331,18 @@ export async function updateDealAction(
   if (!context.ok) {
     return context;
   }
-  const parsed = updateDealSchema.safeParse(pick(formData, UPDATE_DEAL_FIELD_NAMES));
-  if (!parsed.success) {
-    return invalid(parsed.error, formData);
+  // the recurring fields travel only with a form that shows them (DEAL-07)
+  const withRecurring = formData.has("billing_kind");
+  const parsed = withRecurring
+    ? parseDealForm(updateDealSchema, UPDATE_DEAL_FIELD_NAMES, formData)
+    : (() => {
+        const plain = updateDealSchema.safeParse(pick(formData, UPDATE_DEAL_FIELD_NAMES));
+        return plain.success
+          ? { ok: true as const, data: plain.data, recurring: null, amount: typedDealValue(formData.get("amount"), plain.data.amount) }
+          : { ok: false as const, state: invalid(plain.error, formData) };
+      })();
+  if (!parsed.ok) {
+    return parsed.state;
   }
   const custom = await customFieldsFromForm(orgId, "deal", formData, dealId);
   if (!custom.ok) {
@@ -320,10 +352,10 @@ export async function updateDealAction(
   if (!loss.ok) {
     return loss.state;
   }
-  const { amount, ...rest } = parsed.data;
+  const { name, contact_id, company_id, expected_close_date } = parsed.data;
   const { data, error } = await context.supabase
     .from("deals")
-    .update({ ...rest, amount_agorot: amount, ...(loss.loss ?? {}), ...customFieldsPatch(custom.customFields) })
+    .update({ name, contact_id, company_id, expected_close_date, amount_agorot: parsed.amount, ...(parsed.recurring ?? {}), ...(loss.loss ?? {}), ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)
@@ -427,7 +459,7 @@ export async function duplicateDealAction(orgId: string, dealId: string, _prev: 
 
   const { data: deal, error: dealError } = await supabase
     .from("deals")
-    .select("id, pipeline_id, stage_id, amount_agorot, contact_id, company_id, source_id, expected_close_date, tag_ids, custom_fields")
+    .select("id, pipeline_id, stage_id, amount_agorot, contact_id, company_id, source_id, expected_close_date, tag_ids, custom_fields, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto")
     .eq("organization_id", orgId)
     .eq("id", dealId)
     .is("deleted_at", null)
@@ -456,7 +488,13 @@ export async function duplicateDealAction(orgId: string, dealId: string, _prev: 
     name: parsed.data.name,
     pipeline_id: deal.pipeline_id,
     stage_id: stage.id,
-    amount_agorot: deal.amount_agorot,
+    // DEAL-07: a computed value is sent empty, so the copy is computed and stays automatic
+    amount_agorot: deal.amount_auto === true ? null : deal.amount_agorot,
+    // DEAL-07: a copy keeps the deal's recurring terms as they are
+    billing_kind: deal.billing_kind,
+    recurring_amount_agorot: deal.recurring_amount_agorot,
+    recurring_start_date: deal.recurring_start_date,
+    renewal_date: deal.renewal_date,
     contact_id: deal.contact_id,
     company_id: deal.company_id,
     source_id: deal.source_id,

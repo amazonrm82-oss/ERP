@@ -104,6 +104,9 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       owner,
       tag,
       { key: "expected_close", label: "צפי סגירה", kind: "day", column: "expected_close_date" },
+      // DEAL-07: "not empty" = a recurring deal (a filter by kind needs its values in app.export_choice_values(); follow-up)
+      { key: "recurring_amount", label: "סכום חוזר (חודשי או שנתי, ₪)", kind: "number", column: "recurring_amount_agorot", scale: 100 },
+      { key: "renewal", label: "תאריך חידוש", kind: "day", column: "renewal_date" },
       created,
     ],
     // tasks have no tags and no custom fields

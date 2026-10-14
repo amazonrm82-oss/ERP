@@ -8,6 +8,8 @@ export type PlanCapability = { feature: string; label: string; built: boolean; c
 
 export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "billing_details", label: "פרטי חיוב בחברה ובאיש קשר", built: true, core: true },
+  // DEAL-07: deal data, no plan key (to be confirmed by the owner)
+  { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
   { feature: "products", label: "קטלוג מוצרים, מחירונים ומוצר מבוקש בליד", built: true },
   { feature: "quotes", label: "הצעות מחיר וחתימה", built: false },
   { feature: "payment_links", label: "קישורי תשלום", built: false },

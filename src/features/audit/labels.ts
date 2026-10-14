@@ -124,6 +124,12 @@ export const FIELD_LABELS: Record<string, string> = {
   expected_close_date: "תאריך סגירה צפוי",
   lost_reason: "סיבת הפסד",
   competitor: "מתחרה",
+  // DEAL-07: recurring revenue
+  billing_kind: "סוג עסקה",
+  recurring_amount_agorot: "סכום חוזר",
+  recurring_start_date: "תאריך התחלה",
+  renewal_date: "תאריך חידוש",
+  amount_auto: "שווי לפי שנה ראשונה",
   // GOL-01: a goal
   target: "יעד",
   metric: "מדד",
@@ -217,4 +223,6 @@ export const VALUE_LABELS: Record<string, Record<string, string>> = {
   period: GOAL_PERIOD_LABELS,
   // LEAD-06
   target_type: { contact: "איש קשר", deal: "עסקה" },
+  // DEAL-07 (null = one-time shows as empty)
+  billing_kind: { monthly: "חודשית", yearly: "שנתית" },
 };

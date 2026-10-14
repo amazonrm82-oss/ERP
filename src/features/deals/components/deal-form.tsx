@@ -14,6 +14,7 @@ import { paths } from "@/lib/paths";
 
 import { createDealAction } from "../actions";
 import type { StageOption } from "../queries";
+import { RecurringFields } from "./recurring-fields";
 
 type Props = {
   orgId: string;
@@ -61,6 +62,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
           placeholder="0"
           defaultValue={values.amount}
           error={errors.amount}
+          hint="שדה ריק בעסקה חוזרת יחושב לפי שנה ראשונה."
         />
         <SelectField key={`stage-${stageValue}`} label="שלב" name="stage_id" required defaultValue={stageValue} error={errors.stage_id}>
           {stages.map((stage) => (
@@ -104,6 +106,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
           error={errors.expected_close_date}
         />
       </div>
+      <RecurringFields initial={{ kind: null, amount: "", start: "", renewal: "" }} submitted={failure?.values} errors={errors} />
       <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצרים עסקה…">יצירת עסקה</SubmitButton>

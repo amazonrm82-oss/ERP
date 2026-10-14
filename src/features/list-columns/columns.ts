@@ -67,6 +67,11 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "company", label: "חברה" },
       { key: "owner", label: "אחראי" },
       { key: "expected_close", label: "צפי סגירה" },
+      // DEAL-07: recurring revenue
+      { key: "billing_kind", label: "סוג עסקה" },
+      { key: "recurring_amount", label: "סכום חוזר" },
+      { key: "recurring_start", label: "תאריך התחלה" },
+      { key: "renewal", label: "תאריך חידוש" },
       { key: "created", label: "נוצרה" },
     ],
     defaults: ["amount", "stage", "contact", "owner", "expected_close"],

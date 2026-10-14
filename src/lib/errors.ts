@@ -124,6 +124,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:snoozed_until": "אפשר לדחות עסקה ליום שאחרי היום, עד שנה קדימה.",
   // DEAL-11: the deal a follow-up continues is set once, to a live deal the user reads
   "deal:previous_deal": "העסקה הקודמת כבר לא זמינה. רעננו את הדף ונסו שוב.",
+  // DEAL-07: the first-year value would pass the largest amount the system keeps
+  "deal:amount_too_big": "שווי השנה הראשונה גדול מדי. הזינו את השווי בעצמכם.",
   // LEAD-04: a person picks only an offerable product (active, not archived)
   "lead:requested_product": "המוצר שנבחר כבר לא זמין. בחרו מוצר פעיל מהקטלוג.",
   // TAX-02 follow-up (trigger org_bank_details_check): no value in the error, so the account never leaks
