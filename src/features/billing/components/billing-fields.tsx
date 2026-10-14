@@ -4,10 +4,12 @@ import { useState } from "react";
 
 import { SelectField, TextField } from "@/components/ui/field";
 
+import { cn } from "@/lib/cn";
+
 import type { Billing, BillingSubject } from "../billing";
 import type { BillingPriceList } from "../queries";
 import { BILLING_MARKER } from "../schema";
-import { PAYMENT_DAYS_MAX } from "../terms";
+import { PAYMENT_DAYS_MAX, PAYMENT_TERMS_LABELS, PAYMENT_TERMS_SHORTCUTS, paymentTermsText } from "../terms";
 
 /** Form values: what is stored (as strings) or what the user typed in a failed submit. */
 export type BillingFormValues = Partial<Record<string, string | null>>;
@@ -38,6 +40,9 @@ type Props = {
 /** CON-08: the billing fields of a company or contact (the card's edit form and the create forms). */
 export function BillingFields({ subject, values, errors, priceLists, fromCompanyHint }: Props) {
   const [terms, setTerms] = useState(values.payment_terms ?? "");
+  const [days, setDays] = useState(values.payment_days ?? "");
+  // the typed days as a number ("030" = 30; empty = 0, as saved); null when not a number
+  const typedDays = /^\d{0,3}$/.test(days.trim()) ? Number(days.trim() || "0") : null;
   const priceListId = values.price_list_id ?? "";
   const showPriceLists = priceLists.length > 0 || priceListId !== "";
   const emptyHint = fromCompanyHint ? "שדה ריק יוצג מפרטי החברה." : undefined;
@@ -96,26 +101,58 @@ export function BillingFields({ subject, values, errors, priceLists, fromCompany
         defaultValue={values.billing_email ?? ""}
         error={errors.billing_email}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField label="תנאי תשלום" name="payment_terms" value={terms} onChange={(event) => setTerms(event.target.value)} error={errors.payment_terms}>
-          <option value="">לא נקבע</option>
-          <option value="immediate">מיידי</option>
-          <option value="eom">שוטף + ימים</option>
-          <option value="net">ימים מתאריך המסמך</option>
-        </SelectField>
-        {terms === "net" || terms === "eom" ? (
-          <TextField
-            label="מספר ימים"
-            name="payment_days"
-            inputMode="numeric"
-            dir="ltr"
-            maxLength={3}
-            autoComplete="off"
-            defaultValue={values.payment_days ?? ""}
-            hint={terms === "eom" ? "למשל 30 לשוטף + 30. ריק = שוטף." : `0 עד ${PAYMENT_DAYS_MAX}.`}
-            error={errors.payment_days}
-          />
-        ) : null}
+      <div className="space-y-2">
+        <div role="group" aria-label="קיצורים לתנאי תשלום" className="flex flex-wrap gap-2">
+          {PAYMENT_TERMS_SHORTCUTS.map((shortcut) => {
+            const text = paymentTermsText(shortcut) ?? "";
+            const value = shortcut.days === null ? "" : String(shortcut.days);
+            const pressed = terms === shortcut.kind && (shortcut.days === null || typedDays === shortcut.days);
+            return (
+              <button
+                key={text}
+                type="button"
+                aria-label={`תנאי תשלום ${text}`}
+                aria-pressed={pressed}
+                onClick={(event) => {
+                  setTerms(shortcut.kind);
+                  setDays(value);
+                  // controlled fields change by property, not attribute: tell FormGuard (unsaved changes)
+                  event.currentTarget.form?.dispatchEvent(new Event("change", { bubbles: true }));
+                }}
+                className={cn(
+                  "inline-flex min-h-11 items-center justify-center rounded-md border px-4 text-md font-medium whitespace-nowrap transition-colors",
+                  pressed ? "border-accent bg-accent-soft text-accent-strong" : "border-line-strong bg-surface text-ink hover:bg-canvas",
+                )}
+              >
+                {text}
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField label="תנאי תשלום" name="payment_terms" value={terms} onChange={(event) => setTerms(event.target.value)} error={errors.payment_terms}>
+            <option value="">לא נקבע</option>
+            {(["immediate", "eom", "net"] as const).map((kind) => (
+              <option key={kind} value={kind}>
+                {PAYMENT_TERMS_LABELS[kind]}
+              </option>
+            ))}
+          </SelectField>
+          {terms === "net" || terms === "eom" ? (
+            <TextField
+              label="מספר ימים"
+              name="payment_days"
+              inputMode="numeric"
+              dir="ltr"
+              maxLength={3}
+              autoComplete="off"
+              value={days}
+              onChange={(event) => setDays(event.target.value)}
+              hint={terms === "eom" ? "למשל 30 לשוטף+30. ריק = שוטף." : `0 עד ${PAYMENT_DAYS_MAX}. ריק = ביום המסמך.`}
+              error={errors.payment_days}
+            />
+          ) : null}
+        </div>
       </div>
       {showPriceLists ? (
         <SelectField key={`price-list-${priceListId}`} label="מחירון" name="price_list_id" defaultValue={priceListId} error={errors.price_list_id} className="sm:max-w-xs">

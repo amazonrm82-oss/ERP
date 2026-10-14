@@ -1,11 +1,20 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { companyBilling, contactBilling, effectiveBilling, type BillingColumns } from "@/features/billing/billing";
 import { companyBillingSchema, contactBillingSchema } from "@/features/billing/schema";
-import { PAYMENT_DAYS_MAX, PAYMENT_TERMS, paymentDueDate, paymentTermsOf, paymentTermsText } from "@/features/billing/terms";
+import {
+  PAYMENT_DAYS_MAX,
+  PAYMENT_TERMS,
+  PAYMENT_TERMS_LABELS,
+  PAYMENT_TERMS_SHORTCUTS,
+  PaymentTermsError,
+  paymentDueDate,
+  paymentTermsOf,
+  paymentTermsText,
+} from "@/features/billing/terms";
 
 const empty: BillingColumns = {
   billing_name: null,
@@ -53,9 +62,11 @@ describe("billing details (CON-08)", () => {
   it("says the terms the way Israelis write them", () => {
     expect(paymentTermsText({ kind: "immediate", days: null })).toBe("מיידי");
     expect(paymentTermsText({ kind: "eom", days: 0 })).toBe("שוטף");
-    expect(paymentTermsText({ kind: "eom", days: 30 })).toBe("שוטף + 30");
-    expect(paymentTermsText({ kind: "net", days: 45 })).toBe("45 ימים מתאריך המסמך");
-    expect(paymentTermsText({ kind: "net", days: 1 })).toBe("יום אחד מתאריך המסמך");
+    expect(paymentTermsText({ kind: "eom", days: 30 })).toBe("שוטף+30");
+    expect(paymentTermsText({ kind: "eom", days: 45 })).toBe("שוטף+45");
+    expect(paymentTermsText({ kind: "net", days: 30 })).toBe("30 יום מתאריך המסמך");
+    expect(paymentTermsText({ kind: "net", days: 1 })).toBe("1 יום מתאריך המסמך");
+    expect(paymentTermsText({ kind: "net", days: 0 })).toBe("ביום המסמך");
     expect(paymentTermsText(null)).toBeNull();
   });
 
@@ -67,6 +78,52 @@ describe("billing details (CON-08)", () => {
     // February of a leap year, and the end of the year
     expect(paymentDueDate("2028-02-10", { kind: "eom", days: 0 })).toBe("2028-02-29");
     expect(paymentDueDate("2026-12-31", { kind: "eom", days: 60 })).toBe("2027-03-01");
+    // the years 0001..0099 stay themselves (Date.UTC would move them to 19xx), and the top edge
+    expect(paymentDueDate("0050-02-10", { kind: "eom", days: 0 })).toBe("0050-02-28");
+    expect(paymentDueDate("0004-02-10", { kind: "eom", days: 1 })).toBe("0004-03-01");
+    expect(paymentDueDate("0001-01-01", { kind: "net", days: 365 })).toBe("0002-01-01");
+    expect(paymentDueDate("9999-12-15", { kind: "eom", days: 0 })).toBe("9999-12-31");
+    expect(paymentDueDate("9999-12-31", { kind: "net", days: 0 })).toBe("9999-12-31");
+    // a rest day is not skipped: Saturday 31 October 2026 stays
+    expect(paymentDueDate("2026-10-01", { kind: "net", days: 30 })).toBe("2026-10-31");
+  });
+
+  it("refuses terms the database would refuse, like app.payment_due_date (22023)", () => {
+    const bad: Array<[string, { kind: string; days: number | null }]> = [
+      ["2026-10-13", { kind: "weekly", days: 7 }],
+      ["2026-10-13", { kind: "immediate", days: 0 }],
+      ["2026-10-13", { kind: "net", days: null }],
+      ["2026-10-13", { kind: "eom", days: -1 }],
+      ["2026-10-13", { kind: "net", days: 366 }],
+      ["2026-10-13", { kind: "net", days: 1.5 }],
+      ["2026-02-30", { kind: "net", days: 1 }],
+      // the edges of app.payment_due_date: years 0001..9999 only
+      ["0000-06-01", { kind: "immediate", days: null }],
+      ["9999-12-31", { kind: "net", days: 1 }],
+      ["9999-12-01", { kind: "eom", days: 1 }],
+    ];
+    for (const [day, terms] of bad) {
+      expect(() => paymentDueDate(day, terms)).toThrow(PaymentTermsError);
+    }
+  });
+
+  it("names every kind in the terms select", () => {
+    expect(Object.keys(PAYMENT_TERMS_LABELS).sort()).toEqual([...PAYMENT_TERMS].sort());
+  });
+
+  it("offers the owner's shortcuts, in order", () => {
+    expect(PAYMENT_TERMS_SHORTCUTS.map((terms) => paymentTermsText(terms))).toEqual(["מיידי", "שוטף", "שוטף+30", "שוטף+60", "שוטף+90"]);
+  });
+
+  it("the TS rule says the same as the migration's (kinds, range, error)", () => {
+    const dir = join(process.cwd(), "supabase/migrations");
+    const file = readdirSync(dir).find((name) => name.endsWith("_payment_due_date.sql"));
+    expect(file).toBeDefined();
+    const sql = readFileSync(join(dir, file!), "utf8");
+    expect(sql).toContain("p_terms not in ('immediate', 'net', 'eom')");
+    expect(sql).toContain(`p_days > ${PAYMENT_DAYS_MAX}`);
+    expect(sql).toContain("hint = 'payment_terms:invalid'");
+    expect(new PaymentTermsError().hint).toBe("payment_terms:invalid");
   });
 
   it("a contact's empty fields show its company's values, marked as from the company", () => {
@@ -93,7 +150,11 @@ describe("billing details (CON-08)", () => {
     });
     expect(companyBillingSchema.parse(form({ payment_terms: "immediate", payment_days: "30" }))).toMatchObject({ payment_terms: "immediate", payment_days: null });
     expect(companyBillingSchema.parse(form({ payment_terms: "", payment_days: "30" }))).toMatchObject({ payment_terms: null, payment_days: null });
-    expect(companyBillingSchema.safeParse(form({ payment_terms: "net" })).success).toBe(false);
+    // an empty days box is 0 under both kinds (owner, 14 October 2026)
+    expect(companyBillingSchema.parse(form({ payment_terms: "net" }))).toMatchObject({ payment_terms: "net", payment_days: 0 });
+    expect(companyBillingSchema.parse(form({ payment_terms: "net", payment_days: " " }))).toMatchObject({ payment_terms: "net", payment_days: 0 });
+    expect(companyBillingSchema.parse(form({ payment_terms: "eom", payment_days: "" }))).toMatchObject({ payment_terms: "eom", payment_days: 0 });
+    expect(contactBillingSchema.parse(form({ payment_terms: "net", payment_days: "" }))).toMatchObject({ payment_terms: "net", payment_days: 0 });
     expect(companyBillingSchema.safeParse(form({ payment_terms: "net", payment_days: "366" })).success).toBe(false);
     expect(companyBillingSchema.safeParse(form({ payment_terms: "net", payment_days: "-1" })).success).toBe(false);
     expect(companyBillingSchema.safeParse(form({ payment_terms: "weekly" })).success).toBe(false);

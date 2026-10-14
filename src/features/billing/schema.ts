@@ -38,7 +38,7 @@ const base = z.object({
 type Parsed = z.infer<typeof base> & { billing_tax_id?: string | null };
 
 /** The payment terms pair as the database accepts it (constraint *_payment_terms_shape). */
-function checkTerms(data: Parsed, ctx: z.RefinementCtx): Parsed {
+function checkTerms(data: Parsed): Parsed {
   if (data.payment_terms === null) {
     return { ...data, payment_days: null };
   }
@@ -46,17 +46,13 @@ function checkTerms(data: Parsed, ctx: z.RefinementCtx): Parsed {
     return { ...data, payment_days: null };
   }
   if (data.payment_days === null) {
-    if (data.payment_terms === "eom") {
-      // "שוטף" alone is שוטף + 0
-      return { ...data, payment_days: 0 };
-    }
-    ctx.addIssue({ code: "custom", path: ["payment_days"], message: "יש להזין את מספר הימים." });
-    return z.NEVER;
+    // an empty box is 0 (owner, 14 October 2026): "שוטף" alone is שוטף+0, net alone is "ביום המסמך"
+    return { ...data, payment_days: 0 };
   }
   return data;
 }
 
-export const companyBillingSchema = base.transform((data, ctx) => checkTerms(data, ctx));
+export const companyBillingSchema = base.transform((data) => checkTerms(data));
 
 export const contactBillingSchema = base
   .extend({ billing_tax_id: optionalText(20, "המספר ארוך מדי.") })
@@ -69,7 +65,7 @@ export const contactBillingSchema = base
       }
       data = { ...data, billing_tax_id: id };
     }
-    return checkTerms(data, ctx);
+    return checkTerms(data);
   });
 
 export type CompanyBillingPatch = {
