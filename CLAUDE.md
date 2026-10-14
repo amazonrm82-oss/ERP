@@ -563,6 +563,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   site hosts (`app.public_email_domain`, closed list) never match. Candidates come from `app.company_domain_candidates()` (definer,
   ids only, no cap, members only) and are re-read under RLS. `contacts.company_matched_domain` / `company_match_kind` (server only)
   drive the card marks. Mirrors in `src/features/company-domain/domains.ts` (unit test).
+- Contact preferences (CON-10, migration 0183): `contacts.preferred_locale` (he|ar|en|ru|am|fr|es) and `preferred_channel`
+  (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
+  reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
+  `app.export_choice_values()` (last redefined in 0183) lists the fixed choice codes kept in an export's audit filters.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
