@@ -505,6 +505,18 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `crm-rotation-waiting` (every minute, `app.assign_waiting_rotation_leads()`, fair per org: 50 per org, 500 per run, per-row
   exception block) gives it to the first member back in hours; a lead taken meanwhile is left alone; 14 days then given up.
   `take_lead` never moves the rotation pointer. A new redefinition of `intake_submit` must keep the `v_rotation_closed` lines.
+- Absence deputy (HEB-08, migrations 0187 in four files 018700-018730; owner 14 October 2026): `member_leaves.kind`
+  (reserve|vacation|null) and `deputy_id` (trigger `member_leaves_deputy_check`: active non-viewer, not self, not away then).
+  `app.member_on_leave`, `app.deputy_for` (no chain, hours not asked), `app.next_lead_turn` (the rotation gives an absent
+  member's turn to their deputy in hours). Every automatic assignment of a fixed person goes through `app.auto_lead_owner` /
+  `app.assign_lead_owner_auto`: absent with no usable deputy = no owner, SPD-01 notices, `app.absence_waiting_leads` and pg_cron
+  `crm-absence-return` hand it back on return (`lead_new`). Reading: the select policies of leads, contacts, companies, deals and
+  tasks add `(organization_id, id) in (select … from app.deputy_readable(type))` (records linked by the absent person's open
+  tasks that the absent person reads, and their unanswered open leads, during the absence in the org zone); `app.can_read_record`
+  is unchanged, `app.user_deputy_reads` is the per-user rule beside `app.user_can_read_record`. A deputy updates open tasks but
+  never hands them over (`tasks_deputy_guard`, hint `task:deputy_owner`); reminders also go to the deputy. `intake_submit`,
+  `app.notify_assignment`, `app.run_automation_actions`, `app.check_lead_responses`, `app.send_task_reminders` and the mention
+  functions were last redefined in 0187.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
