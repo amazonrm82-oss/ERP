@@ -9,6 +9,10 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import { AskedFields } from "@/features/custom-fields/components/asked-fields";
+import { isMoveRefusal } from "@/features/custom-fields/required-move";
+import type { FieldDefinition } from "@/features/custom-fields/types";
+import { missingForMoveAction } from "@/features/record-move/actions";
 import type { FormState } from "@/lib/action-result";
 
 import { closeDealWonAction, closeOpenDealWonAction, dealOnboardingTaskAction } from "../actions";
@@ -34,7 +38,8 @@ type Props = { orgId: string; target: WonTarget | null; setup: CloseWindowSetup;
 
 /**
  * DEAL-04, the close window on the won side: confirm the amount and the close
- * date, and choose what comes next (wave 1: an onboarding task). Nothing moves
+ * date, fill the fields the won stage makes required (FLD-09), and choose what comes next (wave 1: an
+ * onboarding task). Nothing moves
  * until "סגירה בהצלחה" is pressed; closing the window leaves the deal where it was.
  */
 export function DealWonDialog({ orgId, target, setup, onClose, onDone, expectOpen = false }: Props) {
@@ -93,6 +98,9 @@ function WonForm({
   const choiceKey = onboardingChoiceKey(orgId, setup.userId);
   // an open onboarding task already linked to the deal: none is offered (checked again on save)
   const [existing, setExisting] = useState<"checking" | "open" | "none">("checking");
+  // FLD-09: the fields the won stage makes required and are empty, asked here and saved with the close
+  // (when this read fails, the first save names them and they show then)
+  const [required, setRequired] = useState<FieldDefinition[]>([]);
   useEffect(() => {
     let cancelled = false;
     dealOnboardingTaskAction(orgId, target.dealId)
@@ -102,10 +110,17 @@ function WonForm({
       .catch(() => {
         if (!cancelled) setExisting("none");
       });
+    missingForMoveAction(orgId, "deal", target.dealId, target.stageId)
+      .then((result) => {
+        if (!cancelled && result.ok && result.data) setRequired(result.data.fields);
+      })
+      .catch(() => {
+        // the save checks again
+      });
     return () => {
       cancelled = true;
     };
-  }, [orgId, target.dealId]);
+  }, [orgId, target.dealId, target.stageId]);
 
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await (expectOpen ? closeOpenDealWonAction : closeDealWonAction)(orgId, target.dealId, target.stageId, prev, formData);
@@ -118,6 +133,7 @@ function WonForm({
   // a close date more than three months back is confirmed first
   const { onSubmit, asking, confirm, cancel } = useOldCloseDate(setup.today);
   const failure = state && !state.ok ? state : null;
+  const asked = isMoveRefusal(state) ? state.missing : required;
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
   const [onboarding, setOnboarding] = useState(() => (values ? values.onboarding === "on" : readChoice(choiceKey)));
@@ -146,6 +162,7 @@ function WonForm({
         timeZone={setup.timeZone}
         error={errors.closed_date}
       />
+      <AskedFields object="deal" fields={asked} submitted={values} errors={errors} />
       <fieldset className="space-y-3 rounded-md border border-line p-3">
         <legend className="px-1 text-sm font-medium text-ink">מה הלאה?</legend>
         {existing === "open" ? (

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { AskedFields } from "@/features/custom-fields/components/asked-fields";
+import { askedFieldsFor } from "@/features/custom-fields/required-move";
 import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
 import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
 import type { FormState } from "@/lib/action-result";
@@ -38,7 +40,8 @@ type Props = {
  * Works with keyboard and touch alike, and never moves a deal by accident while
  * browsing the options. The board remounts the card (key) after a move.
  * A lost stage also asks, without insisting, why and to whom (DEAL-03); a won
- * stage opens the close window instead of moving (DEAL-04).
+ * stage opens the close window instead of moving (DEAL-04). Fields the chosen stage makes required
+ * and are empty are added to the menu after the first try and saved with the stage (FLD-09).
  */
 export function DealStageForm({ orgId, dealId, dealName, currentStageId, stages, lossReasons, competitor, lossReason, closeWindow, amountAgorot = 0, ownerId = null }: Props) {
   const [selected, setSelected] = useState(currentStageId);
@@ -49,6 +52,9 @@ export function DealStageForm({ orgId, dealId, dealName, currentStageId, stages,
   const askLoss = changed && lossReasons !== undefined && target?.kind === "lost";
   const askWon = changed && Boolean(closeWindow) && entersWon(stages.find((stage) => stage.id === currentStageId)?.kind, target?.kind);
   const [won, setWon] = useState<WonTarget | null>(null);
+  // FLD-09: a stage that makes empty fields required adds them to this menu (sent with the stage);
+  // a won stage asks for them in the close window instead
+  const asked = changed && !askWon ? askedFieldsFor(state, "stage_id", selected) : [];
 
   const openWon = () => {
     if (target) setWon({ dealId, dealName, stageId: target.id, stageName: target.name, amountAgorot, ownerId });
@@ -91,15 +97,24 @@ export function DealStageForm({ orgId, dealId, dealName, currentStageId, stages,
             <Button size="sm" onClick={openWon}>
               העברה
             </Button>
-          ) : changed && !askLoss ? (
+          ) : changed && !askLoss && asked.length === 0 ? (
             <SubmitButton size="sm" pending={pending} pendingText="מעבירים…">
               העברה
             </SubmitButton>
           ) : null}
         </div>
+        {asked.length > 0 && !askLoss ? (
+          <>
+            <AskedFields object="deal" fields={asked} submitted={failure?.values} errors={failure?.fieldErrors} />
+            <SubmitButton size="sm" pending={pending} pendingText="מעבירים…">
+              שמירה והעברה
+            </SubmitButton>
+          </>
+        ) : null}
         {askLoss ? (
           <div className="space-y-2 rounded-md border border-line bg-canvas p-2.5">
             <LossFields reasons={lossReasons} current={lossReason} competitor={competitor} errors={failure?.fieldErrors} controlSize="sm" />
+            <AskedFields object="deal" fields={asked} submitted={failure?.values} errors={failure?.fieldErrors} />
             <SubmitButton size="sm" pending={pending} pendingText="מעבירים…">
               העברה
             </SubmitButton>

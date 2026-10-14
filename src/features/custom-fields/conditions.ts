@@ -146,12 +146,6 @@ export function conditionApplies(condition: FieldCondition, definitions: FieldDe
 
 export type FieldState = { visible: boolean; required: boolean };
 
-/**
- * A move (status, stage) refused because it would leave conditionally required fields empty: the
- * board or the table cell opens a window that asks for them (missing, as the window shows them).
- */
-export type MissingResult = { ok: false; message: string; missing: FieldDefinition[] };
-
 /** Whether a field shows and whether it is required, for these values. */
 export function fieldState(field: FieldDefinition, definitions: FieldDefinition[], values: ConditionValues, objectType?: FieldObject): FieldState {
   const condition = field.condition ?? null;

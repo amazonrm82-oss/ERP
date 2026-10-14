@@ -11,8 +11,10 @@ import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
+import { isMoveRefusal } from "@/features/custom-fields/required-move";
+import { moveAsk } from "@/features/record-move/ask";
+import { moveRecordAction } from "@/features/record-move/actions";
 
-import { dropLeadAction, moveLeadWithFieldsAction } from "../actions";
 import type { LeadBoard, LeadBoardCard } from "../queries";
 import { LeadStatusMenu } from "./lead-status-menu";
 
@@ -54,18 +56,26 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
     setError(null);
     startTransition(async () => {
       moveOptimistic({ leadId: card.id, statusId });
-      const result = await dropLeadAction(orgId, card.id, statusId, why);
+      const result = await moveRecordAction(orgId, "lead", card.id, statusId, why, null);
       const moved = () => setAnnouncement(`הליד ${nameOf(card)} הועבר לסטטוס ${status.name}.`);
       if (result.ok) {
         moved();
-      } else if ("missing" in result) {
+      } else if (isMoveRefusal(result)) {
         // the card goes back until the window is saved; cancel leaves it there
-        setAsk({
-          description: `הליד ${nameOf(card)} עובר לסטטוס ${status.name}`,
-          fields: result.missing,
-          save: (formData) => moveLeadWithFieldsAction(orgId, card.id, statusId, why, formData),
-          onSaved: moved,
-        });
+        setAsk(
+          moveAsk({
+            orgId,
+            object: "lead",
+            id: card.id,
+            targetId: statusId,
+            description: `הליד ${nameOf(card)} עובר לסטטוס ${status.name}`,
+            reason: why,
+            reasons,
+            reasonLabel: `למה הליד ${nameOf(card)} לא רלוונטי?`,
+            refusal: result,
+            onSaved: moved,
+          }),
+        );
       } else {
         // the optimistic move is dropped when the transition ends
         setError(result.message);
@@ -209,6 +219,7 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
                                 currentStatusId={card.statusId}
                                 statuses={board.statuses}
                                 reasons={reasons}
+                                onMoved={(statusName) => setAnnouncement(`הליד ${nameOf(card)} הועבר לסטטוס ${statusName}.`)}
                               />
                             ) : null}
                           </li>

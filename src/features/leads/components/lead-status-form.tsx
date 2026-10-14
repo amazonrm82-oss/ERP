@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
+import { AskedFields } from "@/features/custom-fields/components/asked-fields";
+import { askedFieldsFor } from "@/features/custom-fields/required-move";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
@@ -18,7 +20,8 @@ type Props = { orgId: string; leadId: string; currentStatusId: string; statuses:
 /**
  * Status picker of a lead. The change is saved with an explicit button (not on
  * select change) so keyboard users can browse the options without saving each
- * one. A "not relevant" status asks for the reason first.
+ * one. A "not relevant" status asks for the reason first. Fields the chosen status makes required
+ * and are empty are added to the form after the first try (FLD-09), and saved with the status.
  * The parent remounts this component (key) when the saved status changes.
  */
 export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses, reasons }: Props) {
@@ -35,6 +38,8 @@ export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses, reaso
   const selectedStatus = statuses.find((status) => status.id === selected);
   const needsReason = selectedStatus?.kind === "disqualified";
   const changed = selected !== currentStatusId;
+  // FLD-09: a status that makes empty fields required adds them to this form (sent with the status)
+  const asked = changed ? askedFieldsFor(state, "status_id", selected) : [];
 
   return (
     // submitted by hand: the select is controlled (see submitWith)
@@ -56,6 +61,7 @@ export function LeadStatusForm({ orgId, leadId, currentStatusId, statuses, reaso
           error={failure?.fieldErrors?.disqualify_reason}
         />
       ) : null}
+      <AskedFields object="lead" fields={asked} submitted={failure?.values} errors={failure?.fieldErrors} />
       {failure && !failure.fieldErrors ? <FormError message={failure.message} /> : null}
       {changed ? (
         <SubmitButton size="sm" pending={pending} pendingText="מעדכנים…">

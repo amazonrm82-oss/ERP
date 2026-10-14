@@ -12,11 +12,14 @@ import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
+import { AskedFields } from "@/features/custom-fields/components/asked-fields";
+import { askedFieldsFor, isMoveRefusal } from "@/features/custom-fields/required-move";
 import { moveOpenDealAction, snoozeDealAction } from "@/features/deals/actions";
 import { DealWonDialog, type WonTarget } from "@/features/deals/components/deal-won-dialog";
 import { MAX_SNOOZE_DAYS } from "@/features/deals/snooze";
 import { setExpectedCloseDateAction } from "@/features/reports/forecast-actions";
 import type { FormState } from "@/lib/action-result";
+import { submitWith } from "@/lib/use-submit";
 import { addDays } from "@/lib/calendar-grid";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -189,6 +192,8 @@ function AdvanceForm({
     const dated = await setExpectedCloseDateAction(orgId, deal.id, null, formData);
     if (!dated?.ok) return dated;
     const moved = await moveOpenDealAction(orgId, deal.id, null, formData);
+    // FLD-09: the stage asks for fields: they show in this form (the date is saved again with them)
+    if (isMoveRefusal(moved)) return moved;
     if (moved && !moved.ok) {
       return { ok: false, message: `${DATE_SAVED_MOVE_FAILED} (${moved.message})` };
     }
@@ -235,6 +240,7 @@ function AdvanceForm({
           hint="תאריך הסגירה של העסקה עבר. בלי תאריך חדש היא תישאר ברשימה."
         />
       ) : null}
+      <AskedFields object="deal" fields={askedFieldsFor(state, "stage_id", stageId)} submitted={failure?.values} errors={failure?.fieldErrors} />
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <FormButtons pending={pending} label="לקדם" pendingText="מעבירים…" onCancel={onCancel} />
     </form>
@@ -300,9 +306,12 @@ function LostForm({
   useDone(state, onDone);
   const failure = state && !state.ok ? state : null;
   return (
-    <form action={action} className="space-y-4" noValidate>
+    // submitted by hand: a form action resets the form, and the loss fields would lose the
+    // chosen reason and competitor when the stage asks for fields first (FLD-09)
+    <form onSubmit={submitWith(action)} className="space-y-4" noValidate>
       <input type="hidden" name="stage_id" value={stageId} />
       <LossFields reasons={reasons} errors={failure?.fieldErrors} autoFocus />
+      <AskedFields object="deal" fields={askedFieldsFor(state, "stage_id", stageId)} submitted={failure?.values} errors={failure?.fieldErrors} />
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <FormButtons pending={pending} label="סגירה כאבודה" pendingText="סוגרים…" onCancel={onCancel} />
     </form>

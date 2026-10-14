@@ -11,9 +11,12 @@ import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
+import { AskedFields } from "@/features/custom-fields/components/asked-fields";
+import { askedFieldsFor } from "@/features/custom-fields/required-move";
 import { moveOpenDealAction } from "@/features/deals/actions";
 import { DealWonDialog, type WonTarget } from "@/features/deals/components/deal-won-dialog";
 import type { FormState } from "@/lib/action-result";
+import { submitWith } from "@/lib/use-submit";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -211,9 +214,12 @@ function LostForm({
   useDone(state, onDone);
   const failure = state && !state.ok ? state : null;
   return (
-    <form action={action} className="space-y-4" noValidate>
+    // submitted by hand: a form action resets the form, and the loss fields would lose the
+    // chosen reason and competitor when the stage asks for fields first (FLD-09)
+    <form onSubmit={submitWith(action)} className="space-y-4" noValidate>
       <input type="hidden" name="stage_id" value={stageId} />
       <LossFields reasons={reasons} errors={failure?.fieldErrors} autoFocus />
+      <AskedFields object="deal" fields={askedFieldsFor(state, "stage_id", stageId)} submitted={failure?.values} errors={failure?.fieldErrors} />
       <FormError message={failure?.message} />
       <div className="flex flex-wrap gap-2">
         <SubmitButton pending={pending} pendingText="סוגרים…">

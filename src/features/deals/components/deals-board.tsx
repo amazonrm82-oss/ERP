@@ -23,8 +23,10 @@ import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
+import { isMoveRefusal } from "@/features/custom-fields/required-move";
+import { moveAsk } from "@/features/record-move/ask";
+import { moveRecordAction } from "@/features/record-move/actions";
 
-import { dropDealAction, moveDealWithFieldsAction } from "../actions";
 import { edgeStep, moveTexts, stepStage } from "../board-drag";
 import type { Board, BoardDeal } from "../queries";
 import { STAGE_RULE, stageTone } from "../stage-colors";
@@ -110,7 +112,7 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
     const dealId = deal.id;
     startTransition(async () => {
       moveOptimistic({ dealId, stageId });
-      const result = await dropDealAction(orgId, dealId, stageId);
+      const result = await moveRecordAction(orgId, "deal", dealId, stageId, null, null);
       const afterMove = () => {
         setAnnouncement(moveTexts.moved(deal.name, stage.name));
         if (stage.kind === "lost") {
@@ -119,14 +121,20 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
       };
       if (result.ok) {
         afterMove();
-      } else if ("missing" in result) {
+      } else if (isMoveRefusal(result)) {
         // the card goes back until the window is saved; cancel leaves it there
-        setAsk({
-          description: `העסקה ${deal.name} עוברת לשלב ${stage.name}`,
-          fields: result.missing,
-          save: (formData) => moveDealWithFieldsAction(orgId, dealId, stageId, null, formData),
-          onSaved: afterMove,
-        });
+        setAsk(
+          moveAsk({
+            orgId,
+            object: "deal",
+            id: dealId,
+            targetId: stageId,
+            description: `העסקה ${deal.name} עוברת לשלב ${stage.name}`,
+            reason: null,
+            refusal: result,
+            onSaved: afterMove,
+          }),
+        );
       } else {
         // the optimistic move is dropped when the transition ends
         setError(result.message);

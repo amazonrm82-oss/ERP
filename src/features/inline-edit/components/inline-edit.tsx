@@ -7,9 +7,11 @@ import { FormError } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 import { PencilIcon } from "@/components/ui/icons";
 import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
+import { isMoveRefusal } from "@/features/custom-fields/required-move";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
+import { moveAsk } from "@/features/record-move/ask";
 
-import { inlineEditAction, inlineMoveWithFieldsAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
+import { inlineEditAction, type InlineField, type InlineObject, type InlineValue } from "../actions";
 
 // opensWindow: saving this choice hands it to onWindow instead (a deal entering a won stage, DEAL-04)
 export type InlineOption = { value: string; label: string; needsReason?: boolean; opensWindow?: boolean };
@@ -76,16 +78,19 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
     startTransition(async () => {
       const result = await inlineEditAction(orgId, object, id, field, value);
       if (result.ok) close();
-      else if ("missing" in result) {
-        const chosenValue = value;
-        const target = options.find((option) => option.value === chosenValue.id)?.label ?? "";
-        close(() =>
-          setAsk({
-            description: `${label}: ${target}`,
-            fields: result.missing,
-            save: (formData) => inlineMoveWithFieldsAction(orgId, object, id, field, chosenValue, formData),
-          }),
-        );
+      else if (isMoveRefusal(result) && (object === "lead" || object === "deal") && value.id) {
+        const target = options.find((option) => option.value === value.id)?.label ?? "";
+        const ask = moveAsk({
+          orgId,
+          object,
+          id,
+          targetId: value.id,
+          description: `${label}: ${target}`,
+          reason: value.reason?.trim() || null,
+          reasons: object === "lead" ? reasons : undefined,
+          refusal: result,
+        });
+        close(() => setAsk(ask));
       } else setError(result.message);
     });
   }

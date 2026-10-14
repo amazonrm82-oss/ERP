@@ -4,16 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { duplicateMessage, findPersonDuplicate } from "@/features/data-quality/duplicates";
-import type { MissingResult } from "@/features/custom-fields/conditions";
-import { askedField, missingAfterChange, requiredFieldsMerge } from "@/features/custom-fields/required-server";
+import type { MoveRefusal } from "@/features/custom-fields/required-move";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
-import { missingFieldsMessage } from "@/features/custom-fields/conditions";
 import { actionContext } from "@/lib/action-context";
-import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { ConvertLeadResult } from "@/lib/database.types";
 import { conversionErrorMessage, dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { isUuid, paths } from "@/lib/paths";
+import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
 import { pick } from "@/lib/validation";
 
@@ -30,7 +27,9 @@ import {
 } from "./schema";
 import { requestedProductFromForm } from "@/features/requested-product/schema";
 
-import { setLeadStatus, validateStatusChoice } from "./status";
+import { moveRecord } from "@/features/record-move/server";
+
+import { validateStatusChoice } from "./status";
 
 function revalidateLead(orgId: string, leadId?: string) {
   revalidatePath(paths.leads(orgId));
@@ -156,12 +155,17 @@ export async function updateLeadAction(
   return ok();
 }
 
+/**
+ * The lead card's status form (FLD-09: the same path as the board and the table cell). A status that
+ * leaves conditionally required fields empty is refused with them (missing); the form shows them and
+ * sends them with the status, saved in one update. A "not relevant" reason is judged with them.
+ */
 export async function changeLeadStatusAction(
   orgId: string,
   leadId: string,
-  _prev: FormState,
+  _prev: FormState | MoveRefusal,
   formData: FormData,
-): Promise<FormState> {
+): Promise<FormState | MoveRefusal> {
   const context = await actionContext(orgId, leadId);
   if (!context.ok) {
     return context;
@@ -171,63 +175,17 @@ export async function changeLeadStatusAction(
     return invalid(parsed.error, formData);
   }
 
-  const result = await setLeadStatus(context.supabase, orgId, leadId, parsed.data.status_id, parsed.data.disqualify_reason ?? null);
+  const result = await moveRecord(
+    context.supabase,
+    orgId,
+    leadId,
+    { object: "lead", statusId: parsed.data.status_id, reason: parsed.data.disqualify_reason ?? null },
+    formData,
+  );
   if (!result.ok) {
-    return result.needsReason
-      ? fail(result.message, { fieldErrors: { disqualify_reason: result.message }, values: formValues(formData) })
-      : fail(result.message);
+    return result;
   }
 
-  revalidateLead(orgId, leadId);
-  return ok();
-}
-
-/**
- * From the leads board: a card dropped on another status (a reason comes with "not relevant"). FLD-09:
- * when the status would leave conditionally required fields empty, nothing is saved and the answer
- * names them (missing), so the board asks for them and saves with moveLeadWithFieldsAction.
- */
-export async function dropLeadAction(orgId: string, leadId: string, statusId: string, reason: string | null): Promise<ActionResult | MissingResult> {
-  if (!validArg(optionalTextArg(500), reason)) return fail(INVALID_ARGS);
-  if (!isUuid(statusId)) {
-    return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
-  }
-  const context = await actionContext(orgId, leadId);
-  if (!context.ok) {
-    return context;
-  }
-  const trimmed = reason?.trim().slice(0, 500) || null;
-  const missing = await missingLeadFields(orgId, leadId, statusId);
-  if (missing) return missing;
-  const result = await setLeadStatus(context.supabase, orgId, leadId, statusId, trimmed);
-  if (!result.ok) {
-    return fail(result.message);
-  }
-  revalidateLead(orgId, leadId);
-  return ok();
-}
-
-/** FLD-09: the fields the new status would leave required and empty, as a refusal; null when none. */
-async function missingLeadFields(orgId: string, leadId: string, statusId: string): Promise<MissingResult | ActionResult | null> {
-  const found = await missingAfterChange(orgId, "lead", [leadId], { "builtin:status": statusId });
-  if (!found.ok) return fail(dbErrorMessage(found.error));
-  const fields = found.missing.get(leadId);
-  return fields ? { ok: false, message: missingFieldsMessage(fields), missing: fields.map(askedField) } : null;
-}
-
-/**
- * FLD-09: the window's answer: the status (and a "not relevant" reason) with the values the status
- * makes required, in one update. Refuses with field errors while a value is still missing or invalid.
- */
-export async function moveLeadWithFieldsAction(orgId: string, leadId: string, statusId: string, reason: string | null, formData: FormData): Promise<ActionResult> {
-  if (!validArg(optionalTextArg(500), reason)) return fail(INVALID_ARGS);
-  if (!isUuid(statusId)) return fail("הסטטוס שנבחר כבר לא קיים. רעננו את הדף ונסו שוב.");
-  const context = await actionContext(orgId, leadId);
-  if (!context.ok) return context;
-  const merge = await requiredFieldsMerge(orgId, "lead", leadId, { "builtin:status": statusId }, formData);
-  if (!merge.ok) return fail(merge.message, { fieldErrors: merge.fieldErrors, values: formValues(formData) });
-  const result = await setLeadStatus(context.supabase, orgId, leadId, statusId, reason?.trim().slice(0, 500) || null, merge.merge);
-  if (!result.ok) return fail(result.message, { values: formValues(formData) });
   revalidateLead(orgId, leadId);
   return ok();
 }

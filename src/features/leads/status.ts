@@ -61,8 +61,8 @@ export async function validateStatusChoice(
 }
 
 /**
- * A status change from the status form and the leads board. customFields: {"$merge": …} saved in the
- * same update (FLD-09: the values a conditionally required field was missing).
+ * A status change (bulk and its undo; the moves by hand go through moveRecord, which also asks for the
+ * fields the status makes required, FLD-09). customFields: {"$merge": …} saved in the same update.
  */
 export async function setLeadStatus(
   supabase: SupabaseClient<Database>,
@@ -76,9 +76,21 @@ export async function setLeadStatus(
   if (!choice.ok) {
     return choice;
   }
+  return writeLeadStatus(supabase, orgId, leadId, statusId, choice.reason, customFields);
+}
+
+/** The update itself, after validateStatusChoice: reason is the one it returned. */
+export async function writeLeadStatus(
+  supabase: SupabaseClient<Database>,
+  orgId: string,
+  leadId: string,
+  statusId: string,
+  reason: string | null,
+  customFields?: Json,
+): Promise<StatusResult> {
   const { data, error } = await supabase
     .from("leads")
-    .update({ status_id: statusId, disqualify_reason: choice.reason, ...(customFields === undefined ? {} : { custom_fields: customFields }) })
+    .update({ status_id: statusId, disqualify_reason: reason, ...(customFields === undefined ? {} : { custom_fields: customFields }) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)
