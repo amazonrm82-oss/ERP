@@ -76,6 +76,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "price_lists", file: "price_lists.csv" },
   // PL-02
   { table: "price_list_lines", file: "price_list_lines.csv" },
+  // DLI-01
+  { table: "deal_lines", file: "deal_lines.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   // CAP-09
   { table: "member_leaves", file: "member_leaves.csv" },
@@ -223,6 +225,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
+שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר.
 חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.
 הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;

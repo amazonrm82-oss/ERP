@@ -19,6 +19,8 @@ const SKU_TAKEN = 'המק"ט הזה כבר שייך למוצר אחר.';
 const IN_USE = "המוצר מופיע במסמכים, ולכן אי אפשר למחוק אותו. אפשר להעביר אותו לארכיון: הוא לא יוצע במסמכים חדשים, והמסמכים הקיימים לא ישתנו.";
 // PL-02: a price list line references the product with no on delete action (price_list_lines_product_fk)
 const IN_PRICE_LIST = "המוצר מופיע במחירון, ולכן אי אפשר למחוק אותו. אפשר להסיר אותו מהמחירונים, או להעביר אותו לארכיון: הוא לא יוצע במסמכים חדשים, והמחירים שלו יישמרו.";
+// DLI-01: a deal line references the product with no on delete action (deal_lines_product_fk)
+const IN_DEAL = "המוצר מופיע בשורות של עסקאות, ולכן אי אפשר למחוק אותו. אפשר להעביר אותו לארכיון: הוא לא יוצע בשורות חדשות, והשורות הקיימות לא ישתנו.";
 
 function revalidateProducts(orgId: string, productId?: string) {
   revalidatePath(productsPath(orgId));
@@ -136,7 +138,8 @@ export async function deleteProductAction(orgId: string, productId: string): Pro
   const { data, error } = await context.supabase.from("products").delete().eq("organization_id", orgId).eq("id", productId).select("id");
   if (error) {
     if (error.code !== "23503") return fail(dbErrorMessage(error));
-    return fail(error.message.includes("price_list_lines_product_fk") ? IN_PRICE_LIST : IN_USE);
+    if (error.message.includes("price_list_lines_product_fk")) return fail(IN_PRICE_LIST);
+    return fail(error.message.includes("deal_lines_product_fk") ? IN_DEAL : IN_USE);
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidateProducts(orgId);

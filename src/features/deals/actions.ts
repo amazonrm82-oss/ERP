@@ -21,6 +21,7 @@ import { pick } from "@/lib/validation";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate } from "@/lib/format";
 
+import { LINES_PRICES_KEPT } from "@/features/deal-lines/schema";
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
@@ -397,6 +398,17 @@ export async function updateDealAction(
     return loss.state;
   }
   const { name, contact_id, company_id, expected_close_date } = parsed.data;
+  // PL-03: a new contact or company prices only new lines; a deal with lines says so after the save
+  const { data: before, error: beforeError } = await context.supabase
+    .from("deals")
+    .select("contact_id, company_id")
+    .eq("organization_id", orgId)
+    .eq("id", dealId)
+    .maybeSingle();
+  if (beforeError) {
+    return fail(dbErrorMessage(beforeError), { values: formValues(formData) });
+  }
+  const customerChanged = before !== null && (before.contact_id !== contact_id || before.company_id !== company_id);
   const { data, error } = await context.supabase
     .from("deals")
     .update({ name, contact_id, company_id, expected_close_date, amount_agorot: parsed.amount, ...(parsed.recurring ?? {}), ...(loss.loss ?? {}), ...customFieldsPatch(custom.customFields) })
@@ -411,6 +423,16 @@ export async function updateDealAction(
     return fail(NOT_FOUND_OR_FORBIDDEN, { values: formValues(formData) });
   }
   revalidateDeal(orgId, dealId);
+  if (customerChanged) {
+    const { count, error: linesError } = await context.supabase
+      .from("deal_lines")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("deal_id", dealId);
+    if (!linesError && (count ?? 0) > 0) {
+      return { ok: true, message: LINES_PRICES_KEPT };
+    }
+  }
   return { ok: true };
 }
 

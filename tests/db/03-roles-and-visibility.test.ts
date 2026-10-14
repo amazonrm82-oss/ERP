@@ -518,6 +518,73 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("product lines follow the deal: readers read, editors write, nobody writes in the recycle bin (DLI-01)", async () => {
+    await setVisibility("own");
+    const pipe = await asAdmin(async (q) => {
+      const p = (await q<{ id: string }>("select id from public.pipelines where organization_id = $1 and is_default", [org])).rows[0].id;
+      const s = (await q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [p])).rows[0].id;
+      return { p, s };
+    });
+    const deal = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id, team_id) values ($1, 'עסקת שורות', $2, $3, $4) returning id", [
+          org,
+          pipe.p,
+          pipe.s,
+          team,
+        ])
+      ).rows[0].id,
+    );
+    const addLine = (description: string) => (q: Query) =>
+      q("insert into public.deal_lines (organization_id, deal_id, description, quantity, unit_price_agorot) values ($1, $2, $3, 1, 1000)", [org, deal, description]);
+
+    // the deal's owner, the manager of its team and an admin write lines
+    await asUser(m1.id, addLine("של m1"));
+    await asUser(manager.id, addLine("של המנהל"));
+    await asUser(admin.id, addLine("של מנהל המערכת"));
+    // m2 and the viewer do not read the deal (visibility own), so neither its lines
+    for (const u of [m2, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.deal_lines where deal_id = $1", [deal]), u.email).toBe(0);
+        expect((await q("update public.deal_lines set quantity = 5 where deal_id = $1", [deal])).rowCount).toBe(0);
+        expect((await q("delete from public.deal_lines where deal_id = $1", [deal])).rowCount).toBe(0);
+      });
+      expect((await pgError(asUser(u.id, addLine("פולש")))).code).toBe("42501");
+    }
+    // visibility org: they read the lines, and still change nothing
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.deal_lines where deal_id = $1", [deal]), u.email).toBe(3);
+        expect((await q("update public.deal_lines set quantity = 5 where deal_id = $1", [deal])).rowCount).toBe(0);
+        expect((await q("delete from public.deal_lines where deal_id = $1", [deal])).rowCount).toBe(0);
+      });
+      expect((await pgError(asUser(u.id, addLine("פולש")))).code).toBe("42501");
+    }
+    // the server's columns are not the client's
+    for (const set of ["total_agorot = 1", "price_includes_vat = true", "price_list_name = 'x'", "deal_id = deal_id", "product_id = null"]) {
+      expect((await pgError(asUser(m1.id, (q) => q(`update public.deal_lines set ${set} where deal_id = $1`, [deal])))).code, set).toBe("42501");
+    }
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.deal_lines set quantity = 2 where deal_id = $1", [deal])).rowCount).toBe(3);
+    });
+    // in the recycle bin the lines stay readable and frozen
+    await asUser(admin.id, (q) => q("update public.deals set deleted_at = now() where id = $1", [deal]));
+    for (const u of [m1, admin]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.deal_lines where deal_id = $1", [deal])).toBe(3);
+        expect((await q("update public.deal_lines set quantity = 3 where deal_id = $1", [deal])).rowCount).toBe(0);
+        expect((await q("delete from public.deal_lines where deal_id = $1", [deal])).rowCount).toBe(0);
+      });
+      expect((await pgError(asUser(u.id, addLine("בסל")))).code).toBe("42501");
+    }
+    // restored, its owner removes them
+    await asUser(admin.id, (q) => q("update public.deals set deleted_at = null where id = $1", [deal]));
+    await asUser(m1.id, async (q) => {
+      expect((await q("delete from public.deal_lines where deal_id = $1", [deal])).rowCount).toBe(3);
+    });
+  });
+
   it("nobody can change the organization's billing status from a client", async () => {
     for (const u of [owner, admin]) {
       const err = await pgError(

@@ -13,6 +13,12 @@ describe("plan capabilities", () => {
     expect(planCapabilities({ products: false }).map((item) => item.feature)).not.toContain("products");
   });
 
+  it("lists line discounts under their own flag (DSC-01)", () => {
+    expect(planCapabilities({ discounts: true }).map((item) => item.feature)).toContain("discounts");
+    expect(planCapabilities({ discounts: false }).map((item) => item.feature)).not.toContain("discounts");
+    expect(PLAN_CAPABILITIES.find((item) => item.feature === "discounts")?.built).toBe(true);
+  });
+
   it("names each capability once", () => {
     const keys = PLAN_CAPABILITIES.map((item) => item.feature);
     expect(new Set(keys).size).toBe(keys.length);

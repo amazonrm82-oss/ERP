@@ -8,7 +8,7 @@ import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { FormError } from "@/components/ui/feedback";
+import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
@@ -75,10 +75,24 @@ const linkClass = "text-accent underline underline-offset-4";
 export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
+  // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
+  const [notice, setNotice] = useState<string | null>(null);
   useEditFocus("deal-details-title", focus, editing);
 
   if (editing) {
-    return <DealEditForm orgId={orgId} deal={deal} contacts={contacts} companies={companies} lossReasons={lossReasons} onDone={() => setEditing(false)} />;
+    return (
+      <DealEditForm
+        orgId={orgId}
+        deal={deal}
+        contacts={contacts}
+        companies={companies}
+        lossReasons={lossReasons}
+        onDone={(message) => {
+          setNotice(message ?? null);
+          setEditing(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -95,6 +109,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
         }
       />
       <CardBody>
+        <FormNotice message={notice} className="mb-4" />
         <DetailList>
           <Detail label="שווי" value={deal.amountAuto ? `${deal.amountText} ${FIRST_YEAR_NOTE}` : deal.amountText} />
           <Detail
@@ -138,13 +153,13 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   );
 }
 
-type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; onDone: () => void };
+type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; onDone: (message?: string) => void };
 
 function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateDealAction(orgId, deal.id, prev, formData);
     if (result?.ok) {
-      onDone();
+      onDone(result.message);
     }
     return result;
   }, null);
@@ -234,7 +249,7 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
           <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} objectType="deal" builtins={deal.custom.builtins} />
           <div className="flex flex-wrap gap-2 pt-1">
             <SubmitButton size="sm">שמירה</SubmitButton>
-            <Button variant="ghost" size="sm" onClick={onDone}>
+            <Button variant="ghost" size="sm" onClick={() => onDone()}>
               ביטול
             </Button>
           </div>

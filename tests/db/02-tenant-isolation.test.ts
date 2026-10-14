@@ -142,6 +142,11 @@ describe("tenant isolation", () => {
         ids.priceListA,
         ids.productA,
       ]);
+      // DLI-01: a product line on the deal
+      await q(
+        "insert into public.deal_lines (organization_id, deal_id, product_id, description, quantity, unit_price_agorot, price_source) values ($1, $2, $3, 'מוצר של א', 2, 10000, 'product')",
+        [orgA, ids.dealA, ids.productA],
+      );
       await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
       await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02')", [orgA, a.id]);
     });
@@ -206,6 +211,8 @@ describe("tenant isolation", () => {
     "price_lists",
     // PL-02
     "price_list_lines",
+    // DLI-01
+    "deal_lines",
     // DQL-01, seeded for every new organization
     "completeness_settings",
     // CAP-09
@@ -341,6 +348,7 @@ describe("tenant isolation", () => {
       products: "name = name",
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
+      deal_lines: "quantity = quantity",
       completeness_settings: "fields = fields",
       member_leaves: "ends_on = ends_on",
       conversion_field_maps: "target_field_id = target_field_id",
@@ -430,6 +438,8 @@ describe("tenant isolation", () => {
       ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.price_lists (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
+      ["insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgA, ids.dealA]],
+      ["insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgA, ids.dealA, ids.productA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
@@ -503,6 +513,7 @@ describe("tenant isolation", () => {
       ["products", "description = 'HACKED'", "description = 'HACKED'"],
       ["price_lists", "is_active = false", "not is_active"],
       ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
+      ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
       ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
@@ -668,6 +679,41 @@ describe("tenant isolation", () => {
       );
       expect(["23514", "23503"]).toContain(viaFieldMap.code);
     }
+
+    // a product line in org B on org A's deal, and on org B's own deal with org A's product or price list (DLI-01)
+    const dealB = await asUser(b.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'x', $2, $3) returning id", [
+          orgB,
+          pipeB.pipelineId,
+          pipeB.stages[0].id,
+        ])
+      ).rows[0].id,
+    );
+    const viaDealLine = await pgError(
+      asUser(b.id, (q) => q("insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgB, ids.dealA])),
+    );
+    expect(["42501", "23503"]).toContain(viaDealLine.code);
+    const viaLineProduct = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, dealB, ids.productA]),
+      ),
+    );
+    expect(viaLineProduct.code).toBe("23503");
+    const productB = await asUser(b.id, async (q) =>
+      (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'מוצר של ב') returning id", [orgB])).rows[0].id,
+    );
+    const viaLineList = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source, price_list_id) values ($1, $2, $3, 'x', 'price_list', $4)", [
+          orgB,
+          dealB,
+          productB,
+          ids.priceListA,
+        ]),
+      ),
+    );
+    expect(viaLineList.code).toBe("23503");
 
     // sanity: the same inserts work with org B's own ids
     await asUser(b.id, (q) =>

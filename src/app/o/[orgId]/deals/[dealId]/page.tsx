@@ -48,6 +48,9 @@ import { RecordFiles } from "@/features/files/components/record-files";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
+import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
+import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
+import { orgHasFeature } from "@/features/settings/queries";
 
 export const metadata: Metadata = { title: "עסקה" };
 
@@ -89,10 +92,15 @@ export default async function DealPage({ params, searchParams }: Props) {
     context.user.id,
   );
   // DEAL-11: the deal this one continues and its follow-ups; the pipelines for a new deal (writers only)
-  const [links, pipelines] = await Promise.all([
+  const [links, pipelines, lines, hasProducts, hasDiscounts] = await Promise.all([
     getDealLinks(orgId, deal.id, deal.previous_deal_id),
     context.canWrite ? listPipelines(orgId) : Promise.resolve(null),
+    listDealLines(orgId, deal.id),
+    orgHasFeature(orgId, "products"),
+    orgHasFeature(orgId, "discounts"),
   ]);
+  // DLI-01, PL-03: the day, the VAT and the customer's price list the lines are priced by
+  const linesPricing = await getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone);
   // DEAL-11: right after a copy, the custom fields it could not carry
   const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
@@ -151,6 +159,15 @@ export default async function DealPage({ params, searchParams }: Props) {
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
+          <DealLinesCard
+            orgId={orgId}
+            dealId={deal.id}
+            lines={lines}
+            pricing={linesPricing}
+            canEdit={canEdit}
+            features={{ products: hasProducts, discounts: hasDiscounts }}
+            canCreateProducts={hasProducts && context.canWrite && isAdminRole(context.role)}
+          />
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />

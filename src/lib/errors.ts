@@ -142,6 +142,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // PL-01 follow-up (migration price_list_vat): the VAT setting of a list that has prices
   "price_lists:vat_locked": "אי אפשר לשנות את הגדרת המע\"מ של מחירון שיש בו מחירים. כדי לעבוד אחרת, צרו מחירון חדש.",
   "price_list_lines:tiers": "אפשר לשמור עד 20 מדרגות כמות למוצר אחד במחירון. מחקו מדרגה כדי להוסיף חדשה.",
+  // DLI-01, DLI-02, PL-03 (migration deal_lines)
+  "deal_lines:max": "אפשר עד 200 שורות מוצר בעסקה אחת. מחקו שורה כדי להוסיף חדשה.",
+  "deal_lines:vat_mode": "הגדרת המע\"מ של השורות השתנתה בזמן שמילאתם. רעננו את הדף ונסו שוב.",
+  "deal_lines:product": "המוצר שנבחר לא פעיל או בארכיון. בחרו מוצר פעיל מהקטלוג.",
+  "deal_lines:price_list": "חסר המחירון שממנו נלקח המחיר. רעננו את הדף ונסו שוב.",
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

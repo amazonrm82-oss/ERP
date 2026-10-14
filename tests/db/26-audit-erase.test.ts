@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead, pgError } from "./helpers";
 
 afterAll(closePool);
 
@@ -111,6 +111,40 @@ describe("erasing a deleted record from the audit log", () => {
     const payloads = await asAdmin(async (q) => (await q<{ id: string; payload: unknown }>("select id, payload from public.form_submissions where id = any ($1) order by id", [old])).rows);
     expect(payloads.find((p) => p.id === old[0])?.payload).toEqual({});
     expect(payloads.find((p) => p.id === old[1])?.payload).toEqual({ phone: "0500000000" });
+  });
+
+  it("erases the entries of a purged deal's product lines too, updates included (DLI-01)", async () => {
+    const pipe = await defaultPipeline(org);
+    const deal = await asUser(rep.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה למחיקה', $2, $3) returning id", [
+          org,
+          pipe.pipelineId,
+          pipe.stages[0].id,
+        ])
+      ).rows[0].id,
+    );
+    const line = await asUser(rep.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.deal_lines (organization_id, deal_id, description, unit_price_agorot) values ($1, $2, 'שורה של דנה כהן', 1000) returning id", [
+          org,
+          deal,
+        ])
+      ).rows[0].id,
+    );
+    await asUser(rep.id, (q) => q("update public.deal_lines set description = 'שורה פרטית של דנה כהן' where id = $1", [line]));
+    await asUser(owner.id, async (q) => {
+      await q("update public.deals set deleted_at = now() where id = $1", [deal]);
+      await q("delete from public.deals where id = $1", [deal]);
+    });
+    const holding = () =>
+      asAdmin((q) => count(q, "select 1 from public.audit_log where entity_type = 'deal_lines' and entity_id = $1 and changes::text like '%דנה כהן%'", [line]));
+    // the update and the delete by cascade hold the text before the erasure (an insert entry is empty)
+    expect(await holding()).toBe(2);
+    await asUser(owner.id, (q) => q("select public.audit_erase_record($1, 'deals', $2)", [org, deal]));
+    expect(await holding()).toBe(0);
+    // insert, update and delete entries are all erased
+    expect(await asAdmin((q) => count(q, "select 1 from public.audit_log where entity_type = 'deal_lines' and entity_id = $1 and changes = '{\"erased\": true}'", [line]))).toBe(3);
   });
 
   it("refuses a record that still exists, non-admins and other organizations", async () => {

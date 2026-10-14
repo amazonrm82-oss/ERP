@@ -1071,6 +1071,30 @@ export type PriceListLineRow = {
   updated_at: string;
 };
 
+// DLI-01: a product line on a deal (migration deal_lines). total_agorot, price_includes_vat (one mode per deal),
+// vat_exempt (a product line's; a free line's is the person's) and price_list_name are set by trigger deal_lines_check; price_source is product | price_list | manual.
+export type DealLineRow = {
+  id: string;
+  organization_id: string;
+  deal_id: string;
+  position: number;
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  total_agorot: number;
+  price_includes_vat: boolean;
+  vat_exempt: boolean;
+  price_source: string;
+  price_list_id: string | null;
+  price_list_name: string | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // PRD-01: the product catalog (migration products). kind, vat_kind and billing are text with check
 // constraints (PRODUCT_KINDS, VAT_KINDS, BILLINGS in src/features/products/schema.ts). archived_at is stamped by trigger.
 export type ProductRow = {
@@ -1615,6 +1639,40 @@ export type Database = {
           currency?: string;
         },
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
+      >;
+      // DLI-01: column grants; the deal and the product are fixed once inserted; price_includes_vat may be sent on
+      // insert only (it must match the deal's mode); the totals and the copied names come from the server
+      deal_lines: Table<
+        DealLineRow,
+        {
+          organization_id: string;
+          deal_id: string;
+          position?: number;
+          product_id?: string | null;
+          description: string;
+          quantity?: number;
+          unit_price_agorot?: number;
+          discount_bp?: number | null;
+          discount_agorot?: number | null;
+          price_includes_vat?: boolean;
+          // a free line only; a product line's comes from the product (trigger deal_lines_check)
+          vat_exempt?: boolean;
+          price_source?: string;
+          price_list_id?: string | null;
+          currency?: string;
+        },
+        {
+          position?: number;
+          description?: string;
+          quantity?: number;
+          unit_price_agorot?: number;
+          discount_bp?: number | null;
+          discount_agorot?: number | null;
+          vat_exempt?: boolean;
+          price_source?: string;
+          price_list_id?: string | null;
+          currency?: string;
+        }
       >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;
       // GOL-01: who, period and metric are fixed once inserted; only the target changes (column-level update grant)
