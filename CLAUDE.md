@@ -472,8 +472,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   'erasure', 'blocked') and is lifted only by a form consent. `consent_prepare`'s refusal is a message only: for non-admins it
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
-  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links`, `app.audit_erase_core` and
-  `app.sample_untouched` were last redefined in 015510; a new table linking to leads/contacts must also be checked there.
+  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was last redefined in 015510 (`app.audit_erase_core` and
+  `app.sample_untouched` in 0185); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -573,6 +573,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   change). The effect is app-only (`src/features/custom-fields/conditions.ts`): a hidden field keeps its value (a disabled
   fieldset with a `cond_shown_<key>` marker; the server skips a field whose marker did not arrive); "require" is checked by the
   record forms, and by board drag / table cell (`RequiredFieldsDialog`) and bulk (skipped "חסר שדה חובה: …"), never by the database.
+- Deal lines (DLI-01/02, DSC-01 line part, PL-03 for deals; migration 0185): `public.deal_lines` (rights follow the deal; edit
+  needs `app.can_edit_record` and a deal not in the bin; product FK with no on delete action; price list FK set null; cap 200 per
+  deal, hint `deal_lines:max`). Definer trigger `app.deal_lines_check` (outsider guard first): one VAT mode per deal (lines', else
+  `prices_include_vat`; hint `deal_lines:vat_mode`), `vat_exempt` from the product on product lines and the person's choice on free
+  lines (owner), flags `products` / `discounts` / `price_lists`, offerable products only, `price_list_name` copied, `total_agorot`
+  by `app.document_totals` on the line alone. `price_source` is a person's claim: verify it on the server before quotes and
+  documents rely on it. Price list order (owner): the deal contact's list, else that contact's company's, else the deal's company's,
+  else the product price; inactive or expired lists fall through (`pickCustomerList`, `src/features/deal-lines/`). The deal value is
+  not computed from the lines yet (DLI-03). `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
