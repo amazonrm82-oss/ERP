@@ -569,6 +569,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
+- Field settings (FLD-07, migrations 0175 and 017510 pasted by hand): `field_definitions.is_unique|is_read_only|default_value`
+  (checked by `field_definitions_settings_check`). Unique values live in `app.custom_unique_values` (field, record, normalized value
+  by `app.custom_unique_norm`), kept by `*_custom_unique_sync` triggers with a deferred unique constraint; the deferred trigger
+  `A_custom_unique_values_message` raises 23505 hint `custom_field:unique`. Public-form leads, restore and conversion never refuse
+  (a taken value stays unrecorded and is marked by `public.custom_unique_clashes()`). Writers take a shared advisory lock per
+  (org, record type); turning unique on takes the exclusive one. Defaults fill an empty active field on create (`*_cf_defaults`,
+  intake leads too, conversion via `app.convert_custom_fields`); read-only values may be filled once, then
+  `app.check_custom_fields()` (last redefined in 0175) refuses changing or clearing them. Mirrors in
+  `src/features/custom-fields/settings.ts`.
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
