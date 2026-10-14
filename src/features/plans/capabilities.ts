@@ -3,9 +3,12 @@
 // a capability not built yet; the card shows it as "בקרוב". The lead flips `built`
 // when a requirement is merged.
 
-export type PlanCapability = { feature: string; label: string; built: boolean };
+// `core`: CRM data every plan holds, with no plan key (owner, 14 October 2026); every card lists it.
+export type PlanCapability = { feature: string; label: string; built: boolean; core?: true };
 
 export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
+  { feature: "billing_details", label: "פרטי חיוב בחברה ובאיש קשר", built: true, core: true },
+  { feature: "products", label: "קטלוג מוצרים, מחירונים ומוצר מבוקש בליד", built: true },
   { feature: "quotes", label: "הצעות מחיר וחתימה", built: false },
   { feature: "payment_links", label: "קישורי תשלום", built: false },
   { feature: "balances", label: "כרטסת לקוח", built: false },
@@ -33,7 +36,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
 /** The capabilities a plan includes, in list order, from its plans.features. */
 export function planCapabilities(features: unknown): PlanCapability[] {
   const flags = features && typeof features === "object" && !Array.isArray(features) ? (features as Record<string, unknown>) : {};
-  return PLAN_CAPABILITIES.filter((item) => flags[item.feature] === true);
+  return PLAN_CAPABILITIES.filter((item) => item.core === true || flags[item.feature] === true);
 }
 
 // The "עסקי" plan opens when these are built (owner, 13 October 2026). The lead
