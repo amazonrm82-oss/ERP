@@ -605,6 +605,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `deals.amount_source` (lines|first_year while `amount_auto`, null = typed or empty) and `recurring_amount_auto` (a recurring deal with lines fills its recurring amount
   from them until typed); statement triggers `deal_lines_recompute_*` call `app.deal_recompute_value`; `app.deal_amount_auto` is
   security definer since 0189. `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
+- Card layout (FLD-08, migration 0190): `public.card_layouts` (one row per org and type lead|contact|company|deal; `groups` =
+  [{title 1..60, columns 1|2, fields}] of built-in keys `app.card_layout_builtin_keys()` mirrored by `CARD_LAYOUT_BUILT_IN`
+  in `src/features/card-layout/layout.ts`, test 99, or `cf:<key>`; at most 20 groups / 60 fields; members read, owners/admins
+  of a writable org write; audited; no delete). Invoker trigger `app.card_layouts_check` (hint `card_layout:invalid`). No row =
+  the default order; details cards render through `LayoutDetails`; a field in no group shows in a final group; FLD-09 hidden
+  fields stay hidden. A new field on a details card is added to both key lists.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
@@ -760,6 +766,10 @@ that back.
   missing; `alter table … drop constraint if exists` passed); a function that must contain a `delete` goes
   into its own small migration file, which the owner pastes in the SQL Editor (fallback below). Never
   disguise the SQL to get past this check. After a timeout, check read-only what exists before retrying.
+- The connector decodes `\uXXXX` in the migration text (seen 14 October 2026, 0190): a regex written as `\u00a0` arrived
+  as the character itself. Prefer no `\u` escapes in SQL (use `chr()` or `U&'…'`); after every apply compare
+  `md5(pg_get_functiondef(...))` of the new functions with the local test database, and if they differ, re-apply the same
+  file (statements are safe to run twice) with the transport fixed, never a hand edit.
 - Changing a function's signature without `drop` (RPT-02, migration 0180): a `do` block that runs only while the old signature
   exists renames it (`<name>_<migration>_retired`), moves it into schema `app` and revokes every grant (service_role included),
   then `create or replace` makes the new signature (one function with defaults, never two overloads: test 07 keys functions by
