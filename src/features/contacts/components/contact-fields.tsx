@@ -4,6 +4,7 @@ import { RecordTypeField } from "@/features/record-type-options/components/type-
 import type { RecordType } from "@/features/record-type-options/schema";
 
 import { draftsFrom, type ChannelDraft, type ChannelKind, type StoredChannel } from "../channels";
+import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "../preferences";
 import { ChannelsEditor } from "./channels-editor";
 
 export type ContactValues = {
@@ -14,6 +15,9 @@ export type ContactValues = {
   job_title?: string | null;
   company_id?: string | null;
   birth_date?: string | null;
+  // CON-10
+  preferred_locale?: string | null;
+  preferred_channel?: string | null;
   // CON-02
   type_id?: string | null;
   // CON-01: the primary's types and the further phones and emails as stored ...
@@ -102,6 +106,37 @@ export function ContactFields({ values, errors, companies, types, legacyType }: 
       </div>
       <RecordTypeField types={types} value={values.type_id} legacy={legacyType} label="סוג איש קשר" error={errors.type_id} className="sm:max-w-xs" />
       <TextField label="יום הולדת" name="birth_date" type="date" defaultValue={values.birth_date ?? ""} error={errors.birth_date} className="sm:max-w-56" />
+      {/* CON-10: how the person likes to be addressed; shown on the card, nothing sends by it yet */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          key={`locale-${values.preferred_locale ?? ""}`}
+          label="שפה מועדפת"
+          name="preferred_locale"
+          defaultValue={values.preferred_locale ?? ""}
+          error={errors.preferred_locale}
+        >
+          <option value="">לא צוין</option>
+          {LOCALE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
+          key={`channel-${values.preferred_channel ?? ""}`}
+          label="ערוץ מועדף"
+          name="preferred_channel"
+          defaultValue={values.preferred_channel ?? ""}
+          error={errors.preferred_channel}
+        >
+          <option value="">לא צוין</option>
+          {CHANNEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+      </div>
       <p className="text-sm text-ink-soft">חובה למלא לפחות אחד: שם, טלפון או אימייל.</p>
     </>
   );

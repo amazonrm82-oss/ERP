@@ -810,7 +810,9 @@ export type ContactRow = {
   address_line: string | null;
   city: string | null;
   birth_date: string | null;
+  // CON-10: null or ContactLocale / ContactChannel (src/features/contacts/preferences.ts), check constraints
   preferred_locale: string | null;
+  preferred_channel: string | null;
   owner_id: string | null;
   team_id: string | null;
   tag_ids: string[];
@@ -908,7 +910,9 @@ export type ContactInsert = {
   address_line?: string | null;
   city?: string | null;
   birth_date?: string | null;
+  // CON-10
   preferred_locale?: string | null;
+  preferred_channel?: string | null;
   owner_id?: string | null;
   team_id?: string | null;
   tag_ids?: string[];

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { ListObject } from "@/features/list-columns/columns";
+import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "@/features/contacts/preferences";
 import { INDUSTRIES } from "@/features/onboarding/options";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
@@ -64,6 +65,9 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("city", "עיר", "city"),
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
       type,
+      // CON-10: stored codes, picked from the closed lists
+      { key: "locale", label: "שפה מועדפת", kind: "select", column: "preferred_locale", plain: true, options: [...LOCALE_OPTIONS] },
+      { key: "channel", label: "ערוץ מועדף", kind: "select", column: "preferred_channel", plain: true, options: [...CHANNEL_OPTIONS] },
       owner,
       tag,
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },

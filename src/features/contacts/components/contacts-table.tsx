@@ -12,6 +12,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import { contactDisplayName } from "../display";
+import { channelLabel, localeLabel } from "../preferences";
 import type { ContactListItem } from "../queries";
 
 type Props = {
@@ -101,6 +102,10 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
               return contact.companyName;
             case "type":
               return contact.typeName;
+            case "locale":
+              return localeLabel(contact.preferredLocale);
+            case "channel":
+              return channelLabel(contact.preferredChannel);
             case "owner":
               return (
                 <InlineEdit

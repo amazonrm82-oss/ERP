@@ -24,6 +24,7 @@ import { listCompanyOptions } from "@/features/companies/queries";
 import { trashContactAction } from "@/features/contacts/actions";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
 import { contactDisplayName } from "@/features/contacts/display";
+import { preferredContactChannel } from "@/features/contacts/preferences";
 import { getContact } from "@/features/contacts/queries";
 import { DomainLinkNote } from "@/features/company-domain/components/domain-link-note";
 import { getDomainLinkInfo } from "@/features/company-domain/queries";
@@ -126,6 +127,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
                 }
               : undefined
           }
+          preferred={preferredContactChannel(contact.preferred_channel)}
         />
         <div className="mt-2">
           <ShareSummary

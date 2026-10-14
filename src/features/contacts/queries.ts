@@ -24,6 +24,9 @@ export type ContactListItem = {
   // CON-02: the type from the list, else the older free-text type
   typeId: string | null;
   typeName: string | null;
+  // CON-10: stored codes (src/features/contacts/preferences.ts)
+  preferredLocale: string | null;
+  preferredChannel: string | null;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
@@ -55,6 +58,9 @@ export const CONTACT_SORT_COLUMNS = {
   company: "sort_company",
   // the type's position in the settings (CON-02)
   type: "sort_type",
+  // CON-10: by the stored code, so equal choices sit together
+  locale: "preferred_locale",
+  channel: "preferred_channel",
   owner: "sort_owner",
   created: "created_at",
   // DQL-01: computed field public.completeness(contacts)
@@ -75,7 +81,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, owner_id, created_at, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -128,6 +134,8 @@ export async function listContacts(
       companyName: row.company_id ? (companies.get(row.company_id) ?? null) : null,
       typeId: row.type_id,
       typeName: (row.type_id ? types.get(row.type_id) : null) ?? row.contact_type,
+      preferredLocale: row.preferred_locale,
+      preferredChannel: row.preferred_channel,
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
@@ -141,7 +149,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, preferred_locale, preferred_channel, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

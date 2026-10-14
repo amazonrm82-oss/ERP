@@ -2,6 +2,7 @@ import "server-only";
 
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
+import { channelLabel, localeLabel } from "@/features/contacts/preferences";
 import { DEAL_STATUS } from "@/features/deals/display";
 import { BILLING_KIND_LABELS, billingKindOf, recurringText } from "@/features/deals/recurring";
 import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getPipeline, listDeals } from "@/features/deals/queries";
@@ -133,6 +134,8 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             job_title: contact.jobTitle,
             company: contact.companyName,
             type: contact.typeName,
+            locale: localeLabel(contact.preferredLocale),
+            channel: channelLabel(contact.preferredChannel),
             owner: contact.ownerName,
             created: created(contact.createdAt),
             completeness: percent(scores?.get(contact.id)),

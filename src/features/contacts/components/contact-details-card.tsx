@@ -21,6 +21,7 @@ import { paths } from "@/lib/paths";
 
 import { updateContactAction } from "../actions";
 import { channelTypeLabel, draftsFrom, type ChannelKind } from "../channels";
+import { channelLabel, localeLabel } from "../preferences";
 import { ContactFields, type ContactValues } from "./contact-fields";
 
 export type ContactDetailsView = ContactValues & {
@@ -83,6 +84,8 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
           />
           <Detail label="סוג" value={contact.typeName ?? contact.contact_type} />
           <Detail label="יום הולדת" value={contact.birthDateText} />
+          <Detail label="שפה מועדפת" value={localeLabel(contact.preferred_locale)} />
+          <Detail label="ערוץ מועדף" value={channelLabel(contact.preferred_channel)} />
           <Detail label="מקור" value={contact.sourceName} />
           <Detail label="אחראי" value={contact.ownerName} />
           <Detail label="נוצר" value={contact.createdAtText} />

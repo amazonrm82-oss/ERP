@@ -38,6 +38,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "company", label: "חברה" },
       // CON-02
       { key: "type", label: "סוג" },
+      // CON-10
+      { key: "locale", label: "שפה מועדפת" },
+      { key: "channel", label: "ערוץ מועדף" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
       // DQL-01
