@@ -59,7 +59,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
     return fail(choice.message, { fieldErrors: { [field]: choice.message }, values: formValues(formData) });
   }
 
-  const custom = await customFieldsFromForm(orgId, "lead", formData);
+  const custom = await customFieldsFromForm(orgId, "lead", formData, undefined, ["builtin:status", "builtin:source"]);
   if (!custom.ok) {
     return custom;
   }
@@ -125,7 +125,7 @@ export async function updateLeadAction(
   }
   const campaignPatch = withCampaign && campaign.success ? campaignUpdate(campaign.data) : {};
 
-  const custom = await customFieldsFromForm(orgId, "lead", formData, leadId);
+  const custom = await customFieldsFromForm(orgId, "lead", formData, leadId, ["builtin:source"]);
   if (!custom.ok) {
     return custom;
   }

@@ -42,7 +42,7 @@ export function ContactForm({
       <FormError message={failure?.message} />
       {failure?.fieldErrors?.allow_duplicate ? <DuplicateNotice href={failure.fieldErrors.allow_duplicate} createLabel="ליצור איש קשר חדש בכל זאת" /> : null}
       <ContactFields values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} companies={companies} types={types} />
-      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} />
+      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={failure?.fieldErrors} objectType="contact" />
       <BillingSection subject="contact" values={failure?.values ?? {}} errors={failure?.fieldErrors ?? {}} priceLists={priceLists} fromCompanyHint />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצרים איש קשר…">יצירת איש קשר</SubmitButton>

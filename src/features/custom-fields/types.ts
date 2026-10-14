@@ -1,6 +1,8 @@
 import type { Json } from "@/lib/database.types";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import type { FieldCondition } from "./conditions";
+
 // Objects that carry custom fields (field_definitions.object_type).
 export const FIELD_OBJECTS = ["lead", "contact", "company", "deal"] as const;
 export type FieldObject = (typeof FIELD_OBJECTS)[number];
@@ -58,6 +60,8 @@ export type FieldDefinition = {
   isUnique?: boolean;
   isReadOnly?: boolean;
   defaultValue?: Json | null;
+  // FLD-09 (src/features/custom-fields/conditions.ts); absent = none
+  condition?: FieldCondition | null;
 };
 
 export function isFieldType(value: string): value is FieldType {

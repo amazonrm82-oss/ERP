@@ -107,7 +107,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
         />
       </div>
       <RecurringFields initial={{ kind: null, amount: "", start: "", renewal: "" }} submitted={failure?.values} errors={errors} />
-      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} />
+      <CustomFieldInputs definitions={fields} submitted={failure?.values} errors={errors} objectType="deal" />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="יוצרים עסקה…">יצירת עסקה</SubmitButton>
         <ButtonLink href={paths.deals(orgId)} variant="ghost">

@@ -63,7 +63,7 @@ export type DealDetailsView = {
   ownerName: string | null;
   createdAtText: string;
   // active custom fields and the values stored on the record
-  custom: { definitions: FieldDefinition[]; values: CustomValues };
+  custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
 };
 
 // lossReasons: the organization's active loss reasons (DEAL-03)
@@ -131,7 +131,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
           {deal.competitor || deal.status === "lost" ? <Detail label="מתחרה" value={deal.competitor} /> : null}
           <Detail label="אחראי" value={deal.ownerName} />
           <Detail label="נוצרה" value={deal.createdAtText} />
-          <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} />
+          <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} objectType="deal" builtins={deal.custom.builtins} />
         </DetailList>
       </CardBody>
     </Card>
@@ -231,7 +231,7 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
               error={errors.competitor}
             />
           )}
-          <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} />
+          <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} objectType="deal" builtins={deal.custom.builtins} />
           <div className="flex flex-wrap gap-2 pt-1">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

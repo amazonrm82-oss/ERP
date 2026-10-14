@@ -138,7 +138,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               ...company,
               createdAtText: formatDateTime(company.created_at),
               parent: family.parent,
-              custom: { definitions: fields, values: asCustomValues(company.custom_fields) },
+              custom: { definitions: fields, values: asCustomValues(company.custom_fields), builtins: { "builtin:type": company.type_id } },
             }}
           />
           {contactDomain ? (

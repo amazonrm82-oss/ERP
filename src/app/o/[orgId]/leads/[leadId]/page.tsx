@@ -207,7 +207,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
               createdAtText: formatDateTime(lead.created_at),
               lastContactText: lead.last_contacted_at ? formatDateTime(lead.last_contacted_at) : null,
-              custom: { definitions: fields, values: asCustomValues(lead.custom_fields) },
+              custom: { definitions: fields, values: asCustomValues(lead.custom_fields), builtins: { "builtin:status": lead.status_id, "builtin:source": lead.source_id } },
               attribution: attributionRows(lead),
               campaign: lead.campaign,
               budgetAgorot: lead.budget_agorot,

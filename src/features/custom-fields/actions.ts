@@ -13,9 +13,12 @@ import { paths } from "@/lib/paths";
 import type { Json } from "@/lib/database.types";
 import { pick } from "@/lib/validation";
 
+import { buildCondition, sameAsStored, type FieldCondition } from "./conditions";
+import { conditionBuiltinChoices } from "./condition-queries";
+import { listFieldDefinitions } from "./queries";
 import { createFieldSchema, updateFieldSchema } from "./schema";
 import { canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
-import { inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
+import { FIELD_OBJECTS, inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
 import { parseCustomFields } from "./values";
 
 function revalidateFields(orgId: string) {
@@ -143,7 +146,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   }
   const { data: field, error: fieldError } = await context.supabase
     .from("field_definitions")
-    .select("field_type, key")
+    .select("field_type, key, object_type")
     .eq("organization_id", orgId)
     .eq("id", fieldId)
     .maybeSingle();
@@ -182,9 +185,17 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   if (settingsProblem) {
     return fail(settingsProblem, { values: formValues(formData) });
   }
+  // FLD-09: the condition, when the form has its editor
+  const condition = await conditionFromForm(orgId, fieldId, field.object_type, formData);
+  if (!condition.ok) {
+    const values = formValues(formData);
+    values.condition_value = formData.getAll("condition_value").filter((v) => typeof v === "string").join("\n");
+    return fail(condition.message, { fieldErrors: { condition: condition.message }, values });
+  }
   const { data, error } = await context.supabase
     .from("field_definitions")
     .update({
+      ...(condition.changed ? { condition: condition.value } : {}),
       label: parsed.data.label,
       help_text: parsed.data.help_text,
       is_required: parsed.data.is_required,
@@ -204,6 +215,42 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   }
   revalidateFields(orgId);
   return { ok: true };
+}
+
+/**
+ * FLD-09: the condition the field's edit form sends (inputs condition_*), checked against the
+ * fields and lists of its record type; the database checks it again. Unchanged when the form has
+ * no editor, or when it repeats what is stored (a condition whose controlling field was hidden
+ * since then is kept, not re-checked, so other settings can still be saved).
+ */
+async function conditionFromForm(
+  orgId: string,
+  fieldId: string,
+  objectType: string,
+  formData: FormData,
+): Promise<{ ok: true; changed: boolean; value: FieldCondition | null } | { ok: false; message: string }> {
+  if (!formData.has("condition_effect") || !(FIELD_OBJECTS as readonly string[]).includes(objectType)) {
+    return { ok: true, changed: false, value: null };
+  }
+  const object = objectType as FieldObject;
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const input = {
+    effect: text("condition_effect"),
+    controller: text("condition_field"),
+    op: text("condition_op"),
+    choices: formData.getAll("condition_value").filter((v): v is string => typeof v === "string" && v !== ""),
+  };
+  const definitions = await listFieldDefinitions(orgId, object, { includeInactive: true });
+  const self = definitions.find((item) => item.id === fieldId);
+  if (!self) return { ok: false, message: NOT_FOUND_OR_FORBIDDEN };
+  if (sameAsStored(self.condition, input)) return { ok: true, changed: false, value: null };
+  const builtins = await conditionBuiltinChoices(orgId, object);
+  const built = buildCondition(self, definitions, object, builtins, input);
+  if (!built.ok) return built;
+  return { ok: true, changed: true, value: built.condition };
 }
 
 /** A hidden field disappears from forms and cards; the values already stored are kept. */

@@ -503,6 +503,7 @@ export type FieldDefinitionRow = {
   is_unique: boolean;
   is_read_only: boolean;
   default_value: Json | null;
+  condition: Json | null;
 };
 
 export type SavedViewRow = {
@@ -1425,6 +1426,7 @@ export type Database = {
           is_unique?: boolean;
           is_read_only?: boolean;
           default_value?: Json | null;
+          condition?: Json | null;
         }
       >;
       saved_views: Table<

@@ -77,7 +77,7 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
     return parsed.state;
   }
 
-  const custom = await customFieldsFromForm(orgId, "deal", formData);
+  const custom = await customFieldsFromForm(orgId, "deal", formData, undefined, ["builtin:stage"]);
   if (!custom.ok) {
     return custom;
   }

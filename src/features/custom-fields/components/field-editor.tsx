@@ -12,9 +12,11 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
+import { conditionReminder, describeCondition, type BuiltinChoices } from "../conditions";
 import { canBeUnique, canHaveDefault } from "../settings";
 import { FIELD_TYPE_LABELS, FIELD_TYPES, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
 import { displayCustomFields } from "../values";
+import { ConditionEditor } from "./condition-editor";
 import { CustomFieldInputs } from "./custom-field-inputs";
 
 const UNIQUE_HINT = "שתי רשומות לא יכולות לקבל אותו ערך. סל המחזור ושדה מוסתר לא נבדקים. ליד מטופס באתר נשמר תמיד, ומסומן אם הערך כבר קיים.";
@@ -93,7 +95,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
       </label>
       <SettingBoxes type={type as FieldType} unique={unique} onUnique={setUnique} readOnly={values?.is_read_only === "on"} />
       {errors.is_unique ? <p className="text-sm text-danger">{errors.is_unique}</p> : null}
-      <p className="text-sm text-ink-soft">ערך ברירת מחדל קובעים בכפתור &quot;עריכה&quot; של השדה, אחרי שמוסיפים אותו.</p>
+      <p className="text-sm text-ink-soft">ערך ברירת מחדל, ומתי השדה מופיע או חובה, קובעים בכפתור &quot;עריכה&quot; של השדה, אחרי שמוסיפים אותו.</p>
       <SubmitButton pendingText="מוסיפים…">הוספת שדה</SubmitButton>
     </form>
   );
@@ -101,19 +103,25 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
 
 type ListProps = {
   orgId: string;
+  objectType: FieldObject;
   fields: FieldDefinition[];
+  // FLD-09: the choices of the built-in fields a condition may depend on
+  builtins: BuiltinChoices;
   editable: boolean;
   // LEAD-06: the question before hiding a field that receives a lead field's value on conversion, by field id
   hideWarnings?: Record<string, string>;
 };
 
-export function FieldList({ orgId, fields, editable, hideWarnings = {} }: ListProps) {
+export function FieldList({ orgId, objectType, fields, builtins, editable, hideWarnings = {} }: ListProps) {
   return (
     <ol className="divide-y divide-line">
       {fields.map((field, index) => (
         <FieldRow
-          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.isUnique}-${field.isReadOnly}-${JSON.stringify(field.defaultValue ?? null)}-${field.options.join("|")}`}
+          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.isUnique}-${field.isReadOnly}-${JSON.stringify(field.defaultValue ?? null)}-${field.options.join("|")}-${JSON.stringify(field.condition ?? null)}`}
           orgId={orgId}
+          objectType={objectType}
+          fields={fields}
+          builtins={builtins}
           field={field}
           editable={editable}
           hideWarning={hideWarnings[field.id]}
@@ -125,10 +133,21 @@ export function FieldList({ orgId, fields, editable, hideWarnings = {} }: ListPr
   );
 }
 
-type RowProps = { orgId: string; field: FieldDefinition; editable: boolean; hideWarning?: string; isFirst: boolean; isLast: boolean };
+type RowProps = {
+  orgId: string;
+  objectType: FieldObject;
+  fields: FieldDefinition[];
+  builtins: BuiltinChoices;
+  field: FieldDefinition;
+  editable: boolean;
+  hideWarning?: string;
+  isFirst: boolean;
+  isLast: boolean;
+};
 
-function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowProps) {
+function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWarning, isFirst, isLast }: RowProps) {
   const [editing, setEditing] = useState(false);
+  const reminder = conditionReminder(field, fields, objectType, builtins);
 
   return (
     <li className="space-y-3 px-4 py-3.5 sm:px-5">
@@ -139,6 +158,7 @@ function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowP
           {field.isRequired ? <Badge tone="warning">חובה</Badge> : null}
           {field.isUnique ? <Badge>ייחודי</Badge> : null}
           {field.isReadOnly ? <Badge>קריאה בלבד</Badge> : null}
+          {field.condition ? <Badge>מותנה</Badge> : null}
           {field.isActive ? null : <Badge>מוסתר</Badge>}
         </p>
         {editable ? (
@@ -178,7 +198,9 @@ function FieldRow({ orgId, field, editable, hideWarning, isFirst, isLast }: RowP
           ברירת מחדל: <span dir="auto">{displayCustomFields([field], { [field.key]: field.defaultValue ?? null })[0].text}</span>
         </p>
       ) : null}
-      {editing ? <EditFieldForm orgId={orgId} field={field} onDone={() => setEditing(false)} /> : null}
+      {field.condition && !editing ? <p className="text-sm text-ink-soft">{describeCondition(field.condition, fields, objectType, builtins)}</p> : null}
+      {reminder ? <p className="text-sm text-warning">{reminder}</p> : null}
+      {editing ? <EditFieldForm orgId={orgId} objectType={objectType} fields={fields} builtins={builtins} field={field} onDone={() => setEditing(false)} /> : null}
     </li>
   );
 }
@@ -187,7 +209,9 @@ function hasDefault(field: FieldDefinition): boolean {
   return field.defaultValue !== null && field.defaultValue !== undefined;
 }
 
-function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDefinition; onDone: () => void }) {
+type EditProps = { orgId: string; objectType: FieldObject; fields: FieldDefinition[]; builtins: BuiltinChoices; field: FieldDefinition; onDone: () => void };
+
+function EditFieldForm({ orgId, objectType, fields, builtins, field, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateFieldAction(orgId, field.id, prev, formData);
     if (result?.ok) {
@@ -200,7 +224,14 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
   const errors = failure?.fieldErrors ?? {};
   const [unique, setUnique] = useState(values ? values.is_unique === "on" : field.isUnique === true);
   // the default is typed in the field's own input (a unique field has none)
-  const defaultInput: FieldDefinition = { ...field, label: "ערך ברירת מחדל (לא חובה)", isRequired: false, isReadOnly: false, helpText: "ממולא מראש ברשומה חדשה. מי שיוצר את הרשומה יכול לשנות אותו." };
+  const defaultInput: FieldDefinition = {
+    ...field,
+    label: "ערך ברירת מחדל (לא חובה)",
+    isRequired: false,
+    isReadOnly: false,
+    condition: null,
+    helpText: "ממולא מראש ברשומה חדשה. מי שיוצר את הרשומה יכול לשנות אותו.",
+  };
 
   return (
     <form action={formAction} className="space-y-3 rounded-md border border-line p-3" noValidate>
@@ -230,6 +261,7 @@ function EditFieldForm({ orgId, field, onDone }: { orgId: string; field: FieldDe
       {canHaveDefault(field.type) && !unique ? (
         <CustomFieldInputs definitions={[defaultInput]} stored={{ [field.key]: field.defaultValue ?? null }} submitted={values} errors={errors} />
       ) : null}
+      <ConditionEditor field={field} definitions={fields} objectType={objectType} builtins={builtins} submitted={values} error={errors.condition} />
       <div className="flex gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>
         <Button variant="ghost" size="sm" onClick={onDone}>

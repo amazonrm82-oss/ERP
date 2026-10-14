@@ -3,6 +3,7 @@ import "server-only";
 import { listMembers } from "@/features/settings/queries";
 import { createClient } from "@/lib/supabase/server";
 
+import { parseCondition } from "./conditions";
 import { isFieldType, type FieldDefinition, type FieldObject } from "./types";
 
 /** Custom field definitions of one object type, in order. Active ones only unless asked. */
@@ -14,7 +15,7 @@ export async function listFieldDefinitions(
   const supabase = await createClient();
   let query = supabase
     .from("field_definitions")
-    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value")
+    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition")
     .eq("organization_id", orgId)
     .eq("object_type", objectType);
   if (!options.includeInactive) {
@@ -38,6 +39,7 @@ export async function listFieldDefinitions(
       isUnique: row.is_unique,
       isReadOnly: row.is_read_only,
       defaultValue: row.default_value,
+      condition: parseCondition(row.condition),
     }));
   // a "user" field picks one of the business's members (FLD-01); a former member keeps their name
   if (definitions.some((field) => field.type === "user")) {

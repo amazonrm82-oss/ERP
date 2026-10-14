@@ -43,7 +43,7 @@ export type LeadDetailsView = {
   // LEAD-02: the last contact logged on the timeline, formatted on the server; null when none yet
   lastContactText: string | null;
   // active custom fields and the values stored on the record
-  custom: { definitions: FieldDefinition[]; values: CustomValues };
+  custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
   // CAP-02: campaign, UTM, pages and ad click ids the lead arrived with (first touch); only lines with a value
   attribution?: AttributionRow[];
   // LEAD-01: the editable part of it, plus the budget (agorot)
@@ -96,7 +96,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props
           <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
           <Detail label="נוצר" value={lead.createdAtText} />
           {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
-          <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} />
+          <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} objectType="lead" builtins={lead.custom.builtins} />
         </DetailList>
         {lead.message ? (
           <div className="mt-4 border-t border-line pt-4">
@@ -224,7 +224,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             errors={errors}
             readOnlyNote
           />
-          <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} />
+          <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} objectType="lead" builtins={lead.custom.builtins} />
           <div className="flex flex-wrap gap-2">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

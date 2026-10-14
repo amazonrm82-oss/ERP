@@ -309,6 +309,9 @@ export function customFieldMessage(error: unknown): string | null {
       return "לשדה ייחודי אין ערך ברירת מחדל, כי כל רשומה חדשה הייתה מקבלת אותו ערך.";
     case "custom_field:default":
       return "ערך ברירת המחדל אינו מתאים לסוג השדה או לאפשרויות שלו. אם הסרתם אפשרות, בחרו ברירת מחדל אחרת קודם.";
+    // FLD-09 (migration conditional_fields)
+    case "custom_field:condition":
+      return "אי אפשר לשמור את התנאי: השדה הקובע צריך להיות שדה פעיל אחר, בלי תנאי משלו, והערך צריך להתאים לו. רעננו את הדף ונסו שוב.";
     default:
       return null;
   }

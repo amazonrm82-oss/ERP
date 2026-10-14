@@ -34,7 +34,7 @@ export type CompanyDetailsView = CompanyValues & {
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
   // active custom fields and the values stored on the record
-  custom: { definitions: FieldDefinition[]; values: CustomValues };
+  custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
   // CON-07
   parent: CompanyParent | null;
 };
@@ -117,7 +117,7 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit, focus }: Pr
           <Detail label="כתובת" value={company.address_line} />
           <Detail label="אחראי" value={company.ownerName} />
           <Detail label="נוצר" value={company.createdAtText} />
-          <CustomFieldDetails definitions={company.custom.definitions} values={company.custom.values} />
+          <CustomFieldDetails definitions={company.custom.definitions} values={company.custom.values} objectType="company" builtins={company.custom.builtins} />
         </DetailList>
       </CardBody>
     </Card>
@@ -151,6 +151,8 @@ function CompanyEditForm({ orgId, company, types, onDone }: { orgId: string; com
           <CustomFieldInputs
             definitions={company.custom.definitions}
             stored={company.custom.values}
+            objectType="company"
+            builtins={company.custom.builtins}
             submitted={failure?.values}
             errors={failure?.fieldErrors}
           />

@@ -107,7 +107,7 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
     return parsed.failure;
   }
 
-  const custom = await customFieldsFromForm(orgId, "contact", formData);
+  const custom = await customFieldsFromForm(orgId, "contact", formData, undefined, ["builtin:type"]);
   if (!custom.ok) {
     return custom;
   }
@@ -169,7 +169,7 @@ export async function updateContactAction(
     return parsed.failure;
   }
 
-  const custom = await customFieldsFromForm(orgId, "contact", formData, contactId);
+  const custom = await customFieldsFromForm(orgId, "contact", formData, contactId, ["builtin:type"]);
   if (!custom.ok) {
     return custom;
   }

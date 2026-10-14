@@ -37,7 +37,7 @@ export type ContactDetailsView = ContactValues & {
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
   // active custom fields and the values stored on the record
-  custom: { definitions: FieldDefinition[]; values: CustomValues };
+  custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
 };
 
 type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; canEdit: boolean; focus?: string | null };
@@ -89,7 +89,7 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
           <Detail label="מקור" value={contact.sourceName} />
           <Detail label="אחראי" value={contact.ownerName} />
           <Detail label="נוצר" value={contact.createdAtText} />
-          <CustomFieldDetails definitions={contact.custom.definitions} values={contact.custom.values} />
+          <CustomFieldDetails definitions={contact.custom.definitions} values={contact.custom.values} objectType="contact" builtins={contact.custom.builtins} />
         </DetailList>
       </CardBody>
     </Card>
@@ -122,6 +122,8 @@ function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps
           <CustomFieldInputs
             definitions={contact.custom.definitions}
             stored={contact.custom.values}
+            objectType="contact"
+            builtins={contact.custom.builtins}
             submitted={failure?.values}
             errors={failure?.fieldErrors}
           />

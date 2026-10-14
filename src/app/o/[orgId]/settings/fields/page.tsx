@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PencilIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { hideWarningsFor } from "@/features/conversion-map/queries";
+import { conditionBuiltinChoices } from "@/features/custom-fields/condition-queries";
 import { CreateFieldForm, FieldList } from "@/features/custom-fields/components/field-editor";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { FIELD_OBJECT_LABELS, FIELD_OBJECTS, type FieldObject } from "@/features/custom-fields/types";
@@ -27,10 +28,12 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
   const requested = firstParam((await searchParams).object);
   const objectType: FieldObject = (FIELD_OBJECTS as readonly string[]).includes(requested) ? (requested as FieldObject) : "lead";
   const editable = isAdminRole(role) && canWrite;
-  const [fields, hideWarnings] = await Promise.all([
+  const [fields, hideWarnings, builtins] = await Promise.all([
     listFieldDefinitions(orgId, objectType, { includeInactive: true }),
     // LEAD-06: hiding a field a lead field's value goes to asks first
     editable && (objectType === "contact" || objectType === "deal") ? hideWarningsFor(orgId, objectType) : Promise.resolve({}),
+    // FLD-09: the lists a condition may depend on (statuses, sources, stages, types)
+    conditionBuiltinChoices(orgId, objectType),
   ]);
 
   return (
@@ -59,7 +62,7 @@ export default async function FieldsSettingsPage({ params, searchParams }: Props
         {fields.length === 0 ? (
           <EmptyState icon={<PencilIcon />} title="עוד אין שדות" description="שדה חדש מוסיפים בטופס שלמטה." />
         ) : (
-          <FieldList orgId={orgId} fields={fields} editable={editable} hideWarnings={hideWarnings} />
+          <FieldList orgId={orgId} objectType={objectType} fields={fields} builtins={builtins} editable={editable} hideWarnings={hideWarnings} />
         )}
       </Card>
 

@@ -242,7 +242,7 @@ export default async function DealPage({ params, searchParams }: Props) {
               closedAtText: deal.closed_at ? formatDate(zoneDate(new Date(deal.closed_at), context.org.timeZone)) : null,
               ownerName: deal.ownerName,
               createdAtText: formatDateTime(deal.created_at),
-              custom: { definitions: fields, values: asCustomValues(deal.custom_fields) },
+              custom: { definitions: fields, values: asCustomValues(deal.custom_fields), builtins: { "builtin:stage": deal.stage_id } },
             }}
           />
 

@@ -173,7 +173,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
               ...contact,
               createdAtText: formatDateTime(contact.created_at),
               birthDateText: contact.birth_date ? formatDate(contact.birth_date) : null,
-              custom: { definitions: fields, values: asCustomValues(contact.custom_fields) },
+              custom: { definitions: fields, values: asCustomValues(contact.custom_fields), builtins: { "builtin:type": contact.type_id } },
             }}
           />
 
