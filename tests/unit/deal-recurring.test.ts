@@ -12,6 +12,7 @@ import {
   firstYearValue,
   LINES_NOTE,
   linesValueNote,
+  ownPeriodSums,
   recurringFormSchema,
   recurringSchema,
   recurringText,
@@ -133,6 +134,11 @@ type Fixture = {
   insert: boolean;
   // DLI-03 cases also carry the lines' sum and the old recurring state, and expect the source and the recurring amount
   lines?: number | null;
+  // DLI-04 cases carry the lines' sums per billing mode instead
+  lines_once?: number | null;
+  lines_monthly?: number | null;
+  lines_quarterly?: number | null;
+  lines_yearly?: number | null;
   old_recurring?: number | null;
   old_recurring_auto?: boolean | null;
   old_source?: string | null;
@@ -161,6 +167,10 @@ describe("deal value and first-year value (mirror of app.deal_value)", () => {
       oldAuto: f.old_auto,
       insert: f.insert,
       lines: f.lines ?? null,
+      lineSums:
+        "lines_once" in f || "lines_monthly" in f || "lines_quarterly" in f || "lines_yearly" in f
+          ? { once: f.lines_once ?? null, monthly: f.lines_monthly ?? null, quarterly: f.lines_quarterly ?? null, yearly: f.lines_yearly ?? null }
+          : null,
       oldRecurring: f.old_recurring ?? null,
       oldRecurringAuto: f.old_recurring_auto ?? null,
       oldSource: f.old_source ?? null,
@@ -194,6 +204,27 @@ describe("deal value and first-year value (mirror of app.deal_value)", () => {
     }
   });
 
+  it("the fixtures cover every DLI-04 case the owner named", () => {
+    const names = FIXTURES.map((f) => f.name).join("\n");
+    for (const part of [
+      "one-time deal with a monthly line",
+      "monthly deal, mixed lines",
+      "a yearly line counts /12",
+      "a quarterly line counts /3",
+      "yearly deal, monthly x12 and quarterly x4",
+      "recurring lines gone, one-time left: keeps the last recurring amount",
+      "a typed value wins over mixed lines",
+    ]) {
+      expect(names, part).toContain(part);
+    }
+  });
+
+  it("DLI-03's single sum is lines billed in the deal's own period", () => {
+    expect(ownPeriodSums(null, 500)).toEqual({ once: 500, monthly: null, quarterly: null, yearly: null });
+    expect(ownPeriodSums("monthly", 500)).toEqual({ once: null, monthly: 500, quarterly: null, yearly: null });
+    expect(ownPeriodSums("yearly", null)).toEqual({ once: null, monthly: null, quarterly: null, yearly: null });
+  });
+
   it("an empty value field is sent as null; a typed one as typed", () => {
     expect(typedDealValue("", 0)).toBeNull();
     expect(typedDealValue("  ", 0)).toBeNull();
@@ -222,12 +253,15 @@ describe("deal value from product lines (DLI-03)", () => {
   });
 
   it("the lines card says what the value does with the lines", () => {
-    expect(linesValueNote({ kind: null, auto: true, source: "lines", recurringAuto: false })).toBe('שווי העסקה מחושב מסכום השורות לפני מע"מ.');
+    expect(linesValueNote({ kind: null, auto: true, source: "lines", recurringAuto: false })).toBe(
+      'שווי העסקה מחושב מסכום השורות לפני מע"מ. שורה בחיוב חוזר נספרת לפי שנה ראשונה.',
+    );
     expect(linesValueNote({ kind: null, auto: false, source: null, recurringAuto: false })).toContain("הוקלד ביד");
     expect(linesValueNote({ kind: "monthly", auto: true, source: "lines", recurringAuto: true })).toBe(
-      'הסכום החודשי מחושב מסכום השורות לפני מע"מ. שווי העסקה לפי שנה ראשונה.',
+      'הסכום החודשי מחושב מהשורות בחיוב חוזר, לפני מע"מ. שווי העסקה: שנה ראשונה ועוד השורות החד-פעמיות.',
     );
     expect(linesValueNote({ kind: "yearly", auto: true, source: "first_year", recurringAuto: false })).toContain("הסכום השנתי הוקלד ביד");
+    expect(linesValueNote({ kind: "yearly", auto: true, source: "first_year", recurringAuto: false })).toContain("החד-פעמיות");
     expect(linesValueNote({ kind: "monthly", auto: false, source: null, recurringAuto: true })).toContain("שווי העסקה הוקלד ביד");
   });
 

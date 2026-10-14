@@ -13,7 +13,9 @@ import { formatMoney, parseMoneyToAgorot } from "@/lib/format";
 // deals.amount_auto (true = the value is computed) and deals.amount_source (DLI-03: "lines",
 // the before-VAT sum of the product lines, or "first_year", 12 x monthly or the yearly amount),
 // and fills recurring_amount_agorot from the lines while nobody typed it (recurring_amount_auto).
-// dealValueRule() below mirrors app.deal_amount_rule(); tests/unit/fixtures/deal-value.json is
+// DLI-04: every line has a billing mode; the recurring amount comes from the recurring lines only,
+// converted to the deal's period, and the value is their first year plus the one-time lines.
+// dealValueRule() below mirrors app.deal_value_rule(); tests/unit/fixtures/deal-value.json is
 // checked against both. The app sends amount_agorot = null for an empty value field.
 
 export const BILLING_KINDS = ["one_time", "monthly", "yearly"] as const;
@@ -86,6 +88,27 @@ export function firstYearValue(kind: string | null, recurringAgorot: number | nu
 
 export type DealValueSource = "lines" | "first_year";
 
+/** DLI-04: the before-VAT sums of a deal's lines per billing mode; null = no line of that mode. */
+export type LineSums = { once: number | null; monthly: number | null; quarterly: number | null; yearly: number | null };
+
+const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+
+/** DLI-03's single sum as DLI-04 sums: lines billed in the deal's own period (once on a one-time deal). */
+export function ownPeriodSums(kind: string | null, lines: number | null): LineSums {
+  return {
+    once: kind === null ? lines : null,
+    monthly: kind === "monthly" ? lines : null,
+    quarterly: null,
+    yearly: kind === "yearly" ? lines : null,
+  };
+}
+
+/** Half up division of a non-negative integer (the amounts are never negative). */
+function divideHalfUp(value: number, by: number): number {
+  const whole = Math.floor(value / by);
+  return value - whole * by >= by / 2 ? whole + 1 : whole;
+}
+
 export type DealValueInput = {
   kind: string | null;
   recurring: number | null;
@@ -94,8 +117,11 @@ export type DealValueInput = {
   oldAmount: number | null;
   oldAuto: boolean | null;
   insert: boolean;
-  // DLI-03: the before-VAT sum of the deal's product lines (dealLinesNet()); null = no lines
+  // DLI-03: the before-VAT sum of the deal's product lines, all billed in the deal's own period
+  // (the meaning of app.deal_amount_rule()); null = no lines. Ignored when lineSums is given.
   lines?: number | null;
+  // DLI-04: the before-VAT sums per billing mode (dealLinesSums(), app.deal_lines_sums); null = no such line
+  lineSums?: LineSums | null;
   oldRecurring?: number | null;
   oldRecurringAuto?: boolean | null;
   oldSource?: string | null;
@@ -111,38 +137,49 @@ export type DealValueResult =
   | { error: "deal:amount_too_big" };
 
 /**
- * Mirror of app.deal_amount_rule() (migrations deal_recurring, deal_value_from_lines): the stored
- * value, its flag and source, and the recurring amount. Owner's order (DLI-03): a typed value; the
- * lines' sum (before VAT); a recurring deal's first year; empty (0).
- * - The recurring amount (recurring deal only) follows the lines when sent empty, or unchanged
- *   while it was following; with no lines it keeps what it had (0 when empty). Else kept as typed.
- * - Computed: a recurring deal, the first year of its recurring amount (source "lines" while that
- *   amount follows existing lines, else "first_year"); a one-time deal with lines, their sum.
+ * Mirror of app.deal_value_rule() (migrations deal_recurring, deal_value_from_lines, deal_line_billing): the
+ * stored value, its flag and source, and the recurring amount. Owner's order (DLI-03): a typed value; the
+ * lines (before VAT); a recurring deal's first year; empty (0). DLI-04: with R = the first year of the
+ * recurring lines (12 x monthly + 4 x quarterly + yearly):
+ * - The recurring amount (recurring deal only) follows the recurring lines when sent empty, or unchanged
+ *   while it was following: R / 12 half up on a monthly deal, R on a yearly one; with no recurring lines
+ *   it keeps what it had (0 when empty). Else kept as typed.
+ * - Computed: a recurring deal, the first year of its recurring amount plus the one-time lines (source
+ *   "lines" when a line takes part, else "first_year"); a one-time deal with lines, R plus the one-time lines.
  * - The value follows it when sent empty, or unchanged while computed; an unchanged 0 nobody
  *   computed follows the lines too ("0 is empty"). An unchanged value computed from lines with
  *   nothing left to compute becomes empty. Anything else is kept, flag off; a typed value turns
  *   the flag off even when it equals the computed one.
  */
 export function dealValueRule(input: DealValueInput): DealValueResult {
-  const lines = input.lines ?? null;
+  const sums = input.lineSums ?? ownPeriodSums(input.kind, input.lines ?? null);
+  const hasRecurring = sums.monthly !== null || sums.quarterly !== null || sums.yearly !== null;
+  const hasLines = hasRecurring || sums.once !== null;
+  let year: number | null = null;
+  if (hasRecurring) {
+    year = 12 * (sums.monthly ?? 0) + 4 * (sums.quarterly ?? 0) + (sums.yearly ?? 0);
+    if (!Number.isSafeInteger(year) || year > MAX_SAFE) return { error: "deal:amount_too_big" };
+  }
+
   let recurring = input.recurring;
   let recurringAuto: true | null = null;
   if (
     input.kind !== null &&
     (input.recurring === null || (!input.insert && input.recurring === (input.oldRecurring ?? null) && input.oldRecurringAuto === true))
   ) {
-    recurring = lines ?? input.recurring ?? 0;
+    recurring = year !== null ? (input.kind === "monthly" ? divideHalfUp(year, 12) : year) : (input.recurring ?? 0);
     recurringAuto = true;
   }
 
   let computed: number | null = null;
   let source: DealValueSource | null = null;
   if (input.kind !== null) {
-    // an amount waiting for lines (following, none yet, 0) is nothing to compute from: empty
-    computed = recurringAuto === true && lines === null && recurring === 0 ? null : firstYearValue(input.kind, recurring);
-    source = recurringAuto === true && lines !== null ? "lines" : "first_year";
-  } else if (lines !== null) {
-    computed = lines;
+    // an amount waiting for lines (following, no recurring lines, 0) is nothing to compute from
+    const firstYear = recurringAuto === true && !hasRecurring && recurring === 0 ? null : firstYearValue(input.kind, recurring);
+    if (firstYear !== null || sums.once !== null) computed = (firstYear ?? 0) + (sums.once ?? 0);
+    source = (recurringAuto === true && hasRecurring) || sums.once !== null ? "lines" : "first_year";
+  } else if (hasLines) {
+    computed = (year ?? 0) + (sums.once ?? 0);
     source = "lines";
   }
 
@@ -150,7 +187,7 @@ export function dealValueRule(input: DealValueInput): DealValueResult {
   const follows =
     input.amount === null ||
     (unchanged && input.oldAuto === true && computed !== null) ||
-    (unchanged && input.amount === 0 && input.oldAuto !== true && lines !== null && computed !== null);
+    (unchanged && input.amount === 0 && input.oldAuto !== true && hasLines && computed !== null);
   if (follows) {
     if (computed === null) return { amount: 0, auto: null, source: null, recurring, recurringAuto };
     if (!Number.isSafeInteger(computed)) return { error: "deal:amount_too_big" };
@@ -188,21 +225,26 @@ export function dealValueNote(auto: boolean | null | undefined, source: string |
 }
 
 /**
- * DLI-03: what the deal value does with the product lines, for the lines card. A recurring deal's
- * recurring amount follows the lines while nobody typed it; the value follows the lines (or the
- * first year of that amount) while nobody typed it.
+ * DLI-03, DLI-04: what the deal value does with the product lines, for the lines card. A recurring deal's
+ * recurring amount follows its recurring lines while nobody typed it; the value is the first year of that
+ * amount plus the one-time lines (a one-time deal: the first year of its recurring lines plus the rest),
+ * while nobody typed it.
  */
 export function linesValueNote(deal: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean }): string {
   const typed = "שווי העסקה הוקלד ביד ולא משתנה לפי השורות. כדי לחשב אותו מהשורות, מרוקנים את השווי בפרטי העסקה.";
+  const value = "שווי העסקה: שנה ראשונה ועוד השורות החד-פעמיות.";
   if (deal.kind === "monthly" || deal.kind === "yearly") {
     const per = deal.kind === "monthly" ? "הסכום החודשי" : "הסכום השנתי";
     if (!deal.recurringAuto) {
-      return `${per} הוקלד ביד ולא משתנה לפי השורות. כדי לחשב אותו מהשורות, מרוקנים אותו בפרטי העסקה.`;
+      const own = `${per} הוקלד ביד ולא משתנה לפי השורות. כדי לחשב אותו מהשורות, מרוקנים אותו בפרטי העסקה.`;
+      return deal.auto ? `${own} ${value}` : own;
     }
-    const recurring = `${per} מחושב מסכום השורות לפני מע"מ.`;
-    return deal.auto ? `${recurring} שווי העסקה לפי שנה ראשונה.` : `${recurring} ${typed}`;
+    const recurring = `${per} מחושב מהשורות בחיוב חוזר, לפני מע"מ.`;
+    return deal.auto ? `${recurring} ${value}` : `${recurring} ${typed}`;
   }
-  return deal.auto && deal.source === "lines" ? 'שווי העסקה מחושב מסכום השורות לפני מע"מ.' : typed;
+  return deal.auto && deal.source === "lines"
+    ? 'שווי העסקה מחושב מסכום השורות לפני מע"מ. שורה בחיוב חוזר נספרת לפי שנה ראשונה.'
+    : typed;
 }
 
 /** The value field's hint in the deal form, by what the value follows now. */

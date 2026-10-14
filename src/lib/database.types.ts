@@ -1114,6 +1114,9 @@ export type DealLineRow = {
   price_list_id: string | null;
   price_list_name: string | null;
   currency: string;
+  // DLI-04: one_time | monthly | quarterly | yearly (trigger deal_lines_billing: a product line's is its
+  // product's; a free line's the person's); null = saved before DLI-04, counts in the deal's own period
+  billing: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1694,6 +1697,8 @@ export type Database = {
           price_source?: string;
           price_list_id?: string | null;
           currency?: string;
+          // a free line only; a product line's comes from the product (trigger deal_lines_billing)
+          billing?: string | null;
         },
         {
           position?: number;
@@ -1706,6 +1711,7 @@ export type Database = {
           price_source?: string;
           price_list_id?: string | null;
           currency?: string;
+          billing?: string | null;
         }
       >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;

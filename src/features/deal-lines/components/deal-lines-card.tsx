@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,15 +10,15 @@ import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
 import { linesValueNote, monthlyRecurringAgorot } from "@/features/deals/recurring";
-import type { Billing } from "@/features/products/schema";
 import { documentVatRateBp } from "@/features/tax/calc";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
 import { formatMoney, formatNumber } from "@/lib/format";
+import { paths } from "@/lib/paths";
 
 import { deleteDealLineAction, moveDealLineAction } from "../actions";
 import { dealLinesTotals } from "../pricing";
 import type { DealLine } from "../queries";
-import { lineBillingText, linesBillingNotice } from "../recurring";
+import { lineBillingText, MAKE_RECURRING_LABEL, makeRecurringOffer } from "../recurring";
 import { DEAL_LINES_MAX, priceSourceText } from "../schema";
 import { DealLineForm } from "./deal-line-form";
 
@@ -42,8 +42,6 @@ type Props = {
   // DLI-03: what the deal value follows (deals.amount_auto, amount_source, recurring_amount_auto)
   // DLI-04: the deal's recurring amount as shown (null = one-time or empty)
   dealValue: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean; recurringAgorot: number | null };
-  // DLI-04: how each product on the lines bills (products.billing), by product id; display only
-  billings: Record<string, Billing>;
 };
 
 function discountText(line: DealLine): string | null {
@@ -57,7 +55,7 @@ function discountText(line: DealLine): string | null {
  * discount and amount, and the totals with VAT under them by the one totals rule (TAX-05). DLI-03: the
  * deal's value follows their sum before VAT unless a person typed it; the card says which.
  */
-export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue, billings }: Props) {
+export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue }: Props) {
   const [editing, setEditing] = useState<DealLine | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -79,9 +77,10 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
   const vatMissing = documentVatError(pricing.vat);
   // DLI-04: the monthly recurring revenue the lines make (a recurring amount that follows them)
   const monthly = dealValue.recurringAuto ? monthlyRecurringAgorot(dealValue.kind, dealValue.recurringAgorot) : null;
-  const billingNotice = linesBillingNotice(
+  // DLI-04: a one-time deal with a recurring line: the offer to make it recurring (never done by itself)
+  const recurringOffer = makeRecurringOffer(
     dealValue.kind,
-    lines.map((line) => (line.productId ? billings[line.productId] : null)),
+    lines.map((line) => line.billing),
   );
 
   function move(line: DealLine, direction: -1 | 1) {
@@ -132,7 +131,7 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
                       <span className="tabular-nums">{formatMoney(line.unitPriceAgorot)}</span>
                       {discount ? `, ${discount}` : ""}
                       {line.vatExempt && pricing.vat.kind !== "none" ? ', פטור ממע"מ' : ""}
-                      {line.productId ? lineBillingText(billings[line.productId]) : ""}
+                      {lineBillingText(line.billing)}
                     </p>
                     {line.productId ? <p className="text-sm text-ink-soft">{priceSourceText(line.source, line.priceListName)}</p> : null}
                   </div>
@@ -197,10 +196,15 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
             <span className="font-semibold tabular-nums">{formatMoney(monthly)}</span>
           </p>
         ) : null}
-        {lines.length > 0 && billingNotice ? (
-          <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-            {billingNotice}
-          </p>
+        {lines.length > 0 && recurringOffer ? (
+          <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+            <p className="min-w-0 flex-1">{recurringOffer}</p>
+            {canEdit ? (
+              <ButtonLink href={`${paths.deal(orgId, dealId)}?edit=billing_kind`} variant="secondary" size="sm" className="print:hidden">
+                {MAKE_RECURRING_LABEL}
+              </ButtonLink>
+            ) : null}
+          </div>
         ) : null}
         {lines.length > 0 && vatMissing ? <p className="text-sm text-ink-soft">{vatMissing}</p> : null}
         {lines.length > 0 ? (
@@ -228,6 +232,7 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
               line={editing === "new" ? null : editing}
               features={features}
               canCreateProducts={canCreateProducts}
+              dealKind={dealValue.kind}
               onDone={close}
               onCancel={close}
             />

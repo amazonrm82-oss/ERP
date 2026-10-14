@@ -32,10 +32,12 @@ export type DealLine = {
   source: DealLineSource;
   priceListId: string | null;
   priceListName: string | null;
+  // DLI-04: how the line bills; null = saved before DLI-04 (counts in the deal's own period)
+  billing: Billing | null;
 };
 
 const LINE_COLUMNS =
-  "id, position, product_id, description, quantity, unit_price_agorot, discount_bp, discount_agorot, total_agorot, price_includes_vat, vat_exempt, price_source, price_list_id, price_list_name";
+  "id, position, product_id, description, quantity, unit_price_agorot, discount_bp, discount_agorot, total_agorot, price_includes_vat, vat_exempt, price_source, price_list_id, price_list_name, billing";
 
 type LineRow = {
   id: string;
@@ -52,6 +54,7 @@ type LineRow = {
   price_source: string;
   price_list_id: string | null;
   price_list_name: string | null;
+  billing: string | null;
 };
 
 function toLine(row: LineRow): DealLine {
@@ -71,6 +74,8 @@ function toLine(row: LineRow): DealLine {
     source: isDealLineSource(row.price_source) ? row.price_source : "manual",
     priceListId: row.price_list_id,
     priceListName: row.price_list_name,
+    // the check constraint holds billing to the four modes
+    billing: isBilling(row.billing) ? row.billing : null,
   };
 }
 
@@ -92,23 +97,6 @@ export async function readDealLines(supabase: Client, orgId: string, dealId: str
 
 export async function listDealLines(orgId: string, dealId: string): Promise<DealLine[]> {
   return readDealLines(await createClient(), orgId, dealId);
-}
-
-/**
- * DLI-04: how the products on these lines bill (products.billing), by product id. Display only: a
- * line stores no billing of its own. Read with the user's session (members read products); at most
- * 200 lines per deal, so one read.
- */
-export async function listLineProductBillings(orgId: string, lines: DealLine[]): Promise<Record<string, Billing>> {
-  const ids = [...new Set(lines.map((line) => line.productId).filter((id): id is string => id !== null))];
-  if (ids.length === 0) return {};
-  const supabase = await createClient();
-  const rows = must(await supabase.from("products").select("id, billing").eq("organization_id", orgId).in("id", ids), "products");
-  const out: Record<string, Billing> = {};
-  for (const row of rows) {
-    if (isBilling(row.billing)) out[row.id] = row.billing;
-  }
-  return out;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { lineBillingText, linesBillingNotice } from "@/features/deal-lines/recurring";
+import { dealLinesSums } from "@/features/deal-lines/pricing";
+import { lineBillingText, MAKE_RECURRING_LABEL, makeRecurringOffer, ownBilling } from "@/features/deal-lines/recurring";
 import { monthlyRecurringAgorot, recurringText } from "@/features/deals/recurring";
 
 // DLI-04: monthly recurring revenue of a deal and how product lines bill.
@@ -46,36 +47,67 @@ describe("lineBillingText", () => {
   });
 });
 
-describe("linesBillingNotice", () => {
-  it("says nothing when every product line fits the deal's kind", () => {
-    expect(linesBillingNotice("monthly", ["monthly", "monthly", null])).toBeNull();
-    expect(linesBillingNotice("yearly", ["yearly"])).toBeNull();
-    expect(linesBillingNotice(null, ["one_time", null])).toBeNull();
-    expect(linesBillingNotice("monthly", [])).toBeNull();
-    expect(linesBillingNotice("monthly", [null, undefined])).toBeNull();
+describe("makeRecurringOffer (DLI-04)", () => {
+  it("a recurring deal never warns: each line counts by its own mode", () => {
+    expect(makeRecurringOffer("monthly", ["monthly", "one_time", "yearly", null])).toBeNull();
+    expect(makeRecurringOffer("yearly", ["quarterly", "monthly"])).toBeNull();
   });
 
-  it("warns that a recurring deal counts every line per period", () => {
-    const one = linesBillingNotice("monthly", ["monthly", "one_time"]) ?? "";
-    expect(one).toContain("בעסקה חודשית");
-    expect(one).toContain("לחודש");
-    expect(one).toContain("חד-פעמי");
+  it("a one-time deal with only one-time lines (or lines saved before DLI-04) has nothing to offer", () => {
+    expect(makeRecurringOffer(null, ["one_time", null])).toBeNull();
+    expect(makeRecurringOffer(null, [])).toBeNull();
+    expect(makeRecurringOffer(null, [undefined])).toBeNull();
+  });
+
+  it("a one-time deal with a recurring line offers to make it recurring and says how the line counts now", () => {
+    const one = makeRecurringOffer(null, ["monthly", "one_time"]) ?? "";
+    expect(one).toContain("חודשי");
     expect(one).toContain("שורה אחת");
-    const many = linesBillingNotice("yearly", ["quarterly", "monthly", "monthly"]) ?? "";
-    expect(many).toContain("בעסקה שנתית");
+    expect(one).toContain("שנה ראשונה");
+    expect(one).toContain("חוזרת");
+    const many = makeRecurringOffer("one_time", ["quarterly", "monthly", "monthly"]) ?? "";
     expect(many).toContain("3 שורות");
     expect(many).toContain("רבעוני, חודשי");
-  });
-
-  it("warns that a one-time deal counts recurring products once", () => {
-    const text = linesBillingNotice(null, ["monthly", "one_time"]) ?? "";
-    expect(text).toContain("חד-פעמית");
-    expect(text).toContain("חודשי");
-    expect(text).toContain("שורה אחת");
-    expect(linesBillingNotice("one_time", ["yearly"])).not.toBeNull();
+    expect(MAKE_RECURRING_LABEL).toBe("להפוך לעסקה חוזרת");
   });
 
   it("ignores values that are not a billing", () => {
-    expect(linesBillingNotice("monthly", ["weekly" as never])).toBeNull();
+    expect(makeRecurringOffer(null, ["weekly" as never])).toBeNull();
+  });
+});
+
+describe("ownBilling", () => {
+  it("a line saved before DLI-04 counts in the deal's own period", () => {
+    expect(ownBilling("monthly")).toBe("monthly");
+    expect(ownBilling("yearly")).toBe("yearly");
+    expect(ownBilling(null)).toBe("one_time");
+  });
+});
+
+describe("dealLinesSums (mirror of app.deal_lines_sums)", () => {
+  const line = (unit: number, billing: "one_time" | "monthly" | "quarterly" | "yearly" | null) => ({
+    quantity: 1,
+    unitPriceAgorot: unit,
+    discountBp: null,
+    discountAgorot: null,
+    vatExempt: false,
+    billing,
+  });
+  it("sums per mode; a mode without lines is null", () => {
+    expect(dealLinesSums([line(100, "monthly"), line(200, "monthly"), line(50, "one_time")], null, 0, false)).toEqual({
+      once: 50,
+      monthly: 300,
+      quarterly: null,
+      yearly: null,
+    });
+    expect(dealLinesSums([], "monthly", 0, false)).toEqual({ once: null, monthly: null, quarterly: null, yearly: null });
+  });
+  it("a line saved before DLI-04 counts in the deal's own period", () => {
+    expect(dealLinesSums([line(100, null)], "yearly", 0, false).yearly).toBe(100);
+    expect(dealLinesSums([line(100, null)], null, 0, false).once).toBe(100);
+  });
+  it("prices including VAT are carried back per mode group", () => {
+    // 11800 including 18% = 10000 before VAT
+    expect(dealLinesSums([line(11800, "quarterly")], null, 1800, true).quarterly).toBe(10000);
   });
 });

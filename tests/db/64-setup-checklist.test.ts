@@ -421,7 +421,8 @@ describe("setup checklist and sample data (USR-04)", () => {
     const dir = path.resolve(__dirname, "../../supabase/migrations");
     // later ones redefine app.sample_row() (DEAL-03, TAX-06) and app.sample_untouched() (CNS-01, then DLI-01), so they
     // run again after the first, keeping the latest versions; deal_lines comes after consents_followups (both redefine
-    // app.sample_untouched(), the later one wins)
+    // app.sample_untouched(), the later one wins); deal_lines revokes the table's client grants, so deal_line_billing
+    // (DLI-04) runs after it to grant its column again
     for (const suffix of [
       "_setup_checklist.sql",
       "_sample_data_remove.sql",
@@ -430,6 +431,7 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_consents_followups.sql",
       "_money_currency.sql",
       "_deal_lines.sql",
+      "_deal_line_billing.sql",
     ]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();

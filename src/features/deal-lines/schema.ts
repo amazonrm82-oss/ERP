@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { discountField } from "@/features/price-lists/schema";
-import { PRODUCT_CODE_MAX, PRODUCT_NAME_MAX } from "@/features/products/schema";
+import { BILLINGS, PRODUCT_CODE_MAX, PRODUCT_NAME_MAX } from "@/features/products/schema";
 import { TOTALS_MAX_QUANTITY } from "@/features/tax/calc";
 import { moneyField, optionalId, optionalText, requiredText } from "@/lib/validation";
 
@@ -71,6 +71,11 @@ export const dealLineSchema = z
     // owner, 14 October 2026: "פטור ממע"מ" on a free line; the form sends the marker only while it shows the box
     vat_exempt: z.unknown().optional(),
     vat_exempt_shown: z.unknown().optional(),
+    // DLI-04: a free line's billing mode; a product line sends none (its product's)
+    billing: z.preprocess(
+      (value) => (typeof value === "string" ? value : ""),
+      z.union([z.literal(""), z.enum(BILLINGS)], { error: "יש לבחור אופן חיוב." }),
+    ),
   })
   .transform((value, ctx) => {
     let discountBp: number | null = null;
@@ -99,14 +104,18 @@ export const dealLineSchema = z
       discountAgorot,
       // null: the box was not shown (a product line, or a business that charges no VAT); keep what is stored
       vatExempt: value.vat_exempt_shown === "1" ? value.vat_exempt === "on" || value.vat_exempt === "true" : null,
+      // null: not sent (a product line); keep what is stored
+      billing: value.billing === "" ? null : value.billing,
     };
   });
 
 export type DealLineInput = z.infer<typeof dealLineSchema>;
 
-export const DEAL_LINE_FIELD_NAMES = ["product_id", "description", "quantity", "unit_price", "discount_kind", "discount", "vat_exempt", "vat_exempt_shown"] as const;
+export const DEAL_LINE_FIELD_NAMES = ["product_id", "description", "quantity", "unit_price", "discount_kind", "discount", "vat_exempt", "vat_exempt_shown", "billing"] as const;
 
 export const VAT_EXEMPT_LABEL = 'פטור ממע"מ';
+
+export const LINE_BILLING_LABEL = "אופן חיוב";
 
 // DLI-02: a product made from the picker (owners and admins of a writable business).
 export const quickProductSchema = z.object({

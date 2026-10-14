@@ -8,13 +8,15 @@ import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { agorotInput } from "@/features/deals/recurring";
+import { BILLING_LABELS, BILLINGS, type Billing } from "@/features/products/schema";
 import type { FormState } from "@/lib/action-result";
 import { formatMoney, parseMoneyToAgorot } from "@/lib/format";
 
 import { addDealLineAction, updateDealLineAction, type ProductHit } from "../actions";
 import { lineTotal, pulledPrice } from "../pricing";
 import type { DealLine } from "../queries";
-import { DEAL_LINE_DESCRIPTION_MAX, DISCOUNT_KIND_LABELS, DISCOUNT_KINDS, priceSourceText, VAT_EXEMPT_LABEL, type DiscountKind } from "../schema";
+import { ownBilling } from "../recurring";
+import { DEAL_LINE_DESCRIPTION_MAX, DISCOUNT_KIND_LABELS, DISCOUNT_KINDS, LINE_BILLING_LABEL, priceSourceText, VAT_EXEMPT_LABEL, type DiscountKind } from "../schema";
 import { DealProductPicker } from "./deal-product-picker";
 import type { LinesPricing } from "./deal-lines-card";
 
@@ -26,6 +28,8 @@ type Props = {
   line: DealLine | null;
   features: { products: boolean; discounts: boolean };
   canCreateProducts: boolean;
+  // DLI-04: the deal's billing kind (deals.billing_kind): a line saved before DLI-04 counts in its period
+  dealKind: string | null;
   onDone: () => void;
   onCancel: () => void;
 };
@@ -47,7 +51,7 @@ function quantityOf(text: string): number | null {
  * price: the customer's price list with its quantity tiers, else the product's own price (PL-03);
  * the form shows it before saving. A typed price is the person's own and stays as typed.
  */
-export function DealLineForm({ orgId, dealId, pricing, line, features, canCreateProducts, onDone, onCancel }: Props) {
+export function DealLineForm({ orgId, dealId, pricing, line, features, canCreateProducts, dealKind, onDone, onCancel }: Props) {
   const action = line ? updateDealLineAction.bind(null, orgId, dealId, line.id) : addDealLineAction.bind(null, orgId, dealId);
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await action(prev, formData);
@@ -101,6 +105,9 @@ export function DealLineForm({ orgId, dealId, pricing, line, features, canCreate
   // charges no VAT does not see the box (every line has no VAT; a stored value is kept)
   const showVatExempt = !isProductLine && pricing.vat.kind !== "none";
   const vatWord = pricing.includesVat ? 'כולל מע"מ' : 'לפני מע"מ';
+  // DLI-04: a free line's billing is the person's; a product line's is its product's (shown, not chosen).
+  // A line saved before DLI-04 has none and counts in the deal's period, so the form starts there.
+  const productBilling: Billing | null = line ? (line.productId ? (line.billing ?? ownBilling(dealKind)) : null) : (product?.billing ?? null);
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -190,6 +197,25 @@ export function DealLineForm({ orgId, dealId, pricing, line, features, canCreate
         </div>
       ) : (
         <input type="hidden" name="discount_kind" value="" />
+      )}
+      {isProductLine ? (
+        productBilling ? (
+          <p className="text-sm text-ink-soft">{`${LINE_BILLING_LABEL}: ${BILLING_LABELS[productBilling]} (לפי המוצר)`}</p>
+        ) : null
+      ) : (
+        <SelectField
+          label={LINE_BILLING_LABEL}
+          name="billing"
+          defaultValue={line?.billing ?? (line ? ownBilling(dealKind) : "one_time")}
+          hint="שורה בחיוב חוזר נספרת בהכנסה החוזרת של העסקה."
+          error={errors.billing}
+        >
+          {BILLINGS.map((billing) => (
+            <option key={billing} value={billing}>
+              {BILLING_LABELS[billing]}
+            </option>
+          ))}
+        </SelectField>
       )}
       {showVatExempt ? (
         <>

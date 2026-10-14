@@ -1,6 +1,8 @@
 import { unitPriceFor, type PriceListForPricing, type PricedProduct } from "@/features/price-lists/price";
 import { priceListApplies, type PriceListTerms } from "@/features/price-lists/status";
+import type { LineSums } from "@/features/deals/recurring";
 import { productPriceFor } from "@/features/products/price";
+import type { Billing } from "@/features/products/schema";
 import { documentTotals, documentVatRateBp, type TotalsLine, type TotalsResult } from "@/features/tax/calc";
 import { vatRateAt, type DocumentVat, type VatRate } from "@/features/tax/rates";
 
@@ -123,6 +125,22 @@ export function dealLinesNet(lines: readonly DealLineAmounts[], conversionRateBp
   if (lines.length === 0) return null;
   const result = documentTotals(lines, { rateBp: pricesIncludeVat ? conversionRateBp : 0, pricesIncludeVat });
   return result.ok ? result.totals.netTotalAgorot : null;
+}
+
+/** A line with its billing mode (deal_lines.billing; null = saved before DLI-04). */
+export type DealLineWithBilling = DealLineAmounts & { billing: Billing | null };
+
+/**
+ * DLI-04: the lines' sums before VAT per billing mode (mirror of app.deal_lines_sums): documentTotals()
+ * per mode group, in the deal's mode, carried back by the conversion rate. A line saved before DLI-04
+ * (billing null) counts in the deal's own period (kind: deals.billing_kind). null = no line of that mode.
+ */
+export function dealLinesSums(lines: readonly DealLineWithBilling[], kind: string | null, conversionRateBp: number, pricesIncludeVat: boolean): LineSums {
+  const own: Billing = kind === "monthly" || kind === "yearly" ? kind : "one_time";
+  const groups: Record<Billing, DealLineAmounts[]> = { one_time: [], monthly: [], quarterly: [], yearly: [] };
+  for (const line of lines) groups[line.billing ?? own].push(line);
+  const net = (group: DealLineAmounts[]) => dealLinesNet(group, conversionRateBp, pricesIncludeVat);
+  return { once: net(groups.one_time), monthly: net(groups.monthly), quarterly: net(groups.quarterly), yearly: net(groups.yearly) };
 }
 
 /** One line's amount after its own discount, as typed: the line part of documentTotals(). */

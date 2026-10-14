@@ -219,9 +219,12 @@ describe("recurring revenue on deals (DEAL-07)", () => {
     const sql = fs.readFileSync(path.join(dir, file!), "utf8");
     // DLI-03 redefines app.deal_value() and the trigger function: re-run it after, so later tests see the latest rule
     const later = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find((name) => name.endsWith("_deal_value_from_lines.sql"))!), "utf8");
+    // DLI-04 redefines them again
+    const latest = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find((name) => name.endsWith("_deal_line_billing.sql"))!), "utf8");
     await asAdmin((q) => q(sql));
     await asAdmin((q) => q(sql));
     await asAdmin((q) => q(later));
+    await asAdmin((q) => q(latest));
     await asAdmin(async (q) => {
       expect(await count(q, "select 1 from pg_constraint where conrelid = 'public.deals'::regclass and conname in ('deals_billing_kind', 'deals_recurring_shape', 'deals_amount_auto_true')")).toBe(3);
     });
@@ -237,6 +240,11 @@ type Fixture = {
   old_auto: boolean | null;
   insert: boolean;
   lines?: number | null;
+  // DLI-04: the lines' sums per billing mode (app.deal_lines_sums); a case with them runs app.deal_value_rule()
+  lines_once?: number | null;
+  lines_monthly?: number | null;
+  lines_quarterly?: number | null;
+  lines_yearly?: number | null;
   old_recurring?: number | null;
   old_recurring_auto?: boolean | null;
   old_source?: string | null;
@@ -248,13 +256,37 @@ const FIXTURES = JSON.parse(readFileSync(path.resolve(__dirname, "../unit/fixtur
 
 describe("first-year value: app.deal_value() matches the shared fixtures", () => {
   it.each(FIXTURES.map((f) => [f.name, f] as const))("%s", async (_name, f) => {
-    // DLI-03: the full rule (app.deal_value() is the same rule without lines)
-    const run = asAdmin((q) =>
-      q<{ amount: string; auto: boolean | null; source: string | null; recurring: string | null; recurring_auto: boolean | null }>(
-        "select amount::text, auto, source, recurring::text, recurring_auto from app.deal_amount_rule($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-        [f.kind, f.recurring, f.amount, f.old_amount, f.old_auto, f.insert, f.lines ?? null, f.old_recurring ?? null, f.old_recurring_auto ?? null, f.old_source ?? null],
-      ),
-    );
+    // DLI-04: the full rule takes the lines' sums per billing mode; DLI-03's entry point (one sum, in the deal's own
+    // period) and app.deal_value() (no lines) are the same rule
+    type Row = { amount: string; auto: boolean | null; source: string | null; recurring: string | null; recurring_auto: boolean | null };
+    const byBilling = "lines_once" in f || "lines_monthly" in f || "lines_quarterly" in f || "lines_yearly" in f;
+    const run = byBilling
+      ? asAdmin((q) =>
+          q<Row>(
+            "select amount::text, auto, source, recurring::text, recurring_auto from app.deal_value_rule($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            [
+              f.kind,
+              f.recurring,
+              f.amount,
+              f.old_amount,
+              f.old_auto,
+              f.insert,
+              f.lines_once ?? null,
+              f.lines_monthly ?? null,
+              f.lines_quarterly ?? null,
+              f.lines_yearly ?? null,
+              f.old_recurring ?? null,
+              f.old_recurring_auto ?? null,
+              f.old_source ?? null,
+            ],
+          ),
+        )
+      : asAdmin((q) =>
+          q<Row>(
+            "select amount::text, auto, source, recurring::text, recurring_auto from app.deal_amount_rule($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            [f.kind, f.recurring, f.amount, f.old_amount, f.old_auto, f.insert, f.lines ?? null, f.old_recurring ?? null, f.old_recurring_auto ?? null, f.old_source ?? null],
+          ),
+        );
     if ("error" in f.expect) {
       const e = await pgError(run);
       expect(e.code).toBe("P0001");
@@ -267,7 +299,7 @@ describe("first-year value: app.deal_value() matches the shared fixtures", () =>
       if ("recurring_auto" in f.expect) shaped.recurring_auto = row.recurring_auto;
       expect(shaped).toEqual(f.expect);
       // a case without lines answers the same through DEAL-07's entry point
-      if (f.lines == null && f.old_recurring == null && f.old_source == null) {
+      if (!byBilling && f.lines == null && f.old_recurring == null && f.old_source == null) {
         const old = await asAdmin((q) =>
           q<{ amount: string; auto: boolean | null }>("select amount::text, auto from app.deal_value($1, $2, $3, $4, $5, $6)", [
             f.kind,

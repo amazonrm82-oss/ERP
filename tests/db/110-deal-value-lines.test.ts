@@ -164,15 +164,16 @@ describe("deal value from product lines (DLI-03)", () => {
     // M1: nothing to compute from yet, so the value is empty (no flag, no source); the amount waits for lines
     expect(await value(deal)).toEqual({ amount: 0, auto: null, source: null, recurring: 0, recurring_auto: true });
 
-    const line = await addLine(member.id, deal, 30000);
+    // DLI-04: a line billed monthly (a free line is one-time unless the person picks)
+    const line = await addLine(member.id, deal, 30000, { billing: "monthly" });
     expect(await value(deal)).toEqual({ amount: 360000, auto: true, source: "lines", recurring: 30000, recurring_auto: true });
 
     await asUser(member.id, (q) => q("update public.deal_lines set unit_price_agorot = 40000 where id = $1", [line]));
     expect(await value(deal)).toEqual({ amount: 480000, auto: true, source: "lines", recurring: 40000, recurring_auto: true });
 
-    // to yearly: the lines are the yearly amount
+    // to yearly: DLI-04, the monthly line counts 12 times a year
     await asUser(member.id, (q) => q("update public.deals set billing_kind = 'yearly' where id = $1", [deal]));
-    expect(await value(deal)).toEqual({ amount: 40000, auto: true, source: "lines", recurring: 40000, recurring_auto: true });
+    expect(await value(deal)).toEqual({ amount: 480000, auto: true, source: "lines", recurring: 480000, recurring_auto: true });
     await asUser(member.id, (q) => q("update public.deals set billing_kind = 'monthly' where id = $1", [deal]));
 
     // a typed recurring amount: the first year of it, and the lines no longer move it
@@ -299,7 +300,7 @@ describe("deal value from product lines (DLI-03)", () => {
     const oneTime = await newDeal(member.id);
     await addLine(member.id, oneTime, 27700);
     const recurring = await newDeal(member.id, { billing_kind: "monthly", recurring_start_date: "2026-11-01", amount_agorot: null });
-    await addLine(member.id, recurring, 3000);
+    await addLine(member.id, recurring, 3000, { billing: "monthly" });
     expect(await value(oneTime)).toEqual({ amount: 27700, auto: true, source: "lines", recurring: null, recurring_auto: null });
     expect(await value(recurring)).toEqual({ amount: 36000, auto: true, source: "lines", recurring: 3000, recurring_auto: true });
     await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
@@ -360,6 +361,9 @@ describe("deal value from product lines (DLI-03)", () => {
     expect(sql).not.toMatch(/delete\s+from/i);
     await asAdmin((q) => q(sql));
     await asAdmin((q) => q(sql));
+    // DLI-04 redefines the rule's functions: re-run it after, so later tests see the latest rule
+    const latest = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find((name) => name.endsWith("_deal_line_billing.sql"))!), "utf8");
+    await asAdmin((q) => q(latest));
     expect((await value(deal)).amount).toBe(31400);
     await asAdmin(async (q) => {
       expect(

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { PriceListLineRule } from "@/features/price-lists/price";
 import { productsPath } from "@/features/products/paths";
+import type { Billing } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { totalsErrorMessage } from "@/features/tax/calc";
 import { actionContext } from "@/lib/action-context";
@@ -16,6 +17,7 @@ import { pick } from "@/lib/validation";
 
 import { priceListTiers, readDealLines, readDealPricing, readPricedProduct, type DealPricing } from "./queries";
 import { lineTotal, priceOnEdit, pulledPrice, type PulledPrice } from "./pricing";
+import { isBilling } from "./recurring";
 import { DEAL_LINE_FIELD_NAMES, DEAL_LINES_MAX, dealLineSchema, QUICK_PRODUCT_FIELD_NAMES, quickProductSchema } from "./schema";
 
 // DLI-01, DLI-02, PL-03. Every write goes with the user's session; rights follow the deal (RLS on
@@ -119,6 +121,8 @@ async function addLine(orgId: string, dealId: string, formData: FormData): Promi
     price_includes_vat: pricing.includesVat,
     // a free line's own choice; a product line's comes from the product (the trigger overrides it)
     ...(input.productId === null ? { vat_exempt: input.vatExempt ?? false } : {}),
+    // DLI-04: a free line's billing is the person's (one-time by default); a product line's is the product's (trigger)
+    ...(input.productId === null ? { billing: input.billing ?? "one_time" } : {}),
     price_source: price.source,
     price_list_id: price.listId,
   });
@@ -184,6 +188,7 @@ async function updateLine(orgId: string, dealId: string, lineId: string, formDat
       discount_bp: input.discountBp,
       discount_agorot: input.discountAgorot,
       ...(stored.productId === null && input.vatExempt !== null ? { vat_exempt: input.vatExempt } : {}),
+      ...(stored.productId === null && input.billing !== null ? { billing: input.billing } : {}),
       ...(sameList ? {} : { price_source: patch.price_source, price_list_id: patch.price_list_id }),
     })
     .eq("organization_id", orgId)
@@ -273,6 +278,8 @@ export type ProductHit = {
   priceAgorot: number;
   priceIncludesVat: boolean;
   vatKind: "taxable" | "exempt" | "zero_rate";
+  // DLI-04: how the product bills; a line made from it copies this
+  billing: Billing;
   // the customer's price list tiers for this product (PL-03), so the form shows the price it will get
   tiers: PriceListLineRule[];
 };
@@ -288,7 +295,7 @@ export async function searchDealProductsAction(orgId: string, query: unknown, li
   if (!context.ok) return [];
   let request = context.supabase
     .from("products")
-    .select("id, name, sku, barcode, price_agorot, price_includes_vat, vat_kind")
+    .select("id, name, sku, barcode, price_agorot, price_includes_vat, vat_kind, billing")
     .eq("organization_id", orgId)
     .eq("is_active", true)
     .is("archived_at", null);
@@ -322,6 +329,7 @@ export async function searchDealProductsAction(orgId: string, query: unknown, li
     priceAgorot: Number(row.price_agorot),
     priceIncludesVat: row.price_includes_vat,
     vatKind: row.vat_kind === "exempt" || row.vat_kind === "zero_rate" ? row.vat_kind : "taxable",
+    billing: isBilling(row.billing) ? row.billing : "one_time",
     tiers: tiers.filter((tier) => tier.productId === row.id),
   }));
 }
@@ -380,6 +388,7 @@ export async function quickCreateProductAction(orgId: string, dealId: string, _p
     priceAgorot: Number(data.price_agorot),
     priceIncludesVat: data.price_includes_vat,
     vatKind: "taxable",
+    billing: "one_time",
     tiers: [],
   });
 }
