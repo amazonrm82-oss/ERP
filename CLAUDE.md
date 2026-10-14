@@ -545,6 +545,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (composite FK set null, column grants): trigger `leads_requested_product_check` (invoker, person writes; non-members go to RLS)
   needs an offerable product and the `products` flag; sort field `sort_requested_product`. Owner: billing is core (no plan key,
   `PLAN_CAPABILITIES` `core`); neither is in merge picks yet (shared-ground follow-up).
+  Since 0179 the due date is `app.payment_due_date(date, terms, days)` (immutable, Gregorian, no rest-day skip; 22023 hint
+  `payment_terms:invalid`), mirrored by `paymentDueDate()` (test 105 compares them day by day); shortcuts and wording per owner.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
