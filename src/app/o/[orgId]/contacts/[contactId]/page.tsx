@@ -25,6 +25,8 @@ import { trashContactAction } from "@/features/contacts/actions";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
 import { contactDisplayName } from "@/features/contacts/display";
 import { getContact } from "@/features/contacts/queries";
+import { DomainLinkNote } from "@/features/company-domain/components/domain-link-note";
+import { getDomainLinkInfo } from "@/features/company-domain/queries";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { contactDealsWithRoles } from "@/features/deal-contacts/contact-deals";
 import { listContactDealRoles } from "@/features/deal-contacts/queries";
@@ -80,7 +82,12 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, contact.owner_id);
-  const [companies, types] = canEdit ? await Promise.all([listCompanyOptions(orgId), listRecordTypes(orgId, "contact")]) : [[], []];
+  const [companies, types, domainLink] = await Promise.all([
+    canEdit ? listCompanyOptions(orgId) : [],
+    canEdit ? listRecordTypes(orgId, "contact") : [],
+    // CON-09: a company linked by the email domain, or the companies to pick from
+    getDomainLinkInfo(orgId, contact),
+  ]);
   const name = contactDisplayName({ fullName: contact.full_name, email: contact.email, phone: contact.phone });
 
   return (
@@ -100,6 +107,11 @@ export default async function ContactPage({ params, searchParams }: Props) {
       />
       {channels === "failed" ? (
         <FormError className="mb-4" message="איש הקשר נוצר, אבל לא כל הטלפונים והאימיילים הנוספים נשמרו. אפשר להוסיף אותם בעריכה." />
+      ) : null}
+      {domainLink ? (
+        <div className="mb-4 print:hidden">
+          <DomainLinkNote orgId={orgId} contactId={contact.id} info={domainLink} canEdit={canEdit} />
+        </div>
       ) : null}
       <div className="mb-5 print:hidden">
         <ContactActions phone={contact.phone} phoneE164={contact.phone_e164} email={contact.email} saveHref={paths.vcard(orgId, "contact", contact.id)}

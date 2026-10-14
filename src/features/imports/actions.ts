@@ -118,9 +118,14 @@ export async function previewImportAction(
 /** Creates the import job; the browser then sends the rows chunk by chunk. */
 export async function startImportAction(
   orgId: string,
-  input: { entity: string; mode: string; fileName: string; totalRows: number },
+  input: { entity: string; mode: string; fileName: string; totalRows: number; mapsCompany?: boolean },
 ): Promise<ActionResult<{ jobId: string }>> {
-  if (!validArg(z.object({ entity: z.string(), mode: z.string(), fileName: z.string().max(2000), totalRows: z.number() }), input)) {
+  if (
+    !validArg(
+      z.object({ entity: z.string(), mode: z.string(), fileName: z.string().max(2000), totalRows: z.number(), mapsCompany: z.boolean().optional() }),
+      input,
+    )
+  ) {
     return fail(INVALID_ARGS);
   }
   const context = await actionContext(orgId);
@@ -144,6 +149,7 @@ export async function startImportAction(
       duplicate_mode: mode.data,
       file_name: (input.fileName || "file").slice(0, 255),
       total_rows: input.totalRows,
+      maps_company: entity.data === "contact" && input.mapsCompany === true,
     })
     .select("id")
     .single();

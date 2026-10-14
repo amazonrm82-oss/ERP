@@ -634,6 +634,8 @@ export type ImportJobRow = {
   updated_at: string;
   finished_at: string | null;
   undone_at: string | null;
+  // CON-09: the file's company column was mapped, so new contacts are not linked by email domain
+  maps_company: boolean;
 };
 
 export type SupportAccessGrantRow = {
@@ -747,6 +749,8 @@ export type CompanyRow = {
   payment_terms: string | null;
   payment_days: number | null;
   price_list_id: string | null;
+  // CON-09: true = matched only by its own website or email, not by its contacts' domain; null = on
+  contact_domain_off: boolean | null;
 };
 
 export type CompanyInsert = {
@@ -779,6 +783,8 @@ export type CompanyInsert = {
   payment_terms?: string | null;
   payment_days?: number | null;
   price_list_id?: string | null;
+  // CON-09: only true or null
+  contact_domain_off?: true | null;
 };
 
 export type ContactRow = {
@@ -796,6 +802,10 @@ export type ContactRow = {
   // CON-02: from record_type_options; contact_type is the older free text
   type_id: string | null;
   company_id: string | null;
+  // CON-09: the email domain the database linked the company by (server only; cleared when company_id changes)
+  company_matched_domain: string | null;
+  // CON-09: exact | parent | contacts, how that link was made (server only; cleared with it)
+  company_match_kind: string | null;
   source_id: string | null;
   address_line: string | null;
   city: string | null;
@@ -1515,7 +1525,7 @@ export type Database = {
       >;
       import_jobs: Table<
         ImportJobRow,
-        { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number },
+        { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number; maps_company?: boolean },
         {
           status?: ImportStatus;
           created_count?: number;
@@ -1826,6 +1836,13 @@ export type Database = {
       custom_unique_clashes: {
         Args: { p_org: string; p_type: string; p_ids: string[] };
         Returns: Array<{ record_id: string; field_key: string; field_label: string; other_id: string | null }>;
+      };
+      // CON-09: the one domain two or more of the company's readable live contacts share, else null
+      company_contact_domain: { Args: { p_org: string; p_company: string }; Returns: string | null };
+      // CON-09: live companies the caller reads with this email's domain, own or from contacts (max 6)
+      company_domain_matches: {
+        Args: { p_org: string; p_email: string };
+        Returns: Array<{ id: string; name: string; domain: string; kind: "exact" | "parent" | "contacts" }>;
       };
       contact_channel_matches: {
         Args: { p_org: string; p_phones: string[]; p_emails: string[] };

@@ -102,7 +102,7 @@ export async function getCompany(orgId: string, companyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("companies")
-    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids, parent_company_id")
+    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids, parent_company_id, contact_domain_off")
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)

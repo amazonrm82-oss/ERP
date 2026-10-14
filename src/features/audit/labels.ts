@@ -165,6 +165,10 @@ export const FIELD_LABELS: Record<string, string> = {
   revoked_at: "בוטלה",
   expires_at: "בתוקף עד",
   website: "אתר",
+  // CON-09
+  company_matched_domain: "שויך לחברה לפי דומיין האימייל",
+  company_match_kind: "אופן השיוך לפי דומיין",
+  contact_domain_off: "דומיין לפי אנשי הקשר כבוי",
   city: "עיר",
   tax_id: "ח.פ. / מספר רישום",
   country: "מדינת הרישום",

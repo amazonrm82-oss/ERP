@@ -141,7 +141,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, created_at, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

@@ -21,6 +21,8 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
 import { getCompany, getCompanyFamily, listContactsOfCompany } from "@/features/companies/queries";
+import { ContactDomainNote } from "@/features/company-domain/components/contact-domain-note";
+import { getContactDomainInfo } from "@/features/company-domain/queries";
 import { ChildCompaniesCard } from "@/features/companies/components/child-companies-card";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
@@ -71,7 +73,11 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
   // CON-07: the parent and the child companies the user may read
-  const family = await getCompanyFamily(orgId, company.id, company.parent_company_id);
+  // CON-09: the domain the company gets from its contacts' emails, when it has none of its own
+  const [family, contactDomain] = await Promise.all([
+    getCompanyFamily(orgId, company.id, company.parent_company_id),
+    getContactDomainInfo(orgId, company),
+  ]);
 
   return (
     <>
@@ -135,6 +141,15 @@ export default async function CompanyPage({ params, searchParams }: Props) {
               custom: { definitions: fields, values: asCustomValues(company.custom_fields) },
             }}
           />
+          {contactDomain ? (
+            <ContactDomainNote
+              orgId={orgId}
+              companyId={company.id}
+              domain={contactDomain.domain}
+              off={contactDomain.off}
+              canEdit={canEditRecordHint(context, company.owner_id)}
+            />
+          ) : null}
 
           {billing ? (
             <BillingCard

@@ -156,7 +156,14 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   async function run() {
     if (!sheet) return;
     setError(null);
-    const start = await startImportAction(orgId, { entity, mode, fileName: sheet.fileName, totalRows: sheet.rows.length });
+    const start = await startImportAction(orgId, {
+      entity,
+      mode,
+      fileName: sheet.fileName,
+      totalRows: sheet.rows.length,
+      // CON-09: a mapped company column decides the company; otherwise the database links new contacts by email domain
+      mapsCompany: entity === "contact" && mapping.includes("company"),
+    });
     if (!start.ok || !start.data) {
       setError(start.ok ? "לא הצלחנו להתחיל את הייבוא." : start.message);
       return;
