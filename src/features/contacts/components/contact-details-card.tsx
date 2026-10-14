@@ -5,14 +5,14 @@ import { useActionState, useState } from "react";
 
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
-import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { CompanyOption } from "@/features/companies/queries";
-import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { LayoutDetails } from "@/features/card-layout/components/layout-details";
+import type { CardLayoutGroup } from "@/features/card-layout/layout";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { RecordType } from "@/features/record-type-options/schema";
@@ -42,10 +42,19 @@ export type ContactDetailsView = ContactValues & {
   custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
 };
 
-type Props = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; canEdit: boolean; focus?: string | null };
+// layout: the business's card layout (FLD-08); null or missing = the default layout
+type Props = {
+  orgId: string;
+  contact: ContactDetailsView;
+  companies: CompanyOption[];
+  types: RecordType[];
+  canEdit: boolean;
+  focus?: string | null;
+  layout?: CardLayoutGroup[] | null;
+};
 
 /** Contact details that switch in place between reading and editing. */
-export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, focus }: Props) {
+export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, focus, layout = null }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   useEditFocus("contact-details-title", focus, editing);
@@ -69,30 +78,34 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
         }
       />
       <CardBody>
-        <DetailList>
-          <Detail label="שם מלא" value={contact.full_name} />
-          <Detail label="טלפון" value={<ChannelList kind="phone" contact={contact} />} />
-          <Detail label="אימייל" value={<ChannelList kind="email" contact={contact} />} />
-          <Detail label="תפקיד" value={contact.job_title} />
-          <Detail
-            label="חברה"
-            value={
-              contact.company_id && contact.companyName ? (
-                <Link href={paths.company(orgId, contact.company_id)} className="text-accent underline underline-offset-4">
-                  {contact.companyName}
-                </Link>
-              ) : null
-            }
-          />
-          <Detail label="סוג" value={contact.typeName ?? contact.contact_type} />
-          <Detail label="יום הולדת" value={contact.birthDateText} />
-          <Detail label="שפה מועדפת" value={localeLabel(contact.preferred_locale)} />
-          <Detail label="ערוץ מועדף" value={channelDetail(contact.preferred_channel, contact.preferred_channel_source)} />
-          <Detail label="מקור" value={contact.sourceName} />
-          <Detail label="אחראי" value={contact.ownerName} />
-          <Detail label="נוצר" value={contact.createdAtText} />
-          <CustomFieldDetails definitions={contact.custom.definitions} values={contact.custom.values} objectType="contact" builtins={contact.custom.builtins} />
-        </DetailList>
+        <LayoutDetails
+          type="contact"
+          idPrefix="contact-details"
+          layout={layout}
+          custom={contact.custom}
+          builtIn={{
+            full_name: { value: contact.full_name },
+            phone: { value: <ChannelList kind="phone" contact={contact} /> },
+            email: { value: <ChannelList kind="email" contact={contact} /> },
+            job_title: { value: contact.job_title },
+            company_id: {
+              value:
+                contact.company_id && contact.companyName ? (
+                  <Link href={paths.company(orgId, contact.company_id)} className="text-accent underline underline-offset-4">
+                    {contact.companyName}
+                  </Link>
+                ) : null,
+            },
+            type: { value: contact.typeName ?? contact.contact_type },
+            birth_date: { value: contact.birthDateText },
+            preferred_locale: { value: localeLabel(contact.preferred_locale) },
+            // CON-10: "(מטופס)" when the channel came from a public form
+            preferred_channel: { value: channelDetail(contact.preferred_channel, contact.preferred_channel_source) },
+            source_id: { value: contact.sourceName },
+            owner_id: { value: contact.ownerName },
+            created_at: { value: contact.createdAtText },
+          }}
+        />
       </CardBody>
     </Card>
   );

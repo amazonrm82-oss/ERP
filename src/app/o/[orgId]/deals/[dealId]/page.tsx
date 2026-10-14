@@ -23,6 +23,7 @@ import { DealContactsCard } from "@/features/deal-contacts/components/deal-conta
 import { addableDealContacts } from "@/features/deal-contacts/options";
 import { listDealContacts } from "@/features/deal-contacts/queries";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
+import { getCardLayout } from "@/features/card-layout/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
 import { agorotInput, BILLING_KIND_LABELS, billingKindOf, recurringText, shownRecurringAmount } from "@/features/deals/recurring";
 import { DealSnoozeForm } from "@/features/deals/components/deal-snooze-form";
@@ -69,13 +70,15 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
-  const [deal, fields, tags, follow, dealContacts, lossReasons] = await Promise.all([
+  const [deal, fields, tags, follow, dealContacts, lossReasons, cardLayout] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
     getFollowState(orgId, { kind: "deal", id: dealId }, context.user.id),
     listDealContacts(orgId, dealId),
     listLossReasons(orgId),
+    // FLD-08: the business's card layout (null = the default)
+    getCardLayout(orgId, "deal"),
   ]);
   if (!deal) {
     notFound();
@@ -227,6 +230,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             {deal.status === "open" ? <CompletenessCard orgId={orgId} type="deal" id={deal.id} editBase={canEdit ? paths.deal(orgId, deal.id) : null} /> : null}
           </div>
           <DealDetailsCard
+            layout={cardLayout}
             key={focus ?? "view"}
             focus={focus}
             orgId={orgId}

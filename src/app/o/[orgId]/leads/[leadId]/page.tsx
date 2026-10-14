@@ -25,6 +25,7 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
 import { attributionRows } from "@/features/intake/attribution";
+import { getCardLayout } from "@/features/card-layout/queries";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
@@ -63,12 +64,14 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [lead, lookups, fields, reasons, follow] = await Promise.all([
+  const [lead, lookups, fields, reasons, follow, cardLayout] = await Promise.all([
     getLead(orgId, leadId),
     getLeadLookups(orgId),
     listFieldDefinitions(orgId, "lead"),
     activeReasonNames(orgId),
     getFollowState(orgId, { kind: "lead", id: leadId }, context.user.id),
+    // FLD-08: the business's card layout (null = the default)
+    getCardLayout(orgId, "lead"),
   ]);
   if (!lead) {
     notFound();
@@ -191,6 +194,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
           ) : null}
 
           <LeadDetailsCard
+            layout={cardLayout}
             key={focus ?? "view"}
             focus={focus}
             orgId={orgId}

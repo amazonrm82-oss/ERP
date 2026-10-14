@@ -5,14 +5,14 @@ import { useActionState, useState } from "react";
 
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
-import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
-import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { LayoutDetails } from "@/features/card-layout/components/layout-details";
+import type { CardLayoutGroup } from "@/features/card-layout/layout";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
 import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
@@ -70,12 +70,22 @@ export type DealDetailsView = {
 };
 
 // lossReasons: the organization's active loss reasons (DEAL-03)
-type Props = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; canEdit: boolean; focus?: string | null };
+// layout: the business's card layout (FLD-08); null or missing = the default layout
+type Props = {
+  orgId: string;
+  deal: DealDetailsView;
+  contacts: Option[];
+  companies: Option[];
+  lossReasons: LossReasonOption[];
+  canEdit: boolean;
+  focus?: string | null;
+  layout?: CardLayoutGroup[] | null;
+};
 
 const linkClass = "text-accent underline underline-offset-4";
 
 /** Deal details that switch in place between reading and editing. */
-export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus }: Props) {
+export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus, layout = null }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
@@ -114,44 +124,43 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
       />
       <CardBody>
         <FormNotice message={notice} className="mb-4" />
-        <DetailList>
-          <Detail label="שווי" value={note ? `${deal.amountText} ${note}` : deal.amountText} />
-          <Detail
-            label="איש קשר"
-            value={
-              deal.contactId && deal.contactName ? (
-                <Link href={paths.contact(orgId, deal.contactId)} className={linkClass}>
-                  {deal.contactName}
-                </Link>
-              ) : null
-            }
-          />
-          <Detail
-            label="חברה"
-            value={
-              deal.companyId && deal.companyName ? (
-                <Link href={paths.company(orgId, deal.companyId)} className={linkClass}>
-                  {deal.companyName}
-                </Link>
-              ) : null
-            }
-          />
-          <Detail label="סגירה צפויה" value={deal.expectedCloseText} />
-          <Detail label="סוג עסקה" value={deal.recurring.kindText} />
-          {deal.recurring.kind ? (
-            <>
-              <Detail label="סכום חוזר" value={deal.recurring.amountText} />
-              <Detail label="תאריך התחלה" value={deal.recurring.startText} />
-              <Detail label="תאריך חידוש" value={deal.recurring.renewalText} />
-            </>
-          ) : null}
-          {deal.closedAtText ? <Detail label="נסגרה" value={deal.closedAtText} /> : null}
-          {deal.status === "lost" ? <Detail label="סיבת הפסד" value={deal.lostReason} /> : null}
-          {deal.competitor || deal.status === "lost" ? <Detail label="מתחרה" value={deal.competitor} /> : null}
-          <Detail label="אחראי" value={deal.ownerName} />
-          <Detail label="נוצרה" value={deal.createdAtText} />
-          <CustomFieldDetails definitions={deal.custom.definitions} values={deal.custom.values} objectType="deal" builtins={deal.custom.builtins} />
-        </DetailList>
+        <LayoutDetails
+          type="deal"
+          idPrefix="deal-details"
+          layout={layout}
+          custom={deal.custom}
+          builtIn={{
+            // DLI-03: "(לפי שורות המוצר)" / "(לפי שנה ראשונה)" when the value is computed
+            amount: { value: note ? `${deal.amountText} ${note}` : deal.amountText },
+            contact_id: {
+              value:
+                deal.contactId && deal.contactName ? (
+                  <Link href={paths.contact(orgId, deal.contactId)} className={linkClass}>
+                    {deal.contactName}
+                  </Link>
+                ) : null,
+            },
+            company_id: {
+              value:
+                deal.companyId && deal.companyName ? (
+                  <Link href={paths.company(orgId, deal.companyId)} className={linkClass}>
+                    {deal.companyName}
+                  </Link>
+                ) : null,
+            },
+            expected_close_date: { value: deal.expectedCloseText },
+            recurring_kind: { value: deal.recurring.kindText },
+            // the page passes the amount through shownRecurringAmount() (DLI-03: a following 0 is hidden)
+            recurring_amount: deal.recurring.kind ? { value: deal.recurring.amountText } : null,
+            recurring_start: deal.recurring.kind ? { value: deal.recurring.startText } : null,
+            renewal_date: deal.recurring.kind ? { value: deal.recurring.renewalText } : null,
+            closed_at: deal.closedAtText ? { value: deal.closedAtText } : null,
+            lost_reason: deal.status === "lost" ? { value: deal.lostReason } : null,
+            competitor: deal.competitor || deal.status === "lost" ? { value: deal.competitor } : null,
+            owner_id: { value: deal.ownerName },
+            created_at: { value: deal.createdAtText },
+          }}
+        />
       </CardBody>
     </Card>
   );

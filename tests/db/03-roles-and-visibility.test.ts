@@ -870,6 +870,35 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.completeness_settings set fields = app.completeness_default_keys('lead') where organization_id = $1 and object_type = 'lead'", [org]));
   });
 
+  it("everyone reads the card layout; only owners and admins write it, and nobody deletes it (FLD-08)", async () => {
+    const layout = JSON.stringify([{ title: "קשר", columns: 2, fields: ["phone", "email"] }]);
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'contact', $2)", [org, layout])))).code, u.email).toBe(
+        "42501",
+      );
+    }
+    await asUser(admin.id, (q) => q("insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'contact', $2)", [org, layout]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.card_layouts where organization_id = $1 and object_type = 'contact'", [org]), u.email).toBe(1);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.card_layouts set groups = '[]' where organization_id = $1", [org])).rowCount, u.email).toBe(0);
+      });
+    }
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.card_layouts where organization_id = $1", [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.card_layouts set groups = '[]' where organization_id = $1 and object_type = 'contact'", [org])).rowCount).toBe(1);
+    });
+    expect(
+      await asAdmin(async (q) => (await q<{ g: unknown }>("select groups as g from public.card_layouts where organization_id = $1 and object_type = 'contact'", [org])).rows[0].g),
+    ).toEqual([]);
+  });
+
   it("only owners and admins read and write the bank details (TAX-02 follow-up)", async () => {
     const insert = "insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק לאומי', '800', '7654321')";
     for (const u of [manager, m1, viewer]) {

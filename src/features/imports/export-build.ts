@@ -87,6 +87,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "lead_response_settings", file: "response_settings.csv" },
   // DQL-01: the important fields per record type
   { table: "completeness_settings", file: "completeness_settings.csv" },
+  // FLD-08: the card layout per record type
+  { table: "card_layouts", file: "card_layouts.csv" },
   { table: "files", file: "files.csv" },
 ];
 

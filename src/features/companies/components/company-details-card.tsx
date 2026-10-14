@@ -5,14 +5,14 @@ import { useActionState, useState } from "react";
 
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
-import { Detail, DetailList } from "@/components/detail-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { INDUSTRIES } from "@/features/onboarding/options";
-import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { LayoutDetails } from "@/features/card-layout/components/layout-details";
+import type { CardLayoutGroup } from "@/features/card-layout/layout";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { RecordType } from "@/features/record-type-options/schema";
@@ -65,10 +65,11 @@ function ParentValue({ orgId, parent }: { orgId: string; parent: CompanyParent |
   );
 }
 
-type Props = { orgId: string; company: CompanyDetailsView; types: RecordType[]; canEdit: boolean; focus?: string | null };
+// layout: the business's card layout (FLD-08); null or missing = the default layout
+type Props = { orgId: string; company: CompanyDetailsView; types: RecordType[]; canEdit: boolean; focus?: string | null; layout?: CardLayoutGroup[] | null };
 
 /** Company details that switch in place between reading and editing. */
-export function CompanyDetailsCard({ orgId, company, types, canEdit, focus }: Props) {
+export function CompanyDetailsCard({ orgId, company, types, canEdit, focus, layout = null }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   useEditFocus("company-details-title", focus, editing);
@@ -93,32 +94,34 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit, focus }: Pr
         }
       />
       <CardBody>
-        <DetailList>
-          <Detail label="סוג" value={company.typeName ?? company.company_type} />
-          <Detail label="שייכת ל" value={company.parent ? <ParentValue orgId={orgId} parent={company.parent} /> : null} />
-          {/* CON-04: the country only when it is not Israel */}
-          {israeli ? null : <Detail label="מדינת הרישום" value={countryName(company.country)} />}
-          <Detail label={israeli ? "ח.פ." : "מספר רישום"} value={company.tax_id} ltr />
-          <Detail label="ענף" value={INDUSTRIES.find((option) => option.value === company.industry)?.label} />
-          <Detail label="טלפון" value={company.phone} ltr />
-          <Detail label="אימייל" value={company.email} ltr />
-          <Detail
-            label="אתר"
-            value={
-              company.website ? (
+        <LayoutDetails
+          type="company"
+          idPrefix="company-details"
+          layout={layout}
+          custom={company.custom}
+          builtIn={{
+            type: { value: company.typeName ?? company.company_type },
+            parent_company_id: { value: company.parent ? <ParentValue orgId={orgId} parent={company.parent} /> : null },
+            // CON-04: the country only when it is not Israel
+            country: israeli ? null : { value: countryName(company.country) },
+            tax_id: { value: company.tax_id, ltr: true, label: israeli ? "ח.פ." : "מספר רישום" },
+            industry: { value: INDUSTRIES.find((option) => option.value === company.industry)?.label },
+            phone: { value: company.phone, ltr: true },
+            email: { value: company.email, ltr: true },
+            website: {
+              ltr: true,
+              value: company.website ? (
                 <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
                   {company.website.replace(/^https?:\/\//, "")}
                 </a>
-              ) : null
-            }
-            ltr
-          />
-          <Detail label="עיר" value={company.city} />
-          <Detail label="כתובת" value={company.address_line} />
-          <Detail label="אחראי" value={company.ownerName} />
-          <Detail label="נוצר" value={company.createdAtText} />
-          <CustomFieldDetails definitions={company.custom.definitions} values={company.custom.values} objectType="company" builtins={company.custom.builtins} />
-        </DetailList>
+              ) : null,
+            },
+            city: { value: company.city },
+            address_line: { value: company.address_line },
+            owner_id: { value: company.ownerName },
+            created_at: { value: company.createdAtText },
+          }}
+        />
       </CardBody>
     </Card>
   );

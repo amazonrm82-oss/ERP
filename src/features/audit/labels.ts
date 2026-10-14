@@ -58,6 +58,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   deal_lines: "שורת מוצר בעסקה",
   // DQL-01
   completeness_settings: "שדות חשובים",
+  // FLD-08
+  card_layouts: "תצוגת כרטיס",
   // CAP-10
   lead_response_settings: "יעד זמן תגובה",
   reports: "דוח",

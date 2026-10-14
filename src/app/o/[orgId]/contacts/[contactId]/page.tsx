@@ -22,6 +22,7 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { trashContactAction } from "@/features/contacts/actions";
+import { getCardLayout } from "@/features/card-layout/queries";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
 import { contactDisplayName } from "@/features/contacts/display";
 import { preferredContactChannel } from "@/features/contacts/preferences";
@@ -65,7 +66,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, mainDeals, dealRoles, fields, follow, billing] = await Promise.all([
+  const [contact, mainDeals, dealRoles, fields, follow, billing, cardLayout] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
     listContactDealRoles(orgId, contactId),
@@ -73,6 +74,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
     getFollowState(orgId, { kind: "contact", id: contactId }, context.user.id),
     // CON-08
     getRecordBilling(orgId, "contact", contactId),
+    // FLD-08: the business's card layout (null = the default)
+    getCardLayout(orgId, "contact"),
   ]);
   const [tags, takingPart] = await Promise.all([
     listTags(orgId),
@@ -163,6 +166,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
             <CompletenessCard orgId={orgId} type="contact" id={contact.id} editBase={canEdit ? paths.contact(orgId, contact.id) : null} />
           </div>
           <ContactDetailsCard
+            layout={cardLayout}
             key={focus ?? "view"}
             focus={focus}
             orgId={orgId}

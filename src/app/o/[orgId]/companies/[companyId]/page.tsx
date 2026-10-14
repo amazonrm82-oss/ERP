@@ -19,6 +19,7 @@ import { RecordSummaryCard } from "@/features/record-summary/components/record-s
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
+import { getCardLayout } from "@/features/card-layout/queries";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
 import { getCompany, getCompanyFamily, listContactsOfCompany } from "@/features/companies/queries";
 import { ContactDomainNote } from "@/features/company-domain/components/contact-domain-note";
@@ -58,7 +59,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals, fields, tags, types, follow, billing] = await Promise.all([
+  const [company, contacts, deals, fields, tags, types, follow, billing, cardLayout] = await Promise.all([
     getCompany(orgId, companyId),
     listContactsOfCompany(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
@@ -68,6 +69,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     getFollowState(orgId, { kind: "company", id: companyId }, context.user.id),
     // CON-08
     getRecordBilling(orgId, "company", companyId),
+    // FLD-08: the business's card layout (null = the default)
+    getCardLayout(orgId, "company"),
   ]);
   if (!company) {
     notFound();
@@ -129,6 +132,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             <CompletenessCard orgId={orgId} type="company" id={company.id} editBase={canEditRecordHint(context, company.owner_id) ? paths.company(orgId, company.id) : null} />
           </div>
           <CompanyDetailsCard
+            layout={cardLayout}
             key={focus ?? "view"}
             focus={focus}
             orgId={orgId}

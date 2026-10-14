@@ -19,6 +19,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
+import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
@@ -88,6 +89,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
             { href: paths.settingsDisqualifyReasons(orgId), label: "סיבות לליד לא רלוונטי", description: "הרשימה שבוחרים ממנה כשליד לא רלוונטי", icon: InboxIcon },
             { href: paths.settingsRecordTypes(orgId), label: "סוגי אנשי קשר וחברות", description: "לקוח, ספק, שותף: הרשימה שבוחרים ממנה וסוננים לפיה", icon: UsersIcon },
             { href: paths.settingsFields(orgId), label: "שדות", description: "שדות משלכם בכרטיסים ובטפסים", icon: PencilIcon },
+            // FLD-08
+            { href: cardLayoutSettingsPath(orgId), label: "תצוגת כרטיס", description: "קבוצות של שדות בכרטיס של כל רשומה, בסדר שלכם", icon: FormIcon },
             { href: conversionMapSettingsPath(orgId), label: "שדות בהמרת ליד", description: "לאיזה שדה של איש קשר ועסקה עובר כל שדה של ליד", icon: InboxIcon },
             { href: completenessSettingsPath(orgId), label: "שדות חשובים", description: "מה חשוב למלא בכל רשומה, ומה חסר", icon: CheckSquareIcon },
             { href: paths.settingsTags(orgId), label: "תגיות", description: "סימון רשומות וסינון לפיהן", icon: TagIcon },

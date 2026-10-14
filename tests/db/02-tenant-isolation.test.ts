@@ -149,6 +149,7 @@ describe("tenant isolation", () => {
       );
       await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
       await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02')", [orgA, a.id]);
+      await q(`insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'lead', '[{"title": "קשר", "columns": 2, "fields": ["phone", "email"]}]')`, [orgA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -219,6 +220,8 @@ describe("tenant isolation", () => {
     "member_leaves",
     // LEAD-06
     "conversion_field_maps",
+    // FLD-08
+    "card_layouts",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -352,6 +355,7 @@ describe("tenant isolation", () => {
       completeness_settings: "fields = fields",
       member_leaves: "ends_on = ends_on",
       conversion_field_maps: "target_field_id = target_field_id",
+      card_layouts: "groups = groups",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -443,6 +447,7 @@ describe("tenant isolation", () => {
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
+      ["insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'deal', '[]')", [orgA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -517,6 +522,7 @@ describe("tenant isolation", () => {
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
       ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
+      ["card_layouts", "groups = '[]'", "groups = '[]'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

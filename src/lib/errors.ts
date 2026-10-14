@@ -106,6 +106,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "plan:not_available": "החבילה הזו תיפתח בקרוב. עדיין אי אפשר לבחור בה.",
   // not limits, but raised the same way (migrations 0026, 0027)
   "erase:exists": "הרשומה עדיין קיימת. קודם מעבירים אותה לסל המחזור ומוחקים משם לצמיתות.",
+  // FLD-08 (migration card_layouts)
+  "card_layout:invalid": "התצוגה אינה תקינה, או שאחד השדות הוסר בינתיים. רעננו את הדף ונסו שוב.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",

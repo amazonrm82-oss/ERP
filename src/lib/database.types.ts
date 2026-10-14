@@ -54,6 +54,16 @@ export type CompletenessSettingsRow = {
   updated_at: string;
 };
 
+// FLD-08: the groups of the record details card per organization and type; groups = [{title, columns, fields}]. No row = default.
+export type CardLayoutRow = {
+  id: string;
+  organization_id: string;
+  object_type: string;
+  groups: Json;
+  created_at: string;
+  updated_at: string;
+};
+
 // LEAD-06: where a lead custom field goes on conversion. No row = mode "auto" (same label and type, 0029).
 export type ConversionFieldMapRow = {
   id: string;
@@ -1716,6 +1726,8 @@ export type Database = {
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
+      // FLD-08: the card layout per record type; no row = the default layout; no delete grant
+      card_layouts: Table<CardLayoutRow, { organization_id: string; object_type: string; groups?: Json }, { groups?: Json }>;
       // DQL-01: the important fields per record type; seeded per organization, no delete grant
       completeness_settings: Table<CompletenessSettingsRow, { organization_id: string; object_type: string; fields?: string[] }, { fields?: string[] }>;
       // CAP-09: the user is inserted once; the dates, kind and deputy change (column-level update grant; HEB-08)

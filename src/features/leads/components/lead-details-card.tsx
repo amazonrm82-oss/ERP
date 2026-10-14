@@ -13,7 +13,8 @@ import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
-import { CustomFieldDetails } from "@/features/custom-fields/components/custom-field-details";
+import { LayoutDetails } from "@/features/card-layout/components/layout-details";
+import type { CardLayoutGroup } from "@/features/card-layout/layout";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { AttributionRow } from "@/features/intake/attribution";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
@@ -60,10 +61,11 @@ export type LeadDetailsView = {
   preferredChannelSource?: string | null;
 };
 
-type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null };
+// layout: the business's card layout (FLD-08); null or missing = the default layout
+type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null; layout?: CardLayoutGroup[] | null };
 
 /** Lead details that switch in place between reading and editing. */
-export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props) {
+export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout = null }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canWrite);
   useEditFocus("lead-details-title", focus, editing);
@@ -88,23 +90,30 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props
         }
       />
       <CardBody>
-        <DetailList>
-          <Detail label="שם מלא" value={lead.fullName} />
-          <Detail label="טלפון" value={lead.phone} ltr />
-          <Detail label="אימייל" value={lead.email} ltr />
-          <Detail label="חברה" value={lead.companyName} />
-          <Detail label="מקור" value={sourceName} />
-          {lead.requestedProduct && (lead.requestedProduct.enabled || lead.requestedProduct.product) ? (
-            <Detail label="מוצר מבוקש" value={lead.requestedProduct.product ? <RequestedProductValue orgId={orgId} product={lead.requestedProduct.product} /> : null} />
-          ) : null}
-          <Detail label="ערוץ מועדף" value={channelDetail(lead.preferredChannel, lead.preferredChannelSource)} />
-          <Detail label="אחראי" value={lead.ownerName} />
-          <Detail label="תקציב" value={lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null} />
-          <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
-          <Detail label="נוצר" value={lead.createdAtText} />
-          {lead.disqualifyReason ? <Detail label="סיבת פסילה" value={lead.disqualifyReason} /> : null}
-          <CustomFieldDetails definitions={lead.custom.definitions} values={lead.custom.values} objectType="lead" builtins={lead.custom.builtins} />
-        </DetailList>
+        <LayoutDetails
+          type="lead"
+          idPrefix="lead-details"
+          layout={layout}
+          custom={lead.custom}
+          builtIn={{
+            full_name: { value: lead.fullName },
+            phone: { value: lead.phone, ltr: true },
+            email: { value: lead.email, ltr: true },
+            company_name: { value: lead.companyName },
+            source_id: { value: sourceName },
+            requested_product_id:
+              lead.requestedProduct && (lead.requestedProduct.enabled || lead.requestedProduct.product)
+                ? { value: lead.requestedProduct.product ? <RequestedProductValue orgId={orgId} product={lead.requestedProduct.product} /> : null }
+                : null,
+            // CON-10: "(מטופס)" when the channel came from a public form
+            preferred_channel: { value: channelDetail(lead.preferredChannel, lead.preferredChannelSource) },
+            owner_id: { value: lead.ownerName },
+            budget: { value: lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null },
+            last_contacted_at: { value: lead.lastContactText ?? "אין עדיין" },
+            created_at: { value: lead.createdAtText },
+            disqualify_reason: lead.disqualifyReason ? { value: lead.disqualifyReason } : null,
+          }}
+        />
         {lead.message ? (
           <div className="mt-4 border-t border-line pt-4">
             <p className="text-sm text-ink-soft">הודעה</p>
