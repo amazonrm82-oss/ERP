@@ -59,4 +59,45 @@ describe("report and full exports are written to the audit log (IMP-02)", () => 
     );
     expect(elsewhere).toBe(0);
   });
+
+  it("a report export records its format (RPT-02); the four-argument call still records csv", async () => {
+    const before = (await entries()).length;
+    await asUser(admin.id, (q) => q("select public.log_export($1, 'report', 'funnel', 5, 'xlsx')", [org]));
+    await asUser(admin.id, (q) => q("select public.log_export($1, 'report', 'funnel', 6, 'csv')", [org]));
+    await log(admin.id, "report", "funnel", 7);
+    await asUser(owner.id, (q) => q("select public.log_export($1, 'full', null, 8, 'csv')", [org]));
+    expect((await entries()).slice(before)).toEqual([
+      { actor_id: admin.id, entity_type: "reports", changes: { kind: "report", report: "funnel", rows: 5, format: "xlsx" } },
+      { actor_id: admin.id, entity_type: "reports", changes: { kind: "report", report: "funnel", rows: 6, format: "csv" } },
+      { actor_id: admin.id, entity_type: "reports", changes: { kind: "report", report: "funnel", rows: 7, format: "csv" } },
+      { actor_id: owner.id, entity_type: "full_export", changes: { kind: "full", rows: 8, format: "zip" } },
+    ]);
+  });
+
+  it("refuses an unknown format, and the rights checks still come first", async () => {
+    const before = (await entries()).length;
+    for (const format of ["pdf", "XLSX", "", null]) {
+      expect((await pgError(asUser(owner.id, (q) => q("select public.log_export($1, 'report', 'sources', 1, $2)", [org, format])))).code, String(format)).toBe("22023");
+    }
+    expect((await pgError(asUser(rep.id, (q) => q("select public.log_export($1, 'report', 'sources', 1, 'xlsx')", [org])))).code).toBe("42501");
+    expect((await pgError(asAnon((q) => q("select public.log_export($1, 'report', 'sources', 1, 'xlsx')", [org])))).code).toBe("42501");
+    expect(await entries()).toHaveLength(before);
+  });
+
+  it("is one function, granted as before; the 0050 one is out of the API", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (await q<{ sig: string; anon: boolean; auth: boolean }>(
+          `select p.oid::regprocedure::text as sig,
+                  has_function_privilege('anon', p.oid, 'execute') as anon,
+                  has_function_privilege('authenticated', p.oid, 'execute') as auth
+             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname in ('public', 'app') and p.proname like 'log_export%' order by 1`,
+        )).rows,
+    );
+    expect(rows).toEqual([
+      { sig: "app.log_export_0050_retired(uuid,text,text,integer)", anon: false, auth: false },
+      { sig: "log_export(uuid,text,text,integer,text)", anon: false, auth: true },
+    ]);
+  });
 });

@@ -62,9 +62,14 @@ export default async function ReportPage({ params, searchParams }: Props) {
         back={{ href: paths.reports(orgId), label: "כל הדוחות" }}
         actions={
           canExport(context.role) ? (
-            <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}`} className={buttonClasses("secondary", "sm")} download>
-              ייצוא ל-Excel (CSV)
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}&format=xlsx`} className={buttonClasses("secondary", "sm")} download>
+                ייצוא ל-Excel
+              </a>
+              <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}`} className={buttonClasses("secondary", "sm")} download>
+                ייצוא ל-CSV
+              </a>
+            </div>
           ) : null
         }
       />
