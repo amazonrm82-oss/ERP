@@ -220,11 +220,28 @@ export function shownRecurringAmount(amountAgorot: number | null, following: boo
   return following === true && amountAgorot === 0 ? null : amountAgorot;
 }
 
-/** "₪500 לחודש" / "₪6,000 לשנה"; null for a one-time deal. */
+/**
+ * DLI-04: the deal's monthly recurring revenue in agorot: the monthly amount, or a yearly amount
+ * divided by 12, half up (the rounding of app.document_totals). null for a one-time deal or no amount.
+ */
+export function monthlyRecurringAgorot(stored: string | null | undefined, amountAgorot: number | null | undefined): number | null {
+  const kind = billingKindOf(stored);
+  if (kind === "one_time" || amountAgorot === null || amountAgorot === undefined) return null;
+  if (kind === "monthly") return amountAgorot;
+  const whole = Math.floor(amountAgorot / 12);
+  return amountAgorot - whole * 12 >= 6 ? whole + 1 : whole;
+}
+
+/**
+ * "₪500 לחודש" / "₪6,000 לשנה (₪500 לחודש)"; null for a one-time deal. DLI-04: a yearly amount
+ * also says its monthly share (monthlyRecurringAgorot()).
+ */
 export function recurringText(stored: string | null | undefined, amountAgorot: number | null | undefined): string | null {
   const kind = billingKindOf(stored);
   if (kind === "one_time" || amountAgorot === null || amountAgorot === undefined) return null;
-  return `${formatMoney(amountAgorot)} ${PER[kind]}`;
+  const text = `${formatMoney(amountAgorot)} ${PER[kind]}`;
+  if (kind === "yearly" && amountAgorot > 0) return `${text} (${formatMoney(monthlyRecurringAgorot(kind, amountAgorot))} ${PER.monthly})`;
+  return text;
 }
 
 export const RECURRING_FIELD_NAMES = ["billing_kind", "recurring_amount", "recurring_start_date", "renewal_date"] as const;

@@ -50,7 +50,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
-import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
+import { getDealPricing, listDealLines, listLineProductBillings } from "@/features/deal-lines/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 
 export const metadata: Metadata = { title: "עסקה" };
@@ -103,7 +103,11 @@ export default async function DealPage({ params, searchParams }: Props) {
     orgHasFeature(orgId, "discounts"),
   ]);
   // DLI-01, PL-03: the day, the VAT and the customer's price list the lines are priced by
-  const linesPricing = await getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone);
+  // DLI-04: how the products on the lines bill (display only)
+  const [linesPricing, lineBillings] = await Promise.all([
+    getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone),
+    listLineProductBillings(orgId, lines),
+  ]);
   // DEAL-11: right after a copy, the custom fields it could not carry
   const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
@@ -170,8 +174,10 @@ export default async function DealPage({ params, searchParams }: Props) {
               auto: deal.amount_auto === true,
               source: deal.amount_source,
               recurringAuto: deal.recurring_amount_auto === true,
+              recurringAgorot: shownRecurringAmount(deal.recurring_amount_agorot, deal.recurring_amount_auto),
             }}
             lines={lines}
+            billings={lineBillings}
             pricing={linesPricing}
             canEdit={canEdit}
             features={{ products: hasProducts, discounts: hasDiscounts }}

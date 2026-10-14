@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PriceListLineRule, PricedProduct } from "@/features/price-lists/price";
-import type { VatKind } from "@/features/products/schema";
+import type { Billing, VatKind } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
@@ -12,6 +12,7 @@ import { must } from "@/lib/db-read";
 import { zoneDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
+import { isBilling } from "./recurring";
 import { conversionRateBp, dealLinesMode, pickCustomerList, isDealLineSource, type DealLineSource, type NamedPriceList } from "./pricing";
 
 type Client = SupabaseClient<Database>;
@@ -91,6 +92,23 @@ export async function readDealLines(supabase: Client, orgId: string, dealId: str
 
 export async function listDealLines(orgId: string, dealId: string): Promise<DealLine[]> {
   return readDealLines(await createClient(), orgId, dealId);
+}
+
+/**
+ * DLI-04: how the products on these lines bill (products.billing), by product id. Display only: a
+ * line stores no billing of its own. Read with the user's session (members read products); at most
+ * 200 lines per deal, so one read.
+ */
+export async function listLineProductBillings(orgId: string, lines: DealLine[]): Promise<Record<string, Billing>> {
+  const ids = [...new Set(lines.map((line) => line.productId).filter((id): id is string => id !== null))];
+  if (ids.length === 0) return {};
+  const supabase = await createClient();
+  const rows = must(await supabase.from("products").select("id, billing").eq("organization_id", orgId).in("id", ids), "products");
+  const out: Record<string, Billing> = {};
+  for (const row of rows) {
+    if (isBilling(row.billing)) out[row.id] = row.billing;
+  }
+  return out;
 }
 
 /**
