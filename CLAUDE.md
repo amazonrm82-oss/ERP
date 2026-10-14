@@ -554,6 +554,15 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   checked against `tests/unit/fixtures/deal-value.json`): empty value = first year (12 x monthly, the yearly amount), flag on;
   a typed or changed value is kept and turns it off; unchanged while on recomputes; one-time is never computed. Over 2^53-1
   agorot: hint `deal:amount_too_big`. Not in merge picks yet (shared-ground follow-up).
+- Company by email domain (CON-09, migration 0182; owner 14 October 2026): trigger `contacts_company_by_domain` (before insert,
+  invoker, person writes only; never replaces a picked company; an import with a mapped company column skips) links a new contact
+  when exactly one company of the first tier of `public.company_domain_matches(org, email)` (invoker, at most 7 rows) has the
+  domain: per level from the full domain down to the registered one (`app.domain_candidates`, `app.registered_domain`,
+  `app.domain_suffix`), own website/email first, then the one domain at least two of its contacts share
+  (`company_contact_domain()`, only without an own domain and while `companies.contact_domain_off` is null). Public domains and
+  site hosts (`app.public_email_domain`, closed list) never match. Candidates come from `app.company_domain_candidates()` (definer,
+  ids only, no cap, members only) and are re-read under RLS. `contacts.company_matched_domain` / `company_match_kind` (server only)
+  drive the card marks. Mirrors in `src/features/company-domain/domains.ts` (unit test).
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
