@@ -537,6 +537,14 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   overdue + not answered (the report's contact rule) -> pass to `app.next_lead_owner` (never a previous owner; skipped people keep
   their rotation turn; the SPD-05 call task follows silently; one `system` entry `response_pass`) or `response_overdue` to the team's
   managers (`app.response_managers`), else owners/admins. A taken lead (`taken_at`) is never passed on.
+- Billing details and requested product (CON-08, LEAD-04, migrations 0176, 0177): nullable columns on `companies` and `contacts`
+  (`billing_name`, `billing_address`, `shipping_address`, `billing_email`, `payment_terms` immediate|net|eom with `payment_days`
+  0..365, `price_list_id` composite FK set null; contacts also `billing_tax_id` with `app.valid_israeli_id`; contacts column grants).
+  A contact's empty field shows its company's value, display only (`effectiveBilling()`; owner: never copied; a document takes the
+  effective value as a snapshot). Terms and `paymentDueDate()` in `src/features/billing/terms.ts`. `leads.requested_product_id`
+  (composite FK set null, column grants): trigger `leads_requested_product_check` (invoker, person writes; non-members go to RLS)
+  needs an offerable product and the `products` flag; sort field `sort_requested_product`. Owner: billing is core (no plan key,
+  `PLAN_CAPABILITIES` `core`); neither is in merge picks yet (shared-ground follow-up).
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
