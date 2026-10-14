@@ -23,6 +23,26 @@ export const CUSTOM_PREFIX = "cf:";
 export const MORE_FIELDS_TITLE = "שדות נוספים";
 // the title of the one group of the default layout
 export const DEFAULT_GROUP_TITLE = "פרטים";
+// the title the editor gives a group it adds
+export const NEW_GROUP_TITLE = "קבוצה חדשה";
+
+// Titles the app writes itself; a group so titled has no name from the business.
+export const APP_GROUP_TITLES: readonly string[] = [DEFAULT_GROUP_TITLE, MORE_FIELDS_TITLE, NEW_GROUP_TITLE];
+
+/** True when the business gave the group its own name (not one of the app's default titles). */
+export function isNamedTitle(title: string): boolean {
+  const trimmed = title.trim();
+  return trimmed !== "" && !APP_GROUP_TITLES.includes(trimmed);
+}
+
+/**
+ * Whether each rendered group shows its heading (owner, 14 October 2026): with several groups every
+ * heading shows; a single group shows its heading only when the business named it.
+ */
+export function groupHeadings(groups: Pick<CardLayoutGroup, "title">[]): boolean[] {
+  if (groups.length === 1) return [isNamedTitle(groups[0].title)];
+  return groups.map(() => true);
+}
 
 // The details card's own fields, in the order the card showed them before FLD-08.
 export const CARD_LAYOUT_BUILT_IN: Record<CardLayoutType, Array<{ key: string; label: string }>> = {
@@ -144,8 +164,8 @@ export function layoutCatalog(type: CardLayoutType, definitions: Pick<FieldDefin
 }
 
 /**
- * What a card shows when the business has no saved layout: today's card, one group (shown without a
- * heading) with every field it knows, in order, and no cap. The 60-field cap is for saved layouts only.
+ * What a card shows when the business has no saved layout: today's card, one group (its default title is
+ * not shown) with every field it knows, in order, and no cap. The 60-field cap is for saved layouts only.
  */
 export function unsavedLayout(known: readonly string[]): CardLayoutGroup[] {
   return [{ title: DEFAULT_GROUP_TITLE, columns: 1, fields: [...known] }];

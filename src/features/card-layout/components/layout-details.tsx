@@ -5,7 +5,7 @@ import { fieldState } from "@/features/custom-fields/conditions";
 import type { CustomValues, FieldDefinition, FieldObject } from "@/features/custom-fields/types";
 import { displayCustomFields } from "@/features/custom-fields/values";
 
-import { CARD_LAYOUT_BUILT_IN, CUSTOM_PREFIX, resolveLayout, splitColumns, unsavedLayout, type CardLayoutGroup, type CardLayoutType } from "../layout";
+import { CARD_LAYOUT_BUILT_IN, CUSTOM_PREFIX, groupHeadings, resolveLayout, splitColumns, unsavedLayout, type CardLayoutGroup, type CardLayoutType } from "../layout";
 
 // a built-in field as the card shows it; null/undefined = not shown on this record (e.g. the loss reason of an open deal)
 export type BuiltInDetail = { value: ReactNode; ltr?: boolean; label?: string } | null | undefined;
@@ -25,7 +25,9 @@ type Item = { key: string; label: string; value: ReactNode; ltr?: boolean };
 /**
  * The details of a record card arranged by the business's groups (FLD-08). Fields whose FLD-09
  * "show" condition does not hold are left out; a field the layout does not place shows in a
- * final group "שדות נוספים". One group shows without its heading (the card already has one).
+ * final group "שדות נוספים". A single group shows its heading only when the business named it
+ * (groupHeadings); without a heading it is plain lists under the card's own heading, with no
+ * section, so no unnamed region is announced.
  */
 export function LayoutDetails({ type, layout, builtIn, custom, idPrefix }: Props) {
   const items = new Map<string, Item>();
@@ -54,7 +56,7 @@ export function LayoutDetails({ type, layout, builtIn, custom, idPrefix }: Props
   const known = [...items.keys()];
   // no saved layout: exactly today's card (one list of every field, no heading, no cap)
   const groups = layout ? resolveLayout(layout, known) : unsavedLayout(known);
-  const single = groups.length === 1;
+  const headings = groupHeadings(groups);
 
   return (
     <div className="space-y-4">
@@ -74,7 +76,7 @@ export function LayoutDetails({ type, layout, builtIn, custom, idPrefix }: Props
             ))}
           </div>
         );
-        if (single) return <Fragment key={index}>{lists}</Fragment>;
+        if (!headings[index]) return <Fragment key={index}>{lists}</Fragment>;
         return (
           <section key={index} aria-labelledby={headingId} className={index > 0 ? "border-t border-line pt-4" : undefined}>
             <h3 id={headingId} className="mb-3 text-sm font-medium text-ink">

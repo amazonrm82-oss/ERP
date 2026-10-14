@@ -17,6 +17,7 @@ import {
   CARD_LAYOUT_TITLE_MAX,
   layoutProblem,
   MORE_FIELDS_TITLE,
+  NEW_GROUP_TITLE,
   type CardLayoutGroup,
   type CardLayoutType,
   type CatalogField,
@@ -139,7 +140,7 @@ export function CardLayoutEditor({ orgId, type, initial, catalog, editable }: Pr
   }
 
   function addGroup() {
-    change((current) => [...current, { id: nextId, title: "קבוצה חדשה", columns: 1, fields: [] }]);
+    change((current) => [...current, { id: nextId, title: NEW_GROUP_TITLE, columns: 1, fields: [] }]);
     setNextId((id) => id + 1);
   }
 

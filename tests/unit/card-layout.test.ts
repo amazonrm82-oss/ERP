@@ -4,10 +4,14 @@ import {
   CARD_LAYOUT_BUILT_IN,
   CARD_LAYOUT_TYPES,
   cleanLayout,
+  DEFAULT_GROUP_TITLE,
   defaultLayout,
+  groupHeadings,
+  isNamedTitle,
   layoutProblem,
   layoutSchema,
   MORE_FIELDS_TITLE,
+  NEW_GROUP_TITLE,
   parseLayout,
   resolveLayout,
   splitColumns,
@@ -118,5 +122,46 @@ describe("card layout (FLD-08)", () => {
     expect(layoutProblem([{ title: "א", columns: 1, fields: [] }])).toBeNull();
     expect(layoutProblem([{ title: "  ", columns: 1, fields: [] }])).toBe("לכל קבוצה צריך כותרת.");
     expect(layoutProblem([{ title: "א", columns: 1, fields: Array.from({ length: 61 }, (_, i) => `cf:k${i}`) }])).toContain("60");
+  });
+});
+
+// FLD-08 follow-up (owner, 14 October 2026): a single group's heading shows only when the business named it
+describe("card layout headings (FLD-08)", () => {
+  const known = ["full_name", "phone", "email"];
+
+  it("several groups always show their headings, default titles included", () => {
+    expect(groupHeadings([{ title: DEFAULT_GROUP_TITLE }, { title: MORE_FIELDS_TITLE }])).toEqual([true, true]);
+    expect(groupHeadings([{ title: "קשר" }, { title: NEW_GROUP_TITLE }, { title: "פרטים" }])).toEqual([true, true, true]);
+  });
+
+  it("a single group with an app title hides its heading", () => {
+    for (const title of [DEFAULT_GROUP_TITLE, MORE_FIELDS_TITLE, NEW_GROUP_TITLE, ` ${DEFAULT_GROUP_TITLE} `]) {
+      expect(groupHeadings([{ title }]), title).toEqual([false]);
+    }
+  });
+
+  it("a single group the business named shows its heading", () => {
+    expect(groupHeadings([{ title: "פרטי התקשרות" }])).toEqual([true]);
+    expect(groupHeadings([{ title: "פרטים כלליים" }])).toEqual([true]);
+  });
+
+  it("no saved layout keeps today's card: one list without a heading", () => {
+    expect(groupHeadings(unsavedLayout(known))).toEqual([false]);
+  });
+
+  it("a layout whose groups all empty out leaves only the final group, without a heading", () => {
+    const groups = resolveLayout([{ title: "קשר", columns: 1, fields: ["cf:gone"] }], known);
+    expect(groups.map((g) => g.title)).toEqual([MORE_FIELDS_TITLE]);
+    expect(groupHeadings(groups)).toEqual([false]);
+  });
+
+  it("a named group that holds every field shows its heading; with the final group both show", () => {
+    expect(groupHeadings(resolveLayout([{ title: "קשר", columns: 2, fields: known }], known))).toEqual([true]);
+    expect(groupHeadings(resolveLayout([{ title: DEFAULT_GROUP_TITLE, columns: 1, fields: ["phone"] }], known))).toEqual([true, true]);
+  });
+
+  it("an empty title is never a name", () => {
+    expect(isNamedTitle("")).toBe(false);
+    expect(isNamedTitle("   ")).toBe(false);
   });
 });
