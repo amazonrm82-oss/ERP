@@ -573,6 +573,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   change). The effect is app-only (`src/features/custom-fields/conditions.ts`): a hidden field keeps its value (a disabled
   fieldset with a `cond_shown_<key>` marker; the server skips a field whose marker did not arrive); "require" is checked by the
   record forms, and by board drag / table cell (`RequiredFieldsDialog`) and bulk (skipped "חסר שדה חובה: …"), never by the database.
+  Every manual move of a lead status or deal stage (board, card menu, table cell, lead status form, deal stage menu, won window,
+  cleanup and forecast lists) goes through `moveRecord()` / `moveRecordAction()` in `src/features/record-move/`: the reason and the
+  missing fields are checked together, refused as `MoveRefusal`, then asked by `RequiredFieldsDialog` or `AskedFields` (marker
+  `required_fields_asked`) and saved in one update. `setLeadStatus` stays for bulk and its undo.
 - Deal lines (DLI-01/02, DSC-01 line part, PL-03 for deals; migration 0185): `public.deal_lines` (rights follow the deal; edit
   needs `app.can_edit_record` and a deal not in the bin; product FK with no on delete action; price list FK set null; cap 200 per
   deal, hint `deal_lines:max`). Definer trigger `app.deal_lines_check` (outsider guard first): one VAT mode per deal (lines', else
