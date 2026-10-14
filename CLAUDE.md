@@ -514,8 +514,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   tasks add `(organization_id, id) in (select … from app.deputy_readable(type))` (records linked by the absent person's open
   tasks that the absent person reads, and their unanswered open leads, during the absence in the org zone); `app.can_read_record`
   is unchanged, `app.user_deputy_reads` is the per-user rule beside `app.user_can_read_record`. A deputy updates open tasks but
-  never hands them over (`tasks_deputy_guard`, hint `task:deputy_owner`); reminders also go to the deputy. `intake_submit`,
-  `app.notify_assignment`, `app.run_automation_actions`, `app.check_lead_responses`, `app.send_task_reminders` and the mention
+  never hands them over (`tasks_deputy_guard`, hint `task:deputy_owner`); reminders also go to the deputy. `intake_submit` (0188),
+  `app.notify_assignment`, `app.run_automation_actions` (0188), `app.check_lead_responses`, `app.send_task_reminders` and the mention
   functions were last redefined in 0187.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
@@ -579,6 +579,9 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
   reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
   `app.export_choice_values()` (last redefined in 0183) lists the fixed choice codes kept in an export's audit filters.
+  Since 0188 leads have `preferred_channel` too, and both tables `preferred_channel_source` (form|manual, server-maintained by
+  the invoker trigger `app.preferred_channel_source()`: a person's change = manual). `forms.channel_choice` asks on the public
+  form; `intake_submit` (last redefined in 0188) fills an empty or form-set channel, never a manual one; conversion carries it.
 - Conditional fields (FLD-09, migration 0184): `field_definitions.condition` = {field, op, value, effect show|require} (one per
   field, no chains, controller of the same type or `builtin:status|source|stage|type`), checked by the invoker trigger
   `field_definitions_condition_check` (hint `custom_field:condition`, advisory lock per org and type, re-checked on key/type
