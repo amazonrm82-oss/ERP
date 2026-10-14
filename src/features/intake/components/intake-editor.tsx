@@ -90,6 +90,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <TextareaField label="טקסט מעל הטופס (לא חובה)" name="intro" rows={2} maxLength={500} defaultValue={values?.intro ?? intake.intro ?? ""} error={errors.intro} />
           <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
           <CallbackSettings intake={intake} values={values} />
+          <ChannelSettings intake={intake} values={values} />
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>
@@ -230,6 +231,26 @@ function CallbackSettings({ intake, values }: { intake: IntakeDetails; values?: 
         </fieldset>
       ) : null}
     </div>
+  );
+}
+
+/** CON-10: ask how the person likes to be contacted; the answer fills the preferred channel (never one a person set). */
+function ChannelSettings({ intake, values }: { intake: IntakeDetails; values?: Record<string, string> }) {
+  return (
+    <label className="flex items-start gap-2.5 text-md">
+      <input
+        type="checkbox"
+        name="channel_choice"
+        defaultChecked={values ? values.channel_choice === "on" : intake.channelChoice}
+        className="mt-1 size-4.5 accent-accent"
+      />
+      <span>
+        לשאול איך נוח שניצור קשר
+        <span className="block text-sm text-ink-soft">
+          טלפון, וואטסאפ, אימייל או SMS. התשובה נשמרת כערוץ המועדף של הליד. ערוץ שמישהו בצוות קבע לא משתנה.
+        </span>
+      </span>
+    </label>
   );
 }
 

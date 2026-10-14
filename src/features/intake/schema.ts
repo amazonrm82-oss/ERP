@@ -56,6 +56,8 @@ export const updateIntakeSchema = z.object({
   whatsapp_text: optionalText(MAX_WHATSAPP_TEXT, `ההודעה ארוכה מדי (עד ${MAX_WHATSAPP_TEXT} תווים).`),
   // SPD-05: ask when to call back
   callback_choice: checkbox,
+  // CON-10: ask how the person likes to be contacted
+  channel_choice: checkbox,
 });
 
 const slotsOffSchema = z.array(z.enum(CALLBACK_SLOT_STARTS as [CallbackSlotStart, ...CallbackSlotStart[]])).max(CALLBACK_SLOT_STARTS.length);

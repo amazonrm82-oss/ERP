@@ -555,6 +555,8 @@ export type FormRow = {
   callback_choice: boolean;
   // SPD-05: slots switched off on this form, by start hour ('09', '12', '15', '18')
   callback_slots_off: string[];
+  // CON-10: the hosted form asks how the person likes to be contacted
+  channel_choice: boolean;
 };
 
 export type FormSubmissionRow = {
@@ -818,6 +820,8 @@ export type ContactRow = {
   // CON-10: null or ContactLocale / ContactChannel (src/features/contacts/preferences.ts), check constraints
   preferred_locale: string | null;
   preferred_channel: string | null;
+  // CON-10: form | manual, null while the channel is empty (server only, app.preferred_channel_source())
+  preferred_channel_source: string | null;
   owner_id: string | null;
   team_id: string | null;
   tag_ids: string[];
@@ -982,6 +986,9 @@ export type LeadRow = {
   taken_at: string | null;
   // LEAD-04: the product the lead asked about (public.products); a person may pick only an offerable one
   requested_product_id: string | null;
+  // CON-10: null or ContactChannel (src/features/contacts/preferences.ts); its source is form | manual (server only)
+  preferred_channel: string | null;
+  preferred_channel_source: string | null;
 };
 
 export type LeadInsert = {
@@ -1009,6 +1016,8 @@ export type LeadInsert = {
   last_contacted_at?: string | null;
   deleted_at?: string | null;
   requested_product_id?: string | null;
+  // CON-10
+  preferred_channel?: string | null;
 };
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
@@ -1495,6 +1504,7 @@ export type Database = {
           whatsapp_text?: string | null;
           callback_choice?: boolean;
           callback_slots_off?: string[];
+          channel_choice?: boolean;
         },
         {
           name?: string;
@@ -1514,6 +1524,7 @@ export type Database = {
           whatsapp_text?: string | null;
           callback_choice?: boolean;
           callback_slots_off?: string[];
+          channel_choice?: boolean;
         }
       >;
       // written only by intake_submit()

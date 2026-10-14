@@ -190,6 +190,7 @@ describe("hosted form: what the server reads (CAP-01)", () => {
       thanks: { whatsappUrl: null },
       callback: null,
       builtWith: false,
+      channelChoice: false,
     });
     expect(publicFormFrom(null)).toBeNull();
   });

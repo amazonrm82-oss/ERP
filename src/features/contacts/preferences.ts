@@ -47,6 +47,19 @@ export function channelLabel(value: string | null | undefined): string | null {
 export const LOCALE_OPTIONS = CONTACT_LOCALES.map((value) => ({ value, label: CONTACT_LOCALE_LABELS[value] }));
 export const CHANNEL_OPTIONS = CONTACT_CHANNELS.map((value) => ({ value, label: CONTACT_CHANNEL_LABELS[value] }));
 
+/**
+ * CON-10 follow-up: where a stored channel came from (leads and contacts, server-maintained by
+ * app.preferred_channel_source()). 'form' = picked on a public form, so a later form choice may
+ * replace it; 'manual' (or none, for a value older than the source) = set by a person, kept.
+ */
+export const CHANNEL_SOURCES = ["form", "manual"] as const;
+
+/** The channel as the card shows it: "וואטסאפ (מטופס)" when a public form set it. */
+export function channelDetail(value: string | null | undefined, source: string | null | undefined): string | null {
+  const label = channelLabel(value);
+  return label && source === "form" ? `${label} (מטופס)` : label;
+}
+
 /** The preferred channel as the contact buttons take it, or null when none is set. */
 export function preferredContactChannel(value: string | null | undefined): { channel: ContactChannel; label: string } | null {
   return isContactChannel(value) ? { channel: value, label: CONTACT_CHANNEL_LABELS[value] } : null;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { parseMoneyToAgorot } from "@/lib/format";
+import { CONTACT_CHANNELS, type ContactChannel } from "@/features/contacts/preferences";
 import { checkbox, moneyField, optionalEmail, optionalId, optionalPhone, optionalText, requiredId } from "@/lib/validation";
 
 const leadFields = {
@@ -118,6 +119,29 @@ export function utmValues(utm: unknown): Partial<Record<LeadUtmKey, string>> {
     if (typeof value === "string") out[key] = value;
   }
   return out;
+}
+
+// CON-10: the lead's preferred channel ("" = none); its source is kept by the database
+const channelChoice = z
+  .preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string())
+  .refine((value) => value === "" || (CONTACT_CHANNELS as readonly string[]).includes(value), { error: "הערוץ שנבחר אינו ברשימה." })
+  .transform((value) => (value === "" ? null : (value as ContactChannel)));
+
+/**
+ * The preferred channel a lead form sends, as columns to write. Written only when the form has
+ * the field, so a form without it never empties a channel a public form filled in.
+ */
+export function leadChannelFromForm(
+  formData: FormData,
+): { ok: true; patch: { preferred_channel?: ContactChannel | null } } | { ok: false; message: string } {
+  if (!formData.has("preferred_channel")) {
+    return { ok: true, patch: {} };
+  }
+  const parsed = channelChoice.safeParse(formData.get("preferred_channel"));
+  if (!parsed.success) {
+    return { ok: false, message: "הערוץ שנבחר אינו ברשימה." };
+  }
+  return { ok: true, patch: { preferred_channel: parsed.data } };
 }
 
 export const convertLeadSchema = z.object({

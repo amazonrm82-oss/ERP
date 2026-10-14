@@ -19,6 +19,7 @@ import { createLeadAction } from "../actions";
 import { RequestedProductPicker } from "@/features/requested-product/components/requested-product-picker";
 
 import { LeadCampaignFields } from "./lead-campaign-fields";
+import { LeadChannelField } from "./lead-channel-field";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
 // reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
@@ -122,6 +123,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons, products =
         />
       ) : null}
       {products ? <RequestedProductPicker orgId={orgId} initial={null} error={errors.requested_product_id} /> : null}
+      <LeadChannelField value={values.preferred_channel ?? ""} error={errors.preferred_channel} />
       <LeadCampaignFields values={values} errors={errors} />
       <TextareaField
         label="הודעה או הערה ראשונה"

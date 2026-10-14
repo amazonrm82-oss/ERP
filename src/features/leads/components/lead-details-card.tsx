@@ -26,7 +26,10 @@ import type { RequestedProduct } from "@/features/requested-product/queries";
 import { updateLeadAction } from "../actions";
 import type { LeadSourceOption } from "../queries";
 import { budgetInputValue, LEAD_UTM_KEYS, type LeadUtmKey } from "../schema";
+import { channelDetail } from "@/features/contacts/preferences";
+
 import { LeadCampaignFields } from "./lead-campaign-fields";
+import { LeadChannelField } from "./lead-channel-field";
 
 export type LeadDetailsView = {
   id: string;
@@ -52,6 +55,9 @@ export type LeadDetailsView = {
   utm?: Partial<Record<LeadUtmKey, string>>;
   // LEAD-04: the requested product (null: none, or not readable) and whether the plan has products
   requestedProduct?: { enabled: boolean; product: RequestedProduct | null };
+  // CON-10: the stored channel code and where it came from (form | manual)
+  preferredChannel?: string | null;
+  preferredChannelSource?: string | null;
 };
 
 type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null };
@@ -91,6 +97,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus }: Props
           {lead.requestedProduct && (lead.requestedProduct.enabled || lead.requestedProduct.product) ? (
             <Detail label="מוצר מבוקש" value={lead.requestedProduct.product ? <RequestedProductValue orgId={orgId} product={lead.requestedProduct.product} /> : null} />
           ) : null}
+          <Detail label="ערוץ מועדף" value={channelDetail(lead.preferredChannel, lead.preferredChannelSource)} />
           <Detail label="אחראי" value={lead.ownerName} />
           <Detail label="תקציב" value={lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null} />
           <Detail label="מגע אחרון" value={lead.lastContactText ?? "אין עדיין"} />
@@ -207,6 +214,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
               error={errors.requested_product_id}
             />
           ) : null}
+          <LeadChannelField value={values?.preferred_channel ?? lead.preferredChannel ?? ""} error={errors.preferred_channel} />
           <TextareaField
             label="הודעה"
             name="message"

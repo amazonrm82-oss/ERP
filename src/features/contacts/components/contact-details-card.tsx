@@ -21,7 +21,7 @@ import { paths } from "@/lib/paths";
 
 import { updateContactAction } from "../actions";
 import { channelTypeLabel, draftsFrom, type ChannelKind } from "../channels";
-import { channelLabel, localeLabel } from "../preferences";
+import { channelDetail, localeLabel } from "../preferences";
 import { ContactFields, type ContactValues } from "./contact-fields";
 
 export type ContactDetailsView = ContactValues & {
@@ -34,6 +34,8 @@ export type ContactDetailsView = ContactValues & {
   contact_type: string | null;
   ownerName: string | null;
   birthDateText: string | null;
+  // CON-10: form | manual (server-maintained); a form's value is marked on the card
+  preferred_channel_source?: string | null;
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
   // active custom fields and the values stored on the record
@@ -85,7 +87,7 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
           <Detail label="סוג" value={contact.typeName ?? contact.contact_type} />
           <Detail label="יום הולדת" value={contact.birthDateText} />
           <Detail label="שפה מועדפת" value={localeLabel(contact.preferred_locale)} />
-          <Detail label="ערוץ מועדף" value={channelLabel(contact.preferred_channel)} />
+          <Detail label="ערוץ מועדף" value={channelDetail(contact.preferred_channel, contact.preferred_channel_source)} />
           <Detail label="מקור" value={contact.sourceName} />
           <Detail label="אחראי" value={contact.ownerName} />
           <Detail label="נוצר" value={contact.createdAtText} />

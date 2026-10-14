@@ -134,7 +134,7 @@ describe("business branding (FLD-04)", () => {
     );
     const shown = await asService(async (q) => (await q<{ r: Record<string, unknown> }>("select public.intake_form($1) as r", [form.token])).rows[0].r);
     expect(shown.brand).toEqual({ logo, color: "#e91e63" });
-    expect(Object.keys(shown).sort()).toEqual(["brand", "built_with", "callback", "fields", "intro", "submit_label", "thanks", "title"]);
+    expect(Object.keys(shown).sort()).toEqual(["brand", "built_with", "callback", "channel_choice", "fields", "intro", "submit_label", "thanks", "title"]);
     await update(owner, "logo_path = null, brand_color = null");
     const plain = await asService(async (q) => (await q<{ r: Record<string, unknown> }>("select public.intake_form($1) as r", [form.token])).rows[0].r);
     expect(plain.brand).toEqual({ logo: null, color: null });

@@ -11,12 +11,21 @@ import { SubmitButton } from "@/components/ui/submit-button";
 
 import { collectAttribution } from "../attribution";
 import { CALLBACK_INPUT, type CallbackOffer } from "../callback";
+import { CHANNEL_INPUT, CHANNEL_QUESTION, PUBLIC_CHANNEL_OPTIONS } from "../channel";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
 
 // whatsappUrl: CAP-05, the thank-you state's chat with the business (wa.me), or null for no button
 // callback: SPD-05, what the form offered when the page was made, or null when the form does not ask
-type Props = { token: string; fields: PublicField[]; submitLabel: string; whatsappUrl: string | null; callback: CallbackOffer | null };
+// channelChoice: CON-10, ask how the person likes to be contacted
+type Props = {
+  token: string;
+  fields: PublicField[];
+  submitLabel: string;
+  whatsappUrl: string | null;
+  callback: CallbackOffer | null;
+  channelChoice?: boolean;
+};
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
 function rawValues(form: HTMLFormElement): RawValues {
@@ -30,7 +39,7 @@ function rawValues(form: HTMLFormElement): RawValues {
 }
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
-export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback }: Props) {
+export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false }: Props) {
   const router = useRouter();
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
@@ -111,6 +120,16 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
             })
           }
         /> : null}
+      {channelChoice ? (
+        <SelectField label={CHANNEL_QUESTION} name={CHANNEL_INPUT} defaultValue="">
+          <option value="">לא משנה</option>
+          {PUBLIC_CHANNEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
       {/* honeypot: hidden from people and from screen readers; bots fill it */}
       <div aria-hidden="true" className="absolute -start-[10000px] h-px w-px overflow-hidden">
         <label>

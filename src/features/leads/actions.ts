@@ -23,6 +23,7 @@ import {
   LEAD_CAMPAIGN_FIELD_NAMES,
   LEAD_FIELD_NAMES,
   leadCampaignSchema,
+  leadChannelFromForm,
   updateLeadSchema,
 } from "./schema";
 import { requestedProductFromForm } from "@/features/requested-product/schema";
@@ -70,6 +71,11 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   if (!product.ok) {
     return fail(product.message, { fieldErrors: { requested_product_id: product.message }, values: formValues(formData) });
   }
+  // CON-10: the preferred channel
+  const channel = leadChannelFromForm(formData);
+  if (!channel.ok) {
+    return fail(channel.message, { fieldErrors: { preferred_channel: channel.message }, values: formValues(formData) });
+  }
 
   // A repeat lead (same phone or email as a lead or contact the user can see)
   // is pointed out first; the user may still create a new one.
@@ -92,6 +98,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
       ...campaignInsert(campaign.data),
       disqualify_reason: choice.reason,
       ...product.patch,
+      ...channel.patch,
       ...customFieldsPatch(custom.customFields),
     })
     .select("id")
@@ -136,10 +143,15 @@ export async function updateLeadAction(
   if (!product.ok) {
     return fail(product.message, { fieldErrors: { requested_product_id: product.message }, values: formValues(formData) });
   }
+  // CON-10: the preferred channel (the database marks a changed one as set by a person)
+  const channel = leadChannelFromForm(formData);
+  if (!channel.ok) {
+    return fail(channel.message, { fieldErrors: { preferred_channel: channel.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("leads")
-    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...channel.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

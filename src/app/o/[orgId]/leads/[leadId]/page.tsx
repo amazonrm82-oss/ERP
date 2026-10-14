@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
+import { preferredContactChannel } from "@/features/contacts/preferences";
 import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { ShareSummary } from "@/features/share/components/share-summary";
 import { recordSummary } from "@/features/share/summary";
@@ -107,6 +108,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               ? { orgId, subject: { kind: "lead", id: lead.id }, name, values: recordTemplateValues({ fullName: lead.full_name }, context) }
               : undefined
           }
+          preferred={preferredContactChannel(lead.preferred_channel)}
         />
         <div className="mt-2">
           <ShareSummary
@@ -213,6 +215,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
               budgetAgorot: lead.budget_agorot,
               utm: utmValues(lead.utm),
               requestedProduct: { enabled: productsEnabled, product: requestedProduct },
+              preferredChannel: lead.preferred_channel,
+              preferredChannelSource: lead.preferred_channel_source,
             }}
           />
 

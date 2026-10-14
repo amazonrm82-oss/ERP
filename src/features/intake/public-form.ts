@@ -26,6 +26,8 @@ export type PublicForm = {
   callback: CallbackOffer | null;
   // FLD-04: show the "נבנה ב-Mexuz" line (false unless the database says true)
   builtWith: boolean;
+  // CON-10: ask how the person likes to be contacted (the four channels)
+  channelChoice: boolean;
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -91,6 +93,7 @@ export function publicFormFrom(data: Json): PublicForm | null {
     },
     callback: callbackOfferFrom(data.callback),
     builtWith: builtWithVisible(data.built_with),
+    channelChoice: data.channel_choice === true,
   };
 }
 

@@ -167,7 +167,7 @@ export async function getLead(orgId: string, leadId: string) {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, requested_product_id, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
+      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, requested_product_id, preferred_channel, preferred_channel_source, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
     )
     .eq("organization_id", orgId)
     .eq("id", leadId)
