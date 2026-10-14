@@ -10,7 +10,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
 import { DEFAULT_ORG_HOURS, workingDaysOnly } from "./in-hours";
-import { parseLeave } from "./leave";
+import { parseDeputy, parseLeave, parseLeaveKind } from "./leave";
 import { memberHoursPath } from "./paths";
 
 const NO_DAY = "יש לסמן לפחות יום עבודה אחד.";
@@ -118,14 +118,32 @@ export async function addLeaveAction(orgId: string, userId: string, _prev: FormS
   if (!context.ok) return context;
   const leave = parseLeave(formData.get("starts_on"), formData.get("ends_on"));
   if (!leave.ok) return fail(leave.message, { fieldErrors: { [leave.field]: leave.message }, values: formValues(formData) });
+  // HEB-08: the kind and the deputy (who may be the deputy is checked by the database)
+  const kind = parseLeaveKind(formData.get("kind"));
+  const deputy = parseDeputy(formData.get("deputy_id"));
+  if (!deputy.ok) return fail(deputy.message, { fieldErrors: { deputy_id: deputy.message }, values: formValues(formData) });
+  if (deputy.deputyId === userId) {
+    const message = "אי אפשר למלא את המקום של עצמך. בחרו עובד אחר.";
+    return fail(message, { fieldErrors: { deputy_id: message }, values: formValues(formData) });
+  }
   const { error } = await context.supabase
     .from("member_leaves")
-    .insert({ organization_id: orgId, user_id: userId, starts_on: leave.startsOn, ends_on: leave.endsOn })
+    .insert({ organization_id: orgId, user_id: userId, starts_on: leave.startsOn, ends_on: leave.endsOn, kind, deputy_id: deputy.deputyId })
     .select("id")
     .single();
-  if (error) return fail(dbErrorMessage(error, "לא הצלחנו לשמור את החופשה. נסו שוב."), { values: formValues(formData) });
+  if (error) {
+    const deputyError = error.hint?.startsWith("member_leaves:deputy");
+    const message = dbErrorMessage(error, "לא הצלחנו לשמור את החופשה. נסו שוב.");
+    return fail(message, { ...(deputyError ? { fieldErrors: { deputy_id: message } } : {}), values: formValues(formData) });
+  }
   revalidateMember(orgId, userId);
-  return { ok: true, message: "החופשה נשמרה. בימים האלה לא יגיעו לידים בסבב." };
+  revalidatePath(paths.tasks(orgId));
+  return {
+    ok: true,
+    message: deputy.deputyId
+      ? "ההיעדרות נשמרה. בימים האלה לידים חדשים יגיעו לממלא המקום, והוא יראה את המשימות הפתוחות."
+      : "החופשה נשמרה. בימים האלה לא יגיעו לידים בסבב.",
+  };
 }
 
 /** Removes a leave (RLS: the member's own, or an owner/admin). CAP-09. */

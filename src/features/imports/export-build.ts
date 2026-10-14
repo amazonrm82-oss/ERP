@@ -124,6 +124,8 @@ export const LOOKUPS: Record<string, string> = {
   price_list_id: "price_list",
   // LEAD-04: a lead's requested product
   requested_product_id: "requested_product",
+  // HEB-08: who stands in during an absence
+  deputy_id: "deputy",
 };
 
 export type ExportRow = Record<string, unknown>;
@@ -216,7 +218,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 סכומים (amount_agorot) הם באגורות: מחלקים ב-100 לקבלת שקלים.
 הפגישות נמצאות ב-meetings.csv (owner הוא מי שקבע את הפגישה), והמשתתפים בכל פגישה ב-meeting_participants.csv.
 ימי המנוחה של העסק נמצאים ב-calendar_settings.csv: rest_weekdays הם ימי השבוע (0 = ראשון עד 6 = שבת), holidays_rest אומר אם החגים הם ימי מנוחה, holiday_eves_rest אם ערבי החג, ו-rest_occasions מועדים נוספים שבחרתם. אם הקובץ ריק, ההגדרות הן ברירת המחדל: שישי ושבת וחגים. working_hours הן שעות העבודה של העסק לפי יום (sun עד sat, כל יום רשימה של טווחים start עד end); ריק = בלי הגבלת שעות.
-החופשות של העובדים נמצאות ב-member_leaves.csv: user הוא העובד, starts_on ו-ends_on הם הימים הראשון והאחרון של החופשה.
+החופשות של העובדים נמצאות ב-member_leaves.csv: user הוא העובד, starts_on ו-ends_on הם הימים הראשון והאחרון של החופשה, kind הוא סוג ההיעדרות (reserve = במילואים, vacation = בחופשה, ריק = היעדרות אחרת), ו-deputy הוא ממלא המקום.
 היעדים נמצאים ב-goals.csv: scope הוא user (חבר צוות), team (צוות) או org (כל העסק); period הוא month, quarter או year מ-period_start; metric הוא won_amount (הכנסה שנסגרה, target באגורות), won_deals, leads_handled או meetings_held.
 המעמד של העסק במע"מ נמצא ב-document_settings.csv: vat_status הוא licensed (עוסק מורשה או חברה בע"מ), exempt (עוסק פטור), nonprofit (עמותה או מלכ"ר) או other (מעמד אחר, ששמו ב-vat_status_other, ו-other_charges_vat אומר אם הוא גובה מע"מ). legal_form היא צורת ההתאגדות. באותו קובץ פרטי העסק שמופיעים במסמכים: legal_name (שם רשמי), tax_id (מספר עוסק או ח.פ., 9 ספרות), address_line, city ו-postal_code (כתובת), phone ו-email (פרטי קשר במסמכים, והאימייל גם בהזמנות ליומן). פרטי הבנק להעברה נמצאים ב-bank_details.csv: bank_name, bank_branch, bank_account ו-bank_account_name (רק בעלים ומנהלי מערכת רואים אותם במערכת).
 קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון.

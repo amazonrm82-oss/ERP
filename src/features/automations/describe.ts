@@ -99,4 +99,6 @@ export const STEP_WARNINGS: Record<string, string> = {
   "no reason is set": "בוצע בלי סיבה: לאוטומציה לא נבחרה סיבה",
   "the reason no longer exists": "בוצע בלי סיבה: הסיבה שנבחרה כבר לא ברשימה",
   "the business-day offset is invalid": "המשימה נוצרה בלי מועד: מספר ימי העסקים לא תקין",
+  // HEB-08: an automation gave the lead to someone away with no deputy
+  "the owner is away, the lead has no owner": "האחראי נעדר, הליד נכנס בלי אחראי",
 };

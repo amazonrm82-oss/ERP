@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CALENDAR_SETTINGS, type CalendarSettings } from "@/features/calendar-days/holidays";
 import type { WorkingHours } from "@/features/profile/working-hours";
 import { DEFAULT_ORG_HOURS, hoursCover, memberInHours, outOfHoursReason, wallClock, workingDaysOnly, type HoursInput } from "@/features/work-hours/in-hours";
-import { onLeave, parseLeave } from "@/features/work-hours/leave";
+import { absenceLabel, leaveOn, onLeave, parseDeputy, parseLeave, parseLeaveKind } from "@/features/work-hours/leave";
 
 const base: Omit<HoursInput, "at"> = {
   orgTimeZone: "Asia/Jerusalem",
@@ -97,5 +97,36 @@ describe("leave form (CAP-09)", () => {
     expect(parseLeave("2026-01-01", "2026-12-31")).toMatchObject({ ok: true });
     expect(parseLeave("2026-01-01", "2027-01-01")).toMatchObject({ ok: true }); // 366 days: the database allows ends_on - starts_on <= 365
     expect(parseLeave("2026-01-01", "2027-01-02")).toMatchObject({ ok: false, field: "ends_on" });
+  });
+});
+
+// HEB-08: the absence kind and the deputy on the leave form
+describe("absence kind and deputy (HEB-08)", () => {
+  it("reads the kind from a closed list; anything else is a plain leave", () => {
+    expect(parseLeaveKind("reserve")).toBe("reserve");
+    expect(parseLeaveKind("vacation")).toBe("vacation");
+    expect(parseLeaveKind("other")).toBeNull();
+    expect(parseLeaveKind("sick")).toBeNull();
+    expect(parseLeaveKind(null)).toBeNull();
+    expect(absenceLabel("reserve")).toBe("במילואים");
+    expect(absenceLabel("vacation")).toBe("בחופשה");
+    expect(absenceLabel(null)).toBe("בהיעדרות");
+  });
+
+  it("reads the deputy as a user id or none", () => {
+    expect(parseDeputy("")).toEqual({ ok: true, deputyId: null });
+    expect(parseDeputy(null)).toEqual({ ok: true, deputyId: null });
+    expect(parseDeputy("3F2504E0-4F89-11D3-9A0C-0305E82C3301")).toEqual({ ok: true, deputyId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" });
+    expect(parseDeputy("x")).toMatchObject({ ok: false });
+  });
+
+  it("finds the leave that covers a day", () => {
+    const leaves = [
+      { startsOn: "2026-10-20", endsOn: "2026-10-21", kind: "reserve" },
+      { startsOn: "2026-10-25", endsOn: "2026-10-25", kind: null },
+    ];
+    expect(leaveOn("2026-10-21", leaves)?.kind).toBe("reserve");
+    expect(leaveOn("2026-10-25", leaves)?.kind).toBeNull();
+    expect(leaveOn("2026-10-22", leaves)).toBeNull();
   });
 });

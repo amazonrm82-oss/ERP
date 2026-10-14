@@ -1,7 +1,9 @@
 import type { CalendarSettings } from "@/features/calendar-days/holidays";
 import type { WorkingHours } from "@/features/profile/working-hours";
+import { longDay } from "@/lib/calendar-grid";
 
 import { DEFAULT_ORG_HOURS, OUT_OF_HOURS_LABELS, outOfHoursReason, wallClock, workingDaysOnly } from "../in-hours";
+import { absenceLabel, leaveOn } from "../leave";
 import type { MemberHours } from "../queries";
 import { LeaveManager } from "./leave-manager";
 import { MemberHoursForm } from "./member-hours-form";
@@ -18,10 +20,15 @@ type Props = {
   canEdit: boolean;
   // why the person is not in lead distribution now, or null when they are
   outOfRotation: "unavailable" | "seat" | null;
+  // HEB-08: who may stand in during an absence
+  deputyOptions: { userId: string; name: string }[];
+  // HEB-08: the forms with this member as fixed owner, and their name for the warning
+  fixedOwnerForms: string[];
+  personName: string;
 };
 
 /** "שעות עבודה וחופשה" of one member (CAP-09): the status now, the hours, the leaves. */
-export function MemberHoursSection({ orgId, userId, name, member, orgHours, calendar, orgTimeZone, canEdit, outOfRotation }: Props) {
+export function MemberHoursSection({ orgId, userId, name, member, orgHours, calendar, orgTimeZone, canEdit, outOfRotation, deputyOptions, fixedOwnerForms, personName }: Props) {
   const zone = member.timeZone ?? orgTimeZone;
   const now = new Date();
   const reason = outOfHoursReason({
@@ -34,6 +41,11 @@ export function MemberHoursSection({ orgId, userId, name, member, orgHours, cale
     leaves: member.leaves,
   });
   const today = wallClock(now, zone).date;
+  // HEB-08: an absence today, with its deputy
+  const away = leaveOn(today, member.leaves);
+  const awayText = away
+    ? `${name ?? "אתם"} ${absenceLabel(away.kind)} עד ${longDay(away.endsOn)}.${away.deputyId ? ` ממלא מקום: ${away.deputyName ?? "משתמש"}. לידים חדשים מגיעים אליו.` : ""}`
+    : null;
   const status = outOfRotation === "seat"
     ? "מושב צפייה לא מקבל לידים בסבב."
     : outOfRotation === "unavailable"
@@ -45,6 +57,7 @@ export function MemberHoursSection({ orgId, userId, name, member, orgHours, cale
   return (
     <div className="space-y-6">
       <p role="status" className="rounded-md bg-canvas px-3 py-2 text-sm text-ink">
+        {awayText ? <span className="block font-medium">{awayText}</span> : null}
         {status}
       </p>
       {canEdit ? (
@@ -64,8 +77,20 @@ export function MemberHoursSection({ orgId, userId, name, member, orgHours, cale
         <h3 id={`leaves-${userId}`} className="text-md font-medium text-ink">
           חופשות והיעדרויות
         </h3>
-        <p className="text-sm text-ink-soft">בימי החופשה לא מגיעים לידים בסבב. ממלא מקום יתווסף בהמשך.</p>
-        <LeaveManager orgId={orgId} userId={userId} leaves={member.leaves.filter((leave) => leave.endsOn >= today)} canEdit={canEdit} today={today} timeZone={zone} />
+        <p className="text-sm text-ink-soft">
+          בימי ההיעדרות לא מגיעים לידים בסבב. כשבוחרים ממלא מקום, לידים חדשים מגיעים אליו, והוא רואה ומטפל במשימות הפתוחות עד סוף ההיעדרות.
+        </p>
+        <LeaveManager
+          orgId={orgId}
+          userId={userId}
+          leaves={member.leaves.filter((leave) => leave.endsOn >= today)}
+          canEdit={canEdit}
+          today={today}
+          timeZone={zone}
+          deputyOptions={deputyOptions}
+          fixedOwnerForms={fixedOwnerForms}
+          personName={personName}
+        />
       </section>
     </div>
   );

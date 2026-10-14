@@ -8,7 +8,7 @@ import { canManageMember, isAdminRole } from "@/features/settings/permissions";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { MemberHoursSection } from "@/features/work-hours/components/member-hours-section";
-import { getMemberHours, getOrgHours } from "@/features/work-hours/queries";
+import { getDeputyOptions, getFixedOwnerForms, getMemberHours, getOrgHours } from "@/features/work-hours/queries";
 import { isUuid, paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "שעות עבודה וחופשה" };
@@ -32,7 +32,13 @@ export default async function MemberHoursPage({ params }: Props) {
   const members = await listMembers(orgId);
   const person = members.find((m) => m.userId === userId);
   if (!person) notFound();
-  const [member, orgHours, calendar] = await Promise.all([getMemberHours(orgId, userId, org.timeZone), getOrgHours(orgId), getCalendarSettings(orgId)]);
+  const [member, orgHours, calendar, deputyOptions, fixedOwnerForms] = await Promise.all([
+    getMemberHours(orgId, userId, org.timeZone),
+    getOrgHours(orgId),
+    getCalendarSettings(orgId),
+    getDeputyOptions(orgId, userId),
+    getFixedOwnerForms(orgId, userId),
+  ]);
   const isMe = userId === user.id;
 
   return (
@@ -55,6 +61,9 @@ export default async function MemberHoursPage({ params }: Props) {
             // the owner changes anyone; an admin anyone but the owner and other admins (as the database)
             canEdit={canWrite && person.status === "active" && (isMe || canManageMember(role, user.id, person))}
             outOfRotation={person.seatType !== "full" ? "seat" : person.status !== "active" || !person.isAvailable ? "unavailable" : null}
+            deputyOptions={deputyOptions}
+            fixedOwnerForms={fixedOwnerForms}
+            personName={person.name}
           />
         </CardBody>
       </Card>

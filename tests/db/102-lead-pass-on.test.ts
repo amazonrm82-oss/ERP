@@ -293,6 +293,13 @@ describe("passing a lead on to the next rep (SPD-03)", () => {
       const check = (await q<{ d: string }>("select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'lead_response_settings_action_check'")).rows[0].d;
       expect(check).toContain("pass_on");
       await q(readFileSync(join(dir, files[1]), "utf8"));
+      // the later migrations that redefine the job run again too (HEB-08), so no later test sees an old body
+      const later = readdirSync(dir)
+        .filter((f) => f.endsWith(".sql") && f > files[1])
+        .sort()
+        .map((f) => readFileSync(join(dir, f), "utf8"))
+        .filter((sql) => /function\s+app\.check_lead_responses\s*\(/.test(sql));
+      for (const sql of later) await q(sql);
     });
     await setSettings("pass_on", 2);
     const lead = await submit("055-7200011");

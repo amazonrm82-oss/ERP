@@ -114,6 +114,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "member_hours:other_orgs": "המשתמש שייך גם לעסק אחר, ולכן רק הוא יכול לשנות את שעות העבודה שלו, מהחשבון שלו.",
   "member_hours:invalid": "שעות העבודה אינן תקינות. בדקו שכל טווח מתחיל לפני שהוא נגמר ושהטווחים לא חופפים.",
   "member_leaves:max": "אפשר לשמור עד 100 חופשות נוכחיות ועתידיות לכל משתמש. חופשות שכבר עברו לא נספרות.",
+  // HEB-08: who may stand in during an absence
+  "member_leaves:deputy_self": "אי אפשר למלא את המקום של עצמך. בחרו עובד אחר.",
+  "member_leaves:deputy_inactive": "ממלא המקום צריך להיות עובד פעיל בעסק שאינו צופה בלבד. בחרו עובד אחר.",
+  "member_leaves:deputy_absent": "ממלא המקום נעדר בחלק מהימים האלה. בחרו עובד אחר או שנו את התאריכים.",
+  "task:deputy_owner": "ממלא מקום לא מעביר משימה לאחראי אחר. אפשר לסיים, לדחות ולערוך אותה.",
   // LEAD-06 (migration lead_convert_map)
   "convert_map:invalid": "אפשר לבחור רק שדה מאותו סוג. רעננו את הדף ונסו שוב.",
   // DEAL-03 (migration deal_loss_reasons)

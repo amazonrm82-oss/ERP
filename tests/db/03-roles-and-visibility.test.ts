@@ -759,6 +759,34 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("a deputy reads the absent colleague's unanswered lead and task, only during the absence, even under 'own' (HEB-08)", async () => {
+    await setVisibility("own");
+    const lead = await insertLead(owner.id, org, { full_name: "ליד שמחכה", owner_id: m2.id });
+    const task = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.tasks (organization_id, title, owner_id) values ($1, 'לחזור', $2) returning id", [org, m2.id])).rows[0].id,
+    );
+    const leave = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on, kind, deputy_id) values ($1, $2, current_date - 1, current_date + 1, 'reserve', $3) returning id", [org, m2.id, m1.id])).rows[0].id,
+    );
+    const seesTask = (u: U) => asUser(u.id, async (q) => (await count(q, "select 1 from public.tasks where id = $1", [task])) === 1);
+    expect(await sees(m1.id, lead)).toBe(true);
+    expect(await seesTask(m1)).toBe(true);
+    for (const u of [manager, viewer]) {
+      expect(await sees(u.id, lead), u.email).toBe(false);
+      expect(await seesTask(u), u.email).toBe(false);
+    }
+    // the deputy works the task but does not hand it over
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.tasks set title = 'לחזור מחר' where id = $1 returning id", [task])).rowCount).toBe(1);
+    });
+    expect((await pgError(asUser(m1.id, (q) => q("update public.tasks set owner_id = $2 where id = $1", [task, m1.id])))).hint).toBe("task:deputy_owner");
+    // the absence ended: nothing any more
+    await asAdmin((q) => q("update public.member_leaves set starts_on = current_date - 5, ends_on = current_date - 3 where id = $1", [leave]));
+    expect(await sees(m1.id, lead)).toBe(false);
+    expect(await seesTask(m1)).toBe(false);
+    await asUser(owner.id, (q) => q("delete from public.member_leaves where id = $1", [leave]));
+  });
+
   it("everyone reads the VAT status; only owners and admins set it (TAX-01)", async () => {
     const insert = "insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')";
     for (const u of [manager, m1, viewer]) {

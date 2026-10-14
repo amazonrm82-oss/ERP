@@ -100,6 +100,10 @@ export type MemberLeaveRow = {
   user_id: string;
   starts_on: string;
   ends_on: string;
+  // HEB-08 (migration absence_deputy): null = a plain leave; 'reserve' = במילואים, 'vacation' = בחופשה (LEAVE_KINDS)
+  kind: string | null;
+  // HEB-08: who stands in during the absence (an active member, checked by trigger)
+  deputy_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1698,11 +1702,11 @@ export type Database = {
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // DQL-01: the important fields per record type; seeded per organization, no delete grant
       completeness_settings: Table<CompletenessSettingsRow, { organization_id: string; object_type: string; fields?: string[] }, { fields?: string[] }>;
-      // CAP-09: the user and the dates are inserted once; only the dates change (column-level update grant)
+      // CAP-09: the user is inserted once; the dates, kind and deputy change (column-level update grant; HEB-08)
       member_leaves: Table<
         MemberLeaveRow,
-        { organization_id: string; user_id: string; starts_on: string; ends_on: string },
-        { starts_on?: string; ends_on?: string }
+        { organization_id: string; user_id: string; starts_on: string; ends_on: string; kind?: string | null; deputy_id?: string | null },
+        { starts_on?: string; ends_on?: string; kind?: string | null; deputy_id?: string | null }
       >;
       // LEAD-06: clients insert the identity columns once and update only the target
       conversion_field_maps: Table<

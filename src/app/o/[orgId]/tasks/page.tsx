@@ -25,9 +25,11 @@ import { TaskForm } from "@/features/tasks/components/task-form";
 import { remindOption } from "@/features/tasks/components/task-fields";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
 import { TasksTable } from "@/features/tasks/components/tasks-table";
-import { listTaskGroups, listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
+import { listCoveringTasks, listTaskGroups, listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
+import { absenceLabel } from "@/features/work-hours/leave";
+import { shortDay } from "@/lib/calendar-grid";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber, zoneDate, zoneTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -120,11 +122,13 @@ export default async function TasksPage({ params, searchParams }: Props) {
     return <TasksTableView orgId={orgId} context={context} query={query} showAll={showAll} />;
   }
 
-  const [groups, members, calendar] = await Promise.all([
+  const [groups, members, calendar, covering] = await Promise.all([
     listTaskGroups(orgId, showAll ? null : user.id),
     listMembers(orgId),
     // HEB-02: always read, so every row's snooze label knows the rest days
     getCalendarSettings(orgId),
+    // HEB-08: the open tasks of colleagues the user stands in for ("all" already shows them)
+    showAll ? Promise.resolve([]) : listCoveringTasks(orgId, user.id, context.org.timeZone),
   ]);
   // HEB-03: "in N business days" counts from today in the business's zone
   const today = zoneDate(new Date(), context.org.timeZone);
@@ -202,6 +206,34 @@ export default async function TasksPage({ params, searchParams }: Props) {
                 </Card>
               ))
           )}
+
+          {covering.map((group) => (
+            <Card key={group.userId} aria-labelledby={`tasks-for-${group.userId}`}>
+              <CardHeader id={`tasks-for-${group.userId}`} title={`בשביל ${group.name} (${formatNumber(group.tasks.length)})`} />
+              <p className="border-b border-line px-4 py-2.5 text-sm text-ink-soft sm:px-5">
+                {group.name} {absenceLabel(group.kind)} עד {shortDay(group.endsOn)}. המשימות נשארות על שמו, ואתם יכולים לסיים, לדחות ולערוך אותן.
+                {group.truncated ? " מוצגות 300 המשימות הראשונות." : null}
+              </p>
+              {group.tasks.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-ink-soft sm:px-5">אין משימות פתוחות.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {group.tasks.map((task) => (
+                    <TaskRow
+                      key={`${task.id}-${task.dueAt}-${task.remindAt}`}
+                      orgId={orgId}
+                      task={view(task, task.dueAt !== null && zoneDate(new Date(task.dueAt), context.org.timeZone) < today)}
+                      canEdit={canWrite}
+                      showOwner={false}
+                      // a deputy does not hand the task over (HEB-08)
+                      assignees={[]}
+                      businessDays={businessDays}
+                    />
+                  ))}
+                </ul>
+              )}
+            </Card>
+          ))}
 
           {groups.done.length > 0 ? (
             <Card aria-labelledby="tasks-done">

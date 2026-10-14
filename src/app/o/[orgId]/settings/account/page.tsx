@@ -20,7 +20,7 @@ import { getMyProfile } from "@/features/profile/queries";
 import { timeZones } from "@/features/profile/working-hours";
 import { getOrgContext } from "@/features/shell/queries";
 import { MemberHoursSection } from "@/features/work-hours/components/member-hours-section";
-import { getMemberHours, getOrgHours } from "@/features/work-hours/queries";
+import { getDeputyOptions, getFixedOwnerForms, getMemberHours, getOrgHours } from "@/features/work-hours/queries";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -42,7 +42,9 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
     getNotificationSettings(),
     // a support session is not a member: it has no personal calendar link
     supportUntil ? null : getCalendarFeedStatus(orgId),
-    showHours ? Promise.all([getMemberHours(orgId, user.id, orgContext.timeZone), getOrgHours(orgId), getCalendarSettings(orgId)]) : null,
+    showHours
+      ? Promise.all([getMemberHours(orgId, user.id, orgContext.timeZone), getOrgHours(orgId), getCalendarSettings(orgId), getDeputyOptions(orgId, user.id), getFixedOwnerForms(orgId, user.id)])
+      : null,
   ]);
   const sessions = sessionsResult.ok ? sessionsResult.sessions : [];
 
@@ -75,6 +77,9 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
               orgTimeZone={orgContext.timeZone}
               canEdit={canWrite}
               outOfRotation={isAvailable ? null : "unavailable"}
+              deputyOptions={hours[3]}
+              fixedOwnerForms={hours[4]}
+              personName={profile.fullName?.trim() || user.email || "החשבון שלכם"}
             />
           </CardBody>
         </Card>

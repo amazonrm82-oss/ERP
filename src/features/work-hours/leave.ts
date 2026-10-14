@@ -29,3 +29,31 @@ export function parseLeave(startsOn: unknown, endsOn: unknown): LeaveResult {
 export function onLeave(day: string, leaves: readonly { startsOn: string; endsOn: string }[]): boolean {
   return leaves.some((leave) => day >= leave.startsOn && day <= leave.endsOn);
 }
+
+// HEB-08: the kind of an absence (member_leaves_kind_check); null = a plain leave, as before
+export const LEAVE_KINDS = ["vacation", "reserve"] as const;
+export type LeaveKind = (typeof LEAVE_KINDS)[number];
+
+/** "בחופשה" / "במילואים"; a leave saved without a kind reads "בהיעדרות". */
+export function absenceLabel(kind: LeaveKind | null): string {
+  return kind === "reserve" ? "במילואים" : kind === "vacation" ? "בחופשה" : "בהיעדרות";
+}
+
+/** The kind picked on the leave form: one of LEAVE_KINDS, or null for "other" (anything else). */
+export function parseLeaveKind(value: unknown): LeaveKind | null {
+  return typeof value === "string" && (LEAVE_KINDS as readonly string[]).includes(value) ? (value as LeaveKind) : null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The deputy picked on the leave form: a user id, or null for "no deputy". */
+export function parseDeputy(value: unknown): { ok: true; deputyId: string | null } | { ok: false; message: string } {
+  if (value === null || value === undefined || value === "") return { ok: true, deputyId: null };
+  if (typeof value !== "string" || !UUID.test(value)) return { ok: false, message: "יש לבחור ממלא מקום מהרשימה." };
+  return { ok: true, deputyId: value.toLowerCase() };
+}
+
+/** The leave that covers the day, if any (the first, earliest start). */
+export function leaveOn<T extends { startsOn: string; endsOn: string }>(day: string, leaves: readonly T[]): T | null {
+  return leaves.find((leave) => day >= leave.startsOn && day <= leave.endsOn) ?? null;
+}

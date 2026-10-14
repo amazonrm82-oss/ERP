@@ -99,6 +99,8 @@ export const FIELD_LABELS: Record<string, string> = {
   breach_action: "פעולה בחריגה",
   starts_on: "מתאריך",
   ends_on: "עד תאריך",
+  // HEB-08
+  deputy_id: "ממלא מקום",
   full_name: "שם",
   first_name: "שם פרטי",
   last_name: "שם משפחה",

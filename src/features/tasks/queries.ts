@@ -1,6 +1,8 @@
 import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
+import type { LeaveKind } from "@/features/work-hours/leave";
+import { getCurrentAbsences } from "@/features/work-hours/queries";
 import type { TaskStatus } from "@/lib/database.types";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { ilikeAny, PAGE_SIZE } from "@/lib/search";
@@ -40,6 +42,49 @@ export type TaskGroups = {
 
 const OPEN_LIMIT = 300;
 const DONE_SHOWN = 20;
+const TASK_ITEM_COLUMNS = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+
+type TaskItemRow = {
+  id: string;
+  title: string;
+  task_type: string;
+  priority: number;
+  outcome: string | null;
+  recurrence: unknown;
+  due_at: string | null;
+  remind_at: string | null;
+  owner_id: string | null;
+  completed_at: string | null;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+};
+
+function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
+  return {
+    id: row.id,
+    title: row.title,
+    dueAt: row.due_at,
+    remindAt: row.remind_at,
+    ownerId: row.owner_id,
+    ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+    taskType: row.task_type,
+    priority: row.priority,
+    completedAt: row.completed_at,
+    outcome: row.outcome,
+    recurrence: parseRecurrence(row.recurrence),
+    related: row.deal_id
+      ? { kind: "deal", id: row.deal_id }
+      : row.lead_id
+        ? { kind: "lead", id: row.lead_id }
+        : row.contact_id
+          ? { kind: "contact", id: row.contact_id }
+          : row.company_id
+            ? { kind: "company", id: row.company_id }
+            : null,
+  };
+}
 
 /**
  * Open tasks grouped by due date (organization time zone), plus the latest
@@ -48,7 +93,7 @@ const DONE_SHOWN = 20;
  */
 export async function listTaskGroups(orgId: string, ownerId: string | null): Promise<TaskGroups> {
   const supabase = await createClient();
-  const columns = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+  const columns = TASK_ITEM_COLUMNS;
 
   let open = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "open").is("deleted_at", null);
   let done = supabase.from("tasks").select(columns).eq("organization_id", orgId).eq("status", "done").is("deleted_at", null);
@@ -70,28 +115,7 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
 
   const openRows = openResult.data.slice(0, OPEN_LIMIT);
   const owners = await getUserNames([...openRows, ...doneResult.data].map((row) => row.owner_id));
-  const toItem = (row: (typeof openRows)[number]): TaskItem => ({
-    id: row.id,
-    title: row.title,
-    dueAt: row.due_at,
-    remindAt: row.remind_at,
-    ownerId: row.owner_id,
-    ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
-    taskType: row.task_type,
-    priority: row.priority,
-    completedAt: row.completed_at,
-    outcome: row.outcome,
-    recurrence: parseRecurrence(row.recurrence),
-    related: row.deal_id
-      ? { kind: "deal", id: row.deal_id }
-      : row.lead_id
-        ? { kind: "lead", id: row.lead_id }
-        : row.contact_id
-          ? { kind: "contact", id: row.contact_id }
-          : row.company_id
-            ? { kind: "company", id: row.company_id }
-            : null,
-  });
+  const toItem = (row: (typeof openRows)[number]): TaskItem => toTaskItem(row, owners);
 
   const today = zoneDate(new Date());
   // compared as numbers: PostgREST writes "+00:00", toISOString() writes "Z"
@@ -110,6 +134,44 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
   // TASK-01: within a group, high priority first; the due order stays among equals (a stable sort)
   for (const key of ["overdue", "today", "upcoming", "undated"] as const) groups[key].sort((a, b) => a.priority - b.priority);
   return groups;
+}
+
+export type CoveringGroup = { userId: string; name: string; kind: LeaveKind | null; endsOn: string; tasks: TaskItem[]; truncated: boolean };
+
+/**
+ * HEB-08: the open tasks of the colleagues the user stands in for today (the
+ * business's date), one group per absent colleague, due first. The tasks stay in
+ * the colleague's name; RLS lets the deputy read them only while the absence lasts.
+ */
+export async function listCoveringTasks(orgId: string, userId: string, orgTimeZone: string): Promise<CoveringGroup[]> {
+  const absences = [...(await getCurrentAbsences(orgId, orgTimeZone)).values()].filter((a) => a.deputyId === userId && a.userId !== userId);
+  if (absences.length === 0) return [];
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("tasks")
+      .select(TASK_ITEM_COLUMNS)
+      .eq("organization_id", orgId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .in("owner_id", absences.map((a) => a.userId))
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .limit(OPEN_LIMIT + 1),
+    "covering tasks",
+  );
+  const shown = rows.slice(0, OPEN_LIMIT);
+  const owners = await getUserNames(absences.map((a) => a.userId));
+  return absences
+    .map((a) => ({
+      userId: a.userId,
+      name: owners.get(a.userId) ?? "עמית",
+      kind: a.kind,
+      endsOn: a.endsOn,
+      tasks: shown.filter((row) => row.owner_id === a.userId).map((row) => toTaskItem(row, owners)),
+      truncated: rows.length > OPEN_LIMIT,
+    }))
+    .sort((x, y) => x.name.localeCompare(y.name, "he"));
 }
 
 export type TaskListItem = {

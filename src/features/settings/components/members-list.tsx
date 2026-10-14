@@ -30,9 +30,11 @@ type Props = {
   members: Member[];
   // members with two-step verification on (known to owners and admins only)
   mfaUserIds?: string[];
+  // HEB-08: who is away today ("במילואים עד 20.10.2026") and their deputy, by user id
+  absences?: Record<string, { label: string; deputyName: string | null }>;
 };
 
-export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members, mfaUserIds = [] }: Props) {
+export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members, mfaUserIds = [], absences = {} }: Props) {
   return (
     <ul className="divide-y divide-line">
       {members.map((member) => (
@@ -45,15 +47,24 @@ export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members,
           manageable={canWrite && canManageMember(myRole, myUserId, member)}
           roles={roles}
           hasMfa={mfaUserIds.includes(member.userId)}
+          absence={absences[member.userId] ?? null}
         />
       ))}
     </ul>
   );
 }
 
-type RowProps = { orgId: string; member: Member; isMe: boolean; manageable: boolean; roles: InvitableRole[]; hasMfa: boolean };
+type RowProps = {
+  orgId: string;
+  member: Member;
+  isMe: boolean;
+  manageable: boolean;
+  roles: InvitableRole[];
+  hasMfa: boolean;
+  absence: { label: string; deputyName: string | null } | null;
+};
 
-function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps) {
+function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa, absence }: RowProps) {
   const suspended = member.status === "suspended";
 
   return (
@@ -66,7 +77,9 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa }: RowProps)
           {suspended ? <Badge tone="warning">מושבת</Badge> : null}
           {!suspended && !member.isAvailable ? <Badge>לא זמין ללידים</Badge> : null}
           {hasMfa ? <Badge>אימות דו-שלבי</Badge> : null}
+          {!suspended && absence ? <Badge tone="warning">{absence.label}</Badge> : null}
         </p>
+        {!suspended && absence?.deputyName ? <p className="text-sm text-ink-soft">ממלא מקום: {absence.deputyName}</p> : null}
         {member.email ? (
           <p dir="ltr" className="truncate text-end text-sm text-ink-soft sm:text-start">
             {member.email}
