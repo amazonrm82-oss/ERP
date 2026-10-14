@@ -682,6 +682,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`src/features/imports/`), which write with the user's session.
   Since 0045 every chunk touches its job, and pg_cron `crm-stale-imports` (`app.fail_stale_imports()`,
   every 5 minutes) marks a job idle for 10 minutes as failed, with its created count, so it can be undone.
+  Since 0186 (IMP-03) deals and tasks import too (`deals/tasks.import_job_id`, `app.guard_import_tag('deal'|'task')`, tasks
+  insert grant only; a task links a deal by exact name through `public.deal_name_matches()`, invoker; undo soft-deletes).
   Since 0044 duplicates are found by `public.import_find_duplicates()` (security invoker; a lookup error
   fails the chunk), and a contacts import tags the companies it creates, so undo removes them too.
 - Reports (migration 0011) are `public.report_*` functions, **security invoker** on purpose: RLS decides
