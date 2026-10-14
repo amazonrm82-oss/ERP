@@ -599,8 +599,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   lines (owner), flags `products` / `discounts` / `price_lists`, offerable products only, `price_list_name` copied, `total_agorot`
   by `app.document_totals` on the line alone. `price_source` is a person's claim: verify it on the server before quotes and
   documents rely on it. Price list order (owner): the deal contact's list, else that contact's company's, else the deal's company's,
-  else the product price; inactive or expired lists fall through (`pickCustomerList`, `src/features/deal-lines/`). The deal value is
-  not computed from the lines yet (DLI-03). `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
+  else the product price; inactive or expired lists fall through (`pickCustomerList`, `src/features/deal-lines/`). Since 0189 (DLI-03, owner) the
+  deal value is: a typed amount, else the lines' sum (`app.deal_lines_sum`, internal definer; `app.deal_lines_net` checks
+  `can_read_record`), else a recurring deal's first year, else empty; pure rule `app.deal_amount_rule` (mirrored by `dealValueRule()`),
+  `deals.amount_source` (lines|first_year while `amount_auto`, null = typed or empty) and `recurring_amount_auto` (a recurring deal with lines fills its recurring amount
+  from them until typed); statement triggers `deal_lines_recompute_*` call `app.deal_recompute_value`; `app.deal_amount_auto` is
+  security definer since 0189. `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
