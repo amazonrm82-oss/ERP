@@ -15,10 +15,10 @@
 --   a free line: the person's choice, default 'one_time' (insert and update; column grants);
 --   null: a line saved before this migration. It counts as before (DLI-03: in the deal's own
 --     period: monthly / yearly on a recurring deal, once on a one-time deal), so this migration
---     changes no stored value and rewrites no row. Every new line gets a mode; a null is filled
---     once: a free line by the person's next save, a product line from its product (the separate
---     backfill migration deal_line_billing_backfill does it for all of them, with the owner's
---     approval, because it moves the stored value of deals whose lines mix billings).
+--     changes no stored value and rewrites no row. Lines saved earlier keep billing null and keep
+--     counting in the deal's period; there is no backfill (the hosted database had no deal lines
+--     when DLI-04 was built). Every new line gets a mode; a null free line gets one on the person's
+--     next save (the form starts at the deal's period, so the value does not move).
 --
 -- The rule (pure, one place): app.deal_value_rule(), mirrored by dealValueRule() in
 -- src/features/deals/recurring.ts; both checked against tests/unit/fixtures/deal-value.json
@@ -42,6 +42,11 @@
 -- The sums per mode (app.deal_lines_sums): document_totals() per mode group, in the deal's one VAT
 -- mode, carried back by the same conversion rate as app.deal_lines_sum (DLI-03). Internal:
 -- security definer, granted to no one; only the definer trigger functions call it.
+--
+-- app.deal_lines_net / app.deal_lines_sum (DLI-03) are left as they are: the plain before-VAT total
+-- of ALL the deal's lines, whatever their billing. Since DLI-04 the deal value no longer reads
+-- them (it reads app.deal_lines_sums per mode), so they are not "what the deal follows"; the
+-- function comments below say so.
 --
 -- No drops, no row removal, no bulk rewrite. Safe to run twice.
 
@@ -234,6 +239,10 @@ begin
       when recurring is null then null
       -- an amount waiting for lines (following, no recurring lines, 0) is nothing to compute from
       when recurring_auto is true and not v_has_recurring and recurring = 0 then null
+      -- Owner's decision of 14 October 2026 ("עיגול השווי בעסקה חודשית"): a monthly deal's value is
+      -- 12 x the ROUNDED monthly amount, the number the card shows, not the exact first year of its
+      -- lines (a 1,002-agorot yearly line: 84 a month, value 1,008, not 1,002). Intended; do not
+      -- "fix" it to the exact first year. Mirrored by dealValueRule() / firstYearValue().
       when p_kind = 'monthly' then recurring::numeric * 12
       when p_kind = 'yearly' then recurring::numeric
     end;
@@ -367,3 +376,8 @@ begin
 end;
 $$;
 revoke all on function app.deal_recompute_value(uuid, uuid) from public, anon, authenticated;
+
+comment on function app.deal_lines_sum(uuid, uuid) is
+  'DLI-03: plain before-VAT total of all the deal''s lines, every billing mode added together. Not what the deal value follows since DLI-04 (app.deal_lines_sums per mode); no caller left.';
+comment on function app.deal_lines_net(uuid, uuid) is
+  'DLI-03: plain before-VAT total of all the deal''s lines, every billing mode added together (guarded by app.can_read_record). Not what the deal value follows since DLI-04: see app.deal_lines_sums.';

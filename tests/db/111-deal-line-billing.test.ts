@@ -167,6 +167,14 @@ describe("one-time and recurring lines in one deal (DLI-04)", () => {
     expect(await value(deal)).toEqual({ amount: 36000 * 12, auto: true, source: "first_year", recurring: 36000, recurring_auto: true });
   });
 
+  // Owner's decision of 14 October 2026 ("עיגול השווי בעסקה חודשית"): 12 x the rounded monthly amount, as the
+  // card shows it, not the exact first year. Do not change this test to expect 1,002.
+  it("owner's rounding rule: a 1,002-agorot yearly line on a monthly deal is 84 a month and a value of 1,008", async () => {
+    const deal = await newDeal({ billing_kind: "monthly", recurring_start_date: "2026-11-01", amount_agorot: null });
+    await addLine(deal, 1002, { billing: "yearly" });
+    expect(await value(deal)).toEqual({ amount: 1008, auto: true, source: "lines", recurring: 84, recurring_auto: true });
+  });
+
   it("a typed value, and a typed recurring amount, still win", async () => {
     const deal = await newDeal({ billing_kind: "monthly", recurring_start_date: "2026-11-01", recurring_amount_agorot: 70000, amount_agorot: null });
     await addLine(deal, 10000, { product_id: monthlyProduct, price_source: "product" });

@@ -108,6 +108,9 @@ export function DealLineForm({ orgId, dealId, pricing, line, features, canCreate
   // DLI-04: a free line's billing is the person's; a product line's is its product's (shown, not chosen).
   // A line saved before DLI-04 has none and counts in the deal's period, so the form starts there.
   const productBilling: Billing | null = line ? (line.productId ? (line.billing ?? ownBilling(dealKind)) : null) : (product?.billing ?? null);
+  // only a stored (or, for a new line, the product's) billing comes from the product; a product line saved before
+  // DLI-04 has none yet and counts in the deal's period, so it says that instead
+  const billingNote = line && line.productId && line.billing === null ? "נספר לפי תקופת העסקה" : "לפי המוצר";
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -200,7 +203,7 @@ export function DealLineForm({ orgId, dealId, pricing, line, features, canCreate
       )}
       {isProductLine ? (
         productBilling ? (
-          <p className="text-sm text-ink-soft">{`${LINE_BILLING_LABEL}: ${BILLING_LABELS[productBilling]} (לפי המוצר)`}</p>
+          <p className="text-sm text-ink-soft">{`${LINE_BILLING_LABEL}: ${BILLING_LABELS[productBilling]} (${billingNote})`}</p>
         ) : null
       ) : (
         <SelectField

@@ -214,9 +214,21 @@ describe("deal value and first-year value (mirror of app.deal_value)", () => {
       "yearly deal, monthly x12 and quarterly x4",
       "recurring lines gone, one-time left: keeps the last recurring amount",
       "a typed value wins over mixed lines",
+      "owner's rounding rule (14 Oct 2026)",
     ]) {
       expect(names, part).toContain(part);
     }
+  });
+
+  // Owner's decision of 14 October 2026: a monthly deal's value is 12 x the rounded monthly amount, as the
+  // card shows it, not the exact first year. Do not change this test to expect 1,002.
+  it("owner's rounding rule: a 1,002-agorot yearly line on a monthly deal is 84 a month and a value of 1,008", () => {
+    const result = dealValueRule({
+      kind: "monthly", recurring: null, amount: null, oldAmount: 0, oldAuto: null, insert: false,
+      lineSums: { once: null, monthly: null, quarterly: null, yearly: 1002 },
+      oldRecurring: 0, oldRecurringAuto: true, oldSource: null,
+    });
+    expect(result).toMatchObject({ amount: 1008, auto: true, source: "lines", recurring: 84, recurringAuto: true });
   });
 
   it("DLI-03's single sum is lines billed in the deal's own period", () => {

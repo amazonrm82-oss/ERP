@@ -16,13 +16,16 @@ const MIGRATION = readFileSync(join(MIGRATIONS_DIR, MIGRATION_FILE), "utf8");
 // them (0118: sample leads never activate; plan_review_fixes: platform_metrics counts a price per
 // business once) run again after it, so no later test sees an old body. 0118 also redefines
 // app.sample_untouched(), so the later migrations that redefine that one run again too (CNS follow-ups:
-// a consent keeps a sample record).
+// a consent keeps a sample record). deal_lines (DLI-01) is one of them and revokes the table's client
+// grants, so every later migration that grants a deal_lines column again (DLI-04 billing) runs too.
 const LATER = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql") && f > MIGRATION_FILE)
   .sort()
   .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
-  .filter((sql) =>
-    /function\s+(app\.mark_org_activation|app\.sample_untouched|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql),
+  .filter(
+    (sql) =>
+      /function\s+(app\.mark_org_activation|app\.sample_untouched|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql) ||
+      /^grant [^;]* on public\.deal_lines to authenticated/im.test(sql),
   );
 const rerun = (): Promise<void> =>
   asAdmin(async (q) => {

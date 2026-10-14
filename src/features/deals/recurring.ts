@@ -174,7 +174,11 @@ export function dealValueRule(input: DealValueInput): DealValueResult {
   let computed: number | null = null;
   let source: DealValueSource | null = null;
   if (input.kind !== null) {
-    // an amount waiting for lines (following, no recurring lines, 0) is nothing to compute from
+    // an amount waiting for lines (following, no recurring lines, 0) is nothing to compute from.
+    // Owner's decision of 14 October 2026 ("עיגול השווי בעסקה חודשית"): on a monthly deal the value is
+    // 12 x the ROUNDED monthly amount (firstYearValue), the number the card shows, not the exact first
+    // year `year` (a 1,002-agorot yearly line: 84 a month, value 1,008, not 1,002). Intended; do not
+    // "fix" it to the exact first year. Mirrors app.deal_value_rule.
     const firstYear = recurringAuto === true && !hasRecurring && recurring === 0 ? null : firstYearValue(input.kind, recurring);
     if (firstYear !== null || sums.once !== null) computed = (firstYear ?? 0) + (sums.once ?? 0);
     source = (recurringAuto === true && hasRecurring) || sums.once !== null ? "lines" : "first_year";
