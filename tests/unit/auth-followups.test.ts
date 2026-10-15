@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mfaSessionCheck } from "@/features/auth/mfa-session";
-import { logSessionCheckThrow } from "@/lib/auth-transient";
+import { logSessionCheckThrow, redactLogText } from "@/lib/auth-transient";
 
 // FXC-10 security review follow-ups: the second-step screen keeps the session on an outage, and a session check that
 // throws is logged on the server (tag, error name and message; never a cookie or a token).
@@ -62,6 +62,31 @@ describe("a session check that throws is logged, without cookies or tokens", () 
       "[auth:proxy] session check threw; treated as unavailable: TypeError: boom",
       "[auth:readSession] session check threw; treated as unavailable: string",
     ]);
+  });
+
+  it("an error message that echoes part of a token is redacted (quoted runs and token-like runs)", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1MSIsInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.c2lnbmF0dXJlLXZhbHVl";
+    let parseError: unknown;
+    try {
+      JSON.parse(jwt);
+    } catch (error) {
+      parseError = error;
+    }
+    expect(parseError).toBeInstanceOf(SyntaxError);
+    // the raw message really does echo the start of the token
+    expect((parseError as Error).message).toContain(jwt.slice(0, 8));
+    logSessionCheckThrow("proxy", parseError);
+    logSessionCheckThrow("readSession", new Error(`refresh failed for token ${jwt} at /auth/v1/token`));
+    expect(logged).toHaveLength(2);
+    for (const line of logged) {
+      expect(line).not.toContain(jwt.slice(0, 8));
+      for (const part of jwt.split(".")) expect(line).not.toContain(part.slice(0, 12));
+    }
+    expect(logged[0]).toMatch(/^\[auth:proxy\] session check threw; treated as unavailable: SyntaxError: /);
+    expect(logged[1]).toBe("[auth:readSession] session check threw; treated as unavailable: Error: refresh failed for token [redacted] at /auth/v1/token");
+    // ordinary words and short values stay readable
+    expect(redactLogText('Unexpected token "x" at position 3')).toBe('Unexpected token "…" at position 3');
+    expect(redactLogText("fetch failed: ECONNRESET")).toBe("fetch failed: ECONNRESET");
   });
 
   it("readSession logs a throw once, and still answers 'unavailable'", async () => {
