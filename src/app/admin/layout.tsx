@@ -7,21 +7,12 @@ import { Wordmark } from "@/components/wordmark";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { MfaGate } from "@/features/auth/components/mfa-gate";
 import { PLATFORM_ROLE_LABELS } from "@/features/platform/labels";
+import { ADMIN_NAV } from "@/features/platform/nav";
 import { getPlatformMe } from "@/features/platform/queries";
 import { requireUser } from "@/lib/auth";
-import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: { default: "ניהול הפלטפורמה", template: "%s | ניהול הפלטפורמה" }, robots: { index: false } };
 
-const NAV = [
-  { href: paths.admin, label: "מדדים" },
-  { href: paths.adminOrgs, label: "ארגונים" },
-  { href: paths.adminUsers, label: "משתמשים" },
-  { href: paths.adminPlans, label: "חבילות" },
-  { href: paths.adminStaff, label: "צוות" },
-  { href: paths.adminLog, label: "יומן" },
-  { href: paths.adminDesign, label: "עיצוב" },
-];
 
 // The platform owner's panel. To everyone who is not platform staff it does not exist (404).
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -49,7 +40,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <>
           <nav aria-label="ניהול" className="overflow-x-auto border-b border-line bg-surface px-4 sm:px-6">
             <ul className="flex gap-1">
-              {NAV.map((item) => (
+              {ADMIN_NAV.map((item) => (
                 <li key={item.href}>
                   <Link href={item.href} className="flex min-h-11 items-center px-3 text-md whitespace-nowrap text-ink-soft hover:text-ink">
                     {item.label}
