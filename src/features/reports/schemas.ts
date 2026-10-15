@@ -86,6 +86,42 @@ export const REPORT_SCHEMAS = {
     by_owner: z.array(z.object({ owner_id: id, deals: count, amount })),
     by_competitor: z.array(z.object({ competitor: text, deals: count, amount })),
   }),
+  // CAL-11: meetings that START in the period, per organizer; no_show_rate is null below no_show_min
+  // meetings held or missed; "led" = a held meeting with one deal picked (its own, its lead's conversion
+  // deal, else its contact's deal created after it) won within led_window_days of its start; each deal
+  // once per organizer and once in totals
+  report_meetings: z.object({
+    led_window_days: count,
+    no_show_min: count,
+    totals: z.object({
+      meetings: count,
+      held: count,
+      no_show: count,
+      no_show_rate: decimal,
+      cancelled: count,
+      not_updated: count,
+      upcoming: count,
+      led_meetings: count,
+      won_deals: count,
+      won_amount: amount,
+    }),
+    by_owner: z.array(
+      z.object({
+        owner_id: id,
+        meetings: count,
+        held: count,
+        no_show: count,
+        no_show_rate: decimal,
+        cancelled: count,
+        not_updated: count,
+        upcoming: count,
+        led_meetings: count,
+        won_deals: count,
+        won_amount: amount,
+      }),
+    ),
+    deals: z.array(z.object({ deal_id: uuid, name: text, amount, closed_at: z.string(), owner_id: id, meetings: count })),
+  }),
   report_cycle_length: z.object({
     won: count,
     avg_days: decimal,

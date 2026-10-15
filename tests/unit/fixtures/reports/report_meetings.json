@@ -1,0 +1,54 @@
+{
+  "deals": [
+    {
+      "name": "ישראל ישראלי",
+      "amount": 100000,
+      "deal_id": "00000000-0000-4000-8000-000000000009",
+      "meetings": 1,
+      "owner_id": "00000000-0000-4000-8000-000000000007",
+      "closed_at": "2026-10-15T14:55:51.143506+00:00"
+    }
+  ],
+  "totals": {
+    "held": 1,
+    "no_show": 1,
+    "meetings": 3,
+    "upcoming": 0,
+    "cancelled": 1,
+    "won_deals": 1,
+    "won_amount": 100000,
+    "not_updated": 0,
+    "led_meetings": 1,
+    "no_show_rate": null
+  },
+  "by_owner": [
+    {
+      "held": 1,
+      "no_show": 0,
+      "meetings": 2,
+      "owner_id": "00000000-0000-4000-8000-000000000007",
+      "upcoming": 0,
+      "cancelled": 1,
+      "won_deals": 1,
+      "won_amount": 100000,
+      "not_updated": 0,
+      "led_meetings": 1,
+      "no_show_rate": null
+    },
+    {
+      "held": 0,
+      "no_show": 1,
+      "meetings": 1,
+      "owner_id": "00000000-0000-4000-8000-000000000008",
+      "upcoming": 0,
+      "cancelled": 0,
+      "won_deals": 0,
+      "won_amount": 0,
+      "not_updated": 0,
+      "led_meetings": 0,
+      "no_show_rate": null
+    }
+  ],
+  "no_show_min": 5,
+  "led_window_days": 90
+}

@@ -1973,6 +1973,7 @@ export type Database = {
       report_rep_performance: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null }; Returns: Json };
       report_activity: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_meetings: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_lost_reasons: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       report_cycle_length: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       report_stuck_deals: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null; p_days?: number }; Returns: Json };

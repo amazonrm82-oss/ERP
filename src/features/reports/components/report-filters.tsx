@@ -14,6 +14,8 @@ type Props = {
   filters: ReportFilter[];
   period: { key: string; fromDate: string; toDate: string };
   ownerId: string;
+  // "אחראי" unless the report filters by someone else (the meetings report: the organizer)
+  ownerLabel?: string;
   owners: Option[];
   pipelineId: string;
   pipelines: Option[];
@@ -22,7 +24,7 @@ type Props = {
 };
 
 /** A plain GET form: the filters live in the URL, so a report can be bookmarked or shared. */
-export function ReportFilters({ filters, period, ownerId, owners, pipelineId, pipelines, pipelineEmptyLabel }: Props) {
+export function ReportFilters({ filters, period, ownerId, ownerLabel = "אחראי", owners, pipelineId, pipelines, pipelineEmptyLabel }: Props) {
   const [periodKey, setPeriodKey] = useState(period.key);
   return (
     <form method="get" className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4" aria-label="סינון הדוח">
@@ -44,7 +46,7 @@ export function ReportFilters({ filters, period, ownerId, owners, pipelineId, pi
         </>
       ) : null}
       {filters.includes("owner") ? (
-        <SelectField label="אחראי" name="owner" defaultValue={ownerId} className="w-44">
+        <SelectField label={ownerLabel} name="owner" defaultValue={ownerId} className="w-44">
           <option value="">כל חברי הצוות</option>
           {owners.map((option) => (
             <option key={option.value} value={option.value}>

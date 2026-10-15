@@ -80,6 +80,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
         filters={definition.filters}
         period={{ key: period.key, fromDate: period.fromDate, toDate: period.toDate }}
         ownerId={filters.ownerId ?? ""}
+        ownerLabel={definition.ownerLabel}
         owners={owners}
         pipelineId={filters.pipelineId ?? ""}
         pipelines={pipelines.map((p) => ({ value: p.id, label: p.isDefault ? `${p.name} (ברירת מחדל)` : p.name }))}

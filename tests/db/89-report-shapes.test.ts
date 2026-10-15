@@ -122,6 +122,28 @@ describe("report result shapes (FXC-12)", () => {
       ),
     );
 
+    // meetings (CAL-11): a held meeting on the won deal before it closed (led to a deal), a no-show
+    // of the member and a cancelled one
+    await asUser(owner.id, async (q) => {
+      await q(
+        `insert into public.meetings (organization_id, title, starts_at, ends_at, status, deal_id)
+         values ($1, 'פגישת סגירה', now() - interval '3 hours', now() - interval '2 hours', 'held', $2)`,
+        [org, wonDeal],
+      );
+      await q(
+        `insert into public.meetings (organization_id, title, starts_at, ends_at, status)
+         values ($1, 'פגישה שבוטלה', now() - interval '5 hours', now() - interval '4 hours', 'cancelled')`,
+        [org],
+      );
+    });
+    await asUser(member.id, (q) =>
+      q(
+        `insert into public.meetings (organization_id, title, starts_at, ends_at, status)
+         values ($1, 'הלקוח לא הגיע', now() - interval '6 hours', now() - interval '5 hours', 'no_show')`,
+        [org],
+      ),
+    );
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -132,6 +154,7 @@ describe("report result shapes (FXC-12)", () => {
       report_activity: ["public.report_activity($1, $2, $3)", range],
       report_forecast: ["public.report_forecast($1)", [org]],
       report_lost_reasons: ["public.report_lost_reasons($1, $2, $3)", range],
+      report_meetings: ["public.report_meetings($1, $2, $3)", range],
       report_cycle_length: ["public.report_cycle_length($1, $2, $3)", range],
       report_stuck_deals: ["public.report_stuck_deals($1)", [org]],
       report_revenue: ["public.report_revenue($1, $2, $3)", range],

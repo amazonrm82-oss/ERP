@@ -774,6 +774,98 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         ],
       };
     }
+
+    // CAL-11: meetings that started in the period, by organizer
+    case "meetings": {
+      const data = obj(await rpc("report_meetings", { ...range, p_owner: ownerId }));
+      const totals = obj(data.totals as Json);
+      const byOwner = list(data.by_owner as Json);
+      const deals = list(data.deals as Json);
+      const name = await ownerNames([...byOwner.map((r) => r.owner_id), ...deals.map((r) => r.owner_id)]);
+      const organizer = (id: unknown) => (str(id) ? name(id) : "ללא מארגן");
+      const held = num(totals.held);
+      const noShow = num(totals.no_show);
+      // null (shown as "—") below no_show_min meetings held or missed: the rule is in the SQL
+      const minMeetings = num(data.no_show_min);
+      const windowDays = num(data.led_window_days);
+      // the SQL lists at most 200 deals; won_deals counts them all
+      const dealsTotal = num(totals.won_deals);
+      const dealsCapped = deals.length < dealsTotal;
+      return {
+        kpis: [
+          { label: "פגישות", value: formatNumber(num(totals.meetings)), hint: `${formatNumber(held)} התקיימו` },
+          {
+            label: "אחוז אי-הגעה",
+            value: formatCell("percent", numOrNull(totals.no_show_rate)),
+            hint: `${formatNumber(noShow)} מתוך ${formatNumber(held + noShow)} פגישות שהתקיימו או שהלקוח לא הגיע`,
+          },
+          {
+            label: "פגישות שהובילו לעסקה",
+            value: formatNumber(num(totals.led_meetings)),
+            hint: `${formatNumber(num(totals.won_deals))} עסקאות, ${formatMoney(num(totals.won_amount))}`,
+          },
+        ],
+        sections: [
+          {
+            title: "לפי מארגן",
+            columns: [
+              { key: "owner", label: "מארגן", kind: "text" },
+              { key: "meetings", label: "פגישות", kind: "number" },
+              { key: "held", label: "התקיימו", kind: "number" },
+              { key: "no_show", label: "הלקוח לא הגיע", kind: "number" },
+              { key: "no_show_rate", label: "אחוז אי-הגעה", kind: "percent" },
+              { key: "cancelled", label: "בוטלו", kind: "number" },
+              { key: "not_updated", label: "עברו ולא עודכנו", kind: "number" },
+              { key: "upcoming", label: "עוד לא התקיימו", kind: "number" },
+              { key: "led_meetings", label: "הובילו לעסקה", kind: "number" },
+              { key: "won_deals", label: "עסקאות שנסגרו", kind: "number" },
+              { key: "won_amount", label: "שווי", kind: "money" },
+            ],
+            rows: byOwner.map((r) => ({
+              owner: organizer(r.owner_id),
+              meetings: num(r.meetings),
+              held: num(r.held),
+              no_show: num(r.no_show),
+              no_show_rate: numOrNull(r.no_show_rate),
+              cancelled: num(r.cancelled),
+              not_updated: num(r.not_updated),
+              upcoming: num(r.upcoming),
+              led_meetings: num(r.led_meetings),
+              won_deals: num(r.won_deals),
+              won_amount: num(r.won_amount),
+            })),
+            bar: "meetings",
+            empty: "לא נקבעו פגישות בתקופה הזו.",
+            note: `נספרות פגישות שמועד תחילתן בתקופה, לפי מי שארגן אותן. אחוז אי-הגעה: מתוך הפגישות שהתקיימו או שהלקוח לא הגיע אליהן; פגישות שבוטלו או שעוד מתוכננות לא נספרות בו. כשיש פחות מ-${formatNumber(minMeetings)} פגישות כאלה, האחוז לא מוצג. עסקה שהיו בה פגישות של שני מארגנים נספרת בשורה של כל אחד מהם, ובסיכום פעם אחת.`,
+          },
+          {
+            // the cap is said in the title, so the CSV and Excel files say it too
+            title: dealsCapped
+              ? `עסקאות שנסגרו אחרי פגישה (מוצגות ${formatNumber(deals.length)} האחרונות מתוך ${formatNumber(dealsTotal)})`
+              : "עסקאות שנסגרו אחרי פגישה",
+            columns: [
+              { key: "name", label: "עסקה", kind: "text" },
+              { key: "owner", label: "אחראי לעסקה", kind: "text" },
+              { key: "meetings", label: "פגישות בתקופה", kind: "number" },
+              { key: "closed", label: "נסגרה", kind: "text" },
+              { key: "amount", label: "שווי", kind: "money" },
+            ],
+            rows: deals.map(
+              (r): ReportRow => ({
+                _href: str(r.deal_id) ? paths.deal(orgId, str(r.deal_id) as string) : null,
+                name: str(r.name),
+                owner: name(r.owner_id),
+                meetings: num(r.meetings),
+                closed: str(r.closed_at) ? formatDate(str(r.closed_at)) : null,
+                amount: num(r.amount),
+              }),
+            ),
+            empty: "אף פגישה בתקופה הזו לא הובילה עדיין לעסקה שנסגרה.",
+            note: `פגישה הובילה לעסקה כשהיא התקיימה, ועסקה אחת שנבחרה לה נסגרה בהצלחה בתוך ${formatNumber(windowDays)} ימים מתחילת הפגישה. העסקה נבחרת כך: העסקה שהפגישה מקושרת אליה; אחרת, העסקה שנוצרה בהמרת הליד של הפגישה; אחרת, מבין עסקאות איש הקשר של הפגישה שנוצרו אחרי תחילתה, זו שנסגרה בהצלחה ראשונה. עסקה שנבחרה ולא נסגרה בהצלחה בזמן לא מחליפה עסקה אחרת. כשהליד של הפגישה לא גלוי לך, הבחירה נעשית לפי איש הקשר, ולכן שני משתמשים עשויים לראות תוצאה שונה לאותה פגישה. עסקה נספרת פעם אחת גם כשהיו בה כמה פגישות.`,
+          },
+        ],
+      };
+    }
   }
   throw new Error(`unknown report ${key}`);
 }

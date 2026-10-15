@@ -242,3 +242,15 @@ describe("report shaping from the saved samples", () => {
     await expect(getDashboard("00000000-0000-4000-8000-000000000099")).rejects.toThrow(ReportShapeError);
   });
 });
+
+// CAL-11: the deals list stops at 200; the section title says so (screen, CSV and Excel)
+describe("meetings report: the capped deals list", () => {
+  it("says how many of how many deals are shown when the SQL cut the list", async () => {
+    const data = sample("report_meetings") as { totals: { won_deals: number }; deals: unknown[] };
+    let view = await buildReport("org", "meetings", filters);
+    expect(view.sections[1].title).toBe("עסקאות שנסגרו אחרי פגישה");
+    results.report_meetings = { ...data, totals: { ...data.totals, won_deals: 250 } };
+    view = await buildReport("org", "meetings", filters);
+    expect(view.sections[1].title).toBe(`עסקאות שנסגרו אחרי פגישה (מוצגות ${data.deals.length} האחרונות מתוך 250)`);
+  });
+});
