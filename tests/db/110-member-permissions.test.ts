@@ -63,6 +63,7 @@ describe("member permissions (PRM-01)", () => {
     // another business's owner, and platform support in a customer-approved session
     expect((await pgError(grant(owner2.id, plain.id, ["export"]))).code).toBe("42501");
     await asAdmin((q) => q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]));
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
     expect((await pgError(asMfaUser(support.id, (q) => q("select public.set_member_permissions($1, $2, '{export}')", [org, plain.id])))).code).toBe("42501");
     expect(await asMfaUser(support.id, async (q) => (await q<{ k: string[] }>("select public.my_permissions($1) as k", [org])).rows[0].k)).toEqual([]);
     await asAdmin((q) => q("update public.support_access_grants set revoked_at = now() where organization_id = $1", [org]));

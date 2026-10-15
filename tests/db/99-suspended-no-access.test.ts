@@ -161,6 +161,7 @@ describe("a suspended business: no access until payment", () => {
 
   it("suspended: platform support in a customer-approved session still reads, to help", async () => {
     await asAdmin((q) => q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]));
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
     expect(await asMfaUser(support.id, (q) => count(q, "select 1 from public.leads where organization_id = $1", [org]))).toBeGreaterThan(0);
     await asAdmin((q) => q("update public.support_access_grants set revoked_at = now() where organization_id = $1", [org]));
   });

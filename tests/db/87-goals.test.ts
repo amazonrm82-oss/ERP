@@ -106,6 +106,7 @@ describe("goals (GOL-01)", () => {
       await q("insert into app.platform_staff (user_id, role) values ($1, 'support')", [support.id]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]);
     });
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
     const all = pick("org", "m1", "m2", "manager", "north", "south");
     expect(await asMfaUser(support.id, async (q) => (await q<{ id: string }>("select id from public.goals where organization_id = $1", [org])).rows.map((r) => r.id).sort())).toEqual(all);
     expect(await asMfaUser(support.id, async (q) => (await q("update public.goals set target = target where organization_id = $1", [org])).rowCount)).toBe(0);

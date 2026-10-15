@@ -103,6 +103,7 @@ describe("product cost and who sees it (PRD-06)", () => {
 
   it("platform support in a customer-approved session reads the catalog but not the cost", async () => {
     await asAdmin((q) => q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]));
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
     try {
       expect(await asMfaUser(support.id, (q) => count(q, "select 1 from public.products where organization_id = $1", [org]))).toBeGreaterThan(0);
       expect(await asMfaUser(support.id, (q) => count(q, "select 1 from public.product_costs where organization_id = $1", [org]))).toBe(0);

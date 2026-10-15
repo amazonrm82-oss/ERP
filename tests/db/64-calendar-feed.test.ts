@@ -141,6 +141,7 @@ describe("personal calendar feed (CAL-07)", () => {
       await q("insert into app.platform_staff (user_id, role) values ($1, 'support')", [support.id]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]);
     });
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
     expect(await asMfaUser(support.id, (q) => count(q, "select 1 from public.organizations where id = $1", [org]))).toBe(1);
     expect((await pgError(asMfaUser(support.id, (q) => q("select public.calendar_feed_create($1)", [org])))).code).toBe("42501");
     expect((await pgError(asMfaUser(support.id, (q) => q("select public.calendar_feed_status($1)", [org])))).code).toBe("42501");

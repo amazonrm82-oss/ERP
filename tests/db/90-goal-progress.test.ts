@@ -255,6 +255,7 @@ describe("goal progress (GOL-03)", () => {
           await q("insert into app.platform_staff (user_id, role) values ($1, 'support')", [support.id]);
           await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]);
         });
+        await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
         try {
           const seen = await asMfaUser(support.id, async (q) =>
             (await q<{ r: Row[] }>("select public.report_goal_progress($1) as r", [org])).rows[0].r.map((r) => r.goal_id).sort(),
@@ -360,6 +361,7 @@ describe("goal progress (GOL-03)", () => {
       await q("insert into app.platform_staff (user_id, role) values ($1, 'support')", [staff.id]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [org]);
     });
+    await asMfaUser(staff.id, (q) => q("select public.platform_open_support($1)", [org]));
     await setVisibility("own");
     try {
       const seen = await asMfaUser(staff.id, async (q) => (await q<{ r: Row[] }>("select public.report_goal_progress($1) as r", [org])).rows[0].r);

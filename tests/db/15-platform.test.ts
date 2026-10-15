@@ -86,11 +86,13 @@ describe("platform admin", () => {
       (await q<{ id: string }>("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '2 hours') returning id", [org])).rows[0].id,
     );
 
+    // the approval alone gives no read: support opens a session, which is logged (FXS-08)
+    expect(await leads(support.id)).toBe(0);
+    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
+    expect(await asAdmin((q) => count(q, "select 1 from public.audit_log where organization_id = $1 and action = 'support_open'", [org]))).toBe(1);
     expect(await leads(support.id)).toBeGreaterThan(0);
     expect(await leads(support.id, false)).toBe(0); // no second factor, no access
     expect(await leads(finance.id)).toBe(0); // not a support role
-    await asMfaUser(support.id, (q) => q("select public.platform_open_support($1)", [org]));
-    expect(await asAdmin((q) => count(q, "select 1 from public.audit_log where organization_id = $1 and action = 'support_open'", [org]))).toBe(1);
 
     // read-only: no inserts, no updates, no deletes
     expect((await pgError(insertLead(support.id, org))).code).toBe("42501");
