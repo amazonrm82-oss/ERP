@@ -56,6 +56,7 @@ export default async function NewDealPage({ params, searchParams }: Props) {
           <CardBody>
             <DealForm
               orgId={orgId}
+              pipelineId={pipeline.id}
               stages={pipeline.stages}
               contacts={contacts}
               companies={companies}

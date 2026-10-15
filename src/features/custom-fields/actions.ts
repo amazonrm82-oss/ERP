@@ -190,6 +190,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
   if (!condition.ok) {
     const values = formValues(formData);
     values.condition_value = formData.getAll("condition_value").filter((v) => typeof v === "string").join("\n");
+    values.condition_or_value = formData.getAll("condition_or_value").filter((v) => typeof v === "string").join("\n");
     return fail(condition.message, { fieldErrors: { condition: condition.message }, values });
   }
   const { data, error } = await context.supabase
@@ -242,6 +243,9 @@ async function conditionFromForm(
     controller: text("condition_field"),
     op: text("condition_op"),
     choices: formData.getAll("condition_value").filter((v): v is string => typeof v === "string" && v !== ""),
+    // the optional second part (a deal's pipeline beside its stage); its field follows from the first
+    orOp: text("condition_or_op"),
+    orChoices: formData.getAll("condition_or_value").filter((v): v is string => typeof v === "string" && v !== ""),
   };
   const definitions = await listFieldDefinitions(orgId, object, { includeInactive: true });
   const self = definitions.find((item) => item.id === fieldId);

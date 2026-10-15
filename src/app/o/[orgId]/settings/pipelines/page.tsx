@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { fieldsAffectedByPipelineDelete } from "@/features/custom-fields/conditions";
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { CreatePipelineForm, PipelineCard } from "@/features/customization/components/pipeline-editor";
 import { listPipelineSettings } from "@/features/customization/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -14,7 +16,11 @@ export default async function PipelinesSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
   const editable = isAdminRole(role) && canWrite;
-  const pipelines = await listPipelineSettings(orgId);
+  const [pipelines, dealFields] = await Promise.all([
+    listPipelineSettings(orgId),
+    // FLD-09: deleting a pipeline removes the conditions based on it; the delete window names those fields
+    editable ? listFieldDefinitions(orgId, "deal", { includeInactive: true }) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -31,7 +37,18 @@ export default async function PipelinesSettingsPage({ params }: Props) {
         </Card>
       ) : null}
       {pipelines.map((pipeline) => (
-        <PipelineCard key={pipeline.id} orgId={orgId} pipeline={pipeline} editable={editable} isOnly={pipelines.length === 1} />
+        <PipelineCard
+          key={pipeline.id}
+          orgId={orgId}
+          pipeline={pipeline}
+          editable={editable}
+          isOnly={pipelines.length === 1}
+          conditionFields={fieldsAffectedByPipelineDelete(
+            dealFields,
+            pipeline.id,
+            pipeline.stages.map((stage) => stage.id),
+          ).map((field) => field.label)}
+        />
       ))}
     </div>
   );

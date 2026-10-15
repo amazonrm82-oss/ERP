@@ -18,6 +18,8 @@ import { RecurringFields } from "./recurring-fields";
 
 type Props = {
   orgId: string;
+  // the pipeline the stages belong to (a pipeline condition of a custom field reads it)
+  pipelineId: string;
   stages: StageOption[];
   contacts: Array<{ id: string; name: string }>;
   companies: Array<{ id: string; name: string }>;
@@ -28,7 +30,7 @@ type Props = {
 };
 
 /** New deal form. On success the action redirects to the board. */
-export function DealForm({ orgId, stages, contacts, companies, defaultContactId, defaultCompanyId, fields }: Props) {
+export function DealForm({ orgId, pipelineId, stages, contacts, companies, defaultContactId, defaultCompanyId, fields }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createDealAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
@@ -41,6 +43,7 @@ export function DealForm({ orgId, stages, contacts, companies, defaultContactId,
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
+      <input type="hidden" name="pipeline_id" value={pipelineId} />
       <FormError message={failure?.message} />
       <TextField
         label="שם העסקה"

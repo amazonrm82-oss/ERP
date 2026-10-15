@@ -35,7 +35,7 @@ export async function conditionBuiltinChoices(orgId: string, objectType: FieldOb
         choices.push({ value: stage.id, label: pipelines.length > 1 ? `${pipeline.name}: ${stage.name}` : stage.name });
       }
     }
-    return { "builtin:stage": choices };
+    return { "builtin:pipeline": pipelines.map((p) => ({ value: p.id, label: p.name })), "builtin:stage": choices };
   }
   const types = await listRecordTypes(orgId, objectType);
   return { "builtin:type": types.map((t) => ({ value: t.id, label: t.isActive ? t.name : `${t.name} (מוסתר)` })) };

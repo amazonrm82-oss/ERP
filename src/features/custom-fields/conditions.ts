@@ -15,13 +15,28 @@ export type ConditionOp = (typeof CONDITION_OPS)[number];
 export const CONDITION_EFFECTS = ["show", "require"] as const;
 export type ConditionEffect = (typeof CONDITION_EFFECTS)[number];
 
-export type FieldCondition = {
+/** One test of a condition: a field, an op and (for equals / not_equals / in) a value. */
+export type ConditionPart = {
   // a custom field's key, or a built-in field "builtin:<name>"
   field: string;
   op: ConditionOp;
   value?: Json;
-  effect: ConditionEffect;
 };
+
+export type FieldCondition = ConditionPart & {
+  effect: ConditionEffect;
+  // FLD-09 follow-up (owner, 15 October 2026): a deal field may hold a pipeline condition and a stage
+  // condition together; it is enough that one of them holds. Only that pair (either order).
+  or?: ConditionPart;
+};
+
+/** The built-in pair that may share one field's condition (main part and "or"), either way round. */
+export const OR_PAIR: Record<string, string> = { "builtin:stage": "builtin:pipeline", "builtin:pipeline": "builtin:stage" };
+
+/** The built-in field a second ("or") part of a deal condition is on, given the main part's field; null when none may be added. */
+export function orFieldFor(objectType: FieldObject, field: string): string | null {
+  return objectType === "deal" ? (OR_PAIR[field] ?? null) : null;
+}
 
 export const BUILTIN_PREFIX = "builtin:";
 
@@ -48,7 +63,11 @@ export const BUILTIN_CONDITION_FIELDS: Record<FieldObject, BuiltinConditionField
     { key: "builtin:status", label: "סטטוס", input: "status_id" },
     { key: "builtin:source", label: "מקור", input: "source_id" },
   ],
-  deal: [{ key: "builtin:stage", label: "שלב", input: "stage_id" }],
+  // a pipeline condition holds in every stage of the pipeline, stages added later included
+  deal: [
+    { key: "builtin:pipeline", label: "תהליך מכירה", input: "pipeline_id" },
+    { key: "builtin:stage", label: "שלב", input: "stage_id" },
+  ],
   contact: [{ key: "builtin:type", label: "סוג איש קשר", input: "type_id" }],
   company: [{ key: "builtin:type", label: "סוג חברה", input: "type_id" }],
 };
@@ -74,19 +93,30 @@ export const OP_LABELS: Record<ConditionOp, string> = {
   empty: "ריק",
 };
 
-/** Reads a stored condition; anything that is not a valid shape is no condition. */
-export function parseCondition(raw: Json | null | undefined): FieldCondition | null {
+function parsePart(raw: Json | null | undefined): ConditionPart | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const { field, op, value, effect } = raw as Record<string, Json | undefined>;
+  const { field, op, value } = raw as Record<string, Json | undefined>;
   if (typeof field !== "string" || field === "") return null;
   if (typeof op !== "string" || !(CONDITION_OPS as readonly string[]).includes(op)) return null;
-  if (typeof effect !== "string" || !(CONDITION_EFFECTS as readonly string[]).includes(effect)) return null;
-  const condition: FieldCondition = { field, op: op as ConditionOp, effect: effect as ConditionEffect };
-  if (op === "filled" || op === "empty") return condition;
+  const part: ConditionPart = { field, op: op as ConditionOp };
+  if (op === "filled" || op === "empty") return part;
   if (value === undefined || value === null) return null;
   if (op === "in" && !Array.isArray(value)) return null;
   if (op !== "in" && (Array.isArray(value) || typeof value === "object")) return null;
-  return { ...condition, value };
+  return { ...part, value };
+}
+
+/** Reads a stored condition; anything that is not a valid shape is no condition. */
+export function parseCondition(raw: Json | null | undefined): FieldCondition | null {
+  const main = parsePart(raw);
+  if (!main || !raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const { effect, or } = raw as Record<string, Json | undefined>;
+  if (typeof effect !== "string" || !(CONDITION_EFFECTS as readonly string[]).includes(effect)) return null;
+  const condition: FieldCondition = { ...main, effect: effect as ConditionEffect };
+  if (or === undefined || or === null) return condition;
+  const second = parsePart(or);
+  if (!second || OR_PAIR[main.field] !== second.field) return null;
+  return { ...condition, or: second };
 }
 
 export function isBuiltinKey(key: string): boolean {
@@ -101,10 +131,15 @@ function sameValue(a: Json | undefined, b: Json): boolean {
 }
 
 /**
- * Whether the condition holds for these values. Pure; mirrors nothing in the database
- * (the database never applies a condition). A multi_select holds a choice when it contains it.
+ * Whether the condition holds for these values: its main part, or its "or" part (a deal's pipeline
+ * beside its stage). Pure; mirrors nothing in the database (the database never applies a condition).
  */
 export function conditionHolds(condition: FieldCondition, values: ConditionValues): boolean {
+  return partHolds(condition, values) || (condition.or !== undefined && partHolds(condition.or, values));
+}
+
+/** Whether one part holds. A multi_select holds a choice when it contains it. */
+function partHolds(condition: ConditionPart, values: ConditionValues): boolean {
   const current = values[condition.field];
   const empty = isEmptyCustomValue(current ?? null) || (Array.isArray(current) && current.length === 0);
   switch (condition.op) {
@@ -137,6 +172,7 @@ export function conditionHolds(condition: FieldCondition, values: ConditionValue
  * shows, and is required only by its own box).
  */
 export function conditionApplies(condition: FieldCondition, definitions: FieldDefinition[], objectType?: FieldObject): boolean {
+  if (condition.or && !(objectType ? BUILTIN_CONDITION_FIELDS[objectType].some((field) => field.key === condition.or?.field) : true)) return false;
   if (isBuiltinKey(condition.field)) {
     return objectType ? BUILTIN_CONDITION_FIELDS[objectType].some((field) => field.key === condition.field) : true;
   }
@@ -197,11 +233,42 @@ export function choiceToValue(key: string, definitions: FieldDefinition[], choic
   return choice;
 }
 
-/** The value of a condition as the editor's text choices. */
-export function valueToChoices(condition: FieldCondition | null): string[] {
+/** The value of a condition (or one part of it) as the editor's text choices. */
+export function valueToChoices(condition: ConditionPart | null | undefined): string[] {
   if (!condition || condition.value === undefined || condition.value === null) return [];
   const values = Array.isArray(condition.value) ? condition.value : [condition.value];
   return values.map((value) => String(value));
+}
+
+/** What the condition editor sends. orOp / orChoices: the optional second part (a deal's pipeline beside its stage). */
+export type ConditionInput = { effect: string; controller: string; op: string; choices: string[]; orOp?: string; orChoices?: string[] };
+
+/** One part of the editor's input as a condition part, or why it cannot be saved. */
+function buildPart(
+  field: FieldDefinition,
+  definitions: FieldDefinition[],
+  objectType: FieldObject,
+  builtins: BuiltinChoices,
+  controllerKey: string,
+  opInput: string,
+  choices: string[],
+): { ok: true; part: ConditionPart } | { ok: false; message: string } {
+  const builtin = BUILTIN_CONDITION_FIELDS[objectType].find((item) => item.key === controllerKey);
+  const controller = builtin ? null : controllerCandidates(field, definitions).find((item) => item.key === controllerKey);
+  if (!builtin && !controller) return { ok: false, message: "יש לבחור שדה פעיל אחר, שאין לו תנאי משלו." };
+  const ops = opsForType(controller ? controller.type : "builtin");
+  if (!(ops as readonly string[]).includes(opInput)) return { ok: false, message: "יש לבחור תנאי שמתאים לשדה." };
+  const op = opInput as ConditionOp;
+  if (op === "filled" || op === "empty") return { ok: true, part: { field: controllerKey, op } };
+  const allowed = new Set(controllerChoices(controllerKey, definitions, builtins).map((choice) => choice.value));
+  const picked = [...new Set(choices.filter((choice) => allowed.has(choice)))];
+  if (picked.length === 0 || picked.length !== new Set(choices).size) return { ok: false, message: "יש לבחור ערך מהרשימה." };
+  if (op === "in") {
+    if (picked.length > 50) return { ok: false, message: "אפשר לבחור עד 50 ערכים." };
+    return { ok: true, part: { field: controllerKey, op, value: picked.map((choice) => choiceToValue(controllerKey, definitions, choice)) } };
+  }
+  if (picked.length !== 1) return { ok: false, message: "יש לבחור ערך אחד." };
+  return { ok: true, part: { field: controllerKey, op, value: choiceToValue(controllerKey, definitions, picked[0]) } };
 }
 
 /**
@@ -213,7 +280,7 @@ export function buildCondition(
   definitions: FieldDefinition[],
   objectType: FieldObject,
   builtins: BuiltinChoices,
-  input: { effect: string; controller: string; op: string; choices: string[] },
+  input: ConditionInput,
 ): { ok: true; condition: FieldCondition | null } | { ok: false; message: string } {
   if (input.effect === "" || input.effect === "none") return { ok: true, condition: null };
   if (!(CONDITION_EFFECTS as readonly string[]).includes(input.effect)) return { ok: false, message: "יש לבחור מתי התנאי חל." };
@@ -221,22 +288,14 @@ export function buildCondition(
     return { ok: false, message: "שדה אחר תלוי בשדה הזה, ולכן אי אפשר להוסיף לו תנאי משלו." };
   }
   const effect = input.effect as ConditionEffect;
-  const builtin = BUILTIN_CONDITION_FIELDS[objectType].find((item) => item.key === input.controller);
-  const controller = builtin ? null : controllerCandidates(field, definitions).find((item) => item.key === input.controller);
-  if (!builtin && !controller) return { ok: false, message: "יש לבחור שדה פעיל אחר, שאין לו תנאי משלו." };
-  const ops = opsForType(controller ? controller.type : "builtin");
-  if (!(ops as readonly string[]).includes(input.op)) return { ok: false, message: "יש לבחור תנאי שמתאים לשדה." };
-  const op = input.op as ConditionOp;
-  if (op === "filled" || op === "empty") return { ok: true, condition: { field: input.controller, op, effect } };
-  const allowed = new Set(controllerChoices(input.controller, definitions, builtins).map((choice) => choice.value));
-  const picked = [...new Set(input.choices.filter((choice) => allowed.has(choice)))];
-  if (picked.length === 0 || picked.length !== new Set(input.choices).size) return { ok: false, message: "יש לבחור ערך מהרשימה." };
-  if (op === "in") {
-    if (picked.length > 50) return { ok: false, message: "אפשר לבחור עד 50 ערכים." };
-    return { ok: true, condition: { field: input.controller, op, value: picked.map((choice) => choiceToValue(input.controller, definitions, choice)), effect } };
-  }
-  if (picked.length !== 1) return { ok: false, message: "יש לבחור ערך אחד." };
-  return { ok: true, condition: { field: input.controller, op, value: choiceToValue(input.controller, definitions, picked[0]), effect } };
+  const main = buildPart(field, definitions, objectType, builtins, input.controller, input.op, input.choices);
+  if (!main.ok) return main;
+  const orField = orFieldFor(objectType, input.controller);
+  const orOp = input.orOp ?? "";
+  if (!orField || orOp === "" || orOp === "none") return { ok: true, condition: { ...main.part, effect } };
+  const second = buildPart(field, definitions, objectType, builtins, orField, orOp, input.orChoices ?? []);
+  if (!second.ok) return second;
+  return { ok: true, condition: { ...main.part, effect, or: second.part } };
 }
 
 /** The controlling field's name for the screen, or null when it is gone. */
@@ -246,14 +305,19 @@ function controllerLabel(key: string, definitions: FieldDefinition[], objectType
   return definitions.find((field) => field.key === key)?.label ?? null;
 }
 
-/** "מופיע רק כאשר "סטטוס" שווה ל "חדש"" — for the field settings list. */
+function describePart(part: ConditionPart, definitions: FieldDefinition[], objectType: FieldObject, builtins: BuiltinChoices): string {
+  const label = controllerLabel(part.field, definitions, objectType) ?? "שדה שנמחק";
+  if (part.op === "filled" || part.op === "empty") return `"${label}" ${OP_LABELS[part.op]}`;
+  const choices = controllerChoices(part.field, definitions, builtins);
+  const names = valueToChoices(part).map((value) => choices.find((choice) => choice.value === value)?.label ?? "ערך שהוסר");
+  return `"${label}" ${OP_LABELS[part.op]}: ${names.map((name) => `"${name}"`).join(", ")}`;
+}
+
+/** "מופיע רק כאשר "סטטוס" שווה ל "חדש"" (and "… או "שלב" …" with a second part) — for the field settings list. */
 export function describeCondition(condition: FieldCondition, definitions: FieldDefinition[], objectType: FieldObject, builtins: BuiltinChoices): string {
   const lead = condition.effect === "show" ? "מופיע רק כאשר" : "חובה כאשר";
-  const label = controllerLabel(condition.field, definitions, objectType) ?? "שדה שנמחק";
-  if (condition.op === "filled" || condition.op === "empty") return `${lead} "${label}" ${OP_LABELS[condition.op]}`;
-  const choices = controllerChoices(condition.field, definitions, builtins);
-  const names = valueToChoices(condition).map((value) => choices.find((choice) => choice.value === value)?.label ?? "ערך שהוסר");
-  return `${lead} "${label}" ${OP_LABELS[condition.op]}: ${names.map((name) => `"${name}"`).join(", ")}`;
+  const main = `${lead} ${describePart(condition, definitions, objectType, builtins)}`;
+  return condition.or ? `${main}, או כאשר ${describePart(condition.or, definitions, objectType, builtins)}` : main;
 }
 
 /**
@@ -276,12 +340,14 @@ export function conditionReminder(
     if (!controller.isActive) return `השדה "${controller.label}" שהתנאי תלוי בו מוסתר, ולכן השדה מופיע תמיד. הציגו אותו שוב או עדכנו את התנאי.`;
     if (!conditionApplies(condition, definitions, objectType)) return "התנאי של השדה כבר לא מתאים לשדה שהוא תלוי בו, ולכן השדה מופיע תמיד. עדכנו את התנאי.";
   }
-  if (condition.op === "filled" || condition.op === "empty") return null;
-  const choices = controllerChoices(condition.field, definitions, builtins);
-  // built-in lists are loaded only on the settings page; without them nothing is known
-  if (isBuiltinKey(condition.field) && !(condition.field in builtins)) return null;
-  const missing = valueToChoices(condition).filter((value) => !choices.some((choice) => choice.value === value));
-  if (missing.length > 0) {
+  const removedValue = (part: ConditionPart): boolean => {
+    if (part.op === "filled" || part.op === "empty") return false;
+    // built-in lists are loaded only on the settings page; without them nothing is known
+    if (isBuiltinKey(part.field) && !(part.field in builtins)) return false;
+    const choices = controllerChoices(part.field, definitions, builtins);
+    return valueToChoices(part).some((value) => !choices.some((choice) => choice.value === value));
+  };
+  if (removedValue(condition) || (condition.or !== undefined && removedValue(condition.or))) {
     return condition.effect === "show"
       ? "ערך שהתנאי בודק הוסר מהרשימה, אז ייתכן שהשדה לא יופיע אף פעם. עדכנו את התנאי."
       : "ערך שהתנאי בודק הוסר מהרשימה. עדכנו את התנאי.";
@@ -316,13 +382,20 @@ export function conditionValuesFromForm(
   return values;
 }
 
+function sameChoices(stored: ConditionPart | undefined, choices: string[]): boolean {
+  const a = [...valueToChoices(stored)].sort();
+  const b = [...new Set(choices)].sort();
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 /** True when the editor's inputs say exactly what is stored (then nothing is re-checked or sent). */
-export function sameAsStored(stored: FieldCondition | null | undefined, input: { effect: string; controller: string; op: string; choices: string[] }): boolean {
+export function sameAsStored(stored: FieldCondition | null | undefined, input: ConditionInput): boolean {
   if (!stored) return input.effect === "" || input.effect === "none";
   if (stored.effect !== input.effect || stored.field !== input.controller || stored.op !== input.op) return false;
-  const a = [...valueToChoices(stored)].sort();
-  const b = [...new Set(input.choices)].sort();
-  return a.length === b.length && a.every((value, index) => value === b[index]);
+  if (!sameChoices(stored, input.choices)) return false;
+  const orOp = input.orOp === "none" ? "" : (input.orOp ?? "");
+  if (!stored.or) return orOp === "";
+  return stored.or.op === orOp && sameChoices(stored.or, input.orChoices ?? []);
 }
 
 /** A required custom field's value is missing (same rule as parseCustomFields: a box must be ticked). */
@@ -358,4 +431,50 @@ export function missingRequiredAfter(
 /** "חסר שדה חובה: תקציב, תאריך חתימה" (the owner's wording) */
 export function missingFieldsMessage(fields: Array<{ label: string }>): string {
   return `חסר שדה חובה: ${fields.map((field) => field.label).join(", ")}`;
+}
+
+/**
+ * FLD-09 follow-up (owner, 15 October 2026): a deal field's condition after its pipeline is deleted.
+ * Every part on "builtin:pipeline" loses that pipeline's id and every part on "builtin:stage" the ids
+ * of its stages: a list keeps its other values, a part with one value on it (or a list left empty)
+ * goes, filled / empty stay. One part left becomes the condition; none left = no condition. Mirrors
+ * app.condition_without_pipeline() (test 108 compares them); the database applies it when the
+ * pipeline is deleted, the delete window uses it to name the fields.
+ */
+export function conditionWithoutPipeline(condition: FieldCondition | null, pipelineId: string, stageIds: readonly string[]): FieldCondition | null {
+  if (!condition) return null;
+  const prune = (part: ConditionPart): ConditionPart | null => {
+    const ids: readonly string[] = part.field === "builtin:pipeline" ? [pipelineId] : part.field === "builtin:stage" ? stageIds : [];
+    if (ids.length === 0) return part;
+    if (part.op === "in" && Array.isArray(part.value)) {
+      const left = part.value.filter((value) => !(typeof value === "string" && ids.includes(value)));
+      return left.length === 0 ? null : { ...part, value: left };
+    }
+    if ((part.op === "equals" || part.op === "not_equals") && typeof part.value === "string" && ids.includes(part.value)) return null;
+    return part;
+  };
+  const { effect, or, ...rest } = condition;
+  const main = prune(rest);
+  const second = or ? prune(or) : null;
+  if (!main && !second) return null;
+  if (!main) return { ...(second as ConditionPart), effect };
+  return second ? { ...main, effect, or: second } : { ...main, effect };
+}
+
+/** The fields whose condition deleting this pipeline changes or removes (the delete window names them). */
+export function fieldsAffectedByPipelineDelete(definitions: FieldDefinition[], pipelineId: string, stageIds: readonly string[]): FieldDefinition[] {
+  return definitions.filter((field) => {
+    const condition = field.condition ?? null;
+    return condition !== null && JSON.stringify(conditionWithoutPipeline(condition, pipelineId, stageIds)) !== JSON.stringify(condition);
+  });
+}
+
+/** The delete window's question with the fields whose conditions go with the pipeline. */
+export function pipelineDeleteQuestion(pipelineName: string, fieldLabels: string[]): string {
+  const question = `למחוק את תהליך המכירה "${pipelineName}"?`;
+  if (fieldLabels.length === 0) return question;
+  const names = fieldLabels.map((label) => `"${label}"`).join(", ");
+  return fieldLabels.length === 1
+    ? `${question} התנאי של השדה ${names} מבוסס עליו, ויימחק יחד איתו.`
+    : `${question} התנאים של השדות ${names} מבוססים עליו, ויימחקו יחד איתו.`;
 }

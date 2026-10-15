@@ -79,11 +79,6 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
     return parsed.state;
   }
 
-  const custom = await customFieldsFromForm(orgId, "deal", formData, undefined, ["builtin:stage"]);
-  if (!custom.ok) {
-    return custom;
-  }
-
   // The pipeline comes from the stage, read from the database, not from the form.
   const { data: stage, error: stageError } = await context.supabase
     .from("stages")
@@ -94,6 +89,13 @@ export async function createDealAction(orgId: string, _prev: FormState, formData
   if (stageError) return fail(dbErrorMessage(stageError), { values: formValues(formData) });
   if (!stage) {
     return fail(STAGE_GONE, { values: formValues(formData) });
+  }
+
+  // FLD-09: a pipeline condition reads the stage's pipeline (set here, never taken from the browser)
+  formData.set("pipeline_id", stage.pipeline_id);
+  const custom = await customFieldsFromForm(orgId, "deal", formData, undefined, ["builtin:stage", "builtin:pipeline"]);
+  if (!custom.ok) {
+    return custom;
   }
 
   // status / probability / closed_at are set by the database from the stage;

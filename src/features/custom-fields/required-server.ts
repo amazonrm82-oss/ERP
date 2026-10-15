@@ -32,6 +32,13 @@ export async function missingAfterChange(
   const definitions = await listFieldDefinitions(orgId, object);
   if (ids.length === 0 || !hasConditions(definitions, object)) return { ok: true, missing };
   const supabase = await createClient();
+  // a deal's pipeline follows its stage (FLD-09 follow-up): a pipeline condition reads the target stage's pipeline
+  const stageId = change["builtin:stage"];
+  if (object === "deal" && typeof stageId === "string" && !("builtin:pipeline" in change)) {
+    const { data: stage, error: stageError } = await supabase.from("stages").select("pipeline_id").eq("organization_id", orgId).eq("id", stageId).maybeSingle();
+    if (stageError) return { ok: false, error: stageError };
+    if (stage) change = { ...change, "builtin:pipeline": stage.pipeline_id };
+  }
   const columns = BUILTIN_CONDITION_FIELDS[object].map((field) => field.input);
   const table = object === "lead" ? "leads" : "deals";
   // callers pass one record, or a bulk action's page (at most 100 ids): one read

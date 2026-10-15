@@ -18,6 +18,9 @@ import {
   sameAsStored,
   missingFieldsMessage,
   missingRequiredAfter,
+  conditionWithoutPipeline,
+  fieldsAffectedByPipelineDelete,
+  pipelineDeleteQuestion,
   shownMarkerName,
   type FieldCondition,
 } from "@/features/custom-fields/conditions";
@@ -334,7 +337,8 @@ describe("mirrors the database", () => {
   const migration = readFileSync(
     join(
       "supabase/migrations",
-      readdirSync("supabase/migrations").find((name) => name.endsWith("_conditional_fields.sql")) ?? "",
+      // the latest migration that redefines app.field_condition_check
+      readdirSync("supabase/migrations").find((name) => name.endsWith("_condition_pipeline.sql")) ?? "",
     ),
     "utf8",
   );
@@ -358,5 +362,153 @@ describe("mirrors the database", () => {
 
   it("maps the refusal to Hebrew", () => {
     expect(customFieldMessage({ code: "P0001", hint: "custom_field:condition", message: "x" })).toMatch(/התנאי/);
+  });
+});
+
+// FLD-09 follow-up (owner, 15 October 2026): the pipeline beside the stage.
+describe("pipeline conditions (deals)", () => {
+  const P1 = "51111111-1111-4111-8111-111111111111";
+  const P2 = "52222222-2222-4222-8222-222222222222";
+  const S1A = "61111111-1111-4111-8111-111111111111";
+  const S1WON = "62222222-2222-4222-8222-222222222222";
+  const S2A = "63333333-3333-4333-8333-333333333333";
+  const S1LATER = "64444444-4444-4444-8444-444444444444";
+  const onPipeline = def("po", "text", { label: "הזמנת רכש", condition: { field: "builtin:pipeline", op: "equals", value: P2, effect: "show" } });
+  const onStage = def("signed", "date", { label: "תאריך חתימה", condition: { field: "builtin:stage", op: "equals", value: S1WON, effect: "require" } });
+  const onBoth = def("contract", "text", {
+    label: "חוזה",
+    condition: { field: "builtin:stage", op: "in", value: [S1WON], effect: "require", or: { field: "builtin:pipeline", op: "equals", value: P2 } },
+  });
+
+  it("is offered on deals only, beside the stage", () => {
+    expect(BUILTIN_CONDITION_FIELDS.deal.map((field) => field.key)).toEqual(["builtin:pipeline", "builtin:stage"]);
+    expect(BUILTIN_CONDITION_FIELDS.deal.find((field) => field.key === "builtin:pipeline")?.input).toBe("pipeline_id");
+    expect(conditionApplies({ field: "builtin:pipeline", op: "filled", effect: "show" }, [], "lead")).toBe(false);
+    expect(conditionApplies({ field: "builtin:pipeline", op: "filled", effect: "show" }, [], "deal")).toBe(true);
+  });
+
+  it("pipeline only: holds in every stage of the pipeline, a stage added later included", () => {
+    expect(fieldState(onPipeline, [onPipeline], { "builtin:pipeline": P2, "builtin:stage": S2A }, "deal").visible).toBe(true);
+    expect(fieldState(onPipeline, [onPipeline], { "builtin:pipeline": P1, "builtin:stage": S1A }, "deal").visible).toBe(false);
+    // a stage the condition never named, added to the pipeline afterwards
+    expect(fieldState(onPipeline, [onPipeline], { "builtin:pipeline": P2, "builtin:stage": S1LATER }, "deal").visible).toBe(true);
+  });
+
+  it("stage only: unchanged", () => {
+    expect(fieldState(onStage, [onStage], { "builtin:pipeline": P1, "builtin:stage": S1WON }, "deal").required).toBe(true);
+    expect(fieldState(onStage, [onStage], { "builtin:pipeline": P1, "builtin:stage": S1A }, "deal").required).toBe(false);
+  });
+
+  it("both: either one is enough", () => {
+    const state = (pipeline: string, stage: string) => fieldState(onBoth, [onBoth], { "builtin:pipeline": pipeline, "builtin:stage": stage }, "deal").required;
+    expect(state(P1, S1WON)).toBe(true);
+    expect(state(P2, S2A)).toBe(true);
+    expect(state(P2, S1LATER)).toBe(true);
+    expect(state(P1, S1A)).toBe(false);
+    expect(conditionHolds(onBoth.condition!, {})).toBe(false);
+  });
+
+  it("a move to another pipeline's stage changes what is required (the pipeline travels with the stage)", () => {
+    const all = [onPipeline, onStage, onBoth];
+    const from = { "builtin:pipeline": P1, "builtin:stage": S1A };
+    expect(missingRequiredAfter(all, from, "deal", { "builtin:stage": S2A, "builtin:pipeline": P2 }).map((f) => f.key)).toEqual(["contract"]);
+    expect(missingRequiredAfter(all, from, "deal", { "builtin:stage": S1WON, "builtin:pipeline": P1 }).map((f) => f.key)).toEqual(["signed", "contract"]);
+    expect(missingRequiredAfter(all, from, "deal", { "builtin:stage": S1A, "builtin:pipeline": P1 })).toEqual([]);
+  });
+
+  it("parses the second part only as the stage / pipeline pair", () => {
+    expect(parseCondition(onBoth.condition as never)).toEqual(onBoth.condition);
+    expect(parseCondition({ field: "builtin:pipeline", op: "filled", effect: "show", or: { field: "builtin:stage", op: "empty" } })).toEqual({
+      field: "builtin:pipeline",
+      op: "filled",
+      effect: "show",
+      or: { field: "builtin:stage", op: "empty" },
+    });
+    expect(parseCondition({ field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:stage", op: "empty" } })).toBeNull();
+    expect(parseCondition({ field: "tier", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "empty" } })).toBeNull();
+    expect(parseCondition({ field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "equals" } })).toBeNull();
+    expect(parseCondition({ field: "builtin:stage", op: "filled", effect: "show", or: null })).toEqual({ field: "builtin:stage", op: "filled", effect: "show" });
+  });
+
+  describe("the settings form", () => {
+    const target = def("budget", "number");
+    const builtins = {
+      "builtin:pipeline": [{ value: P1, label: "מכירות" }, { value: P2, label: "שותפים" }],
+      "builtin:stage": [{ value: S1A, label: "חדש" }, { value: S1WON, label: "נסגר" }, { value: S2A, label: "שותפים: חדש" }],
+    };
+    const build = (input: Parameters<typeof buildCondition>[4]) => buildCondition(target, [target], "deal", builtins, input);
+
+    it("builds a pipeline condition, alone or with a stage condition", () => {
+      expect(build({ effect: "show", controller: "builtin:pipeline", op: "in", choices: [P2] })).toEqual({
+        ok: true,
+        condition: { field: "builtin:pipeline", op: "in", value: [P2], effect: "show" },
+      });
+      expect(build({ effect: "require", controller: "builtin:stage", op: "equals", choices: [S1WON], orOp: "equals", orChoices: [P2] })).toEqual({
+        ok: true,
+        condition: { field: "builtin:stage", op: "equals", value: S1WON, effect: "require", or: { field: "builtin:pipeline", op: "equals", value: P2 } },
+      });
+      expect(build({ effect: "require", controller: "builtin:stage", op: "equals", choices: [S1WON], orOp: "none", orChoices: [] })).toEqual({
+        ok: true,
+        condition: { field: "builtin:stage", op: "equals", value: S1WON, effect: "require" },
+      });
+      // the second part's value must come from the other list
+      expect(build({ effect: "require", controller: "builtin:stage", op: "equals", choices: [S1WON], orOp: "equals", orChoices: [S1A] }).ok).toBe(false);
+      expect(build({ effect: "require", controller: "builtin:stage", op: "equals", choices: [S1WON], orOp: "like", orChoices: [] }).ok).toBe(false);
+      // a lead has no second part: it is ignored
+      expect(
+        buildCondition(target, [target], "lead", { "builtin:status": [{ value: S1A, label: "חדש" }] }, { effect: "show", controller: "builtin:status", op: "equals", choices: [S1A], orOp: "filled" }),
+      ).toEqual({ ok: true, condition: { field: "builtin:status", op: "equals", value: S1A, effect: "show" } });
+    });
+
+    it("sameAsStored compares the second part too", () => {
+      const stored = onBoth.condition!;
+      const input = { effect: "require", controller: "builtin:stage", op: "in", choices: [S1WON], orOp: "equals", orChoices: [P2] };
+      expect(sameAsStored(stored, input)).toBe(true);
+      expect(sameAsStored(stored, { ...input, orChoices: [P1] })).toBe(false);
+      expect(sameAsStored(stored, { ...input, orOp: "none" })).toBe(false);
+      expect(sameAsStored(onStage.condition, { effect: "require", controller: "builtin:stage", op: "equals", choices: [S1WON], orOp: "none" })).toBe(true);
+    });
+
+    it("describes and reminds both parts", () => {
+      expect(describeCondition(onBoth.condition!, [onBoth], "deal", builtins)).toBe('חובה כאשר "שלב" אחד מ: "נסגר", או כאשר "תהליך מכירה" שווה ל: "שותפים"');
+      expect(conditionReminder(onBoth, [onBoth], "deal", builtins)).toBeNull();
+      expect(conditionReminder(onBoth, [onBoth], "deal", { ...builtins, "builtin:pipeline": [{ value: P1, label: "מכירות" }] })).toMatch(/הוסר/);
+    });
+  });
+
+  describe("deleting a pipeline", () => {
+    const stages = [S1A, S1WON, S1LATER];
+    it("removes the parts based on it and its stages", () => {
+      expect(conditionWithoutPipeline({ field: "builtin:pipeline", op: "equals", value: P1, effect: "show" }, P1, stages)).toBeNull();
+      expect(conditionWithoutPipeline({ field: "builtin:pipeline", op: "not_equals", value: P1, effect: "show" }, P1, stages)).toBeNull();
+      expect(conditionWithoutPipeline({ field: "builtin:pipeline", op: "in", value: [P1, P2], effect: "show" }, P1, stages)).toEqual({
+        field: "builtin:pipeline",
+        op: "in",
+        value: [P2],
+        effect: "show",
+      });
+      expect(conditionWithoutPipeline({ field: "builtin:stage", op: "in", value: [S1A, S2A], effect: "require" }, P1, stages)).toEqual({
+        field: "builtin:stage",
+        op: "in",
+        value: [S2A],
+        effect: "require",
+      });
+      expect(conditionWithoutPipeline(onBoth.condition!, P1, stages)).toEqual({ field: "builtin:pipeline", op: "equals", value: P2, effect: "require" });
+      expect(conditionWithoutPipeline(onBoth.condition!, P2, [S2A])).toEqual({ field: "builtin:stage", op: "in", value: [S1WON], effect: "require" });
+      const filled: FieldCondition = { field: "builtin:pipeline", op: "filled", effect: "show", or: { field: "builtin:stage", op: "empty" } };
+      expect(conditionWithoutPipeline(filled, P1, stages)).toEqual(filled);
+      expect(conditionWithoutPipeline(tier.condition ?? null, P1, stages)).toBeNull();
+    });
+
+    it("names the fields in the delete window", () => {
+      const fields = [onPipeline, onStage, onBoth, def("free", "text")];
+      expect(fieldsAffectedByPipelineDelete(fields, P1, stages).map((f) => f.key)).toEqual(["signed", "contract"]);
+      expect(fieldsAffectedByPipelineDelete(fields, P2, [S2A]).map((f) => f.key)).toEqual(["po", "contract"]);
+      expect(pipelineDeleteQuestion("שותפים", [])).toBe('למחוק את תהליך המכירה "שותפים"?');
+      expect(pipelineDeleteQuestion("שותפים", ["חוזה"])).toBe('למחוק את תהליך המכירה "שותפים"? התנאי של השדה "חוזה" מבוסס עליו, ויימחק יחד איתו.');
+      expect(pipelineDeleteQuestion("שותפים", ["חוזה", "הזמנת רכש"])).toBe(
+        'למחוק את תהליך המכירה "שותפים"? התנאים של השדות "חוזה", "הזמנת רכש" מבוססים עליו, ויימחקו יחד איתו.',
+      );
+    });
   });
 });

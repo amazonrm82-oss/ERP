@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { conditionWithoutPipeline, parseCondition, type FieldCondition } from "@/features/custom-fields/conditions";
+
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultLeadStatus, defaultPipeline, insertLead, pgError } from "./helpers";
 
 afterAll(closePool);
@@ -252,10 +254,255 @@ describe("conditional fields (FLD-09)", () => {
 
   it("the migration is safe to run twice", async () => {
     const dir = "supabase/migrations";
-    const file = readdirSync(dir).find((name) => name.endsWith("_conditional_fields.sql"));
-    const sql = readFileSync(join(dir, file ?? ""), "utf8");
-    await asAdmin((q) => q(sql));
-    await asAdmin((q) => q(sql));
+    // the later migration that redefines app.field_condition_check runs again after it
+    for (const suffix of ["_conditional_fields.sql", "_condition_pipeline.sql"]) {
+      const file = readdirSync(dir).find((name) => name.endsWith(suffix));
+      const sql = readFileSync(join(dir, file ?? ""), "utf8");
+      await asAdmin((q) => q(sql));
+      await asAdmin((q) => q(sql));
+    }
     expect(await conditionOf(org, "lead", "c1")).toEqual({ field: "tier", op: "equals", value: "זהב", effect: "show" });
+  });
+});
+
+// FLD-09 follow-up (owner, 15 October 2026; migration condition_pipeline): the pipeline as a controlling
+// field of deal fields, a pipeline condition beside a stage condition ("or"), and deleting a pipeline
+// removes the conditions based on it.
+describe("conditional fields: the pipeline (FLD-09 follow-up)", () => {
+  let owner: { id: string }, rep: { id: string }, other: { id: string };
+  let org: string, otherOrg: string;
+  let p1: string, p2: string, s1: string[], s2: string[], otherPipeline: string;
+
+  const define = (userId: string, o: string, object: string, key: string, condition: unknown) =>
+    asUser(userId, (q) =>
+      q(
+        `insert into public.field_definitions (organization_id, object_type, key, label, field_type, condition)
+         values ($1, $2, $3, $3, 'text', $4) returning id`,
+        [o, object, key, condition === null ? null : JSON.stringify(condition)],
+      ),
+    );
+  const conditionOf = (o: string, key: string) =>
+    asAdmin(async (q) => (await q("select condition from public.field_definitions where organization_id = $1 and object_type = 'deal' and key = $2", [o, key])).rows[0]?.condition);
+  const addPipeline = async (o: string, name: string) =>
+    asAdmin(async (q) => {
+      const p = await q("insert into public.pipelines (organization_id, name, position) values ($1, $2, 5) returning id", [o, name]);
+      const id = p.rows[0].id as string;
+      const stages: string[] = [];
+      for (const [position, kind] of ["open", "open", "won"].entries()) {
+        const s = await q("insert into public.stages (organization_id, pipeline_id, name, kind, position) values ($1, $2, $3, $4, $5) returning id", [o, id, `${name} ${position}`, kind, position]);
+        stages.push(s.rows[0].id as string);
+      }
+      return { id, stages };
+    });
+  const deletePipeline = (userId: string, o: string, id: string) =>
+    asUser(userId, (q) => q("update public.pipelines set deleted_at = now() where organization_id = $1 and id = $2 returning id", [o, id]));
+
+  beforeAll(async () => {
+    owner = await createUser("cfp-owner");
+    org = await createOrg(owner.id);
+    rep = await addMember(org, owner.id, "member");
+    other = await createUser("cfp-other");
+    otherOrg = await createOrg(other.id);
+    const first = await defaultPipeline(org);
+    p1 = first.pipelineId;
+    s1 = first.stages.map((stage) => stage.id);
+    ({ id: p2, stages: s2 } = await addPipeline(org, "שני"));
+    otherPipeline = (await defaultPipeline(otherOrg)).pipelineId;
+  });
+
+  it("accepts a pipeline condition on a deal field, with any op", async () => {
+    const ok: Array<[string, unknown]> = [
+      ["pp1", { field: "builtin:pipeline", op: "equals", value: p1, effect: "show" }],
+      ["pp2", { field: "builtin:pipeline", op: "in", value: [p1, p2], effect: "require" }],
+      ["pp3", { field: "builtin:pipeline", op: "not_equals", value: p2, effect: "show" }],
+      ["pp4", { field: "builtin:pipeline", op: "filled", effect: "show" }],
+    ];
+    for (const [key, condition] of ok) {
+      await define(owner.id, org, "deal", key, condition);
+      expect(await conditionOf(org, key), key).toEqual(condition);
+    }
+  });
+
+  it("refuses a pipeline on another record type, of another organization, a stage id or a deleted pipeline", async () => {
+    const gone = await addPipeline(org, "נמחק");
+    await deletePipeline(owner.id, org, gone.id);
+    const bad: Array<[string, unknown]> = [
+      ["lead", { field: "builtin:pipeline", op: "filled", effect: "show" }],
+      ["deal", { field: "builtin:pipeline", op: "equals", value: otherPipeline, effect: "show" }],
+      ["deal", { field: "builtin:pipeline", op: "equals", value: s1[0], effect: "show" }],
+      ["deal", { field: "builtin:pipeline", op: "in", value: [p1, gone.id], effect: "show" }],
+    ];
+    for (const [index, [object, condition]] of bad.entries()) {
+      expect((await failure(define(owner.id, org, object, `pb${index}`, condition))).hint, JSON.stringify(condition)).toBe(HINT);
+    }
+  });
+
+  it("a stage condition and a pipeline condition on one field (either order), each part checked", async () => {
+    const both = { field: "builtin:stage", op: "in", value: [s1[2]], effect: "require", or: { field: "builtin:pipeline", op: "equals", value: p2 } };
+    await define(owner.id, org, "deal", "or1", both);
+    expect(await conditionOf(org, "or1")).toEqual(both);
+    const reversed = { field: "builtin:pipeline", op: "equals", value: p1, effect: "show", or: { field: "builtin:stage", op: "equals", value: s2[0] } };
+    await define(owner.id, org, "deal", "or2", reversed);
+    expect(await conditionOf(org, "or2")).toEqual(reversed);
+    // filled / empty drop a null value in the second part too; a JSON null "or" is no second part
+    await define(owner.id, org, "deal", "or3", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "empty", value: null } });
+    expect(await conditionOf(org, "or3")).toEqual({ field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "empty" } });
+    await define(owner.id, org, "deal", "or4", { field: "builtin:stage", op: "filled", effect: "show", or: null });
+    expect(await conditionOf(org, "or4")).toEqual({ field: "builtin:stage", op: "filled", effect: "show" });
+  });
+
+  it("refuses any other second part", async () => {
+    await asUser(owner.id, (q) => q("insert into public.field_definitions (organization_id, object_type, key, label, field_type, options) values ($1, 'deal', 'tier', 'tier', 'select', '[\"זהב\"]')", [org]));
+    const pipe = { field: "builtin:pipeline", op: "equals", value: p1 };
+    const bad: Array<[string, unknown]> = [
+      // the same field twice, a custom field, an effect inside, an unknown key, not an object
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:stage", op: "empty" } }],
+      ["deal", { field: "builtin:pipeline", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "empty" } }],
+      ["deal", { field: "tier", op: "equals", value: "זהב", effect: "show", or: pipe }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "tier", op: "equals", value: "זהב" } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { ...pipe, effect: "show" } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { ...pipe, x: 1 } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: [pipe] }],
+      // a bad value in the second part
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "equals", value: otherPipeline } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "in", value: [] } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "filled", value: p1 } }],
+      ["deal", { field: "builtin:stage", op: "filled", effect: "show", or: { field: "builtin:pipeline", op: "like", value: p1 } }],
+      // only on deals
+      ["lead", { field: "builtin:status", op: "filled", effect: "show", or: { field: "builtin:source", op: "filled" } }],
+    ];
+    for (const [index, [object, condition]] of bad.entries()) {
+      expect((await failure(define(owner.id, org, object, `ob${index}`, condition))).hint, JSON.stringify(condition)).toBe(HINT);
+    }
+  });
+
+  it("a stage of a deleted pipeline is refused as a stage value", async () => {
+    const gone = await addPipeline(org, "שלבים שנמחקו");
+    await define(owner.id, org, "deal", "gs0", { field: "builtin:stage", op: "equals", value: gone.stages[0], effect: "show" });
+    await deletePipeline(owner.id, org, gone.id);
+    expect((await failure(define(owner.id, org, "deal", "gs1", { field: "builtin:stage", op: "equals", value: gone.stages[0], effect: "show" }))).hint).toBe(HINT);
+    expect(
+      (await failure(define(owner.id, org, "deal", "gs2", { field: "builtin:pipeline", op: "filled", effect: "show", or: { field: "builtin:stage", op: "in", value: [s1[0], gone.stages[1]] } }))).hint,
+    ).toBe(HINT);
+  });
+
+  it("a person who sets app.condition_cleanup by hand is still checked", async () => {
+    const withSetting = (key: string, condition: unknown) =>
+      asUser(owner.id, async (q) => {
+        await q("select set_config('app.condition_cleanup', 'on', true)");
+        return q(
+          "insert into public.field_definitions (organization_id, object_type, key, label, field_type, condition) values ($1, 'deal', $2, $2, 'text', $3) returning id",
+          [org, key, JSON.stringify(condition)],
+        );
+      });
+    expect((await failure(withSetting("gc1", { field: "builtin:pipeline", op: "equals", value: otherPipeline, effect: "show" }))).hint).toBe(HINT);
+    expect((await failure(withSetting("gc2", { field: "nothing", op: "bogus", effect: "show" }))).hint).toBe(HINT);
+    // with the setting on, the person's pipeline delete still cleans (the cleanup runs as the owner)
+    const p = await addPipeline(org, "עם ההגדרה");
+    await define(owner.id, org, "deal", "gc3", { field: "builtin:pipeline", op: "equals", value: p.id, effect: "show" });
+    await asUser(owner.id, async (q) => {
+      await q("select set_config('app.condition_cleanup', 'on', true)");
+      await q("update public.pipelines set deleted_at = now() where organization_id = $1 and id = $2", [org, p.id]);
+    });
+    expect(await conditionOf(org, "gc3")).toBeNull();
+  });
+
+  it("a hard delete of a live pipeline cleans its conditions too; deleting an organization still works", async () => {
+    const p = await addPipeline(org, "נמחק לגמרי");
+    await define(owner.id, org, "deal", "hd1", { field: "builtin:stage", op: "equals", value: s1[0], effect: "show", or: { field: "builtin:pipeline", op: "equals", value: p.id } });
+    await define(owner.id, org, "deal", "hd2", { field: "builtin:stage", op: "in", value: [p.stages[0]], effect: "require" });
+    await asAdmin((q) => q("delete from public.pipelines where id = $1", [p.id]));
+    expect(await conditionOf(org, "hd1")).toEqual({ field: "builtin:stage", op: "equals", value: s1[0], effect: "show" });
+    expect(await conditionOf(org, "hd2")).toBeNull();
+    // an organization with pipeline conditions can be deleted (its fields go with it)
+    const doomedOwner = await createUser("cfp-doomed");
+    const doomed = await createOrg(doomedOwner.id);
+    const dp = await defaultPipeline(doomed);
+    await define(doomedOwner.id, doomed, "deal", "dd1", { field: "builtin:pipeline", op: "equals", value: dp.pipelineId, effect: "show" });
+    await asAdmin((q) => q("delete from public.organizations where id = $1", [doomed]));
+    expect(await asAdmin(async (q) => (await q("select count(*)::int as n from public.field_definitions where organization_id = $1", [doomed])).rows[0].n)).toBe(0);
+  });
+
+  it("a member cannot write it; an outsider gets RLS's refusal", async () => {
+    const condition = { field: "builtin:pipeline", op: "equals", value: p1, effect: "show" };
+    expect((await failure(define(rep.id, org, "deal", "w1", condition))).code).toBe("42501");
+    const error = await failure(define(other.id, org, "deal", "w2", condition));
+    expect(error.code).toBe("42501");
+    expect(error.hint).not.toBe(HINT);
+  });
+
+  describe("deleting a pipeline removes the conditions based on it", () => {
+    let p3: string, s3: string[], p4: string, s4: string[];
+    const cases: Record<string, (ids: { p3: string; s3: string[]; p4: string; s4: string[] }) => FieldCondition> = {
+      only_pipeline: ({ p3 }) => ({ field: "builtin:pipeline", op: "equals", value: p3, effect: "show" }),
+      not_pipeline: ({ p3 }) => ({ field: "builtin:pipeline", op: "not_equals", value: p3, effect: "require" }),
+      pipeline_list: ({ p3, p4 }) => ({ field: "builtin:pipeline", op: "in", value: [p3, p4], effect: "show" }),
+      stage_list: ({ s3, s4 }) => ({ field: "builtin:stage", op: "in", value: [s3[0], s4[0], s3[1]], effect: "show" }),
+      stage_of_it: ({ s3 }) => ({ field: "builtin:stage", op: "equals", value: s3[2], effect: "require" }),
+      stage_or_pipeline: ({ p3, s4 }) => ({ field: "builtin:stage", op: "equals", value: s4[2], effect: "require", or: { field: "builtin:pipeline", op: "equals", value: p3 } }),
+      pipeline_or_stage: ({ p3, s4 }) => ({ field: "builtin:pipeline", op: "equals", value: p3, effect: "show", or: { field: "builtin:stage", op: "in", value: [s4[1]] } }),
+      both_go: ({ p3, s3 }) => ({ field: "builtin:pipeline", op: "in", value: [p3], effect: "show", or: { field: "builtin:stage", op: "equals", value: s3[0] } }),
+      untouched_other: ({ p4, s4 }) => ({ field: "builtin:stage", op: "equals", value: s4[0], effect: "show", or: { field: "builtin:pipeline", op: "not_equals", value: p4 } }),
+      untouched_filled: () => ({ field: "builtin:pipeline", op: "filled", effect: "show", or: { field: "builtin:stage", op: "empty" } }),
+    };
+
+    beforeAll(async () => {
+      ({ id: p3, stages: s3 } = await addPipeline(org, "שלישי"));
+      ({ id: p4, stages: s4 } = await addPipeline(org, "רביעי"));
+      for (const [key, make] of Object.entries(cases)) {
+        await define(owner.id, org, "deal", `del_${key}`, make({ p3, s3, p4, s4 }));
+      }
+      // a condition whose stage value was removed earlier must not stop the delete
+      await define(owner.id, org, "deal", "del_dangling", { field: "builtin:stage", op: "in", value: [s4[1], s4[0]], effect: "show", or: { field: "builtin:pipeline", op: "equals", value: p3 } });
+      await asAdmin((q) => q("delete from public.stages where id = $1", [s4[1]]));
+      // a lead field and another organization are never touched
+      await define(other.id, otherOrg, "deal", "del_other", { field: "builtin:pipeline", op: "equals", value: otherPipeline, effect: "show" });
+    });
+
+    it("by the rule the delete window uses (conditionWithoutPipeline), audited", async () => {
+      const before = Object.fromEntries(await Promise.all(Object.keys(cases).map(async (key) => [key, await conditionOf(org, `del_${key}`)] as const)));
+      expect((await deletePipeline(owner.id, org, p3)).rowCount).toBe(1);
+      for (const key of Object.keys(cases)) {
+        const expected = conditionWithoutPipeline(parseCondition(before[key]), p3, s3);
+        expect(await conditionOf(org, `del_${key}`), key).toEqual(expected ?? null);
+      }
+      expect(await conditionOf(org, "del_only_pipeline")).toBeNull();
+      expect(await conditionOf(org, "del_not_pipeline")).toBeNull();
+      expect(await conditionOf(org, "del_pipeline_list")).toEqual({ field: "builtin:pipeline", op: "in", value: [p4], effect: "show" });
+      expect(await conditionOf(org, "del_stage_list")).toEqual({ field: "builtin:stage", op: "in", value: [s4[0]], effect: "show" });
+      expect(await conditionOf(org, "del_stage_of_it")).toBeNull();
+      expect(await conditionOf(org, "del_stage_or_pipeline")).toEqual({ field: "builtin:stage", op: "equals", value: s4[2], effect: "require" });
+      expect(await conditionOf(org, "del_pipeline_or_stage")).toEqual({ field: "builtin:stage", op: "in", value: [s4[1]], effect: "show" });
+      expect(await conditionOf(org, "del_both_go")).toBeNull();
+      expect(await conditionOf(org, "del_untouched_other")).toEqual(before.untouched_other);
+      expect(await conditionOf(org, "del_untouched_filled")).toEqual(before.untouched_filled);
+      expect(await conditionOf(org, "del_dangling")).toEqual({ field: "builtin:stage", op: "in", value: [s4[1], s4[0]], effect: "show" });
+      expect(await conditionOf(otherOrg, "del_other")).toEqual({ field: "builtin:pipeline", op: "equals", value: otherPipeline, effect: "show" });
+      // the change is in the audit log, by the person who deleted the pipeline
+      const audited = await asAdmin(async (q) =>
+        (await q(
+          `select count(*)::int as n from public.audit_log a join public.field_definitions f on f.id = a.entity_id
+            where a.organization_id = $1 and f.key = 'del_only_pipeline' and a.actor_id = $2 and a.action = 'update'`,
+          [org, owner.id],
+        )).rows[0].n,
+      );
+      expect(audited).toBe(1);
+      // after the cleanup the check runs again as usual
+      expect((await failure(define(owner.id, org, "deal", "after1", { field: "builtin:pipeline", op: "equals", value: p3, effect: "show" }))).hint).toBe(HINT);
+    });
+
+    it("the SQL rule equals conditionWithoutPipeline()", async () => {
+      const ids = { p3: "11111111-1111-4111-8111-111111111111", p4: "22222222-2222-4222-8222-222222222222", s3: ["31111111-1111-4111-8111-111111111111", "32222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"], s4: ["41111111-1111-4111-8111-111111111111", "42222222-2222-4222-8222-222222222222", "43333333-3333-4333-8333-333333333333"] };
+      const conditions: FieldCondition[] = [
+        ...Object.values(cases).map((make) => make(ids)),
+        { field: "tier", op: "equals", value: "זהב", effect: "show" },
+        { field: "builtin:stage", op: "in", value: [ids.s3[0], ids.s3[1]], effect: "show", or: { field: "builtin:pipeline", op: "in", value: [ids.p4, ids.p3] } },
+      ];
+      for (const condition of conditions) {
+        const sql = await asAdmin(async (q) => (await q("select app.condition_without_pipeline($1::jsonb, $2, $3::text[]) as c", [JSON.stringify(condition), ids.p3, ids.s3])).rows[0].c);
+        expect(sql, JSON.stringify(condition)).toEqual(conditionWithoutPipeline(condition, ids.p3, ids.s3));
+      }
+      expect(await asAdmin(async (q) => (await q("select app.condition_without_pipeline(null, $1, '{}') as c", [ids.p3])).rows[0].c)).toBeNull();
+    });
   });
 });

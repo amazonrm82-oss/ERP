@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { pipelineDeleteQuestion } from "@/features/custom-fields/conditions";
 import { DEFAULT_ROT_DAYS, MAX_ROT_DAYS, STAGE_COLORS, stageColor, stageTone } from "@/features/deals/stage-colors";
 import type { StageKind } from "@/lib/database.types";
 import type { FormState } from "@/lib/action-result";
@@ -53,10 +54,17 @@ export function CreatePipelineForm({ orgId }: { orgId: string }) {
   );
 }
 
-type CardProps = { orgId: string; pipeline: PipelineSetting; editable: boolean; isOnly: boolean };
+type CardProps = {
+  orgId: string;
+  pipeline: PipelineSetting;
+  editable: boolean;
+  isOnly: boolean;
+  // FLD-09: the deal fields whose show / require conditions are based on this pipeline or its stages
+  conditionFields?: string[];
+};
 
 /** One pipeline: its name, default flag and stages, editable by admins. */
-export function PipelineCard({ orgId, pipeline, editable, isOnly }: CardProps) {
+export function PipelineCard({ orgId, pipeline, editable, isOnly, conditionFields = [] }: CardProps) {
   const headingId = `pipeline-${pipeline.id}`;
   return (
     <Card aria-labelledby={headingId}>
@@ -79,7 +87,7 @@ export function PipelineCard({ orgId, pipeline, editable, isOnly }: CardProps) {
                 action={deletePipelineAction.bind(null, orgId, pipeline.id)}
                 pendingText="מוחקים…"
                 variant="danger-ghost"
-                confirm={`למחוק את תהליך המכירה "${pipeline.name}"?`}
+                confirm={pipelineDeleteQuestion(pipeline.name, conditionFields)}
               >
                 מחיקת תהליך המכירה
               </ActionButton>
