@@ -246,6 +246,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   the note is private, with the record type, name and author only (no note text). `app.user_can_read_record(org, user,
   owner, team)` mirrors `app.can_read_record()` for a given user; keep the two in step. `public.mention_candidates()`
   feeds the picker.
+- Meeting types (CAL-08, migration 0197; owner: core, no plan key): `public.meeting_types` (managed list: name, duration, format,
+  location, optional offerable product, buffers 0..240 before/after, colour palette key; members read, owners/admins of a writable org
+  write; 50 per org; audited; seeded with four defaults while a list is empty, mirrored by `DEFAULT_MEETING_TYPES`).
+  `meetings.meeting_type_id` (composite FK set null; only an active type may be picked, hint `meeting:type`). `public.meeting_busy`
+  returns `busy_from`/`busy_to` with the type's live buffers (no type or a deleted type = 0); its pre-filter of 240 minutes is tied
+  to the buffer checks by test 99. Copying buffers onto meetings is open for CAL-10.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
