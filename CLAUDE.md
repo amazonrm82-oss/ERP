@@ -596,6 +596,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   cleanup and forecast lists) goes through `moveRecord()` / `moveRecordAction()` in `src/features/record-move/`: the reason and the
   missing fields are checked together, refused as `MoveRefusal`, then asked by `RequiredFieldsDialog` or `AskedFields` (marker
   `required_fields_asked`) and saved in one update. `setLeadStatus` stays for bulk and its undo.
+  Since 0194 deals also take `builtin:pipeline` (a live pipeline of the org; holds in all its stages), and a deal condition on
+  stage or pipeline may carry one `or` part on the other (either holds). Deleting a pipeline (deleted_at or a hard delete) runs
+  `app.pipeline_conditions_cleanup()` (definer), which removes the pipeline's id and its stages' ids from every deal condition
+  (`app.condition_without_pipeline`, mirrored by `conditionWithoutPipeline()`, test 108) while `app.condition_cleanup` is 'on'
+  (honoured only when current_user is not `authenticated`). `app.field_condition_check()` was last redefined in 0194; a test that
+  re-runs 0184 must re-run 0194 after it.
 - Deal lines (DLI-01/02, DSC-01 line part, PL-03 for deals; migration 0185): `public.deal_lines` (rights follow the deal; edit
   needs `app.can_edit_record` and a deal not in the bin; product FK with no on delete action; price list FK set null; cap 200 per
   deal, hint `deal_lines:max`). Definer trigger `app.deal_lines_check` (outsider guard first): one VAT mode per deal (lines', else
