@@ -174,6 +174,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
+  Since 020055 (FXC-11) lists search the same folded text through computed fields `public.search_text(leads|contacts|companies|deals|
+  tasks|products)` (invoker, no SET, inlined; leads/contacts/deals equal the global index expressions, companies add city with
+  `companies_list_search_idx`); the app filters `search_text.like` with `searchNorm()` (src/lib/search-norm.ts, mirror of
+  `app.search_norm`, test 122); a term that folds to nothing matches nothing; exact substring, no fuzzy matches in lists.
 - Purge (migration 0018): activities and tasks reference leads/contacts/companies/deals with
   `on delete set null (x_id)`; the `before delete` trigger `app.purge_links()` first deletes the ones
   that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
