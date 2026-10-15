@@ -325,6 +325,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (hint `bank:invalid`, no value in errors); audit masks the account (`app.mask_bank_account`); every change notifies all
   active owners/admins with kind `system`; documents store `app.document_bank_snapshot(org)` (service_role only) when made.
   Business name rule (owner): customer-facing communication uses the display name; documents use the registered name when set.
+  Since 0193 (ADM-01) the platform owner (aal2) adds, edits or removes a FUTURE rate through `platform_add/update/remove_vat_rate`
+  (logged in `app.platform_log`); a removed rate gets `cancelled_at` (never deleted) and `app.vat_rate_at` skips it; the guard also
+  locks cancelling or reviving a started row; no TRUNCATE for API roles. `app.vat_rate_at` and `app.vat_rates_guard` were last
+  redefined in 0193. Readers of `vat_rates` in TS must filter `cancelled_at is null`.
 - Prices, totals, currency (TAX-04..06, migrations 0141-0143): `org_document_settings.prices_include_vat` (default false); every
   document stores its own copy when made. `app.document_totals(lines, rate_bp, include_vat, discount_bp, discount_agorot,
   round)` (pure, agorot and basis points, half up, discounts before VAT, VAT once per document, hint `totals:invalid`) mirrors
