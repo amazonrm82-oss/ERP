@@ -285,6 +285,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   Since 0112 trigger `leads_convert_followers` (`app.convert_followers()`, after `converted_at` is first set, also by a
   merge) adds the lead's followers who may read them to the new contact and deal (not in the bin; one row per user;
   no notifications; company not carried; no backfill); `convert_lead()` unchanged.
+  Since 0199 (owner 14 October 2026) the record's owner is a built-in follower (no row; same rules), and a change made by an
+  update import tells no follower: header `x-crm-import` = job id, accepted by `app.import_write_running(org, kind)` only for the
+  caller's own running update-mode job of that type created within 2 hours; notes are always told. `import_jobs.status` is
+  one-way (trigger `import_jobs_status_one_way`, hint `import:status`). `app.notify_followers_of_change/_of_entry` were last
+  redefined in 0199. Accepted risk: an importer (manager and up) can mute their own change notices for one job's window.
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
@@ -313,6 +318,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Deal contacts (CON-03, migration 0111): `deal_contacts.role` is null or `decision_maker|influencer|user|finance`
   (`deal_contacts_role_check`, mirrored by `src/features/deal-contacts/roles.ts`, unit test). Clients update only `role`
   (column grant); a new link needs an editable deal and a live contact the caller reads (`deal_contacts_insert`). Not audited.
+  Since 019910 the roles are a managed list `public.deal_contact_roles` (members read, owners/admins of a writable org write, 20
+  per org, hint `deal_contact_roles:max`, audited; `key` server-only = the old code on the four seeded defaults, mirrored by
+  `DEFAULT_DEAL_CONTACT_ROLES`); `deal_contacts.role_id` (composite FK set null of the column); trigger `deal_contacts_role_pick`
+  (invoker): a person picks only an active role (hint `deal_contact_role:invalid`) and setting `role_id` clears the old `role`
+  text; a link without `role_id` shows the list role with its old key. Merge carries `role_id` unchanged.
 - Stage settings (DEAL-01, migration 0113): `stages.color` is null (by kind) or a palette key (`accent|success|warning|danger|neutral`,
   check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
   1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
