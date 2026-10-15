@@ -110,6 +110,8 @@ node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of
 ```
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
+`test:db` fails at teardown when a test leaves any app/public function body different from the fresh build
+(`tests/db/global-setup.ts`); a test that re-runs a migration uses `rerunClosure()` from `tests/db/rerun.ts`.
 
 ## Architecture rules
 
@@ -618,6 +620,10 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   (`app.condition_without_pipeline`, mirrored by `conditionWithoutPipeline()`, test 108) while `app.condition_cleanup` is 'on'
   (honoured only when current_user is not `authenticated`). `app.field_condition_check()` was last redefined in 0194; a test that
   re-runs 0184 must re-run 0194 after it.
+  Since 0198 the cleanup also writes one audit entry (action `conditions_removed`, entity `pipelines`, the fields) and sets
+  `field_definitions.condition_removed_at` on a field left with no condition; trigger `field_definitions_condition_mark` keeps that
+  column server-only (kept on a move/hide only, cleared by any real edit). `app.pipeline_conditions_cleanup` was last redefined in
+  0198. User-facing text always says "תהליך מכירה", never "צנרת" or "פייפליין" (owner); CSV import synonyms may keep them.
 - Deal lines (DLI-01/02, DSC-01 line part, PL-03 for deals; migration 0185): `public.deal_lines` (rights follow the deal; edit
   needs `app.can_edit_record` and a deal not in the bin; product FK with no on delete action; price list FK set null; cap 200 per
   deal, hint `deal_lines:max`). Definer trigger `app.deal_lines_check` (outsider guard first): one VAT mode per deal (lines', else
