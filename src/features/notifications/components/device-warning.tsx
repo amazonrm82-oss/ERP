@@ -8,6 +8,8 @@ import { paths } from "@/lib/paths";
 
 import {
   DEVICE_FIX,
+  DEVICE_OFF_LINE,
+  DEVICE_OFF_LINK,
   DEVICE_WARNING_TITLE,
   deviceNeedsWarning,
   deviceState,
@@ -136,6 +138,26 @@ export function DeviceStatus() {
   return (
     <p role="status" className="text-sm text-warning">
       {`${DEVICE_WARNING_TITLE}. ${DEVICE_FIX[state as keyof typeof DEVICE_FIX]}`}
+    </p>
+  );
+}
+
+/**
+ * GAP-01 (owner, 14 October 2026): in the "התראות" card of the account settings, one short line
+ * while this device does not get notifications (the bar's own rule), with a link to the
+ * notifications page where the device is switched on. Not a bar, and it cannot be closed.
+ */
+export function DeviceOffLine({ orgId }: { orgId: string }) {
+  const state = useDeviceCheck()?.state ?? null;
+  if (state === null || !deviceNeedsWarning(state)) {
+    return null;
+  }
+  return (
+    <p role="status" className="text-sm text-warning">
+      {DEVICE_OFF_LINE}{" "}
+      <Link href={paths.notifications(orgId)} className="font-medium underline underline-offset-4">
+        {DEVICE_OFF_LINK}
+      </Link>
     </p>
   );
 }

@@ -63,6 +63,11 @@ export const DEVICE_FIX: Record<"ios_install" | "unsupported" | "denied" | "off"
 /** The browser fires this after push is turned on or off here, so the bar checks again. */
 export const PUSH_CHANGED_EVENT = "crm:push-changed";
 
+// GAP-01 (owner, 14 October 2026): the one line in the account's notifications card while this
+// device does not get notifications; not a bar, cannot be closed. The link text goes to /notifications.
+export const DEVICE_OFF_LINE = "התראות למכשיר הזה כבויות. להפעלה:";
+export const DEVICE_OFF_LINK = "עמוד ההתראות";
+
 /** Reads the capabilities in the browser. Never call it during render on the server. */
 export async function readDeviceCapabilities(vapidPublicKey: string): Promise<DeviceCapabilities> {
   const hasNotification = "Notification" in window;

@@ -11,6 +11,7 @@ import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { CalendarFeedCard } from "@/features/calendar-feed/components/calendar-feed-card";
 import { getCalendarFeedStatus } from "@/features/calendar-feed/queries";
 import { getSignedVersion } from "@/features/legal/queries";
+import { DeviceOffLine } from "@/features/notifications/components/device-warning";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
 import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
 import { getNotificationSettings } from "@/features/notifications/queries";
@@ -117,6 +118,8 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
       <Card aria-labelledby="account-notifications" className="lg:col-span-2">
         <CardHeader id="account-notifications" title="התראות" />
         <CardBody className="space-y-5">
+          {/* GAP-01: this device does not get notifications (not a bar; cannot be closed) */}
+          <DeviceOffLine orgId={orgId} />
           <NotificationSettingsForm orgId={orgId} settings={notificationSettings} />
           {/* a support session is not a member: nothing to send to */}
           {supportUntil ? null : (
