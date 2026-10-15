@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
 import { assertSafeTestUrl, TEST_DB_URL } from "./helpers";
@@ -16,6 +16,33 @@ const FUNCTION_BODIES = `
 async function functionBodies(db: Client): Promise<Map<string, string>> {
   const { rows } = await db.query<{ name: string; body: string }>(FUNCTION_BODIES);
   return new Map(rows.map((row) => [row.name, row.body]));
+}
+
+/**
+ * The server at TEST_DATABASE_URL must be the cluster `npm run db:test:start` made in TEST_DB_DIR (its `data`
+ * folder, scripts/test-db.sh), so a test run never drops and rebuilds another agent's database on a port it shares.
+ * Skipped only in CI without TEST_DB_DIR, where the database is the job's own service container.
+ */
+export async function assertOwnCluster(db: Client, env: NodeJS.ProcessEnv = process.env): Promise<void> {
+  if (!env.TEST_DB_DIR && env.CI) return;
+  const dir = env.TEST_DB_DIR || "/tmp/crm-saas-pgtest";
+  const want = path.join(path.resolve(dir), "data");
+  const { rows } = await db.query<{ data_directory: string }>("show data_directory");
+  const actual = rows[0]?.data_directory ?? "";
+  const real = (p: string) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  if (real(actual) !== real(want)) {
+    throw new Error(
+      `Refusing to rebuild the test database: the server at ${new URL(TEST_DB_URL).host} runs the cluster in "${actual}", ` +
+        `not "${want}" (TEST_DB_DIR). Another test database may be using this port; set TEST_DB_PORT, TEST_DB_DIR and ` +
+        `TEST_DATABASE_URL to your own and run "npm run db:test:start".`,
+    );
+  }
 }
 
 export default async function setup(): Promise<() => Promise<void>> {
@@ -36,6 +63,12 @@ export default async function setup(): Promise<() => Promise<void>> {
     throw new Error(
       `Cannot reach the local test database at ${target.host}. Start it with "npm run db:test:start". (${String(error)})`,
     );
+  }
+  try {
+    await assertOwnCluster(admin);
+  } catch (error) {
+    await admin.end();
+    throw error;
   }
   await admin.query(`drop database if exists ${dbName} with (force)`);
   await admin.query(`create database ${dbName}`);
