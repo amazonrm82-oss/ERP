@@ -71,6 +71,15 @@ describe("absence with a deputy (HEB-08)", () => {
     otherOrg = await createOrg(outsider.id, "עסק זר");
     await asAdmin(async (q) => {
       await q("update public.organizations set record_visibility = 'own', timezone = 'Asia/Jerusalem' where id = $1", [org]);
+      // No rest days or holidays, and no business hours: the response clock (app.response_deadline, SPD-03) counts
+      // working time only, so with the default Friday/Saturday rest a lead that came in two hours ago is not yet
+      // overdue on a Friday, a Saturday or late on a Thursday night, and these tests would depend on the hour.
+      await q(
+        `insert into public.org_calendar_settings (organization_id, rest_weekdays, holidays_rest, holiday_eves_rest, rest_occasions, working_hours)
+         values ($1, '{}', false, false, '{}', null)
+         on conflict (organization_id) do update set rest_weekdays = '{}', holidays_rest = false, holiday_eves_rest = false, rest_occasions = '{}', working_hours = null`,
+        [org],
+      );
       await q("update public.profiles set full_name = 'דנה הנעדרת' where id = $1", [away.id]);
     });
     await asUser(owner.id, async (q) => {
