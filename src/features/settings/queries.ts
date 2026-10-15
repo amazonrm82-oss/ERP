@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { getUserNames } from "@/features/shell/queries";
 import type { MembershipRole, MembershipStatus, RecordVisibility, SeatType } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -77,7 +79,8 @@ const ROLE_ORDER: MembershipRole[] = ["owner", "admin", "manager", "member", "vi
  * Admins also see suspended members; for others RLS returns active rows only
  * (a suspended user is no longer a member, and their row is hidden with them).
  */
-export async function listMembers(orgId: string): Promise<Member[]> {
+// Memoized per request (FXC-09): a list page, its filter and its table cells ask for it several times.
+export const listMembers = cache(async (orgId: string): Promise<Member[]> => {
   const supabase = await createClient();
   const { data: memberships, error } = await supabase
     .from("memberships")
@@ -119,7 +122,7 @@ export async function listMembers(orgId: string): Promise<Member[]> {
       ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) ||
       a.name.localeCompare(b.name, "he"),
   );
-}
+});
 
 export type PendingInvitation = {
   id: string;

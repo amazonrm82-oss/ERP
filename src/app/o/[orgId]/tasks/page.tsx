@@ -15,7 +15,7 @@ import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
-import { prepareListFilter } from "@/features/list-filters/prepare";
+import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
@@ -283,7 +283,8 @@ export default async function TasksPage({ params, searchParams }: Props) {
 async function TasksTableView({ orgId, context, query, showAll }: { orgId: string; context: OrgContext; query: Query; showAll: boolean }) {
   const search = firstParam(query.q).trim();
   const page = parsePage(query.page);
-  const listColumns = await getListColumns(orgId, "task");
+  // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
+  const [listColumns] = await Promise.all([getListColumns(orgId, "task"), startListFilterLookups(orgId, "task")]);
   const filter = await prepareListFilter(orgId, "task", firstParam(query.f), context.user.id, []);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   const sortKeys = Object.keys(TASK_SORT_COLUMNS) as Array<keyof typeof TASK_SORT_COLUMNS>;

@@ -19,7 +19,7 @@ import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
-import { prepareListFilter } from "@/features/list-filters/prepare";
+import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
@@ -50,7 +50,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const tagParam = firstParam(query.tag);
   const tagId = isUuid(tagParam) ? tagParam : null;
   const page = parsePage(query.page);
-  const listColumns = await getListColumns(orgId, "contact");
+  // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
+  const [listColumns] = await Promise.all([getListColumns(orgId, "contact"), startListFilterLookups(orgId, "contact")]);
   // the advanced filter (LST-05), checked against the list's fields
   const filter = await prepareListFilter(orgId, "contact", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;

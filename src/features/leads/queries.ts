@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requestedProductNames } from "@/features/requested-product/queries";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json, LeadStatusKind } from "@/lib/database.types";
@@ -11,7 +13,8 @@ export type LeadStatusOption = { id: string; name: string; kind: LeadStatusKind;
 export type LeadSourceOption = { id: string; name: string; isActive: boolean };
 
 /** Statuses (in their configured order) and active sources of the organization. */
-export async function getLeadLookups(orgId: string): Promise<{ statuses: LeadStatusOption[]; sources: LeadSourceOption[] }> {
+// Memoized per request (FXC-09): a list page, its filter and its table cells ask for it several times.
+export const getLeadLookups = cache(async (orgId: string): Promise<{ statuses: LeadStatusOption[]; sources: LeadSourceOption[] }> => {
   const supabase = await createClient();
   const [statuses, sources] = await Promise.all([
     supabase
@@ -38,7 +41,7 @@ export async function getLeadLookups(orgId: string): Promise<{ statuses: LeadSta
     // forms offer them only to a lead that already has one
     sources: sources.data.map((s) => ({ id: s.id, name: s.name, isActive: s.is_active })),
   };
-}
+});
 
 export type LeadListItem = {
   id: string;
