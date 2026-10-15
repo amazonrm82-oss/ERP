@@ -218,6 +218,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-01 (trigger contact_channels_payload_check)
   "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר.",
   "contact_channel:max": "אפשר לשמור עד 10 טלפונים נוספים ו-10 אימיילים נוספים לאיש קשר.",
+  // CON-05 (trigger contact_companies_check)
+  "contact_company:primary": "את החברה הראשית מחליפים או מסירים בפרטי איש הקשר.",
+  "contact_company:max": "אפשר לקשר איש קשר לעד 50 חברות.",
   // CNS-01, CNS-03 (trigger consents_prepare, guard consents_guard)
   "consent:subject": "הסכמה נרשמת לליד אחד או לאיש קשר אחד. רעננו את הדף ונסו שוב.",
   // owner's rules of 13 October 2026 (trigger consents_prepare)

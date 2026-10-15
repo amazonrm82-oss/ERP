@@ -258,6 +258,8 @@ export const FIELD_LABELS: Record<string, string> = {
   phone_type: "סוג הטלפון",
   email_type: "סוג האימייל",
   extra_phone: "טלפון נוסף",
+  // CON-05: a further company of the contact, with the role there
+  company_link: "חברה מקושרת",
   extra_email: "אימייל נוסף",
   // PRD-01, PRD-04 (products, product categories and units)
   sku: 'מק"ט',

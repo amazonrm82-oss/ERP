@@ -42,6 +42,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "leads", file: "leads.csv" },
   { table: "contacts", file: "contacts.csv" },
   { table: "contact_channels", file: "contact_channels.csv" },
+  // CON-05: every company of a contact, with the role there; is_primary = the contact's company_id
+  { table: "contact_companies", file: "contact_companies.csv" },
   // CNS-01: the consent history of leads and contacts (rows of purged records are not readable, so not exported)
   { table: "consents", file: "consents.csv" },
   { table: "companies", file: "companies.csv" },
@@ -243,6 +245,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 פרטי החיוב של חברות ואנשי קשר נמצאים בעמודות של companies.csv ושל contacts.csv: billing_name (שם לחשבונית), billing_tax_id (באנשי קשר: מספר עוסק או ת"ז; בחברה המספר הוא tax_id), billing_address ו-shipping_address (כתובת לחיוב ולמשלוח), billing_email (אימייל לחשבוניות), payment_terms (immediate = מיידי, net = מספר ימים מתאריך המסמך, eom = שוטף + מספר ימים) עם payment_days, ו-price_list_id עם שם המחירון ב-price_list.
 המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
+כל החברות של כל איש קשר נמצאות ב-contact_companies.csv, עם התפקיד שלו באותה חברה (title); is_primary מסמן את החברה הראשית, שהיא גם company_id ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר.
 חלוקת הלידים נמצאת ב-lead_distribution.csv: method הוא round_robin (סבב), weighted (לפי משקל) או load (לפי עומס פתוח), ו-weights הם המשקלים של העובדים (מזהה משתמש ומספר מ-1 עד 10; מי שלא מופיע שוקל 1). כללי החלוקה נמצאים ב-lead_routing_rules.csv: ליד מהמקור source_id, עם המוצר product_id, בשפה locale ו/או עם הערך field_value בשדה field_key (כל מה שמולא בכלל צריך להתאים) נשלח לצוות team_id או לאדם user_id, לפי הסדר position, ורק כללים עם is_active.

@@ -25,6 +25,8 @@ type Lookups = {
   stages?: Option[];
   // contacts and companies: the organization's types (CON-02)
   types?: Option[];
+  // contacts: the live companies, for the primary company (CON-05)
+  companies?: Option[];
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -65,6 +67,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("email", "אימייל", "email"),
       text("job_title", "תפקיד", "job_title"),
       text("city", "עיר", "city"),
+      // CON-05: the primary company; "ריק" = contacts without a primary company
+      { key: "primary_company", label: "חברה ראשית", kind: "select", column: "company_id", options: lookups.companies ?? [] },
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
       type,
       // CON-10: stored codes, picked from the closed lists

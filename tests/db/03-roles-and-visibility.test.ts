@@ -1239,6 +1239,60 @@ describe("roles and record visibility", () => {
     await asUser(m1.id, async (q) => expect((await q("delete from public.contact_channels where id = $1", [mine])).rowCount).toBe(1));
   });
 
+  it("a contact's companies follow the contact, and a new link needs a company the person reads (CON-05)", async () => {
+    await setVisibility("own");
+    const [contact, ownCompany, otherCompany] = await asUser(m1.id, async (q) => {
+      const c = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, team_id) values ($1, 'עובדת של m1', $2) returning id", [org, team])).rows[0].id;
+      const a = (await q<{ id: string }>("insert into public.companies (organization_id, name, team_id) values ($1, 'חברה של m1', $2) returning id", [org, team])).rows[0].id;
+      return [c, a];
+    }).then(async ([c, a]) => [c, a, await asUser(m2.id, async (q) => (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה של m2') returning id", [org])).rows[0].id)]);
+    const add = (u: U, company: string, title = "שותפה") =>
+      asUser(u.id, (q) =>
+        q<{ id: string }>("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, $4) returning id", [org, contact, company, title]),
+      );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.contact_companies where contact_id = $1", [contact]));
+    const retitle = (u: U, id: string) => asUser(u.id, async (q) => (await q("update public.contact_companies set title = 'מנכ\"לית' where id = $1", [id])).rowCount);
+    const remove = (u: U, id: string) => asUser(u.id, async (q) => (await q("delete from public.contact_companies where id = $1", [id])).rowCount);
+
+    // a company m1 cannot read cannot be linked; their own can
+    expect((await pgError(add(m1, otherCompany))).code).toBe("42501");
+    const mine = (await add(m1, ownCompany)).rows[0].id;
+    // a colleague who cannot see the contact sees, adds and changes nothing
+    expect(await seen(m2)).toBe(0);
+    expect((await pgError(add(m2, otherCompany))).code).toBe("42501");
+    expect(await retitle(m2, mine)).toBe(0);
+    expect(await remove(m2, mine)).toBe(0);
+    // the team's manager and an admin do; a link shows only to someone who reads the company too
+    expect(await seen(manager)).toBe(1);
+    expect(await retitle(manager, mine)).toBe(1);
+    const theirs = (await add(admin, otherCompany)).rows[0].id;
+    expect(await seen(admin)).toBe(2);
+    expect(await seen(manager)).toBe(1);
+    expect(await seen(m1)).toBe(1);
+
+    // reading is not editing: with visibility "org" a colleague and a viewer read, and change nothing
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(2);
+      expect((await pgError(add(u, otherCompany))).code, u.email).toBe("42501");
+      expect(await retitle(u, mine), u.email).toBe(0);
+      expect(await remove(u, mine), u.email).toBe(0);
+    }
+
+    // a read-only organization keeps them readable and unchanged
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await seen(m1)).toBe(2);
+      expect(await retitle(m1, mine)).toBe(0);
+      expect(await remove(m1, theirs)).toBe(0);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+    expect(await remove(m1, theirs)).toBe(1);
+    expect(await remove(m1, mine)).toBe(1);
+  });
+
   it("a lead's consents follow the lead: who reads it reads them, who edits it records a new one; nobody changes one (CNS-01)", async () => {
     await setVisibility("own");
     const lead = await insertLead(m1.id, org, { phone: "052-1120001", team_id: team });

@@ -21,6 +21,8 @@ import { RecordSummaryCard } from "@/features/record-summary/components/record-s
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
+import { ContactCompaniesCard } from "@/features/contact-companies/components/contact-companies-card";
+import { listContactCompanies } from "@/features/contact-companies/queries";
 import { trashContactAction } from "@/features/contacts/actions";
 import { getCardLayout } from "@/features/card-layout/queries";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
@@ -86,11 +88,13 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, contact.owner_id);
-  const [companies, types, domainLink] = await Promise.all([
+  const [companies, types, domainLink, companyLinks] = await Promise.all([
     canEdit ? listCompanyOptions(orgId) : [],
     canEdit ? listRecordTypes(orgId, "contact") : [],
     // CON-09: a company linked by the email domain, or the companies to pick from
     getDomainLinkInfo(orgId, contact),
+    // CON-05: every company of the contact, with the role there
+    listContactCompanies(orgId, contact.id),
   ]);
   const name = contactDisplayName({ fullName: contact.full_name, email: contact.email, phone: contact.phone });
 
@@ -180,6 +184,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields), builtins: { "builtin:type": contact.type_id } },
             }}
           />
+
+          <ContactCompaniesCard orgId={orgId} contactId={contact.id} canEdit={canEdit} items={companyLinks} options={companies} />
 
           {billing ? <BillingCard orgId={orgId} recordId={contact.id} billing={billing} canEdit={canEdit} today={zoneDate(new Date(), context.org.timeZone)} /> : null}
 

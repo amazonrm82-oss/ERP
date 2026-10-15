@@ -1012,6 +1012,20 @@ export type ContactRow = {
 // CON-01: further phones and emails of a contact; the primary ones stay on the contact row
 export type ContactPhoneType = "mobile" | "work" | "home" | "other";
 export type ContactEmailType = "work" | "home" | "other";
+// CON-05: a contact's link to a company, with the role there; is_primary mirrors contacts.company_id (server-set)
+export type ContactCompanyRow = {
+  id: string;
+  organization_id: string;
+  contact_id: string;
+  company_id: string;
+  title: string | null;
+  is_primary: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ContactChannelRow = {
   id: string;
   organization_id: string;
@@ -1805,6 +1819,12 @@ export type Database = {
         ContactChannelRow,
         { organization_id: string; contact_id: string; kind: "phone" | "email"; label?: ContactPhoneType; value: string; position?: number },
         { label?: ContactPhoneType; value?: string; position?: number }
+      >;
+      // CON-05: column grants (is_primary is the server's; a link is moved by removing and adding)
+      contact_companies: Table<
+        ContactCompanyRow,
+        { organization_id: string; contact_id: string; company_id: string; title?: string | null },
+        { title?: string | null }
       >;
       leads: Table<LeadRow, LeadInsert>;
       // marketing consent (CNS-01): append-only; the browser inserts manual entries only

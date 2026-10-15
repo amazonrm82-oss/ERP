@@ -106,6 +106,9 @@ describe("full export: tables (SPEC 12.4)", () => {
         ).rows[0].id;
         await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'work', '03-1234567')", [orgId, contact]);
         await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [orgId, deal, contact]);
+        // CON-05: a further company of the contact, with the role there
+        const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'ענן בע\"מ') returning id", [orgId])).rows[0].id;
+        await q("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, 'יועצת')", [orgId, contact, company]);
         return { contactId: contact, dealId: deal };
       }));
       // a link saved before the role list carries the old code, which only the server writes now
@@ -130,6 +133,8 @@ describe("full export: tables (SPEC 12.4)", () => {
         ).rows[0].id;
         await q("insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.com')", [otherOrg, contact]);
         await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [otherOrg, deal, contact]);
+        const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'זרה') returning id", [otherOrg])).rows[0].id;
+        await q("insert into public.contact_companies (organization_id, contact_id, company_id) values ($1, $2, $3)", [otherOrg, contact, company]);
         const team = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות זר') returning id", [otherOrg])).rows[0].id;
         await q("insert into public.team_members (organization_id, team_id, user_id) values ($1, $2, $3)", [otherOrg, team, stranger.id]);
       });
@@ -154,6 +159,11 @@ describe("full export: tables (SPEC 12.4)", () => {
       expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, deal_id: dealId, contact_id: contactId, role: "finance" })]);
     });
 
+    it("sees every company of the business's contacts, with the role there (CON-05)", async () => {
+      const rows = await read("contact_companies", orgId);
+      expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, contact_id: contactId, title: "יועצת", is_primary: false })]);
+    });
+
     it("sees the team members", async () => {
       const rows = await read("team_members", orgId);
       expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, team_id: teamId, user_id: member.id, is_manager: true })]);
@@ -171,7 +181,7 @@ describe("full export: tables (SPEC 12.4)", () => {
     });
 
     it("sees nothing of another business", async () => {
-      for (const table of ["contact_channels", "deal_contacts", "team_members", "whatsapp_templates", "deal_contact_roles"]) expect(await read(table, otherOrg)).toEqual([]);
+      for (const table of ["contact_channels", "contact_companies", "deal_contacts", "team_members", "whatsapp_templates", "deal_contact_roles"]) expect(await read(table, otherOrg)).toEqual([]);
     });
   });
 

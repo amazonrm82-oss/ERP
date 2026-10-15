@@ -150,6 +150,26 @@ describe("full export: contact channels, deal contacts, team members, WhatsApp t
     expect(second).toContain("email,home,אישי,dana@example.com,");
   });
 
+  it("names the contact and the company in contact_companies.csv, next to the role there (CON-05)", () => {
+    const COMPANY = "00000000-0000-0000-0000-0000000000c9";
+    const entry = EXPORT_TABLES.find((t) => t.table === "contact_companies");
+    expect(entry?.file).toBe("contact_companies.csv");
+    expect(exportKey(entry!)).toEqual(["id"]);
+    expect(EXPORT_README).toContain("contact_companies.csv");
+    const { names, tagNames } = exportNames(
+      [
+        { table: "contacts", rows: [{ id: CONTACT, full_name: "דנה כהן" }] },
+        { table: "companies", rows: [{ id: COMPANY, name: "ענן בע\"מ" }] },
+      ],
+      [],
+    );
+    const [header, row] = lines(
+      toCsv([{ id: "l1", organization_id: ORG, contact_id: CONTACT, company_id: COMPANY, title: "יועצת", is_primary: false }], names, tagNames, "contact_companies"),
+    );
+    expect(header).toBe("id,organization_id,contact_id,contact,company_id,company,title,is_primary");
+    expect(row).toBe(`l1,${ORG},${CONTACT},דנה כהן,${COMPANY},"ענן בע""מ",יועצת,false`);
+  });
+
   it("names the team and the member in team_members.csv", () => {
     const { names, tagNames } = exportNames([{ table: "teams", rows: [{ id: TEAM, name: "צוות צפון" }] }], [{ id: GUEST, full_name: "רון", email: null }]);
     const [header, row] = lines(

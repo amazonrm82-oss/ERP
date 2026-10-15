@@ -19,7 +19,9 @@ function query(table: string) {
     select: () => builder,
     eq: () => builder,
     in: () => builder,
+    is: () => builder,
     order: () => builder,
+    limit: () => builder,
     then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => {
       reads.push(table);
       return Promise.resolve({ data: ROWS[table] ?? [], error: null }).then(resolve);

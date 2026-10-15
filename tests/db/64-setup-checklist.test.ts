@@ -436,6 +436,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_lead_score.sql",
       // lead_score also redefines app.audit_row(); PRM-01's later body (rule name) must stay the live one
       "_automation_permission_answer.sql",
+      // CON-05 redefines app.sample_untouched() last (links a person made keep the record), and with it
+      // app.import_record_worked() of undo_own_import, which no file above touches
+      "_contact_companies.sql",
     ]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();

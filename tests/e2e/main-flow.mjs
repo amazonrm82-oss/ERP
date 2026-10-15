@@ -787,7 +787,7 @@ try {
   await ownerDesk.waitForURL(/\/contacts\/[0-9a-f-]{36}$/);
   const contactUrl = ownerDesk.url();
   await ownerDesk.getByRole("button", { name: "עריכה", exact: true }).click();
-  await ownerDesk.getByLabel("תפקיד").fill("מנכ\"ל");
+  await ownerDesk.getByLabel("תפקיד", { exact: true }).fill("מנכ\"ל");
   await ownerDesk.getByRole("button", { name: "שמירה" }).click();
   await expectText(ownerDesk, "מנכ\"ל, כהן ובניו");
 

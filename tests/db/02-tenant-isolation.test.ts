@@ -132,6 +132,9 @@ describe("tenant isolation", () => {
       await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-10-01', 'won_amount', 100000)", [orgA]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
+      // CON-05: contactA's company is its primary link (by trigger); a second company as a further one
+      ids.company2A = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה שנייה של א') returning id", [orgA])).rows[0].id;
+      await q("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, 'יועצת')", [orgA, ids.contactA, ids.company2A]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
       ids.productA = (
         await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
@@ -215,6 +218,8 @@ describe("tenant isolation", () => {
     "number_sequences",
     "record_type_options",
     "contact_channels",
+    // CON-05
+    "contact_companies",
     "plan_waitlist",
     "consents",
     // seeded for every new organization (WA-01)
@@ -374,6 +379,7 @@ describe("tenant isolation", () => {
       org_bank_details: "bank_name = bank_name",
       record_type_options: "name = name",
       contact_channels: "label = label",
+      contact_companies: "title = title",
       // no update or delete grant at all: a permission error is the expected outcome
       plan_waitlist: "plan_key = plan_key",
       // append-only (CNS-02): no update or delete grant, a permission error is the expected outcome
@@ -476,6 +482,7 @@ describe("tenant isolation", () => {
       ["insert into public.org_bank_details (organization_id, bank_name) values ($1, 'x')", [orgA]],
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
+      ["insert into public.contact_companies (organization_id, contact_id, company_id) values ($1, $2, $3)", [orgA, ids.contactA, ids.companyA]],
       ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
       ["insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'x')", [orgA, ids.leadA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
@@ -560,6 +567,7 @@ describe("tenant isolation", () => {
       ["org_bank_details", "bank_name = 'HACKED'", "bank_name = 'HACKED'"],
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
+      ["contact_companies", "title = 'HACKED'", "title = 'HACKED'"],
       ["plan_waitlist", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["consents", "state = 'denied'", "state = 'denied'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],

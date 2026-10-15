@@ -139,30 +139,6 @@ export async function listCompanyOptions(orgId: string): Promise<CompanyOption[]
   return data;
 }
 
-export type CompanyContact = { id: string; name: string; jobTitle: string | null; phone: string | null };
-
-/** Live contacts that belong to the company (latest 100). */
-export async function listContactsOfCompany(orgId: string, companyId: string): Promise<CompanyContact[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("id, full_name, email, phone, job_title")
-    .eq("organization_id", orgId)
-    .eq("company_id", companyId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) {
-    throw new Error(`company contacts query failed: ${error.message}`);
-  }
-  return data.map((row) => ({
-    id: row.id,
-    name: row.full_name || row.email || row.phone || "איש קשר ללא שם",
-    jobTitle: row.job_title,
-    phone: row.phone,
-  }));
-}
-
 /** How many child companies the company page lists (CON-07). */
 export const CHILD_COMPANIES_SHOWN = 20;
 

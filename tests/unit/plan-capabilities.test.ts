@@ -6,6 +6,8 @@ describe("plan capabilities", () => {
   it("lists core CRM data on every plan, with or without flags", () => {
     expect(planCapabilities({}).map((item) => item.feature)).toContain("billing_details");
     expect(planCapabilities(null).map((item) => item.feature)).toContain("billing_details");
+    // CON-05 (owner, 15 October 2026): core
+    expect(planCapabilities({}).map((item) => item.feature)).toContain("contact_companies");
   });
 
   it("lists a flagged capability only when the plan holds its flag", () => {

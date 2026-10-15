@@ -1,14 +1,12 @@
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContactActions } from "@/components/contact-actions";
 import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { TrashRecordButton } from "@/components/trash-record-button";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrintButton } from "@/features/print/components/print-button";
 import { PrintHeader } from "@/features/print/components/print-header";
@@ -21,7 +19,9 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { getCardLayout } from "@/features/card-layout/queries";
 import { CompanyDetailsCard } from "@/features/companies/components/company-details-card";
-import { getCompany, getCompanyFamily, listContactsOfCompany } from "@/features/companies/queries";
+import { getCompany, getCompanyFamily } from "@/features/companies/queries";
+import { CompanyPeopleCard } from "@/features/contact-companies/components/company-people-card";
+import { listCompanyPeople } from "@/features/contact-companies/queries";
 import { ContactDomainNote } from "@/features/company-domain/components/contact-domain-note";
 import { getContactDomainInfo } from "@/features/company-domain/queries";
 import { ChildCompaniesCard } from "@/features/companies/components/child-companies-card";
@@ -61,7 +61,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
 
   const [company, contacts, deals, fields, tags, types, follow, billing, cardLayout] = await Promise.all([
     getCompany(orgId, companyId),
-    listContactsOfCompany(orgId, companyId),
+    // CON-05: the people linked to the company, with their role there
+    listCompanyPeople(orgId, companyId),
     listRelatedDeals(orgId, { companyId }),
     listFieldDefinitions(orgId, "company"),
     listTags(orgId),
@@ -175,25 +176,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             canEdit={canEditRecordHint(context, company.owner_id)}
           />
 
-          <Card aria-labelledby="company-contacts-title">
-            <CardHeader id="company-contacts-title" title={`אנשי קשר (${contacts.length})`} />
-            <CardBody>
-              {contacts.length === 0 ? (
-                <p className="text-md text-ink-soft">עוד אין אנשי קשר בחברה. משייכים איש קשר לחברה בכרטיס שלו.</p>
-              ) : (
-                <ul className="divide-y divide-line">
-                  {contacts.map((contact) => (
-                    <li key={contact.id} className="py-2.5 first:pt-0 last:pb-0">
-                      <Link href={paths.contact(orgId, contact.id)} className="font-medium underline-offset-4 hover:underline">
-                        {contact.name}
-                      </Link>
-                      {contact.jobTitle ? <span className="block text-sm text-ink-soft">{contact.jobTitle}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
+          <CompanyPeopleCard orgId={orgId} people={contacts} />
 
           <ChildCompaniesCard orgId={orgId} items={family.children} total={family.childCount} />
 

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listCompanyOptions } from "@/features/companies/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { getLeadLookups } from "@/features/leads/queries";
 import { listRecordTypes } from "@/features/record-type-options/queries";
@@ -44,13 +45,19 @@ export async function prepareListFilter(
   extra: { stages?: Array<{ id: string; name: string }> } = {},
 ): Promise<PreparedFilter> {
   // memoized per request: the page has already read the context, and started the rest (startListFilterLookups)
-  const [context, [lookups, members, tags, types]] = await Promise.all([getOrgContext(orgId), filterLookups(orgId, object)]);
+  const [context, [lookups, members, tags, types], companies] = await Promise.all([
+    getOrgContext(orgId),
+    filterLookups(orgId, object),
+    // CON-05: the primary company of a contact
+    object === "contact" ? listCompanyOptions(orgId) : [],
+  ]);
   const fields = filterFields(object, {
     statuses: object === "lead" ? lookups?.statuses.map((s) => ({ value: s.id, label: s.name })) : undefined,
     sources: lookups?.sources.map((s) => ({ value: s.id, label: s.name })),
     stages: extra.stages?.map((s) => ({ value: s.id, label: s.name })),
     // hidden types too: records may still have them
     types: types.map((t) => ({ value: t.id, label: t.isActive ? t.name : `${t.name} (מוסתר)` })),
+    companies: companies.map((c) => ({ value: c.id, label: c.name })),
     members: members.map((m) => ({ value: m.userId, label: m.name })),
     tags: tags.map((t) => ({ value: t.id, label: t.name })),
     fields: customFields,
