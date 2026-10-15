@@ -49,13 +49,19 @@ describe("card layout (FLD-08)", () => {
   });
 
   it("a title may not start or end with any white space that trim() removes, and nothing else", () => {
+    // every code unit but the surrogates is checked at both edges; one assertion at the end keeps it fast
+    const wrong: string[] = [];
+    let checked = 0;
     for (let code = 0; code <= 0xffff; code++) {
       if (code >= 0xd800 && code <= 0xdfff) continue;
       const ch = String.fromCharCode(code);
       const trimmed = (ch + "א").trim() !== ch + "א";
-      expect(TITLE_EDGE_SPACE.test(ch + "א"), code.toString(16)).toBe(trimmed);
-      expect(TITLE_EDGE_SPACE.test("א" + ch), code.toString(16)).toBe(trimmed);
+      if (TITLE_EDGE_SPACE.test(ch + "א") !== trimmed) wrong.push(`start ${code.toString(16)}`);
+      if (TITLE_EDGE_SPACE.test("א" + ch) !== trimmed) wrong.push(`end ${code.toString(16)}`);
+      checked++;
     }
+    expect(checked).toBe(0x10000 - 0x800);
+    expect(wrong).toEqual([]);
     expect(TITLE_EDGE_SPACE.test("א ב")).toBe(false);
   });
 

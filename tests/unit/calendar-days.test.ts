@@ -212,16 +212,25 @@ describe("the official moves of the national days", () => {
   });
 
   it("every year 2000-2060 has exactly one of each national day, never on Friday or Shabbat", () => {
+    // one holiday computation per year and one assertion at the end, so the test stays fast under load
+    const wrong: string[] = [];
     for (let year = 2000; year <= 2060; year++) {
+      const holidays = holidaysInRange(`${year}-01-01`, `${year}-12-31`);
+      const of = (name: string) => holidays.filter((h) => h.name === name).map((h) => h.date);
       for (const name of ["יום השואה", "יום הזיכרון", "יום העצמאות"]) {
-        const days = daysOf(name, year);
-        expect(days, `${name} ${year}`).toHaveLength(1);
+        const days = of(name);
+        if (days.length !== 1) {
+          wrong.push(`${name} ${year}: ${days.length} days`);
+          continue;
+        }
         const w = new Date(`${days[0]}T00:00:00Z`).getUTCDay();
-        expect([5, 6], `${name} ${year} on ${days[0]}`).not.toContain(w);
+        if (w === 5 || w === 6) wrong.push(`${name} ${year} on ${days[0]}`);
       }
-      const zikaron = daysOf("יום הזיכרון", year)[0];
-      expect(daysOf("יום העצמאות", year)[0], String(year)).toBe(addDays(zikaron, 1));
+      const zikaron = of("יום הזיכרון")[0];
+      const atzmaut = of("יום העצמאות")[0];
+      if (zikaron !== undefined && atzmaut !== addDays(zikaron, 1)) wrong.push(`${year}: יום העצמאות ${atzmaut} after יום הזיכרון ${zikaron}`);
     }
+    expect(wrong).toEqual([]);
   });
 });
 
