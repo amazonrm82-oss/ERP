@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { publicFormFrom } from "@/features/intake/public-form";
 import { updateIntakeSchema } from "@/features/intake/schema";
-import { whatsappChatUrl, whatsappNumber } from "@/features/intake/whatsapp";
+import { defaultWhatsappButton, whatsappChatUrl, whatsappNumber } from "@/features/intake/whatsapp";
 
 // CAP-05: the thank-you page's WhatsApp button
 describe("WhatsApp chat link (CAP-05)", () => {
@@ -61,5 +61,17 @@ describe("WhatsApp chat link (CAP-05)", () => {
       expect(updateIntakeSchema.safeParse({ ...form, whatsapp_button: "on", whatsapp_phone: bad, whatsapp_text: "" }).success).toBe(false);
     }
     expect(updateIntakeSchema.safeParse({ ...form, whatsapp_button: "on", whatsapp_phone: "", whatsapp_text: "א".repeat(301) }).success).toBe(false);
+  });
+});
+
+describe("the thank-you WhatsApp button on a new form (CAP-05, owner 14 October 2026)", () => {
+  it("starts on only for a web form of a business whose phone WhatsApp can open", () => {
+    expect(defaultWhatsappButton("form", "050-1234567")).toBe(true);
+    expect(defaultWhatsappButton("form", "+972 52 765 4321")).toBe(true);
+    for (const phone of [null, undefined, "", "123", "not a phone"]) {
+      expect(defaultWhatsappButton("form", phone), String(phone)).toBe(false);
+    }
+    // a webhook has no thank-you page
+    expect(defaultWhatsappButton("webhook", "050-1234567")).toBe(false);
   });
 });

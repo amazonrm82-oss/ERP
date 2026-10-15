@@ -28,3 +28,12 @@ export function whatsappChatUrl(phoneE164: string | null | undefined, text?: str
   const base = `https://wa.me/${phoneE164.slice(1)}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
+
+/**
+ * CAP-05 follow-up (owner, 14 October 2026): a new web form starts with the thank-you WhatsApp button
+ * on only when the business phone is a number WhatsApp can open; otherwise off. A webhook has no
+ * thank-you page. Existing forms keep what they have.
+ */
+export function defaultWhatsappButton(kind: string, businessPhone: string | null | undefined): boolean {
+  return kind === "form" && whatsappNumber(businessPhone) !== null;
+}

@@ -14,7 +14,7 @@ import type { Json } from "@/lib/database.types";
 
 import { formFieldOptions, storedFields } from "./fields";
 import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
-import { whatsappNumber } from "./whatsapp";
+import { defaultWhatsappButton, whatsappNumber } from "./whatsapp";
 
 export async function createIntakeAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId);
@@ -25,6 +25,15 @@ export async function createIntakeAction(orgId: string, _prev: FormState, formDa
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+  // CAP-05: the thank-you WhatsApp button starts on only when the business phone is a valid number
+  let whatsappButton = false;
+  if (parsed.data.kind === "form") {
+    const { data: org, error: orgError } = await context.supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle();
+    if (orgError) {
+      return fail(dbErrorMessage(orgError, "לא הצלחנו ליצור. נסו שוב."), { values: formValues(formData) });
+    }
+    whatsappButton = defaultWhatsappButton(parsed.data.kind, org?.phone);
+  }
   // leads of a new web form go to the person who made it, until changed
   const { data, error } = await context.supabase
     .from("forms")
@@ -34,6 +43,7 @@ export async function createIntakeAction(orgId: string, _prev: FormState, formDa
       name: parsed.data.name,
       title: parsed.data.kind === "form" ? parsed.data.name : null,
       owner_id: context.user.id,
+      whatsapp_button: whatsappButton,
     })
     .select("id")
     .single();
