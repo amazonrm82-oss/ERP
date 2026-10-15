@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultLeadStatus, pgError } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultLeadStatus, defaultPipeline, pgError, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -101,11 +101,47 @@ describe("currency next to every amount", () => {
       ).rows.map((row) => row.table_name),
     );
     expect(tables).toEqual(expect.arrayContaining(["deals", "leads"]));
-    // by behaviour, on every such table: one existing row (the tests above made leads and deals), set to USD, refused
+    // by behaviour, on every such table: a row of this test's own organization, set to USD, refused. The rows are
+    // made here (as the server, triggers off; CHECK constraints still apply), so the test passes alone and in any
+    // order; a new table needs its own line in SAMPLE_ROWS.
+    const status = await defaultLeadStatus(org);
+    const pipe = await defaultPipeline(org);
+    const SAMPLE_ROWS: Record<string, (q: Query) => Promise<void>> = {
+      leads: async (q) => {
+        await q("insert into public.leads (organization_id, status_id, full_name) values ($1, $2, 'ליד לבדיקת מטבע')", [org, status]);
+      },
+      deals: async (q) => {
+        await q("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה לבדיקת מטבע', $2, $3)", [org, pipe.pipelineId, pipe.stages[0].id]);
+      },
+      products: async (q) => {
+        await q("insert into public.products (organization_id, name) values ($1, 'מוצר לבדיקת מטבע')", [org]);
+      },
+      price_list_lines: async (q) => {
+        const product = (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'מוצר במחירון') returning id", [org])).rows[0].id;
+        const list = (await q<{ id: string }>("insert into public.price_lists (organization_id, name, prices_include_vat) values ($1, 'מחירון לבדיקה', false) returning id", [org])).rows[0].id;
+        await q("insert into public.price_list_lines (organization_id, price_list_id, product_id, price_agorot) values ($1, $2, $3, 1000)", [org, list, product]);
+      },
+      product_costs: async (q) => {
+        const product = (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'מוצר עם עלות') returning id", [org])).rows[0].id;
+        await q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 500)", [org, product]);
+      },
+      deal_lines: async (q) => {
+        const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם שורה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
+        await q("insert into public.deal_lines (organization_id, deal_id, description, price_includes_vat, price_source, quantity, unit_price_agorot) values ($1, $2, 'שורה', false, 'manual', 1, 1000)", [org, deal]);
+      },
+    };
+    expect(tables.filter((table) => !(table in SAMPLE_ROWS)), "add a sample row for every table with a currency").toEqual([]);
+    await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      for (const table of tables) await SAMPLE_ROWS[table](q);
+    });
     for (const table of tables) {
       const error = await pgError(
         asAdmin(async (q) => {
-          const res = await q(`update public.${table} set currency = 'USD' where ctid = (select ctid from public.${table} limit 1) returning 1`);
+          const res = await q(
+            `update public.${table} set currency = 'USD' where ctid = (select ctid from public.${table} where organization_id = $1 limit 1) returning 1`,
+            [org],
+          );
           if (res.rowCount === 0) throw Object.assign(new Error(`no row in ${table} to try`), { code: "no_row" });
         }),
       );
