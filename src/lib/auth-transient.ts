@@ -15,3 +15,14 @@ export function isTransientAuthError(error: unknown): boolean {
   }
   return error.status === 429;
 }
+
+/**
+ * FXC-10 follow-up: a session check that THREW (rather than answering with an error) is treated as "unavailable",
+ * which could also hide a real bug. Logs it on the server with a short tag: the error's name and message only, never
+ * the request, its cookies or a token.
+ */
+export function logSessionCheckThrow(where: "proxy" | "readSession", error: unknown): void {
+  const name = error instanceof Error ? error.name : typeof error;
+  const message = error instanceof Error ? error.message.slice(0, 300) : "";
+  console.error(`[auth:${where}] session check threw; treated as unavailable: ${name}${message ? `: ${message}` : ""}`);
+}

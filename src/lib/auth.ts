@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { AUTH_UNAVAILABLE_MESSAGE, AuthUnavailableError } from "@/lib/auth-unavailable";
-import { isTransientAuthError } from "@/lib/auth-transient";
+import { isTransientAuthError, logSessionCheckThrow } from "@/lib/auth-transient";
 import { getSupabaseEnv } from "@/lib/env";
 import { SESSION_EXPIRED } from "@/lib/errors";
 import { paths } from "@/lib/paths";
@@ -41,8 +41,9 @@ const readSession = cache(async (): Promise<SessionRead> => {
       return { kind: "none" };
     }
     claims = data.claims;
-  } catch {
-    // something other than an answer about the session (a network failure that escaped auth-js)
+  } catch (error) {
+    // something other than an answer about the session (a network failure that escaped auth-js, or a bug)
+    logSessionCheckThrow("readSession", error);
     return { kind: "unavailable" };
   }
   const fullName = claims.user_metadata?.full_name;

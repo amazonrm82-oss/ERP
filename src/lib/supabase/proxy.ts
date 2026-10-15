@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isTransientAuthError } from "@/lib/auth-transient";
+import { isTransientAuthError, logSessionCheckThrow } from "@/lib/auth-transient";
 import { contentSecurityPolicy, makeNonce } from "@/lib/csp";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
@@ -109,6 +109,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   } catch (error) {
     isSignedIn = false;
     authUnavailable = isTransientAuthError(error);
+    logSessionCheckThrow("proxy", error);
   }
 
   if (authUnavailable) {

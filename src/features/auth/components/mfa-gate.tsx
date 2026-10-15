@@ -7,16 +7,20 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { APP_NAME } from "@/lib/app";
+import { AUTH_UNAVAILABLE_MESSAGE, AUTH_UNAVAILABLE_TITLE } from "@/lib/auth-unavailable";
 import { createClient } from "@/lib/supabase/client";
 
 import { recoverWithCodeAction } from "../actions";
+import { mfaSessionCheck } from "../mfa-session";
 
 type Step =
   | { kind: "loading" }
   | { kind: "enroll"; factorId: string; qr: string; secret: string }
   | { kind: "verify"; factorId: string }
   // a backup code removed the authenticator, and no organization requires a new one
-  | { kind: "recovered" };
+  | { kind: "recovered" }
+  // FXC-10: the sign-in service did not answer; the session is kept and the user may try again
+  | { kind: "unavailable" };
 
 /**
  * Two-step verification (Supabase MFA, TOTP): sets up an authenticator app when
@@ -41,7 +45,13 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       // getUser() asks the server: the session's own copy of the user can predate an
       // authenticator added on another device
       const { data: fresh, error: userError } = await supabase.auth.getUser();
-      if (userError || !fresh.user) {
+      const check = mfaSessionCheck(userError, Boolean(fresh.user));
+      if (check === "unavailable") {
+        // FXC-10: an outage of the sign-in service is not a signed-out session; keep it and offer a retry
+        if (!cancelled) setStep({ kind: "unavailable" });
+        return;
+      }
+      if (check === "signed_out" || !fresh.user) {
         // this device's session is gone (for example, turning on two-step verification on
         // another device signs out all the others): sign in again
         await supabase.auth.signOut({ scope: "local" });
@@ -137,6 +147,20 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
       ) : null}
       {step.kind === "verify" ? (
         <p className="text-md">{useBackup ? "הזינו אחד מקודי הגיבוי ששמרתם. כל קוד עובד פעם אחת." : "הזינו את 6 הספרות מאפליקציית האימות."}</p>
+      ) : null}
+      {step.kind === "unavailable" ? (
+        <div role="alert" className="space-y-3">
+          <p className="font-semibold">{AUTH_UNAVAILABLE_TITLE}</p>
+          <p className="text-md">{AUTH_UNAVAILABLE_MESSAGE}</p>
+          <Button
+            onClick={() => {
+              setStep({ kind: "loading" });
+              setRound((r) => r + 1);
+            }}
+          >
+            ניסיון נוסף
+          </Button>
+        </div>
       ) : null}
       {step.kind === "recovered" ? (
         <div role="status" className="space-y-3">
