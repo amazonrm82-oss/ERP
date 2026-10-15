@@ -521,6 +521,16 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   never hands them over (`tasks_deputy_guard`, hint `task:deputy_owner`); reminders also go to the deputy. `intake_submit` (0188),
   `app.notify_assignment`, `app.run_automation_actions` (0188), `app.check_lead_responses`, `app.send_task_reminders` and the mention
   functions were last redefined in 0187.
+- Lead distribution (CAP-08, migrations 019600-019640; owner 14 October 2026; plan key `lead_distribution` from basic up):
+  `public.lead_distribution_settings` (one row per org; method round_robin|weighted|load, weights {user: 1..10} checked by
+  `app.distribution_weights_ok`, whole numbers only) and `public.lead_routing_rules` (source / product / language / select field;
+  a team or one person, exactly one; 50 per org; an active rule needs the flag; quota guard first). One pick for every automatic
+  assignment: `app.lead_distribution_route` (a person rule goes through `app.auto_lead_owner`, team by `app.member_default_team`)
+  over `app.lead_distribution_pick` (CAP-09/HEB-08 eligibility unchanged; weighted = stride passes in `app.lead_rotation_passes` /
+  `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
+  `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
+  team on the lead (deliberate). `public.intake_submit`, `public.intake_form` and `app.run_automation_actions` were last redefined in
+  019640/019620; `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
