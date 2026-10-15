@@ -604,7 +604,11 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `can_read_record`), else a recurring deal's first year, else empty; pure rule `app.deal_amount_rule` (mirrored by `dealValueRule()`),
   `deals.amount_source` (lines|first_year while `amount_auto`, null = typed or empty) and `recurring_amount_auto` (a recurring deal with lines fills its recurring amount
   from them until typed); statement triggers `deal_lines_recompute_*` call `app.deal_recompute_value`; `app.deal_amount_auto` is
-  security definer since 0189. `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
+  security definer since 0189. Since 0191 (DLI-04, owner) every line has `billing` (one_time|monthly|quarterly|yearly; a product
+  line copies its product's, a free line is the person's; null = saved before 0191, counts in the deal's period, trigger
+  `app.deal_lines_billing`); the rule is `app.deal_value_rule` (13 args; `deal_amount_rule` is a wrapper) over
+  `app.deal_lines_sums` (definer, no grants): recurring amount from recurring lines only, value = first year of the recurring
+  amount + one-time lines; a monthly deal's value is 12 x the ROUNDED monthly amount (owner, do not "fix"). `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
 - Card layout (FLD-08, migration 0190): `public.card_layouts` (one row per org and type lead|contact|company|deal; `groups` =
   [{title 1..60, columns 1|2, fields}] of built-in keys `app.card_layout_builtin_keys()` mirrored by `CARD_LAYOUT_BUILT_IN`
   in `src/features/card-layout/layout.ts`, test 99, or `cf:<key>`; at most 20 groups / 60 fields; members read, owners/admins
