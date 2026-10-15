@@ -92,8 +92,8 @@ describe("roles of contacts on a deal as a managed list (CON-03 follow-up)", () 
     await asUser(member.id, (q) => q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role_id) values ($1, $2, $3, $4)", [org, dealId, contactA, finance]));
     expect(await link(dealId, contactA)).toEqual({ role: null, role_id: finance });
 
-    // a link saved before the list keeps its code untouched
-    await asUser(member.id, (q) => q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'influencer')", [org, dealId, contactB]));
+    // a link saved before the list keeps its code untouched (only the server writes the code now)
+    await asAdmin((q) => q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'influencer')", [org, dealId, contactB]));
     expect(await link(dealId, contactB)).toEqual({ role: "influencer", role_id: null });
     // an edit that does not touch the role keeps it; picking a role from the list replaces the code
     const user = await roleId(org, "user");

@@ -105,9 +105,11 @@ describe("full export: tables (SPEC 12.4)", () => {
           ])
         ).rows[0].id;
         await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'work', '03-1234567')", [orgId, contact]);
-        await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'finance')", [orgId, deal, contact]);
+        await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [orgId, deal, contact]);
         return { contactId: contact, dealId: deal };
       }));
+      // a link saved before the role list carries the old code, which only the server writes now
+      await asAdmin((q) => q("update public.deal_contacts set role = 'finance' where organization_id = $1 and deal_id = $2", [orgId, dealId]));
       teamId = await asUser(owner.id, async (q) => {
         const team = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות דרום') returning id", [orgId])).rows[0].id;
         await q("insert into public.team_members (organization_id, team_id, user_id, is_manager) values ($1, $2, $3, true)", [orgId, team, member.id]);

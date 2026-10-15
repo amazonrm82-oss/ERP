@@ -397,7 +397,7 @@ describe("roles and record visibility", () => {
         await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה של m2', $2, $3) returning id", [org, pipe.p, pipe.s])
       ).rows[0].id;
       const task = (await q<{ id: string }>("insert into public.tasks (organization_id, title) values ($1, 'משימה של m2') returning id", [org])).rows[0].id;
-      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, 'decision_maker')", [org, deal, contact]);
+      await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [org, deal, contact]);
       return { company, contact, contact2, deal, task };
     });
 
@@ -429,7 +429,7 @@ describe("roles and record visibility", () => {
       for (const [table, id, set] of tables) {
         expect((await q(`update public.${table} set ${set} where id = $1`, [id])).rowCount, `own update ${table}`).toBe(1);
       }
-      expect((await q("update public.deal_contacts set role = 'influencer' where deal_id = $1", [rec.deal])).rowCount).toBe(1);
+      expect((await q("update public.deal_contacts set role = null where deal_id = $1", [rec.deal])).rowCount).toBe(1);
     });
     for (const [table, id] of tables) {
       const err = await pgError(asUser(m2.id, (q) => q(`update public.${table} set deleted_at = now() where id = $1`, [id])));
@@ -477,15 +477,19 @@ describe("roles and record visibility", () => {
     );
     await asUser(admin.id, (q) => q("update public.contacts set deleted_at = now() where id = $1", [mine.binned]));
 
+    // the role comes from the business's list (role_id); the old code is the server's only
+    const roleIds = await asAdmin(async (q) =>
+      Object.fromEntries((await q<{ key: string; id: string }>("select key, id from public.deal_contact_roles where organization_id = $1 and key is not null", [org])).rows.map((r) => [r.key, r.id])),
+    );
     const link = (contactId: string, role: string | null) => (q: Query) =>
-      q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role) values ($1, $2, $3, $4)", [org, mine.deal, contactId, role]);
+      q("insert into public.deal_contacts (organization_id, deal_id, contact_id, role_id) values ($1, $2, $3, $4)", [org, mine.deal, contactId, role ? roleIds[role] : null]);
 
     // the deal's owner links a contact they read, with one of the four roles
     await asUser(m1.id, link(mine.contact, "decision_maker"));
     // not a contact they cannot read, nor one in the recycle bin, nor an unknown role
     expect((await pgError(asUser(m1.id, link(theirs, "user")))).code).toBe("42501");
     expect((await pgError(asUser(m1.id, link(mine.binned, "user")))).code).toBe("42501");
-    await asUser(admin.id, async (q) => {
+    await asAdmin(async (q) => {
       expect((await pgError(q("update public.deal_contacts set role = 'boss' where deal_id = $1", [mine.deal]))).code).toBe("23514");
     });
 
@@ -497,8 +501,8 @@ describe("roles and record visibility", () => {
       (await pgError(asUser(m1.id, (q) => q("update public.deal_contacts set deal_id = deal_id where deal_id = $1", [mine.deal])))).code,
     ).toBe("42501");
     await asUser(m1.id, async (q) => {
-      expect((await q("update public.deal_contacts set role = 'finance' where deal_id = $1", [mine.deal])).rowCount).toBe(1);
-      expect((await q("update public.deal_contacts set role = null where deal_id = $1", [mine.deal])).rowCount).toBe(1);
+      expect((await q("update public.deal_contacts set role_id = $2 where deal_id = $1", [mine.deal, roleIds.finance])).rowCount).toBe(1);
+      expect((await q("update public.deal_contacts set role_id = null where deal_id = $1", [mine.deal])).rowCount).toBe(1);
     });
 
     // an admin reads every contact and may link m2's contact; m1 then sees the link but not the contact
