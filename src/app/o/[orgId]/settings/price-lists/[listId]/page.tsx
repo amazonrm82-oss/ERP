@@ -15,7 +15,8 @@ import { validityText } from "@/features/price-lists/status";
 import { PRICE_LISTS_NOT_IN_PLAN, priceHeading } from "@/features/price-lists/schema";
 import { isOfferable } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { documentVatRateBp } from "@/features/tax/calc";
 import { getPricesIncludeVat, getTaxSettings, getVatRates } from "@/features/tax/queries";
@@ -38,7 +39,8 @@ export default async function PriceListPage({ params }: Props) {
   if (!isUuid(listId)) notFound();
   const list = await getPriceList(orgId, listId);
   if (!list) notFound();
-  const editable = isAdminRole(role) && canWrite;
+  // PRM-01: a member with the catalog permission edits too
+  const editable = canEditCatalog(role, await getMyPermissions(orgId)) && canWrite;
   const [lines, inPlan, businessIncludesVat, tax, rates] = await Promise.all([
     listPriceListLines(orgId, list.id),
     orgHasFeature(orgId, "price_lists"),

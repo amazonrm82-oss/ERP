@@ -19,6 +19,7 @@ const LEFT_OUT: Record<string, string> = {
   invitations: "carry secret tokens",
   list_preferences: "a person's screen settings",
   memberships: "people come in as names next to their ids",
+  member_permissions: "access settings of the team, like memberships; the audit log keeps every change",
   notifications: "a person's bell",
   org_usage: "server counters",
   outbox_events: "engine queue",

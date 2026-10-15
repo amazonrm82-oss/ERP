@@ -12,7 +12,8 @@ import { actionsMissingReason } from "@/features/automations/convert";
 import { describeRule } from "@/features/automations/describe";
 import { getLookups, listAutomations } from "@/features/automations/queries";
 import { TEMPLATES } from "@/features/automations/templates";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canManageAutomations } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -23,10 +24,11 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function AutomationsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  if (!isAdminRole(role)) {
+  // PRM-01: a member with the automations permission manages them too
+  if (!canManageAutomations(role, await getMyPermissions(orgId))) {
     return (
       <div className="rounded-lg border border-line bg-surface">
-        <EmptyState kind="locked" title="אין גישה" description="אוטומציות מנוהלות על ידי הבעלים ומנהלי המערכת." />
+        <EmptyState kind="locked" title="אין גישה" description="אוטומציות מנוהלות על ידי הבעלים, מנהלי המערכת ומי שקיבל הרשאה לכך." />
       </div>
     );
   }

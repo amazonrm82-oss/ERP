@@ -1,15 +1,15 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
+import { migrationFile, rerunClosure } from "./rerun";
 
 afterAll(closePool);
 
 type U = { id: string };
 
-const MIGRATION = path.join(__dirname, "../../supabase/migrations/20261006016900_price_list_vat.sql");
+// Re-running this migration puts back its own functions (app.price_list_lines_vat, which PRM-01 redefines later);
+// rerunClosure adds every later migration that redefines one of them, so no later test sees an old body.
+const RERUN = rerunClosure([migrationFile("_price_list_vat.sql")]);
 
 // Owner, 13 October 2026 (DECISIONS.md "מע"מ במחירון"): one "prices include VAT" setting per price list,
 // starting from the business's setting, locked once the list has prices; every line takes the list's flag.
@@ -150,7 +150,6 @@ describe("one VAT setting per price list (PL-01 follow-up)", () => {
     await insertLine(owner.id, fromLine, { product_id: product2, price_agorot: 100 });
     const mixedA = await insertLine(owner.id, mixed, { price_agorot: 100 });
     const mixedB = await insertLine(owner.id, mixed, { product_id: product2, price_agorot: 200 });
-    const sql = readFileSync(MIGRATION, "utf8");
     // committed: the migration ends in its own final state (and leaves these test rows as it found them, re-filled)
     const seen = await asAdmin(async (q) => {
       // the state before this migration: lines typed with their own modes, lists without a setting
@@ -161,8 +160,8 @@ describe("one VAT setting per price list (PL-01 follow-up)", () => {
       await q("alter table public.price_lists alter column prices_include_vat drop not null");
       await q("update public.price_lists set prices_include_vat = null where id = any($1)", [[fromLine, fromBusiness, mixed]]);
       await q("set local session_replication_role = origin");
-      await q(sql);
-      await q(sql);
+      for (const sql of RERUN.sql) await q(sql);
+      for (const sql of RERUN.sql) await q(sql);
       const lists = (await q<{ id: string; v: boolean }>("select id, prices_include_vat as v from public.price_lists where id = any($1)", [[fromLine, fromBusiness, mixed]])).rows;
       const lines = (await q<{ id: string; v: boolean }>("select id, price_includes_vat as v from public.price_list_lines where id = any($1)", [[mixedA, mixedB]])).rows;
       const notNull = (await q<{ n: boolean }>("select attnotnull as n from pg_attribute where attrelid = 'public.price_lists'::regclass and attname = 'prices_include_vat'")).rows[0].n;

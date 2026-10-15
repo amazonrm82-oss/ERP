@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { csvText } from "@/lib/csv";
@@ -25,8 +26,10 @@ const text = (message: string, status: number) => new Response(message, { status
 
 export async function exportProducts(request: Request, orgId: string): Promise<Response> {
   const context = await getOrgContext(orgId);
-  if (!canExport(context.role)) {
-    return text("ייצוא מותר לבעלים, למנהלי מערכת ולמנהלי צוות.", 403);
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
+  if (!canExport(context.role, granted)) {
+    return text("ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא.", 403);
   }
   const params = new URL(request.url).searchParams;
   const format = params.get("format") === "xlsx" ? "xlsx" : "csv";
@@ -75,7 +78,7 @@ export async function exportProducts(request: Request, orgId: string): Promise<R
   });
   if (error) {
     return text(
-      error.code === "42501" ? "ייצוא מותר לבעלים, למנהלי מערכת ולמנהלי צוות." : "לא הצלחנו להכין את הקובץ. נסו שוב.",
+      error.code === "42501" ? "ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא." : "לא הצלחנו להכין את הקובץ. נסו שוב.",
       error.code === "42501" ? 403 : 500,
     );
   }

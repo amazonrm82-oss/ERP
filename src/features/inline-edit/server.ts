@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
 import { canEditRecordHint, type OrgContext } from "@/features/shell/queries";
@@ -20,12 +21,12 @@ export type InlineEditing = {
 };
 
 export async function inlineEditing(orgId: string, context: OrgContext): Promise<InlineEditing> {
-  const members = context.canWrite ? await listMembers(orgId) : [];
+  const [members, granted] = await Promise.all([context.canWrite ? listMembers(orgId) : Promise.resolve([]), getMyPermissions(orgId)]);
   return {
     orgId,
     owners: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
     canEdit: (ownerId) => canEditRecordHint(context, ownerId),
     canReassign: (ownerId) => context.role !== "member" && canEditRecordHint(context, ownerId),
-    bulk: context.canWrite ? { reassign: context.role !== "member", trash: context.role !== "member", exportable: canExport(context.role) } : null,
+    bulk: context.canWrite ? { reassign: context.role !== "member", trash: context.role !== "member", exportable: canExport(context.role, granted) } : null,
   };
 }

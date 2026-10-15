@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { getMemberPermissions } from "@/features/permissions/queries";
 import { InviteForm } from "@/features/settings/components/invite-form";
 import { MembersList } from "@/features/settings/components/members-list";
 import { PendingInvitations } from "@/features/settings/components/pending-invitations";
@@ -22,14 +23,17 @@ export default async function UsersSettingsPage({ params }: Props) {
   const { org, user, role, canWrite } = await getOrgContext(orgId);
   const isAdmin = isAdminRole(role);
 
-  const [members, invitations, hasViewSeats, mfaUserIds, away] = await Promise.all([
+  const [members, invitations, hasViewSeats, mfaUserIds, away, permissions] = await Promise.all([
     listMembers(orgId),
     isAdmin ? listPendingInvitations(orgId) : Promise.resolve([]),
     isAdmin ? orgHasFeature(orgId, "view_seats") : Promise.resolve(false),
     isAdmin ? listMembersWithMfa(orgId) : Promise.resolve([]),
     // HEB-08: who is away today, with the deputy
     getCurrentAbsences(orgId, org.timeZone),
+    // PRM-01: extra permissions, for owners and admins
+    isAdmin ? getMemberPermissions(orgId) : Promise.resolve(new Map<string, string[]>()),
   ]);
+  const permissionCounts = Object.fromEntries([...permissions].map(([userId, keys]) => [userId, keys.length]));
   const absences = Object.fromEntries(
     [...away.values()].map((a) => [a.userId, { label: `${absenceLabel(a.kind)} עד ${shortDay(a.endsOn)}`, deputyName: a.deputyId ? (a.deputyName ?? "משתמש") : null }]),
   );
@@ -67,7 +71,7 @@ export default async function UsersSettingsPage({ params }: Props) {
 
       <Card aria-labelledby="members-title">
         <CardHeader id="members-title" title={`משתמשים (${members.length})`} />
-        <MembersList orgId={orgId} myUserId={user.id} myRole={role} roles={roles} canWrite={canWrite} members={members} mfaUserIds={mfaUserIds} absences={absences} />
+        <MembersList orgId={orgId} myUserId={user.id} myRole={role} roles={roles} canWrite={canWrite} members={members} mfaUserIds={mfaUserIds} absences={absences} permissionCounts={permissionCounts} />
       </Card>
 
       {role === "owner" && canWrite ? (

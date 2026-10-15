@@ -26,6 +26,7 @@ import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
@@ -362,7 +363,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
         canShare={context.role === "owner" || context.role === "admin"}
       />
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {canExport(context.role) ? <ExportMenu href={exportHref(paths.deals(orgId), listHref(1, sortValue(sort)))} /> : null}
+        {canExport(context.role, await getMyPermissions(orgId)) ? <ExportMenu href={exportHref(paths.deals(orgId), listHref(1, sortValue(sort)))} /> : null}
         <AdvancedFilter
           fields={filter.fields}
           current={filter.tree}

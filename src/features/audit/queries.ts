@@ -1,5 +1,7 @@
 import "server-only";
 
+import { MEMBER_PERMISSIONS } from "@/features/permissions/keys";
+import { automationNameOf } from "./automation-name";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +23,8 @@ export type AuditItem = {
   erased: boolean;
   // one line of context that is not a field change (FLD-09: the fields a deleted pipeline took conditions from)
   note: string | null;
+  // PRM-01: the rule, when an automation made the change ("שונה על ידי האוטומציה: …")
+  automationName: string | null;
 };
 
 export type AuditFilters = { entityType: string | null; actorId: string | null; from: string | null; to: string | null; page: number };
@@ -35,13 +39,24 @@ function toChanges(action: string, changes: Json): AuditChange[] {
   if (isErased(changes)) return [];
   if (action !== "update" && action !== "trash" && action !== "restore") return [];
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) return [];
-  return Object.entries(changes).flatMap(([field, value]) => {
+  // PRM-01: an entry of member_permissions names whose permissions changed
+  const whose: AuditChange[] = "permissions" in changes && typeof changes.user_id === "string" ? [{ field: "user_id", old: null, new: changes.user_id }] : [];
+  return whose.concat(Object.entries(changes).flatMap(([field, value]) => {
     // only {old, new} pairs are changes; a plain value is context (REC-05: which record a note was on)
     if (!value || typeof value !== "object" || Array.isArray(value) || !("old" in value || "new" in value)) return [];
     const pair = value as Record<string, Json>;
     if (field === "utm") return utmChanges(pair.old ?? null, pair.new ?? null);
+    // PRM-01: the keys of the extra permissions, in Hebrew
+    if (field === "permissions") return [{ field, old: permissionLabels(pair.old ?? null), new: permissionLabels(pair.new ?? null) }];
     return [{ field, old: pair.old ?? null, new: pair.new ?? null }];
-  });
+  }));
+}
+
+/** PRM-01: ["export", "import"] -> "ייצוא, ייבוא"; nothing -> "ללא". */
+export function permissionLabels(value: Json): string {
+  const keys = Array.isArray(value) ? value.filter((key): key is string => typeof key === "string") : [];
+  if (keys.length === 0) return "ללא";
+  return keys.map((key) => MEMBER_PERMISSIONS.find((p) => p.key === key)?.label ?? key).join(", ");
 }
 
 function asObject(value: Json): Record<string, Json | undefined> {
@@ -103,6 +118,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
       changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
       note: conditionRemovalNote(r.action, r.changes),
+    automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
     })),
     more: data.length > AUDIT_PAGE,
     days,
@@ -133,6 +149,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
     note: conditionRemovalNote(r.action, r.changes),
+    automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
   }));
 }
 

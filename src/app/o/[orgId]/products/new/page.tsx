@@ -7,7 +7,8 @@ import { ProductForm } from "@/features/products/components/product-form";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
 import { categoryOptions } from "@/features/products/lists";
 import { productsPath } from "@/features/products/paths";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
 import { getOrgContext } from "@/features/shell/queries";
 import { getPricesIncludeVat } from "@/features/tax/queries";
@@ -30,12 +31,13 @@ export default async function NewProductPage({ params }: Props) {
       </>
     );
   }
-  if (!isAdminRole(role)) {
+  // PRM-01: a member with the catalog permission adds products too
+  if (!canEditCatalog(role, await getMyPermissions(orgId))) {
     return (
       <>
         <PageHeader title="מוצר חדש" back={back} />
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState kind="locked" title="רק בעלים ומנהלי מערכת מוסיפים מוצרים" description="אפשר לראות את כל המוצרים ברשימה." />
+          <EmptyState kind="locked" title="רק בעלים, מנהלי מערכת ומי שקיבל הרשאה לעריכת הקטלוג מוסיפים מוצרים" description="אפשר לראות את כל המוצרים ברשימה." />
         </div>
       </>
     );

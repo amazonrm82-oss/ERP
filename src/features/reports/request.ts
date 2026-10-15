@@ -1,5 +1,7 @@
 import "server-only";
 
+import { canExportWith } from "@/features/permissions/keys";
+import type { MembershipRole } from "@/lib/database.types";
 import { isUuid } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
 
@@ -32,7 +34,11 @@ export function filtersQuery(filters: ReportFilters): string {
   return query.toString();
 }
 
-/** Owners, admins and team managers may export (SPEC 7.1: members do not export). */
-export function canExport(role: string): boolean {
-  return role === "owner" || role === "admin" || role === "manager";
+/**
+ * Owners, admins and team managers may export (SPEC 7.1: members do not export), and a
+ * member with the export permission (PRM-01; `granted` from getMyPermissions()). Mirrors
+ * app.can_export(); the database checks it again in log_list_export / log_export.
+ */
+export function canExport(role: MembershipRole, granted: readonly string[]): boolean {
+  return canExportWith(role, granted);
 }

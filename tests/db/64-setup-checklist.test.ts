@@ -434,6 +434,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_deal_line_billing.sql",
       // LEAD-05 redefines app.sample_row() last
       "_lead_score.sql",
+      // lead_score also redefines app.audit_row(); PRM-01's later body (rule name) must stay the live one
+      "_automation_permission_answer.sql",
     ]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();

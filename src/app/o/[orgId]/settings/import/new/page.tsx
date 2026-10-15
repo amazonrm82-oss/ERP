@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { ImportWizard } from "@/features/imports/components/import-wizard";
+import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
@@ -18,9 +20,12 @@ export default async function NewImportPage({ params, searchParams }: Props) {
   const asked = (await searchParams).entity;
   const initialEntity = asked === "product" || asked === "deal" || asked === "task" ? asked : "lead";
   const { role, canWrite } = await getOrgContext(orgId);
-  if (!canWrite || !(isAdminRole(role) || role === "manager")) {
+  // PRM-01: a member with the import permission too; products also need the catalog permission
+  const granted = await getMyPermissions(orgId);
+  if (!canWrite || !canImportWith(role, granted)) {
     notFound();
   }
+  const catalog = canEditCatalog(role, granted);
   const [lead, contact, company, deal] = await Promise.all([
     listFieldDefinitions(orgId, "lead"),
     listFieldDefinitions(orgId, "contact"),
@@ -36,8 +41,8 @@ export default async function NewImportPage({ params, searchParams }: Props) {
         orgId={orgId}
         customFields={{ lead: short(lead), contact: short(contact), company: short(company), deal: short(deal), task: [], product: [] }}
         canCreateFields={isAdminRole(role)}
-        canImportProducts={isAdminRole(role)}
-        initialEntity={initialEntity === "product" && !isAdminRole(role) ? "lead" : initialEntity}
+        canImportProducts={catalog}
+        initialEntity={initialEntity === "product" && !catalog ? "lead" : initialEntity}
       />
     </>
   );

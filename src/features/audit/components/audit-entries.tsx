@@ -43,7 +43,8 @@ export function AuditEntries({ items, names, showEntity = true }: Props) {
               {showEntity ? <span className="text-ink-soft"> · {ENTITY_LABELS[item.entityType] ?? item.entityType}</span> : null}
             </p>
             <p className="text-sm text-ink-soft">
-              {formatDateTime(item.createdAt)} · {item.actorName ?? "המערכת"}
+              {formatDateTime(item.createdAt)} ·{" "}
+              {item.automationName ? `שונה על ידי האוטומציה: ${item.automationName}` : (item.actorName ?? "המערכת")}
             </p>
             {item.erased ? <p className="mt-1.5 text-sm text-ink-soft">הפרטים נמחקו לבקשת פרטיות.</p> : null}
             {item.note ? <p className="mt-1.5 break-words text-sm">{item.note}</p> : null}

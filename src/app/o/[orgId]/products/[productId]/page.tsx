@@ -11,6 +11,8 @@ import { listProductCategories, listProductUnits } from "@/features/products/lis
 import { categoryLabel, categoryOptions } from "@/features/products/lists";
 import { productsPath } from "@/features/products/paths";
 import { getProduct, listProductPriceHistory } from "@/features/products/queries";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { getPricesIncludeVat } from "@/features/tax/queries";
@@ -28,7 +30,8 @@ export default async function ProductPage({ params }: Props) {
   const { orgId, productId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
   if (!isUuid(productId)) notFound();
-  const canEdit = isAdminRole(role) && canWrite;
+  // PRM-01: a member with the catalog permission edits too
+  const canEdit = canEditCatalog(role, await getMyPermissions(orgId)) && canWrite;
   // PRD-07: the audit log is readable by owners and admins only (RLS), so only they see the price history
   const canSeeHistory = isAdminRole(role);
   const [product, categories, units, pricesIncludeVat] = await Promise.all([

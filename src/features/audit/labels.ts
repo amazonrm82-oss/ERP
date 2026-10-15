@@ -73,6 +73,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // CAP-08
   lead_distribution_settings: "חלוקת לידים",
   lead_routing_rules: "כלל חלוקת לידים",
+  // PRM-01 (entity_id is the user)
+  member_permissions: "הרשאות נוספות של משתמש",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -116,6 +118,8 @@ export const FIELD_LABELS: Record<string, string> = {
   condition_removed_at: "התנאי הוסר (תהליך המכירה נמחק)",
   prefix: "קידומת",
   start_number: "מספר התחלתי",
+  // PRM-01
+  permissions: "הרשאות נוספות",
   // CAP-09
   working_hours: "שעות עבודה",
   // CAP-10

@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ActionButton } from "@/components/action-button";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { UploadIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
-import { undoImportAction } from "@/features/imports/actions";
 import { IMPORT_ENTITIES } from "@/features/imports/fields";
+import { UndoImportButton } from "@/features/imports/components/undo-import-button";
 import { listImportJobs } from "@/features/imports/queries";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContextForOwner } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -24,11 +24,21 @@ function canUndo(job: { created_by: string | null; status: string; created_count
   return job.created_by === userId && (job.status === "done" || job.status === "failed") && job.created_count > 0 && Date.now() - Date.parse(job.created_at) < UNDO_MS;
 }
 
+/**
+ * PRM-01: undoing a products import removes products, which needs the catalog rules. A member
+ * undoes a records import through undo_own_import() (owner, 15 October 2026): only unchanged records.
+ */
+function mayRemove(entity: string, catalog: boolean): boolean {
+  return entity !== "product" || catalog;
+}
+
 export default async function ImportsPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
   // the owner opens the full export in every state: read-only, and closed until payment (BIL-09)
   const { role, canWrite, user } = await getOrgContextForOwner(orgId);
-  const canImport = canWrite && (isAdminRole(role) || role === "manager");
+  const granted = await getMyPermissions(orgId);
+  const canImport = canWrite && canImportWith(role, granted);
+  const catalog = canEditCatalog(role, granted);
   if (!canImport && role !== "owner") {
     notFound();
   }
@@ -44,7 +54,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
           ) : (
             <ul className="divide-y divide-line">
               {jobs.map((job) => {
-                const undoable = canUndo(job, user.id);
+                const undoable = canUndo(job, user.id) && mayRemove(job.entity_type, catalog);
                 return (
                   <li key={job.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
                     <div className="min-w-0">
@@ -60,21 +70,20 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
                       </p>
                     </div>
                     {undoable ? (
-                      <ActionButton
-                        action={undoImportAction.bind(null, orgId, job.id)}
-                        pendingText="מבטלים…"
-                        variant="danger-ghost"
-                        confirm={
+                      <UndoImportButton
+                        orgId={orgId}
+                        jobId={job.id}
+                        fileName={job.file_name}
+                        question={
                           job.entity_type === "product"
                             ? `למחוק את ${formatNumber(job.created_count)} המוצרים שנוצרו? מוצר שכבר מופיע במסמך יעבור לארכיון במקום להימחק.`
                             : job.entity_type === "task"
                               ? `להסיר את ${formatNumber(job.created_count)} המשימות שנוצרו?`
-                              : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
+                              : role === "member"
+                                ? `להעביר לסל המחזור את הרשומות שנוצרו בייבוא? רשומות ששונו מאז יישארו.`
+                                : `להעביר את ${formatNumber(job.created_count)} הרשומות שנוצרו לסל המחזור?`
                         }
-                        srLabel={job.file_name}
-                      >
-                        ביטול הייבוא
-                      </ActionButton>
+                      />
                     ) : null}
                   </li>
                 );

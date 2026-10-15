@@ -46,12 +46,15 @@ export type SettingsAccess = {
   // owners and admins: customization, intake, automations, audit
   admin: boolean;
   // the import and export page: owners, admins and team managers who can write (app.can_import),
-  // and the owner in every state for the full export (BIL-09)
+  // a member with the import permission (PRM-01), and the owner in every state for the full export (BIL-09)
   canImport: boolean;
   // owners, admins and team managers (recycle bin)
   canDelete: boolean;
   // PL-01: the plan holds the 'price_lists' capability (orgHasFeature); without it the section is hidden
   priceLists?: boolean;
+  // PRM-01: owners and admins, or a member with the extra permission (edit_catalog / manage_automations)
+  catalog?: boolean;
+  automations?: boolean;
 };
 
 /**
@@ -87,35 +90,44 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
     },
     {
       label: "התאמה אישית",
-      sections: access.admin
-        ? [
-            { href: paths.settingsPipelines(orgId), label: "תהליכי מכירה", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
-            { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
-            // CON-03 follow-up
-            { href: paths.settingsDealContactRoles(orgId), label: "תפקידים בעסקה", description: "התפקידים של אנשי הקשר בעסקה", icon: BoardIcon },
-            // PRD-04
-            { href: productListsSettingsPath(orgId), label: "קטגוריות ויחידות מידה", description: "הרשימות שבוחרים מהן בכל מוצר בקטלוג", icon: TagIcon },
-            { href: paths.settingsLeads(orgId), label: "סטטוסים ומקורות", description: "השלבים של ליד ומאיפה הוא הגיע", icon: InboxIcon },
-            { href: paths.settingsDisqualifyReasons(orgId), label: "סיבות לליד לא רלוונטי", description: "הרשימה שבוחרים ממנה כשליד לא רלוונטי", icon: InboxIcon },
-            { href: paths.settingsRecordTypes(orgId), label: "סוגי אנשי קשר וחברות", description: "לקוח, ספק, שותף: הרשימה שבוחרים ממנה וסוננים לפיה", icon: UsersIcon },
-            { href: paths.settingsFields(orgId), label: "שדות", description: "שדות משלכם בכרטיסים ובטפסים", icon: PencilIcon },
-            // FLD-08
-            { href: cardLayoutSettingsPath(orgId), label: "תצוגת כרטיס", description: "קבוצות של שדות בכרטיס של כל רשומה, בסדר שלכם", icon: FormIcon },
-            { href: conversionMapSettingsPath(orgId), label: "שדות בהמרת ליד", description: "לאיזה שדה של איש קשר ועסקה עובר כל שדה של ליד", icon: InboxIcon },
-            { href: completenessSettingsPath(orgId), label: "שדות חשובים", description: "מה חשוב למלא בכל רשומה, ומה חסר", icon: CheckSquareIcon },
-            { href: paths.settingsTags(orgId), label: "תגיות", description: "סימון רשומות וסינון לפיהן", icon: TagIcon },
-            { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
-          ]
-        : [],
+      sections: [
+        ...(access.admin
+          ? [
+              { href: paths.settingsPipelines(orgId), label: "תהליכי מכירה", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
+              { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
+              // CON-03 follow-up
+              { href: paths.settingsDealContactRoles(orgId), label: "תפקידים בעסקה", description: "התפקידים של אנשי הקשר בעסקה", icon: BoardIcon },
+            ]
+          : []),
+        // PRD-04; PRM-01: also for a member with the catalog permission
+        ...(access.admin || access.catalog
+          ? [{ href: productListsSettingsPath(orgId), label: "קטגוריות ויחידות מידה", description: "הרשימות שבוחרים מהן בכל מוצר בקטלוג", icon: TagIcon }]
+          : []),
+        ...(access.admin
+          ? [
+              { href: paths.settingsLeads(orgId), label: "סטטוסים ומקורות", description: "השלבים של ליד ומאיפה הוא הגיע", icon: InboxIcon },
+              { href: paths.settingsDisqualifyReasons(orgId), label: "סיבות לליד לא רלוונטי", description: "הרשימה שבוחרים ממנה כשליד לא רלוונטי", icon: InboxIcon },
+              { href: paths.settingsRecordTypes(orgId), label: "סוגי אנשי קשר וחברות", description: "לקוח, ספק, שותף: הרשימה שבוחרים ממנה וסוננים לפיה", icon: UsersIcon },
+              { href: paths.settingsFields(orgId), label: "שדות", description: "שדות משלכם בכרטיסים ובטפסים", icon: PencilIcon },
+              // FLD-08
+              { href: cardLayoutSettingsPath(orgId), label: "תצוגת כרטיס", description: "קבוצות של שדות בכרטיס של כל רשומה, בסדר שלכם", icon: FormIcon },
+              { href: conversionMapSettingsPath(orgId), label: "שדות בהמרת ליד", description: "לאיזה שדה של איש קשר ועסקה עובר כל שדה של ליד", icon: InboxIcon },
+              { href: completenessSettingsPath(orgId), label: "שדות חשובים", description: "מה חשוב למלא בכל רשומה, ומה חסר", icon: CheckSquareIcon },
+              { href: paths.settingsTags(orgId), label: "תגיות", description: "סימון רשומות וסינון לפיהן", icon: TagIcon },
+              { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
+            ]
+          : []),
+      ],
     },
     {
       label: "לידים ואוטומציות",
       sections: [
         ...(access.admin
-          ? [
-              { href: paths.settingsIntake(orgId), label: "טפסים וחיבורים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon },
-              { href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon },
-            ]
+          ? [{ href: paths.settingsIntake(orgId), label: "טפסים וחיבורים", description: "טפסים, קישור לשיתוף וחלוקת לידים", icon: FormIcon }]
+          : []),
+        // PRM-01: also for a member with the automations permission
+        ...(access.admin || access.automations
+          ? [{ href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon }]
           : []),
         // CAP-08: everyone reads it; owners and admins change it
         { href: distributionSettingsPath(orgId), label: "חלוקת לידים", description: "סבב, משקל, עומס פתוח, וכללים לפי מקור ומוצר", icon: UsersIcon },

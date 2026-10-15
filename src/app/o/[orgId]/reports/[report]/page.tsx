@@ -11,6 +11,7 @@ import { ForecastOverdueDeals } from "@/features/reports/components/forecast-ove
 import { getOverdueActionsSetup } from "@/features/reports/forecast-overdue-server";
 import { ReportFilters } from "@/features/reports/components/report-filters";
 import { findReport } from "@/features/reports/definitions";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
 import { listMembers } from "@/features/settings/queries";
@@ -35,6 +36,8 @@ export default async function ReportPage({ params, searchParams }: Props) {
     notFound();
   }
   const context = await getOrgContext(orgId);
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
   const filters = reportFilters(definition, await searchParams);
 
   const [view, members, pipelines] = await Promise.all([
@@ -61,7 +64,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
         description={`${definition.description} ${periodText}.`}
         back={{ href: paths.reports(orgId), label: "כל הדוחות" }}
         actions={
-          canExport(context.role) ? (
+          canExport(context.role, granted) ? (
             <div className="flex flex-wrap gap-2">
               <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}&format=xlsx`} className={buttonClasses("secondary", "sm")} download>
                 ייצוא ל-Excel

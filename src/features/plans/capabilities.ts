@@ -36,6 +36,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "dashboards", label: "דשבורדים", built: false },
   { feature: "goals_per_rep", label: "יעד לכל נציג ולכל צוות", built: true },
   { feature: "custom_roles", label: "תפקידים מותאמים", built: false },
+  // PRM-01
+  { feature: "granular_permissions", label: "הרשאות נקודתיות למשתמש", built: true },
   { feature: "view_seats", label: "מושבי צפייה", built: true },
   { feature: "telephony", label: "טלפוניה", built: false },
   { feature: "custom_objects", label: "אובייקטים מותאמים", built: false },

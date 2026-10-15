@@ -946,6 +946,28 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.completeness_settings set fields = app.completeness_default_keys('lead') where organization_id = $1 and object_type = 'lead'", [org]));
   });
 
+  it("extra permissions: owners and admins grant and read all; a member reads only their own; nobody writes the table (PRM-01)", async () => {
+    const set = (by: string, user: string, keys: string) => asUser(by, (q) => q("select public.set_member_permissions($1, $2, $3)", [org, user, keys]));
+    await set(owner.id, m1.id, "{export}");
+    await set(admin.id, manager.id, "{import}");
+    for (const u of [manager, m1, m2, viewer]) {
+      expect((await pgError(set(u.id, m2.id, "{export}"))).code, u.email).toBe("42501");
+    }
+    expect((await pgError(set(owner.id, viewer.id, "{export}"))).hint).toBe("permissions:role");
+    for (const u of [owner, admin]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.member_permissions where organization_id = $1", [org])), u.email).toBe(2);
+    }
+    for (const [u, n] of [[manager, 1], [m1, 1], [m2, 0], [viewer, 0]] as const) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.member_permissions where organization_id = $1", [org])), u.email).toBe(n);
+    }
+    for (const u of [owner, admin, manager, m1]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.member_permissions set permissions = '{}' where organization_id = $1", [org])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.member_permissions where organization_id = $1", [org])))).code, u.email).toBe("42501");
+    }
+    await set(owner.id, m1.id, "{}");
+    await set(owner.id, manager.id, "{}");
+  });
+
   it("everyone reads the card layout; only owners and admins write it, and nobody deletes it (FLD-08)", async () => {
     const layout = JSON.stringify([{ title: "קשר", columns: 2, fields: ["phone", "email"] }]);
     for (const u of [manager, m1, viewer]) {

@@ -24,8 +24,9 @@ import {
   type ProductStatusFilter,
 } from "@/features/products/queries";
 import { PRODUCT_KIND_LABELS, PRODUCT_KINDS, type ProductKind } from "@/features/products/schema";
+import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
-import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
@@ -46,7 +47,11 @@ export default async function ProductsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
   const context = await getOrgContext(orgId);
-  const canEdit = isAdminRole(context.role) && context.canWrite;
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
+  const canEdit = canEditCatalog(context.role, granted) && context.canWrite;
+  // a products import needs both the catalog and the import rules (PRM-01)
+  const canImportProducts = canEdit && canImportWith(context.role, granted);
 
   const search = firstParam(query.q).trim();
   const categoryParam = firstParam(query.category);
@@ -111,11 +116,11 @@ export default async function ProductsPage({ params, searchParams }: Props) {
                 מחירונים
               </ButtonLink>
             ) : null}
-            {newButton || canExport(context.role) ? (
+            {newButton || canExport(context.role, granted) ? (
               <>
               {/* PRD-05: export with the list's filters; import through the import wizard */}
-              {canExport(context.role) ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
-              {canEdit ? (
+              {canExport(context.role, granted) ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
+              {canImportProducts ? (
                 <ButtonLink href={`${paths.importNew(orgId)}?entity=product`} variant="secondary">
                   ייבוא
                 </ButtonLink>

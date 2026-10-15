@@ -80,6 +80,9 @@ export type AutomationSummary = {
   actions: Array<Record<string, unknown>>;
   runs7d: number;
   failed7d: number;
+  // PRM-01: who made the rule and who changed it last (server-set)
+  createdBy: string | null;
+  updatedBy: string | null;
 };
 
 function objects(value: unknown): Array<Record<string, unknown>> {
@@ -90,7 +93,7 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("automations")
-    .select("id, name, is_active, template_key, entity_type, trigger_type, trigger_config, conditions, actions")
+    .select("id, name, is_active, template_key, entity_type, trigger_type, trigger_config, conditions, actions, created_by, updated_by")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false });
   if (error) {
@@ -117,6 +120,8 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
     templateKey: row.template_key,
     entity: row.entity_type,
     triggerType: row.trigger_type,
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
     triggerConfig: row.trigger_config && typeof row.trigger_config === "object" && !Array.isArray(row.trigger_config) ? row.trigger_config : {},
     conditions: objects(row.conditions),
     actions: objects(row.actions),

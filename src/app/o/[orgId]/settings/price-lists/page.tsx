@@ -10,7 +10,8 @@ import { listPriceLists } from "@/features/price-lists/queries";
 import { validityText } from "@/features/price-lists/status";
 import { productsPath } from "@/features/products/paths";
 import { PRICE_LISTS_NOT_IN_PLAN } from "@/features/price-lists/schema";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { getPricesIncludeVat } from "@/features/tax/queries";
@@ -25,7 +26,8 @@ export default async function PriceListsPage({ params }: Props) {
   const { orgId } = await params;
   const { org, role, canWrite } = await getOrgContext(orgId);
   const timeZone = org.timeZone;
-  const editable = isAdminRole(role) && canWrite;
+  // PRM-01: a member with the catalog permission edits too
+  const editable = canEditCatalog(role, await getMyPermissions(orgId)) && canWrite;
   const [lists, inPlan, businessIncludesVat] = await Promise.all([
     listPriceLists(orgId),
     orgHasFeature(orgId, "price_lists"),

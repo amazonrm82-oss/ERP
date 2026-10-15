@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { BackIcon } from "@/components/ui/icons";
 import { RuleBuilder } from "@/features/automations/components/rule-builder";
 import { getLookups } from "@/features/automations/queries";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canManageAutomations } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -16,7 +17,8 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function NewAutomationPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  if (!isAdminRole(role) || !canWrite) {
+  // PRM-01: a member with the automations permission manages them too
+  if (!canManageAutomations(role, await getMyPermissions(orgId)) || !canWrite) {
     notFound();
   }
   const lookups = await getLookups(orgId);

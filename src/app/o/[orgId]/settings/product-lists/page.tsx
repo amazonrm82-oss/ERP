@@ -5,7 +5,8 @@ import { AddCategoryForm, CategoryList } from "@/features/products/components/ca
 import { AddUnitForm, UnitList } from "@/features/products/components/units-editor";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
 import { CATEGORIES_PER_ORG, categoryTree, UNITS_PER_ORG } from "@/features/products/lists";
-import { isAdminRole } from "@/features/settings/permissions";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContext } from "@/features/shell/queries";
 
 export const metadata: Metadata = { title: "קטגוריות ויחידות מידה" };
@@ -16,7 +17,8 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function ProductListsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  const editable = isAdminRole(role) && canWrite;
+  // PRM-01: a member with the catalog permission edits too
+  const editable = canEditCatalog(role, await getMyPermissions(orgId)) && canWrite;
   const [categories, units] = await Promise.all([listProductCategories(orgId), listProductUnits(orgId)]);
   const tree = categoryTree(categories);
 

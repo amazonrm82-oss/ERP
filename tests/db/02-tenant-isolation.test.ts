@@ -161,6 +161,12 @@ describe("tenant isolation", () => {
         [orgA, ids.productA],
       );
     });
+    // PRM-01: a member of org A with an extra permission
+    const helper = await createUser("alice-helper");
+    await asAdmin(async (q) => {
+      await q("insert into public.memberships (organization_id, user_id, role) values ($1, $2, 'member')", [orgA, helper.id]);
+    });
+    await asUser(a.id, (q) => q("select public.set_member_permissions($1, $2, '{export}')", [orgA, helper.id]));
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
     );
@@ -243,6 +249,8 @@ describe("tenant isolation", () => {
     // CAP-08
     "lead_distribution_settings",
     "lead_routing_rules",
+    // PRM-01
+    "member_permissions",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -384,6 +392,8 @@ describe("tenant isolation", () => {
       lead_score_rules: "points = points",
       lead_distribution_settings: "method = method",
       lead_routing_rules: "position = position",
+      // no write grant at all (set_member_permissions() writes): a permission error is the expected outcome
+      member_permissions: "permissions = permissions",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -482,6 +492,7 @@ describe("tenant isolation", () => {
       ["insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'phone', 'filled', 1)", [orgA]],
       ["insert into public.lead_distribution_settings (organization_id) values ($1)", [orgA]],
       ["insert into public.lead_routing_rules (organization_id, is_active, product_id, team_id) values ($1, false, $2, $3)", [orgA, ids.productA, team]],
+      ["insert into public.member_permissions (organization_id, user_id, permissions) values ($1, $2, '{import}')", [orgA, a.id]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -563,6 +574,7 @@ describe("tenant isolation", () => {
       ["lead_score_rules", "points = 77", "points = 77"],
       ["lead_distribution_settings", "weights = '{}'", "weights = '{}'"],
       ["lead_routing_rules", "position = 777", "position = 777"],
+      ["member_permissions", "permissions = '{}'", "permissions = '{}'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

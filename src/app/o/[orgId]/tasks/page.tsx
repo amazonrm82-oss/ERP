@@ -17,6 +17,7 @@ import { ExportMenu, exportHref } from "@/features/list-export/components/export
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
@@ -332,7 +333,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
         canShare={context.role === "owner" || context.role === "admin"}
       />
       <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
-        {canExport(context.role) ? <ExportMenu href={exportHref(paths.tasks(orgId), listHref(1, sortValue(sort)))} /> : null}
+        {canExport(context.role, await getMyPermissions(orgId)) ? <ExportMenu href={exportHref(paths.tasks(orgId), listHref(1, sortValue(sort)))} /> : null}
         <AdvancedFilter
           fields={filter.fields}
           current={filter.tree}

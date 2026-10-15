@@ -46,6 +46,8 @@ import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format"
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
+import { canEditCatalog } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
@@ -178,7 +180,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             pricing={linesPricing}
             canEdit={canEdit}
             features={{ products: hasProducts, discounts: hasDiscounts }}
-            canCreateProducts={hasProducts && context.canWrite && isAdminRole(context.role)}
+            canCreateProducts={hasProducts && context.canWrite && canEditCatalog(context.role, await getMyPermissions(orgId))}
           />
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}

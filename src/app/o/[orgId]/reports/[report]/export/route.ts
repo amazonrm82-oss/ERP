@@ -1,6 +1,7 @@
 import { buildReport } from "@/features/reports/build";
 import { findReport } from "@/features/reports/definitions";
 import { csvCell } from "@/features/reports/format";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
 import { reportXlsxRows } from "@/features/reports/xlsx";
@@ -16,8 +17,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     return new Response("not found", { status: 404 });
   }
   const context = await getOrgContext(orgId);
-  if (!canExport(context.role)) {
-    return new Response("ייצוא מותר לבעלים, למנהלי מערכת ולמנהלי צוות.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
+  if (!canExport(context.role, granted)) {
+    return new Response("ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
   const searchParams = Object.fromEntries(new URL(request.url).searchParams);
   const xlsx = searchParams.format === "xlsx";

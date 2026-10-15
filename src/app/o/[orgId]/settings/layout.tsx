@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { canEditCatalog, canImportWith, canManageAutomations } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { SettingsFrame } from "@/features/settings/components/settings-frame";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -16,16 +18,19 @@ export default async function SettingsLayout({ children, params }: Props) {
     return <>{children}</>;
   }
   const admin = isAdminRole(role);
-  const priceLists = await orgHasFeature(orgId, "price_lists");
+  const [priceLists, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), getMyPermissions(orgId)]);
   return (
     <SettingsFrame
       orgId={orgId}
       access={{
         admin,
-        // owners, admins and team managers import (app.can_import); the owner also exports in read-only
-        canImport: (canWrite && (admin || role === "manager")) || role === "owner",
+        // owners, admins and team managers import (app.can_import), and a member with the
+        // import permission (PRM-01); the owner also exports in read-only
+        canImport: (canWrite && canImportWith(role, granted)) || role === "owner",
         canDelete,
         priceLists,
+        catalog: canEditCatalog(role, granted),
+        automations: canManageAutomations(role, granted),
       }}
     >
       {children}

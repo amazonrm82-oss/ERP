@@ -79,6 +79,18 @@ export type LeadScoreRuleRow = {
   updated_at: string;
 };
 
+// PRM-01: the extra permissions of one manager or member (keys of app.member_permission_keys()).
+// Clients only read; set_member_permissions() writes.
+export type MemberPermissionsRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  permissions: string[];
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
 // LEAD-06: where a lead custom field goes on conversion. No row = mode "auto" (same label and type, 0029).
 export type ConversionFieldMapRow = {
   id: string;
@@ -716,6 +728,8 @@ export type AutomationRow = {
   conditions: Json;
   actions: Json;
   created_by: string | null;
+  // PRM-01: the last person who changed the rule (app.touch_row; not client-writable)
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1910,6 +1924,8 @@ export type Database = {
       lead_routing_rules: Table<LeadRoutingRuleRow, LeadRoutingRuleWrite & { organization_id: string }, LeadRoutingRuleWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
+      // PRM-01: read only; written by set_member_permissions()
+      member_permissions: Table<MemberPermissionsRow, Record<string, never>, Record<string, never>>;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -2134,6 +2150,12 @@ export type Database = {
       };
       // an exported list goes to the audit log (migration 0034)
       log_export: { Args: { p_org: string; p_kind: string; p_report: string | null; p_rows: number; p_format?: "csv" | "xlsx" }; Returns: undefined };
+      // PRM-01: owners and admins set a manager's or member's extra permissions (the whole set)
+      set_member_permissions: { Args: { p_org: string; p_user: string; p_permissions: string[] }; Returns: string[] };
+      // PRM-01: the keys the caller holds (all for owners and admins)
+      my_permissions: { Args: { p_org: string }; Returns: string[] };
+      // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
+      undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };
       // platform admin (migration 0013): each checks the platform role and aal2 itself
       support_session_info: { Args: { p_org: string }; Returns: Json };

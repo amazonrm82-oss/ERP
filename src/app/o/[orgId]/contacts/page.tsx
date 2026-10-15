@@ -20,6 +20,7 @@ import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { listWhatsappLog, whatsappListContext } from "@/features/whatsapp/templates";
@@ -41,6 +42,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
   const context = await getOrgContext(orgId);
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
   const { canWrite } = context;
 
   const search = firstParam(query.q).trim();
@@ -112,7 +115,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         />
 
         <div className="flex flex-wrap items-start gap-2 md:justify-end">
-          {canExport(context.role) ? <ExportMenu href={exportHref(paths.contacts(orgId), listHref(1, sortValue(sort)))} /> : null}
+          {canExport(context.role, granted) ? <ExportMenu href={exportHref(paths.contacts(orgId), listHref(1, sortValue(sort)))} /> : null}
           <AdvancedFilter
             fields={filter.fields}
             current={filter.tree}

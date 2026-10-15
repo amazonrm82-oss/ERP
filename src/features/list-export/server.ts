@@ -15,6 +15,7 @@ import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from 
 import { CUSTOM_PREFIX, resolveColumns, type ListObject } from "@/features/list-columns/columns";
 import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
@@ -50,8 +51,10 @@ type ExportRow = { name: string; cells: Record<string, string | null>; customFie
 
 export async function exportList(request: Request, orgId: string, object: ListObject): Promise<Response> {
   const context = await getOrgContext(orgId);
-  if (!canExport(context.role)) {
-    return text("ייצוא מותר לבעלים, למנהלי מערכת ולמנהלי צוות.", 403);
+  // PRM-01: extra permissions (export)
+  const granted = await getMyPermissions(orgId);
+  if (!canExport(context.role, granted)) {
+    return text("ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא.", 403);
   }
   const params = new URL(request.url).searchParams;
   const format = params.get("format") === "xlsx" ? "xlsx" : "csv";
@@ -246,7 +249,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
   });
   if (error) {
     return text(
-      error.code === "42501" ? "ייצוא מותר לבעלים, למנהלי מערכת ולמנהלי צוות." : "לא הצלחנו להכין את הקובץ. נסו שוב.",
+      error.code === "42501" ? "ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא." : "לא הצלחנו להכין את הקובץ. נסו שוב.",
       error.code === "42501" ? 403 : 500,
     );
   }

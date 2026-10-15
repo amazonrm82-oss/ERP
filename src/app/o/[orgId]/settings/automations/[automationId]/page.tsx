@@ -13,8 +13,10 @@ import { ACTION_LABELS, type ActionType } from "@/features/automations/definitio
 import { actionsMissingReason } from "@/features/automations/convert";
 import { describeRule, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
-import { isAdminRole } from "@/features/settings/permissions";
-import { getOrgContext } from "@/features/shell/queries";
+import { canManageAutomations } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
+import { ruleAuthorshipLine } from "@/features/automations/authorship";
+import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -34,14 +36,21 @@ const RECORD_PATH = { lead: paths.lead, contact: paths.contact, company: paths.c
 export default async function AutomationPage({ params }: Props) {
   const { orgId, automationId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  if (!isAdminRole(role) || !isUuid(automationId)) {
+  // PRM-01: a member with the automations permission manages them too
+  if (!canManageAutomations(role, await getMyPermissions(orgId)) || !isUuid(automationId)) {
     notFound();
   }
   const automation = await getAutomation(orgId, automationId);
   if (!automation) {
     notFound();
   }
-  const [lookups, runs, records] = await Promise.all([getLookups(orgId), listRuns(orgId, automationId), listTestRecords(orgId, automation.entity)]);
+  const [lookups, runs, records, people] = await Promise.all([
+    getLookups(orgId),
+    listRuns(orgId, automationId),
+    listTestRecords(orgId, automation.entity),
+    // PRM-01: who made the rule and who changed it last
+    getUserNames([automation.createdBy, automation.updatedBy].filter((id): id is string => !!id)),
+  ]);
   const description = describeRule(automation, lookups);
   const missingReason = actionsMissingReason(automation.actions, lookups);
 
@@ -56,6 +65,8 @@ export default async function AutomationPage({ params }: Props) {
           {automation.name}
           {automation.isActive ? <Badge tone="success">פעילה</Badge> : <Badge>כבויה</Badge>}
         </h2>
+        {/* PRM-01: an unknown last editor reads "לא ידוע" (owner) */}
+        <p className="mt-1 text-sm text-ink-soft">{ruleAuthorshipLine(automation.createdBy, automation.updatedBy, people)}</p>
       </div>
 
       {missingReason.length > 0 ? (

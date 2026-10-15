@@ -35,12 +35,23 @@ const mappingSchema = z.array(z.string().max(100)).max(200);
 
 const UNDO_DAYS = 7;
 
-const PRODUCTS_FOR_ADMINS = "ייבוא מוצרים מותר לבעלים ולמנהלי מערכת.";
+const PRODUCTS_FOR_ADMINS = "ייבוא מוצרים מותר לבעלים, למנהלי מערכת ולמי שקיבל הרשאה לעריכת הקטלוג.";
 
 type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
 
-/** PRD-05: the catalog is written by owners and admins only (RLS refuses others row by row; say it once, up front). */
-async function mayImportProducts(supabase: Supabase, orgId: string, userId: string): Promise<boolean> {
+/**
+ * PRD-05: the catalog is written by owners and admins, and (PRM-01) by a member with the
+ * catalog permission (RLS refuses others row by row; say it once, up front).
+ */
+async function mayImportProducts(supabase: Supabase, orgId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("my_permissions", { p_org: orgId });
+  // a failed read answers "no": the user sees the rule and can try again
+  if (error) return false;
+  return (data ?? []).includes("edit_catalog");
+}
+
+/** The caller's active role in the organization, or null (a failed read answers null). */
+async function myRole(supabase: Supabase, orgId: string, userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("memberships")
     .select("role")
@@ -48,16 +59,15 @@ async function mayImportProducts(supabase: Supabase, orgId: string, userId: stri
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
-  // a failed read answers "no": the user sees the rule and can try again
-  if (error) return false;
-  return data?.role === "owner" || data?.role === "admin";
+  if (error) return null;
+  return data?.role ?? null;
 }
 
 /** PRD-05: products have no custom fields; only their own columns can be mapped. */
 async function productContext(orgId: string, mapping: string[]) {
   const context = await actionContext(orgId);
   if (!context.ok) return context;
-  if (!(await mayImportProducts(context.supabase, orgId, context.user.id))) return fail(PRODUCTS_FOR_ADMINS);
+  if (!(await mayImportProducts(context.supabase, orgId))) return fail(PRODUCTS_FOR_ADMINS);
   const allowed = new Set([...IMPORT_TARGETS.product.map((t) => t.key), ""]);
   if (!mapping.every((target) => allowed.has(target))) {
     return fail("בחירת השדות לא נשמרה. בחרו שוב לאיזה שדה כל עמודה נכנסת.");
@@ -195,7 +205,7 @@ export async function startImportAction(
   if (!duplicateModesFor(entity.data).includes(mode.data)) {
     return fail("הקובץ אינו תקין.");
   }
-  if (entity.data === "product" && !(await mayImportProducts(context.supabase, orgId, context.user.id))) {
+  if (entity.data === "product" && !(await mayImportProducts(context.supabase, orgId))) {
     return fail(PRODUCTS_FOR_ADMINS);
   }
   const { data, error } = await context.supabase
@@ -461,6 +471,17 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   if (Date.now() - Date.parse(job.created_at) > UNDO_DAYS * 86_400_000) return fail("אפשר לבטל ייבוא רק בשבעת הימים הראשונים.");
 
   const entity = entitySchema.parse(job.entity_type);
+  // PRM-01 (owner, 15 October 2026): a member who holds the import permission undoes their own
+  // import through undo_own_import(), which moves only the records nobody changed since and counts the rest
+  if (entity !== "product" && (await myRole(context.supabase, orgId, context.user.id)) === "member") {
+    const { data, error } = await context.supabase.rpc("undo_own_import", { p_org: orgId, p_job: jobId });
+    if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
+    const result = data as { done?: number; kept?: number } | null;
+    const kept = result?.kept ?? 0;
+    revalidatePath(paths.imports(orgId));
+    revalidatePath(paths.org(orgId), "layout");
+    return { ok: true, message: kept > 0 ? `הייבוא בוטל. לא בוטלו: ${kept}, כי שונו אחרי הייבוא.` : "הייבוא בוטל." };
+  }
   if (entity === "product") {
     const removeError = await removeImportedProducts(context.supabase, orgId, jobId);
     if (removeError) return fail(removeError);

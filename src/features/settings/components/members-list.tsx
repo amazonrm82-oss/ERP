@@ -10,6 +10,7 @@ import { FormError } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ROLE_LABELS } from "@/features/shell/labels";
+import { memberPermissionsPath } from "@/features/permissions/paths";
 import { memberHoursPath } from "@/features/work-hours/paths";
 import type { FormState } from "@/lib/action-result";
 import type { MembershipRole } from "@/lib/database.types";
@@ -32,9 +33,11 @@ type Props = {
   mfaUserIds?: string[];
   // HEB-08: who is away today ("במילואים עד 20.10.2026") and their deputy, by user id
   absences?: Record<string, { label: string; deputyName: string | null }>;
+  // PRM-01: how many extra permissions each manager or member holds (known to owners and admins only)
+  permissionCounts?: Record<string, number>;
 };
 
-export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members, mfaUserIds = [], absences = {} }: Props) {
+export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members, mfaUserIds = [], absences = {}, permissionCounts = {} }: Props) {
   return (
     <ul className="divide-y divide-line">
       {members.map((member) => (
@@ -48,6 +51,7 @@ export function MembersList({ orgId, myUserId, myRole, roles, canWrite, members,
           roles={roles}
           hasMfa={mfaUserIds.includes(member.userId)}
           absence={absences[member.userId] ?? null}
+          permissionCount={permissionCounts[member.userId] ?? 0}
         />
       ))}
     </ul>
@@ -62,9 +66,10 @@ type RowProps = {
   roles: InvitableRole[];
   hasMfa: boolean;
   absence: { label: string; deputyName: string | null } | null;
+  permissionCount: number;
 };
 
-function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa, absence }: RowProps) {
+function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa, absence, permissionCount }: RowProps) {
   const suspended = member.status === "suspended";
 
   return (
@@ -78,6 +83,7 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa, absence }: 
           {!suspended && !member.isAvailable ? <Badge>לא זמין ללידים</Badge> : null}
           {hasMfa ? <Badge>אימות דו-שלבי</Badge> : null}
           {!suspended && absence ? <Badge tone="warning">{absence.label}</Badge> : null}
+          {!suspended && permissionCount > 0 ? <Badge>{permissionCount === 1 ? "הרשאה נוספת אחת" : `${permissionCount} הרשאות נוספות`}</Badge> : null}
         </p>
         {!suspended && absence?.deputyName ? <p className="text-sm text-ink-soft">ממלא מקום: {absence.deputyName}</p> : null}
         {member.email ? (
@@ -118,6 +124,15 @@ function MemberRow({ orgId, member, isMe, manageable, roles, hasMfa, absence }: 
               שעות וחופשה<span className="sr-only">: {member.name}</span>
             </Link>
           )}
+          {/* PRM-01 */}
+          {!suspended && (member.role === "manager" || member.role === "member") ? (
+            <Link
+              href={memberPermissionsPath(orgId, member.userId)}
+              className="inline-flex min-h-9 items-center px-2 text-sm text-accent-strong underline underline-offset-4"
+            >
+              הרשאות נוספות<span className="sr-only">: {member.name}</span>
+            </Link>
+          ) : null}
           <Link
             href={paths.transferRecords(orgId, member.userId)}
             className="inline-flex min-h-9 items-center px-2 text-sm text-accent-strong underline underline-offset-4"
