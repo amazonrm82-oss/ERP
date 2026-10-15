@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ContactActions } from "@/components/contact-actions";
+import type { WhatsappLog } from "@/features/whatsapp/templates";
 
 export type RecordCard = {
   id: string;
@@ -13,6 +14,8 @@ export type RecordCard = {
   details: Array<string | null>;
   phone: string | null;
   phoneE164: string | null;
+  // WA-01 follow-up: the WhatsApp templates for someone who can write (listWhatsappLog)
+  whatsappLog?: WhatsappLog;
 };
 
 /**
@@ -32,7 +35,7 @@ export function RecordCards({ label, cards, className }: { label: string; cards:
               {card.details.some(Boolean) ? <span className="min-w-0 truncate">{card.details.filter(Boolean).join(" · ")}</span> : null}
             </span>
           </Link>
-          <ContactActions phone={card.phone} phoneE164={card.phoneE164} email={null} compact={{ name: card.title }} />
+          <ContactActions phone={card.phone} phoneE164={card.phoneE164} email={null} compact={{ name: card.title }} whatsappLog={card.whatsappLog} />
         </li>
       ))}
     </ul>

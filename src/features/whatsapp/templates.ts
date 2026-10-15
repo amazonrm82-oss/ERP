@@ -1,3 +1,4 @@
+import type { TimelineSubject } from "@/features/activities/schema";
 import { mentionAt, mentionIds } from "@/features/mentions/token";
 
 // WA-01: WhatsApp text templates, sent one by one through a wa.me link (no provider).
@@ -110,6 +111,34 @@ export function recordTemplateValues(
     userName: context.user.displayName,
     businessName: context.org.name,
   };
+}
+
+/** WA-01 follow-up (owner, 14 October 2026): what a list row needs to offer the templates; null for someone who cannot write. */
+export type WhatsappListContext = { orgId: string; userName: string; businessName: string };
+
+export type WhatsappLog = { orgId: string; subject: TimelineSubject; name: string; values: TemplateValues };
+
+/**
+ * The WhatsApp button of one list row (leads, contacts, "My day"), the same flow and logging as
+ * the record page. undefined for someone who cannot write or a row without a valid phone, so the
+ * row falls back to the plain wa.me link (or none).
+ */
+export function listWhatsappLog(
+  context: WhatsappListContext | null,
+  row: { subject: TimelineSubject; name: string; phoneE164: string | null; firstName?: string | null; fullName: string | null },
+): WhatsappLog | undefined {
+  if (!context || !row.phoneE164) return undefined;
+  return {
+    orgId: context.orgId,
+    subject: row.subject,
+    name: row.name,
+    values: recordTemplateValues({ firstName: row.firstName, fullName: row.fullName }, { user: { displayName: context.userName }, org: { name: context.businessName } }),
+  };
+}
+
+/** The list context of an org context: null for someone who cannot write. */
+export function whatsappListContext(context: { canWrite: boolean; user: { displayName: string }; org: { id: string; name: string } }): WhatsappListContext | null {
+  return context.canWrite ? { orgId: context.org.id, userName: context.user.displayName, businessName: context.org.name } : null;
 }
 
 /** The place after the last template: one past the highest position (a deleted template leaves a gap). */

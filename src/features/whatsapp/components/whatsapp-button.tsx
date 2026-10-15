@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Button, buttonClasses, iconButtonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { TextareaField } from "@/components/ui/field";
@@ -27,6 +27,8 @@ type Props = {
   wide?: boolean;
   // SPD-01: open the window once on arrival ("WhatsApp" pressed on the push)
   autoStart?: boolean;
+  // WA-01 follow-up: a 44px icon in a list row, named after the person
+  iconOnly?: boolean;
 };
 
 const NO_TEMPLATE = "";
@@ -36,7 +38,7 @@ const NO_TEMPLATE = "";
  * lets the person change the text, opens wa.me with it, and logs the message on the
  * timeline. One message, sent by the person from their own WhatsApp; nothing is sent by us.
  */
-export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null, wide, autoStart }: Props) {
+export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null, wide, autoStart, iconOnly }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<TemplateChoice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -106,15 +108,28 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values, presel
 
   return (
     <>
-      <button
-        type="button"
-        className={wide ? buttonClasses("secondary", "md", "w-full") : buttonClasses("secondary", "sm")}
-        onClick={openWindow}
-        aria-haspopup="dialog"
-      >
-        <ChatIcon className="size-4.5 text-accent" />
-        <span dir="ltr">WhatsApp</span>
-      </button>
+      {iconOnly ? (
+        <button
+          type="button"
+          className={iconButtonClasses("secondary")}
+          onClick={openWindow}
+          aria-haspopup="dialog"
+          aria-label={`הודעת WhatsApp אל ${name}`}
+          title="הודעת WhatsApp"
+        >
+          <ChatIcon aria-hidden="true" className="size-5 text-accent" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={wide ? buttonClasses("secondary", "md", "w-full") : buttonClasses("secondary", "sm")}
+          onClick={openWindow}
+          aria-haspopup="dialog"
+        >
+          <ChatIcon className="size-4.5 text-accent" />
+          <span dir="ltr">WhatsApp</span>
+        </button>
+      )}
       <Dialog open={open} onClose={() => setOpen(false)} title="הודעת WhatsApp" description={`אל ${name}`} variant="sheet">
         <div className="space-y-4">
           <FormError message={loadError} />

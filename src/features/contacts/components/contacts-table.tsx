@@ -7,6 +7,8 @@ import type { InlineEditing } from "@/features/inline-edit/server";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
+import { PhoneCell } from "@/features/whatsapp/components/phone-cell";
+import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
@@ -31,10 +33,12 @@ type Props = {
   tags: TagOption[];
   // DQL-01: the score of each row, read only when the column is shown
   completeness?: Map<string, number>;
+  // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
+  whatsapp?: WhatsappListContext | null;
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, whatsapp = null }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -85,11 +89,19 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
         cell={(key, contact) => {
           switch (key) {
             case "phone":
-              return contact.phone ? (
-                <span dir="ltr" className="whitespace-nowrap">
-                  {contact.phone}
-                </span>
-              ) : null;
+              return (
+                <PhoneCell
+                  phone={contact.phone}
+                  phoneE164={contact.phoneE164}
+                  whatsappLog={listWhatsappLog(whatsapp, {
+                    subject: { kind: "contact", id: contact.id },
+                    name: contactDisplayName(contact),
+                    phoneE164: contact.phoneE164,
+                    firstName: contact.firstName,
+                    fullName: contact.fullName,
+                  })}
+                />
+              );
             case "email":
               return contact.email ? (
                 <span dir="ltr" title={contact.email} className="block max-w-52 truncate text-end">

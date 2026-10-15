@@ -8,6 +8,8 @@ import type { InlineEditing } from "@/features/inline-edit/server";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
+import { PhoneCell } from "@/features/whatsapp/components/phone-cell";
+import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
@@ -35,10 +37,12 @@ type Props = {
   reasons: string[];
   // DQL-01: the score of each row, read only when the column is shown
   completeness?: Map<string, number>;
+  // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
+  whatsapp?: WhatsappListContext | null;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -98,11 +102,18 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
         cell={(key, lead) => {
           switch (key) {
             case "phone":
-              return lead.phone ? (
-                <span dir="ltr" className="whitespace-nowrap">
-                  {lead.phone}
-                </span>
-              ) : null;
+              return (
+                <PhoneCell
+                  phone={lead.phone}
+                  phoneE164={lead.phoneE164}
+                  whatsappLog={listWhatsappLog(whatsapp, {
+                    subject: { kind: "lead", id: lead.id },
+                    name: leadDisplayName(lead),
+                    phoneE164: lead.phoneE164,
+                    fullName: lead.fullName,
+                  })}
+                />
+              );
             case "email":
               // long addresses are cut with an ellipsis; the full address is in the tooltip and on the lead's page
               return lead.email ? (

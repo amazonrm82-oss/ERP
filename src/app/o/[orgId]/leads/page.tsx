@@ -23,6 +23,7 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
+import { whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
@@ -193,7 +194,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} />
       ) : leads.length > 0 ? (
         <>
-          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" />
+          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} />
           <div className="hidden md:block">
             <LeadsTable
               orgId={orgId}
@@ -209,6 +210,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               tags={tags}
               reasons={reasons}
               completeness={completeness}
+              whatsapp={whatsappListContext(context)}
             />
           </div>
         </>

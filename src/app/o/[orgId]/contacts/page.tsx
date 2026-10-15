@@ -22,6 +22,7 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
+import { listWhatsappLog, whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
@@ -164,6 +165,13 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               details: [contact.typeName, contact.companyName, contact.jobTitle, contact.ownerName ? `אחראי: ${contact.ownerName}` : null],
               phone: contact.phone,
               phoneE164: contact.phoneE164,
+              whatsappLog: listWhatsappLog(whatsappListContext(context), {
+                subject: { kind: "contact", id: contact.id },
+                name: contactDisplayName(contact),
+                phoneE164: contact.phoneE164,
+                firstName: contact.firstName,
+                fullName: contact.fullName,
+              }),
             }))}
           />
           <div className="hidden md:block">
@@ -178,6 +186,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               editing={editing}
               tags={tags}
               completeness={completeness}
+              whatsapp={whatsappListContext(context)}
             />
           </div>
         </>

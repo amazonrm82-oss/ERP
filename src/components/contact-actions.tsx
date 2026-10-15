@@ -18,7 +18,8 @@ type Props = {
   saveHref?: string;
   // a record page: after dialling, offer to log the call (TASK-02)
   callLog?: { orgId: string; subject: TimelineSubject; name: string };
-  // a record page, for someone who can write: WhatsApp offers the templates and logs the message (WA-01)
+  // someone who can write (a record page, and since the WA-01 follow-up a list row): WhatsApp offers the
+  // templates and logs the message
   whatsappLog?: { orgId: string; subject: TimelineSubject; name: string; values: TemplateValues };
   // a record page (CON-10): the person's preferred channel; its button comes first and it is named
   preferred?: { channel: string; label: string } | null;
@@ -38,7 +39,10 @@ export function ContactActions({ phone, phoneE164, email, compact, saveHref, cal
             <PhoneIcon className="size-5 text-accent" />
           </a>
         ) : null}
-        {whatsapp ? (
+        {whatsapp && whatsappLog && phoneE164 ? (
+          // WA-01 follow-up: the templates and the timeline entry, as on the record page
+          <WhatsappButton phoneE164={phoneE164} {...whatsappLog} iconOnly />
+        ) : whatsapp ? (
           <a href={whatsapp} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp אל ${compact.name} (נפתח בחלון חדש)`} title="WhatsApp" className={icon}>
             <ChatIcon className="size-5 text-accent" />
           </a>

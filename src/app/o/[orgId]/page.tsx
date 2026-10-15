@@ -15,6 +15,7 @@ import { getMyDay } from "@/features/home/queries";
 import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
 import { getGoalProgress, getMyMonthClosings } from "@/features/goals/progress-queries";
 import { DeviceWarning } from "@/features/notifications/components/device-warning";
+import { listWhatsappLog, whatsappListContext } from "@/features/whatsapp/templates";
 import { PrintButton } from "@/features/print/components/print-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { MEETING_STATUS_TONE } from "@/features/meetings/display";
@@ -48,7 +49,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function HomePage({ params }: Props) {
   const { orgId } = await params;
-  const { user, canWrite, org, role } = await getOrgContext(orgId);
+  const context = await getOrgContext(orgId);
+  const { user, canWrite, org, role } = context;
+  // WA-01 follow-up: the WhatsApp templates on the new leads; none for someone who cannot write
+  const whatsappContext = whatsappListContext(context);
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
@@ -315,7 +319,18 @@ export default async function HomePage({ params }: Props) {
                         </span>
                       </span>
                       <span className="print:hidden">
-                        <ContactActions phone={lead.phone} phoneE164={lead.phoneE164} email={null} compact={{ name: leadDisplayName(lead) }} />
+                        <ContactActions
+                          phone={lead.phone}
+                          phoneE164={lead.phoneE164}
+                          email={null}
+                          compact={{ name: leadDisplayName(lead) }}
+                          whatsappLog={listWhatsappLog(whatsappContext, {
+                            subject: { kind: "lead", id: lead.id },
+                            name: leadDisplayName(lead),
+                            phoneE164: lead.phoneE164,
+                            fullName: lead.fullName,
+                          })}
+                        />
                       </span>
                     </li>
                   ))}
