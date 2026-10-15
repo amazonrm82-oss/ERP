@@ -158,7 +158,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `aal` is not `aal2` gets no role when the organization has `require_mfa` or the user has a verified
   factor (`app.has_verified_factor()`). Pages send such users to `/login/mfa`
   (`mfa_required_orgs()`, `mfa_status()`). The proxy calls `auth.getUser()` so signed-out sessions end
-  on the next page load. Each admin page checks `platformReady()` itself: Next renders a page in
+  on the next page load; since FXC-10 a transient auth error (`isTransientAuthError`, src/lib/auth-transient.ts: network, 5xx, 429, unknown)
+  never signs out: the proxy lets the request through and pages throw `AuthUnavailableError` ("בעיית תקשורת"). Each admin page checks `platformReady()` itself: Next renders a page in
   parallel with its layout, so a layout cannot guard its pages.
 - Backup codes (migration 0015): `app.mfa_recovery_codes` holds SHA-256 hashes only (schema app, no
   API access). `mfa_recovery_codes_create()` needs aal2; `mfa_recover(code)` (password session) deletes
