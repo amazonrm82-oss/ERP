@@ -18,6 +18,7 @@ type Lead = { id: string; phone_e164: string | null; email: string | null; statu
 /** A stand-in for the user's Supabase session: lead duplicates, their statuses, updates and inserts. */
 function fakeSupabase(existing: Lead[] = [], readable: Lead[] = existing) {
   const updates: Array<Record<string, unknown>> = [];
+  const headers: Array<[string, string]> = [];
   const inserts: Array<Record<string, unknown>> = [];
   const statusReads: string[][] = [];
   const supabase = {
@@ -45,7 +46,15 @@ function fakeSupabase(existing: Lead[] = [], readable: Lead[] = existing) {
       },
       update: (values: Record<string, unknown>) => {
         updates.push(values);
-        const chain = { eq: () => chain, select: async () => ({ data: [{ id: "l1" }], error: null }) };
+        // REC-03: an import's update carries its job id in a header (no follower notices)
+        const chain = {
+          eq: () => chain,
+          setHeader: (name: string, value: string) => {
+            headers.push([name, value]);
+            return chain;
+          },
+          select: async () => ({ data: [{ id: "l1" }], error: null }),
+        };
         return chain;
       },
       insert: async (rows: Record<string, unknown> | Array<Record<string, unknown>>) => {

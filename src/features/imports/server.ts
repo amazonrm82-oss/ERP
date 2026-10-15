@@ -47,6 +47,9 @@ type Lookups = {
 };
 
 /** The reason a file gave is not on the list: the row is imported without it (RVW-9). */
+// REC-03: the request header that marks an import's update (app.import_write_running reads it)
+export const IMPORT_HEADER = "x-crm-import";
+
 export const REASON_NOT_ON_LIST = (reason: string) => `הסיבה "${reason}" לא ברשימת הסיבות ולא נשמרה. השורה יובאה בלעדיה.`;
 export const REASON_NEEDED_TO_DISQUALIFY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה מרשימת הסיבות.';
 export const REASON_LIST_EMPTY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה, אבל רשימת הסיבות ריקה. אפשר להוסיף סיבות בהגדרות, בעמוד "סיבות לליד לא רלוונטי".';
@@ -540,7 +543,15 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         if (Object.keys(filled).length) values.custom_fields = { $merge: filled };
         else delete values.custom_fields;
       }
-      const { data, error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).update(values as never).eq("organization_id", ctx.orgId).eq("id", match.id).select("id");
+      // REC-03 (owner, 14 October 2026): an import's change tells no follower; the database accepts the
+      // header only for this user's running job (app.import_write_running)
+      const { data, error } = await ctx.supabase
+        .from(RECORD_TYPES[ctx.entity].table)
+        .update(values as never)
+        .eq("organization_id", ctx.orgId)
+        .eq("id", match.id)
+        .setHeader(IMPORT_HEADER, jobId)
+        .select("id");
       if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : NO_PERMISSION_TO_UPDATE });
       else outcomes.push(withWarning(row, "updated"));
     } else {

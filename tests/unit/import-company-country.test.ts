@@ -15,6 +15,7 @@ type Existing = { id: string; phone_e164: string | null; email: string | null; t
 /** A stand-in for the user's Supabase session: duplicates, countries, updates and inserts. */
 function fakeSupabase(existing: Existing[]) {
   const updates: Array<Record<string, unknown>> = [];
+  const headers: Array<[string, string]> = [];
   const inserts: Array<Record<string, unknown>> = [];
   const rpcArgs: Array<Record<string, unknown>> = [];
   const supabase = {
@@ -29,7 +30,15 @@ function fakeSupabase(existing: Existing[]) {
       },
       update: (values: Record<string, unknown>) => {
         updates.push(values);
-        const chain = { eq: () => chain, select: async () => ({ data: [{ id: "c1" }], error: null }) };
+        // REC-03: an import's update carries its job id in a header (no follower notices)
+        const chain = {
+          eq: () => chain,
+          setHeader: (name: string, value: string) => {
+            headers.push([name, value]);
+            return chain;
+          },
+          select: async () => ({ data: [{ id: "c1" }], error: null }),
+        };
         return chain;
       },
       insert: async (rows: Record<string, unknown> | Array<Record<string, unknown>>) => {
@@ -38,7 +47,7 @@ function fakeSupabase(existing: Existing[]) {
       },
     }),
   };
-  return { supabase, updates, inserts, rpcArgs };
+  return { supabase, updates, inserts, rpcArgs, headers };
 }
 
 const lookups = { statuses: new Map(), defaultStatus: null, sources: new Map(), owners: new Map() };
@@ -136,6 +145,7 @@ describe("company import in update mode", () => {
     expect(outcomes).toEqual([{ row: 1, status: "updated" }]);
     expect(fake.updates).toHaveLength(1);
     expect(fake.updates[0]).toEqual({ name: "Foreign Ltd", city: "London" });
+    expect(fake.headers).toEqual([["x-crm-import", "job"]]);
     expect(fake.updates[0]).not.toHaveProperty("country");
     expect(fake.updates[0]).not.toHaveProperty("tax_id");
   });
