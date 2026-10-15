@@ -270,6 +270,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   session and list the skipped dates ("אין הרשאה"); a weekday change splits the series, refused up front unless
   `public.meetings_removable` (invoker, mirrors the `meetings_delete` policy; keep in step) returns every affected meeting.
   `app.notify_meeting_participant` (last redefined in 020040) sends one notice per series while it is unread.
+- Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
+  organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
+  own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020050) lists the report keys; keep them equal to
+  `src/features/reports/definitions.ts` (test 117).
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
