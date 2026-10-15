@@ -615,6 +615,12 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   of a writable org write; audited; no delete). Invoker trigger `app.card_layouts_check` (hint `card_layout:invalid`). No row =
   the default order; details cards render through `LayoutDetails`; a field in no group shows in a final group; FLD-09 hidden
   fields stay hidden. A new field on a details card is added to both key lists.
+- Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
+  start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
+  cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
+  row lock, gap-free on rollback; take 'quote' before 'order' in one transaction; pass the document's own org).
+  `public.number_sequence_jump(org, kind, next)` moves forward only (owner/admin, audited). Audit WHEN skips only the allocator's
+  own insert (`app.number_allocating`), never an authenticated session.
 - Company hierarchy (CON-07, migration 0160; owner: one link "שייכת ל", no kind, the words חברת-אם/חברת-בת/סניף never in the UI):
   `companies.parent_company_id` is set from the company form/card (`ParentCompanyPicker`, `getCompanyFamily`). Trigger
   `companies_parent_check` (invoker, person writes only) needs a readable live parent of the same org (`company:parent_invalid`);
