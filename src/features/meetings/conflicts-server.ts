@@ -18,7 +18,10 @@ type Check = {
   excludeId?: string | null;
   // the organization's zone
   timeZone: string;
-  // CAL-08: the meeting's type, whose buffers widen the time that must be free
+  // CAL-10: the meeting's own buffers, which widen the time that must be free; a null one is its type's (typeId),
+  // as the database fills it (trigger meetings_buffers)
+  buffers?: { before: number | null; after: number | null };
+  // CAL-08: the meeting's type
   typeId?: string | null;
 };
 
@@ -38,14 +41,15 @@ function widened(span: Span, before: number, after: number): Span {
  * The check is a warning: when it cannot be made (a read fails) it logs the
  * error, answers null, and the meeting is saved as before.
  */
-export async function meetingConflicts(supabase: Client, orgId: string, { span, userIds, excludeId, timeZone, typeId }: Check): Promise<ConflictReport | null> {
+export async function meetingConflicts(supabase: Client, orgId: string, { span, userIds, excludeId, timeZone, typeId, buffers }: Check): Promise<ConflictReport | null> {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (ids.length === 0) return null;
 
-  // CAL-08: the type's buffers, read with the user's session (members read the list); a type
-  // deleted meanwhile has none
-  let busySpan = span;
-  if (typeId) {
+  // CAL-10: the meeting's own buffers; one not given is the type's, read with the user's session (members read
+  // the list); a type deleted meanwhile has none
+  let before = buffers?.before ?? null;
+  let after = buffers?.after ?? null;
+  if (typeId && (before === null || after === null)) {
     const { data: type, error } = await supabase
       .from("meeting_types")
       .select("buffer_before_minutes, buffer_after_minutes")
@@ -56,8 +60,10 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
       console.error("[CAL-05 meeting conflicts] check skipped, a read failed:", error.code, error.message);
       return null;
     }
-    if (type) busySpan = widened(span, type.buffer_before_minutes, type.buffer_after_minutes);
+    before ??= type?.buffer_before_minutes ?? 0;
+    after ??= type?.buffer_after_minutes ?? 0;
   }
+  const busySpan = widened(span, before ?? 0, after ?? 0);
 
   const [busyRead, profilesRead, settingsRead] = await Promise.all([
     supabase.rpc("meeting_busy", { p_org: orgId, p_users: ids, p_from: busySpan.startsAt, p_to: busySpan.endsAt, p_exclude: excludeId ?? null }),
@@ -113,7 +119,13 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
 export async function seriesConflicts(
   supabase: Client,
   orgId: string,
-  check: { spans: Array<{ span: Span; excludeId?: string | null }>; userIds: string[]; timeZone: string; typeId?: string | null },
+  check: {
+    spans: Array<{ span: Span; excludeId?: string | null }>;
+    userIds: string[];
+    timeZone: string;
+    typeId?: string | null;
+    buffers?: { before: number | null; after: number | null };
+  },
 ): Promise<ConflictReport | null> {
   const reports: Array<ConflictReport | null> = [];
   for (let i = 0; i < check.spans.length; i += 8) {
@@ -121,7 +133,7 @@ export async function seriesConflicts(
     reports.push(
       ...(await Promise.all(
         slice.map(({ span, excludeId }) =>
-          meetingConflicts(supabase, orgId, { span, userIds: check.userIds, excludeId, timeZone: check.timeZone, typeId: check.typeId }),
+          meetingConflicts(supabase, orgId, { span, userIds: check.userIds, excludeId, timeZone: check.timeZone, typeId: check.typeId, buffers: check.buffers }),
         ),
       )),
     );

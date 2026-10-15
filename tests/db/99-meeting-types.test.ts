@@ -26,7 +26,7 @@ type Busy = { user_id: string; meeting_id: string | null; title: string | null; 
  * CAL-08: meeting types are a managed list (members read, owners/admins of a writable organization
  * write, 50 per organization, seeded); a type may link an offerable product while the plan holds
  * products; a meeting may pick an active type and keeps it when the type is hidden; deleting a type
- * clears the link; the type's buffers count as busy in public.meeting_busy().
+ * clears the link; the buffers (copied onto the meeting when booked, CAL-10) count as busy in public.meeting_busy().
  */
 describe("meeting types (CAL-08)", () => {
   let owner: U, admin: U, member: U, viewer: U, stranger: U;
@@ -273,7 +273,7 @@ describe("meeting types (CAL-08)", () => {
     expect(await busy(member, [member.id], "2026-12-12T05:45:00Z", "2026-12-12T06:15:00Z")).toHaveLength(1);
   });
 
-  it("buffers are read live from the type: no type, or a type deleted later, means 0 before and 0 after (owner)", async () => {
+  it("buffers are copied onto the meeting when booked (CAL-10): no type means 0, and a type deleted later leaves them", async () => {
     // no type
     await newMeeting(member.id, "2026-12-14T10:00:00Z", "2026-12-14T11:00:00Z");
     const none = await busy(member, [member.id], "2026-12-14T09:00:00Z", "2026-12-14T12:00:00Z");
@@ -287,12 +287,11 @@ describe("meeting types (CAL-08)", () => {
 
     await asUser(owner.id, (q) => q("delete from public.meeting_types where id = $1", [typeId]));
     expect(await asAdmin(async (q) => (await q<{ t: string | null }>("select meeting_type_id as t from public.meetings where id = $1", [meeting])).rows[0].t)).toBeNull();
+    // the meeting keeps its own buffers (owner, 15 October 2026)
     const after = await busy(member, [member.id], "2026-12-15T09:00:00Z", "2026-12-15T12:00:00Z");
     expect(after.map((r) => [r.meeting_id, r.busy_from.toISOString(), r.busy_to.toISOString()])).toEqual([
-      [meeting, "2026-12-15T10:00:00.000Z", "2026-12-15T11:00:00.000Z"],
+      [meeting, "2026-12-15T09:30:00.000Z", "2026-12-15T11:30:00.000Z"],
     ]);
-    // the former buffer after is free again
-    expect(await busy(member, [member.id], "2026-12-15T11:00:00Z", "2026-12-15T11:20:00Z")).toHaveLength(0);
   });
 
   it("meeting_busy's first cut is as wide as the largest buffer the table allows", async () => {
@@ -300,11 +299,13 @@ describe("meeting types (CAL-08)", () => {
       (
         await q<{ def: string }>(
           `select pg_get_constraintdef(c.oid) as def from pg_constraint c
-            where c.conrelid = 'public.meeting_types'::regclass and c.contype = 'c' and pg_get_constraintdef(c.oid) like '%buffer_%_minutes%'`,
+            where c.conrelid in ('public.meeting_types'::regclass, 'public.meetings'::regclass) and c.contype = 'c'
+              and pg_get_constraintdef(c.oid) like '%buffer_%_minutes%'`,
         )
       ).rows,
     );
-    expect(rows).toHaveLength(2);
+    // the type's two and the meeting's two (CAL-10)
+    expect(rows).toHaveLength(4);
     const maxes = rows.map((r) => Number(/<= (\d+)/.exec(r.def)?.[1]));
     expect(new Set(maxes).size).toBe(1);
     const fn = await asAdmin(async (q) =>

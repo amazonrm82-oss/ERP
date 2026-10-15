@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { STAGE_COLOR_VALUES, stageColor, type StageColor } from "@/features/deals/stage-colors";
-import { MEETING_TYPES } from "@/features/meetings/schema";
+import { BUFFER_MAX as MEETING_BUFFER_MAX, MEETING_TYPES } from "@/features/meetings/schema";
 import type { MeetingType } from "@/lib/database.types";
 import { checkbox, optionalId, optionalText, requiredText } from "@/lib/validation";
 
@@ -12,7 +12,7 @@ export const MEETING_TYPE_NAME_MAX = 80;
 export const MEETING_TYPE_LOCATION_MAX = 500;
 export const DURATION_MIN = 5;
 export const DURATION_MAX = 720;
-export const BUFFER_MAX = 240;
+export const BUFFER_MAX = MEETING_BUFFER_MAX;
 // the database refuses more (trigger meeting_types_cap, hint 'meeting_types:max')
 export const MEETING_TYPES_PER_ORG = 50;
 

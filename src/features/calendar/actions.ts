@@ -53,7 +53,7 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
   if (target.kind === "meeting") {
     const { data: meeting, error: readError } = await supabase
       .from("meetings")
-      .select("starts_at, ends_at, status, owner_id, meeting_type_id, lead_id, contact_id, company_id, deal_id")
+      .select("starts_at, ends_at, status, owner_id, meeting_type_id, buffer_before_minutes, buffer_after_minutes, lead_id, contact_id, company_id, deal_id")
       .eq("organization_id", orgId)
       .eq("id", itemId)
       .maybeSingle();
@@ -75,7 +75,10 @@ export async function moveCalendarItemAction(orgId: string, itemId: string, targ
         return fail(dbErrorMessage(participantsError));
       }
       const userIds = [...(meeting.owner_id ? [meeting.owner_id] : []), ...participants.map((p) => p.user_id)];
-      const conflicts = await meetingConflicts(supabase, orgId, { span, userIds, excludeId: itemId, timeZone, typeId: meeting.meeting_type_id });
+      const conflicts = await meetingConflicts(supabase, orgId, { span, userIds, excludeId: itemId, timeZone,
+        // CAL-10: the meeting's own buffers
+        buffers: { before: meeting.buffer_before_minutes, after: meeting.buffer_after_minutes },
+      });
       if (conflicts) {
         return { ok: false, message: CONFLICT_MESSAGE, conflicts, span };
       }
@@ -148,6 +151,9 @@ export type MeetingDetails = {
   outcome: string | null;
   // CAL-06: minutes before the start; null = no reminder
   reminderMinutes: number | null;
+  // CAL-10: the meeting's own free time before and after, in minutes
+  bufferBefore: number;
+  bufferAfter: number;
   participants: { userId: string; name: string }[];
   // the record it is on, for refreshing that record's page after a change; null = an internal meeting
   subject: TimelineSubject | null;
@@ -166,7 +172,7 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
   const { supabase } = context;
   const { data: row, error } = await supabase
     .from("meetings")
-    .select("id, title, meeting_type, meeting_type_id, series_index, starts_at, ends_at, location, video_url, description, status, outcome, reminder_minutes, lead_id, contact_id, company_id, deal_id")
+    .select("id, title, meeting_type, meeting_type_id, series_index, starts_at, ends_at, location, video_url, description, status, outcome, reminder_minutes, buffer_before_minutes, buffer_after_minutes, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .eq("id", meetingId)
     .maybeSingle();
@@ -209,6 +215,8 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
       status: row.status,
       outcome: row.outcome,
       reminderMinutes: row.reminder_minutes,
+      bufferBefore: row.buffer_before_minutes,
+      bufferAfter: row.buffer_after_minutes,
       participants: ids.map((id) => ({ userId: id, name: names.get(id) ?? "משתמש" })),
       subject: subjectOf(row),
     },

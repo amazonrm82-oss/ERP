@@ -325,6 +325,9 @@ export type MeetingRow = {
   // CAL-09: the weekly series it belongs to and its place in it (1..52); null = a single meeting; insert only
   series_id: string | null;
   series_index: number | null;
+  // CAL-10: free time before and after, copied from the type when booked (0..240); what conflicts check
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -351,6 +354,9 @@ export type MeetingInsert = {
   meeting_type_id?: string | null;
   series_id?: string | null;
   series_index?: number | null;
+  // absent or null: the type's (trigger meetings_buffers)
+  buffer_before_minutes?: number | null;
+  buffer_after_minutes?: number | null;
 };
 
 export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id" | "series_id" | "series_index">>;

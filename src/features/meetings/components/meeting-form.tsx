@@ -13,7 +13,7 @@ import { durationText, fillFromType, offeredTypes, timeAfter, type MeetingTypeCh
 import { longDay } from "@/lib/calendar-grid";
 
 import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
-import { MEETING_REMINDER_OPTIONS, MEETING_TYPE_OPTIONS, type MeetingReminderValue } from "../schema";
+import { BUFFER_MAX, MEETING_REMINDER_OPTIONS, MEETING_TYPE_OPTIONS, type MeetingReminderValue } from "../schema";
 import { DEFAULT_SERIES_COUNT, lastSeriesDate, SERIES_MAX, SERIES_MIN, seriesLabel } from "../series";
 import { ConflictWarning } from "./conflict-warning";
 
@@ -33,6 +33,9 @@ export type MeetingFormValues = {
   participant_ids: string[];
   // CAL-06: "none" or minutes before the start
   reminder_minutes: MeetingReminderValue;
+  // CAL-10: the meeting's own free time before and after, in minutes ("" = the type's)
+  buffer_before_minutes: string;
+  buffer_after_minutes: string;
   // CAL-09: the meeting's place in its weekly series; absent or null = a single meeting
   series_index?: number | null;
 };
@@ -81,6 +84,8 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
   const [title, setTitle] = useState(values?.title ?? initial.title);
   const [location, setLocation] = useState(values?.location ?? initial.location);
   const [typeId, setTypeId] = useState(values?.meeting_type_id ?? initial.meeting_type_id);
+  const [bufferBefore, setBufferBefore] = useState(values?.buffer_before_minutes ?? initial.buffer_before_minutes);
+  const [bufferAfter, setBufferAfter] = useState(values?.buffer_after_minutes ?? initial.buffer_after_minutes);
   const types = offeredTypes(meetingTypes, initial.meeting_type_id);
   const typeOf = (id: string) => types.find((t) => t.id === id) ?? null;
 
@@ -92,6 +97,12 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
     setType(filled.format);
     setLocation(filled.location);
     setEnd(filled.endTime);
+    // CAL-10: another type brings its buffers (they can be changed); no type keeps the ones in the form
+    const next = typeOf(nextId);
+    if (next) {
+      setBufferBefore(String(next.bufferBefore));
+      setBufferAfter(String(next.bufferAfter));
+    }
   }
   const picked = typeOf(typeId);
   // CAL-09: a new meeting may repeat every week; a series meeting asks what an edit applies to
@@ -175,6 +186,34 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
           error={errors.start_time}
         />
         <TextField label="עד שעה" name="end_time" type="time" required value={end} onChange={(event) => setEnd(event.target.value)} error={errors.end_time} />
+      </div>
+      {/* CAL-10: kept free around the meeting; checked against other meetings */}
+      <div className="grid grid-cols-2 gap-4">
+        <TextField
+          label="מרווח לפני (דקות)"
+          name="buffer_before_minutes"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={BUFFER_MAX}
+          step={5}
+          value={bufferBefore}
+          onChange={(event) => setBufferBefore(event.target.value)}
+          error={errors.buffer_before_minutes}
+        />
+        <TextField
+          label="מרווח אחרי (דקות)"
+          name="buffer_after_minutes"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={BUFFER_MAX}
+          step={5}
+          value={bufferAfter}
+          onChange={(event) => setBufferAfter(event.target.value)}
+          error={errors.buffer_after_minutes}
+        />
+        <p className="col-span-2 -mt-2 text-sm text-ink-soft">זמן פנוי לפני ואחרי הפגישה, שנבדק מול פגישות אחרות. סוג הפגישה ממלא אותו, ואפשר לשנות.</p>
       </div>
       {type === "video" ? (
         <TextField

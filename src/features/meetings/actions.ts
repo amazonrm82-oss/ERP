@@ -63,7 +63,14 @@ function keepParticipants(state: MeetingFormState, formData: FormData): MeetingF
 async function conflictState(
   supabase: Client,
   orgId: string,
-  check: { span: Span; userIds: string[]; excludeId?: string; timeZone: string; typeId?: string | null },
+  check: {
+    span: Span;
+    userIds: string[];
+    excludeId?: string;
+    timeZone: string;
+    typeId?: string | null;
+    buffers?: { before: number | null; after: number | null };
+  },
   formData: FormData,
 ): Promise<MeetingFormState> {
   const conflicts = await meetingConflicts(supabase, orgId, check);
@@ -133,8 +140,16 @@ async function parseMeeting(supabase: Client, orgId: string, formData: FormData)
       video_url: data.video_url,
       description: data.description,
       reminder_minutes: data.reminder_minutes,
+      // CAL-10: the meeting's own buffers; null = the type's (filled by the database)
+      buffer_before_minutes: data.buffer_before_minutes,
+      buffer_after_minutes: data.buffer_after_minutes,
     },
   };
+}
+
+/** The buffers the form asks for, for the conflict check (CAL-10). */
+function formBuffers(parsed: { row: { buffer_before_minutes: number | null; buffer_after_minutes: number | null } }) {
+  return { before: parsed.row.buffer_before_minutes, after: parsed.row.buffer_after_minutes };
 }
 
 /** The id back when the user can read that contact or company (RLS decides), else null. */
@@ -224,11 +239,11 @@ async function createMeeting(orgId: string, subject: TimelineSubject | null, for
     if (series) {
       // CAL-09: every week of the series is checked, in one warning
       const spans = series.map((t) => ({ span: { startsAt: t.starts_at, endsAt: t.ends_at } }));
-      const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id });
+      const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id, buffers: formBuffers(parsed) });
       if (conflicts) return { ok: false, message: CONFLICT_MESSAGE, values: formValues(formData), conflicts, span: spans[0].span };
     } else {
       const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
-      const warning = await conflictState(supabase, orgId, { span, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id }, formData);
+      const warning = await conflictState(supabase, orgId, { span, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id, buffers: formBuffers(parsed) }, formData);
       if (warning) return warning;
     }
   }
@@ -260,6 +275,8 @@ async function createMeeting(orgId: string, subject: TimelineSubject | null, for
       video_url: row.video_url ?? null,
       description: row.description ?? null,
       reminder_minutes: row.reminder_minutes ?? null,
+      buffer_before_minutes: row.buffer_before_minutes ?? null,
+      buffer_after_minutes: row.buffer_after_minutes ?? null,
       lead_id: row.lead_id ?? null,
       contact_id: row.contact_id ?? null,
       company_id: row.company_id ?? null,
@@ -353,11 +370,11 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
         { span: { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at }, excludeId: meetingId },
         ...followingSpans.map((f) => ({ span: { startsAt: f.times.starts_at, endsAt: f.times.ends_at }, excludeId: f.id })),
       ];
-      const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id });
+      const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id, buffers: formBuffers(parsed) });
       if (conflicts) return { ok: false, message: CONFLICT_MESSAGE, values: formValues(formData), conflicts, span: spans[0].span };
     } else {
       const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
-      const warning = await conflictState(supabase, orgId, { span, userIds, excludeId: meetingId, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id }, formData);
+      const warning = await conflictState(supabase, orgId, { span, userIds, excludeId: meetingId, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id, buffers: formBuffers(parsed) }, formData);
       if (warning) return warning;
     }
   }
@@ -560,7 +577,7 @@ async function splitSeries(
     // one question: the split, and the usual warnings for the new meetings (rest days, clashes)
     const userIds = [...(current.owner_id ? [current.owner_id] : []), ...parsed.participants];
     const spans = times.map((t, i) => ({ span: { startsAt: t.starts_at, endsAt: t.ends_at }, excludeId: old[i]?.id }));
-    const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id });
+    const conflicts = await seriesConflicts(supabase, orgId, { spans, userIds, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id, buffers: formBuffers(parsed) });
     return {
       ok: false,
       message: splitWarningText(old.length, moved, longDay(startDate)),
@@ -578,6 +595,8 @@ async function splitSeries(
     video_url: parsed.row.video_url,
     description: parsed.row.description,
     reminder_minutes: parsed.row.reminder_minutes,
+    buffer_before_minutes: parsed.row.buffer_before_minutes,
+    buffer_after_minutes: parsed.row.buffer_after_minutes,
     lead_id: current.lead_id,
     contact_id: current.contact_id,
     company_id: current.company_id,

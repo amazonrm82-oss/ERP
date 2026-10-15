@@ -51,6 +51,8 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
     description: "",
     participant_ids: [userId],
     reminder_minutes: DEFAULT_MEETING_REMINDER,
+    buffer_before_minutes: "0",
+    buffer_after_minutes: "0",
   };
 
   const item = (meeting: MeetingItem) => {
@@ -116,6 +118,8 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
             description: meeting.description ?? "",
             participant_ids: meeting.participants.map((p) => p.userId),
             reminder_minutes: reminderChoice(meeting.reminderMinutes),
+            buffer_before_minutes: String(meeting.bufferBefore),
+            buffer_after_minutes: String(meeting.bufferAfter),
           }}
         />
       ) : null}

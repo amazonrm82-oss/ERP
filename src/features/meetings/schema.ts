@@ -57,7 +57,31 @@ export const MEETING_FIELD_NAMES = [
   "video_url",
   "description",
   "reminder_minutes",
+  "buffer_before_minutes",
+  "buffer_after_minutes",
 ] as const;
+
+/** CAL-08/CAL-10: the largest buffer, on a type and on a meeting (the database checks both at 240). */
+export const BUFFER_MAX = 240;
+
+/**
+ * CAL-10: free time before or after the meeting, in whole minutes, 0..BUFFER_MAX; "" = the meeting type's (the
+ * database fills it, 0 without a type).
+ */
+const bufferMinutes = (label: string) =>
+  z
+    .preprocess(
+      (value) => (typeof value === "string" ? value.trim() : ""),
+      z.union([
+        z.literal(""),
+        z
+          .string()
+          .regex(/^\d+$/, { error: `${label} בדקות שלמות.` })
+          .transform(Number)
+          .pipe(z.number().max(BUFFER_MAX, { error: `${label}: עד ${BUFFER_MAX} דקות.` })),
+      ]),
+    )
+    .transform((value) => (value === "" ? null : value));
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const requiredTime = (missing: string) =>
@@ -92,6 +116,8 @@ export const meetingSchema = z
     reminder_minutes: z
       .preprocess((value) => (typeof value === "string" && value !== "" ? value : DEFAULT_MEETING_REMINDER), z.enum(REMINDER_VALUES, { error: "יש לבחור מתי להזכיר." }))
       .transform((value) => (value === "none" ? null : Number(value))),
+    buffer_before_minutes: bufferMinutes("מרווח לפני"),
+    buffer_after_minutes: bufferMinutes("מרווח אחרי"),
   })
   // "HH:MM" strings compare in time order
   .refine((m) => m.end_time > m.start_time, { path: ["end_time"], error: "שעת הסיום צריכה להיות אחרי שעת ההתחלה." });

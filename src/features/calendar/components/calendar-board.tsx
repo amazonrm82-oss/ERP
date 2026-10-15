@@ -983,6 +983,8 @@ function ItemDetails({
             description: meeting.description ?? "",
             participant_ids: meeting.participants.map((p) => p.userId),
             reminder_minutes: reminderChoice(meeting.reminderMinutes),
+            buffer_before_minutes: String(meeting.bufferBefore),
+            buffer_after_minutes: String(meeting.bufferAfter),
           }}
           onChanged={onChanged}
         />
