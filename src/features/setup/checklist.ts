@@ -38,7 +38,7 @@ const ITEMS: { key: ChecklistKey; title: string; hint: string; href: (orgId: str
   { key: "detailsFilled", title: "פרטי העסק", hint: "טלפון וענף", href: paths.settingsBusiness },
   { key: "realLead", title: "ליד ראשון", hint: "הוסיפו ליד אמיתי, לא לדוגמה", href: paths.leadNew },
   { key: "activeForm", title: "טופס לידים", hint: "לידים מהאתר נכנסים לבד", href: paths.settingsIntake },
-  { key: "realDeal", title: "עסקה ראשונה", hint: "עסקה בפייפליין", href: paths.dealNew },
+  { key: "realDeal", title: "עסקה ראשונה", hint: "עסקה בתהליך מכירה", href: paths.dealNew },
   { key: "teamInvited", title: "הזמנת הצוות", hint: "עובד אחד לפחות", href: paths.settingsUsers },
   { key: "importDone", title: "ייבוא מקובץ", hint: "לקוחות מאקסל או ממערכת קודמת", href: paths.importNew },
   // GAP-01: the item shows this device's state and a test button; it is done when the user has push on in any browser

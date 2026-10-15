@@ -149,11 +149,11 @@ export function resolveStage(
   const pipeline = pipelineName
     ? ordered.find((p) => nameKey(p.name) === nameKey(pipelineName))
     : (ordered.find((p) => p.isDefault) ?? ordered[0]);
-  if (!pipeline) return pipelineName ? `אין פייפליין בשם "${pipelineName}".` : "אין פייפליין בעסק.";
+  if (!pipeline) return pipelineName ? `אין תהליך מכירה בשם "${pipelineName}".` : "אין תהליך מכירה בעסק.";
   const own = stages.filter((s) => s.pipelineId === pipeline.id).sort((a, b) => a.position - b.position);
   const stage = stageName ? own.find((s) => nameKey(s.name) === nameKey(stageName)) : (own.find((s) => s.kind === "open") ?? own[0]);
   if (!stage) {
-    return stageName ? `אין שלב בשם "${stageName}" בפייפליין "${pipeline.name}". שלב חדש לא נוצר בייבוא.` : `בפייפליין "${pipeline.name}" אין שלבים.`;
+    return stageName ? `אין שלב בשם "${stageName}" בתהליך המכירה "${pipeline.name}". שלב חדש לא נוצר בייבוא.` : `בתהליך המכירה "${pipeline.name}" אין שלבים.`;
   }
   return { pipelineId: pipeline.id, stageId: stage.id, kind: stage.kind };
 }

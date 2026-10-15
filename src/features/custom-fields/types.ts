@@ -62,6 +62,9 @@ export type FieldDefinition = {
   defaultValue?: Json | null;
   // FLD-09 (src/features/custom-fields/conditions.ts); absent = none
   condition?: FieldCondition | null;
+  // FLD-09 part B: set by the database when a deleted pipeline left the field with no condition; cleared when
+  // the field is saved again (settings list only)
+  conditionRemovedAt?: string | null;
 };
 
 export function isFieldType(value: string): value is FieldType {

@@ -159,6 +159,7 @@ function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWa
           {field.isUnique ? <Badge>ייחודי</Badge> : null}
           {field.isReadOnly ? <Badge>קריאה בלבד</Badge> : null}
           {field.condition ? <Badge>מותנה</Badge> : null}
+          {!field.condition && field.conditionRemovedAt ? <Badge tone="warning">התנאי הוסר (תהליך המכירה נמחק)</Badge> : null}
           {field.isActive ? null : <Badge>מוסתר</Badge>}
         </p>
         {editable ? (

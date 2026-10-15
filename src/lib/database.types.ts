@@ -635,6 +635,8 @@ export type FieldDefinitionRow = {
   is_read_only: boolean;
   default_value: Json | null;
   condition: Json | null;
+  // server only (FLD-09 part B): set by the pipeline cleanup, cleared by trigger field_definitions_condition_mark
+  condition_removed_at: string | null;
 };
 
 export type SavedViewRow = {

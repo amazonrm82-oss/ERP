@@ -72,7 +72,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
               </dd>
               <dt className="text-ink-soft">אוטומציות פעילות</dt>
               <dd>{formatNumber(Number(counts.automations ?? 0))}</dd>
-              <dt className="text-ink-soft">טפסים / פייפליינים</dt>
+              <dt className="text-ink-soft">טפסים / תהליכי מכירה</dt>
               <dd>
                 {formatNumber(Number(counts.forms ?? 0))} / {formatNumber(Number(counts.pipelines ?? 0))}
               </dd>

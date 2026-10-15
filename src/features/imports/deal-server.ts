@@ -35,7 +35,7 @@ export type DealLookups = {
 
 export const TAG_NEW = (tag: string) => `תיווצר תגית חדשה: "${tag}".`;
 export const TAG_CREATED = (tag: string) => `נוצרה תגית חדשה: "${tag}".`;
-const LOOKUPS_FAILED = "לא הצלחנו לקרוא את הפייפליינים, השלבים והתגיות. נסו שוב.";
+const LOOKUPS_FAILED = "לא הצלחנו לקרוא את תהליכי המכירה, השלבים והתגיות. נסו שוב.";
 const LINKS_FAILED = "בדיקת אנשי הקשר והחברות נכשלה. נסו לייבא את השורה שוב.";
 
 /** A read the import cannot go on without failed: the import stops (FXC-02). */

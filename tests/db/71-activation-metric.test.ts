@@ -1,36 +1,19 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asMfaUser, asUser, closePool, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { migrationFile, rerunClosure } from "./rerun";
 
 afterAll(closePool);
 
-// found by suffix: the number changes when the lead renumbers it at merge
-const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
-const MIGRATION_FILE = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith("_activation_metric.sql"));
-if (!MIGRATION_FILE) throw new Error("activation metric migration not found");
-const MIGRATION = readFileSync(join(MIGRATIONS_DIR, MIGRATION_FILE), "utf8");
-// Re-running this migration puts back its own functions; the later migrations that redefine one of
-// them (0118: sample leads never activate; plan_review_fixes: platform_metrics counts a price per
-// business once) run again after it, so no later test sees an old body. 0118 also redefines
-// app.sample_untouched(), so the later migrations that redefine that one run again too (CNS follow-ups:
-// a consent keeps a sample record). deal_lines (DLI-01) is one of them and revokes the table's client
-// grants, so every later migration that grants a deal_lines column again (DLI-04 billing) runs too.
-const LATER = readdirSync(MIGRATIONS_DIR)
-  .filter((f) => f.endsWith(".sql") && f > MIGRATION_FILE)
-  .sort()
-  .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
-  .filter(
-    (sql) =>
-      /function\s+(app\.mark_org_activation|app\.sample_untouched|public\.platform_metrics|public\.platform_org|public\.platform_list_orgs)\s*\(/.test(sql) ||
-      /^grant [^;]* on public\.deal_lines to authenticated/im.test(sql),
-  );
+// Re-running this migration puts back its own functions. Every later migration that redefines one of them runs
+// again after it, and every later migration that redefines a function of THOSE files, and so on (rerunClosure:
+// 0118 brings app.sample_untouched, whose later files bring app.merge_move_links, whose last body is in
+// lead_score). deal_lines (DLI-01) is one of them and revokes the table's client grants, so every later migration
+// that grants a deal_lines column again (DLI-04 billing) runs too.
+const RERUN = rerunClosure([migrationFile("_activation_metric.sql")], (sql) => /^grant [^;]* on public\.deal_lines to authenticated/im.test(sql));
 const rerun = (): Promise<void> =>
   asAdmin(async (q) => {
-    await q(MIGRATION);
-    for (const sql of LATER) await q(sql);
+    for (const sql of RERUN.sql) await q(sql);
   });
 
 type U = { id: string; email: string };

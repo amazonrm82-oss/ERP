@@ -5,6 +5,8 @@ import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import { conditionRemovalNote } from "./condition-removal";
+
 export type AuditChange = { field: string; old: Json; new: Json };
 
 export type AuditItem = {
@@ -17,6 +19,8 @@ export type AuditItem = {
   changes: AuditChange[];
   // contents erased on a privacy request (migration 0027)
   erased: boolean;
+  // one line of context that is not a field change (FLD-09: the fields a deleted pipeline took conditions from)
+  note: string | null;
 };
 
 export type AuditFilters = { entityType: string | null; actorId: string | null; from: string | null; to: string | null; page: number };
@@ -98,6 +102,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
       entityId: r.entity_id,
       changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
+      note: conditionRemovalNote(r.action, r.changes),
     })),
     more: data.length > AUDIT_PAGE,
     days,
@@ -127,6 +132,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     entityId: r.entity_id,
     changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
+    note: conditionRemovalNote(r.action, r.changes),
   }));
 }
 

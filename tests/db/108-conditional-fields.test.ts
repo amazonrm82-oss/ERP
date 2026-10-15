@@ -255,7 +255,8 @@ describe("conditional fields (FLD-09)", () => {
   it("the migration is safe to run twice", async () => {
     const dir = "supabase/migrations";
     // the later migration that redefines app.field_condition_check runs again after it
-    for (const suffix of ["_conditional_fields.sql", "_condition_pipeline.sql"]) {
+    // the later migrations that redefine app.field_condition_check / app.pipeline_conditions_cleanup run again after it
+    for (const suffix of ["_conditional_fields.sql", "_condition_pipeline.sql", "_condition_pipeline_notice.sql"]) {
       const file = readdirSync(dir).find((name) => name.endsWith(suffix));
       const sql = readFileSync(join(dir, file ?? ""), "utf8");
       await asAdmin((q) => q(sql));
@@ -504,5 +505,179 @@ describe("conditional fields: the pipeline (FLD-09 follow-up)", () => {
       }
       expect(await asAdmin(async (q) => (await q("select app.condition_without_pipeline(null, $1, '{}') as c", [ids.p3])).rows[0].c)).toBeNull();
     });
+  });
+});
+
+// FLD-09 pipeline part B (owner, 15 October 2026; migration condition_pipeline_notice): the audit entry of a
+// pipeline deletion that took conditions, and the mark on a field left with none.
+describe("conditional fields: what deleting a pipeline leaves behind (FLD-09 part B)", () => {
+  let owner: { id: string }, admin: { id: string }, rep: { id: string }, other: { id: string };
+  let org: string, otherOrg: string;
+  let keep: { id: string; stages: string[] };
+
+  const define = (userId: string, key: string, condition: unknown) =>
+    asUser(userId, (q) =>
+      q(
+        "insert into public.field_definitions (organization_id, object_type, key, label, field_type, condition) values ($1, 'deal', $2, $3, 'text', $4) returning id",
+        [org, key, `שדה ${key}`, JSON.stringify(condition)],
+      ),
+    );
+  const rowOf = (key: string) =>
+    asAdmin(async (q) => (await q("select condition, condition_removed_at from public.field_definitions where organization_id = $1 and object_type = 'deal' and key = $2", [org, key])).rows[0]);
+  const addPipeline = (name: string) =>
+    asAdmin(async (q) => {
+      const p = await q("insert into public.pipelines (organization_id, name, position) values ($1, $2, 5) returning id", [org, name]);
+      const id = p.rows[0].id as string;
+      const stages: string[] = [];
+      for (const [position, kind] of ["open", "won"].entries()) {
+        const st = await q("insert into public.stages (organization_id, pipeline_id, name, kind, position) values ($1, $2, $3, $4, $5) returning id", [org, id, `${name} ${position}`, kind, position]);
+        stages.push(st.rows[0].id as string);
+      }
+      return { id, stages };
+    });
+  const deletePipeline = (id: string) =>
+    asUser(owner.id, (q) => q("update public.pipelines set deleted_at = now() where organization_id = $1 and id = $2 returning id", [org, id]));
+  const entriesFor = (userId: string, pipelineId: string) =>
+    asUser(userId, async (q) => (await q("select actor_id, entity_type, changes from public.audit_log where action = 'conditions_removed' and entity_id = $1", [pipelineId])).rows);
+
+  beforeAll(async () => {
+    owner = await createUser("cfn-owner");
+    org = await createOrg(owner.id);
+    admin = await addMember(org, owner.id, "admin");
+    rep = await addMember(org, owner.id, "member");
+    other = await createUser("cfn-other");
+    otherOrg = await createOrg(other.id);
+    keep = await addPipeline("נשאר");
+  });
+
+  it("marks a field left with no condition, not one that only shrank; one audit entry lists the fields", async () => {
+    const gone = await addPipeline("הולך");
+    await define(owner.id, "n_removed", { field: "builtin:pipeline", op: "not_equals", value: gone.id, effect: "show" });
+    await define(owner.id, "n_stage", { field: "builtin:stage", op: "equals", value: gone.stages[1], effect: "require" });
+    await define(owner.id, "n_shrunk", { field: "builtin:stage", op: "in", value: [gone.stages[0], keep.stages[0]], effect: "show" });
+    await define(owner.id, "n_untouched", { field: "builtin:pipeline", op: "equals", value: keep.id, effect: "show" });
+    expect((await deletePipeline(gone.id)).rowCount).toBe(1);
+
+    for (const key of ["n_removed", "n_stage"]) {
+      const row = await rowOf(key);
+      expect(row.condition, key).toBeNull();
+      expect(row.condition_removed_at, key).not.toBeNull();
+    }
+    const shrunk = await rowOf("n_shrunk");
+    expect(shrunk.condition).toEqual({ field: "builtin:stage", op: "in", value: [keep.stages[0]], effect: "show" });
+    expect(shrunk.condition_removed_at).toBeNull();
+    expect((await rowOf("n_untouched")).condition_removed_at).toBeNull();
+
+    // every changed field row is audited as an update by field_definitions_audit, and one entry names the fields
+    const updates = await asAdmin(async (q) =>
+      (await q(
+        `select count(*)::int as n from public.audit_log a join public.field_definitions f on f.id = a.entity_id
+          where a.organization_id = $1 and a.entity_type = 'field_definitions' and a.action = 'update' and a.actor_id = $2
+            and f.key in ('n_removed', 'n_stage', 'n_shrunk') and a.changes ? 'condition'`,
+        [org, owner.id],
+      )).rows[0].n,
+    );
+    expect(updates).toBe(3);
+    const entries = await entriesFor(owner.id, gone.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].actor_id).toBe(owner.id);
+    expect(entries[0].entity_type).toBe("pipelines");
+    const fields = (entries[0].changes as { fields: Array<{ key: string; label: string; removed: boolean }> }).fields;
+    expect(fields.map((f) => [f.key, f.label, f.removed]).sort()).toEqual([
+      ["n_removed", "שדה n_removed", true],
+      ["n_shrunk", "שדה n_shrunk", false],
+      ["n_stage", "שדה n_stage", true],
+    ]);
+  });
+
+  it("no entry when no field had a condition based on it", async () => {
+    const quiet = await addPipeline("שקט");
+    await deletePipeline(quiet.id);
+    expect(await entriesFor(owner.id, quiet.id)).toHaveLength(0);
+  });
+
+  it("a person cannot set the mark; moving or hiding keeps it; saving the field clears it", async () => {
+    const gone = await addPipeline("סימון");
+    await define(owner.id, "m1", { field: "builtin:pipeline", op: "equals", value: gone.id, effect: "show" });
+    await deletePipeline(gone.id);
+    const marked = (await rowOf("m1")).condition_removed_at;
+    expect(marked).not.toBeNull();
+
+    // a new field cannot be created with a mark, and a person cannot write one
+    await asUser(owner.id, (q) =>
+      q("insert into public.field_definitions (organization_id, object_type, key, label, field_type, condition_removed_at) values ($1, 'deal', 'm2', 'm2', 'text', now())", [org]),
+    );
+    expect((await rowOf("m2")).condition_removed_at).toBeNull();
+    await asUser(owner.id, (q) => q("update public.field_definitions set condition_removed_at = now() where organization_id = $1 and key = 'm2'", [org]));
+    expect((await rowOf("m2")).condition_removed_at).toBeNull();
+    // with the cleanup setting on by hand it is still refused
+    await asUser(owner.id, async (q) => {
+      await q("select set_config('app.condition_cleanup', 'on', true)");
+      await q("update public.field_definitions set condition_removed_at = now() where organization_id = $1 and key = 'm2'", [org]);
+    });
+    expect((await rowOf("m2")).condition_removed_at).toBeNull();
+
+    // moving it or hiding / showing it is not editing it
+    await asUser(owner.id, (q) => q("update public.field_definitions set position = position + 1 where organization_id = $1 and key = 'm1'", [org]));
+    await asUser(admin.id, (q) => q("update public.field_definitions set is_active = false where organization_id = $1 and key = 'm1'", [org]));
+    await asUser(admin.id, (q) => q("update public.field_definitions set is_active = true where organization_id = $1 and key = 'm1'", [org]));
+    expect((await rowOf("m1")).condition_removed_at).toEqual(marked);
+    // trying to clear it alone does nothing either
+    await asUser(owner.id, (q) => q("update public.field_definitions set condition_removed_at = null, position = position + 1 where organization_id = $1 and key = 'm1'", [org]));
+    expect((await rowOf("m1")).condition_removed_at).toEqual(marked);
+    // a hide or show that sends the value the field already has, or a save that changes nothing, keeps it
+    await asUser(admin.id, (q) => q("update public.field_definitions set is_active = is_active where organization_id = $1 and key = 'm1'", [org]));
+    await asUser(admin.id, (q) => q("update public.field_definitions set label = label, help_text = help_text where organization_id = $1 and key = 'm1'", [org]));
+    expect((await rowOf("m1")).condition_removed_at).toEqual(marked);
+    // saving the field (here: its label) clears it
+    await asUser(admin.id, (q) => q("update public.field_definitions set label = 'שם חדש' where organization_id = $1 and key = 'm1'", [org]));
+    expect((await rowOf("m1")).condition_removed_at).toBeNull();
+
+    // a real edit made together with a move or a hide clears it too
+    for (const [key, extra] of [["mv_edit", "position = position + 1"], ["hide_edit", "is_active = false"]] as const) {
+      const p = await addPipeline(`עריכה ${key}`);
+      await define(owner.id, key, { field: "builtin:pipeline", op: "equals", value: p.id, effect: "show" });
+      await deletePipeline(p.id);
+      expect((await rowOf(key)).condition_removed_at, key).not.toBeNull();
+      await asUser(admin.id, (q) => q(`update public.field_definitions set help_text = 'עזרה', ${extra} where organization_id = $1 and key = $2`, [org, key]));
+      expect((await rowOf(key)).condition_removed_at, key).toBeNull();
+    }
+
+    // giving it a condition again clears it too
+    const again = await addPipeline("שוב");
+    await define(owner.id, "m3", { field: "builtin:pipeline", op: "equals", value: again.id, effect: "show" });
+    await deletePipeline(again.id);
+    expect((await rowOf("m3")).condition_removed_at).not.toBeNull();
+    await asUser(owner.id, (q) =>
+      q("update public.field_definitions set condition = $2 where organization_id = $1 and key = 'm3'", [org, JSON.stringify({ field: "builtin:pipeline", op: "equals", value: keep.id, effect: "show" })]),
+    );
+    const m3 = await rowOf("m3");
+    expect(m3.condition_removed_at).toBeNull();
+    expect(m3.condition).toEqual({ field: "builtin:pipeline", op: "equals", value: keep.id, effect: "show" });
+  });
+
+  it("a hard delete marks and logs too", async () => {
+    const gone = await addPipeline("לגמרי");
+    await define(owner.id, "h1", { field: "builtin:stage", op: "in", value: [gone.stages[0]], effect: "show" });
+    await asAdmin((q) => q("delete from public.pipelines where id = $1", [gone.id]));
+    expect((await rowOf("h1")).condition_removed_at).not.toBeNull();
+    expect(await entriesFor(owner.id, gone.id)).toHaveLength(1);
+  });
+
+  it("an outsider and a member see neither the entry nor the mark", async () => {
+    const gone = await addPipeline("סודי");
+    await define(owner.id, "o1", { field: "builtin:pipeline", op: "equals", value: gone.id, effect: "show" });
+    await deletePipeline(gone.id);
+    expect(await entriesFor(owner.id, gone.id)).toHaveLength(1);
+    expect(await entriesFor(other.id, gone.id)).toHaveLength(0);
+    expect(await entriesFor(rep.id, gone.id)).toHaveLength(0);
+    const seen = await asUser(other.id, async (q) => (await q("select count(*)::int as n from public.field_definitions where organization_id = $1", [org])).rows[0].n);
+    expect(seen).toBe(0);
+    // the outsider cannot write the mark or clear it either
+    const before = (await rowOf("o1")).condition_removed_at;
+    const touched = await asUser(other.id, (q) => q("update public.field_definitions set label = 'x' where organization_id = $1 and key = 'o1' returning id", [org]));
+    expect(touched.rowCount).toBe(0);
+    expect((await rowOf("o1")).condition_removed_at).toEqual(before);
+    expect(otherOrg).not.toBe(org);
   });
 });

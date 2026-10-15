@@ -28,6 +28,7 @@ import { effectiveDefinitions } from "@/features/custom-fields/form-conditions";
 import { customValuesForCreate, customValuesForUpdate } from "@/features/custom-fields/settings";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { parseCustomFields } from "@/features/custom-fields/values";
+import { conditionRemovalNote } from "@/features/audit/condition-removal";
 import { customFieldMessage } from "@/lib/errors";
 
 // FLD-09: conditional fields. The database checks the shape (app.field_condition_check);
@@ -505,10 +506,25 @@ describe("pipeline conditions (deals)", () => {
       expect(fieldsAffectedByPipelineDelete(fields, P1, stages).map((f) => f.key)).toEqual(["signed", "contract"]);
       expect(fieldsAffectedByPipelineDelete(fields, P2, [S2A]).map((f) => f.key)).toEqual(["po", "contract"]);
       expect(pipelineDeleteQuestion("שותפים", [])).toBe('למחוק את תהליך המכירה "שותפים"?');
-      expect(pipelineDeleteQuestion("שותפים", ["חוזה"])).toBe('למחוק את תהליך המכירה "שותפים"? התנאי של השדה "חוזה" מבוסס עליו, ויימחק יחד איתו.');
+      // owner, 15 October 2026: the window counts the conditions and names the fields
+      expect(pipelineDeleteQuestion("שותפים", ["חוזה"])).toBe('למחוק את תהליך המכירה "שותפים"? תנאי אחד מבוסס עליו ויוסר, בשדה "חוזה".');
       expect(pipelineDeleteQuestion("שותפים", ["חוזה", "הזמנת רכש"])).toBe(
-        'למחוק את תהליך המכירה "שותפים"? התנאים של השדות "חוזה", "הזמנת רכש" מבוססים עליו, ויימחקו יחד איתו.',
+        'למחוק את תהליך המכירה "שותפים"? 2 תנאים מבוססים עליו ויוסרו, בשדות: "חוזה", "הזמנת רכש".',
       );
+      // the window's list for a condition that holds only "is not this pipeline" (removed with it, owner)
+      const notThis = def("not_this", "text", { label: "לא כאן", condition: { field: "builtin:pipeline", op: "not_equals", value: P1, effect: "show" } });
+      expect(fieldsAffectedByPipelineDelete([notThis], P1, stages).map((f) => f.label)).toEqual(["לא כאן"]);
     });
+  });
+});
+
+describe("the audit entry of a deleted pipeline's conditions", () => {
+  it("is one line with the fields' labels", () => {
+    const changes = { fields: [{ key: "po", label: "הזמנת רכש", removed: true }, { key: "contract", label: "חוזה", removed: false }] };
+    expect(conditionRemovalNote("conditions_removed", changes)).toBe('תהליך המכירה נמחק; תנאים הוסרו משדות: "הזמנת רכש", "חוזה"');
+    expect(conditionRemovalNote("conditions_removed", { fields: [{ key: "po", label: "", removed: true }] })).toBe('תהליך המכירה נמחק; תנאים הוסרו משדות: "po"');
+    expect(conditionRemovalNote("update", changes)).toBeNull();
+    expect(conditionRemovalNote("conditions_removed", { fields: [] })).toBeNull();
+    expect(conditionRemovalNote("conditions_removed", { erased: true })).toBeNull();
   });
 });

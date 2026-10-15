@@ -15,7 +15,7 @@ export async function listFieldDefinitions(
   const supabase = await createClient();
   let query = supabase
     .from("field_definitions")
-    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition")
+    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at")
     .eq("organization_id", orgId)
     .eq("object_type", objectType);
   if (!options.includeInactive) {
@@ -40,6 +40,7 @@ export async function listFieldDefinitions(
       isReadOnly: row.is_read_only,
       defaultValue: row.default_value,
       condition: parseCondition(row.condition),
+      conditionRemovedAt: row.condition_removed_at,
     }));
   // a "user" field picks one of the business's members (FLD-01); a former member keeps their name
   if (definitions.some((field) => field.type === "user")) {

@@ -225,7 +225,7 @@ describe("report shaping from the saved samples", () => {
     results.report_goal_forecast = sample("report_goal_forecast");
     const piped = await buildReport(id, "forecast", { ...filters, pipelineId: "00000000-0000-4000-8000-000000000006" });
     expect(piped.sections[0].columns.map((c) => c.key)).not.toContain("goal_percent");
-    expect(piped.sections[0].note).toContain("בכל הפייפליינים");
+    expect(piped.sections[0].note).toContain("בכל תהליכי המכירה");
 
     // nothing overdue: no "ועוד" line
     const none = sample("report_goal_forecast") as Record<string, unknown>;

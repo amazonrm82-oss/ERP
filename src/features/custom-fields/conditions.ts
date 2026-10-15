@@ -469,12 +469,15 @@ export function fieldsAffectedByPipelineDelete(definitions: FieldDefinition[], p
   });
 }
 
-/** The delete window's question with the fields whose conditions go with the pipeline. */
+/**
+ * The delete window's question: how many conditions go with the pipeline (one per field: a field's condition
+ * is removed, or the part based on the pipeline and its stages is) and which fields (owner, 15 October 2026).
+ */
 export function pipelineDeleteQuestion(pipelineName: string, fieldLabels: string[]): string {
   const question = `למחוק את תהליך המכירה "${pipelineName}"?`;
   if (fieldLabels.length === 0) return question;
   const names = fieldLabels.map((label) => `"${label}"`).join(", ");
   return fieldLabels.length === 1
-    ? `${question} התנאי של השדה ${names} מבוסס עליו, ויימחק יחד איתו.`
-    : `${question} התנאים של השדות ${names} מבוססים עליו, ויימחקו יחד איתו.`;
+    ? `${question} תנאי אחד מבוסס עליו ויוסר, בשדה ${names}.`
+    : `${question} ${fieldLabels.length} תנאים מבוססים עליו ויוסרו, בשדות: ${names}.`;
 }

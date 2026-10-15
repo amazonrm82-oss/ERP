@@ -174,9 +174,9 @@ describe("pipeline and stage by name", () => {
   });
 
   it("an unknown name is an error, never a new stage; a stage counts only in its pipeline", () => {
-    expect(resolveStage(pipelines, stages, "שיווק", null)).toBe('אין פייפליין בשם "שיווק".');
-    expect(resolveStage(pipelines, stages, null, "פנייה")).toMatch(/^אין שלב בשם "פנייה" בפייפליין "מכירות"/);
-    expect(resolveStage([], [], null, null)).toBe("אין פייפליין בעסק.");
+    expect(resolveStage(pipelines, stages, "שיווק", null)).toBe('אין תהליך מכירה בשם "שיווק".');
+    expect(resolveStage(pipelines, stages, null, "פנייה")).toMatch(/^אין שלב בשם "פנייה" בתהליך המכירה "מכירות"/);
+    expect(resolveStage([], [], null, null)).toBe("אין תהליך מכירה בעסק.");
   });
 });
 

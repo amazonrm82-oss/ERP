@@ -131,8 +131,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
   deal: [
     { key: "name", label: "שם העסקה", synonyms: ["שם", "שם עסקה", "עסקה", "deal", "deal name", "name", "title"] },
     { key: "amount", label: "ערך (₪)", synonyms: ["ערך", "סכום", "שווי", "amount", "value", "deal value", "price"] },
-    { key: "pipeline", label: "פייפליין (לפי שם)", synonyms: ["פייפליין", "צנרת", "pipeline", "תהליך מכירה"] },
-    { key: "stage", label: "שלב (לפי שם, בפייפליין)", synonyms: ["שלב", "stage", "deal stage", "מצב"] },
+    { key: "pipeline", label: "תהליך מכירה (לפי שם)", synonyms: ["פייפליין", "צנרת", "pipeline", "תהליך מכירה"] },
+    { key: "stage", label: "שלב (לפי שם, בתהליך המכירה)", synonyms: ["שלב", "stage", "deal stage", "מצב"] },
     { key: "expected_close_date", label: "תאריך סגירה צפוי", synonyms: ["תאריך סגירה צפוי", "סגירה צפויה", "expected close", "expected close date", "close date"] },
     { key: "closed_date", label: "תאריך סגירה בפועל (לעסקה שנסגרה)", synonyms: ["תאריך סגירה בפועל", "נסגרה בתאריך", "closed", "closed at", "closed date", "won date", "lost date"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },

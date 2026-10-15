@@ -80,7 +80,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
         owners={owners}
         pipelineId={filters.pipelineId ?? ""}
         pipelines={pipelines.map((p) => ({ value: p.id, label: p.isDefault ? `${p.name} (ברירת מחדל)` : p.name }))}
-        pipelineEmptyLabel={definition.key === "funnel" ? "ברירת המחדל" : "כל הפייפליינים"}
+        pipelineEmptyLabel={definition.key === "funnel" ? "ברירת המחדל" : "כל תהליכי המכירה"}
       />
       {view.ok ? (
         <ReportBody

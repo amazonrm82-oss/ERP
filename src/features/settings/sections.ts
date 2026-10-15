@@ -89,7 +89,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
       label: "התאמה אישית",
       sections: access.admin
         ? [
-            { href: paths.settingsPipelines(orgId), label: "פייפליינים", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
+            { href: paths.settingsPipelines(orgId), label: "תהליכי מכירה", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
             { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
             // PRD-04
             { href: productListsSettingsPath(orgId), label: "קטגוריות ויחידות מידה", description: "הרשימות שבוחרים מהן בכל מוצר בקטלוג", icon: TagIcon },

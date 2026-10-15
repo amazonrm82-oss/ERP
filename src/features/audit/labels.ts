@@ -88,6 +88,8 @@ export const ACTION_LABELS: Record<string, string> = {
   export: "ייצוא",
   // QUO-03: an owner or admin moved the next number of a series forward
   number_jump: "קפיצה קדימה במספור",
+  // FLD-09: a deleted pipeline took the conditions based on it (app.pipeline_conditions_cleanup)
+  conditions_removed: "הסרת תנאים של שדות",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
@@ -107,6 +109,9 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
 export const FIELD_LABELS: Record<string, string> = {
   // QUO-03 jump forward
   next_number: "המספר הבא",
+  // FLD-09: a custom field's show / require condition, and the mark a deleted pipeline leaves
+  condition: "תנאי",
+  condition_removed_at: "התנאי הוסר (תהליך המכירה נמחק)",
   prefix: "קידומת",
   start_number: "מספר התחלתי",
   // CAP-09

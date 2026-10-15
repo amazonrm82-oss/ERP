@@ -88,7 +88,7 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
     const notes = [
       definition.description,
       today < paceFrom ? `${paceFromText(paceFrom)}.` : null,
-      pipelineId ? "היעדים נמדדים בכל הפייפליינים, בלי קשר לסינון." : null,
+      pipelineId ? "היעדים נמדדים בכל תהליכי המכירה, בלי קשר לסינון." : null,
     ];
     return [
       {
@@ -508,7 +508,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             note: [
               "צפי: מה שכבר נסגר בחודש ועוד השווי המשוקלל של העסקאות הפתוחות שצפויות להיסגר בו.",
               withGoal ? `יעד: ${goalWho} לחודש.` : null,
-              pipelineId ? "היעדים נמדדים בכל הפייפליינים, ולכן הם לא מוצגים כשבוחרים פייפליין." : null,
+              pipelineId ? "היעדים נמדדים בכל תהליכי המכירה, ולכן הם לא מוצגים כשבוחרים תהליך מכירה." : null,
               "עסקאות שתאריך הסגירה שלהן עבר לא נכנסות לאף חודש, והן בשורה נפרדת.",
               overdueMore ? `${overdueMore}.` : null,
             ]
@@ -526,7 +526,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי שלב",
             columns: split("stage"),
             rows: data.by_stage.map((r) => ({
-              stage: pipelines.size > 1 ? `${r.pipeline_name ?? "פייפליין"}: ${r.name ?? "שלב"}` : (r.name ?? "שלב"),
+              stage: pipelines.size > 1 ? `${r.pipeline_name ?? "תהליך מכירה"}: ${r.name ?? "שלב"}` : (r.name ?? "שלב"),
               ...splitRow(r),
             })),
             bar: "weighted",
