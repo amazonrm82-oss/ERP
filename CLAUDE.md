@@ -710,6 +710,19 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   nothing is ever deleted) and new-lead notices to the owner (count only, first at once, then daily, `app.leads_waiting_text`
   mirrored by `leadsWaitingText()`; `crm-suspended-lead-notices`). A new redefinition of `intake_submit` must keep
   `app.org_takes_leads` and the `v_rotation_closed` lines.
+- Individual permissions (PRM-01, migrations 020000-020020; owner 15 October 2026, plan capability `granular_permissions`):
+  `public.member_permissions` (one row per org and user, keys from the closed list `app.member_permission_keys()` mirrored by
+  `MEMBER_PERMISSIONS`; clients read their own row, owners/admins all; written only by `set_member_permissions()`, which refuses a
+  key whose module is not built, `app.member_permission_built_keys()`, hint `permissions:not_built`; audited with the keys before
+  and after; cleared when the member is suspended or leaves manager/member). `app.has_grant(org, key)` / `app.has_permission`;
+  gates `app.can_export`, `app.can_import`, `app.can_edit_catalog` (catalog policies and quota guards) and
+  `app.can_manage_automations` (automations policies, `run_automation_now`; option א: organization-wide, with the warning and
+  confirmation in the app). A new module asks `app.has_permission(org, key)` and adds its key to the built list.
+  `public.undo_own_import(org, job)` (definer): the caller's own finished import, within 7 days, records unchanged
+  (`updated_at = created_at`) and not worked on (`app.import_record_worked`). Every rule keeps `created_by`/`updated_by`; an insert or
+  update an automation makes names the rule in its audit entry, from `app.automation_rule_runs` (65,536 fixed slots keyed by
+  `txid_current() % 65536`, taken with SKIP LOCKED; never a session setting). `app.audit_row` and `app.execute_automation` were last
+  redefined in 020020.
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
