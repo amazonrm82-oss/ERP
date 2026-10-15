@@ -27,6 +27,8 @@ import {
 import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { parsePeople, pickPeople, PEOPLE_MAX, teammatesOf, teamPeople, visibleTeams } from "@/features/calendar/team";
 import { holidaysByDay } from "@/features/calendar-days/holidays";
+import { listMeetingTypeChoices } from "@/features/meeting-types/queries";
+import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { PrintAgenda } from "@/features/print/components/print-agenda";
 import { PrintButton } from "@/features/print/components/print-button";
@@ -49,8 +51,10 @@ const TASK_TYPE_LABEL: Record<string, string> = Object.fromEntries(TASK_TYPE_OPT
 const TASK_STATUS_LABEL: Record<string, string> = { open: "פתוחה", done: "בוצעה" };
 const RELATED_LABEL = { lead: "פתיחת הליד", contact: "פתיחת איש הקשר", company: "פתיחת החברה", deal: "פתיחת העסקה" } as const;
 
-function entry(orgId: string, item: CalendarItem): CalendarEntry {
+function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<string, MeetingTypeChoice>): CalendarEntry {
   const meeting = item.kind === "meeting";
+  // CAL-08: a deleted type is gone (the link was cleared); a hidden one still shows
+  const meetingType = meeting && item.meetingTypeId ? (meetingTypes.get(item.meetingTypeId) ?? null) : null;
   return {
     id: item.id,
     kind: item.kind,
@@ -60,6 +64,8 @@ function entry(orgId: string, item: CalendarItem): CalendarEntry {
     kindLabel: meeting ? "פגישה" : "משימה",
     typeLabel: (meeting ? MEETING_TYPE_LABEL[item.type] : TASK_TYPE_LABEL[item.type]) ?? item.type,
     statusLabel: (meeting ? MEETING_STATUS_LABEL[item.status] : TASK_STATUS_LABEL[item.status]) ?? item.status,
+    meetingTypeName: meetingType?.name ?? null,
+    tone: meetingType?.color ?? null,
     closed: isDoneOrCancelled(item.kind, item.status),
     ownerName: item.ownerName,
     location: item.location,
@@ -93,7 +99,8 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   // `done` rides along on every link of the screen
   const done = showDone || undefined;
 
-  const [allMembers, teamData] = await Promise.all([listMembers(orgId), listCalendarTeams(orgId)]);
+  const [allMembers, teamData, meetingTypes] = await Promise.all([listMembers(orgId), listCalendarTeams(orgId), listMeetingTypeChoices(orgId)]);
+  const typeById = new Map(meetingTypes.map((type) => [type.id, type]));
   const members = allMembers.filter((member) => member.status === "active").map((member) => ({ id: member.userId, name: member.name }));
   const teams = visibleTeams(teamData.teams, teamData.memberships, me, {
     isAdmin: context.role === "owner" || context.role === "admin",
@@ -116,7 +123,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   const days = viewDays(view, day);
   const { items, truncated } = await listCalendarItems(orgId, rangeBounds(days, timeZone), people, showDone);
-  const entries = items.map((item) => entry(orgId, item));
+  const entries = items.map((item) => entry(orgId, item, typeById));
   const holidays = Object.fromEntries(holidaysByDay(days[0], days[days.length - 1]));
 
   const href = (target: { view?: typeof view; date?: string }) =>
@@ -283,6 +290,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
           autoView={requestedView === null}
           holidays={holidays}
           members={context.canWrite ? members.map((member) => ({ userId: member.id, name: member.id === me ? `${member.name} (אני)` : member.name })) : []}
+          meetingTypes={context.canWrite ? meetingTypes : []}
         />
       </div>
 

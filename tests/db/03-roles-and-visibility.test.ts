@@ -244,6 +244,7 @@ describe("roles and record visibility", () => {
       "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
       // LEAD-05
       "insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'email', 'filled', 5)",
+      "insert into public.meeting_types (organization_id, name) values ($1, 'x')",
       "insert into public.product_categories (organization_id, name) values ($1, 'x')",
       "insert into public.product_units (organization_id, name) values ($1, 'x')",
       // PRD-01: the catalog is written by owners and admins only (PRD-06 may refine)
@@ -311,6 +312,7 @@ describe("roles and record visibility", () => {
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       lead_score_rules: "points = points",
+      meeting_types: "name = name",
       // PRD-04, seeded for every organization
       product_categories: "name = name",
       product_units: "name = name",

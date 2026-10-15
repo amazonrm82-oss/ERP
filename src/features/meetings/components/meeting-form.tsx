@@ -9,6 +9,7 @@ import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { TimelineSubject } from "@/features/activities/schema";
+import { durationText, fillFromType, offeredTypes, timeAfter, type MeetingTypeChoice } from "@/features/meeting-types/schema";
 
 import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
 import { MEETING_REMINDER_OPTIONS, MEETING_TYPE_OPTIONS, type MeetingReminderValue } from "../schema";
@@ -18,6 +19,8 @@ export type MemberOption = { userId: string; name: string };
 
 export type MeetingFormValues = {
   title: string;
+  // CAL-08: the business's meeting type, "" = none
+  meeting_type_id: string;
   meeting_type: string;
   date: string;
   start_time: string;
@@ -38,6 +41,8 @@ type Props = {
   meetingId?: string;
   initial: MeetingFormValues;
   members: MemberOption[];
+  // CAL-08: the organization's meeting types (the form offers the active ones and the meeting's own)
+  meetingTypes?: MeetingTypeChoice[];
   timeZone: string;
   // message: the meeting was saved but something next to it was not (participants)
   onDone: (message?: string) => void;
@@ -53,7 +58,7 @@ function anHourLater(time: string): string {
 }
 
 /** New or edited meeting (CAL-01): what, when, where, who comes. */
-export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZone, onDone, onCancel }: Props) {
+export function MeetingForm({ orgId, subject, meetingId, initial, members, meetingTypes = [], timeZone, onDone, onCancel }: Props) {
   const action = meetingId ? updateMeetingAction.bind(null, orgId, meetingId, subject) : createMeetingAction.bind(null, orgId, subject);
   const [state, formAction] = useActionState<MeetingFormState, FormData>(action, null);
   const failure = state && !state.ok ? state : null;
@@ -67,6 +72,22 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
   const [type, setType] = useState(values?.meeting_type ?? initial.meeting_type);
   const [start, setStart] = useState(values?.start_time ?? initial.start_time);
   const [end, setEnd] = useState(values?.end_time ?? initial.end_time);
+  const [title, setTitle] = useState(values?.title ?? initial.title);
+  const [location, setLocation] = useState(values?.location ?? initial.location);
+  const [typeId, setTypeId] = useState(values?.meeting_type_id ?? initial.meeting_type_id);
+  const types = offeredTypes(meetingTypes, initial.meeting_type_id);
+  const typeOf = (id: string) => types.find((t) => t.id === id) ?? null;
+
+  /** CAL-08: a picked type fills the end (its duration), the format, and an untouched title and location. */
+  function pickType(nextId: string) {
+    const filled = fillFromType(typeOf(typeId), typeOf(nextId), { title, format: type, location, startTime: start, endTime: end });
+    setTypeId(nextId);
+    setTitle(filled.title);
+    setType(filled.format);
+    setLocation(filled.location);
+    setEnd(filled.endTime);
+  }
+  const picked = typeOf(typeId);
 
   useEffect(() => {
     if (state?.ok) onDone(state.message);
@@ -76,6 +97,25 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
     <form action={formAction} onChange={() => setChangedAfter(state)} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure && !failure.fieldErrors && !failure.conflicts ? failure.message : null} />
+      {types.length > 0 ? (
+        <SelectField
+          label="סוג פגישה"
+          name="meeting_type_id"
+          value={typeId}
+          onChange={(event) => pickType(event.target.value)}
+          hint={picked ? `${durationText(picked.durationMinutes)}. המשך, המיקום ואופן הפגישה מתמלאים לבד, ואפשר לשנות.` : undefined}
+          error={errors.meeting_type_id}
+        >
+          <option value="">בלי סוג</option>
+          {types.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <input type="hidden" name="meeting_type_id" value={typeId} />
+      )}
       <TextField
         label="כותרת"
         name="title"
@@ -83,10 +123,11 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
         maxLength={300}
         autoComplete="off"
         placeholder="למשל: פגישת היכרות"
-        defaultValue={values?.title ?? initial.title}
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
         error={errors.title}
       />
-      <SelectField label="סוג" name="meeting_type" value={type} onChange={(event) => setType(event.target.value)} error={errors.meeting_type}>
+      <SelectField label="אופן הפגישה" name="meeting_type" value={type} onChange={(event) => setType(event.target.value)} error={errors.meeting_type}>
         {MEETING_TYPE_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -112,8 +153,8 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
           onChange={(event) => {
             const next = event.target.value;
             setStart(next);
-            // keep the end after the start, an hour later by default
-            if (next && end <= next) setEnd(anHourLater(next));
+            // keep the end after the start: the type's duration later, else an hour later
+            if (next && end <= next) setEnd(picked ? timeAfter(next, picked.durationMinutes) : anHourLater(next));
           }}
           error={errors.start_time}
         />
@@ -136,7 +177,8 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, timeZ
             label={type === "phone" ? "מספר או הערה לשיחה (לא חובה)" : "מיקום (לא חובה)"}
             name="location"
             maxLength={500}
-            defaultValue={values?.location ?? initial.location}
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
             error={errors.location}
           />
       )}

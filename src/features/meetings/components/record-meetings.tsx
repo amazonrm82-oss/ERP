@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { TimelineSubject } from "@/features/activities/schema";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
+import { listMeetingTypeChoices } from "@/features/meeting-types/queries";
 import { listMembers } from "@/features/settings/queries";
 import { zoneDate } from "@/lib/format";
 
@@ -26,7 +27,12 @@ type Props = {
  * meeting is a stacked block; forms open as a bottom sheet.
  */
 export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userId }: Props) {
-  const [meetings, members] = await Promise.all([listRecordMeetings(orgId, subject), canWrite ? listMembers(orgId) : Promise.resolve([])]);
+  const [meetings, members, meetingTypes] = await Promise.all([
+    listRecordMeetings(orgId, subject),
+    canWrite ? listMembers(orgId) : Promise.resolve([]),
+    listMeetingTypeChoices(orgId),
+  ]);
+  const typeById = new Map(meetingTypes.map((type) => [type.id, type]));
   const options: MemberOption[] = members
     .filter((member) => member.status === "active")
     .map((member) => ({ userId: member.userId, name: member.userId === userId ? `${member.name} (אני)` : member.name }));
@@ -34,6 +40,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
 
   const blank: MeetingFormValues = {
     title: "",
+    meeting_type_id: "",
     meeting_type: "in_person",
     date: zoneDate(new Date(), timeZone),
     start_time: "10:00",
@@ -45,11 +52,17 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
     reminder_minutes: DEFAULT_MEETING_REMINDER,
   };
 
-  const item = (meeting: MeetingItem) => (
+  const item = (meeting: MeetingItem) => {
+    const meetingType = meeting.meetingTypeId ? typeById.get(meeting.meetingTypeId) : undefined;
+    return (
     <li key={meeting.id} className="space-y-1.5 py-3 last:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <span className="min-w-0 break-words font-medium">{meeting.title}</span>
-        <Badge tone={MEETING_STATUS_TONE[meeting.status] ?? "neutral"}>{MEETING_STATUS_LABEL[meeting.status] ?? meeting.status}</Badge>
+        <span className="flex flex-wrap gap-1.5">
+          {/* CAL-08: the type in its colour, with its name (never colour alone) */}
+          {meetingType ? <Badge tone={meetingType.color ?? "neutral"}>{meetingType.name}</Badge> : null}
+          <Badge tone={MEETING_STATUS_TONE[meeting.status] ?? "neutral"}>{MEETING_STATUS_LABEL[meeting.status] ?? meeting.status}</Badge>
+        </span>
       </div>
       <p className="text-sm text-ink-soft">
         <time dateTime={meeting.startsAt}>{formatMeetingWhen(meeting.startsAt, meeting.endsAt, timeZone)}</time>
@@ -84,6 +97,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
           orgId={orgId}
           subject={subject}
           members={options}
+          meetingTypes={meetingTypes}
           timeZone={timeZone}
           meetingId={meeting.id}
           title={meeting.title}
@@ -91,6 +105,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
           outcome={meeting.outcome ?? ""}
           initial={{
             title: meeting.title,
+            meeting_type_id: meeting.meetingTypeId ?? "",
             meeting_type: meeting.meetingType,
             ...meetingFormTimes(meeting.startsAt, meeting.endsAt, timeZone),
             location: meeting.location ?? "",
@@ -103,13 +118,14 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
       ) : null}
       <InviteFileLink orgId={orgId} meetingId={meeting.id} title={meeting.title} />
     </li>
-  );
+    );
+  };
 
   return (
     <Card aria-labelledby="record-meetings-title">
       <CardHeader id="record-meetings-title" title={meetings.length > 0 ? `פגישות (${meetings.length})` : "פגישות"} />
       <CardBody className="space-y-4">
-        {canWrite ? <NewMeetingButton orgId={orgId} subject={subject} members={options} timeZone={timeZone} initial={blank} /> : null}
+        {canWrite ? <NewMeetingButton orgId={orgId} subject={subject} members={options} meetingTypes={meetingTypes} timeZone={timeZone} initial={blank} /> : null}
         {meetings.length === 0 ? <p className="text-md text-ink-soft">אין עדיין פגישות עם הרשומה הזו.</p> : null}
         {upcoming.length > 0 ? (
           <section aria-labelledby="meetings-upcoming">

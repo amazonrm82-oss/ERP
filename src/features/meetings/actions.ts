@@ -39,7 +39,7 @@ function keepParticipants(state: MeetingFormState, formData: FormData): MeetingF
 async function conflictState(
   supabase: Client,
   orgId: string,
-  check: { span: Span; userIds: string[]; excludeId?: string; timeZone: string },
+  check: { span: Span; userIds: string[]; excludeId?: string; timeZone: string; typeId?: string | null },
   formData: FormData,
 ): Promise<MeetingFormState> {
   const conflicts = await meetingConflicts(supabase, orgId, check);
@@ -100,6 +100,7 @@ async function parseMeeting(supabase: Client, orgId: string, formData: FormData)
     confirmed: formData.get("conflicts_ok") === "1",
     row: {
       title: data.title,
+      meeting_type_id: data.meeting_type_id,
       meeting_type: data.meeting_type,
       ...times,
       location: data.location,
@@ -181,7 +182,12 @@ async function createMeeting(orgId: string, subject: TimelineSubject | null, for
   if (!parsed.confirmed) {
     // the organizer is the user (meetings_default_owner)
     const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
-    const warning = await conflictState(supabase, orgId, { span, userIds: [context.user.id, ...parsed.participants], timeZone: parsed.timeZone }, formData);
+    const warning = await conflictState(
+      supabase,
+      orgId,
+      { span, userIds: [context.user.id, ...parsed.participants], timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id },
+      formData,
+    );
     if (warning) return warning;
   }
 
@@ -253,7 +259,7 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
     if (!(HIDDEN_MEETING_STATUSES as readonly string[]).includes(current.status)) {
       const span = { startsAt: parsed.row.starts_at, endsAt: parsed.row.ends_at };
       const userIds = [...(current.owner_id ? [current.owner_id] : []), ...parsed.participants];
-      const warning = await conflictState(supabase, orgId, { span, userIds, excludeId: meetingId, timeZone: parsed.timeZone }, formData);
+      const warning = await conflictState(supabase, orgId, { span, userIds, excludeId: meetingId, timeZone: parsed.timeZone, typeId: parsed.row.meeting_type_id }, formData);
       if (warning) return warning;
     }
   }

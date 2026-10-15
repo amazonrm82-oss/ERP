@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { BackIcon, CalendarIcon, CheckSquareIcon, ForwardIcon } from "@/components/ui/icons";
 import { HolidayLegend, HolidayMarks } from "@/features/calendar-days/components/holiday-marks";
+import type { StageColor } from "@/features/deals/stage-colors";
+import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
 import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
@@ -57,6 +59,9 @@ export type CalendarEntry = TimedItem & {
   kindLabel: string;
   typeLabel: string;
   statusLabel: string;
+  // CAL-08: the meeting type's name and colour; null for none and for tasks
+  meetingTypeName: string | null;
+  tone: StageColor | null;
   // a held/cancelled meeting or a done task is drawn quieter
   closed: boolean;
   ownerName: string | null;
@@ -87,6 +92,8 @@ type Props = {
   holidays: Record<string, Holiday[]>;
   // the active members, for the participants of the meeting form (writers only)
   members: MemberOption[];
+  // CAL-08: the organization's meeting types, for the meeting form
+  meetingTypes: MeetingTypeChoice[];
 };
 
 type DragMode = "time" | "month";
@@ -146,9 +153,18 @@ function whenText(item: TimedItem, timeZone: string): string {
   return `${longDay(startDay)}, ${zoneTime(start, timeZone)}–${endText}`;
 }
 
+// CAL-08: an open meeting in its type's colour (the type's name is in the details, never colour alone)
+const MEETING_TONE: Record<StageColor, string> = {
+  accent: "border-s-4 border-accent bg-accent-soft text-accent-strong",
+  success: "border-s-4 border-success bg-success-soft text-success",
+  warning: "border-s-4 border-warning bg-warning-soft text-warning",
+  danger: "border-s-4 border-danger bg-danger-soft text-danger",
+  neutral: "border-s-4 border-ink-soft bg-canvas text-ink",
+};
+
 function itemClasses(item: CalendarEntry): string {
   if (item.kind === "meeting") {
-    return item.closed ? "border-s-4 border-line-strong bg-canvas text-ink-soft" : "border-s-4 border-accent bg-accent-soft text-accent-strong";
+    return item.closed ? "border-s-4 border-line-strong bg-canvas text-ink-soft" : MEETING_TONE[item.tone ?? "accent"];
   }
   return cn("border border-line-strong bg-surface", item.closed ? "text-ink-soft line-through" : "text-ink");
 }
@@ -161,7 +177,7 @@ function itemClasses(item: CalendarEntry): string {
  * item is also a button that opens its details with a "move" form, so moving
  * works from the keyboard and with a screen reader.
  */
-export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays, members }: Props) {
+export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZone, canMove, scope, people, autoView, holidays, members, meetingTypes }: Props) {
   const router = useRouter();
   const [shown, showMoved] = useOptimistic(items, (state, moved: { id: string; startsAt: string; endsAt: string | null }) =>
     state.map((item) => (item.id === moved.id ? { ...item, startsAt: moved.startsAt, endsAt: moved.endsAt } : item)),
@@ -427,6 +443,7 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
             timeZone={timeZone}
             canMove={canMove}
             members={members}
+            meetingTypes={meetingTypes}
             onMove={(date, time) => {
               setOpenId(null);
               move(opened, date, time);
@@ -792,7 +809,8 @@ function AgendaList({
                       {item.title}
                     </span>
                     <span className="block text-sm text-ink-soft">
-                      {item.kindLabel} · {item.statusLabel}
+                      {item.kindLabel}
+                      {item.meetingTypeName ? ` · ${item.meetingTypeName}` : ""} · {item.statusLabel}
                       {item.ownerName ? ` · ${item.ownerName}` : ""}
                     </span>
                   </span>
@@ -819,6 +837,7 @@ function ItemDetails({
   timeZone,
   canMove,
   members,
+  meetingTypes,
   onMove,
   onChanged,
 }: {
@@ -827,6 +846,7 @@ function ItemDetails({
   timeZone: string;
   canMove: boolean;
   members: MemberOption[];
+  meetingTypes: MeetingTypeChoice[];
   onMove: (date: string, time: string) => void;
   onChanged: (change: MeetingChange, message?: string) => void;
 }) {
@@ -867,7 +887,13 @@ function ItemDetails({
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-md">
         <dt className="text-ink-soft">מתי</dt>
         <dd>{whenText(item, timeZone)}</dd>
-        <dt className="text-ink-soft">סוג</dt>
+        {item.meetingTypeName ? (
+          <>
+            <dt className="text-ink-soft">סוג פגישה</dt>
+            <dd className="break-words">{item.meetingTypeName}</dd>
+          </>
+        ) : null}
+        <dt className="text-ink-soft">{item.kind === "meeting" ? "אופן" : "סוג"}</dt>
         <dd>{item.typeLabel}</dd>
         <dt className="text-ink-soft">סטטוס</dt>
         <dd>{item.statusLabel}</dd>
@@ -933,6 +959,7 @@ function ItemDetails({
           orgId={orgId}
           subject={meeting.subject}
           members={members}
+          meetingTypes={meetingTypes}
           timeZone={timeZone}
           meetingId={meeting.id}
           title={meeting.title}
@@ -940,6 +967,7 @@ function ItemDetails({
           outcome={meeting.outcome ?? ""}
           initial={{
             title: meeting.title,
+            meeting_type_id: meeting.meetingTypeId ?? "",
             meeting_type: meeting.meetingType,
             ...meetingFormTimes(meeting.startsAt, meeting.endsAt, timeZone),
             location: meeting.location ?? "",

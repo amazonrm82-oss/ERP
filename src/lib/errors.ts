@@ -179,6 +179,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "org:closed": `העסק סגור, ולכן אי אפשר ליצור בו מסמך חדש. לבירור: ${SUPPORT_LINE}.`,
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
+  // CAL-08 (migration meeting_types)
+  "meeting_types:max": "אפשר לשמור עד 50 סוגי פגישה. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
+  "meeting_type:product": "השירות שנבחר כבר לא פעיל בקטלוג. בחרו שירות פעיל, או השאירו בלי שירות.",
+  "meeting:type": "סוג הפגישה שנבחר כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
   // CON-04 (migration israeli_ids)
   "tax_id:invalid": "מספר ח.פ. או עוסק מורשה אינו תקין. בדקו את 9 הספרות.",
   // CON-04, a company outside Israel (migration foreign_company_number)

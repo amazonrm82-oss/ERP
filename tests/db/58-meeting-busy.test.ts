@@ -59,7 +59,7 @@ describe("busy times for conflict warnings (CAL-05)", () => {
     expect(rows[0]).toMatchObject({ user_id: rep.id, meeting_id: null, title: null });
     expect(rows[0].starts_at.toISOString()).toBe("2026-11-02T08:30:00.000Z");
     expect(rows[0].ends_at.toISOString()).toBe("2026-11-02T09:30:00.000Z");
-    expect(Object.keys(rows[0]).sort()).toEqual(["ends_at", "meeting_id", "starts_at", "title", "user_id"]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["busy_from", "busy_to", "ends_at", "meeting_id", "starts_at", "title", "user_id"]);
 
     // the organizer and the owner (admin) may read it: id and title come back
     for (const caller of [rep, owner]) {

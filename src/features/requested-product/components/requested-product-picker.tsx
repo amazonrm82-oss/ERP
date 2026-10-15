@@ -15,6 +15,10 @@ type Props = {
   orgId: string;
   initial: RequestedProductChoice;
   error?: string;
+  // CAL-08 reuses the picker for a meeting type's linked service
+  name?: string;
+  label?: string;
+  hint?: string;
 };
 
 /**
@@ -22,7 +26,7 @@ type Props = {
  * `requested_product_id` ("" = none); the search box itself sends nothing. Only offerable products
  * (active, not archived) are found; a product stored earlier stays as it is until changed.
  */
-export function RequestedProductPicker({ orgId, initial, error }: Props) {
+export function RequestedProductPicker({ orgId, initial, error, name = REQUESTED_PRODUCT_FIELD, label = "מוצר מבוקש", hint = "לא חובה. מוצרים פעילים מהקטלוג." }: Props) {
   const [picked, setPicked] = useState<RequestedProductChoice>(initial);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<RequestedProductHit[]>([]);
@@ -50,10 +54,10 @@ export function RequestedProductPicker({ orgId, initial, error }: Props) {
 
   return (
     <div>
-      <input type="hidden" name={REQUESTED_PRODUCT_FIELD} value={picked?.id ?? ""} />
+      <input type="hidden" name={name} value={picked?.id ?? ""} />
       {picked ? (
         <>
-          <p className="mb-1.5 block text-sm font-medium text-ink">מוצר מבוקש</p>
+          <p className="mb-1.5 block text-sm font-medium text-ink">{label}</p>
           <div className="flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-1 truncate rounded-md border border-line bg-canvas px-3 py-2.5">
               <bdi>{picked.name}</bdi>
@@ -71,7 +75,7 @@ export function RequestedProductPicker({ orgId, initial, error }: Props) {
         </>
       ) : (
         <>
-          <Label htmlFor={inputId}>מוצר מבוקש</Label>
+          <Label htmlFor={inputId}>{label}</Label>
           <Input
             id={inputId}
             type="search"
@@ -92,7 +96,7 @@ export function RequestedProductPicker({ orgId, initial, error }: Props) {
             </p>
           ) : (
             <p id={`${inputId}-hint`} className="mt-1.5 text-sm text-ink-soft">
-              לא חובה. מוצרים פעילים מהקטלוג.
+              {hint}
             </p>
           )}
           <p aria-live="polite" className="text-sm text-ink-soft empty:hidden">

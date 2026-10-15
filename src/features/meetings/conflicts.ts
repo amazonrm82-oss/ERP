@@ -6,6 +6,9 @@
 //   time. Cancelled and no-show meetings do not count (the database leaves
 //   them out). Back to back (one ends when the other starts) is not a conflict.
 //   A meeting the user may not see is named only "another meeting".
+//   CAL-08: a meeting type's buffers keep free time around a meeting. The new
+//   meeting may not fall into another meeting's buffers, and its own buffers
+//   may not fall on another meeting; two buffers may overlap each other.
 // * A person outside their working hours (USR-01, in their own time zone, or
 //   the organization's when they did not set one). Hours not set: no warning.
 // * A rest day or a holiday of the organization (CAL-03).
@@ -20,9 +23,10 @@ export type Span = { startsAt: string; endsAt: string };
 
 /**
  * One row of public.meeting_busy(): a person is in a meeting at that time.
- * Id and title are null for a meeting the user may not see.
+ * Id and title are null for a meeting the user may not see. busyFrom / busyTo
+ * add the meeting type's buffers (CAL-08); absent = the meeting's own times.
  */
-export type BusyRow = Span & { userId: string; meetingId: string | null; title: string | null };
+export type BusyRow = Span & { userId: string; meetingId: string | null; title: string | null; busyFrom?: string; busyTo?: string };
 
 export type ConflictPerson = {
   userId: string;
@@ -38,8 +42,8 @@ export type HoursIssue = "day_off" | "outside";
 export type PersonConflict = {
   userId: string;
   name: string;
-  // meetings the user may see, by title
-  meetings: (Span & { meetingId: string; title: string })[];
+  // meetings the user may see, by title; `buffer`: only the buffers around one of the two meetings clash (CAL-08)
+  meetings: (Span & { meetingId: string; title: string; buffer?: boolean })[];
   // the person has at least one other meeting then that the user may not see
   hidden: boolean;
   hours: HoursIssue | null;
@@ -113,6 +117,8 @@ export function restDayIssues(span: Span, settings: CalendarSettings, timeZone: 
 
 type ReportInput = {
   span: Span;
+  // the span with the new meeting's own buffers (CAL-08); absent = the span itself
+  busySpan?: Span;
   // the organizer first, then the participants; each person once
   people: ConflictPerson[];
   busy: BusyRow[];
@@ -123,7 +129,8 @@ type ReportInput = {
 };
 
 /** Everything to warn about, or null when there is nothing. */
-export function conflictReport({ span, people, busy, excludeId, settings, timeZone }: ReportInput): ConflictReport | null {
+export function conflictReport({ span, busySpan, people, busy, excludeId, settings, timeZone }: ReportInput): ConflictReport | null {
+  const taken = busySpan ?? span;
   const seen = new Set<string>();
   const found: PersonConflict[] = [];
   for (const person of people) {
@@ -133,14 +140,18 @@ export function conflictReport({ span, people, busy, excludeId, settings, timeZo
     const meetings: PersonConflict["meetings"] = [];
     let hidden = false;
     for (const row of busy) {
-      if (row.userId !== person.userId || !overlaps(row, span)) continue;
+      // CAL-08: a meeting may not fall into another meeting's buffers, and its own buffers may not
+      // fall on another meeting; two buffers may share the same free time
+      const rowBusy = { startsAt: row.busyFrom ?? row.startsAt, endsAt: row.busyTo ?? row.endsAt };
+      if (row.userId !== person.userId || !(overlaps(rowBusy, span) || overlaps(row, taken))) continue;
       if (row.meetingId === null || row.title === null) {
         hidden = true;
         continue;
       }
       if (row.meetingId === excludeId || ids.has(row.meetingId)) continue;
       ids.add(row.meetingId);
-      meetings.push({ meetingId: row.meetingId, startsAt: row.startsAt, endsAt: row.endsAt, title: row.title });
+      const buffer = !overlaps(row, span);
+      meetings.push({ meetingId: row.meetingId, startsAt: row.startsAt, endsAt: row.endsAt, title: row.title, ...(buffer ? { buffer } : {}) });
     }
     meetings.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.meetingId.localeCompare(b.meetingId));
     const hours = workingHoursIssue(span, person.hours, person.timeZone);
@@ -166,7 +177,7 @@ export function conflictLines(report: ConflictReport, span: Span, timeZone: stri
       const sameDay = startDay === spanDay && endDay === spanDay;
       lines.push({
         key: `${person.userId}-${meeting.meetingId}`,
-        text: `${person.name}: פגישה "${meeting.title}"${sameDay ? "" : `, ${longDay(startDay)}`}`,
+        text: `${person.name}: פגישה "${meeting.title}"${sameDay ? "" : `, ${longDay(startDay)}`}${meeting.buffer ? " (במרווח בין הפגישות)" : ""}`,
         time: sameDay ? `${zoneTime(start, timeZone)}–${zoneTime(end, timeZone)}` : null,
       });
     }

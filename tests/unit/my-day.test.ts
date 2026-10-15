@@ -48,7 +48,7 @@ describe("deals without a next action (TASK-09)", () => {
 });
 
 function item(id: string, kind: "meeting" | "task", startsAt: string, endsAt: string | null): CalendarItem {
-  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", location: null, ownerName: null, related: null, people: [] };
+  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", meetingTypeId: null, location: null, ownerName: null, related: null, people: [] };
 }
 
 describe("today's meetings (TASK-09)", () => {

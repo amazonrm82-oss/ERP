@@ -12,6 +12,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
   // LEAD-05 (owner, 14 October 2026): core, open in every plan
   { feature: "lead_scoring", label: "ציון ליד לפי כללים", built: true, core: true },
+  // CAL-08: a managed list of the calendar, no plan key (owner, 15 October 2026)
+  { feature: "meeting_types", label: "סוגי פגישה עם משך, מרווח וצבע", built: true, core: true },
   // DLI-01..02, PL-03: product lines in a deal sit under the products flag (owner, 14 October 2026)
   { feature: "products", label: "קטלוג מוצרים, מחירונים, מוצר מבוקש בליד ושורות מוצר בעסקה", built: true },
   // DSC-01 (line part): a discount on a deal line (owner, 14 October 2026)

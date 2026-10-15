@@ -308,6 +308,8 @@ export type MeetingRow = {
   deal_id: string | null;
   // CAL-06: minutes before the start that the team is reminded (5, 15, 30, 60, 1440); null = no reminder
   reminder_minutes: number | null;
+  // CAL-08: the meeting type it was set from (meeting_types); null = none or deleted
+  meeting_type_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -331,9 +333,44 @@ export type MeetingInsert = {
   company_id?: string | null;
   deal_id?: string | null;
   reminder_minutes?: number | null;
+  meeting_type_id?: string | null;
 };
 
 export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id">>;
+
+// CAL-08: the kinds of meeting a business holds (migration meeting_types)
+export type MeetingTypeRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  duration_minutes: number;
+  // a MeetingType value, or null = not set
+  meeting_format: string | null;
+  location: string | null;
+  product_id: string | null;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  // a palette key (stage-colors.ts), or null
+  color: string | null;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MeetingTypeInsert = {
+  organization_id: string;
+  name: string;
+  duration_minutes?: number;
+  meeting_format?: MeetingType | null;
+  location?: string | null;
+  product_id?: string | null;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+  color?: string | null;
+  position?: number;
+  is_active?: boolean;
+};
 
 export type MeetingParticipantRow = {
   id: string;
@@ -1818,6 +1855,7 @@ export type Database = {
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
       tasks: Table<TaskRow, TaskInsert & { import_job_id?: string | null }, Partial<TaskInsert>>;
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
+      meeting_types: Table<MeetingTypeRow, MeetingTypeInsert, Partial<Omit<MeetingTypeInsert, "organization_id">>>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant
@@ -1992,10 +2030,19 @@ export type Database = {
       // removes the untouched sample records in one transaction (separate, hand-pasted migration): { removed, kept }
       sample_data_remove: { Args: { p_org: string }; Returns: Json };
       sample_data_records: { Args: { p_org: string }; Returns: Array<{ record_type: string; record_id: string; removable: boolean }> };
-      // busy times of people in a meeting (CAL-05): id and title only of meetings the caller may read
+      // busy times of people in a meeting (CAL-05): id and title only of meetings the caller may read;
+      // busy_from / busy_to add the meeting type's buffers (CAL-08)
       meeting_busy: {
         Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };
-        Returns: Array<{ user_id: string; meeting_id: string | null; title: string | null; starts_at: string; ends_at: string }>;
+        Returns: Array<{
+          user_id: string;
+          meeting_id: string | null;
+          title: string | null;
+          starts_at: string;
+          ends_at: string;
+          busy_from: string;
+          busy_to: string;
+        }>;
       };
       // CAL-07: the personal calendar link (migration 0102); calendar_feed_events is service_role only
       calendar_feed_status: { Args: { p_org: string }; Returns: Json };

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { MeetingStatus, MeetingType } from "@/lib/database.types";
 import { zonedIso } from "@/lib/format";
-import { optionalText, requiredText } from "@/lib/validation";
+import { optionalId, optionalText, requiredText } from "@/lib/validation";
 import { isCalendarDate } from "@/lib/calendar-date";
 
 // CAL-01: a meeting as its own record.
@@ -48,6 +48,7 @@ export function reminderChoice(minutes: number | null): MeetingReminderValue {
 
 export const MEETING_FIELD_NAMES = [
   "title",
+  "meeting_type_id",
   "meeting_type",
   "date",
   "start_time",
@@ -78,7 +79,9 @@ const httpUrl = optionalText(2000, "הקישור ארוך מדי.").refine(
 export const meetingSchema = z
   .object({
     title: requiredText(300, "יש לכתוב כותרת לפגישה.", "הכותרת ארוכה מדי (עד 300 תווים)."),
-    meeting_type: z.enum(MEETING_TYPES, { error: "יש לבחור סוג פגישה." }),
+    // CAL-08: the business's meeting type ("" = none)
+    meeting_type_id: optionalId,
+    meeting_type: z.enum(MEETING_TYPES, { error: "יש לבחור את אופן הפגישה." }),
     date: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string().refine(isCalendarDate, { error: "יש לבחור תאריך." })),
     start_time: requiredTime("יש לבחור שעת התחלה."),
     end_time: requiredTime("יש לבחור שעת סיום."),

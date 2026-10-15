@@ -51,6 +51,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "activities", file: "activities.csv" },
   { table: "meetings", file: "meetings.csv" },
   { table: "meeting_participants", file: "meeting_participants.csv" },
+  // CAL-08
+  { table: "meeting_types", file: "meeting_types.csv" },
   { table: "pipelines", file: "pipelines.csv" },
   { table: "stages", file: "stages.csv" },
   { table: "lead_statuses", file: "lead_statuses.csv" },

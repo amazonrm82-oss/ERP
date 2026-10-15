@@ -8,15 +8,23 @@ import { Dialog } from "@/components/ui/dialog";
 import { PencilIcon, PlusIcon } from "@/components/ui/icons";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import type { TimelineSubject } from "@/features/activities/schema";
+import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 
 import { deleteMeetingAction } from "../actions";
 import { MeetingForm, type MeetingFormValues, type MemberOption } from "./meeting-form";
 import { MeetingStatusForm } from "./meeting-status-form";
 
-type Common = { orgId: string; subject: TimelineSubject; members: MemberOption[]; timeZone: string };
+type Common = {
+  orgId: string;
+  subject: TimelineSubject;
+  members: MemberOption[];
+  timeZone: string;
+  // CAL-08: the organization's meeting types
+  meetingTypes?: MeetingTypeChoice[];
+};
 
 /** "פגישה חדשה" on a record's meetings card: the form opens as a sheet on a phone. */
-export function NewMeetingButton({ orgId, subject, members, timeZone, initial }: Common & { initial: MeetingFormValues }) {
+export function NewMeetingButton({ orgId, subject, members, timeZone, meetingTypes, initial }: Common & { initial: MeetingFormValues }) {
   const [open, setOpen] = useState(false);
   // the app has no toast region yet: a short notice under the button says it worked
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,7 +50,16 @@ export function NewMeetingButton({ orgId, subject, members, timeZone, initial }:
         פגישה חדשה
       </Button>
       <Dialog open={open} onClose={close} title="פגישה חדשה" variant="sheet">
-        {open ? <MeetingForm orgId={orgId} subject={subject} initial={initial} members={members} timeZone={timeZone} onDone={saved} onCancel={close} /> : null}
+        {open ? <MeetingForm
+            orgId={orgId}
+            subject={subject}
+            initial={initial}
+            members={members}
+            meetingTypes={meetingTypes}
+            timeZone={timeZone}
+            onDone={saved}
+            onCancel={close}
+          /> : null}
       </Dialog>
       <FormNotice message={notice} className="mt-2" />
       <FormError message={warning} className="mt-2" />
@@ -66,7 +83,7 @@ type ItemProps = Omit<Common, "subject"> & {
 export type MeetingChange = "edit" | "status" | "delete";
 
 /** The two things done to a meeting after it is set: say how it went, or change its details. */
-export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingId, title, status, outcome, initial, onChanged }: ItemProps) {
+export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingTypes, meetingId, title, status, outcome, initial, onChanged }: ItemProps) {
   const [open, setOpen] = useState<"status" | "edit" | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
@@ -98,7 +115,17 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingI
       <Dialog open={open === "edit"} onClose={close} title="עריכת הפגישה" variant="sheet">
         {open === "edit" ? (
           <div className="space-y-5">
-            <MeetingForm orgId={orgId} subject={subject} meetingId={meetingId} initial={initial} members={members} timeZone={timeZone} onDone={edited} onCancel={close} />
+            <MeetingForm
+              orgId={orgId}
+              subject={subject}
+              meetingId={meetingId}
+              initial={initial}
+              members={members}
+              meetingTypes={meetingTypes}
+              timeZone={timeZone}
+              onDone={edited}
+              onCancel={close}
+            />
             <div className="border-t border-line pt-4">
               <ConfirmButton
                 title="למחוק את הפגישה?"

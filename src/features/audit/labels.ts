@@ -27,6 +27,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
   deal_loss_reasons: "סיבת הפסד",
+  // CAL-08
+  meeting_types: "סוג פגישה",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // GOL-01
@@ -218,7 +220,12 @@ export const FIELD_LABELS: Record<string, string> = {
   metadata: "פרטים נוספים",
   description: "תיאור",
   // CAL-01: meetings and their participants
-  meeting_type: "סוג פגישה",
+  meeting_type: "אופן הפגישה",
+  // CAL-08: the business's meeting type, and the type's own fields
+  meeting_type_id: "סוג פגישה",
+  meeting_format: "אופן הפגישה",
+  buffer_before_minutes: "מרווח לפני (דקות)",
+  buffer_after_minutes: "מרווח אחרי (דקות)",
   starts_at: "התחלה",
   ends_at: "סיום",
   location: "מיקום",
