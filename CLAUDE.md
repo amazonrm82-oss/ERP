@@ -972,8 +972,10 @@ file wins.
   A new capability not yet assigned to plans is asked of the owner before it is opened to everyone.
 - **A question does not stop the line.** Write it under "שאלות שמחכות לבעל המוצר" in
   `docs/DECISIONS.md` with the requirement id, skip that requirement, continue with the next one that
-  does not depend on it, and ask the waiting questions in plain Hebrew at the end of the turn, **one
-  question at a time** (owner's request, 8 October 2026): the next one only after he answers. Stop completely only when nothing unblocked is left. Record each answer in DECISIONS.md.
+  does not depend on it, and ask the waiting questions in plain Hebrew at the end of the turn, **all of
+  them together in one numbered list**, each with the options and a recommendation, and he answers them all
+  (owner's request, 15 October 2026; it replaces "one question at a time" of 8 October). Stop completely only
+  when nothing unblocked is left. Record each answer in DECISIONS.md.
 - **Design direction is the owner's choice** (`DSN-02`). Show the three directions on real screens,
   ask, and until he answers do only work that does not change how screens look. After the choice,
   every new or changed screen uses the design system (`DSN-16`): no colour or size outside the tokens.
