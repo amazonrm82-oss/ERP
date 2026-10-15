@@ -64,8 +64,10 @@ and build this CRM here instead. The old code is preserved on the branch
    `push_subscriptions`; and the file cleanup (`src/features/files/cleanup-server.ts`, route
    `/api/files/cleanup`, woken at night by the database with the same secret), which calls
    `public.claim_orphan_objects()` / `finish_orphan_files()` and removes those Storage objects, only from the buckets
-   in `CLEANUP_BUCKETS` (`src/features/files/orphans.ts`): `record-files` (files of deleted rows) and `avatars` (the
-   photos of deleted accounts and replaced photos; owner's decision USR-01, 12 October 2026).
+   in `CLEANUP_BUCKETS` (`src/features/files/orphans.ts`): `record-files` (files of deleted rows), `avatars` (the
+   photos of deleted accounts and replaced photos; owner's decision USR-01, 12 October 2026) and `org-logos` (business
+   logos that were replaced or cleared, and the logo folder of a deleted business; never a logo still in use; owner's
+   decision FLD-04, 14 October 2026).
    Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
    `QUO-08`, `CAL-10`, `BAL-04`; owner, 13 October 2026: digital business card `BIZ-02`, QR scan counter `BIZ-03`,
    site widget `SPD-07`): a server route calls one `security definer` function granted to `service_role` only, which
@@ -192,6 +194,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   Since 0086 `app.orphan_files.bucket` is `record-files` | `avatars`; trigger `profiles_avatar_orphans` queues a
   deleted profile's photo folder and a replaced or removed photo; an avatar still in use is never claimed;
   `claim_orphan_files()` stays for old code and returns record files only.
+  Since 019920 (FLD-04) `bucket` also takes `org-logos`; trigger `organizations_logo_orphans` queues a replaced or cleared logo
+  and a deleted organization's logo folder, skipping any path a record file uses (`app.org_logo_path_shared`, because the queue
+  is keyed on the path alone); `app.orphan_claimable` (last redefined there) never claims a current `logo_path`.
 - Handover (migration 0024): `public.transfer_records(org, from, to)` moves owner_id on leads,
   contacts, companies, deals and tasks. It sets `app.bulk_transfer` (notify_assignment skips) and
   `app.automation_running` (events marked as automation, so automations skip) for its duration.

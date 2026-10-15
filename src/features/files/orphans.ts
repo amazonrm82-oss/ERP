@@ -1,13 +1,14 @@
+import { LOGOS_BUCKET } from "@/features/branding/logo";
 import { AVATARS_BUCKET } from "@/features/profile/avatar";
 
 import { FILES_BUCKET } from "./types";
 
 /**
- * The only buckets the nightly cleanup removes objects from (USR-01): record
- * files and profile photos. A bucket name that arrives from the database is
- * checked against this list, never used as given.
+ * The only buckets the nightly cleanup removes objects from: record files, profile photos (USR-01) and business logos
+ * that are no longer in use (FLD-04, owner 14 October 2026). A bucket name that arrives from the database is checked
+ * against this list, never used as given.
  */
-export const CLEANUP_BUCKETS = [FILES_BUCKET, AVATARS_BUCKET] as const;
+export const CLEANUP_BUCKETS = [FILES_BUCKET, AVATARS_BUCKET, LOGOS_BUCKET] as const;
 export type CleanupBucket = (typeof CLEANUP_BUCKETS)[number];
 
 export function isCleanupBucket(value: unknown): value is CleanupBucket {

@@ -103,7 +103,7 @@ describe("profile photos in the nightly file cleanup (USR-01)", () => {
     expect(await queued(photo)).toBeNull();
   });
 
-  it("only the two buckets can be queued", async () => {
+  it("only the known buckets can be queued", async () => {
     const error = await pgError(asAdmin((q) => q("insert into app.orphan_files (storage_path, bucket) values ('x/y', 'other')")));
     expect(error.code).toBe("23514");
   });

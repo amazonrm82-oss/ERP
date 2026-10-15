@@ -18,9 +18,10 @@ function sameSecret(given: string, expected: string): boolean {
 /**
  * Called by the database (app.cleanup_files, through pg_net) at night. Not a user
  * request: it carries the shared secret of the push dispatcher, and uses the
- * service role only to claim paths of deleted file rows and of the profile photos
- * of deleted accounts (USR-01), and remove those objects. Objects are removed only
- * from the buckets in CLEANUP_BUCKETS.
+ * service role only to claim paths of deleted file rows, of the profile photos
+ * of deleted accounts and replaced photos (USR-01) and of business logos no longer
+ * in use (FLD-04), and remove those objects. Objects are removed only from the
+ * buckets in CLEANUP_BUCKETS.
  */
 export async function cleanupFiles(request: Request): Promise<Response> {
   const secret = process.env.PUSH_DISPATCH_SECRET?.trim();
