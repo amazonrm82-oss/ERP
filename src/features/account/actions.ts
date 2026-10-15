@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
-import { getSessionUser } from "@/lib/auth";
-import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN, SESSION_EXPIRED } from "@/lib/errors";
+import { sessionCheck } from "@/lib/auth";
+import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,7 +36,8 @@ export async function setRequireMfaAction(orgId: string, required: boolean): Pro
 
 /** Ten new backup codes, shown once; the old ones stop working. Needs a session that passed two-step verification. */
 export async function createRecoveryCodesAction(): Promise<{ ok: true; codes: string[] } | { ok: false; message: string }> {
-  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const session = await sessionCheck();
+  if (!session.ok) return fail(session.message);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("mfa_recovery_codes_create");
   if (error) {
@@ -48,7 +49,8 @@ export async function createRecoveryCodesAction(): Promise<{ ok: true; codes: st
 
 /** Called after turning two-step verification off: the backup codes belonged to it. */
 export async function clearRecoveryCodesAction(): Promise<ActionResult> {
-  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const session = await sessionCheck();
+  if (!session.ok) return fail(session.message);
   const supabase = await createClient();
   const { error } = await supabase.rpc("mfa_recovery_codes_clear");
   return error ? fail("לא הצלחנו למחוק את קודי הגיבוי.") : ok();

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isTransientAuthError } from "@/lib/auth-transient";
 import { contentSecurityPolicy, makeNonce } from "@/lib/csp";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
@@ -93,6 +94,10 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // data to a session that owes the code (app.membership_role), and the pages
   // send such a user to /login/mfa (getOrgContext, the root page, reset-password).
   let isSignedIn = false;
+  // FXC-10: the auth server did not answer (network, 5xx, rate limit). That says nothing about the session, so
+  // nobody is sent to the login page for it: the request goes on as it is, the pages check the session themselves
+  // (and show "communication problem" if they cannot either), and the database still checks every token.
+  let authUnavailable = false;
   try {
     // Asks the auth server, so a session that was signed out elsewhere ("sign out
     // the other devices", or turning on two-step verification) ends on the next page
@@ -100,8 +105,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     // run before any response is produced so refreshed cookies can still be written.
     const { data, error } = await supabase.auth.getUser();
     isSignedIn = !error && Boolean(data.user?.id);
-  } catch {
+    authUnavailable = error !== null && isTransientAuthError(error);
+  } catch (error) {
     isSignedIn = false;
+    authUnavailable = isTransientAuthError(error);
+  }
+
+  if (authUnavailable) {
+    return response;
   }
 
   const { pathname, search } = request.nextUrl;

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { FILES_BUCKET } from "@/features/files/types";
-import { getSessionUser } from "@/lib/auth";
+import { sessionCheck } from "@/lib/auth";
 import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,8 +14,15 @@ type Context = { params: Promise<{ orgId: string; fileId: string }> };
  */
 export async function GET(request: NextRequest, { params }: Context) {
   const { orgId, fileId } = await params;
-  if (!isUuid(orgId) || !isUuid(fileId) || !(await getSessionUser())) {
+  if (!isUuid(orgId) || !isUuid(fileId)) {
     return new NextResponse("לא נמצא", { status: 404 });
+  }
+  const session = await sessionCheck();
+  if (!session.ok) {
+    // FXC-10: the sign-in service did not answer; that is not "not found"
+    return session.unavailable
+      ? new NextResponse(session.message, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "5" } })
+      : new NextResponse("לא נמצא", { status: 404 });
   }
   const supabase = await createClient();
   const { data: file, error: fileError } = await supabase

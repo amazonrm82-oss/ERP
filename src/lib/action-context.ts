@@ -3,9 +3,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fail } from "@/lib/action-result";
-import { getSessionUser, type SessionUser } from "@/lib/auth";
+import { sessionCheck, type SessionUser } from "@/lib/auth";
 import type { Database } from "@/lib/database.types";
-import { NOT_FOUND, SESSION_EXPIRED } from "@/lib/errors";
+import { NOT_FOUND } from "@/lib/errors";
 import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,9 +23,10 @@ export async function actionContext(orgId: string, ...recordIds: string[]): Prom
   if (![orgId, ...recordIds].every(isUuid)) {
     return fail(NOT_FOUND);
   }
-  const user = await getSessionUser();
-  if (!user) {
-    return fail(SESSION_EXPIRED);
+  // FXC-10: a sign-in service that does not answer is "communication problem", not "signed out"
+  const session = await sessionCheck();
+  if (!session.ok) {
+    return fail(session.message);
   }
-  return { ok: true, supabase: await createClient(), user };
+  return { ok: true, supabase: await createClient(), user: session.user };
 }

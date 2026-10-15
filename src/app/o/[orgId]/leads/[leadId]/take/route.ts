@@ -1,7 +1,7 @@
 import { isOwnTakeRequest, takeMessage } from "@/features/leads/take";
 import { takeLead } from "@/features/leads/take-server";
-import { getSessionUser } from "@/lib/auth";
-import { NOT_FOUND, SESSION_EXPIRED } from "@/lib/errors";
+import { sessionCheck } from "@/lib/auth";
+import { NOT_FOUND } from "@/lib/errors";
 import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,8 +21,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   if (!isUuid(orgId) || !isUuid(leadId)) {
     return json(404, { ok: false, message: NOT_FOUND });
   }
-  if (!(await getSessionUser())) {
-    return json(401, { ok: false, message: SESSION_EXPIRED });
+  const session = await sessionCheck();
+  if (!session.ok) {
+    // FXC-10: 503 when the sign-in service did not answer, so the push says to try again rather than to sign in
+    return json(session.unavailable ? 503 : 401, { ok: false, message: session.message });
   }
   const answer = await takeLead(await createClient(), orgId, leadId);
   if (!answer.ok) {

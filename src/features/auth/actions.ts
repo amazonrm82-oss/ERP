@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 
 import { LEGAL_VERSION } from "@/features/legal/documents";
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
-import { getSessionUser, owesSecondStep } from "@/lib/auth";
-import { authErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
+import { owesSecondStep, sessionCheck } from "@/lib/auth";
+import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
@@ -139,7 +139,8 @@ export type RecoverResult = { ok: true; needsSetup: boolean } | { ok: false; mes
  * verification, so a new authenticator must be set up right away.
  */
 export async function recoverWithCodeAction(code: string): Promise<RecoverResult> {
-  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const session = await sessionCheck();
+  if (!session.ok) return fail(session.message);
   if (typeof code !== "string" || code.replace(/[^0-9a-f]/gi, "").length !== 12) {
     return fail("קוד גיבוי הוא 12 תווים, למשל 1a2b-3c4d-5e6f.");
   }

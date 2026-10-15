@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { fail, formValues, type ActionResult, type FormState } from "@/lib/action-result";
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
-import { getSessionUser } from "@/lib/auth";
+import { sessionCheck } from "@/lib/auth";
 import type { OrgStatus } from "@/lib/database.types";
 import { dbErrorMessage, SESSION_EXPIRED, VAT_RATE_FUTURE_ONLY } from "@/lib/errors";
 import { zoneDate } from "@/lib/format";
@@ -32,7 +32,7 @@ function platformError(error: { code?: string; hint?: string; message?: string }
 }
 
 async function client() {
-  if (!(await getSessionUser())) return null;
+  if (!(await sessionCheck()).ok) return null;
   return createClient();
 }
 

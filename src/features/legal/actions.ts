@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { fail, formValues, type FormState } from "@/lib/action-result";
-import { getSessionUser } from "@/lib/auth";
-import { SESSION_EXPIRED } from "@/lib/errors";
+import { sessionCheck } from "@/lib/auth";
+
 import { safeNextPath } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,7 +20,8 @@ const schema = z.object({
 
 /** Signs the current terms, privacy policy and data processing agreement, then continues. */
 export async function signAgreementAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  if (!(await getSessionUser())) return fail(SESSION_EXPIRED);
+  const session = await sessionCheck();
+  if (!session.ok) return fail(session.message);
   const parsed = schema.safeParse({
     full_name: formData.get("full_name"),
     method: formData.get("method"),

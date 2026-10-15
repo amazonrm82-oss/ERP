@@ -1,7 +1,7 @@
 "use server";
 
 import { notePlainText } from "@/features/activities/markdown";
-import { getSessionUser } from "@/lib/auth";
+import { sessionCheck } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +17,7 @@ const ACTIVITY_LABELS: Record<string, string> = { note: "הערה", call: "שי�
 /** Searches the organization's records the user may see (RLS decides, in public.search_records). */
 export async function searchAction(orgId: string, query: string): Promise<SearchHit[]> {
   if (!isUuid(orgId) || typeof query !== "string" || query.trim().length < 2 || query.length > 100) return [];
-  if (!(await getSessionUser())) return [];
+  if (!(await sessionCheck()).ok) return [];
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("search_records", { p_org: orgId, p_query: query.trim(), p_limit: 6 });
   if (error || !data || typeof data !== "object" || Array.isArray(data)) return [];

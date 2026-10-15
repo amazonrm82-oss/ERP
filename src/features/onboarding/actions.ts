@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
-import { getSessionUser } from "@/lib/auth";
-import { dbErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
+import { sessionCheck } from "@/lib/auth";
+import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
@@ -13,9 +13,9 @@ import { pick } from "@/lib/validation";
 import { createOrganizationSchema } from "./schema";
 
 export async function createOrganizationAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await getSessionUser();
-  if (!user) {
-    return fail(SESSION_EXPIRED);
+  const session = await sessionCheck();
+  if (!session.ok) {
+    return fail(session.message);
   }
 
   const parsed = createOrganizationSchema.safeParse(pick(formData, ["name", "industry", "team_size", "phone"]));
