@@ -360,7 +360,8 @@ try {
   await recordTasks.getByLabel("משימה חדשה לרשומה הזו").fill("להתקשר עם הצעת מחיר");
   await recordTasks.getByRole("button", { name: "מחר", exact: true }).click();
   await recordTasks.getByText("להתקשר עם הצעת מחיר", { exact: true }).waitFor();
-  await expectText(owner, "המשימה נוספה");
+  // HEB-02: when tomorrow is a rest day the task moves to the next working day and says so
+  await owner.getByText(/המשימה נוספה|\(יום העבודה הבא\)/).filter({ visible: true }).first().waitFor({ timeout: 15000 });
   const leadIdNow = owner.url().split("/leads/")[1];
   const [{ n: linkedTasks }] = await sql("select count(*)::int as n from public.tasks where title = 'להתקשר עם הצעת מחיר' and lead_id = $1 and due_at > now()", [leadIdNow]);
   if (linkedTasks !== 1) throw new Error(`the record task was not saved on the lead for tomorrow (${linkedTasks})`);
