@@ -162,8 +162,13 @@ describe("full export: tables (SPEC 12.4)", () => {
       expect(rows.every((r) => r.organization_id === orgId && typeof r.body === "string")).toBe(true);
     });
 
+    it("sees the business's roles of contacts on a deal (the seeded defaults, CON-03 follow-up)", async () => {
+      const rows = await read("deal_contact_roles", orgId);
+      expect(rows.map((r) => r.key).sort()).toEqual(["decision_maker", "finance", "influencer", "user"]);
+    });
+
     it("sees nothing of another business", async () => {
-      for (const table of ["contact_channels", "deal_contacts", "team_members", "whatsapp_templates"]) expect(await read(table, otherOrg)).toEqual([]);
+      for (const table of ["contact_channels", "deal_contacts", "team_members", "whatsapp_templates", "deal_contact_roles"]) expect(await read(table, otherOrg)).toEqual([]);
     });
   });
 

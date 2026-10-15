@@ -14,7 +14,7 @@ import { paths } from "@/lib/paths";
 
 import { addDealContactAction, removeDealContactAction, setDealContactRoleAction } from "../actions";
 import type { DealContactItem } from "../queries";
-import { DEAL_CONTACT_ROLES } from "../roles";
+import { roleChoices, type DealContactRoleOption } from "../roles";
 
 type ContactOption = { id: string; name: string };
 
@@ -23,19 +23,22 @@ type Props = {
   dealId: string;
   canEdit: boolean;
   items: DealContactItem[];
+  // the business's list of roles, hidden ones included (CON-03 follow-up)
+  roles: DealContactRoleOption[];
   // contacts the user may pick (already without the linked ones)
   options: ContactOption[];
 };
 
 const HIDDEN_NAME = "איש קשר שאין לכם גישה אליו";
 
-function RoleOptions() {
+function RoleOptions({ roles, currentId }: { roles: DealContactRoleOption[]; currentId: string | null }) {
+  const current = roles.find((role) => role.id === currentId) ?? null;
   return (
     <>
       <option value="">ללא תפקיד</option>
-      {DEAL_CONTACT_ROLES.map((role) => (
-        <option key={role.key} value={role.key}>
-          {role.label}
+      {roleChoices(roles, current).map((role) => (
+        <option key={role.id} value={role.id}>
+          {role.isActive ? role.name : `${role.name} (מוסתר)`}
         </option>
       ))}
     </>
@@ -43,8 +46,8 @@ function RoleOptions() {
 }
 
 /** One linked contact: its name, its role (a menu for whoever may edit the deal) and "הסרה". */
-function DealContactRow({ orgId, dealId, canEdit, item }: { orgId: string; dealId: string; canEdit: boolean; item: DealContactItem }) {
-  const current = item.role ?? "";
+function DealContactRow({ orgId, dealId, canEdit, item, roles }: { orgId: string; dealId: string; canEdit: boolean; item: DealContactItem; roles: DealContactRoleOption[] }) {
+  const current = item.roleId ?? "";
   const [selected, setSelected] = useState(current);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -94,7 +97,7 @@ function DealContactRow({ orgId, dealId, canEdit, item }: { orgId: string; dealI
             onChange={(event) => setSelected(event.target.value)}
             className="min-w-0 flex-1"
           >
-            <RoleOptions />
+            <RoleOptions roles={roles} currentId={item.roleId} />
           </SelectField>
           {changed ? (
             <Button size="sm" onClick={saveRole} loading={pending}>
@@ -109,10 +112,10 @@ function DealContactRow({ orgId, dealId, canEdit, item }: { orgId: string; dealI
 }
 
 /**
- * CON-03: the contacts on a deal, each with a role in the purchase (מקבל החלטה, משפיע,
- * משתמש, איש כספים). Whoever may edit the deal adds, changes and removes them.
+ * CON-03: the contacts on a deal, each with a role in the purchase from the business's list (by default מקבל
+ * החלטה, משפיע, משתמש, איש כספים). Whoever may edit the deal adds, changes and removes them.
  */
-export function DealContactsCard({ orgId, dealId, canEdit, items, options }: Props) {
+export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options }: Props) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(addDealContactAction.bind(null, orgId, dealId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -125,7 +128,7 @@ export function DealContactsCard({ orgId, dealId, canEdit, items, options }: Pro
         ) : (
           <ul className="divide-y divide-line">
             {items.map((item) => (
-              <DealContactRow key={`${item.contactId}:${item.role ?? ""}`} orgId={orgId} dealId={dealId} canEdit={canEdit} item={item} />
+              <DealContactRow key={`${item.contactId}:${item.roleId ?? ""}`} orgId={orgId} dealId={dealId} canEdit={canEdit} item={item} roles={roles} />
             ))}
           </ul>
         )}
@@ -152,8 +155,8 @@ export function DealContactsCard({ orgId, dealId, canEdit, items, options }: Pro
                   </option>
                 ))}
               </SelectField>
-              <SelectField label="תפקיד" name="role" defaultValue={failure?.values?.role ?? ""}>
-                <RoleOptions />
+              <SelectField label="תפקיד" name="role_id" defaultValue={failure?.values?.role_id ?? ""}>
+                <RoleOptions roles={roles} currentId={null} />
               </SelectField>
               <SubmitButton size="sm" pending={pending} pendingText="מוסיפים…">
                 הוספה לעסקה

@@ -27,6 +27,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // LEAD-03
   disqualify_reasons: "סיבה לליד לא רלוונטי",
   deal_loss_reasons: "סיבת הפסד",
+  // CON-03 follow-up
+  deal_contact_roles: "תפקיד בעסקה",
   // CAL-08
   meeting_types: "סוג פגישה",
   // WA-01

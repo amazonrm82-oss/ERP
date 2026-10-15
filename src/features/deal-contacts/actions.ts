@@ -33,7 +33,7 @@ export async function addDealContactAction(orgId: string, dealId: string, _prev:
     organization_id: orgId,
     deal_id: dealId,
     contact_id: parsed.data.contact_id,
-    role: parsed.data.role,
+    role_id: parsed.data.role_id,
   });
   if (error) {
     const message = error.code === "23505" ? ALREADY_LINKED : error.code === "42501" ? CANNOT_LINK : dbErrorMessage(error);
@@ -43,7 +43,7 @@ export async function addDealContactAction(orgId: string, dealId: string, _prev:
   return ok();
 }
 
-/** CON-03: change (or clear) the role of a contact in a deal. */
+/** CON-03: change (or clear) the role of a contact in a deal. The old code of a link saved before the list goes with it. */
 export async function setDealContactRoleAction(orgId: string, dealId: string, contactId: string, role: unknown): Promise<ActionResult> {
   const context = await actionContext(orgId, dealId, contactId);
   if (!context.ok) {
@@ -55,7 +55,7 @@ export async function setDealContactRoleAction(orgId: string, dealId: string, co
   }
   const { data, error } = await context.supabase
     .from("deal_contacts")
-    .update({ role: parsed.data })
+    .update({ role_id: parsed.data, role: null })
     .eq("organization_id", orgId)
     .eq("deal_id", dealId)
     .eq("contact_id", contactId)

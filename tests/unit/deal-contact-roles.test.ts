@@ -5,7 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import { contactDealsWithRoles } from "@/features/deal-contacts/contact-deals";
 import { addableDealContacts } from "@/features/deal-contacts/options";
-import { DEAL_CONTACT_ROLE_KEYS, dealContactRoleLabel, isDealContactRole } from "@/features/deal-contacts/roles";
+import {
+  DEAL_CONTACT_ROLE_KEYS,
+  DEAL_CONTACT_ROLES,
+  dealContactRoleLabel,
+  isDealContactRole,
+  linkRole,
+  roleChoices,
+  type DealContactRoleOption,
+} from "@/features/deal-contacts/roles";
 import { addDealContactSchema, dealContactRoleArg } from "@/features/deal-contacts/schema";
 import type { RelatedDeal } from "@/features/deals/queries";
 
@@ -39,14 +47,15 @@ describe("roles of contacts in a deal (CON-03)", () => {
     expect(isDealContactRole("מחליט")).toBe(false);
   });
 
-  it("accepts a role from the list or none, nothing else", () => {
-    expect(dealContactRoleArg.parse("influencer")).toBe("influencer");
+  it("accepts a role id of the list or none, nothing else (the database checks the id)", () => {
+    expect(dealContactRoleArg.parse(ID)).toBe(ID);
     expect(dealContactRoleArg.parse("")).toBeNull();
     expect(dealContactRoleArg.parse(null)).toBeNull();
-    expect(dealContactRoleArg.safeParse("boss").success).toBe(false);
+    expect(dealContactRoleArg.safeParse("influencer").success).toBe(false);
     expect(dealContactRoleArg.safeParse(7).success).toBe(false);
-    expect(addDealContactSchema.parse({ contact_id: ID, role: null })).toEqual({ contact_id: ID, role: null });
-    expect(addDealContactSchema.safeParse({ contact_id: "", role: "user" }).success).toBe(false);
+    expect(addDealContactSchema.parse({ contact_id: ID, role_id: null })).toEqual({ contact_id: ID, role_id: null });
+    expect(addDealContactSchema.parse({ contact_id: ID, role_id: "" })).toEqual({ contact_id: ID, role_id: null });
+    expect(addDealContactSchema.safeParse({ contact_id: "", role_id: ID }).success).toBe(false);
   });
 
   it("lists the main deals first, then the deals the contact takes part in, each once, with the role", () => {
@@ -54,9 +63,9 @@ describe("roles of contacts in a deal (CON-03)", () => {
       [deal("a"), deal("b")],
       [deal("b"), deal("c"), deal("d")],
       [
-        { dealId: "b", role: "finance" },
-        { dealId: "c", role: "decision_maker" },
-        { dealId: "d", role: null },
+        { dealId: "b", roleLabel: "איש כספים" },
+        { dealId: "c", roleLabel: "מקבל החלטה" },
+        { dealId: "d", roleLabel: null },
       ],
     );
     expect(rows.map((row) => [row.id, row.roleLabel])).toEqual([
@@ -72,5 +81,44 @@ describe("roles of contacts in a deal (CON-03)", () => {
     expect(addableDealContacts(options, ["b"], "c").map((option) => option.id)).toEqual(["a", "d"]);
     expect(addableDealContacts(options, [], null).map((option) => option.id)).toEqual(["a", "b", "c", "d"]);
     expect(addableDealContacts(options, ["a", "b", "c", "d"], null)).toEqual([]);
+  });
+});
+
+// CON-03 follow-up (owner, 14 October 2026): the roles are a managed list per business; the four are its defaults
+describe("the business's list of roles (CON-03 follow-up)", () => {
+  const roles: DealContactRoleOption[] = [
+    { id: "r1", name: "מחליט סופי", key: "decision_maker", isActive: true },
+    { id: "r2", name: "משפיע", key: "influencer", isActive: false },
+    { id: "r3", name: "יועץ משפטי", key: null, isActive: true },
+  ];
+
+  it("the database seeds the four defaults with their old codes, in this order", () => {
+    const dir = join(process.cwd(), "supabase/migrations");
+    const file = readdirSync(dir).find((name) => name.endsWith("_deal_contact_roles_list.sql"));
+    const sql = readFileSync(join(dir, file ?? ""), "utf8");
+    const seed = /function app\.seed_deal_contact_roles[\s\S]*?\$\$;/.exec(sql)?.[0] ?? "";
+    const rows = [...seed.matchAll(/\('([^']+)', '([a-z_]+)', (\d+)\)/g)].map((m) => ({ label: m[1], key: m[2], pos: Number(m[3]) }));
+    expect(rows.map(({ key, label }) => ({ key, label }))).toEqual(DEAL_CONTACT_ROLES.map(({ key, label }) => ({ key, label })));
+    expect(rows.map((row) => row.pos)).toEqual([0, 1, 2, 3]);
+    // the cap of the database is the app's
+    expect(sql).toContain(") >= 20 then");
+  });
+
+  it("a link shows its role by id, an old link by its code's role (current name), else none", () => {
+    expect(linkRole({ roleId: "r3", role: null }, roles)?.name).toBe("יועץ משפטי");
+    expect(linkRole({ roleId: null, role: "decision_maker" }, roles)?.name).toBe("מחליט סופי");
+    // the id wins over an old code
+    expect(linkRole({ roleId: "r3", role: "decision_maker" }, roles)?.id).toBe("r3");
+    // a hidden role still shows on the links that have it
+    expect(linkRole({ roleId: null, role: "influencer" }, roles)?.id).toBe("r2");
+    // the default was deleted, or the id is gone: no role
+    expect(linkRole({ roleId: null, role: "finance" }, roles)).toBeNull();
+    expect(linkRole({ roleId: "gone", role: null }, roles)).toBeNull();
+    expect(linkRole({ roleId: null, role: null }, roles)).toBeNull();
+  });
+
+  it("offers the active roles, plus the link's own hidden one", () => {
+    expect(roleChoices(roles, null).map((role) => role.id)).toEqual(["r1", "r3"]);
+    expect(roleChoices(roles, roles[1]).map((role) => role.id)).toEqual(["r1", "r2", "r3"]);
   });
 });

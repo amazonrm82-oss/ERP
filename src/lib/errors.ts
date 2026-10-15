@@ -184,6 +184,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "meeting_types:max": "אפשר לשמור עד 50 סוגי פגישה. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
   "meeting_type:product": "השירות שנבחר כבר לא פעיל בקטלוג. בחרו שירות פעיל, או השאירו בלי שירות.",
   "meeting:type": "סוג הפגישה שנבחר כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
+  // CON-03 follow-up: the roles of a contact on a deal
+  "deal_contact_roles:max": "אפשר לשמור עד 20 תפקידים. מחקו תפקיד שלא בשימוש כדי להוסיף חדש.",
+  "deal_contact_role:invalid": "התפקיד שנבחר כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
   // CON-04 (migration israeli_ids)
   "tax_id:invalid": "מספר ח.פ. או עוסק מורשה אינו תקין. בדקו את 9 הספרות.",
   // CON-04, a company outside Israel (migration foreign_company_number)

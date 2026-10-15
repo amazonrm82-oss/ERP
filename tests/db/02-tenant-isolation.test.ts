@@ -128,6 +128,7 @@ describe("tenant isolation", () => {
       ).rows[0].id;
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של א')", [orgA]);
       await q("insert into public.deal_loss_reasons (organization_id, name) values ($1, 'סיבת הפסד של א')", [orgA]);
+      await q("insert into public.deal_contact_roles (organization_id, name) values ($1, 'תפקיד של א')", [orgA]);
       await q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-10-01', 'won_amount', 100000)", [orgA]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'contact', 'סוג של א')", [orgA]);
       await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'other', '052-7000001')", [orgA, ids.contactA]);
@@ -212,6 +213,8 @@ describe("tenant isolation", () => {
     "whatsapp_templates",
     // DEAL-03, also seeded
     "deal_loss_reasons",
+    // CON-03 follow-up, also seeded
+    "deal_contact_roles",
     // CAL-08, also seeded
     "meeting_types",
     // GOL-01
@@ -365,6 +368,7 @@ describe("tenant isolation", () => {
       consents: "state = state",
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
+      deal_contact_roles: "name = name",
       meeting_types: "name = name",
       goals: "target = target",
       product_categories: "name = name",
@@ -461,6 +465,7 @@ describe("tenant isolation", () => {
       ["insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'x')", [orgA, ids.leadA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.meeting_types (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
@@ -542,6 +547,7 @@ describe("tenant isolation", () => {
       ["consents", "state = 'denied'", "state = 'denied'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
+      ["deal_contact_roles", "is_active = false", "not is_active"],
       ["meeting_types", "is_active = false", "not is_active"],
       ["goals", "target = 777", "target = 777"],
       ["product_categories", "position = 777", "position = 777"],

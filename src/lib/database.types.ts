@@ -807,7 +807,10 @@ export type DealContactRow = {
   organization_id: string;
   deal_id: string;
   contact_id: string;
+  // the old code (decision_maker…); kept and read as a fallback while role_id is empty
   role: string | null;
+  // CON-03 follow-up: the role picked from the organization's list (deal_contact_roles)
+  role_id: string | null;
   created_at: string;
 };
 
@@ -1156,6 +1159,18 @@ export type LeadInsert = {
 };
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
+// CON-03 follow-up: the roles a contact may have on a deal, a managed list per organization; key is server-only
+export type DealContactRoleRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  key: string | null;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealLossReasonRow = {
   id: string;
   organization_id: string;
@@ -1775,6 +1790,12 @@ export type Database = {
       >;
       deals: Table<DealRow, DealInsert & { import_job_id?: string | null }, Partial<DealInsert>>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // CON-03 follow-up: column grants (key is server-only; organization_id fixed once inserted)
+      deal_contact_roles: Table<
+        DealContactRoleRow,
+        { organization_id: string; name: string; position?: number; is_active?: boolean },
+        { name?: string; position?: number; is_active?: boolean }
+      >;
       // PRD-04: organization_id is fixed once inserted (column grants)
       product_categories: Table<
         ProductCategoryRow,
@@ -1851,8 +1872,8 @@ export type Database = {
       // CON-03: only the role changes (column-level update grant)
       deal_contacts: Table<
         DealContactRow,
-        { organization_id: string; deal_id: string; contact_id: string; role?: string | null },
-        { role?: string | null }
+        { organization_id: string; deal_id: string; contact_id: string; role?: string | null; role_id?: string | null },
+        { role?: string | null; role_id?: string | null }
       >;
       activities: Table<ActivityRow, ActivityInsert, ActivityUpdate>;
       tasks: Table<TaskRow, TaskInsert & { import_job_id?: string | null }, Partial<TaskInsert>>;

@@ -21,7 +21,7 @@ import { listContactOptions } from "@/features/contacts/queries";
 import { trashDealAction } from "@/features/deals/actions";
 import { DealContactsCard } from "@/features/deal-contacts/components/deal-contacts-card";
 import { addableDealContacts } from "@/features/deal-contacts/options";
-import { listDealContacts } from "@/features/deal-contacts/queries";
+import { listDealContactRoles, listDealContacts } from "@/features/deal-contacts/queries";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { getCardLayout } from "@/features/card-layout/queries";
 import { DealDetailsCard } from "@/features/deals/components/deal-details-card";
@@ -70,12 +70,14 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!isUuid(dealId)) {
     notFound();
   }
+  // CON-03 follow-up: the business's list of roles names each linked contact's role
+  const contactRoles = await listDealContactRoles(orgId);
   const [deal, fields, tags, follow, dealContacts, lossReasons, cardLayout] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
     getFollowState(orgId, { kind: "deal", id: dealId }, context.user.id),
-    listDealContacts(orgId, dealId),
+    listDealContacts(orgId, dealId, contactRoles),
     listLossReasons(orgId),
     // FLD-08: the business's card layout (null = the default)
     getCardLayout(orgId, "deal"),
@@ -281,6 +283,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             dealId={deal.id}
             canEdit={canEdit}
             items={dealContacts}
+            roles={contactRoles}
             options={addableDealContacts(
               contacts,
               dealContacts.map((item) => item.contactId),
