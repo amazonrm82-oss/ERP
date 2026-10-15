@@ -742,6 +742,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   update an automation makes names the rule in its audit entry, from `app.automation_rule_runs` (65,536 fixed slots keyed by
   `txid_current() % 65536`, taken with SKIP LOCKED; never a session setting). `app.audit_row` and `app.execute_automation` were last
   redefined in 020020.
+- Product costs (PRD-06, migration 020060; owner 15 October 2026, part of the `products` flag): `public.product_costs` (one row
+  per product, `cost_agorot` per unit as typed: before VAT in a business that charges VAT, else the amount paid; product FK
+  cascades). Every policy needs `app.can_view_costs(org)` (owner/admin/manager by role, or the PRM-01 grant `view_costs`); writes
+  also `app.can_edit_catalog` of a writable business. `products` holds no cost, so nothing else in the API returns it; the app
+  works out margin and line profit from rows this table returned. Audited, no emit_event. Open: a cost snapshot per deal line in
+  a separate `deal_line_costs` table under the same rule (owner's answer 2, after QUO-01/02).
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
