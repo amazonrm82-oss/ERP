@@ -40,6 +40,9 @@ export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומ�
 // TAX-03: no VAT rate is known for a document's date (before the first row of public.vat_rates)
 export const VAT_BEFORE_TABLE = 'תאריך המסמך מוקדם מכל שיעורי המע"מ שבמערכת, ולכן אי אפשר לחשב לו מע"מ. בחרו תאריך מאוחר יותר.';
 
+// ADM-01: a VAT rate is set only from a day after today; one whose day has begun is locked
+export const VAT_RATE_FUTURE_ONLY = 'אפשר לקבוע שיעור מע"מ רק מיום שאחרי היום. שיעור שכבר התחיל נעול.';
+
 const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_records": "הגעתם למספר הרשומות המרבי בחבילה. אפשר לפנות מקום, או לבקש מבעלי העסק חבילה גדולה יותר. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:max_users": "הגעתם למספר המשתמשים המרבי בחבילה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -139,6 +142,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "bank:invalid": "פרטי הבנק אינם תקינים. סניף: עד 4 ספרות. חשבון: 2 עד 20 ספרות, ויחד איתו שם הבנק והסניף.",
   // TAX-03 (migration vat_rates, app.document_vat_rate): a document dated before the first VAT rate
   "vat:before_table": VAT_BEFORE_TABLE,
+  // ADM-01 (migration platform_vat_rates, vat_rates_guard): a rate whose day has begun is locked
+  "vat:rate_in_force": VAT_RATE_FUTURE_ONLY,
+  "vat:date_taken": 'כבר יש שיעור מע"מ שמתחיל בתאריך הזה. ערכו אותו או בחרו תאריך אחר.',
   // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
   "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
   // PRD-04 (migration product_lists)

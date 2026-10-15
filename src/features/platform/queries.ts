@@ -6,6 +6,8 @@ import type { Json, PlatformRole, PlanRow } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import type { AdminVatRate } from "./vat-rates";
+
 export type PlatformMe = { role: PlatformRole; needsMfa: boolean };
 
 type Obj = Record<string, unknown>;
@@ -168,4 +170,14 @@ export async function findPlatformUser(email: string): Promise<Obj | null> {
   const { data, error } = await supabase.rpc("platform_find_user", { p_email: email });
   if (error) throw new Error(`platform_find_user failed: ${error.message}`);
   return data ? obj(data) : null;
+}
+
+/** ADM-01: every live VAT rate (cancelled rows left out), for the platform screen. A handful of rows. */
+export async function listAdminVatRates(): Promise<AdminVatRate[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase.from("vat_rates").select("id, effective_from, rate_bp, note").is("cancelled_at", null).order("effective_from", { ascending: false }),
+    "vat rates",
+  );
+  return rows.map((row) => ({ id: row.id, effectiveFrom: row.effective_from, rateBp: row.rate_bp, note: row.note }));
 }

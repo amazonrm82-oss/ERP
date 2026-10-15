@@ -8,12 +8,14 @@ import { fail, formValues, type ActionResult, type FormState } from "@/lib/actio
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { getSessionUser } from "@/lib/auth";
 import type { OrgStatus } from "@/lib/database.types";
-import { dbErrorMessage, SESSION_EXPIRED } from "@/lib/errors";
+import { dbErrorMessage, SESSION_EXPIRED, VAT_RATE_FUTURE_ONLY } from "@/lib/errors";
+import { zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { IDENTITY_CHECKS } from "./labels";
 import { parsePlanJson } from "./plan-json";
+import { isFutureVatDay, parseVatPercent } from "./vat-rates";
 import { isCalendarDate } from "@/lib/calendar-date";
 
 const ORG_STATUSES = ["trial", "active", "past_due", "read_only", "suspended", "cancelled"] as const;
@@ -204,4 +206,50 @@ export async function openSupportAction(orgId: string): Promise<{ ok: false; mes
     return fail(error.hint === "platform:no_grant" ? "הלקוח לא אישר גישת תמיכה, או שהאישור פג." : platformError(error));
   }
   redirect(paths.org(orgId));
+}
+
+/** ADM-01: the fields of a VAT rate form, checked before the database checks them again. */
+function vatRateFields(formData: FormData): { ok: true; day: string; rateBp: number; note: string | null } | { ok: false; message: string } {
+  const day = text(formData, "effective_from");
+  const rateBp = parseVatPercent(text(formData, "rate"));
+  const note = text(formData, "note");
+  if (!isCalendarDate(day)) return { ok: false, message: "יש לבחור תאריך תחילה." };
+  if (!isFutureVatDay(day, zoneDate(new Date()))) return { ok: false, message: VAT_RATE_FUTURE_ONLY };
+  if (rateBp === null) return { ok: false, message: "השיעור צריך להיות מספר בין 0 ל-100, עם עד שתי ספרות אחרי הנקודה." };
+  if (note.length > 200) return { ok: false, message: "ההערה ארוכה מדי (עד 200 תווים)." };
+  return { ok: true, day, rateBp, note: note === "" ? null : note };
+}
+
+/** ADM-01: the platform owner adds a VAT rate that starts on a future day (logged in the database). */
+export async function addVatRateAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const fields = vatRateFields(formData);
+  if (!fields.ok) return fail(fields.message, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_add_vat_rate", { p_effective_from: fields.day, p_rate_bp: fields.rateBp, p_note: fields.note });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminVat);
+  return { ok: true, message: "השיעור נוסף." };
+}
+
+/** ADM-01: corrects a VAT rate that has not started yet. */
+export async function updateVatRateAction(rateId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(rateId)) return fail(SESSION_EXPIRED);
+  const fields = vatRateFields(formData);
+  if (!fields.ok) return fail(fields.message, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_update_vat_rate", { p_id: rateId, p_effective_from: fields.day, p_rate_bp: fields.rateBp, p_note: fields.note });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminVat);
+  return { ok: true, message: "נשמר." };
+}
+
+/** ADM-01: removes a VAT rate that has not started yet (the row is marked cancelled). */
+export async function removeVatRateAction(rateId: string): Promise<ActionResult> {
+  const supabase = await client();
+  if (!supabase || !isUuid(rateId)) return fail(SESSION_EXPIRED);
+  const { error } = await supabase.rpc("platform_remove_vat_rate", { p_id: rateId });
+  if (error) return fail(platformError(error));
+  revalidatePath(paths.adminVat);
+  return { ok: true };
 }

@@ -5,12 +5,14 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
+import { TextLink } from "@/components/ui/text-link";
 import { businessPlanCanOpen } from "@/features/plans/capabilities";
 import { annualPriceLabel, AVAILABILITY_LABELS, monthlyPriceLabel, VAT_NOTE } from "@/features/plans/price";
 import { setPlanAvailabilityAction, setSuspendedLeadNoticesAction, setSuspensionCancelAction, setTrialEndAction, updatePlanAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { getPlanWaitlistCounts, getSuspendedLeadNoticesStatus, getSuspensionCancelStatus, getTrialEndStatus, listPlans, platformReady } from "@/features/platform/queries";
 import { formatDate, formatNumber } from "@/lib/format";
+import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "חבילות" };
 
@@ -34,6 +36,7 @@ export default async function AdminPlansPage() {
       <PageHeader
         title="חבילות"
         description={`מחירים ${VAT_NOTE}, לחודש, לעסק או למשתמש לפי החבילה. שינוי חל מיד על כל הארגונים בחבילה (חוץ מדריסות לארגון בודד).`}
+        actions={<TextLink href={paths.adminVat}>שיעורי מע&quot;מ</TextLink>}
       />
       {businessPlanCanOpen(business?.availability) ? (
         <p role="status" className="mb-5 rounded-md bg-accent-soft px-3 py-2.5 text-md">

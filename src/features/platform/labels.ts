@@ -32,6 +32,9 @@ export const ACTION_LABELS: Record<string, string> = {
   "suspension_cancel.switch": "הדלקה או כיבוי של הביטול אחרי השעיה",
   "suspension.cancelled": "ביטול מנוי אחרי 90 יום בהשעיה",
   "suspended_lead_notices.switch": "הדלקה או כיבוי של התראות ליד חדש לעסק מושהה",
+  "vat_rate.add": "הוספת שיעור מע\"מ",
+  "vat_rate.update": "תיקון שיעור מע\"מ עתידי",
+  "vat_rate.remove": "הסרת שיעור מע\"מ עתידי",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

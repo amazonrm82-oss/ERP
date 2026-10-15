@@ -51,10 +51,10 @@ export const getPricesIncludeVat = cache(async (orgId: string): Promise<boolean>
   return row?.prices_include_vat === true;
 });
 
-/** Every VAT rate of the platform (TAX-03), oldest first; a handful of rows. */
+/** Every live VAT rate of the platform (TAX-03; a rate removed in the platform panel, ADM-01, is left out), oldest first; a handful of rows. */
 export const getVatRates = cache(async (): Promise<VatRate[]> => {
   const supabase = await createClient();
-  const rows = must(await supabase.from("vat_rates").select("effective_from, rate_bp").order("effective_from"), "vat rates");
+  const rows = must(await supabase.from("vat_rates").select("effective_from, rate_bp").is("cancelled_at", null).order("effective_from"), "vat rates");
   return rows.map((row) => ({ effectiveFrom: row.effective_from, rateBp: row.rate_bp }));
 });
 

@@ -217,7 +217,7 @@ export async function readDealPricing(
   const day = zoneDate(new Date(), timeZone);
   const [settings, rateRows, list] = await Promise.all([
     supabase.from("org_document_settings").select("vat_status, other_charges_vat, prices_include_vat").eq("organization_id", orgId).maybeSingle(),
-    supabase.from("vat_rates").select("effective_from, rate_bp").order("effective_from"),
+    supabase.from("vat_rates").select("effective_from, rate_bp").is("cancelled_at", null).order("effective_from"),
     customerPriceList(supabase, orgId, deal, day),
   ]);
   const row = must(settings, "org document settings");

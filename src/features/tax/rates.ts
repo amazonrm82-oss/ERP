@@ -3,7 +3,7 @@ import { VAT_BEFORE_TABLE } from "@/lib/errors";
 
 /**
  * VAT rates by effective date (TAX-03). The rates come from public.vat_rates,
- * never from code; vatRateAt() mirrors app.vat_rate_at(): the rate of the latest
+ * never from code (cancelled rows left out by the readers, ADM-01); vatRateAt() mirrors app.vat_rate_at(): the rate of the latest
  * row whose effective day is on or before the document's day, null before the
  * first row. Rates are basis points (1800 = 18%), like money in agorot.
  */

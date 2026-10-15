@@ -206,6 +206,8 @@ export type VatRateRow = {
   // basis points: 1800 = 18%
   rate_bp: number;
   note: string | null;
+  // ADM-01: set when the platform owner removed the rate before its day; a cancelled row never counts
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2009,6 +2011,10 @@ export type Database = {
       };
       platform_metrics: { Args: Record<string, never>; Returns: Json };
       platform_set_plan_availability: { Args: { p_key: string; p_availability: string }; Returns: undefined };
+      // ADM-01: VAT rates from the platform panel (platform owner, future days only)
+      platform_add_vat_rate: { Args: { p_effective_from: string; p_rate_bp: number; p_note?: string | null }; Returns: string };
+      platform_update_vat_rate: { Args: { p_id: string; p_effective_from: string; p_rate_bp: number; p_note?: string | null }; Returns: string };
+      platform_remove_vat_rate: { Args: { p_id: string }; Returns: undefined };
       platform_plan_waitlist: { Args: Record<string, never>; Returns: Json };
       // CNS: hash key and paused erasures, for the panel's alert (platform owner and support)
       platform_consent_health: { Args: Record<string, never>; Returns: Json };
