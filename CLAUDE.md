@@ -263,6 +263,13 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `meetings.meeting_type_id` (composite FK set null; only an active type may be picked, hint `meeting:type`). `public.meeting_busy`
   returns `busy_from`/`busy_to` with the type's live buffers (no type or a deleted type = 0); its pre-filter of 240 minutes is tied
   to the buffer checks by test 99. Copying buffers onto meetings is open for CAL-10.
+- Recurring meetings (CAL-09, migrations 020040, 020045; owner 15 October 2026): a weekly series of 2..52 real meetings made up
+  front by `public.create_meeting_series` (invoker, all or nothing); `meetings.series_id/series_index` are insert-only, checked by the
+  definer trigger `meetings_series_check` (per business; later index needs the head by the same creator and the previous index).
+  Rest days only warn (10 dates, then "ועוד N"); "this and following" edits/cancels/deletes go meeting by meeting with the user's
+  session and list the skipped dates ("אין הרשאה"); a weekday change splits the series, refused up front unless
+  `public.meetings_removable` (invoker, mirrors the `meetings_delete` policy; keep in step) returns every affected meeting.
+  `app.notify_meeting_participant` (last redefined in 020040) sends one notice per series while it is unread.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
