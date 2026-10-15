@@ -619,6 +619,16 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
   `app.deal_lines_billing`); the rule is `app.deal_value_rule` (13 args; `deal_amount_rule` is a wrapper) over
   `app.deal_lines_sums` (definer, no grants): recurring amount from recurring lines only, value = first year of the recurring
   amount + one-time lines; a monthly deal's value is 12 x the ROUNDED monthly amount (owner, do not "fix"). `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
+- Lead score (LEAD-05, migration 0195; owner 14 October 2026, core, no plan key): `public.lead_score_rules` (field/op/value,
+  points -100..100 not 0; members read, owners/admins of a writable org write; 50 per org, hint `lead_score_rules:max`; audited;
+  checked by `app.lead_score_rule_check`, hint `lead_score_rule:invalid`; mirrored by `src/features/lead-score/rules.ts`).
+  `leads.score` is server-only (no client grant), set by `leads_zz_score` on every write (`app.lead_score_value`, never raises;
+  a rule whose option/field is gone matches nothing). Score changes are ignored by `app.audit_row` and `app.emit_event` (both last
+  redefined in 0195). Timeline rules rescore through `activities_lead_score`; a call-back asked in a form is marked in
+  `app.lead_callback_requests` (trigger on `app.intake_callback_tasks`, intake_submit unchanged). Rule changes queue the org in
+  `app.lead_score_queue`; pg_cron `crm-lead-scores` (every minute, fair, 1,000 per org / 5,000 per run, row locks with skip and
+  retry). `lead_scores_refresh/pending`, `lead_score_breakdown` (invoker), `lead_score_rules_suggest` (the managed-list
+  exception). `app.merge_move_links` and `app.sample_row` were last redefined in 0195.
 - Card layout (FLD-08, migration 0190): `public.card_layouts` (one row per org and type lead|contact|company|deal; `groups` =
   [{title 1..60, columns 1|2, fields}] of built-in keys `app.card_layout_builtin_keys()` mirrored by `CARD_LAYOUT_BUILT_IN`
   in `src/features/card-layout/layout.ts`, test 99, or `cf:<key>`; at most 20 groups / 60 fields; members read, owners/admins
