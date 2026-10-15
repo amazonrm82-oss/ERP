@@ -328,6 +328,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `DEFAULT_DEAL_CONTACT_ROLES`); `deal_contacts.role_id` (composite FK set null of the column); trigger `deal_contacts_role_pick`
   (invoker): a person picks only an active role (hint `deal_contact_role:invalid`) and setting `role_id` clears the old `role`
   text; a link without `role_id` shows the list role with its old key. Merge carries `role_id` unchanged.
+  Since 020030 a person may not write a non-null `role` code (insert, or a changed value; clearing stays), and may re-pick a hidden
+  role whose key equals the link's old code; `app.deal_contact_role_check` was last redefined there.
 - Stage settings (DEAL-01, migration 0113): `stages.color` is null (by kind) or a palette key (`accent|success|warning|danger|neutral`,
   check `stages_color_token`, mirrored by `src/features/deals/stage-colors.ts`, unit test); `rot_days` is null (= 14, spec 22.9) or
   1..365 days without activity before an open deal counts as stuck (`stages_rot_days_max`). Board column rule and deal page chip
