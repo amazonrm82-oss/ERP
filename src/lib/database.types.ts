@@ -162,6 +162,25 @@ type LeadResponseSettingsWrite = {
   breach_action?: string;
   max_passes?: number;
 };
+// QUO-03 (migration number_sequences): one running series per organization and kind
+export type NumberSequenceRow = {
+  id: string;
+  organization_id: string;
+  // text with a check: quote | order
+  kind: string;
+  // up to 12 characters: letters, digits, - / . _
+  prefix: string;
+  // 1..999,999,999; fixed once a number was handed out
+  start_number: number;
+  // server only: the last number handed out, null = none yet
+  last_number: number | null;
+  created_at: string;
+  updated_at: string;
+};
+type NumberSequenceUpdate = {
+  prefix?: string;
+  start_number?: number;
+};
 // TAX-02 follow-up (migration org_bank_details): owners and admins only
 export type OrgBankDetailsRow = {
   id: string;
@@ -1750,6 +1769,7 @@ export type Database = {
       >;
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
       lead_response_settings: Table<LeadResponseSettingsRow, LeadResponseSettingsWrite & { organization_id: string }, LeadResponseSettingsWrite>;
+      number_sequences: Table<NumberSequenceRow, NumberSequenceUpdate & { organization_id: string; kind: string }, NumberSequenceUpdate>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
     };
@@ -1867,6 +1887,8 @@ export type Database = {
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)
       org_plan_usage: { Args: { p_org: string }; Returns: Json };
+      // QUO-03: an owner or admin moves the next number of a series forward; returns the new next number
+      number_sequence_jump: { Args: { p_org: string; p_kind: string; p_next: number }; Returns: number };
       my_agreement: { Args: Record<string, never>; Returns: Json };
       // global search (migration 0017), security invoker: { leads, contacts, companies, deals, notes }
       search_records: { Args: { p_org: string; p_query: string; p_limit?: number }; Returns: Json };

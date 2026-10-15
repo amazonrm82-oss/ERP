@@ -25,6 +25,7 @@ import { priceListsPath } from "@/features/price-lists/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
+import { numberingSettingsPath } from "@/features/numbering/paths";
 import { responseSettingsPath } from "@/features/response-target/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
@@ -65,6 +66,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: paths.settingsTeams(orgId), label: "צוותים", description: "מנהל צוות רואה את הרשומות של הצוות שלו", icon: UsersIcon },
         { href: calendarSettingsPath(orgId), label: "שעות וימי מנוחה", description: "שעות העבודה של העסק, הימים שהוא לא עובד בהם והחגים", icon: CalendarIcon },
         { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
+        // QUO-03: everyone reads it; owners and admins change it
+        { href: numberingSettingsPath(orgId), label: "מספור הצעות והזמנות", description: "קידומת ומספר התחלתי למספרים של הצעות מחיר והזמנות", icon: FormIcon },
         // PL-01: everyone reads the price lists; owners and admins edit them. Hidden without the capability.
         ...(access.priceLists
           ? [{ href: priceListsPath(orgId), label: "מחירונים", description: "מחירים אחרים או הנחות לחלק מהמוצרים, לתקופה מסוימת", icon: TagIcon }]

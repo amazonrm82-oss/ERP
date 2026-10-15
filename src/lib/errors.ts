@@ -154,6 +154,16 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal_lines:vat_mode": "הגדרת המע\"מ של השורות השתנתה בזמן שמילאתם. רעננו את הדף ונסו שוב.",
   "deal_lines:product": "המוצר שנבחר לא פעיל או בארכיון. בחרו מוצר פעיל מהקטלוג.",
   "deal_lines:price_list": "חסר המחירון שממנו נלקח המחיר. רעננו את הדף ונסו שוב.",
+  // QUO-03 (migration number_sequences)
+  "number_sequences:start_locked": "כבר ניתן מספר בסדרה הזו, ולכן אי אפשר לשנות את המספר ההתחלתי. אפשר לשנות את הקידומת.",
+  "number_sequences:last_number": "אי אפשר להחזיר את המספור אחורה.",
+  "number_sequences:fixed": "אי אפשר להעביר סדרת מספור לסוג אחר.",
+  "number_sequences:not_forward": "המספר הבא החדש צריך להיות גבוה מהמספר הבא הנוכחי. רעננו את הדף ונסו שוב.",
+  "number_sequences:not_used": "עדיין לא ניתן מספר בסדרה הזו. אפשר לשנות את המספר ההתחלתי.",
+  "number_sequences:range": "המספר הבא צריך להיות עד 999,999,999.",
+  "number_sequences:exhausted": "הסדרה הגיעה למספר 999,999,999 ואין בה עוד מספרים. אפשר לשנות את הקידומת, אבל לא להתחיל את המספור מחדש. לבירור פנו לתמיכה.",
+  "number_sequences:delete": "אי אפשר למחוק סדרת מספור, כדי שמספר לא יחזור.",
+  "org:closed": `העסק סגור, ולכן אי אפשר ליצור בו מסמך חדש. לבירור: ${SUPPORT_LINE}.`,
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-04 (migration israeli_ids)

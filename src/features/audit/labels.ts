@@ -62,6 +62,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   card_layouts: "תצוגת כרטיס",
   // CAP-10
   lead_response_settings: "יעד זמן תגובה",
+  // QUO-03
+  number_sequences: "מספור הצעות והזמנות",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -77,6 +79,8 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_reset: "איפוס אימות דו-שלבי",
   erase: "מחיקת פרטים מהיומן (בקשת פרטיות)",
   export: "ייצוא",
+  // QUO-03: an owner or admin moved the next number of a series forward
+  number_jump: "קפיצה קדימה במספור",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
@@ -94,6 +98,10 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "lost_reason_id"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // QUO-03 jump forward
+  next_number: "המספר הבא",
+  prefix: "קידומת",
+  start_number: "מספר התחלתי",
   // CAP-09
   working_hours: "שעות עבודה",
   // CAP-10

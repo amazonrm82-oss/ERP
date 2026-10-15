@@ -847,6 +847,28 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("everyone reads the number series; only owners and admins set prefix and start; nobody deletes it (QUO-03)", async () => {
+    const insert = "insert into public.number_sequences (organization_id, kind, prefix, start_number) values ($1, 'quote', 'Q-', 100)";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(insert, [org])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(insert, [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.number_sequences where organization_id = $1", [org])), u.email).toBe(1);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.number_sequences set prefix = 'X' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.number_sequences where organization_id = $1", [org])))).code, u.email).toBe("42501");
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.number_sequences set start_number = 200 where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect(await asAdmin(async (q) => (await q<{ p: string; s: string }>("select prefix as p, start_number as s from public.number_sequences where organization_id = $1", [org])).rows[0])).toEqual({
+      p: "Q-",
+      s: "200",
+    });
+  });
+
   it("everyone reads the important fields; only owners and admins change them (DQL-01)", async () => {
     for (const u of [owner, admin, manager, m1, viewer]) {
       await asUser(u.id, async (q) => {

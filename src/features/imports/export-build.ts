@@ -85,6 +85,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "org_bank_details", file: "bank_details.csv" },
   // CAP-10
   { table: "lead_response_settings", file: "response_settings.csv" },
+  // QUO-03: the running number series of quotes and orders
+  { table: "number_sequences", file: "number_sequences.csv" },
   // DQL-01: the important fields per record type
   { table: "completeness_settings", file: "completeness_settings.csv" },
   // FLD-08: the card layout per record type

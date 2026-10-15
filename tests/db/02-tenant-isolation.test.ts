@@ -110,6 +110,7 @@ describe("tenant isolation", () => {
       await q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')", [orgA]);
       await q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed')", [orgA]);
       await q("insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)", [orgA]);
+      await q("insert into public.number_sequences (organization_id, kind, prefix) values ($1, 'quote', 'Q-')", [orgA]);
       await q("insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק', '800', '1234567')", [orgA]);
       ids.meetingA = (
         await q<{ id: string }>(
@@ -193,6 +194,8 @@ describe("tenant isolation", () => {
     "org_bank_details",
     // CAP-10
     "lead_response_settings",
+    // QUO-03
+    "number_sequences",
     "record_type_options",
     "contact_channels",
     "plan_waitlist",
@@ -336,6 +339,8 @@ describe("tenant isolation", () => {
       org_calendar_settings: "holidays_rest = holidays_rest",
       org_document_settings: "vat_status = vat_status",
       lead_response_settings: "target_minutes = target_minutes",
+      // no delete grant at all: a permission error is the expected outcome for the delete
+      number_sequences: "prefix = prefix",
       org_bank_details: "bank_name = bank_name",
       record_type_options: "name = name",
       contact_channels: "label = label",
@@ -429,6 +434,7 @@ describe("tenant isolation", () => {
       ["insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [orgA]],
       ["insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')", [orgA]],
       ["insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 90)", [orgA]],
+      ["insert into public.number_sequences (organization_id, kind) values ($1, 'order')", [orgA]],
       ["insert into public.org_bank_details (organization_id, bank_name) values ($1, 'x')", [orgA]],
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
@@ -505,6 +511,7 @@ describe("tenant isolation", () => {
       ["org_calendar_settings", "holiday_eves_rest = true", "holiday_eves_rest"],
       ["org_document_settings", "vat_status = 'exempt'", "vat_status = 'exempt'"],
       ["lead_response_settings", "target_minutes = 777", "target_minutes = 777"],
+      ["number_sequences", "prefix = 'HACKED'", "prefix = 'HACKED'"],
       ["org_bank_details", "bank_name = 'HACKED'", "bank_name = 'HACKED'"],
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
