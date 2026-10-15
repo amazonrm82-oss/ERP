@@ -50,3 +50,25 @@ export function rerunClosure(
   if (missing.length > 0) throw new Error(`migrations not found: ${missing.join(", ")}`);
   return { files: picked, sql: texts };
 }
+
+/**
+ * For a hand-picked list of migrations re-run in the given order: every function they define whose last body in the
+ * list is not its latest body among all migrations, as "name: list ends with <file>, latest is <file>". Empty when the
+ * list leaves every function it touches as a fresh build made it. A test that keeps such a list asserts this is empty,
+ * so a newer migration that redefines one of its functions fails the test by name, not at teardown.
+ */
+export function staleRestores(files: string[], dir: string = MIGRATIONS_DIR): string[] {
+  const lastInList = new Map<string, string>();
+  for (const file of files) {
+    for (const name of definedFunctions(readFileSync(join(dir, file), "utf8"))) lastInList.set(name, file);
+  }
+  const latest = new Map<string, string>();
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    for (const name of definedFunctions(readFileSync(join(dir, file), "utf8"))) {
+      if (lastInList.has(name)) latest.set(name, file);
+    }
+  }
+  return [...lastInList]
+    .filter(([name, file]) => latest.get(name) !== file)
+    .map(([name, file]) => `${name}: list ends with ${file}, latest is ${latest.get(name)}`);
+}

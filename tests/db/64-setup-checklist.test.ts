@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asAnon, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -423,7 +424,7 @@ describe("setup checklist and sample data (USR-04)", () => {
     // run again after the first, keeping the latest versions; deal_lines comes after consents_followups (both redefine
     // app.sample_untouched(), the later one wins); deal_lines revokes the table's client grants, so deal_line_billing
     // (DLI-04) runs after it to grant its column again
-    for (const suffix of [
+    const files = [
       "_setup_checklist.sql",
       "_sample_data_remove.sql",
       "_sample_data_followups.sql",
@@ -436,13 +437,21 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_lead_score.sql",
       // lead_score also redefines app.audit_row(); PRM-01's later body (rule name) must stay the live one
       "_automation_permission_answer.sql",
+      // automation_permission_answer redefines app.member_permission_built_keys(); PRM-04 adds 'view_costs' last
+      "_product_costs.sql",
       // CON-05 redefines app.sample_untouched() last (links a person made keep the record), and with it
       // app.import_record_worked() of undo_own_import, which no file above touches
       "_contact_companies.sql",
-    ]) {
+    ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
-      expect(file).toBeDefined();
-      await asAdmin((q) => q(readFileSync(path.join(dir, file as string), "utf8")));
+      expect(file, suffix).toBeDefined();
+      return file as string;
+    });
+    // every function these files define must end at its latest body, or the teardown sees an old one; a newer
+    // migration that redefines one of them is named here (add it to the list, in name order)
+    expect(staleRestores(files, dir)).toEqual([]);
+    for (const file of files) {
+      await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
     }
     expect(await records(owner.id, org)).toEqual(before);
   });
