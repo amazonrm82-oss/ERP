@@ -136,6 +136,11 @@ describe("tenant isolation", () => {
       ids.company2A = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה שנייה של א') returning id", [orgA])).rows[0].id;
       await q("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, 'יועצת')", [orgA, ids.contactA, ids.company2A]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
+      // CAL-10: a booking page of a's own (off: a has no working hours, and a page without hours cannot be on)
+      await q(
+        "insert into public.booking_pages (organization_id, user_id, title, meeting_type_id, is_active) select $1, $2, 'דף של א', t.id, false from public.meeting_types t where t.organization_id = $1 order by t.position limit 1",
+        [orgA, a.id],
+      );
       ids.productA = (
         await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
       ).rows[0].id;
@@ -230,6 +235,8 @@ describe("tenant isolation", () => {
     "deal_contact_roles",
     // CAL-08, also seeded
     "meeting_types",
+    // CAL-10
+    "booking_pages",
     // GOL-01
     "goals",
     // PRD-04, seeded for every new organization
@@ -388,6 +395,7 @@ describe("tenant isolation", () => {
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
       meeting_types: "name = name",
+      booking_pages: "title = title",
       goals: "target = target",
       product_categories: "name = name",
       product_units: "name = name",
@@ -489,6 +497,7 @@ describe("tenant isolation", () => {
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.meeting_types (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.booking_pages (organization_id, user_id, title) values ($1, $2, 'x')", [orgA, a.id]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
@@ -574,6 +583,7 @@ describe("tenant isolation", () => {
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["deal_contact_roles", "is_active = false", "not is_active"],
       ["meeting_types", "is_active = false", "not is_active"],
+      ["booking_pages", "title = 'HACKED'", "title = 'HACKED'"],
       ["goals", "target = 777", "target = 777"],
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],

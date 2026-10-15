@@ -31,6 +31,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   deal_contact_roles: "תפקיד בעסקה",
   // CAL-08
   meeting_types: "סוג פגישה",
+  // CAL-10
+  booking_pages: "דף קביעת תור",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // GOL-01
@@ -274,6 +276,13 @@ export const FIELD_LABELS: Record<string, string> = {
   price_includes_vat: 'המחיר כולל מע"מ',
   duration_minutes: "משך בדקות",
   is_active: "פעיל",
+  // CAL-10: a booking page
+  token: "קישור",
+  intro: "הסבר",
+  min_notice_minutes: "התראה מינימלית בדקות",
+  max_days_ahead: "ימים קדימה",
+  slot_step_minutes: "זמני התחלה כל (דקות)",
+  questions: "שאלות מקדימות",
   archived_at: "ארכיון",
   parent_id: "קטגוריה ראשית",
   // LEAD-06: a conversion mapping (ids; the screen names the fields)

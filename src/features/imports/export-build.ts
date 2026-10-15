@@ -57,6 +57,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "meeting_participants", file: "meeting_participants.csv" },
   // CAL-08
   { table: "meeting_types", file: "meeting_types.csv" },
+  // CAL-10: the booking pages (token = the page's link: /f/book/<token>)
+  { table: "booking_pages", file: "booking_pages.csv" },
   { table: "pipelines", file: "pipelines.csv" },
   { table: "stages", file: "stages.csv" },
   { table: "lead_statuses", file: "lead_statuses.csv" },

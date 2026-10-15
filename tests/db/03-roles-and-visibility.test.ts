@@ -1345,6 +1345,50 @@ describe("roles and record visibility", () => {
     expect(roles.find((r) => r.user_id === owner.id)?.role).toBe("admin");
     expect(roles.filter((r) => r.role === "owner")).toHaveLength(1);
   });
+
+  it("booking pages: each person their own, a team manager their people's, owners and admins all; viewers none (CAL-10)", async () => {
+    const type = await asAdmin(
+      async (q) => (await q<{ id: string }>("select id from public.meeting_types where organization_id = $1 order by position limit 1", [org])).rows[0].id,
+    );
+    const insert = (by: U, userId: string, title: string) =>
+      asUser(by.id, async (q) =>
+        (
+          await q<{ id: string }>(
+            // off: nobody here has working hours, and a page without hours cannot be on (125 tests that)
+            "insert into public.booking_pages (organization_id, user_id, title, meeting_type_id, is_active) values ($1, $2, $3, $4, false) returning id",
+            [org, userId, title, type],
+          )
+        ).rows[0].id,
+      );
+    const own = await insert(m1, m1.id, "הדף של m1");
+    // a member makes pages for themselves only; an admin for anyone
+    expect((await pgError(insert(m1, m2.id, "בשם אחר"))).code).toBe("42501");
+    const byAdmin = await insert(admin, m2.id, "הדף של m2");
+    // a viewer makes none, and a viewer is no rep
+    expect((await pgError(insert(viewer, viewer.id, "צופה"))).code).toBe("42501");
+    expect((await pgError(insert(admin, viewer.id, "דף לצופה"))).hint).toBe("booking_page:user");
+    const sees = (u: U) => asUser(u.id, async (q) => (await q<{ id: string }>("select id from public.booking_pages where organization_id = $1", [org])).rows.map((r) => r.id));
+    expect(await sees(m1)).toEqual([own]);
+    expect(await sees(m2)).toEqual([byAdmin]);
+    // the manager manages m1's team (owner, 15 October 2026), not m2's
+    expect(await sees(manager)).toEqual([own]);
+    expect(await sees(viewer)).toEqual([]);
+    expect((await sees(admin)).sort()).toEqual([own, byAdmin].sort());
+    expect((await sees(owner)).sort()).toEqual([own, byAdmin].sort());
+    // writes follow the same line
+    expect(await asUser(m2.id, async (q) => (await q("update public.booking_pages set title = 'x' where id = $1", [own])).rowCount)).toBe(0);
+    expect(await asUser(m2.id, async (q) => (await q("delete from public.booking_pages where id = $1", [own])).rowCount)).toBe(0);
+    expect(await asUser(manager.id, async (q) => (await q("update public.booking_pages set title = 'x' where id = $1", [byAdmin])).rowCount)).toBe(0);
+    expect(await asUser(manager.id, async (q) => (await q("update public.booking_pages set title = 'של המנהל' where id = $1", [own])).rowCount)).toBe(1);
+    expect(await asUser(m1.id, async (q) => (await q("update public.booking_pages set title = 'הדף שלי' where id = $1", [own])).rowCount)).toBe(1);
+    // a member cannot hand their page to someone else
+    expect((await pgError(asUser(m1.id, (q) => q("update public.booking_pages set user_id = $2 where id = $1", [own, m2.id])))).code).toBe("42501");
+    expect(await asUser(admin.id, async (q) => (await q("update public.booking_pages set is_active = false where id = $1", [own])).rowCount)).toBe(1);
+    // the token is the server's
+    expect((await pgError(asUser(m1.id, (q) => q("update public.booking_pages set token = 'x' where id = $1", [own])))).code).toBe("42501");
+    expect(await asUser(m1.id, async (q) => (await q("delete from public.booking_pages where id = $1", [own])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("delete from public.booking_pages where id = $1", [byAdmin])).rowCount)).toBe(1);
+  });
 });
 
 // "עדכנו אותי כשזה זמין" (migration plan_waitlist): every role asks for itself and

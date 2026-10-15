@@ -23,7 +23,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "quotes", label: "הצעות מחיר וחתימה", built: false },
   { feature: "payment_links", label: "קישורי תשלום", built: false },
   { feature: "balances", label: "כרטסת לקוח", built: false },
-  { feature: "booking_page", label: "דפי קביעת תור", built: false },
+  { feature: "booking_page", label: "דפי קביעת תור", built: true },
   { feature: "money_waiting", label: "כסף שמחכה", built: true },
   { feature: "instant_reply", label: "מענה מיידי ללקוח", built: false },
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },

@@ -395,6 +395,45 @@ export type MeetingTypeInsert = {
   is_active?: boolean;
 };
 
+// CAL-10 (migration 020120): public booking pages
+export type BookingQuestion = { id: string; label: string; required: boolean };
+
+export type BookingPageRow = {
+  id: string;
+  organization_id: string;
+  // the rep the page books with
+  user_id: string;
+  // the secret link (server-made)
+  token: string;
+  title: string;
+  intro: string | null;
+  meeting_type_id: string | null;
+  source_id: string | null;
+  min_notice_minutes: number;
+  max_days_ahead: number;
+  slot_step_minutes: number;
+  questions: Json;
+  is_active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BookingPageInsert = {
+  organization_id: string;
+  user_id: string;
+  title: string;
+  intro?: string | null;
+  meeting_type_id?: string | null;
+  source_id?: string | null;
+  min_notice_minutes?: number;
+  max_days_ahead?: number;
+  slot_step_minutes?: number;
+  questions?: Json;
+  is_active?: boolean;
+};
+
 export type MeetingParticipantRow = {
   id: string;
   organization_id: string;
@@ -1941,6 +1980,7 @@ export type Database = {
       tasks: Table<TaskRow, TaskInsert & { import_job_id?: string | null }, Partial<TaskInsert>>;
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_types: Table<MeetingTypeRow, MeetingTypeInsert, Partial<Omit<MeetingTypeInsert, "organization_id">>>;
+      booking_pages: Table<BookingPageRow, BookingPageInsert, Partial<Omit<BookingPageInsert, "organization_id">>>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant
@@ -2147,6 +2187,19 @@ export type Database = {
       calendar_feed_create: { Args: { p_org: string }; Returns: string };
       calendar_feed_revoke: { Args: { p_org: string }; Returns: undefined };
       calendar_feed_events: { Args: { p_token: string }; Returns: Json };
+      // CAL-10: the public booking page; both service_role only
+      booking_page_public: { Args: { p_token: string; p_from?: string | null; p_ip_hash?: string | null }; Returns: Json };
+      booking_submit: {
+        Args: {
+          p_token: string;
+          p_starts_at: string;
+          p_payload: Json;
+          p_ip_hash?: string | null;
+          p_user_agent?: string | null;
+          p_is_spam?: boolean;
+        };
+        Returns: Json;
+      };
       // GAP-01: a test notification to the caller; { ok: true } | { ok: false, reason: "rate", retry_seconds }
       send_test_notification: { Args: { p_org: string }; Returns: Json };
       // SPD-01: "I took it": { ok: true, result: 'taken' | 'acknowledged' } | { ok: false, reason: 'taken', owner_name } | { ok: false, reason: 'closed' }

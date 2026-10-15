@@ -25,7 +25,7 @@ export default async function MeetingTypesPage({ params }: Props) {
       <CardHeader id="meeting-types-title" title="סוגי פגישה" />
       <CardBody className="space-y-2 pb-0 text-md text-ink-soft">
         <p>כשקובעים פגישה ובוחרים סוג, המשך, אופן הפגישה והמיקום נכנסים לבד, ואפשר לשנות אותם. הצבע מסמן את הפגישה ביומן.</p>
-        <p>שינוי בסוג לא משנה פגישות שכבר נקבעו, חוץ מהצבע ומהמרווח, שנלקחים תמיד מהסוג.</p>
+        <p>שינוי בסוג לא משנה פגישות שכבר נקבעו, חוץ מהצבע, שנלקח תמיד מהסוג. המרווח לפני ואחרי מועתק לפגישה כשהיא נקבעת.</p>
       </CardBody>
       {types.length > 0 ? (
         <div className="mt-3 border-t border-line">

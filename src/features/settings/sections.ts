@@ -18,6 +18,7 @@ import {
   UploadIcon,
   UsersIcon,
 } from "@/components/ui/icons";
+import { bookingPagesPath } from "@/features/booking/paths";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
@@ -133,6 +134,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: distributionSettingsPath(orgId), label: "חלוקת לידים", description: "סבב, משקל, עומס פתוח, וכללים לפי מקור ומוצר", icon: UsersIcon },
         // CAP-10: everyone reads it; owners and admins change it
         { href: responseSettingsPath(orgId), label: "יעד זמן תגובה", description: "תוך כמה זמן עונים לליד חדש, ומה קורה כשלא", icon: BellIcon },
+        // CAL-10: each person their own pages; owners and admins all
+        { href: bookingPagesPath(orgId), label: "דפי קביעת תור", description: "קישור שבו לקוחות קובעים פגישה בזמן פנוי", icon: CalendarIcon },
         // LEAD-05: everyone reads the rules; owners and admins change them
         { href: leadScoreSettingsPath(orgId), label: "ציון ליד", description: "כללים שמוסיפים או מורידים נקודות לליד", icon: ChartIcon },
       ],
