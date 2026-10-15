@@ -76,6 +76,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "product_units", file: "product_units.csv" },
   // PRD-01
   { table: "products", file: "products.csv" },
+  // PRD-06: the cost of each product (the full export is the owner's, who sees costs)
+  { table: "product_costs", file: "product_costs.csv" },
   // PL-01
   { table: "price_lists", file: "price_lists.csv" },
   // PL-02
@@ -236,7 +238,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 החופשות של העובדים נמצאות ב-member_leaves.csv: user הוא העובד, starts_on ו-ends_on הם הימים הראשון והאחרון של החופשה, kind הוא סוג ההיעדרות (reserve = במילואים, vacation = בחופשה, ריק = היעדרות אחרת), ו-deputy הוא ממלא המקום.
 היעדים נמצאים ב-goals.csv: scope הוא user (חבר צוות), team (צוות) או org (כל העסק); period הוא month, quarter או year מ-period_start; metric הוא won_amount (הכנסה שנסגרה, target באגורות), won_deals, leads_handled או meetings_held.
 המעמד של העסק במע"מ נמצא ב-document_settings.csv: vat_status הוא licensed (עוסק מורשה או חברה בע"מ), exempt (עוסק פטור), nonprofit (עמותה או מלכ"ר) או other (מעמד אחר, ששמו ב-vat_status_other, ו-other_charges_vat אומר אם הוא גובה מע"מ). legal_form היא צורת ההתאגדות. באותו קובץ פרטי העסק שמופיעים במסמכים: legal_name (שם רשמי), tax_id (מספר עוסק או ח.פ., 9 ספרות), address_line, city ו-postal_code (כתובת), phone ו-email (פרטי קשר במסמכים, והאימייל גם בהזמנות ליומן). פרטי הבנק להעברה נמצאים ב-bank_details.csv: bank_name, bank_branch, bank_account ו-bank_account_name (רק בעלים ומנהלי מערכת רואים אותם במערכת).
-קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון.
+קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון. העלות של כל מוצר נמצאת ב-product_costs.csv: product_id הוא המוצר ו-cost_agorot העלות ליחידה באגורות.
 המחירונים נמצאים ב-price_lists.csv: valid_from ו-valid_to הם התאריכים שבהם המחירון בתוקף (ריק = בלי הגבלה), is_active אומר אם הוא פעיל, ו-prices_include_vat אומר אם המחירים הקבועים במחירון כוללים מע"מ. מחירון ברירת המחדל הוא המחיר שבכל מוצר. המחירים שבכל מחירון נמצאים ב-price_list_lines.csv: min_quantity היא הכמות שממנה השורה חלה (0 = כל כמות), ובכל שורה יש מחיר קבוע באגורות (price_agorot; price_includes_vat בשורה מעתיק את ההגדרה של המחירון) או הנחה מהמחיר של המוצר (discount_bp, ב-1/100 של אחוז: 1000 = 10%).
 פרטי החיוב של חברות ואנשי קשר נמצאים בעמודות של companies.csv ושל contacts.csv: billing_name (שם לחשבונית), billing_tax_id (באנשי קשר: מספר עוסק או ת"ז; בחברה המספר הוא tax_id), billing_address ו-shipping_address (כתובת לחיוב ולמשלוח), billing_email (אימייל לחשבוניות), payment_terms (immediate = מיידי, net = מספר ימים מתאריך המסמך, eom = שוטף + מספר ימים) עם payment_days, ו-price_list_id עם שם המחירון ב-price_list.
 המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.

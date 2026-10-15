@@ -230,6 +230,20 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("product costs: owners, admins and managers read them, members and viewers do not; only owners and admins write them (PRD-06)", async () => {
+    const product = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.products (organization_id, name, price_agorot) values ($1, 'מוצר עם עלות', 1000) returning id", [org])).rows[0].id,
+    );
+    await asUser(admin.id, (q) => q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 400)", [org, product]));
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.product_costs where product_id = $1", [product]));
+    for (const u of [owner, admin, manager]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m1, m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.product_costs set cost_agorot = 1 where product_id = $1", [product])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.product_costs set cost_agorot = 450 where product_id = $1", [product])).rowCount)).toBe(1);
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

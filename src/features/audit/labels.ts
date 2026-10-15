@@ -54,6 +54,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   product_units: "יחידת מידה",
   // PRD-01
   products: "מוצר",
+  // PRD-06
+  product_costs: "עלות של מוצר",
   // PL-01
   price_lists: "מחירון",
   // PL-02
@@ -266,6 +268,7 @@ export const FIELD_LABELS: Record<string, string> = {
   vat_kind: 'מע"מ',
   billing: "חיוב",
   price_agorot: "מחיר",
+  cost_agorot: "עלות ליחידה",
   price_includes_vat: 'המחיר כולל מע"מ',
   duration_minutes: "משך בדקות",
   is_active: "פעיל",

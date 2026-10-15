@@ -153,6 +153,7 @@ describe("product export (PRD-05)", () => {
     const [cells] = productExportRows(
       [
         {
+          id: "p1",
           name: "ייעוץ",
           description: null,
           sku: "C-1",

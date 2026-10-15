@@ -1306,6 +1306,17 @@ export type ProductRow = {
   updated_at: string;
 };
 
+// PRD-06: the cost of a product, per unit (migration product_costs); readable only under app.can_view_costs
+export type ProductCostRow = {
+  id: string;
+  organization_id: string;
+  product_id: string;
+  cost_agorot: number;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type ProductWrite = {
   name: string;
   description?: string | null;
@@ -1823,6 +1834,12 @@ export type Database = {
       >;
       // PRD-01: column grants; organization_id is fixed once inserted, archived_at only on update (stamped by trigger)
       products: Table<ProductRow, ProductWrite & { organization_id: string; import_job_id?: string | null }, Partial<ProductWrite> & { archived_at?: string | null }>;
+      // PRD-06: column grants; organization_id and product_id are fixed once inserted
+      product_costs: Table<
+        ProductCostRow,
+        { organization_id: string; product_id: string; cost_agorot: number; currency?: string },
+        { cost_agorot?: number; currency?: string }
+      >;
       // PL-01: column grants; organization_id is fixed once inserted
       price_lists: Table<
         PriceListRow,

@@ -136,6 +136,8 @@ describe("tenant isolation", () => {
       ids.productA = (
         await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
       ).rows[0].id;
+      // PRD-06: the product's cost, in its own table
+      await q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 6000)", [orgA, ids.productA]);
       ids.priceListA = (
         await q<{ id: string }>("insert into public.price_lists (organization_id, name, valid_from) values ($1, 'מחירון של א', '2026-01-01') returning id", [orgA])
       ).rows[0].id;
@@ -230,6 +232,8 @@ describe("tenant isolation", () => {
     "product_units",
     // PRD-01
     "products",
+    // PRD-06
+    "product_costs",
     // PL-01
     "price_lists",
     // PL-02
@@ -382,6 +386,7 @@ describe("tenant isolation", () => {
       product_categories: "name = name",
       product_units: "name = name",
       products: "name = name",
+      product_costs: "cost_agorot = cost_agorot",
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
       deal_lines: "quantity = quantity",
@@ -481,6 +486,7 @@ describe("tenant isolation", () => {
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.products (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 1)", [orgA, ids.productA]],
       ["insert into public.price_lists (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
       ["insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgA, ids.dealA]],
@@ -564,6 +570,7 @@ describe("tenant isolation", () => {
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],
       ["products", "description = 'HACKED'", "description = 'HACKED'"],
+      ["product_costs", "cost_agorot = 777", "cost_agorot = 777"],
       ["price_lists", "is_active = false", "not is_active"],
       ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
       ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
@@ -761,6 +768,11 @@ describe("tenant isolation", () => {
     const productB = await asUser(b.id, async (q) =>
       (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'מוצר של ב') returning id", [orgB])).rows[0].id,
     );
+    // PRD-06: a cost in B's organization cannot point at A's product
+    const viaCostProduct = await pgError(
+      asUser(b.id, (q) => q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 1)", [orgB, ids.productA])),
+    );
+    expect(viaCostProduct.code).toBe("23503");
     const viaLineList = await pgError(
       asUser(b.id, (q) =>
         q("insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source, price_list_id) values ($1, $2, $3, 'x', 'price_list', $4)", [

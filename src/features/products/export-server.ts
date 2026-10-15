@@ -1,6 +1,8 @@
 import "server-only";
 
+import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
+import { readProductCosts } from "@/features/product-costs/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
 import { csvText } from "@/lib/csv";
@@ -11,7 +13,7 @@ import { parseSort, sortValue } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { xlsxFile } from "@/lib/xlsx";
 
-import { PRODUCT_EXPORT_HEADER, productExportRows } from "./export-table";
+import { productExportHeader, productExportRows } from "./export-table";
 import { listProductCategories, listProductUnits } from "./list-queries";
 import { categoryWithChildren } from "./lists";
 import { listProducts, PRODUCT_DEFAULT_SORT, PRODUCT_SORT_COLUMNS, PRODUCT_STATUS_FILTERS, type Product, type ProductSortKey, type ProductStatusFilter } from "./queries";
@@ -83,8 +85,10 @@ export async function exportProducts(request: Request, orgId: string): Promise<R
     );
   }
 
-  const header = [...PRODUCT_EXPORT_HEADER];
-  const body = productExportRows(products, categories, units);
+  // PRD-06: the cost column only for those who see costs; the rows come from product_costs under RLS
+  const costs = canViewCosts(context.role, granted) ? await readProductCosts(orgId, products.map((p) => p.id)) : null;
+  const header = productExportHeader(costs !== null);
+  const body = productExportRows(products, categories, units, costs);
   const filename = `products-${zoneDate(new Date())}.${format}`;
   if (format === "xlsx") {
     return new Response(xlsxFile("מוצרים", header, body) as unknown as BodyInit, {

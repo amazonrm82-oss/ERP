@@ -34,6 +34,7 @@ const yesNo = (value: boolean) => (value ? "כן" : "לא");
 
 type ProductForExport = Pick<
   Product,
+  | "id"
   | "name"
   | "description"
   | "sku"
@@ -50,9 +51,35 @@ type ProductForExport = Pick<
   | "archivedAt"
 >;
 
-export function productExportRows(products: ProductForExport[], categories: readonly ProductCategory[], units: readonly ProductUnit[]): string[][] {
+/** PRD-06: the column added for those who see costs (the cost per unit, in shekels; empty = none). */
+export const PRODUCT_COST_HEADER = "עלות ליחידה";
+
+/** The header row: the cost column only when the costs were read (canViewCosts). */
+export function productExportHeader(withCost: boolean): string[] {
+  return withCost ? [...PRODUCT_EXPORT_HEADER, PRODUCT_COST_HEADER] : [...PRODUCT_EXPORT_HEADER];
+}
+
+/**
+ * The rows. costs: the cost per unit by product id, read under RLS for someone who sees costs, or
+ * null for anyone else, so their file has no cost column at all.
+ */
+export function productExportRows(
+  products: ProductForExport[],
+  categories: readonly ProductCategory[],
+  units: readonly ProductUnit[],
+  costs: ReadonlyMap<string, number> | null = null,
+): string[][] {
   const unitNames = new Map(units.map((u) => [u.id, u.name]));
-  return products.map((p) => [
+  return products.map((p) => {
+    const row = productRow(p, categories, unitNames);
+    if (costs === null) return row;
+    const cost = costs.get(p.id);
+    return [...row, cost === undefined ? "" : plainShekels(cost)];
+  });
+}
+
+function productRow(p: ProductForExport, categories: readonly ProductCategory[], unitNames: ReadonlyMap<string, string>): string[] {
+  return [
     p.name,
     p.description ?? "",
     p.sku ?? "",
@@ -67,5 +94,5 @@ export function productExportRows(products: ProductForExport[], categories: read
     p.barcode ?? "",
     yesNo(p.isActive),
     yesNo(p.archivedAt !== null),
-  ]);
+  ];
 }

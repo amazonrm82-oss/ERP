@@ -64,8 +64,14 @@ describe("member permission screen texts", () => {
   });
 
   it("the built keys match app.member_permission_built_keys()", () => {
-    const answer = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_automation_permission_answer.sql"))!), "utf8");
-    const fn = answer.match(/function app\.member_permission_built_keys\(\)[\s\S]*?array\[([\s\S]*?)\]::text\[\]/);
+    // the latest migration that defines it (a module that is built adds its key there)
+    const latest = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .filter((text) => text.includes("function app.member_permission_built_keys()"))
+      .at(-1)!;
+    const fn = latest.match(/function app\.member_permission_built_keys\(\)[\s\S]*?array\[([\s\S]*?)\]::text\[\]/);
     expect(fn && [...fn[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual([...BUILT_MEMBER_PERMISSIONS].sort());
   });
 });

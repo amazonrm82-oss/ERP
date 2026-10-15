@@ -10,13 +10,14 @@ import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
 import { linesValueNote, monthlyRecurringAgorot } from "@/features/deals/recurring";
+import { linesProfit, marginText } from "@/features/product-costs/margin";
 import { documentVatRateBp } from "@/features/tax/calc";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { deleteDealLineAction, moveDealLineAction } from "../actions";
-import { dealLinesTotals } from "../pricing";
+import { dealLinesNet, dealLinesTotals } from "../pricing";
 import type { DealLine } from "../queries";
 import { lineBillingText, MAKE_RECURRING_LABEL, makeRecurringOffer } from "../recurring";
 import { DEAL_LINES_MAX, priceSourceText } from "../schema";
@@ -42,6 +43,8 @@ type Props = {
   // DLI-03: what the deal value follows (deals.amount_auto, amount_source, recurring_amount_auto)
   // DLI-04: the deal's recurring amount as shown (null = one-time or empty)
   dealValue: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean; recurringAgorot: number | null };
+  // PRD-06: the cost per unit of the lines' products, by product id, for those who see costs; null for anyone else
+  costs: Record<string, number> | null;
 };
 
 function discountText(line: DealLine): string | null {
@@ -55,7 +58,7 @@ function discountText(line: DealLine): string | null {
  * discount and amount, and the totals with VAT under them by the one totals rule (TAX-05). DLI-03: the
  * deal's value follows their sum before VAT unless a person typed it; the card says which.
  */
-export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue }: Props) {
+export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue, costs }: Props) {
   const [editing, setEditing] = useState<DealLine | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -92,6 +95,22 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
   }
 
   const full = lines.length >= DEAL_LINES_MAX;
+  // PRD-06: the gross profit of the lines whose product has a cost (before VAT), for those who see costs
+  const profit =
+    costs === null
+      ? null
+      : linesProfit(
+          lines.map((line) => ({
+            productId: line.productId,
+            quantity: line.quantity,
+            netAgorot: dealLinesNet(
+              [{ quantity: line.quantity, unitPriceAgorot: line.unitPriceAgorot, discountBp: line.discountBp, discountAgorot: line.discountAgorot, vatExempt: line.vatExempt }],
+              pricing.rateBp,
+              pricing.includesVat,
+            ),
+          })),
+          new Map(Object.entries(costs)),
+        );
 
   return (
     <Card aria-labelledby="deal-lines-title">
@@ -189,6 +208,27 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
               </div>
             )}
           </dl>
+        ) : null}
+        {profit ? (
+          <div className="space-y-1 rounded-md border border-line px-3 py-2.5 text-md print:hidden">
+            <p className="flex justify-between gap-3">
+              <span className="text-ink-soft">עלות המוצרים</span>
+              <span className="tabular-nums">{formatMoney(profit.costAgorot)}</span>
+            </p>
+            <p className="flex justify-between gap-3 font-semibold">
+              <span>רווח גולמי (לפני מע&quot;מ)</span>
+              <span className={profit.profitAgorot < 0 ? "tabular-nums text-danger" : "tabular-nums"}>
+                {formatMoney(profit.profitAgorot)}
+                {profit.marginBp !== null ? ` (${marginText(profit.marginBp)})` : ""}
+              </span>
+            </p>
+            {profit.uncosted > 0 ? (
+              <p className="text-sm text-ink-soft">
+                {profit.uncosted === 1 ? "שורה אחת בלי עלות לא נכללה בחישוב." : `${profit.uncosted} שורות בלי עלות לא נכללו בחישוב.`}
+              </p>
+            ) : null}
+            <p className="text-sm text-ink-soft">לפי העלות שבקטלוג היום. רק מי שמורשה לראות עלות רואה את החלק הזה.</p>
+          </div>
         ) : null}
         {lines.length > 0 && monthly !== null && monthly > 0 ? (
           <p className="flex justify-between gap-3 text-md">

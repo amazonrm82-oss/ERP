@@ -46,8 +46,9 @@ import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format"
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
-import { canEditCatalog } from "@/features/permissions/keys";
+import { canEditCatalog, canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
+import { readProductCosts } from "@/features/product-costs/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
@@ -108,6 +109,11 @@ export default async function DealPage({ params, searchParams }: Props) {
   ]);
   // DLI-01, PL-03: the day, the VAT and the customer's price list the lines are priced by
   const linesPricing = await getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone);
+  const granted = await getMyPermissions(orgId);
+  // PRD-06: the products' costs (gross profit on the lines) only for those who see costs; RLS applies the same rule
+  const lineProductIds = lines.flatMap((line) => (line.productId ? [line.productId] : []));
+  const lineCosts =
+    canViewCosts(context.role, granted) && lineProductIds.length > 0 ? Object.fromEntries(await readProductCosts(orgId, lineProductIds)) : null;
   // DEAL-11: right after a copy, the custom fields it could not carry
   const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
@@ -180,7 +186,8 @@ export default async function DealPage({ params, searchParams }: Props) {
             pricing={linesPricing}
             canEdit={canEdit}
             features={{ products: hasProducts, discounts: hasDiscounts }}
-            canCreateProducts={hasProducts && context.canWrite && canEditCatalog(context.role, await getMyPermissions(orgId))}
+            canCreateProducts={hasProducts && context.canWrite && canEditCatalog(context.role, granted)}
+            costs={lineCosts}
           />
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}

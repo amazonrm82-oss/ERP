@@ -42,6 +42,7 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
   { key: "export", label: "ייצוא", description: "הורדת רשימות ודוחות לקובץ Excel או CSV, מהרשומות שהמשתמש רואה.", built: true },
   { key: "import", label: "ייבוא", description: "העלאת לידים, אנשי קשר, חברות, עסקאות ומשימות מקובץ, וביטול ייבוא שלו בשבעת הימים הראשונים.", built: true },
   { key: "edit_catalog", label: "עריכת קטלוג", description: "הוספה ועריכה של מוצרים, קטגוריות, יחידות מידה ומחירונים.", built: true },
+  { key: "view_costs", label: "צפייה בעלות וברווח", description: "עלות המוצרים והרווח עליהם, בקטלוג ובעסקאות. יחד עם עריכת קטלוג, גם עדכון העלות. בעלים, מנהלי מערכת ומנהלי צוות רואים תמיד.", built: true },
   {
     key: "manage_automations",
     label: "ניהול אוטומציות",
@@ -53,7 +54,6 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
   { key: "issue_documents", label: "הפקת מסמכים", description: "הפקת חשבוניות וקבלות.", built: false },
   { key: "issue_credits", label: "זיכוי", description: "הפקת מסמכי זיכוי.", built: false },
   { key: "record_payments", label: "רישום תשלומים", description: "רישום תשלומים שהתקבלו.", built: false },
-  { key: "view_costs", label: "צפייה בעלות וברווח", description: "מחיר העלות והרווח של מוצרים ועסקאות.", built: false },
   { key: "mass_send", label: "שליחה המונית", description: "שליחת הודעה לקבוצה גדולה של לקוחות.", built: false },
 ];
 
@@ -96,4 +96,14 @@ export function canEditCatalog(role: MembershipRole, granted: readonly string[])
 /** app.can_manage_automations(): owners and admins, or the grant. */
 export function canManageAutomations(role: MembershipRole, granted: readonly string[]): boolean {
   return hasPermission(role, granted, "manage_automations");
+}
+
+/**
+ * PRD-06: who sees the cost of products and the profit on them, the rule of app.can_view_costs():
+ * owners, admins and managers by role, or a member holding the view_costs grant. For the screens
+ * only: the cost itself comes from public.product_costs, whose RLS applies the same rule.
+ */
+export function canViewCosts(role: MembershipRole | null, granted: readonly string[]): boolean {
+  if (role === null) return false;
+  return role === "owner" || role === "admin" || role === "manager" || (canReceivePermissions(role) && granted.includes("view_costs"));
 }
