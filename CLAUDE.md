@@ -113,7 +113,8 @@ node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
 `test:db` fails at teardown when a test leaves any app/public function body different from the fresh build
-(`tests/db/global-setup.ts`); a test that re-runs a migration uses `rerunClosure()` from `tests/db/rerun.ts`.
+(`tests/db/global-setup.ts`); a test that re-runs a migration uses `rerunClosure()` from `tests/db/rerun.ts`. A hand-picked re-run list is checked with
+`staleRestores()` (same file), which names every function whose latest redefinition the list misses.
 `db:test:start` refuses a port another server already answers on and checks that the started postmaster owns it; `test:db`
 refuses to rebuild unless the server at `TEST_DATABASE_URL` reports `TEST_DB_DIR/data` (default `/tmp/crm-saas-pgtest/data`)
 as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker sets `TEST_DB_DIR` together with its port.
