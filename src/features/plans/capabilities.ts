@@ -10,6 +10,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "billing_details", label: "פרטי חיוב בחברה ובאיש קשר", built: true, core: true },
   // DEAL-07: deal data, no plan key (to be confirmed by the owner)
   { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
+  // LEAD-05 (owner, 14 October 2026): core, open in every plan
+  { feature: "lead_scoring", label: "ציון ליד לפי כללים", built: true, core: true },
   // DLI-01..02, PL-03: product lines in a deal sit under the products flag (owner, 14 October 2026)
   { feature: "products", label: "קטלוג מוצרים, מחירונים, מוצר מבוקש בליד ושורות מוצר בעסקה", built: true },
   // DSC-01 (line part): a discount on a deal line (owner, 14 October 2026)

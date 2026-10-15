@@ -432,6 +432,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_money_currency.sql",
       "_deal_lines.sql",
       "_deal_line_billing.sql",
+      // LEAD-05 redefines app.sample_row() last
+      "_lead_score.sql",
     ]) {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file).toBeDefined();

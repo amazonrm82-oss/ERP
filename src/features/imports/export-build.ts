@@ -91,6 +91,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "completeness_settings", file: "completeness_settings.csv" },
   // FLD-08: the card layout per record type
   { table: "card_layouts", file: "card_layouts.csv" },
+  // LEAD-05: the lead score rules
+  { table: "lead_score_rules", file: "lead_score_rules.csv" },
   { table: "files", file: "files.csv" },
 ];
 

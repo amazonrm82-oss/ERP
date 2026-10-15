@@ -115,6 +115,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
   "reasons:max": "אפשר לשמור עד 50 סיבות. מחקו סיבה שלא בשימוש כדי להוסיף חדשה.",
+  // LEAD-05 (migration lead_score)
+  "lead_score_rules:max": "אפשר לשמור עד 50 כללי ניקוד. מחקו כלל שלא צריך כדי להוסיף חדש.",
+  "lead_score_rule:invalid": "הכלל אינו תקין, או שהשדה או הערך שבחרתם הוסרו בינתיים. רעננו את הדף ונסו שוב.",
   // CAP-09 (migration working_hours_leave)
   "member_hours:other_orgs": "המשתמש שייך גם לעסק אחר, ולכן רק הוא יכול לשנות את שעות העבודה שלו, מהחשבון שלו.",
   "member_hours:invalid": "שעות העבודה אינן תקינות. בדקו שכל טווח מתחיל לפני שהוא נגמר ושהטווחים לא חופפים.",

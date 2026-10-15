@@ -44,6 +44,7 @@ import { DuplicatesCard } from "@/features/merge/components/duplicates-card";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
+import { LeadScoreCard } from "@/features/lead-score/components/lead-score-card";
 
 export const metadata: Metadata = { title: "ליד" };
 
@@ -192,6 +193,11 @@ export default async function LeadPage({ params, searchParams }: Props) {
               <CompletenessCard orgId={orgId} type="lead" id={lead.id} editBase={canWrite && canEditRecordHint(context, lead.owner_id) ? paths.lead(orgId, lead.id) : null} />
             </div>
           ) : null}
+
+          {/* LEAD-05: shown only while the business has an active score rule */}
+          <div className="empty:hidden">
+            <LeadScoreCard orgId={orgId} leadId={lead.id} />
+          </div>
 
           <LeadDetailsCard
             layout={cardLayout}

@@ -53,6 +53,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
       owner,
       tag,
+      // LEAD-05: the score the business's rules give
+      { key: "score", label: "ציון", kind: "number", column: "score" },
       created,
       lastContact,
       noContact,

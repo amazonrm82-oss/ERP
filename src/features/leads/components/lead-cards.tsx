@@ -6,10 +6,11 @@ import { paths } from "@/lib/paths";
 import { leadDisplayName, statusTone } from "../display";
 import type { LeadListItem, LeadStatusOption } from "../queries";
 
-type Props = { orgId: string; leads: LeadListItem[]; statuses: LeadStatusOption[]; className?: string };
+// showScore: the user shows the score column on a computer, so the phone card shows it too (LEAD-05)
+type Props = { orgId: string; leads: LeadListItem[]; statuses: LeadStatusOption[]; showScore?: boolean; className?: string };
 
 /** Leads on a phone (FXU-02): name, status, company and owner, with call / WhatsApp. */
-export function LeadCards({ orgId, leads, statuses, className }: Props) {
+export function LeadCards({ orgId, leads, statuses, showScore, className }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   return (
     <RecordCards
@@ -26,6 +27,7 @@ export function LeadCards({ orgId, leads, statuses, className }: Props) {
             lead.companyName,
             lead.ownerName ? `אחראי: ${lead.ownerName}` : null,
             lead.lastContactedAt ? `מגע אחרון: ${formatDate(lead.lastContactedAt)}` : null,
+            showScore && lead.score !== undefined ? `ציון: ${lead.score}` : null,
           ],
           phone: lead.phone,
           phoneE164: lead.phoneE164,

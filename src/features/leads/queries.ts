@@ -55,6 +55,8 @@ export type LeadListItem = {
   ownerName: string | null;
   // LEAD-02: the last contact entry a person logged on the lead's timeline
   lastContactedAt: string | null;
+  // LEAD-05 (listLeads only)
+  score?: number;
   createdAt: string;
   customFields: Json;
 };
@@ -75,6 +77,8 @@ export const LEAD_SORT_COLUMNS = {
   created: "created_at",
   // DQL-01: computed field public.completeness(leads)
   completeness: "completeness",
+  // LEAD-05: set by the database from the score rules
+  score: "score",
 } as const;
 export type LeadSortKey = keyof typeof LEAD_SORT_COLUMNS;
 export const LEAD_DEFAULT_SORT: Sort<LeadSortKey> = { key: "created", ascending: false };
@@ -101,7 +105,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   let query = supabase
     .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, created_at, custom_fields")
+    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, score, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -153,6 +157,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       lastContactedAt: row.last_contacted_at,
+      score: row.score,
       createdAt: row.created_at,
       customFields: row.custom_fields,
     })),

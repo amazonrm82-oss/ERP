@@ -64,6 +64,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   lead_response_settings: "יעד זמן תגובה",
   // QUO-03
   number_sequences: "מספור הצעות והזמנות",
+  // LEAD-05
+  lead_score_rules: "כלל ציון ליד",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -111,6 +113,11 @@ export const FIELD_LABELS: Record<string, string> = {
   ends_on: "עד תאריך",
   // HEB-08
   deputy_id: "ממלא מקום",
+  // LEAD-05: the rule's parts (the lead's score is never in the audit log)
+  points: "נקודות",
+  op: "תנאי",
+  field: "שדה",
+  value: "ערך",
   full_name: "שם",
   first_name: "שם פרטי",
   last_name: "שם משפחה",

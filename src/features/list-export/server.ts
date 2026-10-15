@@ -118,6 +118,7 @@ export async function exportList(request: Request, orgId: string, object: ListOb
             product: lead.requestedProductName ?? null,
             created: created(lead.createdAt),
             completeness: percent(scores?.get(lead.id)),
+            score: lead.score === undefined ? null : String(lead.score),
           },
         });
       }

@@ -27,6 +27,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "created", label: "נוצר" },
       // DQL-01: share of the important fields that are filled
       { key: "completeness", label: "שלמות" },
+      // LEAD-05: the sum of the business's score rules the lead matches
+      { key: "score", label: "ציון" },
     ],
     defaults: ["phone", "email", "status", "source", "owner", "last_contact", "created"],
   },

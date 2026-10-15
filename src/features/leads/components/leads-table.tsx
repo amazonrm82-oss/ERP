@@ -164,6 +164,8 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
               const score = completeness?.get(lead.id);
               return score === undefined ? null : <span className="tabular-nums">{score}%</span>;
             }
+            case "score":
+              return lead.score === undefined ? null : <span className="tabular-nums" dir="ltr">{lead.score}</span>;
             case "created":
               return (
                 <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">

@@ -21,6 +21,7 @@ import {
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
+import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
@@ -112,6 +113,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
           : []),
         // CAP-10: everyone reads it; owners and admins change it
         { href: responseSettingsPath(orgId), label: "יעד זמן תגובה", description: "תוך כמה זמן עונים לליד חדש, ומה קורה כשלא", icon: BellIcon },
+        // LEAD-05: everyone reads the rules; owners and admins change them
+        { href: leadScoreSettingsPath(orgId), label: "ציון ליד", description: "כללים שמוסיפים או מורידים נקודות לליד", icon: ChartIcon },
       ],
     },
     {

@@ -64,6 +64,21 @@ export type CardLayoutRow = {
   updated_at: string;
 };
 
+// LEAD-05: one lead score rule; field = a built-in key, cf:<key> or activity:<type> (src/features/lead-score/rules.ts)
+export type LeadScoreRuleRow = {
+  id: string;
+  organization_id: string;
+  field: string;
+  // "filled" | "empty" | "eq" | "neq" | "gte" | "lte" (check constraint)
+  op: string;
+  value: string | null;
+  points: number;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // LEAD-06: where a lead custom field goes on conversion. No row = mode "auto" (same label and type, 0029).
 export type ConversionFieldMapRow = {
   id: string;
@@ -1034,7 +1049,7 @@ export type LeadInsert = {
   source_id?: string | null;
   campaign?: string | null;
   utm?: Json;
-  score?: number;
+  // score: server-only since LEAD-05 (set by trigger leads_zz_score)
   budget_agorot?: number | null;
   currency?: "ILS";
   message?: string | null;
@@ -1755,6 +1770,12 @@ export type Database = {
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant
       card_layouts: Table<CardLayoutRow, { organization_id: string; object_type: string; groups?: Json }, { groups?: Json }>;
+      // LEAD-05: owners and admins write; everyone in the business reads
+      lead_score_rules: Table<
+        LeadScoreRuleRow,
+        { organization_id: string; field: string; op: string; value?: string | null; points: number; position?: number; is_active?: boolean },
+        { points?: number; position?: number; is_active?: boolean }
+      >;
       // DQL-01: the important fields per record type; seeded per organization, no delete grant
       completeness_settings: Table<CompletenessSettingsRow, { organization_id: string; object_type: string; fields?: string[] }, { fields?: string[] }>;
       // CAP-09: the user is inserted once; the dates, kind and deputy change (column-level update grant; HEB-08)
@@ -1832,6 +1853,13 @@ export type Database = {
         Returns: { changed: number };
       };
       record_completeness: { Args: { p_org: string; p_type: string; p_ids: string[] }; Returns: Json };
+      // LEAD-05: owners/admins recompute one batch now (true = nothing left); members ask whether a recompute waits
+      lead_scores_refresh: { Args: { p_org: string }; Returns: boolean };
+      lead_scores_pending: { Args: { p_org: string }; Returns: boolean | null };
+      // LEAD-05: adds the suggested rules while the business has none; how many were added
+      lead_score_rules_suggest: { Args: { p_org: string }; Returns: number };
+      // LEAD-05 (security invoker): { score, matched: [{ id, points }] }, or null when the lead cannot be read
+      lead_score_breakdown: { Args: { p_org: string; p_lead: string }; Returns: Json };
       incomplete_records: { Args: { p_org: string; p_type: string; p_owner: string; p_limit?: number }; Returns: Json };
       // computed field 0..100 on leads, contacts, companies and deals: used as `order=completeness`, not called as an RPC
       completeness: { Args: Record<string, never>; Returns: number | null };

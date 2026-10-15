@@ -106,8 +106,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     return suffix ? `${paths.leads(orgId)}?${suffix}` : paths.leads(orgId);
   };
   const hrefFor = (target: number) => listHref(target, sortValue(sort));
-  // a new sort starts again from the first page; dates start with the newest
-  const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created" && key !== "last_contact")));
+  // a new sort starts again from the first page; dates start with the newest, the score (LEAD-05) with the highest
+  const sortHref = (key: string) =>
+    listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created" && key !== "last_contact" && key !== "score")));
 
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>
@@ -192,7 +193,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} />
       ) : leads.length > 0 ? (
         <>
-          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} className="md:hidden" />
+          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" />
           <div className="hidden md:block">
             <LeadsTable
               orgId={orgId}
