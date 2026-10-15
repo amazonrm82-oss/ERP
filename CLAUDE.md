@@ -819,8 +819,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).
-  Platform staff see customer data only in a support session: an open `support_access_grants` row
-  makes `app.role_in()` return `viewer` for them (`app.membership_role()` is the plain membership).
+  Platform staff see customer data only in a support session (FXS-08, migration 020075): `platform_open_support()` records
+  a row in `app.support_sessions` (one per staff user and grant) together with its `platform_log` and `audit_log` entries
+  (logged once per session), and `app.support_session()` is true only while that row's grant is live (not revoked, not
+  expired); then `app.role_in()` returns `viewer` (`app.membership_role()` is the plain membership). A grant alone gives nothing.
   The panel is `src/app/admin` + `src/features/platform/`.
 - Imports (migration 0012): `import_jobs` plus `import_job_id` on leads/contacts/companies (guarded:
   only a running job of the same user and type, set on insert, never changed). `emit_event` marks such
