@@ -638,6 +638,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   site hosts (`app.public_email_domain`, closed list) never match. Candidates come from `app.company_domain_candidates()` (definer,
   ids only, no cap, members only) and are re-read under RLS. `contacts.company_matched_domain` / `company_match_kind` (server only)
   drive the card marks. Mirrors in `src/features/company-domain/domains.ts` (unit test).
+- Contact at several companies (CON-05, migration 020070; owner 15 October 2026: core, free-text role up to 80): `public.contact_companies`
+  (contact, company, `title`, server-derived `is_primary`). The primary company stays `contacts.company_id`, the one source of
+  truth: trigger `contacts_company_links` (definer) keeps a primary row for it; a person cannot remove the primary link (hint
+  `contact_company:primary`). Select needs both records readable; insert/update/delete need an editable contact (writable org, not
+  in the bin) and a readable company, and update/delete repeat the company check. At most 50 per contact (hint `contact_company:max`,
+  definer count `app.contact_company_count` after the outsider guard). Audited as a `company_link` change of the contact. Merge
+  copies links through the `merged` timeline entry (`app.merge_contact_companies`, until `merge_move_links` takes it over).
+  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020070.
 - Contact preferences (CON-10, migration 0183): `contacts.preferred_locale` (he|ar|en|ru|am|fr|es) and `preferred_channel`
   (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
   reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
