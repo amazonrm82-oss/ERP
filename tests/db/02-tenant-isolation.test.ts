@@ -153,6 +153,12 @@ describe("tenant isolation", () => {
       await q(`insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'lead', '[{"title": "קשר", "columns": 2, "fields": ["phone", "email"]}]')`, [orgA]);
       // LEAD-05
       await q("insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'email', 'filled', 5)", [orgA]);
+      // CAP-08: weights need no plan key, nor does a rule that is switched off
+      await q("insert into public.lead_distribution_settings (organization_id, weights) values ($1, $2)", [orgA, JSON.stringify({ [a.id]: 2 })]);
+      await q(
+        "insert into public.lead_routing_rules (organization_id, is_active, product_id, team_id) values ($1, false, $2, (select id from public.teams where organization_id = $1 limit 1))",
+        [orgA, ids.productA],
+      );
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -229,6 +235,9 @@ describe("tenant isolation", () => {
     "card_layouts",
     // LEAD-05
     "lead_score_rules",
+    // CAP-08
+    "lead_distribution_settings",
+    "lead_routing_rules",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -366,6 +375,8 @@ describe("tenant isolation", () => {
       conversion_field_maps: "target_field_id = target_field_id",
       card_layouts: "groups = groups",
       lead_score_rules: "points = points",
+      lead_distribution_settings: "method = method",
+      lead_routing_rules: "position = position",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -460,6 +471,8 @@ describe("tenant isolation", () => {
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
       ["insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'deal', '[]')", [orgA]],
       ["insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'phone', 'filled', 1)", [orgA]],
+      ["insert into public.lead_distribution_settings (organization_id) values ($1)", [orgA]],
+      ["insert into public.lead_routing_rules (organization_id, is_active, product_id, team_id) values ($1, false, $2, $3)", [orgA, ids.productA, team]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -537,6 +550,8 @@ describe("tenant isolation", () => {
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
       ["card_layouts", "groups = '[]'", "groups = '[]'"],
       ["lead_score_rules", "points = 77", "points = 77"],
+      ["lead_distribution_settings", "weights = '{}'", "weights = '{}'"],
+      ["lead_routing_rules", "position = 777", "position = 777"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

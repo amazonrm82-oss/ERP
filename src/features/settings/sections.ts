@@ -28,6 +28,7 @@ import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { numberingSettingsPath } from "@/features/numbering/paths";
 import { responseSettingsPath } from "@/features/response-target/paths";
+import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { paths } from "@/lib/paths";
 
@@ -111,6 +112,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: paths.settingsAutomations(orgId), label: "אוטומציות", description: "פעולות שקורות לבד, בלי לזכור", icon: BoltIcon },
             ]
           : []),
+        // CAP-08: everyone reads it; owners and admins change it
+        { href: distributionSettingsPath(orgId), label: "חלוקת לידים", description: "סבב, משקל, עומס פתוח, וכללים לפי מקור ומוצר", icon: UsersIcon },
         // CAP-10: everyone reads it; owners and admins change it
         { href: responseSettingsPath(orgId), label: "יעד זמן תגובה", description: "תוך כמה זמן עונים לליד חדש, ומה קורה כשלא", icon: BellIcon },
         // LEAD-05: everyone reads the rules; owners and admins change them

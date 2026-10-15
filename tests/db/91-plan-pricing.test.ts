@@ -152,9 +152,10 @@ describe("plan prices and states", () => {
       await q(later);
       expect(await snapshot(true)).toEqual(before);
       const values = await snapshot(false);
-      // the pricing seed rewrites the later keys and the later migration puts them back
+      // the pricing seed rewrites the later keys and the later migrations put them back
       await q(pricing);
       await q(later);
+      await q(migration("_lead_distribution_plan.sql"));
       expect(await snapshot(false)).toEqual(values);
       await q("rollback to savepoint s");
     });

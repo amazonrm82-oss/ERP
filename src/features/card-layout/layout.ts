@@ -54,6 +54,8 @@ export const CARD_LAYOUT_BUILT_IN: Record<CardLayoutType, Array<{ key: string; l
     { key: "source_id", label: "מקור" },
     { key: "requested_product_id", label: "מוצר מבוקש" },
     { key: "preferred_channel", label: "ערוץ מועדף" },
+    // CAP-08
+    { key: "preferred_locale", label: "שפה מועדפת" },
     { key: "owner_id", label: "אחראי" },
     { key: "budget", label: "תקציב" },
     { key: "last_contacted_at", label: "מגע אחרון" },

@@ -293,13 +293,19 @@ describe("passing a lead on to the next rep (SPD-03)", () => {
       const check = (await q<{ d: string }>("select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'lead_response_settings_action_check'")).rows[0].d;
       expect(check).toContain("pass_on");
       await q(readFileSync(join(dir, files[1]), "utf8"));
-      // the later migrations that redefine the job run again too (HEB-08), so no later test sees an old body
-      const later = readdirSync(dir)
-        .filter((f) => f.endsWith(".sql") && f > files[1])
-        .sort()
-        .map((f) => readFileSync(join(dir, f), "utf8"))
-        .filter((sql) => /function\s+app\.check_lead_responses\s*\(/.test(sql));
-      for (const sql of later) await q(sql);
+      // every later migration that redefines a function a re-run file defined runs again too, in
+      // name order (HEB-08, CAP-08: 019100 redefines the job and also intake_submit and others, which
+      // later migrations redefine again), so no later test sees an old body
+      const defined = (sql: string) => [...sql.matchAll(/create\s+or\s+replace\s+function\s+([a-z_]+\.[a-z_0-9]+)\s*\(/gi)].map((m) => m[1].toLowerCase());
+      const names = new Set([...defined(readFileSync(join(dir, files[0]), "utf8")), ...defined(readFileSync(join(dir, files[1]), "utf8"))]);
+      for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql") && f > files[1]).sort()) {
+        const sql = readFileSync(join(dir, f), "utf8");
+        const own = defined(sql);
+        if (own.some((name) => names.has(name))) {
+          await q(sql);
+          for (const name of own) names.add(name);
+        }
+      }
     });
     await setSettings("pass_on", 2);
     const lead = await submit("055-7200011");

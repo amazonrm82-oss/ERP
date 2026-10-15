@@ -24,6 +24,7 @@ import {
   LEAD_FIELD_NAMES,
   leadCampaignSchema,
   leadChannelFromForm,
+  leadLocaleFromForm,
   updateLeadSchema,
 } from "./schema";
 import { requestedProductFromForm } from "@/features/requested-product/schema";
@@ -76,6 +77,11 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   if (!channel.ok) {
     return fail(channel.message, { fieldErrors: { preferred_channel: channel.message }, values: formValues(formData) });
   }
+  // CAP-08: the preferred language
+  const locale = leadLocaleFromForm(formData);
+  if (!locale.ok) {
+    return fail(locale.message, { fieldErrors: { preferred_locale: locale.message }, values: formValues(formData) });
+  }
 
   // A repeat lead (same phone or email as a lead or contact the user can see)
   // is pointed out first; the user may still create a new one.
@@ -99,6 +105,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
       disqualify_reason: choice.reason,
       ...product.patch,
       ...channel.patch,
+      ...locale.patch,
       ...customFieldsPatch(custom.customFields),
     })
     .select("id")
@@ -148,10 +155,15 @@ export async function updateLeadAction(
   if (!channel.ok) {
     return fail(channel.message, { fieldErrors: { preferred_channel: channel.message }, values: formValues(formData) });
   }
+  // CAP-08: the preferred language
+  const locale = leadLocaleFromForm(formData);
+  if (!locale.ok) {
+    return fail(locale.message, { fieldErrors: { preferred_locale: locale.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("leads")
-    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...channel.patch, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...channel.patch, ...locale.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

@@ -87,6 +87,9 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "lead_response_settings", file: "response_settings.csv" },
   // QUO-03: the running number series of quotes and orders
   { table: "number_sequences", file: "number_sequences.csv" },
+  // CAP-08
+  { table: "lead_distribution_settings", file: "lead_distribution.csv" },
+  { table: "lead_routing_rules", file: "lead_routing_rules.csv" },
   // DQL-01: the important fields per record type
   { table: "completeness_settings", file: "completeness_settings.csv" },
   // FLD-08: the card layout per record type
@@ -234,6 +237,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר.
+חלוקת הלידים נמצאת ב-lead_distribution.csv: method הוא round_robin (סבב), weighted (לפי משקל) או load (לפי עומס פתוח), ו-weights הם המשקלים של העובדים (מזהה משתמש ומספר מ-1 עד 10; מי שלא מופיע שוקל 1). כללי החלוקה נמצאים ב-lead_routing_rules.csv: ליד מהמקור source_id, עם המוצר product_id, בשפה locale ו/או עם הערך field_value בשדה field_key (כל מה שמולא בכלל צריך להתאים) נשלח לצוות team_id או לאדם user_id, לפי הסדר position, ורק כללים עם is_active.
 חברי כל צוות נמצאים ב-team_members.csv (is_manager אומר אם הוא מנהל הצוות), ותבניות הודעות הוואטסאפ ב-whatsapp_templates.csv.
 הקבצים שצורפו לרשומות נמצאים בתיקייה files, בשם <id>-<שם הקובץ>, ו-files.csv אומר לאיזו רשומה כל אחד שייך.
 `;

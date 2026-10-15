@@ -91,6 +91,7 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   goals: ALL, // one goal for the business
   // basic and up
   auto_reassign: BASIC_UP, // SPD-03
+  lead_distribution: BASIC_UP, // CAP-08 (owner, 14 October 2026)
   orders: BASIC_UP,
   api: BASIC_UP,
   custom_reports: BASIC_UP,
@@ -150,6 +151,8 @@ const WAVE2_FEATURE_LIST = [
   "money_waiting", "consents", "segments", "goals", "granular_permissions", "booking_page", "business_card", "qr_codes",
   "site_widget", "retention", "remove_built_with", "payment_links", "instant_reply", "auto_reassign", "dashboards",
   "goals_per_rep", "booking_team_pages",
+  // CAP-08 (migration lead_distribution_plan)
+  "lead_distribution",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

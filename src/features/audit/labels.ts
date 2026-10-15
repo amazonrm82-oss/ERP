@@ -66,6 +66,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   number_sequences: "מספור הצעות והזמנות",
   // LEAD-05
   lead_score_rules: "כלל ציון ליד",
+  // CAP-08
+  lead_distribution_settings: "חלוקת לידים",
+  lead_routing_rules: "כלל חלוקת לידים",
   reports: "דוח",
   full_export: "כל נתוני העסק",
 };
@@ -109,6 +112,15 @@ export const FIELD_LABELS: Record<string, string> = {
   // CAP-10
   target_minutes: "יעד בדקות",
   breach_action: "פעולה בחריגה",
+  // CAP-08
+  method: "שיטת חלוקה",
+  weights: "משקלים",
+  product_id: "מוצר",
+  position: "מיקום ברשימה",
+  locale: "שפה",
+  preferred_locale: "שפה מועדפת",
+  field_key: "שדה",
+  field_value: "ערך בשדה",
   starts_on: "מתאריך",
   ends_on: "עד תאריך",
   // HEB-08

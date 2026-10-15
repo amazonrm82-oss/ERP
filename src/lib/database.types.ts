@@ -196,6 +196,50 @@ type NumberSequenceUpdate = {
   prefix?: string;
   start_number?: number;
 };
+// CAP-08 (migration lead_distribution): at most one row per organization; no row = round robin
+export type LeadDistributionSettingsRow = {
+  id: string;
+  organization_id: string;
+  // text with a check: round_robin | weighted | load
+  method: string;
+  // {user_id: 1..10}; a member not listed weighs 1
+  weights: Json;
+  created_at: string;
+  updated_at: string;
+};
+type LeadDistributionSettingsWrite = {
+  method?: string;
+  weights?: Json;
+};
+// CAP-08: the first active matching rule (by position) sends a new lead to its team
+export type LeadRoutingRuleRow = {
+  id: string;
+  organization_id: string;
+  position: number;
+  is_active: boolean;
+  source_id: string | null;
+  product_id: string | null;
+  // follow-ups: a language (CONTACT_LOCALES) and a list field of leads with one of its options
+  locale: string | null;
+  field_key: string | null;
+  field_value: string | null;
+  // a team or one person, exactly one of the two
+  team_id: string | null;
+  user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type LeadRoutingRuleWrite = {
+  position?: number;
+  is_active?: boolean;
+  source_id?: string | null;
+  product_id?: string | null;
+  locale?: string | null;
+  field_key?: string | null;
+  field_value?: string | null;
+  team_id?: string | null;
+  user_id?: string | null;
+};
 // TAX-02 follow-up (migration org_bank_details): owners and admins only
 export type OrgBankDetailsRow = {
   id: string;
@@ -603,6 +647,8 @@ export type FormRow = {
   callback_slots_off: string[];
   // CON-10: the hosted form asks how the person likes to be contacted
   channel_choice: boolean;
+  // CAP-08: the hosted form asks the person's preferred language
+  locale_choice: boolean;
 };
 
 export type FormSubmissionRow = {
@@ -1035,6 +1081,8 @@ export type LeadRow = {
   // CON-10: null or ContactChannel (src/features/contacts/preferences.ts); its source is form | manual (server only)
   preferred_channel: string | null;
   preferred_channel_source: string | null;
+  // CAP-08: null or ContactLocale (check constraint), copied to the contact on conversion when empty
+  preferred_locale: string | null;
 };
 
 export type LeadInsert = {
@@ -1064,6 +1112,8 @@ export type LeadInsert = {
   requested_product_id?: string | null;
   // CON-10
   preferred_channel?: string | null;
+  // CAP-08: he | ar | en | ru | am | fr | es (CONTACT_LOCALES)
+  preferred_locale?: string | null;
 };
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
@@ -1559,6 +1609,7 @@ export type Database = {
           callback_choice?: boolean;
           callback_slots_off?: string[];
           channel_choice?: boolean;
+          locale_choice?: boolean;
         },
         {
           name?: string;
@@ -1579,6 +1630,7 @@ export type Database = {
           callback_choice?: boolean;
           callback_slots_off?: string[];
           channel_choice?: boolean;
+          locale_choice?: boolean;
         }
       >;
       // written only by intake_submit()
@@ -1793,6 +1845,8 @@ export type Database = {
       org_document_settings: Table<OrgDocumentSettingsRow, OrgDocumentSettingsWrite & { organization_id: string }, OrgDocumentSettingsWrite>;
       lead_response_settings: Table<LeadResponseSettingsRow, LeadResponseSettingsWrite & { organization_id: string }, LeadResponseSettingsWrite>;
       number_sequences: Table<NumberSequenceRow, NumberSequenceUpdate & { organization_id: string; kind: string }, NumberSequenceUpdate>;
+      lead_distribution_settings: Table<LeadDistributionSettingsRow, LeadDistributionSettingsWrite & { organization_id: string }, LeadDistributionSettingsWrite>;
+      lead_routing_rules: Table<LeadRoutingRuleRow, LeadRoutingRuleWrite & { organization_id: string }, LeadRoutingRuleWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
     };

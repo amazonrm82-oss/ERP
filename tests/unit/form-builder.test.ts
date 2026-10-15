@@ -191,6 +191,7 @@ describe("hosted form: what the server reads (CAP-01)", () => {
       callback: null,
       builtWith: false,
       channelChoice: false,
+      localeChoice: false,
     });
     expect(publicFormFrom(null)).toBeNull();
   });

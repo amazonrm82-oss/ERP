@@ -12,6 +12,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { collectAttribution } from "../attribution";
 import { CALLBACK_INPUT, type CallbackOffer } from "../callback";
 import { CHANNEL_INPUT, CHANNEL_QUESTION, PUBLIC_CHANNEL_OPTIONS } from "../channel";
+import { LOCALE_INPUT, LOCALE_QUESTION, PUBLIC_LOCALE_OPTIONS } from "../locale";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
 
@@ -25,6 +26,8 @@ type Props = {
   whatsappUrl: string | null;
   callback: CallbackOffer | null;
   channelChoice?: boolean;
+  // CAP-08: ask the person's preferred language
+  localeChoice?: boolean;
 };
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
@@ -39,7 +42,7 @@ function rawValues(form: HTMLFormElement): RawValues {
 }
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
-export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false }: Props) {
+export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false, localeChoice = false }: Props) {
   const router = useRouter();
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
@@ -124,6 +127,16 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
         <SelectField label={CHANNEL_QUESTION} name={CHANNEL_INPUT} defaultValue="">
           <option value="">לא משנה</option>
           {PUBLIC_CHANNEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      {localeChoice ? (
+        <SelectField label={LOCALE_QUESTION} name={LOCALE_INPUT} defaultValue="">
+          <option value="">לא משנה</option>
+          {PUBLIC_LOCALE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

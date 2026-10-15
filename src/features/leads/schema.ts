@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { parseMoneyToAgorot } from "@/lib/format";
-import { CONTACT_CHANNELS, type ContactChannel } from "@/features/contacts/preferences";
+import { CONTACT_CHANNELS, CONTACT_LOCALES, type ContactChannel, type ContactLocale } from "@/features/contacts/preferences";
 import { checkbox, moneyField, optionalEmail, optionalId, optionalPhone, optionalText, requiredId } from "@/lib/validation";
 
 const leadFields = {
@@ -142,6 +142,26 @@ export function leadChannelFromForm(
     return { ok: false, message: "הערוץ שנבחר אינו ברשימה." };
   }
   return { ok: true, patch: { preferred_channel: parsed.data } };
+}
+
+// CAP-08: the lead's preferred language ("" = none), the contacts' codes
+const localeChoice = z
+  .preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string())
+  .refine((value) => value === "" || (CONTACT_LOCALES as readonly string[]).includes(value), { error: "השפה שנבחרה אינה ברשימה." })
+  .transform((value) => (value === "" ? null : (value as ContactLocale)));
+
+/** The preferred language a lead form sends; written only when the form has the field. */
+export function leadLocaleFromForm(
+  formData: FormData,
+): { ok: true; patch: { preferred_locale?: ContactLocale | null } } | { ok: false; message: string } {
+  if (!formData.has("preferred_locale")) {
+    return { ok: true, patch: {} };
+  }
+  const parsed = localeChoice.safeParse(formData.get("preferred_locale"));
+  if (!parsed.success) {
+    return { ok: false, message: "השפה שנבחרה אינה ברשימה." };
+  }
+  return { ok: true, patch: { preferred_locale: parsed.data } };
 }
 
 export const convertLeadSchema = z.object({

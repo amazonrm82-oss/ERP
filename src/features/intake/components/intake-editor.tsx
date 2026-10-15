@@ -91,6 +91,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <FormFieldsBuilder key={values?.fields_json ?? "saved"} initial={builderInitial} options={fieldOptions} />
           <CallbackSettings intake={intake} values={values} />
           <ChannelSettings intake={intake} values={values} />
+          <LocaleSettings intake={intake} values={values} />
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>
@@ -248,6 +249,26 @@ function ChannelSettings({ intake, values }: { intake: IntakeDetails; values?: R
         לשאול איך נוח שניצור קשר
         <span className="block text-sm text-ink-soft">
           טלפון, וואטסאפ, אימייל או SMS. התשובה נשמרת כערוץ המועדף של הליד. ערוץ שמישהו בצוות קבע לא משתנה.
+        </span>
+      </span>
+    </label>
+  );
+}
+
+/** CAP-08: ask the person's preferred language; the answer fills the lead's language (never a set one). */
+function LocaleSettings({ intake, values }: { intake: IntakeDetails; values?: Record<string, string> }) {
+  return (
+    <label className="flex items-start gap-2.5 text-md">
+      <input
+        type="checkbox"
+        name="locale_choice"
+        defaultChecked={values ? values.locale_choice === "on" : intake.localeChoice}
+        className="mt-1 size-4.5 accent-accent"
+      />
+      <span>
+        לשאול באיזו שפה נוח לדבר
+        <span className="block text-sm text-ink-soft">
+          עברית, ערבית, אנגלית, רוסית, אמהרית, צרפתית או ספרדית. התשובה נשמרת כשפה המועדפת של הליד, וכללי חלוקת לידים יכולים לשלוח לפיה.
         </span>
       </span>
     </label>

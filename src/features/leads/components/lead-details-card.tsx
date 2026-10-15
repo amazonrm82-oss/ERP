@@ -27,10 +27,11 @@ import type { RequestedProduct } from "@/features/requested-product/queries";
 import { updateLeadAction } from "../actions";
 import type { LeadSourceOption } from "../queries";
 import { budgetInputValue, LEAD_UTM_KEYS, type LeadUtmKey } from "../schema";
-import { channelDetail } from "@/features/contacts/preferences";
+import { channelDetail, localeLabel } from "@/features/contacts/preferences";
 
 import { LeadCampaignFields } from "./lead-campaign-fields";
 import { LeadChannelField } from "./lead-channel-field";
+import { LeadLocaleField } from "./lead-locale-field";
 
 export type LeadDetailsView = {
   id: string;
@@ -59,6 +60,8 @@ export type LeadDetailsView = {
   // CON-10: the stored channel code and where it came from (form | manual)
   preferredChannel?: string | null;
   preferredChannelSource?: string | null;
+  // CAP-08: the stored language code
+  preferredLocale?: string | null;
 };
 
 // layout: the business's card layout (FLD-08); null or missing = the default layout
@@ -107,6 +110,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout 
                 : null,
             // CON-10: "(מטופס)" when the channel came from a public form
             preferred_channel: { value: channelDetail(lead.preferredChannel, lead.preferredChannelSource) },
+            preferred_locale: { value: localeLabel(lead.preferredLocale) },
             owner_id: { value: lead.ownerName },
             budget: { value: lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null },
             last_contacted_at: { value: lead.lastContactText ?? "אין עדיין" },
@@ -224,6 +228,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
             />
           ) : null}
           <LeadChannelField value={values?.preferred_channel ?? lead.preferredChannel ?? ""} error={errors.preferred_channel} />
+          <LeadLocaleField value={values?.preferred_locale ?? lead.preferredLocale ?? ""} error={errors.preferred_locale} />
           <TextareaField
             label="הודעה"
             name="message"

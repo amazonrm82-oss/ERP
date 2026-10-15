@@ -58,6 +58,8 @@ export const updateIntakeSchema = z.object({
   callback_choice: checkbox,
   // CON-10: ask how the person likes to be contacted
   channel_choice: checkbox,
+  // CAP-08: ask the person's preferred language
+  locale_choice: checkbox,
 });
 
 const slotsOffSchema = z.array(z.enum(CALLBACK_SLOT_STARTS as [CallbackSlotStart, ...CallbackSlotStart[]])).max(CALLBACK_SLOT_STARTS.length);

@@ -72,13 +72,15 @@ export type IntakeDetails = {
   callbackSlotsOff: CallbackSlotStart[];
   // CON-10: the hosted form asks how the person likes to be contacted
   channelChoice: boolean;
+  // CAP-08: the hosted form asks the person's preferred language
+  localeChoice: boolean;
 };
 
 export async function getIntake(orgId: string, formId: string): Promise<IntakeDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice")
     .eq("organization_id", orgId)
     .eq("id", formId)
     .maybeSingle();
@@ -110,6 +112,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     callbackChoice: data.callback_choice,
     callbackSlotsOff: (data.callback_slots_off ?? []).filter(isCallbackSlotStart),
     channelChoice: data.channel_choice,
+    localeChoice: data.locale_choice,
   };
 }
 

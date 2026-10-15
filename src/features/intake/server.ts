@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { parseAttribution, safeText } from "./attribution";
 import { CALLBACK_INPUT } from "./callback";
 import { CHANNEL_INPUT, channelInput } from "./channel";
+import { LOCALE_INPUT, localeInput } from "./locale";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { INACTIVE_FORM_TEXT, readPublicForm } from "./public-form";
 import { checkSubmission, wrongField, type RawValues } from "./public-validate";
@@ -241,6 +242,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
       callback: text(body[CALLBACK_INPUT])?.slice(0, 40) ?? null,
       // CON-10: one of the four channels, only when the form asks (the database checks both again)
       preferred_channel: form.channelChoice ? channelInput(text(body[CHANNEL_INPUT])) : null,
+      // CAP-08: one of the contacts' languages, only when the form asks (checked again by the database)
+      preferred_locale: form.localeChoice ? localeInput(text(body[LOCALE_INPUT])) : null,
     };
   }
 

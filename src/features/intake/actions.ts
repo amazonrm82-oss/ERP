@@ -67,6 +67,7 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
       "whatsapp_text",
       "callback_choice",
       "channel_choice",
+      "locale_choice",
     ]),
   );
   if (!parsed.success) {
@@ -120,7 +121,7 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
 
   // CAP-05: webhooks keep their WhatsApp columns as they are; with the button off
   // only the switch is saved, and the stored number and text stay untouched
-  const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, channel_choice, ...settings } = parsed.data;
+  const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, channel_choice, locale_choice, ...settings } = parsed.data;
   const thanks =
     current.kind !== "form" ? {} : whatsapp_button ? { whatsapp_button, whatsapp_phone, whatsapp_text } : { whatsapp_button };
   // SPD-05: a webhook has no form to ask on; its switch stays as it is. The slot
@@ -129,7 +130,7 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
   const formOnly =
     current.kind !== "form"
       ? {}
-      : { channel_choice, ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
+      : { channel_choice, locale_choice, ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
   const { data, error } = await context.supabase
     .from("forms")
     .update({ ...settings, ...thanks, ...formOnly, ...(fields !== undefined ? { fields } : {}) })

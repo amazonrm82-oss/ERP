@@ -227,6 +227,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               requestedProduct: { enabled: productsEnabled, product: requestedProduct },
               preferredChannel: lead.preferred_channel,
               preferredChannelSource: lead.preferred_channel_source,
+              preferredLocale: lead.preferred_locale,
             }}
           />
 

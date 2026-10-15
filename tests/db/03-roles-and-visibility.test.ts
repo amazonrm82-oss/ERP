@@ -873,6 +873,52 @@ describe("roles and record visibility", () => {
     });
   });
 
+  it("everyone reads the lead distribution settings and rules; only owners and admins change them (CAP-08)", async () => {
+    // the plan key is opened here, whatever the business's plan
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"lead_distribution\": true}' where organization_id = $1", [org]),
+    );
+    const team = await asAdmin(async (q) => (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'חלוקה') returning id", [org])).rows[0].id);
+    const source = await asAdmin(async (q) => (await q<{ id: string }>("insert into public.lead_sources (organization_id, name) values ($1, 'מקור חלוקה') returning id", [org])).rows[0].id);
+    const settings = "insert into public.lead_distribution_settings (organization_id, method) values ($1, 'load')";
+    const rule = "insert into public.lead_routing_rules (organization_id, source_id, team_id) values ($1, $2, $3)";
+    for (const u of [manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q(settings, [org])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q(rule, [org, source, team])))).code, u.email).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q(settings, [org]));
+    await asUser(owner.id, (q) => q(rule, [org, source, team]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect(await count(q, "select 1 from public.lead_distribution_settings where organization_id = $1", [org]), u.email).toBe(1);
+        expect(await count(q, "select 1 from public.lead_routing_rules where organization_id = $1", [org]), u.email).toBe(1);
+      });
+    }
+    for (const u of [manager, m1, viewer]) {
+      await asUser(u.id, async (q) => {
+        expect((await q("update public.lead_distribution_settings set method = 'weighted' where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("delete from public.lead_distribution_settings where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("update public.lead_routing_rules set is_active = false where organization_id = $1", [org])).rowCount).toBe(0);
+        expect((await q("delete from public.lead_routing_rules where organization_id = $1", [org])).rowCount).toBe(0);
+      });
+    }
+    await asUser(owner.id, async (q) => {
+      expect((await q("update public.lead_distribution_settings set method = 'weighted' where organization_id = $1", [org])).rowCount).toBe(1);
+      expect((await q("update public.lead_routing_rules set position = 3 where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    expect(
+      await asAdmin(async (q) => (await q<{ m: string }>("select method as m from public.lead_distribution_settings where organization_id = $1", [org])).rows[0].m),
+    ).toBe("weighted");
+    await asUser(admin.id, async (q) => {
+      expect((await q("delete from public.lead_routing_rules where organization_id = $1", [org])).rowCount).toBe(1);
+      expect((await q("delete from public.lead_distribution_settings where organization_id = $1", [org])).rowCount).toBe(1);
+    });
+    await asAdmin(async (q) => {
+      await q("delete from public.teams where id = $1", [team]);
+      await q("update public.subscriptions set feature_overrides = feature_overrides - 'lead_distribution' where organization_id = $1", [org]);
+    });
+  });
+
   it("everyone reads the important fields; only owners and admins change them (DQL-01)", async () => {
     for (const u of [owner, admin, manager, m1, viewer]) {
       await asUser(u.id, async (q) => {
