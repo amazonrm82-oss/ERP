@@ -2,7 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import type { Json, StageKind } from "@/lib/database.types";
-import { ilikeAny, PAGE_SIZE } from "@/lib/search";
+import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
@@ -467,7 +467,7 @@ export async function listDeals(
     .eq("organization_id", orgId)
     .eq("pipeline_id", options.pipelineId)
     .is("deleted_at", null);
-  const searchFilter = ilikeAny(["name"], options.search);
+  const searchFilter = textSearchFilter(options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
   }

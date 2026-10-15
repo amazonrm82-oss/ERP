@@ -5,7 +5,7 @@ import type { LeaveKind } from "@/features/work-hours/leave";
 import { getCurrentAbsences } from "@/features/work-hours/queries";
 import type { TaskStatus } from "@/lib/database.types";
 import { zoneDate, zonedIso } from "@/lib/format";
-import { ilikeAny, PAGE_SIZE } from "@/lib/search";
+import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
@@ -229,7 +229,7 @@ export async function listTasks(
   if (options.ownerId) {
     query = query.eq("owner_id", options.ownerId);
   }
-  const searchFilter = ilikeAny(["title"], options.search);
+  const searchFilter = textSearchFilter(options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
   }

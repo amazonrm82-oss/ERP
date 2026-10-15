@@ -2,7 +2,7 @@ import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
-import { ilikeAny, PAGE_SIZE } from "@/lib/search";
+import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
@@ -115,7 +115,7 @@ export async function listProducts(orgId: string, options: ProductListOptions): 
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
   let query = supabase.from("products").select(COLUMNS).eq("organization_id", orgId);
-  const search = ilikeAny(["name", "sku", "barcode"], options.search);
+  const search = textSearchFilter(options.search);
   if (search) query = query.or(search);
   if (options.categoryIds && options.categoryIds.length > 0) query = query.in("category_id", options.categoryIds);
   if (options.kind) query = query.eq("kind", options.kind);

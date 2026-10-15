@@ -2000,6 +2000,9 @@ export type Database = {
       incomplete_records: { Args: { p_org: string; p_type: string; p_owner: string; p_limit?: number }; Returns: Json };
       // computed field 0..100 on leads, contacts, companies and deals: used as `order=completeness`, not called as an RPC
       completeness: { Args: Record<string, never>; Returns: number | null };
+      // computed field on leads, contacts, companies, deals, tasks and products (FXC-11): the normalized text the lists
+      // search, used as a filter (`search_text=like.*…*`), not called as an RPC
+      search_text: { Args: Record<string, never>; Returns: string };
       report_goal_forecast: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // MNY-05: open deals that need a decision, stuck or past their close date (migration pipeline_cleanup)
       report_pipeline_cleanup: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };

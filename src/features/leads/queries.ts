@@ -118,7 +118,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
   if (options.tagId) {
     query = query.contains("tag_ids", [options.tagId]);
   }
-  const searchFilter = personSearchFilter(["full_name", "company_name"], options.search);
+  const searchFilter = personSearchFilter(options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
   }
@@ -203,7 +203,7 @@ export async function getLeadBoard(orgId: string, options: { search: string; tag
   const supabase = await createClient();
   const { statuses: all } = await getLeadLookups(orgId);
   const statuses = all.filter((status) => status.kind !== "converted");
-  const searchFilter = personSearchFilter(["full_name", "company_name"], options.search);
+  const searchFilter = personSearchFilter(options.search);
 
   // the same filters on the rows and on the count of each column
   type Filterable<Q> = {

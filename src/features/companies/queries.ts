@@ -53,7 +53,7 @@ export async function listCompanies(
     .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
-  const searchFilter = personSearchFilter(["name", "tax_id", "city"], options.search);
+  const searchFilter = personSearchFilter(options.search);
   if (searchFilter) {
     query = query.or(searchFilter);
   }

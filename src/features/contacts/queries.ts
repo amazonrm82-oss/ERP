@@ -85,7 +85,7 @@ export async function listContacts(
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
-  const searchFilter = personSearchFilter(["full_name"], options.search);
+  const searchFilter = personSearchFilter(options.search);
   if (searchFilter) {
     // CON-01: a further phone or email finds its contact too
     const byChannel = await contactIdsByChannelSearch(orgId, options.search);

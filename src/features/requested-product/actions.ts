@@ -2,7 +2,7 @@
 
 import { actionContext } from "@/lib/action-context";
 import { optionalTextArg, validArg } from "@/lib/action-args";
-import { ilikeAny } from "@/lib/search";
+import { textSearchFilter } from "@/lib/search";
 
 import type { RequestedProductHit } from "./queries";
 
@@ -26,7 +26,7 @@ export async function searchRequestedProductsAction(orgId: string, query: string
     .is("archived_at", null);
   const q = query.trim();
   if (q !== "") {
-    const filter = ilikeAny(["name", "sku"], q);
+    const filter = textSearchFilter(q);
     if (!filter) return [];
     request = request.or(filter);
   }

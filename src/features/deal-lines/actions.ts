@@ -12,7 +12,7 @@ import { directionArg, INVALID_ARGS, optionalTextArg, validArg } from "@/lib/act
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
-import { ilikeAny } from "@/lib/search";
+import { textSearchFilter } from "@/lib/search";
 import { pick } from "@/lib/validation";
 
 import { priceListTiers, readDealLines, readDealPricing, readPricedProduct, type DealPricing } from "./queries";
@@ -301,7 +301,7 @@ export async function searchDealProductsAction(orgId: string, query: unknown, li
     .is("archived_at", null);
   const q = (query ?? "").trim();
   if (q !== "") {
-    const filter = ilikeAny(["name", "sku", "barcode"], q);
+    const filter = textSearchFilter(q);
     if (!filter) return [];
     request = request.or(filter);
   }

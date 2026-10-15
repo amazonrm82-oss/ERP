@@ -172,7 +172,7 @@ export async function searchParentCompaniesAction(orgId: string, companyId: stri
   if (!context.ok) {
     return [];
   }
-  const filter = personSearchFilter(["name", "tax_id", "city"], query.trim());
+  const filter = personSearchFilter(query.trim());
   if (!filter) {
     return [];
   }
