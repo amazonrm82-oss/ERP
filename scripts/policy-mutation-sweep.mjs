@@ -19,14 +19,37 @@ const url = process.env.TEST_DATABASE_URL ?? "postgres://postgres@127.0.0.1:5432
 const mutationFile = path.join(root, "supabase/migrations/29990101000000_mutation.sql");
 const filter = process.argv[2];
 
+// The suite's output grew past spawnSync's default 1 MB buffer, which killed the child (ENOBUFS) and read as a
+// failing run. Keep the output (for the tail shown on a failure) in a buffer far larger than any run produces.
+const MAX_OUTPUT = 512 * 1024 * 1024;
+
 const runTests = () =>
-  spawnSync("npx", ["vitest", "run", "--config", "vitest.db.config.mts"], { cwd: root, encoding: "utf8" });
+  spawnSync("npx", ["vitest", "run", "--config", "vitest.db.config.mts"], { cwd: root, encoding: "utf8", maxBuffer: MAX_OUTPUT });
+
+/** The last lines of a run's output, and why the child stopped, for a failure message. */
+function describeRun(result) {
+  const lines = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split("\n").filter((line) => line.trim() !== "");
+  return [
+    `exit status: ${result.status}, signal: ${result.signal ?? "none"}${result.error ? `, error: ${result.error.message}` : ""}`,
+    ...lines.slice(-40),
+  ].join("\n");
+}
+
+/** A run that did not finish on its own (spawn error, killed, buffer overflow) says nothing about the tests. */
+function assertRunFinished(result, what) {
+  if (result.error || result.status === null) {
+    console.error(`The test run for ${what} did not finish, so it proves nothing:\n${describeRun(result)}`);
+    rmSync(mutationFile, { force: true });
+    process.exit(3);
+  }
+}
 
 // a clean run first: builds the database and proves the baseline is green
 rmSync(mutationFile, { force: true });
 const baseline = runTests();
+assertRunFinished(baseline, "the baseline");
 if (baseline.status !== 0) {
-  console.error("Baseline tests are failing; fix them before running the sweep.");
+  console.error(`Baseline tests are failing; fix them before running the sweep.\n${describeRun(baseline)}`);
   process.exit(1);
 }
 
@@ -58,6 +81,8 @@ try {
         `create policy ${p.policyname} on public.${p.tablename} for ${p.cmd} to authenticated${using}${check};\n`,
     );
     const result = runTests();
+    // only a run that finished and failed counts as caught; a killed run would otherwise hide a gap
+    assertRunFinished(result, `${p.tablename}.${p.policyname}`);
     const caught = result.status !== 0;
     console.log(`${caught ? "caught  " : "MISSED  "} ${p.tablename}.${p.policyname} (${p.cmd})`);
     if (!caught) survivors.push(`${p.tablename}.${p.policyname}`);
