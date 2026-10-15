@@ -29,6 +29,7 @@ import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/comp
 import type { MemberOption } from "@/features/meetings/components/meeting-form";
 import { meetingFormTimes } from "@/features/meetings/display";
 import { MEETING_REMINDER_OPTIONS, reminderChoice } from "@/features/meetings/schema";
+import { seriesLabel } from "@/features/meetings/series";
 import type { ConflictReport, Span } from "@/features/meetings/conflicts";
 import type { Holiday } from "@/features/calendar-days/holidays";
 import { longDay, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from "@/lib/calendar-grid";
@@ -909,6 +910,12 @@ function ItemDetails({
             <dd className="break-words">{item.location}</dd>
           </>
         ) : null}
+        {meeting?.seriesIndex ? (
+          <>
+            <dt className="text-ink-soft">סדרה</dt>
+            <dd>{seriesLabel(meeting.seriesIndex)}</dd>
+          </>
+        ) : null}
         {meeting ? (
           <>
             <dt className="text-ink-soft">תזכורת</dt>
@@ -968,6 +975,7 @@ function ItemDetails({
           initial={{
             title: meeting.title,
             meeting_type_id: meeting.meetingTypeId ?? "",
+            series_index: meeting.seriesIndex,
             meeting_type: meeting.meetingType,
             ...meetingFormTimes(meeting.startsAt, meeting.endsAt, timeZone),
             location: meeting.location ?? "",

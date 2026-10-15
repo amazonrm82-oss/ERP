@@ -234,6 +234,9 @@ export const FIELD_LABELS: Record<string, string> = {
   meeting_type: "אופן הפגישה",
   // CAL-08: the business's meeting type, and the type's own fields
   meeting_type_id: "סוג פגישה",
+  // CAL-09
+  series_id: "סדרת פגישות",
+  series_index: "מספר בסדרה",
   meeting_format: "אופן הפגישה",
   buffer_before_minutes: "מרווח לפני (דקות)",
   buffer_after_minutes: "מרווח אחרי (דקות)",

@@ -194,6 +194,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-03 follow-up: the roles of a contact on a deal
   "deal_contact_roles:max": "אפשר לשמור עד 20 תפקידים. מחקו תפקיד שלא בשימוש כדי להוסיף חדש.",
   "deal_contact_role:invalid": "התפקיד שנבחר כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
+  // CAL-09 (migration meeting_series)
+  "meeting_series:invalid": "לא הצלחנו לקבוע את הסדרה. בדקו את מספר הפגישות (2 עד 52) ונסו שוב.",
   // CON-04 (migration israeli_ids)
   "tax_id:invalid": "מספר ח.פ. או עוסק מורשה אינו תקין. בדקו את 9 הספרות.",
   // CON-04, a company outside Israel (migration foreign_company_number)

@@ -6,7 +6,7 @@ import { calendarSettingsFromRow } from "@/features/calendar-days/holidays";
 import { isTimeZone, readWorkingHours } from "@/features/profile/working-hours";
 import type { Database } from "@/lib/database.types";
 
-import { conflictReport, type ConflictPerson, type ConflictReport, type Span } from "./conflicts";
+import { conflictReport, mergeConflictReports, type ConflictPerson, type ConflictReport, type Span } from "./conflicts";
 
 type Client = SupabaseClient<Database>;
 
@@ -102,4 +102,29 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
     settings,
     timeZone,
   });
+}
+
+/**
+ * CAL-09: the warning for a whole series: every meeting of it checked as one meeting is (its
+ * own id left out when it exists already), merged into one report. A few at a time.
+ * Known cost (review, 15 October 2026, accepted for now): one meeting_busy call per week, so a
+ * 52-week series makes about 52 calls; a single call over the whole series would need a wider window.
+ */
+export async function seriesConflicts(
+  supabase: Client,
+  orgId: string,
+  check: { spans: Array<{ span: Span; excludeId?: string | null }>; userIds: string[]; timeZone: string; typeId?: string | null },
+): Promise<ConflictReport | null> {
+  const reports: Array<ConflictReport | null> = [];
+  for (let i = 0; i < check.spans.length; i += 8) {
+    const slice = check.spans.slice(i, i + 8);
+    reports.push(
+      ...(await Promise.all(
+        slice.map(({ span, excludeId }) =>
+          meetingConflicts(supabase, orgId, { span, userIds: check.userIds, excludeId, timeZone: check.timeZone, typeId: check.typeId }),
+        ),
+      )),
+    );
+  }
+  return mergeConflictReports(reports);
 }

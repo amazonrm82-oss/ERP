@@ -137,6 +137,8 @@ export type MeetingDetails = {
   meetingType: string;
   // CAL-08: the business's meeting type; null = none
   meetingTypeId: string | null;
+  // CAL-09: its place in a weekly series; null = a single meeting
+  seriesIndex: number | null;
   startsAt: string;
   endsAt: string;
   location: string | null;
@@ -164,7 +166,7 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
   const { supabase } = context;
   const { data: row, error } = await supabase
     .from("meetings")
-    .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, video_url, description, status, outcome, reminder_minutes, lead_id, contact_id, company_id, deal_id")
+    .select("id, title, meeting_type, meeting_type_id, series_index, starts_at, ends_at, location, video_url, description, status, outcome, reminder_minutes, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .eq("id", meetingId)
     .maybeSingle();
@@ -198,6 +200,7 @@ export async function meetingDetailsAction(orgId: string, meetingId: string): Pr
       title: row.title,
       meetingType: row.meeting_type,
       meetingTypeId: row.meeting_type_id,
+      seriesIndex: row.series_index,
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       location: row.location,

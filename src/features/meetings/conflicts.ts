@@ -161,6 +161,9 @@ export function conflictReport({ span, busySpan, people, busy, excludeId, settin
   return found.length > 0 || restDays.length > 0 ? { people: found, restDays } : null;
 }
 
+/** How many rest days and holidays the warning names before "ועוד N". */
+export const REST_DAYS_SHOWN = 10;
+
 /** One line of the warning; `time` is shown left to right next to the text. */
 export type ConflictLine = { key: string; text: string; time: string | null };
 
@@ -190,11 +193,47 @@ export function conflictLines(report: ConflictReport, span: Span, timeZone: stri
       lines.push({ key: `${person.userId}-hours`, text: `${person.name}: מחוץ לשעות העבודה`, time: null });
     }
   }
-  for (const rest of report.restDays) {
+  // CAL-09 (owner, 15 October 2026): a series may fall on many rest days; the first ten are named
+  for (const rest of report.restDays.slice(0, REST_DAYS_SHOWN)) {
     const what = rest.holiday ? `${rest.holiday}, יום מנוחה בעסק` : "יום מנוחה בעסק";
     lines.push({ key: `rest-${rest.day}`, text: `${longDay(rest.day)}: ${what}`, time: null });
+  }
+  const moreRestDays = report.restDays.length - REST_DAYS_SHOWN;
+  if (moreRestDays > 0) {
+    lines.push({ key: "rest-more", text: `ועוד ${moreRestDays} ${moreRestDays === 1 ? "יום מנוחה או חג" : "ימי מנוחה או חגים"}`, time: null });
   }
   return lines;
 }
 
 export const CONFLICT_MESSAGE = "יש התנגשות בזמן הזה. אפשר לבחור זמן אחר או לקבוע בכל זאת.";
+
+/**
+ * CAL-09: one warning for a whole series. Each person's clashing meetings from every week (once
+ * each), "another meeting" when any week has a hidden one, the first working-hours issue found,
+ * and every rest day or holiday a meeting of the series falls on. null when nothing clashes.
+ */
+export function mergeConflictReports(reports: ReadonlyArray<ConflictReport | null>): ConflictReport | null {
+  const people = new Map<string, PersonConflict>();
+  const restDays = new Map<string, RestDayIssue>();
+  for (const report of reports) {
+    if (!report) continue;
+    for (const person of report.people) {
+      const seen = people.get(person.userId);
+      if (!seen) {
+        people.set(person.userId, { ...person, meetings: [...person.meetings] });
+        continue;
+      }
+      for (const meeting of person.meetings) {
+        if (!seen.meetings.some((m) => m.meetingId === meeting.meetingId)) seen.meetings.push(meeting);
+      }
+      seen.hidden = seen.hidden || person.hidden;
+      seen.hours = seen.hours ?? person.hours;
+    }
+    for (const rest of report.restDays) restDays.set(rest.day, rest);
+  }
+  if (people.size === 0 && restDays.size === 0) return null;
+  for (const person of people.values()) {
+    person.meetings.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.meetingId.localeCompare(b.meetingId));
+  }
+  return { people: [...people.values()], restDays: [...restDays.values()].sort((a, b) => a.day.localeCompare(b.day)) };
+}

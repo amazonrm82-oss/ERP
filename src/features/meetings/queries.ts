@@ -11,6 +11,8 @@ export type MeetingItem = {
   meetingType: string;
   // CAL-08: the business's meeting type; null = none
   meetingTypeId: string | null;
+  // CAL-09: its place in a weekly series; null = a single meeting
+  seriesIndex: number | null;
   startsAt: string;
   endsAt: string;
   location: string | null;
@@ -34,7 +36,7 @@ export async function listRecordMeetings(orgId: string, subject: TimelineSubject
   const rows = must(
     await supabase
       .from("meetings")
-      .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, video_url, description, status, outcome, owner_id, reminder_minutes")
+      .select("id, title, meeting_type, meeting_type_id, series_index, starts_at, ends_at, location, video_url, description, status, outcome, owner_id, reminder_minutes")
       .eq("organization_id", orgId)
       .eq(SUBJECT_COLUMN[subject.kind], subject.id)
       .order("starts_at", { ascending: false })
@@ -61,6 +63,7 @@ export async function listRecordMeetings(orgId: string, subject: TimelineSubject
     title: row.title,
     meetingType: row.meeting_type,
     meetingTypeId: row.meeting_type_id,
+    seriesIndex: row.series_index,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     location: row.location,

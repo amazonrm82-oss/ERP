@@ -8,6 +8,7 @@ import { zoneDate } from "@/lib/format";
 
 import { formatMeetingWhen, meetingFormTimes, MEETING_STATUS_TONE } from "../display";
 import { listRecordMeetings, type MeetingItem } from "../queries";
+import { seriesLabel } from "../series";
 import { DEFAULT_MEETING_REMINDER, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, reminderChoice, splitMeetings } from "../schema";
 import { MeetingItemButtons, NewMeetingButton } from "./meeting-buttons";
 import type { MeetingFormValues, MemberOption } from "./meeting-form";
@@ -68,6 +69,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
         <time dateTime={meeting.startsAt}>{formatMeetingWhen(meeting.startsAt, meeting.endsAt, timeZone)}</time>
         {" · "}
         {MEETING_TYPE_LABEL[meeting.meetingType] ?? meeting.meetingType}
+        {meeting.seriesIndex ? ` · ${seriesLabel(meeting.seriesIndex)}` : ""}
       </p>
       {meeting.videoUrl ? (
         <p className="text-sm">
@@ -106,6 +108,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
           initial={{
             title: meeting.title,
             meeting_type_id: meeting.meetingTypeId ?? "",
+            series_index: meeting.seriesIndex,
             meeting_type: meeting.meetingType,
             ...meetingFormTimes(meeting.startsAt, meeting.endsAt, timeZone),
             location: meeting.location ?? "",

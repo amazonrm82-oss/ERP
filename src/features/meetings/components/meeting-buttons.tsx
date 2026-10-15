@@ -12,6 +12,7 @@ import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 
 import { deleteMeetingAction } from "../actions";
 import { MeetingForm, type MeetingFormValues, type MemberOption } from "./meeting-form";
+import { DeleteFollowingButton } from "./delete-following";
 import { MeetingStatusForm } from "./meeting-status-form";
 
 type Common = {
@@ -109,7 +110,16 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingT
       </Button>
       <Dialog open={open === "status"} onClose={close} title="סטטוס ותוצאה" description={title} variant="sheet">
         {open === "status" ? (
-          <MeetingStatusForm orgId={orgId} meetingId={meetingId} subject={subject} status={status} outcome={outcome} onDone={() => saved("status")} onCancel={close} />
+          <MeetingStatusForm
+            orgId={orgId}
+            meetingId={meetingId}
+            subject={subject}
+            status={status}
+            outcome={outcome}
+            seriesIndex={initial.series_index ?? null}
+            onDone={(message) => saved("status", message)}
+            onCancel={close}
+          />
         ) : null}
       </Dialog>
       <Dialog open={open === "edit"} onClose={close} title="עריכת הפגישה" variant="sheet">
@@ -126,7 +136,7 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingT
               onDone={edited}
               onCancel={close}
             />
-            <div className="border-t border-line pt-4">
+            <div className="flex flex-wrap gap-2 border-t border-line pt-4">
               <ConfirmButton
                 title="למחוק את הפגישה?"
                 description="המחיקה סופית. פגישה שלא התקיימה אפשר לסמן כ״בוטלה״ במקום למחוק."
@@ -139,6 +149,19 @@ export function MeetingItemButtons({ orgId, subject, members, timeZone, meetingT
               >
                 מחיקת הפגישה
               </ConfirmButton>
+              {/* CAL-09: a series made by mistake */}
+              {initial.series_index ? (
+                <DeleteFollowingButton
+                  orgId={orgId}
+                  meetingId={meetingId}
+                  subject={subject}
+                  onDone={(message) => {
+                    setOpen(null);
+                    setWarning(message ?? null);
+                    onChanged?.("delete", message);
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         ) : null}

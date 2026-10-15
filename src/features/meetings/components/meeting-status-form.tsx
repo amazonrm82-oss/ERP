@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
-import { TextareaField } from "@/components/ui/field";
+import { Checkbox, TextareaField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { TimelineSubject } from "@/features/activities/schema";
 import type { FormState } from "@/lib/action-result";
@@ -12,16 +12,27 @@ import type { FormState } from "@/lib/action-result";
 import { setMeetingStatusAction } from "../actions";
 import { MEETING_STATUS_OPTIONS } from "../schema";
 
-type Props = { orgId: string; meetingId: string; subject: TimelineSubject | null; status: string; outcome: string; onDone: () => void; onCancel?: () => void };
+type Props = {
+  orgId: string;
+  meetingId: string;
+  subject: TimelineSubject | null;
+  status: string;
+  outcome: string;
+  // CAL-09: the meeting's place in a weekly series; a cancellation may take the following ones with it
+  seriesIndex?: number | null;
+  // message: done, with a warning (following meetings not cancelled)
+  onDone: (message?: string) => void;
+  onCancel?: () => void;
+};
 
 /** How the meeting went: held, cancelled or the customer did not come, and what came of it. */
-export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, onDone, onCancel }: Props) {
+export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, seriesIndex = null, onDone, onCancel }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(setMeetingStatusAction.bind(null, orgId, meetingId, subject), null);
   const failure = state && !state.ok ? state : null;
-  const current = failure?.values?.status ?? status;
+  const [current, setCurrent] = useState(failure?.values?.status ?? status);
 
   useEffect(() => {
-    if (state?.ok) onDone();
+    if (state?.ok) onDone(state.message);
   }, [state, onDone]);
 
   return (
@@ -35,13 +46,22 @@ export function MeetingStatusForm({ orgId, meetingId, subject, status, outcome, 
               key={option.value}
               className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 has-checked:border-accent has-checked:bg-accent-soft"
             >
-              <input type="radio" name="status" value={option.value} defaultChecked={current === option.value} required />
+              <input type="radio" name="status" value={option.value} checked={current === option.value} onChange={() => setCurrent(option.value)} required />
               {option.label}
             </label>
           ))}
         </div>
         {failure?.fieldErrors?.status ? <p className="mt-1 text-sm text-danger">{failure.fieldErrors.status}</p> : null}
       </fieldset>
+      {seriesIndex && current === "cancelled" ? (
+        <Checkbox
+          name="series_scope"
+          value="following"
+          label="לבטל גם את הפגישות הבאות בסדרה"
+          hint="רק פגישות שעדיין מתוכננות. פגישות קודמות לא משתנות."
+          defaultChecked={failure?.values?.series_scope === "following"}
+        />
+      ) : null}
       <TextareaField
         label="תוצאה (לא חובה)"
         name="outcome"

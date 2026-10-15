@@ -10,9 +10,11 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { TimelineSubject } from "@/features/activities/schema";
 import { durationText, fillFromType, offeredTypes, timeAfter, type MeetingTypeChoice } from "@/features/meeting-types/schema";
+import { longDay } from "@/lib/calendar-grid";
 
 import { createMeetingAction, updateMeetingAction, type MeetingFormState } from "../actions";
 import { MEETING_REMINDER_OPTIONS, MEETING_TYPE_OPTIONS, type MeetingReminderValue } from "../schema";
+import { DEFAULT_SERIES_COUNT, lastSeriesDate, SERIES_MAX, SERIES_MIN, seriesLabel } from "../series";
 import { ConflictWarning } from "./conflict-warning";
 
 export type MemberOption = { userId: string; name: string };
@@ -31,6 +33,8 @@ export type MeetingFormValues = {
   participant_ids: string[];
   // CAL-06: "none" or minutes before the start
   reminder_minutes: MeetingReminderValue;
+  // CAL-09: the meeting's place in its weekly series; absent or null = a single meeting
+  series_index?: number | null;
 };
 
 type Props = {
@@ -68,6 +72,8 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
   // CAL-05: the conflict warning holds until the user changes something in the form
   const [changedAfter, setChangedAfter] = useState<MeetingFormState>(null);
   const conflict = failure?.conflicts && failure.span && changedAfter !== state ? { report: failure.conflicts, span: failure.span } : null;
+  // CAL-09: moving "this and following" to another weekday asks first, with the new series' warnings
+  const split = failure?.split && changedAfter !== state ? failure.split : null;
 
   const [type, setType] = useState(values?.meeting_type ?? initial.meeting_type);
   const [start, setStart] = useState(values?.start_time ?? initial.start_time);
@@ -88,6 +94,13 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
     setEnd(filled.endTime);
   }
   const picked = typeOf(typeId);
+  // CAL-09: a new meeting may repeat every week; a series meeting asks what an edit applies to
+  const [date, setDate] = useState(values?.date ?? initial.date);
+  const [repeat, setRepeat] = useState(values?.repeat === "weekly");
+  const [count, setCount] = useState(values?.series_count ?? String(DEFAULT_SERIES_COUNT));
+  const seriesIndex = meetingId ? (initial.series_index ?? null) : null;
+  const countNumber = Number(count);
+  const until = repeat && /^\d+$/.test(count) && countNumber >= SERIES_MIN && countNumber <= SERIES_MAX && date ? lastSeriesDate(date, countNumber) : null;
 
   useEffect(() => {
     if (state?.ok) onDone(state.message);
@@ -96,7 +109,7 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
   return (
     <form action={formAction} onChange={() => setChangedAfter(state)} className="space-y-4" noValidate>
       <FormGuard state={state} />
-      <FormError message={failure && !failure.fieldErrors && !failure.conflicts ? failure.message : null} />
+      <FormError message={failure && !failure.fieldErrors && !failure.conflicts && !failure.split ? failure.message : null} />
       {types.length > 0 ? (
         <SelectField
           label="סוג פגישה"
@@ -138,10 +151,13 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
         label="תאריך"
         name="date"
         required
-        defaultValue={values?.date ?? initial.date}
+        value={date}
         timeZone={timeZone}
         error={errors.date}
-        onChange={() => setChangedAfter(state)}
+        onChange={(day) => {
+          setDate(day);
+          setChangedAfter(state);
+        }}
       />
       <div className="grid grid-cols-2 gap-4">
         <TextField
@@ -195,6 +211,52 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
           </option>
         ))}
       </SelectField>
+      {meetingId ? null : (
+        <div className="space-y-3 rounded-md border border-line p-3">
+          <Checkbox
+            name="repeat"
+            value="weekly"
+            label="פגישה חוזרת כל שבוע"
+            hint="למשל סדרת טיפולים. כל הפגישות נקבעות עכשיו, באותו יום בשבוע ובאותה שעה."
+            checked={repeat}
+            onChange={(event) => setRepeat(event.target.checked)}
+          />
+          {repeat ? (
+            <TextField
+              label="כמה פגישות בסך הכול"
+              name="series_count"
+              type="number"
+              inputMode="numeric"
+              min={SERIES_MIN}
+              max={SERIES_MAX}
+              required
+              value={count}
+              onChange={(event) => setCount(event.target.value)}
+              hint={until ? `הפגישה האחרונה: ${longDay(until)}` : `בין ${SERIES_MIN} ל-${SERIES_MAX}.`}
+              error={errors.series_count}
+            />
+          ) : null}
+        </div>
+      )}
+      {seriesIndex ? (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium">{seriesLabel(seriesIndex)}. לשמור את השינויים ל:</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 has-checked:border-accent has-checked:bg-accent-soft">
+              <input type="radio" name="series_scope" value="one" defaultChecked={values?.series_scope !== "following"} />
+              הפגישה הזו בלבד
+            </label>
+            <label className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 has-checked:border-accent has-checked:bg-accent-soft">
+              <input type="radio" name="series_scope" value="following" defaultChecked={values?.series_scope === "following"} />
+              הפגישה הזו וכל הבאות
+            </label>
+          </div>
+          <p className="mt-1.5 text-sm text-ink-soft">
+            לפגישות הבאות עוברים הפרטים והשעה, וכל אחת נשארת ביום שלה. בחירת יום אחר בשבוע מעבירה את כל הבאות ליום החדש, כסדרה חדשה. פגישות
+            שכבר עברו, התקיימו או בוטלו לא משתנות.
+          </p>
+        </fieldset>
+      ) : null}
       {members.length > 0 ? (
         <fieldset>
           <legend className="mb-1.5 text-sm font-medium">משתתפים מהצוות</legend>
@@ -219,7 +281,15 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
         defaultValue={values?.description ?? initial.description}
         error={errors.description}
       />
-      {conflict ? (
+      {split ? (
+        <div role="alert" className="space-y-2.5 rounded-md border border-warning/40 bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          <p className="font-semibold">{split.text}</p>
+          {conflict ? <ConflictWarning report={conflict.report} span={conflict.span} timeZone={timeZone} /> : null}
+          <SubmitButton name="split_ok" value="1" size="sm" pendingText="מעבירים…">
+            להעביר את הסדרה
+          </SubmitButton>
+        </div>
+      ) : conflict ? (
         <ConflictWarning report={conflict.report} span={conflict.span} timeZone={timeZone}>
           <SubmitButton name="conflicts_ok" value="1" size="sm" pendingText="שומרים…">
             {meetingId ? "לשמור בכל זאת" : "לקבוע בכל זאת"}
@@ -228,7 +298,7 @@ export function MeetingForm({ orgId, subject, meetingId, initial, members, meeti
       ) : null}
       <div className="flex flex-wrap gap-2">
         {/* while the warning shows, saving goes through its button; changing the form brings this one back */}
-        {conflict ? null : <SubmitButton pendingText="שומרים…">{meetingId ? "שמירת השינויים" : "קביעת הפגישה"}</SubmitButton>}
+        {conflict || split ? null : <SubmitButton pendingText="שומרים…">{meetingId ? "שמירת השינויים" : repeat ? "קביעת הסדרה" : "קביעת הפגישה"}</SubmitButton>}
         <Button variant="ghost" onClick={() => (onCancel ? onCancel() : onDone())}>
           ביטול
         </Button>

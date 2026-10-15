@@ -322,6 +322,9 @@ export type MeetingRow = {
   reminder_minutes: number | null;
   // CAL-08: the meeting type it was set from (meeting_types); null = none or deleted
   meeting_type_id: string | null;
+  // CAL-09: the weekly series it belongs to and its place in it (1..52); null = a single meeting; insert only
+  series_id: string | null;
+  series_index: number | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -346,9 +349,11 @@ export type MeetingInsert = {
   deal_id?: string | null;
   reminder_minutes?: number | null;
   meeting_type_id?: string | null;
+  series_id?: string | null;
+  series_index?: number | null;
 };
 
-export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id">>;
+export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id" | "series_id" | "series_index">>;
 
 // CAL-08: the kinds of meeting a business holds (migration meeting_types)
 export type MeetingTypeRow = {
@@ -2071,6 +2076,13 @@ export type Database = {
       sample_data_records: { Args: { p_org: string }; Returns: Array<{ record_type: string; record_id: string; removable: boolean }> };
       // busy times of people in a meeting (CAL-05): id and title only of meetings the caller may read;
       // busy_from / busy_to add the meeting type's buffers (CAL-08)
+      // CAL-09: a weekly series made in one transaction (security invoker); { series_id, ids }
+      // CAL-09: of the given meetings, the ids the caller could delete now (mirrors meetings_delete)
+      meetings_removable: { Args: { p_org: string; p_ids: string[] }; Returns: string[] };
+      create_meeting_series: {
+        Args: { p_org: string; p_meeting: Json; p_times: Json; p_participants?: string[] };
+        Returns: Json;
+      };
       meeting_busy: {
         Args: { p_org: string; p_users: string[]; p_from: string; p_to: string; p_exclude?: string | null };
         Returns: Array<{
