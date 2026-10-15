@@ -266,7 +266,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   write; 50 per org; audited; seeded with four defaults while a list is empty, mirrored by `DEFAULT_MEETING_TYPES`).
   `meetings.meeting_type_id` (composite FK set null; only an active type may be picked, hint `meeting:type`). `public.meeting_busy`
   returns `busy_from`/`busy_to` with the type's live buffers (no type or a deleted type = 0); its pre-filter of 240 minutes is tied
-  to the buffer checks by test 99. Copying buffers onto meetings is open for CAL-10.
+  to the buffer checks by test 99. Since 020065 (CAL-10, owner 15 October 2026) the buffers are copied onto the meeting when it is
+  booked: `meetings.buffer_before_minutes/buffer_after_minutes` (0..240, NOT NULL, column grants), filled by trigger
+  `meetings_buffers` (invoker) from the type when not sent; a move to another type copies its buffers unless the same update sets
+  them; clearing or deleting the type keeps them. `meeting_busy`, the conflict checks and `create_meeting_series` use the meeting's
+  own buffers; a later change to a type affects only new meetings.
 - Recurring meetings (CAL-09, migrations 020040, 020045; owner 15 October 2026): a weekly series of 2..52 real meetings made up
   front by `public.create_meeting_series` (invoker, all or nothing); `meetings.series_id/series_index` are insert-only, checked by the
   definer trigger `meetings_series_check` (per business; later index needs the head by the same creator and the previous index).
