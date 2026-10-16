@@ -404,6 +404,15 @@ describe("public booking page (CAL-10)", () => {
     const view = (h: string | null) =>
       asService(async (q) => (await q<{ r: Record<string, unknown> }>("select public.booking_page_public($1, $2, $3) as r", [token, target, h])).rows[0].r);
     const sender = "v".repeat(64);
+    // the page's view buckets start empty (earlier tests view it without a sender hash)
+    expect(await asAdmin((q) => count(q, "select 1 from app.booking_view_counts where page_id = $1", [pageId]))).toBe(0);
+    // another sender whose bucket is not the sender's (1,024 shared buckets; the bucket rule is the database's own)
+    const bucketOf = (h: string) =>
+      asAdmin(async (q) =>
+        (await q<{ b: number }>("select (((hashtextextended(app.booking_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b", [pageId, h])).rows[0].b,
+      );
+    let other = "w".repeat(64);
+    for (let i = 0; (await bucketOf(other)) === (await bucketOf(sender)); i++) other = `w${i}`.padEnd(64, "w");
     const requestsBefore = await asAdmin((q) => count(q, "select 1 from app.booking_requests where page_id = $1", [pageId]));
     for (let i = 0; i < 60; i++) expect(await view(sender)).toHaveProperty("slots");
     expect(await view(sender)).toEqual({ rate_limited: true });
@@ -414,7 +423,7 @@ describe("public booking page (CAL-10)", () => {
     expect(counters).toEqual([{ views: 61 }]);
     // others still see the page, with or without a sender hash, however many views there are
     for (let i = 0; i < 100; i++) expect(await view(null)).toHaveProperty("slots");
-    expect(await view("w".repeat(64))).toHaveProperty("slots");
+    expect(await view(other)).toHaveProperty("slots");
     // the next window reuses the counter (an update, never a new row)
     await asAdmin((q) => q("update app.booking_view_counts set window_start = now() - interval '11 minutes' where page_id = $1", [pageId]));
     expect(await view(sender)).toHaveProperty("slots");

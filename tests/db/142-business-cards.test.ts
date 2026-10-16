@@ -30,6 +30,25 @@ describe("business cards (BIZ-02)", () => {
         )
       ).rows[0];
     });
+  // A sender whose view bucket on this card holds no views yet (the 1,024 buckets are shared by all senders, so a random
+  // sender can land in a bucket an earlier test already counted in; the bucket rule is the database's own).
+  const freshSender = async (cardId: string): Promise<string> => {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const candidate = hash();
+      const used = await asAdmin(async (q) =>
+        (
+          await q<{ used: boolean }>(
+            `select exists (select 1 from app.business_card_view_counts c
+                             where c.card_id = $1
+                               and c.bucket = ((hashtextextended(app.business_card_sender($1, $2), 0) % 1024) + 1024) % 1024) as used`,
+            [cardId, candidate],
+          )
+        ).rows[0].used,
+      );
+      if (!used) return candidate;
+    }
+    throw new Error("no free view bucket found");
+  };
   const view = (token: string, ipHash: string | null = hash()) =>
     asService(async (q) => (await q<{ r: Card }>("select public.business_card_public($1, $2) as r", [token, ipHash])).rows[0].r);
   const submit = (token: string, payload: Record<string, unknown>, ipHash: string | null = hash(), spam = false) =>
@@ -231,11 +250,11 @@ describe("business cards (BIZ-02)", () => {
   });
 
   it("rate limits: 60 views per sender in 10 minutes, and intake_submit's per sender", async () => {
-    const sender = hash();
+    const sender = await freshSender(card.id);
     for (let i = 0; i < 60; i += 1) expect((await view(card.token, sender)).rate_limited).toBeUndefined();
     expect(await view(card.token, sender)).toEqual({ rate_limited: true });
-    // another sender is not held back
-    expect((await view(card.token)).name).toBe("card-member");
+    // another sender is not held back (one whose bucket is not the full one)
+    expect((await view(card.token, await freshSender(card.id))).name).toBe("card-member");
     const poster = hash();
     for (let i = 0; i < 10; i += 1) await submit(card.token, { full_name: `שולח ${i}`, phone: `050-90000${10 + i}` }, poster);
     expect((await pgError(submit(card.token, { full_name: "האחד עשר", phone: "050-9000099" }, poster))).hint).toBe("rate_limited");
