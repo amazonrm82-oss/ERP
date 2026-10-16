@@ -106,6 +106,8 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_reset: "איפוס אימות דו-שלבי",
   erase: "מחיקת פרטים מהיומן (בקשת פרטיות)",
   export: "ייצוא",
+  // PRV-02: everything about one person, in one file
+  person_export: "ייצוא כל המידע על האדם",
   // QUO-03: an owner or admin moved the next number of a series forward
   number_jump: "קפיצה קדימה במספור",
   // FLD-09: a deleted pipeline took the conditions based on it (app.pipeline_conditions_cleanup)
@@ -127,6 +129,8 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "lost_reason_id"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // PRV-02 (person_export)
+  file_count: "קבצים",
   // QUO-03 jump forward
   next_number: "המספר הבא",
   // FLD-09: a custom field's show / require condition, and the mark a deleted pipeline leaves

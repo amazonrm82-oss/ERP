@@ -2664,6 +2664,8 @@ export type Database = {
       claim_orphan_files: { Args: { p_limit?: number }; Returns: Json };
       // FXS-07: the uploader, after the upload: { ok: true } | { ok: false, reason: missing|empty|size|type|quota }
       confirm_file_upload: { Args: { p_org: string; p_file: string }; Returns: Json };
+      // PRV-02: owners and admins, before a person's export is handed over
+      log_person_export: { Args: { p_org: string; p_kind: string; p_id: string; p_rows: number; p_files: number }; Returns: undefined };
       // every bucket (USR-01, migration avatar_cleanup): [{ bucket, path }]
       claim_orphan_objects: { Args: { p_limit?: number }; Returns: Json };
       finish_orphan_files: { Args: { p_paths: string[] }; Returns: number };

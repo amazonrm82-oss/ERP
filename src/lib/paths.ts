@@ -41,6 +41,8 @@ export const paths = {
   // MNY-05: the weekly pipeline cleanup (owner=me: the user's own deals)
   dealsCleanup: (orgId: string, owner?: "me" | "all") => `/o/${orgId}/deals/cleanup${owner ? `?owner=${owner}` : ""}`,
   vcard: (orgId: string, kind: "lead" | "contact", id: string) => `/o/${orgId}/vcard/${kind}/${id}`,
+  // PRV-02: everything about one person, one ZIP (owners and admins)
+  personExport: (orgId: string, kind: "lead" | "contact", id: string) => `/o/${orgId}/privacy-export/${kind}/${id}`,
   tasks: (orgId: string) => `/o/${orgId}/tasks`,
   // the tasks list with the "new task" form open and focused (REC-08)
   taskNew: (orgId: string) => `/o/${orgId}/tasks?new=1`,

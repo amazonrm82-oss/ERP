@@ -13,6 +13,7 @@ import { TrashRecordButton } from "@/components/trash-record-button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrintButton } from "@/features/print/components/print-button";
+import { PersonExportLink } from "@/features/privacy-export/components/person-export-link";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
@@ -235,10 +236,12 @@ export default async function ContactPage({ params, searchParams }: Props) {
         </div>
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
-      <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
+      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5 empty:hidden print:hidden">
         {context.canDelete ? (
           <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
         ) : null}
+        {/* PRV-02 */}
+        {isAdminRole(context.role) ? <PersonExportLink orgId={orgId} kind="contact" id={contact.id} /> : null}
       </div>
     </>
   );
