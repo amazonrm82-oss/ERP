@@ -905,7 +905,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 
 ### Checklist for every new table (the tests enforce most of it)
 
-1. `organization_id` + `unique (organization_id, id)` + composite FKs to other tenant tables.
+1. `organization_id` + `unique (organization_id, id)` + composite FKs to other tenant tables, each with a full index
+   `(organization_id, x_id)` (test 130; a partial index counts only for `x_id is not null`).
 2. `alter table … enable row level security`.
 3. `revoke all … from anon, authenticated`, then grant only what a client needs (column-level for
    updates when some columns are server-only).
