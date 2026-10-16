@@ -87,7 +87,9 @@ and build this CRM here instead. The old code is preserved on the branch
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
    `/f/book/<token>`, route `/api/forms/booking/<token>`), which calls only `public.booking_page_public()` and
-   `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`.
+   `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`. Since CAL-10b (owner 15 October 2026) the same
+   file serves the customer's personal link (page `/f/book/manage/<token>`, route `/api/forms/booking/manage/<token>`), which calls only
+   `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -287,7 +289,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   Rest days only warn (10 dates, then "ועוד N"); "this and following" edits/cancels/deletes go meeting by meeting with the user's
   session and list the skipped dates ("אין הרשאה"); a weekday change splits the series, refused up front unless
   `public.meetings_removable` (invoker, mirrors the `meetings_delete` policy; keep in step) returns every affected meeting.
-  `app.notify_meeting_participant` (last redefined in 020040) sends one notice per series while it is unread.
+  `app.notify_meeting_participant` (last redefined in 020100, with `app.notify_meeting_organizer`) sends one notice per series while it is unread.
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
@@ -305,7 +307,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `system` notice to the rep and the owners; answers `{status: booked|slot_taken|invalid_time|spam}`. Links by phone a live lead,
   else a live contact (CON-01 phones), else a new lead with the page's source or "דף קביעת תור" (kind `booking`, made once) and
   campaign = utm_campaign, else the page title. pg_cron `crm-booking-ip-hashes` clears hashes after 15 minutes.
-  Follow-ups: CAL-10b (customer cancel/change link), CAL-12 (team pages), token rotation.
+  Customer link (CAL-10b, migration 020100): every booking answers a personal token once (only its SHA-256, in
+  `app.booking_manage_links`, one per meeting). `booking_pages.cancel_notice_hours` (0..72, default 24; page gone = 24): earlier the
+  customer cancels or changes online, later the page shows the business phone. Cancel = status cancelled, a `system` entry, kind
+  `meeting_cancelled` to the organizer and active participants. Change = cancel + a new booking of the page's current rep through
+  `app.booking_refusal` (the CAL-10 rule, shared with `booking_submit`), participants carried, one "moved" notice (`app.booking_moving`
+  holds back `meeting_scheduled`). The sender is the server's keyed IP hash scoped per page by `app.booking_sender`; views, bookings,
+  cancels and changes share the page's limits. `app.booking_slots` takes `p_ignore_meeting` (old signature retired).
+  Follow-ups: CAL-12 (team pages), token rotation, `meeting_cancelled` for a person's own cancel.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
