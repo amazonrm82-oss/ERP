@@ -177,6 +177,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   copy; `requireAgreement()` (`src/features/legal/queries.ts`) gates `/`, onboarding, invites and
   `getOrgContext`. Changing a legal text means a new `LEGAL_VERSION`, and everyone signs again (owner, 12 October
   2026: filling contact details into a draft does not open a version; a change to the terms does).
+  Since 020085 (FXS-09) `sign_agreement()` accepts only texts whose `app.agreement_fingerprint(title, text)` is in
+  `app.agreement_texts` for that version (hint `agreement:changed`); a new LEGAL_VERSION, or a filled-in detail, ships with a
+  migration registering its texts (test 127 fails otherwise; the unit fixture pins each version's wording). Apply that
+  migration before the code that serves the new text.
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
