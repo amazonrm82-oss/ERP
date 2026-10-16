@@ -10,7 +10,8 @@ import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PublicCardForm } from "@/features/business-cards/components/public-card-form";
 import { cardVCardPath } from "@/features/business-cards/paths";
-import { clientIp, getPublicCard } from "@/features/business-cards/public-server";
+import { getPublicCard } from "@/features/business-cards/public-server";
+import { clientIp } from "@/lib/keyed-ip-hash";
 
 export const metadata: Metadata = { title: "כרטיס ביקור", robots: { index: false, follow: false } };
 

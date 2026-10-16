@@ -1,8 +1,7 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
 import type { Json } from "@/lib/database.types";
+import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseAttribution, safeText } from "./attribution";
@@ -155,11 +154,6 @@ function nonNull(values: Record<string, string | null>): RawValues {
   return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== null));
 }
 
-function clientIp(request: Request): string | null {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || null;
-}
-
 // field: which form field was wrong, so the hosted form can mark it (FXA-02)
 type Reply = { ok: boolean; message: string; redirectUrl?: string | null; field?: string };
 
@@ -198,9 +192,9 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     return respond(503, { ok: false, message: MESSAGES.notConfigured });
   }
   const body = await readBody(request);
-  const ip = clientIp(request);
-  // salted per form: the stored value cannot be matched across forms or reversed cheaply
-  const ipHash = ip ? createHash("sha256").update(`${token}:${ip}`).digest("hex") : null;
+  // FXS-11: keyed with the server's secret (the form's public token alone was a salt anyone could use) and scoped to
+  // the form; the database clears it after the rate-limit window. Without the secret: no hash, the lead still comes in.
+  const ipHash = keyedIpHash(clientIp(request.headers), "intake", token);
   if (body === "too_large") {
     // still counted against the sender's rate limit: logged as spam with nothing in it
     await service.rpc("intake_submit", { p_token: token, p_kind: kind, p_payload: {}, p_ip_hash: ipHash, p_user_agent: null, p_is_spam: true });

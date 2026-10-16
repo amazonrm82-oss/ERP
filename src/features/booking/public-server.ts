@@ -1,10 +1,9 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
-
 import { parseAttribution } from "@/features/intake/attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD } from "@/features/intake/fields";
 import type { Json } from "@/lib/database.types";
+import { clientIp, keyedIpHash as keyedHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { bookingManageFrom, confirmationFrom, MANAGE_TOKEN, publicBookingFrom, type BookingManage, type PublicBooking } from "./public";
@@ -15,6 +14,9 @@ import { BOOKING_ANSWER_MAX } from "./schema";
 // service_role only), which check the token and answer only what the page shows. No table is reached directly.
 
 const TOKEN = /^[0-9a-f]{32}$/;
+
+// FXS-11: the sender's IP as a keyed hash (src/lib/keyed-ip-hash.ts); the database scopes it further per booking
+const keyedIpHash = (ip: string | null) => keyedHash(ip, "booking");
 // a human needs more than this to pick a time and fill in the details
 const MIN_FILL_MS = 2000;
 export const MAX_BODY_BYTES = 16 * 1024;
@@ -39,29 +41,6 @@ export async function getPublicBooking(token: string, from: string | null, ip: s
     if ((data as { rate_limited?: unknown }).rate_limited === true) return "rate-limited";
   }
   return publicBookingFrom(data) ?? "not-found";
-}
-
-/** The sender's address from the proxy's headers (Vercel sets x-forwarded-for). */
-export function clientIp(headers: Headers): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || headers.get("x-real-ip") || null;
-}
-
-/**
- * FXS-11 (owner, 13 October 2026): the sender's IP is kept only as a keyed hash, with the server's secret
- * INTAKE_IP_HASH_SECRET, and only for the rate-limit window (the database clears it). Without the secret no hash is
- * kept and the error is logged; there is no fallback to a plain hash. The database scopes the hash to the page
- * (app.booking_sender, CAL-10b): a visitor is a different sender on every page, and the page's bookings, views,
- * cancels and changes count against that one sender.
- */
-function keyedIpHash(ip: string | null): string | null {
-  if (!ip) return null;
-  const secret = process.env.INTAKE_IP_HASH_SECRET;
-  if (!secret) {
-    console.error("[CAL-10 booking] INTAKE_IP_HASH_SECRET is not set: no IP hash kept, only the per-page rate limit applies");
-    return null;
-  }
-  return createHmac("sha256", secret).update(`booking:${ip}`).digest("hex");
 }
 
 const MESSAGES = {
