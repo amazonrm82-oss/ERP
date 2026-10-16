@@ -458,6 +458,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   against `max_products`. Since 0159 (PRD-05) products import like leads (`import_jobs.entity_type` 'product', `products.import_job_id`
   guarded by `app.guard_import_tag('product')`, `product_sku_matches()` invoker; owners/admins only; undo archives a product a
   document uses) and export through `log_list_export('product')`. PRD-07 price history reads `audit_log` (owners/admins).
+- Products table (LST-09 for products, migration 020280): `list_preferences` and `saved_views` take object type `product`; inline edit
+  (name, category), bulk (state, category, export; undo in `src/features/products/bulk-server.ts`) and the filtered export use the
+  user's session, so the products policies decide. The export keeps PRD-05's fixed columns.
 - Business days (HEB-03, migration 0134): `app.add_business_days(org, from, n)` (app only) counts n working days after a date by
   the CAL-03 rest days, read once and decided by `app.rest_day_with()` (the rule of `app.org_rest_day()` with the settings passed
   in; keep the two in step); n = 0 is the day itself or the next working day; n outside 0..1000 → hint `business_days:range`;
@@ -730,7 +733,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Contact preferences (CON-10, migration 0183): `contacts.preferred_locale` (he|ar|en|ru|am|fr|es) and `preferred_channel`
   (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
   reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
-  `app.export_choice_values()` (last redefined in 0183) lists the fixed choice codes kept in an export's audit filters.
+  `app.export_choice_values()` (last redefined in 020280, LST-09 products) lists the fixed choice codes kept in an export's audit filters.
   Since 0188 leads have `preferred_channel` too, and both tables `preferred_channel_source` (form|manual, server-maintained by
   the invoker trigger `app.preferred_channel_source()`: a person's change = manual). `forms.channel_choice` asks on the public
   form; `intake_submit` (last redefined in 0188) fills an empty or form-set channel, never a manual one; conversion carries it.
