@@ -766,6 +766,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
   (invoker). Applying a template happens in the app with the user's session and adds lines to an editable draft only.
+- Quote design (QUO-05, migration 020185): `public.quote_designs` (one row per org, no row = defaults; members read, owners/admins of
+  a writable org write, no delete): header/footer text, show logo, show business details, accent colour (null = business colour). The
+  document page `/o/[org]/quotes/[id]/document` reads with the user's session, shows stored totals only, BrandScope on the document only;
+  it imports print.css directly (no "הודפס ב-" line on a customer document).
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
