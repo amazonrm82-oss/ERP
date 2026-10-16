@@ -227,6 +227,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "booking_page:questions": "יש בעיה בשאלות המקדימות: לכל שאלה צריך נוסח, עד 200 תווים.",
   // BIZ-02 (migration business_cards)
   "business_card:rep": "כרטיס ביקור שייך למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
+  // BIZ-03 (migration qr_codes)
+  "qr_code:target": "קוד QR פותח טופס אתר או דף קביעת תור של העסק. בחרו אחד מהם.",
   "form:card": "הטופס של כרטיס ביקור משתנה רק דרך הכרטיס עצמו.",
   "booking_page:no_hours": "אי אפשר להפעיל את הדף: לא הוגדרו שעות עבודה לנציג או לעסק, ובלי שעות אין זמנים פנויים. הגדירו שעות עבודה, או שמרו את הדף כשהוא כבוי.",
   // CON-03 follow-up: the roles of a contact on a deal

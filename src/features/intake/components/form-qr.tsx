@@ -49,14 +49,23 @@ function pngOf(code: QrCode, colours: { dark: string; light: string }): Promise<
 type Props = {
   // what the code opens
   url: string;
-  // the printable poster
-  printUrl: string;
+  // the printable poster (none: no print link)
+  printUrl?: string;
   // file name, without extension
   fileName: string;
+  // BIZ-03: the code's own label and line (default: the form's)
+  imageLabel?: string;
+  description?: string;
 };
 
 /** The form's QR code (CAP-03): on screen, as a PNG or SVG file, and a page to print. */
-export function FormQr({ url, printUrl, fileName }: Props) {
+export function FormQr({
+  url,
+  printUrl,
+  fileName,
+  imageLabel = "קוד QR של הטופס",
+  description = "סורקים עם המצלמה של הטלפון ומגיעים ישר לטופס. מתאים לשלט, לפלייר או לכרטיס ביקור.",
+}: Props) {
   const code = useMemo(() => encodeQr(url), [url]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [failed, setFailed] = useState(false);
@@ -64,10 +73,10 @@ export function FormQr({ url, printUrl, fileName }: Props) {
   return (
     <div className="flex flex-wrap items-start gap-4">
       <span className="rounded-md border border-line">
-        <QrImage ref={svgRef} code={code} label="קוד QR של הטופס" className="size-40 rounded-md" />
+        <QrImage ref={svgRef} code={code} label={imageLabel} className="size-40 rounded-md" />
       </span>
       <div className="min-w-0 flex-1 basis-48 space-y-2">
-        <p className="text-md text-ink-soft">סורקים עם המצלמה של הטלפון ומגיעים ישר לטופס. מתאים לשלט, לפלייר או לכרטיס ביקור.</p>
+        <p className="text-md text-ink-soft">{description}</p>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
@@ -87,10 +96,12 @@ export function FormQr({ url, printUrl, fileName }: Props) {
           >
             הורדה לדפוס (SVG)
           </Button>
-          <a href={printUrl} target="_blank" rel="noopener" className={buttonClasses("secondary", "sm")}>
-            דף להדפסה
-            <span className="sr-only"> (נפתח בחלון חדש)</span>
-          </a>
+          {printUrl ? (
+            <a href={printUrl} target="_blank" rel="noopener" className={buttonClasses("secondary", "sm")}>
+              דף להדפסה
+              <span className="sr-only"> (נפתח בחלון חדש)</span>
+            </a>
+          ) : null}
         </div>
         {failed ? (
           <p role="alert" className="text-sm text-danger">

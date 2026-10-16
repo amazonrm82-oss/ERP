@@ -467,6 +467,29 @@ export type BusinessCardWrite = {
   public_fields?: string[];
 };
 
+// BIZ-03: a QR code that opens a form or a booking page (target_kind 'form' | 'booking'); token = its link (/f/q/<token>);
+// an empty target = deleted
+export type QrCodeRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  target_kind: string;
+  form_id: string | null;
+  booking_page_id: string | null;
+  token: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type QrCodeWrite = {
+  name?: string;
+  target_kind?: string;
+  form_id?: string | null;
+  booking_page_id?: string | null;
+  is_active?: boolean;
+};
+
 export type BookingPageRow = {
   id: string;
   organization_id: string;
@@ -2307,6 +2330,8 @@ export type Database = {
       segment_members: Table<SegmentMemberRow, SegmentMemberInsert, Record<string, never>>;
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
+      // BIZ-03: owners and admins only; column grants (token made by the database)
+      qr_codes: Table<QrCodeRow, QrCodeWrite & { organization_id: string; name: string; target_kind: string }, QrCodeWrite>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant
@@ -2531,6 +2556,9 @@ export type Database = {
         Returns: Json;
       };
       // BIZ-02: the public business card and its "leave details" form; service_role only
+      // BIZ-03: the scan (service_role only): {path, campaign} or P0002; the counts per code (owners/admins)
+      qr_scan: { Args: { p_token: string }; Returns: Json };
+      qr_code_scans: { Args: { p_org: string; p_days?: number }; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_card_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };

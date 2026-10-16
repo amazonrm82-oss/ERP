@@ -1643,3 +1643,44 @@ describe("business cards by role", () => {
     expect(await seen("viewer")).toBe(0);
   });
 });
+
+// BIZ-03: QR codes are managed and seen by owners and admins only (the rest is in 154-qr-codes)
+describe("QR codes by role", () => {
+  let org: string;
+  let formId: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("qrrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `qrrole-${role}`);
+    }
+    formId = await asAdmin(async (q) =>
+      (await q<{ id: string }>("insert into public.forms (organization_id, name) values ($1, 'טופס') returning id", [org])).rows[0].id,
+    );
+  });
+
+  it("owners and admins make, see, change and remove codes; a manager, a member and a viewer can do none of it", async () => {
+    const make = (who: string) =>
+      asUser(people[who].id, (q) =>
+        q("insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, $2, 'form', $3)", [org, `קוד ${who}`, formId]),
+      );
+    await make("owner");
+    await make("admin");
+    for (const role of ["manager", "member", "viewer"]) expect((await pgError(make(role))).code, role).toBe("42501");
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.qr_codes where organization_id = $1", [org]));
+      expect(seen, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+      const renamed = await asUser(people[role].id, async (q) => (await q("update public.qr_codes set name = name where organization_id = $1", [org])).rowCount);
+      expect(renamed, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+    }
+    for (const role of ["manager", "member", "viewer"]) {
+      const removed = await asUser(people[role].id, async (q) => (await q("delete from public.qr_codes where organization_id = $1", [org])).rowCount);
+      expect(removed, role).toBe(0);
+    }
+    const removed = await asUser(people.admin.id, async (q) => (await q("delete from public.qr_codes where organization_id = $1 and name = 'קוד admin'", [org])).rowCount);
+    expect(removed).toBe(1);
+  });
+});
