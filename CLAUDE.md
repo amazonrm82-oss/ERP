@@ -211,6 +211,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   visible, so a private note's files stay private) and `files.previous_id` (one newer version per file, deferred unique; same record
   and note, hint `file:version`). Deleting versions relinks the survivor in AFTER trigger `"A_files_relink_versions"` (transition
   table; named to run before the RI set-null). The files policies were last altered in 020210.
+- Upload confirmation (FXS-07, migration 020255): a person's new `files` row waits (`unconfirmed_since`, server only) until
+  `public.confirm_file_upload(org, file)` (uploader only) reads the real size and type from `storage.objects.metadata`
+  (`app.record_file_object`), rechecks size, type (`app.file_allowed_types()` = `ALLOWED_TYPES`, also the bucket's
+  `allowed_mime_types`) and quota, and fixes the row or answers `{ok:false, reason}`. `record_files_insert` (last altered in
+  020255) puts an object only at the caller's waiting row. Waiting rows are hidden by the app, count their real size
+  (`app.files_storage_used`), and are capped at 20 per person per hour (hint `file:pending_max`); pg_cron `crm-file-confirm`
+  (`app.reconcile_pending_files()`, every 5 minutes) confirms what passes and never deletes. `app.files_before_insert` was last
+  redefined in 020255.
 - File cleanup (migration 0021): deleted `files` rows leave their path in `app.orphan_files`;
   pg_cron `crm-file-cleanup` (03:00 UTC) calls `app.cleanup_files()`, which wakes
   `/api/files/cleanup` (URL from `app.settings` `files_cleanup_url`, else derived from
