@@ -15,6 +15,8 @@ export const NOTIFICATION_KINDS = [
   { key: "task_reminder", label: "תזכורות למשימות", group: "calendar", shown: true },
   { key: "meeting_scheduled", label: "נקבעה לי פגישה", group: "calendar", shown: true },
   { key: "meeting_reminder", label: "תזכורות לפגישות", group: "calendar", shown: true },
+  // CAL-10b: a customer cancelled or moved a meeting through their personal link
+  { key: "meeting_cancelled", label: "פגישה שלי בוטלה", group: "calendar", shown: true },
   { key: "quote", label: "הצעת מחיר נצפתה או אושרה", group: "money", shown: false },
   { key: "payment", label: "תשלום התקבל", group: "money", shown: false },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },

@@ -24,6 +24,8 @@ export type BookingPageItem = {
   minNoticeMinutes: number;
   maxDaysAhead: number;
   slotStepMinutes: number;
+  // CAL-10b: up to how many hours before the start the customer may cancel or change online
+  cancelNoticeHours: number;
   questions: BookingQuestion[];
   isActive: boolean;
 };
@@ -34,7 +36,7 @@ export async function listBookingPages(orgId: string): Promise<BookingPageItem[]
   const rows = must(
     await supabase
       .from("booking_pages")
-      .select("id, token, user_id, title, intro, meeting_type_id, source_id, min_notice_minutes, max_days_ahead, slot_step_minutes, questions, is_active, created_at")
+      .select("id, token, user_id, title, intro, meeting_type_id, source_id, min_notice_minutes, max_days_ahead, slot_step_minutes, cancel_notice_hours, questions, is_active, created_at")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: true }),
@@ -64,6 +66,7 @@ export async function listBookingPages(orgId: string): Promise<BookingPageItem[]
       minNoticeMinutes: row.min_notice_minutes,
       maxDaysAhead: row.max_days_ahead,
       slotStepMinutes: row.slot_step_minutes,
+      cancelNoticeHours: row.cancel_notice_hours,
       questions: readQuestions(row.questions),
       isActive: row.is_active,
     };

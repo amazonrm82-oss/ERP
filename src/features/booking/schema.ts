@@ -23,6 +23,19 @@ export const MIN_NOTICE_OPTIONS = [
 ] as const;
 export const DEFAULT_MIN_NOTICE = "120";
 
+// CAL-10b: up to when the customer may cancel or change online (booking_pages.cancel_notice_hours, 0..72)
+export const CANCEL_NOTICE_OPTIONS = [
+  { value: "0", label: "עד תחילת הפגישה" },
+  { value: "2", label: "עד שעתיים לפני" },
+  { value: "4", label: "עד 4 שעות לפני" },
+  { value: "12", label: "עד 12 שעות לפני" },
+  { value: "24", label: "עד יום לפני" },
+  { value: "48", label: "עד יומיים לפני" },
+  { value: "72", label: "עד 3 ימים לפני" },
+] as const;
+export const DEFAULT_CANCEL_NOTICE = "24";
+export const CANCEL_NOTICE_MAX = 72;
+
 export const SLOT_STEP_OPTIONS = [
   { value: "15", label: "כל רבע שעה" },
   { value: "30", label: "כל חצי שעה" },
@@ -43,6 +56,7 @@ export const BOOKING_FIELD_NAMES = [
   "min_notice_minutes",
   "max_days_ahead",
   "slot_step_minutes",
+  "cancel_notice_hours",
   "is_active",
 ] as const;
 
@@ -73,6 +87,7 @@ export const bookingPageSchema = z.object({
       ),
   ),
   slot_step_minutes: fromList(SLOT_STEP_OPTIONS, DEFAULT_SLOT_STEP, "יש לבחור כל כמה זמן מתחיל תור."),
+  cancel_notice_hours: fromList(CANCEL_NOTICE_OPTIONS, DEFAULT_CANCEL_NOTICE, "יש לבחור עד מתי אפשר לבטל."),
   is_active: checkbox,
 });
 

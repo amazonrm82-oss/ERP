@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { addDays, bookingIcs, confirmationFrom, fromParam, localDate, publicBookingFrom, slotsByDay } from "@/features/booking/public";
+import { addDays, bookingIcs, bookingManageFrom, confirmationFrom, fromParam, localDate, publicBookingFrom, slotsByDay } from "@/features/booking/public";
+import { CANCEL_NOTICE_MAX, CANCEL_NOTICE_OPTIONS, bookingPageSchema as pageSchema } from "@/features/booking/schema";
 import { bookingPageSchema, questionsFromForm, readQuestions } from "@/features/booking/schema";
 
 // CAL-10: the public booking page's pure parts: reading the database's answers, days and slots, the settings form.
@@ -69,7 +70,12 @@ describe("public booking page data (CAL-10)", () => {
         meeting: { name: "ייעוץ", format: "video", location: null },
         rep: "דנה",
       }),
-    ).toMatchObject({ startsAt: "2026-10-20T07:00:00+00:00", rep: "דנה", meeting: { name: "ייעוץ" } });
+    ).toMatchObject({ startsAt: "2026-10-20T07:00:00+00:00", rep: "דנה", meeting: { name: "ייעוץ" }, manageToken: null });
+    // CAL-10b: the personal link's token, only in its own shape
+    const token = "a".repeat(64);
+    const booked = { status: "booked", starts_at: "2026-10-20T07:00:00+00:00", ends_at: "2026-10-20T07:45:00+00:00", time_zone: "UTC", meeting: { name: "x" } };
+    expect(confirmationFrom({ ...booked, manage_token: token })?.manageToken).toBe(token);
+    expect(confirmationFrom({ ...booked, manage_token: "../x" })?.manageToken).toBeNull();
     expect(confirmationFrom({ status: "spam" })).toBeNull();
     expect(confirmationFrom(null)).toBeNull();
   });
@@ -141,6 +147,7 @@ describe("the calendar file of a booking (CAL-10)", () => {
     timeZone: "Asia/Jerusalem",
     meeting: { name: "ייעוץ ראשון", format: "in_person", location: "רחוב הרצל 1, תל אביב" },
     rep: "דנה",
+    manageToken: null,
   };
 
   it("holds only the confirmation and the business name", () => {
@@ -161,5 +168,47 @@ describe("the calendar file of a booking (CAL-10)", () => {
     const unfolded = bookingIcs({ ...confirmation, rep: "", meeting: { ...confirmation.meeting, location: null } }, "עסק", "x").replace(/\r\n /g, "");
     expect(unfolded).toContain("SUMMARY:ייעוץ ראשון · עסק");
     expect(unfolded).not.toContain("LOCATION:");
+  });
+});
+
+describe("the personal page of a booking (CAL-10b)", () => {
+  const reply = {
+    status: "planned",
+    starts_at: "2026-10-20T07:00:00+00:00",
+    ends_at: "2026-10-20T08:00:00+00:00",
+    time_zone: "Asia/Jerusalem",
+    meeting: { name: "ייעוץ", format: "phone", location: null },
+    rep: "דנה",
+    business: "העסק",
+    brand: { logo: null, color: "#123456" },
+    built_with: false,
+    notice_hours: 24,
+    can_cancel: true,
+    call_phone: null,
+    change: { today: "2026-10-16", last_day: "2026-11-15", from: "2026-10-16", slots: ["2026-10-21T07:00:00+00:00", "nope"] },
+  };
+
+  it("reads the reply, and drops what is not in shape", () => {
+    expect(bookingManageFrom(reply)).toMatchObject({ status: "planned", canCancel: true, noticeHours: 24, callPhone: null, change: { from: "2026-10-16", slots: ["2026-10-21T07:00:00+00:00"] } });
+    expect(bookingManageFrom({ ...reply, change: null, can_cancel: false, call_phone: "03-1234567" })).toMatchObject({ change: null, canCancel: false, callPhone: "03-1234567" });
+    expect(bookingManageFrom({ ...reply, status: "deleted" })).toBeNull();
+    expect(bookingManageFrom({ ...reply, starts_at: "x" })).toBeNull();
+    expect(bookingManageFrom({ unavailable: true })).toBeNull();
+  });
+
+  it("the threshold's choices are the database's range, 24 by default", async () => {
+    const values = CANCEL_NOTICE_OPTIONS.map((o) => Number(o.value));
+    expect(Math.min(...values)).toBe(0);
+    expect(Math.max(...values)).toBe(CANCEL_NOTICE_MAX);
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const dir = path.join(process.cwd(), "supabase", "migrations");
+    const sql = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_booking_manage.sql"))!), "utf8");
+    expect(sql).toContain(`check (cancel_notice_hours between 0 and ${CANCEL_NOTICE_MAX})`);
+    expect(sql).toContain("cancel_notice_hours smallint not null default 24");
+    const base = { title: "דף", meeting_type_id: "00000000-0000-4000-8000-000000000001", max_days_ahead: "30" };
+    expect(pageSchema.parse({ ...base }).cancel_notice_hours).toBe(24);
+    expect(pageSchema.parse({ ...base, cancel_notice_hours: "0" }).cancel_notice_hours).toBe(0);
+    expect(pageSchema.safeParse({ ...base, cancel_notice_hours: "73" }).success).toBe(false);
   });
 });

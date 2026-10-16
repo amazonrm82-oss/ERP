@@ -28,6 +28,8 @@ import {
   MIN_NOTICE_OPTIONS,
   minNoticeText,
   SLOT_STEP_OPTIONS,
+  CANCEL_NOTICE_OPTIONS,
+  DEFAULT_CANCEL_NOTICE,
 } from "../schema";
 
 export type BookingOption = { id: string; name: string };
@@ -283,6 +285,19 @@ function BookingPageForm({ orgId, types, sources, reps, page, onDone }: Shared &
           ))}
         </SelectField>
       </div>
+      <SelectField
+        label="ביטול או שינוי בקישור האישי"
+        name="cancel_notice_hours"
+        hint="מי שקבע מקבל קישור אישי לביטול או לשינוי. אחרי המועד הזה הדף מבקש להתקשר לעסק."
+        defaultValue={values?.cancel_notice_hours ?? String(page?.cancelNoticeHours ?? DEFAULT_CANCEL_NOTICE)}
+        error={errors.cancel_notice_hours}
+      >
+        {CANCEL_NOTICE_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </SelectField>
       <fieldset className="space-y-3">
         <legend className="mb-1.5 text-sm font-medium">שאלות מקדימות (לא חובה)</legend>
         <p className="text-sm text-ink-soft">מי שקובע עונה עליהן, והתשובות נשמרות בתיאור הפגישה.</p>

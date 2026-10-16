@@ -32,7 +32,30 @@ export type BookingConfirmation = {
   timeZone: string;
   meeting: { name: string; format: string; location: string | null };
   rep: string;
+  // CAL-10b: the personal link's token (64 hex), answered once; null when none came back
+  manageToken: string | null;
 };
+
+/** CAL-10b: the customer's personal page, from booking_manage_public(). */
+export type BookingManage = {
+  status: "planned" | "cancelled" | "past";
+  startsAt: string;
+  endsAt: string;
+  timeZone: string;
+  meeting: { name: string; format: string; location: string | null };
+  rep: string;
+  business: string;
+  brand: { logoPath: string | null; color: string | null };
+  builtWith: boolean;
+  noticeHours: number;
+  canCancel: boolean;
+  // too late to do it online: the business's phone, when set
+  callPhone: string | null;
+  // a change is possible: a week of free times (local dates in the business's zone)
+  change: { today: string; lastDay: string; from: string; slots: string[] } | null;
+};
+
+export const MANAGE_TOKEN = /^[0-9a-f]{64}$/;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -86,6 +109,43 @@ export function confirmationFrom(data: unknown): BookingConfirmation | null {
     timeZone,
     meeting: { name: text(data.meeting.name) ?? "", format: text(data.meeting.format) ?? "in_person", location: text(data.meeting.location) },
     rep: text(data.rep) ?? "",
+    manageToken: typeof data.manage_token === "string" && MANAGE_TOKEN.test(data.manage_token) ? data.manage_token : null,
+  };
+}
+
+const isInstant = (s: unknown): s is string => typeof s === "string" && !Number.isNaN(Date.parse(s));
+
+/** The reply of booking_manage_public() as the page's data; null when it is not one. */
+export function bookingManageFrom(data: unknown): BookingManage | null {
+  if (!isObject(data) || !isObject(data.meeting)) return null;
+  const status = data.status === "planned" || data.status === "cancelled" || data.status === "past" ? data.status : null;
+  const timeZone = text(data.time_zone);
+  if (!status || !timeZone || !isInstant(data.starts_at) || !isInstant(data.ends_at)) return null;
+  const brand = isObject(data.brand) ? data.brand : {};
+  const change = isObject(data.change) ? data.change : null;
+  const changeDates = change ? [change.today, change.last_day, change.from] : [];
+  return {
+    status,
+    startsAt: data.starts_at,
+    endsAt: data.ends_at,
+    timeZone,
+    meeting: { name: text(data.meeting.name) ?? "", format: text(data.meeting.format) ?? "in_person", location: text(data.meeting.location) },
+    rep: text(data.rep) ?? "",
+    business: text(data.business) ?? "",
+    brand: { logoPath: isLogoPath(brand.logo) ? brand.logo : null, color: isHexColor(brand.color) ? brand.color : null },
+    builtWith: builtWithVisible(data.built_with),
+    noticeHours: typeof data.notice_hours === "number" ? data.notice_hours : 24,
+    canCancel: data.can_cancel === true,
+    callPhone: text(data.call_phone),
+    change:
+      change && changeDates.every((d) => typeof d === "string" && DATE.test(d))
+        ? {
+            today: change.today as string,
+            lastDay: change.last_day as string,
+            from: change.from as string,
+            slots: Array.isArray(change.slots) ? change.slots.filter(isInstant) : [],
+          }
+        : null,
   };
 }
 

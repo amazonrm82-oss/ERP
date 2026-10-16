@@ -240,7 +240,9 @@ describe("public booking page (CAL-10)", () => {
       answers: { goal: "לשפר מכירות", notes: "", unknown: "נזרק" },
       attribution: { utm_source: "google", utm_campaign: "סתיו" },
     });
-    expect(Object.keys(result).sort()).toEqual(["ends_at", "meeting", "rep", "starts_at", "status", "time_zone"]);
+    expect(Object.keys(result).sort()).toEqual(["ends_at", "manage_token", "meeting", "rep", "starts_at", "status", "time_zone"]);
+    // CAL-10b: the personal link, answered once (only its hash is kept)
+    expect(result.manage_token).toMatch(/^[0-9a-f]{64}$/);
     expect(result).toMatchObject({ status: "booked", rep: "דנה הנציגה", meeting: { name: "ייעוץ ראשון", format: "in_person", location: "רחוב הרצל 1" } });
     const lead = await asAdmin(
       async (q) =>
@@ -390,10 +392,12 @@ describe("public booking page (CAL-10)", () => {
     // another sender still books
     expect((await book(token, at(dayAhead(6), "09:00"), { full_name: "אחר", phone: "0507770001", answers: { goal: "x" } }, "k".repeat(64))).status).toBe("booked");
     // the hashes are kept only for the window
-    await asAdmin((q) => q("update app.booking_requests set created_at = now() - interval '20 minutes' where ip_hash = $1", [hash]));
+    // the database keeps the sender scoped to the page (CAL-10b), never the hash it was sent
+    expect(await asAdmin((q) => count(q, "select 1 from app.booking_requests where ip_hash = $1", [hash]))).toBe(0);
+    await asAdmin((q) => q("update app.booking_requests set created_at = now() - interval '20 minutes' where ip_hash = app.booking_sender($2, $1)", [hash, pageId]));
     const cleared = await asAdmin(async (q) => (await q<{ n: number }>("select app.clear_booking_ip_hashes() as n")).rows[0].n);
     expect(cleared).toBe(5);
-    expect(await asAdmin((q) => count(q, "select 1 from app.booking_requests where ip_hash = $1", [hash]))).toBe(0);
+    expect(await asAdmin((q) => count(q, "select 1 from app.booking_requests where ip_hash = app.booking_sender($2, $1)", [hash, pageId]))).toBe(0);
   });
 
   it("view limit: 60 per sender in 10 minutes, then nothing is worked out; views never close a page and leave no rows", async () => {
@@ -445,7 +449,7 @@ describe("public booking page (CAL-10)", () => {
     } finally {
       await Promise.all(clients.map((c) => c.end()));
     }
-    expect(await asAdmin((q) => count(q, "select 1 from app.booking_requests where page_id = $1 and ip_hash = $2", [pageId, hash]))).toBe(5);
+    expect(await asAdmin((q) => count(q, "select 1 from app.booking_requests where page_id = $1 and ip_hash = app.booking_sender($1, $2)", [pageId, hash]))).toBe(5);
   });
 
   it("spam counts only against its sender: 60 spam posts from many senders do not shut the page", async () => {

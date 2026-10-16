@@ -14,7 +14,7 @@ import type { BookingQuestion } from "@/lib/database.types";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
 
-import { bookingSubmitPath } from "../paths";
+import { bookingManagePath, bookingSubmitPath } from "../paths";
 import { bookingIcs, localDate, type BookingConfirmation } from "../public";
 import { BOOKING_ANSWER_MAX } from "../schema";
 
@@ -132,9 +132,26 @@ export function PublicBookingForm({ token, business, startsAt, timeZone, questio
   );
 }
 
-/** The confirmation on screen. Focus moves to it, so a screen reader reads it out. */
-function Booked({ confirmation, business, startsAt, timeZone }: { confirmation: BookingConfirmation | null; business: string; startsAt: string; timeZone: string }) {
+/**
+ * The confirmation on screen (a booking, or a change through the personal link). Focus moves to it, so a screen
+ * reader reads it out. CAL-10b: it shows the personal link to cancel or change, which is answered only now.
+ */
+export function Booked({
+  confirmation,
+  business,
+  startsAt,
+  timeZone,
+  heading = "הפגישה נקבעה",
+}: {
+  confirmation: BookingConfirmation | null;
+  business: string;
+  startsAt: string;
+  timeZone: string;
+  heading?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
+  const manageHref = confirmation?.manageToken ? bookingManagePath(confirmation.manageToken) : null;
   // one UID per confirmation, so downloading twice updates the same calendar entry
   const [uid] = useState(() => crypto.randomUUID());
   useEffect(() => ref.current?.focus(), []);
@@ -146,7 +163,7 @@ function Booked({ confirmation, business, startsAt, timeZone }: { confirmation: 
       <span aria-hidden="true" className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-accent text-on-accent">
         <CheckIcon className="size-6" />
       </span>
-      <p className="text-lead font-semibold">הפגישה נקבעה</p>
+      <p className="text-lead font-semibold">{heading}</p>
       <p className="mt-2 text-md">{when}</p>
       {confirmation ? (
         <p className="mt-1 text-md text-ink-soft">
@@ -161,7 +178,18 @@ function Booked({ confirmation, business, startsAt, timeZone }: { confirmation: 
           הוספה ליומן
         </Button>
       ) : null}
-      <p className="mt-3 text-sm text-ink-soft">כדאי לשמור את הפרטים. לשינוי או לביטול, פנו לעסק.</p>
+      {manageHref ? (
+        <div className="mt-4 space-y-1 rounded-md border border-line p-3 text-sm">
+          <p className="font-medium">קישור אישי לביטול או לשינוי</p>
+          <a href={manageHref} dir="ltr" className="block break-all text-accent underline underline-offset-4">
+            {origin}
+            {manageHref}
+          </a>
+          <p className="text-ink-soft">כדאי לשמור אותו: הוא מוצג רק עכשיו.</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-ink-soft">כדאי לשמור את הפרטים. לשינוי או לביטול, פנו לעסק.</p>
+      )}
     </div>
   );
 }

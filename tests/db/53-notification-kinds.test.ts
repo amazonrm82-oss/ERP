@@ -7,7 +7,7 @@ type U = { id: string; email: string };
 
 const ALL_KINDS = [
   "assigned", "task_reminder", "inquiry", "automation", "lead_new", "mention", "follow",
-  "meeting_scheduled", "meeting_reminder", "automation_failed", "quote", "payment", "response_overdue",
+  "meeting_scheduled", "meeting_reminder", "meeting_cancelled", "automation_failed", "quote", "payment", "response_overdue",
 ];
 
 /** USR-06: the full list of notification kinds, meeting_scheduled and automation_failed. */

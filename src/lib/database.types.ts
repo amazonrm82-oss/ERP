@@ -414,6 +414,8 @@ export type BookingPageRow = {
   slot_step_minutes: number;
   questions: Json;
   is_active: boolean;
+  // CAL-10b: up to how many hours before the start the customer may cancel or change online (0..72)
+  cancel_notice_hours: number;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -432,6 +434,7 @@ export type BookingPageInsert = {
   slot_step_minutes?: number;
   questions?: Json;
   is_active?: boolean;
+  cancel_notice_hours?: number;
 };
 
 export type MeetingParticipantRow = {
@@ -2241,6 +2244,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      // CAL-10b: the customer's personal link (cancel or change); all service_role only
+      booking_manage_public: { Args: { p_token: string; p_from?: string | null; p_ip_hash?: string | null }; Returns: Json };
+      booking_manage_cancel: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      booking_manage_change: { Args: { p_token: string; p_starts_at: string; p_ip_hash?: string | null }; Returns: Json };
       // GAP-01: a test notification to the caller; { ok: true } | { ok: false, reason: "rate", retry_seconds }
       send_test_notification: { Args: { p_org: string }; Returns: Json };
       // SPD-01: "I took it": { ok: true, result: 'taken' | 'acknowledged' } | { ok: false, reason: 'taken', owner_name } | { ok: false, reason: 'closed' }
