@@ -25,6 +25,7 @@ import type { StageColor } from "@/features/deals/stage-colors";
 import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
+import { BlockEditor } from "./block-time";
 import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
 import type { MemberOption } from "@/features/meetings/components/meeting-form";
 import { meetingFormTimes } from "@/features/meetings/display";
@@ -70,6 +71,8 @@ export type CalendarEntry = TimedItem & {
   related: { href: string; label: string } | null;
   // CAL-04: the shown people it belongs to (side-by-side view)
   people: string[];
+  // GAP-07: blocked time
+  block: boolean;
 };
 
 type Props = {
@@ -164,6 +167,8 @@ const MEETING_TONE: Record<StageColor, string> = {
 };
 
 function itemClasses(item: CalendarEntry): string {
+  // GAP-07: blocked time is drawn as a dashed, quiet box (its label says what it is, never colour alone)
+  if (item.block) return cn("border border-dashed border-line-strong bg-canvas text-ink-soft", item.closed && "line-through");
   if (item.kind === "meeting") {
     return item.closed ? "border-s-4 border-line-strong bg-canvas text-ink-soft" : MEETING_TONE[item.tone ?? "accent"];
   }
@@ -452,6 +457,10 @@ export function CalendarBoard({ orgId, view, focusDay, days, today, items, timeZ
             onChanged={(change, message) => {
               setOpenId(null);
               setStatus(message ? { tone: "error", text: message } : { tone: "ok", text: CHANGE_TEXT[change] });
+            }}
+            onBlockChanged={(text) => {
+              setOpenId(null);
+              setStatus({ tone: "ok", text });
             }}
           />
         ) : null}
@@ -841,6 +850,7 @@ function ItemDetails({
   meetingTypes,
   onMove,
   onChanged,
+  onBlockChanged,
 }: {
   orgId: string;
   item: CalendarEntry;
@@ -850,6 +860,7 @@ function ItemDetails({
   meetingTypes: MeetingTypeChoice[];
   onMove: (date: string, time: string) => void;
   onChanged: (change: MeetingChange, message?: string) => void;
+  onBlockChanged: (message: string) => void;
 }) {
   const start = new Date(item.startsAt);
   const [date, setDate] = useState(zoneDate(start, timeZone));
@@ -859,7 +870,8 @@ function ItemDetails({
   const [details, setDetails] = useState<{ meeting: MeetingDetails } | { error: string } | null>(null);
 
   useEffect(() => {
-    if (item.kind !== "meeting") return;
+    // GAP-07: a block shows what the calendar already has
+    if (item.kind !== "meeting" || item.block) return;
     let live = true;
     meetingDetailsAction(orgId, item.id).then(
       (result) => {
@@ -872,7 +884,7 @@ function ItemDetails({
     return () => {
       live = false;
     };
-  }, [orgId, item.id, item.kind]);
+  }, [orgId, item.id, item.kind, item.block]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -929,7 +941,7 @@ function ItemDetails({
           </>
         ) : null}
       </dl>
-      {item.kind === "meeting" ? (
+      {item.kind === "meeting" && !item.block ? (
         details === null ? (
           <p role="status" className="text-sm text-ink-soft">
             טוענים את פרטי הפגישה…
@@ -990,6 +1002,20 @@ function ItemDetails({
         />
       ) : null}
       {meeting ? <InviteFileLink orgId={orgId} meetingId={meeting.id} title={meeting.title} /> : null}
+      {item.block && canMove && item.endsAt ? (
+        <BlockEditor
+          orgId={orgId}
+          blockId={item.id}
+          timeZone={timeZone}
+          initial={{
+            title: item.title,
+            date: zoneDate(start, timeZone),
+            start_time: zoneTime(start, timeZone),
+            end_time: zoneTime(new Date(item.endsAt), timeZone),
+          }}
+          onDone={onBlockChanged}
+        />
+      ) : null}
       {canMove ? (
         <form onSubmit={submit} noValidate className="space-y-3 border-t border-line pt-4">
           <h3 className="text-md font-semibold">העברה למועד אחר</h3>

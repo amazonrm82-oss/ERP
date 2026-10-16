@@ -69,7 +69,8 @@ export type MyMeeting = Pick<CalendarItem, "id" | "title" | "startsAt" | "status
 export function myMeetings(items: CalendarItem[], now: Date): MyMeeting[] {
   const at = now.getTime();
   return items
-    .filter((item): item is CalendarItem & { endsAt: string } => item.kind === "meeting" && item.endsAt !== null)
+    // GAP-07: blocked time is not a meeting to attend
+    .filter((item): item is CalendarItem & { endsAt: string } => item.kind === "meeting" && !item.block && item.endsAt !== null)
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id.localeCompare(b.id))
     .map((item) => ({
       id: item.id,

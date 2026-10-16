@@ -46,7 +46,7 @@ export async function listTomorrowMeetings(
   // a meeting that only runs into tomorrow started earlier: it is not tomorrow's
   const items = calendar.items.filter(
     (item): item is CalendarItem & { endsAt: string } =>
-      item.kind === "meeting" && item.endsAt !== null && Date.parse(item.startsAt) >= Date.parse(bounds.from),
+      item.kind === "meeting" && !item.block && item.endsAt !== null && Date.parse(item.startsAt) >= Date.parse(bounds.from),
   );
   const templateId = reminderTemplateId(templates);
   if (items.length === 0) return { meetings: [], truncated: calendar.truncated, templateId };

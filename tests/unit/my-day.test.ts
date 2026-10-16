@@ -47,9 +47,20 @@ describe("deals without a next action (TASK-09)", () => {
   });
 });
 
-function item(id: string, kind: "meeting" | "task", startsAt: string, endsAt: string | null): CalendarItem {
-  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", meetingTypeId: null, location: null, ownerName: null, related: null, people: [] };
+function item(id: string, kind: "meeting" | "task", startsAt: string, endsAt: string | null, block = false): CalendarItem {
+  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", meetingTypeId: null, location: null, ownerName: null, related: null, people: [], block };
 }
+
+describe("today's meetings leave blocked time out (GAP-07)", () => {
+  it("a block is not a meeting to attend", () => {
+    const now = new Date("2026-10-13T09:30:00Z");
+    const result = myMeetings(
+      [item("block", "meeting", "2026-10-13T12:00:00Z", "2026-10-13T13:00:00Z", true), item("real", "meeting", "2026-10-13T14:00:00Z", "2026-10-13T15:00:00Z")],
+      now,
+    );
+    expect(result.map((m) => m.id)).toEqual(["real"]);
+  });
+});
 
 describe("today's meetings (TASK-09)", () => {
   const now = new Date("2026-10-13T09:30:00Z"); // 12:30 in Israel

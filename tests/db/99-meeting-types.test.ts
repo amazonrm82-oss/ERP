@@ -300,7 +300,9 @@ describe("meeting types (CAL-08)", () => {
         await q<{ def: string }>(
           `select pg_get_constraintdef(c.oid) as def from pg_constraint c
             where c.conrelid in ('public.meeting_types'::regclass, 'public.meetings'::regclass) and c.contype = 'c'
-              and pg_get_constraintdef(c.oid) like '%buffer_%_minutes%'`,
+              and pg_get_constraintdef(c.oid) like '%buffer_%_minutes%'
+              -- GAP-07: a block's shape pins its buffers to 0; it sets no limit
+              and c.conname <> 'meetings_block_shape'`,
         )
       ).rows,
     );

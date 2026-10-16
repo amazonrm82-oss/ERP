@@ -7,6 +7,7 @@ import { Checkbox, SelectField } from "@/components/ui/field";
 import { BackIcon, ChatIcon, ForwardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
+import { BlockTimeButton } from "@/features/calendar/components/block-time";
 import { CalendarBoard, type CalendarEntry } from "@/features/calendar/components/calendar-board";
 import { CalendarDoneToggle } from "@/features/calendar/components/done-toggle";
 import { CALENDAR_LIMIT, listCalendarItems, listCalendarTeams, type CalendarItem } from "@/features/calendar/queries";
@@ -55,6 +56,27 @@ function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<stri
   const meeting = item.kind === "meeting";
   // CAL-08: a deleted type is gone (the link was cleared); a hidden one still shows
   const meetingType = meeting && item.meetingTypeId ? (meetingTypes.get(item.meetingTypeId) ?? null) : null;
+  // GAP-07: blocked time
+  if (item.block) {
+    return {
+      id: item.id,
+      kind: item.kind,
+      startsAt: item.startsAt,
+      endsAt: item.endsAt,
+      title: item.title,
+      kindLabel: "זמן חסום",
+      typeLabel: "זמן חסום",
+      statusLabel: MEETING_STATUS_LABEL[item.status] ?? item.status,
+      meetingTypeName: null,
+      tone: null,
+      closed: item.status === "cancelled",
+      ownerName: item.ownerName,
+      location: null,
+      related: null,
+      people: item.people,
+      block: true,
+    };
+  }
   return {
     id: item.id,
     kind: item.kind,
@@ -71,6 +93,7 @@ function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<stri
     location: item.location,
     related: item.related ? { href: recordPage(item.related.type, orgId, item.related.id), label: RELATED_LABEL[item.related.type] } : null,
     people: item.people,
+    block: false,
   };
 }
 
@@ -150,6 +173,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
           <>
             {/* GAP-11: the shown days as a plain list on paper */}
             <PrintButton />
+            {context.canWrite ? <BlockTimeButton orgId={orgId} today={today} timeZone={timeZone} /> : null}
             <Link href={tomorrowPath(orgId)} className={buttonClasses("secondary", "md", "print:hidden")}>
               <ChatIcon className="size-5 text-accent" />
               תזכורות למחר

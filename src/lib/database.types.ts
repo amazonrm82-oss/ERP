@@ -328,6 +328,8 @@ export type MeetingRow = {
   // CAL-10: free time before and after, copied from the type when booked (0..240); what conflicts check
   buffer_before_minutes: number;
   buffer_after_minutes: number;
+  // GAP-07: blocked time (set on insert only): no record, type, series, reminder or buffers; planned or cancelled only
+  is_block: boolean;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -357,9 +359,10 @@ export type MeetingInsert = {
   // absent or null: the type's (trigger meetings_buffers)
   buffer_before_minutes?: number | null;
   buffer_after_minutes?: number | null;
+  is_block?: boolean;
 };
 
-export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id" | "series_id" | "series_index">>;
+export type MeetingUpdate = Partial<Omit<MeetingInsert, "organization_id" | "series_id" | "series_index" | "is_block">>;
 
 // CAL-08: the kinds of meeting a business holds (migration meeting_types)
 export type MeetingTypeRow = {

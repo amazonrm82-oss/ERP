@@ -23,6 +23,8 @@ export type CalendarItem = TimedItem & {
   related: { type: Extract<RecordType, "lead" | "contact" | "company" | "deal">; id: string } | null;
   // which of the asked-for people it belongs to (organizer, participant or task owner); empty for "everyone"
   people: string[];
+  // GAP-07: blocked time (a meeting row with is_block); false for tasks
+  block: boolean;
 };
 
 // "everyone I can see" over a month of a busy organization: past this, the screen says so
@@ -72,7 +74,7 @@ export async function listCalendarItems(
 
   let meetingQuery = supabase
     .from("meetings")
-    .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id")
+    .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id, is_block")
     .eq("organization_id", orgId)
     .lt("starts_at", range.to)
     .gt("ends_at", range.from);
@@ -126,6 +128,7 @@ export async function listCalendarItems(
       ownerName: m.owner_id ? (names.get(m.owner_id) ?? null) : null,
       related: relatedOf(m),
       people: ordered(meetingPeople.get(m.id)),
+      block: m.is_block,
     })),
     ...tasks
       .filter((t): t is typeof t & { due_at: string } => t.due_at !== null)
@@ -142,6 +145,7 @@ export async function listCalendarItems(
         ownerName: t.owner_id ? (names.get(t.owner_id) ?? null) : null,
         related: relatedOf(t),
         people: people && t.owner_id && people.includes(t.owner_id) ? [t.owner_id] : [],
+        block: false,
       })),
   ];
   items.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id.localeCompare(b.id));

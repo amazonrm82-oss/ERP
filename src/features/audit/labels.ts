@@ -249,6 +249,8 @@ export const FIELD_LABELS: Record<string, string> = {
   meeting_format: "אופן הפגישה",
   buffer_before_minutes: "מרווח לפני (דקות)",
   buffer_after_minutes: "מרווח אחרי (דקות)",
+  // GAP-07
+  is_block: "זמן חסום",
   starts_at: "התחלה",
   ends_at: "סיום",
   location: "מיקום",
