@@ -291,7 +291,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020050) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020090) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -668,7 +668,15 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   in the bin) and a readable company, and update/delete repeat the company check. At most 50 per contact (hint `contact_company:max`,
   definer count `app.contact_company_count` after the outsider guard). Audited as a `company_link` change of the contact. Merge
   copies links through the `merged` timeline entry (`app.merge_contact_companies`, until `merge_move_links` takes it over).
-  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020070.
+  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020090 (CON-06).
+- Contact relations (CON-06, migration 020090; owner 15 October 2026: core, every plan): `public.contact_relation_types` (managed
+  list, 20 per org, server-only `key` spouse|family|parent|referral on the seeded defaults; a type in use is hidden, not deleted:
+  FK with no action) and `public.contact_relations` (first side a contact or a lead, exactly one; a lead only as the referrer of
+  the `referral` type; second side a contact). Select needs both sides readable; insert/delete need one editable side, both live,
+  writable org. Same type and pair once in either direction (`contact_relation:exists`), 50 per contact. Audited on both sides with
+  the side's phrase, never a name. Conversion moves a lead's referrals to its contact (`leads_convert_relations`); merges carry them
+  through the `merged` entry. `public.report_referrals` (invoker) counts only deals won after the referral; `public.log_export`
+  was last redefined in 020090.
 - Contact preferences (CON-10, migration 0183): `contacts.preferred_locale` (he|ar|en|ru|am|fr|es) and `preferred_channel`
   (phone|whatsapp|email|sms), nullable, checked by constraints and mirrored by `src/features/contacts/preferences.ts` (unit test
   reads the migration); column grants. Display only: the preferred channel's button comes first on the contact page.
