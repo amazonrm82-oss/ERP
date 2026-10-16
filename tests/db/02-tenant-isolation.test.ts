@@ -175,6 +175,9 @@ describe("tenant isolation", () => {
         [orgA, ids.dealA, ids.productA],
       );
       await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
+      // QUO-01: a draft quote on the deal, with a line
+      ids.quoteA = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה של א', $2) returning id", [orgA, ids.dealA])).rows[0].id;
+      await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.quoteA]);
       await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02')", [orgA, a.id]);
       await q(`insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'lead', '[{"title": "קשר", "columns": 2, "fields": ["phone", "email"]}]')`, [orgA]);
       // LEAD-05
@@ -270,6 +273,9 @@ describe("tenant isolation", () => {
     "price_list_lines",
     // DLI-01
     "deal_lines",
+    // QUO-01
+    "quotes",
+    "quote_lines",
     // DQL-01, seeded for every new organization
     "completeness_settings",
     // CAP-09
@@ -425,6 +431,8 @@ describe("tenant isolation", () => {
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
       deal_lines: "quantity = quantity",
+      quotes: "title = title",
+      quote_lines: "name = name",
       completeness_settings: "fields = fields",
       member_leaves: "ends_on = ends_on",
       conversion_field_maps: "target_field_id = target_field_id",
@@ -531,6 +539,8 @@ describe("tenant isolation", () => {
       ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
       ["insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgA, ids.dealA]],
       ["insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgA, ids.dealA, ids.productA]],
+      ["insert into public.quotes (organization_id, title, deal_id) values ($1, 'x', $2)", [orgA, ids.dealA]],
+      ["insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgA, ids.quoteA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
@@ -618,6 +628,8 @@ describe("tenant isolation", () => {
       ["price_lists", "is_active = false", "not is_active"],
       ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
       ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
+      ["quotes", "title = 'HACKED'", "title = 'HACKED'"],
+      ["quote_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
       ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
@@ -828,6 +840,22 @@ describe("tenant isolation", () => {
       ),
     );
     expect(viaLineList.code).toBe("23503");
+    // QUO-01: a quote in B's organization cannot point at A's deal, contact or company; a line not at A's quote or product
+    for (const [col, id] of [["deal_id", ids.dealA], ["contact_id", ids.contactA], ["company_id", ids.companyA]] as const) {
+      const viaQuote = await pgError(
+        asUser(b.id, (q) => q(`insert into public.quotes (organization_id, title, deal_id, ${col === "deal_id" ? "contact_id" : col}) values ($1, 'x', $2, $3)`, [orgB, col === "deal_id" ? id : dealB, col === "deal_id" ? null : id])),
+      );
+      expect(["42501", "23503", "P0001"], col).toContain(viaQuote.code);
+    }
+    const quoteB = await asUser(b.id, async (q) =>
+      (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה של ב', $2) returning id", [orgB, dealB])).rows[0].id,
+    );
+    const viaQuoteLine = await pgError(asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgB, ids.quoteA])));
+    expect(["42501", "23503"]).toContain(viaQuoteLine.code);
+    const viaQuoteProduct = await pgError(
+      asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, product_id, name, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, quoteB, ids.productA])),
+    );
+    expect(viaQuoteProduct.code).toBe("23503");
 
     // sanity: the same inserts work with org B's own ids
     await asUser(b.id, (q) =>

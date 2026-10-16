@@ -244,6 +244,30 @@ describe("roles and record visibility", () => {
     expect(await asUser(owner.id, async (q) => (await q("update public.product_costs set cost_agorot = 450 where product_id = $1", [product])).rowCount)).toBe(1);
   });
 
+  it("quotes follow their deal: its editors write, readers only read, a viewer never writes (QUO-01)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה להצעה', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const quote = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה', $2) returning id", [org, deal])).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.quotes where id = $1", [quote]));
+    const edits = (u: U) => asUser(u.id, async (q) => (await q("update public.quotes set notes = 'x' where id = $1", [quote])).rowCount);
+    for (const u of [owner, admin, m1]) {
+      expect(await seen(u), u.email).toBe(1);
+      expect(await edits(u), u.email).toBe(1);
+    }
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(1);
+      expect(await edits(u), u.email).toBe(0);
+    }
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

@@ -33,6 +33,7 @@ import { leadDisplayName, statusTone } from "@/features/leads/display";
 import { getLead, getLeadLookups } from "@/features/leads/queries";
 import { getRequestedProduct, requestedProductEnabled } from "@/features/requested-product/queries";
 import { utmValues } from "@/features/leads/schema";
+import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext, getUserNames } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
@@ -82,11 +83,13 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
   // LEAD-04: the requested product, and whether the plan has the product catalog
-  const [tags, owners, productsEnabled, requestedProduct] = await Promise.all([
+  const [tags, owners, productsEnabled, requestedProduct, hasQuotes] = await Promise.all([
     listTags(orgId),
     getUserNames([lead.owner_id]),
     requestedProductEnabled(orgId),
     getRequestedProduct(orgId, lead.requested_product_id),
+    // QUO-01
+    orgHasFeature(orgId, "quotes"),
   ]);
 
   const name = leadDisplayName({ fullName: lead.full_name, email: lead.email, phone: lead.phone });
@@ -185,6 +188,12 @@ export default async function LeadPage({ params, searchParams }: Props) {
                   reasons={reasons}
                 />
                 <div className="border-t border-line pt-5">
+                  {/* QUO-01: a quote is made from a contact or a deal; a lead is converted first */}
+                  {hasQuotes ? (
+                    <p className="mb-3 text-sm text-ink-soft">
+                      רוצים לשלוח הצעת מחיר? קודם ממירים את הליד לאיש קשר ועסקה, ואז יוצרים את ההצעה מהעסקה.
+                    </p>
+                  ) : null}
                   <ConvertLeadPanel
                     orgId={orgId}
                     leadId={lead.id}

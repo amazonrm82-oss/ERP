@@ -66,6 +66,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   price_list_lines: "מחיר במחירון",
   // DLI-01
   deal_lines: "שורת מוצר בעסקה",
+  // QUO-01, QUO-02
+  quotes: "הצעת מחיר",
+  quote_lines: "שורה בהצעת מחיר",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08

@@ -445,6 +445,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // CON-06 redefines app.sample_untouched() last (a relation keeps a sample contact), and with it
       // app.import_record_worked() and public.log_export(), whose latest bodies no file above puts back
       "_contact_relations.sql",
+      // QUO-01 redefines app.sample_untouched(), app.import_record_worked() and app.merge_move_links() last
+      "_quotes.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

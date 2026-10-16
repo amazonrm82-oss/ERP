@@ -53,6 +53,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
+import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 
@@ -100,12 +101,14 @@ export default async function DealPage({ params, searchParams }: Props) {
     context.user.id,
   );
   // DEAL-11: the deal this one continues and its follow-ups; the pipelines for a new deal (writers only)
-  const [links, pipelines, lines, hasProducts, hasDiscounts] = await Promise.all([
+  const [links, pipelines, lines, hasProducts, hasDiscounts, hasQuotes] = await Promise.all([
     getDealLinks(orgId, deal.id, deal.previous_deal_id),
     context.canWrite ? listPipelines(orgId) : Promise.resolve(null),
     listDealLines(orgId, deal.id),
     orgHasFeature(orgId, "products"),
     orgHasFeature(orgId, "discounts"),
+    // QUO-01
+    orgHasFeature(orgId, "quotes"),
   ]);
   // DLI-01, PL-03: the day, the VAT and the customer's price list the lines are priced by
   const linesPricing = await getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone);
@@ -189,6 +192,8 @@ export default async function DealPage({ params, searchParams }: Props) {
             canCreateProducts={hasProducts && context.canWrite && canEditCatalog(context.role, granted)}
             costs={lineCosts}
           />
+          {/* QUO-01: the deal's quotes, and a new one for whoever may edit the deal */}
+          <RecordQuotesCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={hasQuotes && canEdit} />
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />

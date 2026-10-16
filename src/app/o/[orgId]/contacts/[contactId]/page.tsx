@@ -52,6 +52,8 @@ import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { BillingCard } from "@/features/billing/components/billing-card";
 import { getRecordBilling } from "@/features/billing/queries";
+import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
+import { orgHasFeature } from "@/features/settings/queries";
 
 export const metadata: Metadata = { title: "איש קשר" };
 
@@ -91,7 +93,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, contact.owner_id);
-  const [companies, types, domainLink, companyLinks, relationTypes, people] = await Promise.all([
+  const [companies, types, domainLink, companyLinks, relationTypes, people, hasQuotes] = await Promise.all([
     canEdit ? listCompanyOptions(orgId) : [],
     canEdit ? listRecordTypes(orgId, "contact") : [],
     // CON-09: a company linked by the email domain, or the companies to pick from
@@ -101,6 +103,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
     // CON-06: the business's relation types, and the people to relate to
     listRelationTypes(orgId),
     canEdit ? listContactOptions(orgId) : [],
+    // QUO-01
+    orgHasFeature(orgId, "quotes"),
   ]);
   const relations = await listContactRelations(orgId, contact.id, relationTypes);
   const name = contactDisplayName({ fullName: contact.full_name, email: contact.email, phone: contact.phone });
@@ -217,6 +221,9 @@ export default async function ContactPage({ params, searchParams }: Props) {
               canLift={isAdminRole(context.role)}
             />
           </div>
+
+          {/* QUO-01: the contact's quotes, and a new one for whoever may edit the contact */}
+          <RecordQuotesCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} canCreate={hasQuotes && canEdit} />
 
           <RelatedDealsCard
             orgId={orgId}

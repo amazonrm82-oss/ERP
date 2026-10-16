@@ -1342,6 +1342,99 @@ export type PriceListLineRow = {
   updated_at: string;
 };
 
+// QUO-01, QUO-02: a quote made from a deal or a contact (migration quotes). status is server-only (draft until
+// QUO-07 sends it); quote_date, owner_id, vat_rate_bp and every *_agorot total are set by trigger quotes_check.
+export type QuoteRow = {
+  id: string;
+  organization_id: string;
+  title: string;
+  status: string;
+  deal_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  owner_id: string | null;
+  quote_date: string;
+  valid_until: string | null;
+  prices_include_vat: boolean;
+  no_vat_reason: string | null;
+  no_vat_note: string | null;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  notes: string | null;
+  terms: string | null;
+  vat_rate_bp: number | null;
+  subtotal_agorot: number;
+  discount_total_agorot: number;
+  net_total_agorot: number;
+  vat_agorot: number;
+  total_agorot: number;
+  currency: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// QUO-02: a line of a quote (migration quotes). kind item | group; unit_name, total_agorot and a product line's
+// vat_exempt and billing are set by trigger quote_lines_check.
+export type QuoteLineRow = {
+  id: string;
+  organization_id: string;
+  quote_id: string;
+  position: number;
+  kind: string;
+  product_id: string | null;
+  name: string;
+  description: string | null;
+  unit_name: string | null;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  vat_exempt: boolean;
+  billing: string;
+  is_optional: boolean;
+  optional_selected: boolean;
+  price_source: string;
+  price_list_id: string | null;
+  price_list_name: string | null;
+  total_agorot: number;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type QuoteWrite = {
+  title?: string;
+  contact_id?: string | null;
+  company_id?: string | null;
+  valid_until?: string | null;
+  prices_include_vat?: boolean;
+  no_vat_reason?: string | null;
+  no_vat_note?: string | null;
+  discount_bp?: number | null;
+  discount_agorot?: number | null;
+  notes?: string | null;
+  terms?: string | null;
+  currency?: string;
+};
+
+type QuoteLineWrite = {
+  position?: number;
+  name?: string;
+  description?: string | null;
+  quantity?: number;
+  unit_price_agorot?: number;
+  discount_bp?: number | null;
+  discount_agorot?: number | null;
+  vat_exempt?: boolean;
+  billing?: string;
+  is_optional?: boolean;
+  optional_selected?: boolean;
+  price_source?: string;
+  price_list_id?: string | null;
+  currency?: string;
+};
+
 // DLI-01: a product line on a deal (migration deal_lines). total_agorot, price_includes_vat (one mode per deal),
 // vat_exempt (a product line's; a free line's is the person's) and price_list_name are set by trigger deal_lines_check; price_source is product | price_list | manual.
 export type DealLineRow = {
@@ -1968,6 +2061,14 @@ export type Database = {
         },
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
+      // QUO-01: column grants; the deal is fixed once inserted; status and the totals are the server's
+      quotes: Table<QuoteRow, QuoteWrite & { organization_id: string; title: string; deal_id?: string | null }, QuoteWrite>;
+      // QUO-02: column grants; the quote, the kind and the product are fixed once inserted
+      quote_lines: Table<
+        QuoteLineRow,
+        QuoteLineWrite & { organization_id: string; quote_id: string; name: string; kind?: string; product_id?: string | null },
+        QuoteLineWrite
+      >;
       // DLI-01: column grants; the deal and the product are fixed once inserted; price_includes_vat may be sent on
       // insert only (it must match the deal's mode); the totals and the copied names come from the server
       deal_lines: Table<
@@ -2314,6 +2415,8 @@ export type Database = {
       set_member_permissions: { Args: { p_org: string; p_user: string; p_permissions: string[] }; Returns: string[] };
       // PRM-01: the keys the caller holds (all for owners and admins)
       my_permissions: { Args: { p_org: string }; Returns: string[] };
+      // QUO-02: the lines of a quote in a new order (security invoker); the number moved
+      quote_lines_reorder: { Args: { p_org: string; p_quote: string; p_ids: string[] }; Returns: number };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };

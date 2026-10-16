@@ -1,0 +1,234 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { customerPriceList } from "@/features/deal-lines/queries";
+import { conversionRateBp, isDealLineSource, type DealLineSource, type NamedPriceList } from "@/features/deal-lines/pricing";
+import { isBilling } from "@/features/deal-lines/recurring";
+import type { Billing } from "@/features/products/schema";
+import { chargesVat, isVatStatus } from "@/features/tax/status";
+import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
+import type { Database } from "@/lib/database.types";
+import { must } from "@/lib/db-read";
+import { createClient } from "@/lib/supabase/server";
+
+import { isNoVatReason, isQuoteStatus, type NoVatReason, type QuoteStatus } from "./schema";
+
+type Client = SupabaseClient<Database>;
+
+export type Quote = {
+  id: string;
+  title: string;
+  status: QuoteStatus;
+  dealId: string | null;
+  contactId: string | null;
+  companyId: string | null;
+  ownerId: string | null;
+  quoteDate: string;
+  validUntil: string | null;
+  pricesIncludeVat: boolean;
+  noVatReason: NoVatReason | null;
+  noVatNote: string | null;
+  discountBp: number | null;
+  discountAgorot: number | null;
+  notes: string | null;
+  terms: string | null;
+  vatRateBp: number | null;
+  subtotalAgorot: number;
+  discountTotalAgorot: number;
+  netTotalAgorot: number;
+  vatAgorot: number;
+  totalAgorot: number;
+  createdAt: string;
+};
+
+export type QuoteLine = {
+  id: string;
+  position: number;
+  kind: "item" | "group";
+  productId: string | null;
+  name: string;
+  description: string | null;
+  unitName: string | null;
+  quantity: number;
+  unitPriceAgorot: number;
+  discountBp: number | null;
+  discountAgorot: number | null;
+  vatExempt: boolean;
+  billing: Billing;
+  isOptional: boolean;
+  optionalSelected: boolean;
+  source: DealLineSource;
+  priceListId: string | null;
+  priceListName: string | null;
+  totalAgorot: number;
+};
+
+const QUOTE_COLUMNS =
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at";
+
+type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
+type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
+
+function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
+  return {
+    id: row.id,
+    title: row.title,
+    // the check constraints hold these to the lists in schema.ts
+    status: isQuoteStatus(row.status) ? row.status : "draft",
+    dealId: row.deal_id,
+    contactId: row.contact_id,
+    companyId: row.company_id,
+    ownerId: row.owner_id,
+    quoteDate: row.quote_date,
+    validUntil: row.valid_until,
+    pricesIncludeVat: row.prices_include_vat,
+    noVatReason: isNoVatReason(row.no_vat_reason) ? row.no_vat_reason : null,
+    noVatNote: row.no_vat_note,
+    discountBp: row.discount_bp,
+    discountAgorot: row.discount_agorot === null ? null : Number(row.discount_agorot),
+    notes: row.notes,
+    terms: row.terms,
+    vatRateBp: row.vat_rate_bp,
+    subtotalAgorot: Number(row.subtotal_agorot),
+    discountTotalAgorot: Number(row.discount_total_agorot),
+    netTotalAgorot: Number(row.net_total_agorot),
+    vatAgorot: Number(row.vat_agorot),
+    totalAgorot: Number(row.total_agorot),
+    createdAt: row.created_at,
+  };
+}
+
+const LINE_COLUMNS =
+  "id, position, kind, product_id, name, description, unit_name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, billing, is_optional, optional_selected, price_source, price_list_id, price_list_name, total_agorot";
+
+function toLine(row: Pick<LineDbRow, keyof LineDbRow>): QuoteLine {
+  return {
+    id: row.id,
+    position: row.position,
+    kind: row.kind === "group" ? "group" : "item",
+    productId: row.product_id,
+    name: row.name,
+    description: row.description,
+    unitName: row.unit_name,
+    quantity: Number(row.quantity),
+    unitPriceAgorot: Number(row.unit_price_agorot),
+    discountBp: row.discount_bp,
+    discountAgorot: row.discount_agorot === null ? null : Number(row.discount_agorot),
+    vatExempt: row.vat_exempt,
+    billing: isBilling(row.billing) ? row.billing : "one_time",
+    isOptional: row.is_optional,
+    optionalSelected: row.optional_selected,
+    source: isDealLineSource(row.price_source) ? row.price_source : "manual",
+    priceListId: row.price_list_id,
+    priceListName: row.price_list_name,
+    totalAgorot: Number(row.total_agorot),
+  };
+}
+
+/** One quote the caller reads, or null. */
+export async function readQuote(supabase: Client, orgId: string, quoteId: string): Promise<Quote | null> {
+  const row = must(await supabase.from("quotes").select(QUOTE_COLUMNS).eq("organization_id", orgId).eq("id", quoteId).maybeSingle(), "quote");
+  return row ? toQuote(row as QuoteDbRow) : null;
+}
+
+export async function getQuote(orgId: string, quoteId: string): Promise<Quote | null> {
+  return readQuote(await createClient(), orgId, quoteId);
+}
+
+/** The lines of a quote in order (at most 200, app.quote_lines_check). */
+export async function readQuoteLines(supabase: Client, orgId: string, quoteId: string): Promise<QuoteLine[]> {
+  const rows = must(
+    await supabase.from("quote_lines").select(LINE_COLUMNS).eq("organization_id", orgId).eq("quote_id", quoteId).order("position").order("created_at").order("id"),
+    "quote lines",
+  );
+  return rows.map((row) => toLine(row as LineDbRow));
+}
+
+export async function listQuoteLines(orgId: string, quoteId: string): Promise<QuoteLine[]> {
+  return readQuoteLines(await createClient(), orgId, quoteId);
+}
+
+export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt">;
+
+/** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). */
+export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | "contact"; id: string }): Promise<QuoteSummary[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("quotes")
+      .select("id, title, status, quote_date, valid_until, total_agorot, created_at")
+      .eq("organization_id", orgId)
+      .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .limit(50),
+    "quotes",
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    status: isQuoteStatus(row.status) ? row.status : "draft",
+    quoteDate: row.quote_date,
+    validUntil: row.valid_until,
+    totalAgorot: Number(row.total_agorot),
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * What the prices of a quote's lines depend on: its day, the VAT of that day (none with a no-VAT
+ * reason), the rate that carries a product's price between the modes (the business's real rate, so a
+ * price typed including VAT becomes its net on a no-VAT quote), the quote's mode, and the customer's
+ * price list (PL-03 order: the contact's own list, its company's, the quote's company's).
+ */
+export type QuotePricing = {
+  day: string;
+  vat: DocumentVat;
+  // the business's rate for the day: 0 = no VAT, null = status not set (before the quote's own reason)
+  businessRateBp: number | null;
+  rateBp: number;
+  includesVat: boolean;
+  list: Omit<NamedPriceList, "lines"> | null;
+};
+
+export async function readQuotePricing(supabase: Client, orgId: string, quote: Quote): Promise<QuotePricing> {
+  const day = quote.quoteDate;
+  const [settings, rateRows, list] = await Promise.all([
+    supabase.from("org_document_settings").select("vat_status, other_charges_vat").eq("organization_id", orgId).maybeSingle(),
+    supabase.from("vat_rates").select("effective_from, rate_bp").is("cancelled_at", null).order("effective_from"),
+    customerPriceList(supabase, orgId, { contactId: quote.contactId, companyId: quote.companyId }, day),
+  ]);
+  const row = must(settings, "org document settings");
+  const rates: VatRate[] = must(rateRows, "vat rates").map((r) => ({ effectiveFrom: r.effective_from, rateBp: r.rate_bp }));
+  const status = isVatStatus(row?.vat_status) ? row.vat_status : null;
+  const businessVat = documentVat(chargesVat(status, row?.other_charges_vat ?? null), rates, day);
+  const vat: DocumentVat = quote.noVatReason ? { kind: "none" } : businessVat;
+  return {
+    day,
+    vat,
+    businessRateBp: businessVat.kind === "rate" ? businessVat.rateBp : businessVat.kind === "none" ? 0 : null,
+    rateBp: conversionRateBp(businessVat, rates, day),
+    includesVat: quote.pricesIncludeVat,
+    list,
+  };
+}
+
+export async function getQuotePricing(orgId: string, quote: Quote): Promise<QuotePricing> {
+  return readQuotePricing(await createClient(), orgId, quote);
+}
+
+/** The names on the quote's customer side (read with the user's session; a hidden one is null). */
+export async function getQuoteParties(orgId: string, quote: Quote): Promise<{ deal: string | null; contact: string | null; company: string | null }> {
+  const supabase = await createClient();
+  const [deal, contact, company] = await Promise.all([
+    quote.dealId ? supabase.from("deals").select("name").eq("organization_id", orgId).eq("id", quote.dealId).maybeSingle() : null,
+    quote.contactId ? supabase.from("contacts").select("full_name").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle() : null,
+    quote.companyId ? supabase.from("companies").select("name").eq("organization_id", orgId).eq("id", quote.companyId).maybeSingle() : null,
+  ]);
+  return {
+    deal: deal ? (must(deal, "deal")?.name ?? null) : null,
+    contact: contact ? (must(contact, "contact")?.full_name ?? null) : null,
+    company: company ? (must(company, "company")?.name ?? null) : null,
+  };
+}

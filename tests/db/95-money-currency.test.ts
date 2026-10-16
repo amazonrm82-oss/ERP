@@ -129,6 +129,16 @@ describe("currency next to every amount", () => {
         const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם שורה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
         await q("insert into public.deal_lines (organization_id, deal_id, description, price_includes_vat, price_source, quantity, unit_price_agorot) values ($1, $2, 'שורה', false, 'manual', 1, 1000)", [org, deal]);
       },
+      // QUO-01, QUO-02
+      quotes: async (q) => {
+        const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם הצעה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
+        await q("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה לבדיקת מטבע', $2)", [org, deal]);
+      },
+      quote_lines: async (q) => {
+        const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם הצעה ושורה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
+        const quote = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה עם שורה', $2) returning id", [org, deal])).rows[0].id;
+        await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, quote]);
+      },
     };
     expect(tables.filter((table) => !(table in SAMPLE_ROWS)), "add a sample row for every table with a currency").toEqual([]);
     await asAdmin(async (q) => {
