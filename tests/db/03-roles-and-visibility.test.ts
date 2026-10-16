@@ -1612,3 +1612,34 @@ describe("segments by role", () => {
     }
   });
 });
+
+// BIZ-02: a business card is its rep's; owners and admins manage every card (the rest is in 142-business-cards)
+describe("business cards by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("bizrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "member2", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role === "member2" ? "member" : role, `bizrole-${role}`);
+    }
+  });
+
+  it("each writer makes their own card; only owners and admins make or see another's; a viewer has none", async () => {
+    const make = (who: string, forWhom: string) =>
+      asUser(people[who].id, (q) => q("insert into public.business_cards (organization_id, user_id) values ($1, $2)", [org, people[forWhom].id]));
+    for (const role of ["owner", "admin", "manager", "member"]) await make(role, role);
+    expect((await pgError(make("manager", "member2"))).code).toBe("42501");
+    expect((await pgError(make("member", "member2"))).code).toBe("42501");
+    expect((await pgError(make("viewer", "viewer"))).code).toBe("42501");
+    await make("admin", "member2");
+    const seen = (who: string) => asUser(people[who].id, (q) => count(q, "select 1 from public.business_cards where organization_id = $1", [org]));
+    expect(await seen("owner")).toBe(5);
+    expect(await seen("admin")).toBe(5);
+    expect(await seen("manager")).toBe(1);
+    expect(await seen("member")).toBe(1);
+    expect(await seen("viewer")).toBe(0);
+  });
+});

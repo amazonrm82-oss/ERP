@@ -439,6 +439,34 @@ export type SegmentMemberInsert = {
   contact_id?: string | null;
 };
 
+// BIZ-02: a rep's digital business card; token = its public link (/f/card/<token>); public_fields = what the card shows
+export type BusinessCardField = "job_title" | "about" | "phone" | "email" | "whatsapp" | "website";
+export type BusinessCardRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  token: string;
+  is_active: boolean;
+  job_title: string | null;
+  about: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  public_fields: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type BusinessCardWrite = {
+  is_active?: boolean;
+  job_title?: string | null;
+  about?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  public_fields?: string[];
+};
+
 export type BookingPageRow = {
   id: string;
   organization_id: string;
@@ -758,7 +786,8 @@ export type SavedViewRow = {
   updated_at: string;
 };
 
-export type FormKind = "form" | "webhook";
+// BIZ-02: "card" is the "leave details" form of a business card (not a web form; made by the card)
+export type FormKind = "form" | "webhook" | "card";
 export type AssignMode = "owner" | "round_robin";
 
 export type FormRow = {
@@ -794,6 +823,8 @@ export type FormRow = {
   channel_choice: boolean;
   // CAP-08: the hosted form asks the person's preferred language
   locale_choice: boolean;
+  // BIZ-02: the business card this form belongs to (kind 'card' only; made and changed by the card's triggers)
+  business_card_id: string | null;
 };
 
 export type FormSubmissionRow = {
@@ -2259,6 +2290,8 @@ export type Database = {
       booking_pages: Table<BookingPageRow, BookingPageInsert, Partial<Omit<BookingPageInsert, "organization_id">>>;
       segments: Table<SegmentRow, SegmentInsert, { name?: string; filter?: Json | null }>;
       segment_members: Table<SegmentMemberRow, SegmentMemberInsert, Record<string, never>>;
+      // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
+      business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant
@@ -2478,6 +2511,12 @@ export type Database = {
           p_user_agent?: string | null;
           p_is_spam?: boolean;
         };
+        Returns: Json;
+      };
+      // BIZ-02: the public business card and its "leave details" form; service_role only
+      business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      business_card_submit: {
+        Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
         Returns: Json;
       };
       // CAL-10b: the customer's personal link (cancel or change); all service_role only

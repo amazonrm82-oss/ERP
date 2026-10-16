@@ -219,6 +219,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "booking_page:type": "סוג הפגישה שנבחר כבר לא פעיל. בחרו סוג אחר.",
   "booking_page:user": "אפשר לקבוע תורים רק עם חבר צוות פעיל שאינו צופה.",
   "booking_page:questions": "יש בעיה בשאלות המקדימות: לכל שאלה צריך נוסח, עד 200 תווים.",
+  // BIZ-02 (migration business_cards)
+  "business_card:rep": "כרטיס ביקור שייך למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
+  "form:card": "הטופס של כרטיס ביקור משתנה רק דרך הכרטיס עצמו.",
   "booking_page:no_hours": "אי אפשר להפעיל את הדף: לא הוגדרו שעות עבודה לנציג או לעסק, ובלי שעות אין זמנים פנויים. הגדירו שעות עבודה, או שמרו את הדף כשהוא כבוי.",
   // CON-03 follow-up: the roles of a contact on a deal
   "deal_contact_roles:max": "אפשר לשמור עד 20 תפקידים. מחקו תפקיד שלא בשימוש כדי להוסיף חדש.",

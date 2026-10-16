@@ -36,6 +36,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   // CAL-10
   booking_pages: "דף קביעת תור",
   segments: "סגמנט",
+  business_cards: "כרטיס ביקור",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // GOL-01

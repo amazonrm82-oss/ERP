@@ -8,6 +8,8 @@ export type VCardPerson = {
   company?: string | null;
   jobTitle?: string | null;
   birthday?: string | null; // YYYY-MM-DD
+  // BIZ-02: a web site (http or https only)
+  url?: string | null;
   // CON-01: the type of the primary phone / email (mobile | work | home | other); a phone without one is CELL
   phoneType?: string | null;
   emailType?: string | null;
@@ -57,6 +59,7 @@ export function buildVCard(person: VCardPerson): string {
   if (person.company?.trim()) lines.push(`ORG:${escapeVCardText(person.company.trim())}`);
   if (person.jobTitle?.trim()) lines.push(`TITLE:${escapeVCardText(person.jobTitle.trim())}`);
   if (person.birthday && /^\d{4}-\d{2}-\d{2}$/.test(person.birthday)) lines.push(`BDAY:${person.birthday}`);
+  if (person.url && /^https?:\/\/\S+$/i.test(person.url.trim())) lines.push(`URL:${escapeVCardText(person.url.trim())}`);
   lines.push("END:VCARD");
   return `${lines.map(fold).join("\r\n")}\r\n`;
 }

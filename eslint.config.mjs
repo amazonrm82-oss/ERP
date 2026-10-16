@@ -54,6 +54,8 @@ const eslintConfig = defineConfig([
       "src/features/calendar-feed/feed-server.ts",
       // CAL-10: the public booking page, approved public secret-link pattern (owner, 8 October 2026)
       "src/features/booking/public-server.ts",
+      // BIZ-02: the public business card, approved public secret-link pattern (owner, 13 October 2026)
+      "src/features/business-cards/public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

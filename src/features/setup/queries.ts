@@ -60,7 +60,7 @@ export async function getSetupChecklist(orgId: string, userId: string): Promise<
   const [lead, deal, form, members, invitation, importJob, push] = await Promise.all([
     leads.limit(1),
     deals.limit(1),
-    supabase.from("forms").select("id").eq("organization_id", orgId).eq("is_active", true).limit(1),
+    supabase.from("forms").select("id").eq("organization_id", orgId).neq("kind", "card").eq("is_active", true).limit(1),
     supabase.from("memberships").select("user_id").eq("organization_id", orgId).neq("user_id", userId).limit(1),
     supabase.from("invitations").select("id").eq("organization_id", orgId).is("revoked_at", null).limit(1),
     supabase.from("import_jobs").select("id").eq("organization_id", orgId).eq("status", "done").limit(1),
