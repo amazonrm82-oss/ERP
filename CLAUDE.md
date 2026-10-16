@@ -94,6 +94,9 @@ and build this CRM here instead. The old code is preserved on the branch
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
    In use (BIZ-03 part one, owner 13 October 2026, migration 020295): the QR scan route (`src/features/qr-codes/scan-server.ts`, route
    `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>` or `/f/book/<token>`; in the eslint allow-list.
+   In use (SPD-07, owner 13 October 2026, migration 020305): the site widget (`src/features/site-widgets/public-server.ts`; script
+   `/f/w/<token>.js`, form page `/f/widget/<token>`, route `POST /api/forms/widget/<token>`), which calls only `public.site_widget_public()`
+   and `public.site_widget_submit()` (through `intake_submit`); no cookies or visitor id; in the eslint allow-list.
    In use (BIZ-02, owner 13 October 2026, migration 020235): the digital business card (`src/features/business-cards/public-server.ts`,
    page `/f/card/<token>`, routes `POST /api/forms/card/<token>` and `GET /api/forms/card/<token>/vcard`), which calls only
    `public.business_card_public()` and `public.business_card_submit()` (the form goes through `intake_submit`); in the eslint allow-list.
@@ -345,7 +348,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `src/features/calendar/blocks.ts`, `block-actions.ts`, `components/block-time.tsx`.
 - Business cards (BIZ-02, migration 020235): `public.business_cards` (one per rep, secret `token` server-only, public fields only); each card owns
   one form of kind `card` (`forms.business_card_id`, `forms_card_shape`, made by `app.business_cards_make_form`, locked by
-  `app.forms_card_lock`); `app.guard_form` was last redefined in 020235. Views limited per card and keyed IP hash
+  `app.forms_card_lock`); `app.guard_form` was last redefined in 020305 (SPD-07). Views limited per card and keyed IP hash
   (`app.business_card_view_counts`, `app.business_card_sender`); an inactive or deleted rep or card answers not found.
 - QR codes (BIZ-03 part one, migration 020295; flag `qr_codes`, quota `max_qr_codes` counting every code): `public.qr_codes` (a form of
   kind `form` or a booking page, composite FKs set null; server-made `token`; owners/admins of a writable org only, because a code
@@ -353,6 +356,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   (per code and day) and `app.qr_scan_windows` (60 counted per code per minute); `public.qr_scan` (service_role) answers only
   `{path, campaign}`; `public.qr_code_scans(org, days)` (owners/admins). Campaign tags only (utm_source=qr); Google review and card
   targets wait for the owner.
+- Site widget (SPD-07, migration 020305; flag `site_widget`, quota `max_site_widgets`): `public.site_widgets` (owners/admins of a writable
+  org; outsider guard first in `app.site_widgets_check`; lead owner an active non-viewer, hint `site_widget:owner`). Each widget owns a
+  form of kind `widget` (`forms.site_widget_id`, `forms_widget_shape`), made and kept in step by `app.site_widgets_sync_form`; a person
+  can neither create nor change one (`app.guard_form`, last redefined in 020305; `forms_widget_lock`). Widget forms are not web forms:
+  outside `max_forms`, `intake_form` and the forms lists. Views: 60 per sender in 10 minutes (`app.site_widget_view_counts`, buckets,
+  sender = `app.site_widget_sender(widget, keyed IP hash)`). The script is cached 5 minutes; a switched-off widget may show that long.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
