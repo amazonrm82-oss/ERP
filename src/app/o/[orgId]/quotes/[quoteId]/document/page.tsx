@@ -34,7 +34,7 @@ export default async function QuoteDocumentPage({ params }: Props) {
         <PageHeader title="תצוגה והדפסה" back={{ href: quotePath(orgId, quote.id), label: quote.title }} actions={<PrintButton label="הדפסה או שמירה כ-PDF" />} />
         {quote.status === "draft" ? <p className="text-sm text-ink-soft">זו טיוטה: היא מודפסת בלי מספר, ומספר רץ ניתן כשההצעה נשלחת.</p> : null}
       </div>
-      <QuoteDocument data={data} />
+      <QuoteDocument data={data} headingLevel={2} />
     </div>
   );
 }

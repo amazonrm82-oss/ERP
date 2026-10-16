@@ -131,6 +131,7 @@ function TermsLink({ slug, children }: { slug: string; children: string }) {
   return (
     <Link href={paths.legal(slug)} target="_blank" rel="noopener" className="text-accent-strong underline underline-offset-4">
       {children}
+      <span className="sr-only"> (נפתח בחלון חדש)</span>
     </Link>
   );
 }

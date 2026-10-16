@@ -120,7 +120,8 @@
 }
 
 html {
-  font-size: 16px;
+  /* FXA-09: in percent, so a reader's own browser font size is kept (100% = 16px by default) */
+  font-size: 100%;
   -webkit-text-size-adjust: 100%;
   /* Keep focused / scrolled-to elements clear of the sticky top bar... */
   scroll-padding-top: 4.5rem;

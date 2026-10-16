@@ -140,10 +140,12 @@ function BookingLink({ url, title }: { url: string; title: string }) {
         <a href={`https://wa.me/?text=${encodeURIComponent(`${title}\n${url}`)}`} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "sm")}>
           שליחה ב-WhatsApp
           <span className="sr-only">: {title}</span>
+          <span className="sr-only"> (נפתח בחלון חדש)</span>
         </a>
         <a href={url} target="_blank" rel="noopener" className={buttonClasses("secondary", "sm")}>
           פתיחת הדף
           <span className="sr-only">: {title}</span>
+          <span className="sr-only"> (נפתח בחלון חדש)</span>
         </a>
       </div>
     </div>

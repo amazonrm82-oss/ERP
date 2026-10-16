@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { STATUS_KIND_LABELS } from "@/features/customization/labels";
 import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/reason-field";
 import { cn } from "@/lib/cn";
 import type { LeadStatusKind } from "@/lib/database.types";
@@ -175,6 +176,8 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
                         <span className="sr-only"> לידים</span>
                       </span>
                     </h2>
+                    {/* FXA-09: a closed status says so in words, not by its colour alone */}
+                    {status.kind !== "open" ? <p className="text-sm font-medium text-ink">{STATUS_KIND_LABELS[status.kind]}</p> : null}
                   </header>
                   <div
                     className={cn(

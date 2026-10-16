@@ -432,9 +432,11 @@ export function ShareLink({ url, title }: { url: string; title: string }) {
           className={buttonClasses("secondary", "sm")}
         >
           שליחה ב-WhatsApp
+          <span className="sr-only"> (נפתח בחלון חדש)</span>
         </a>
         <a href={url} target="_blank" rel="noopener" className={buttonClasses("secondary", "sm")}>
           פתיחת הטופס
+          <span className="sr-only"> (נפתח בחלון חדש)</span>
         </a>
       </div>
       <span aria-live="polite" className="sr-only">

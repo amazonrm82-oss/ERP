@@ -956,6 +956,7 @@ function ItemDetails({
         <p className="text-md">
           <a href={meeting.videoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
             כניסה לשיחת הווידאו
+            <span className="sr-only"> (נפתח בחלון חדש)</span>
           </a>
         </p>
       ) : null}

@@ -27,7 +27,9 @@ function optionalNote(line: QuoteLine): string | null {
  * amounts of the quote, never worked out again here. A table on a wide page and on paper, cards on a
  * phone. The same piece will be the source of the PDF (QUO-06) and of the customer page (QUO-08).
  */
-export function QuoteDocument({ data }: { data: QuoteDocumentData }) {
+export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentData; headingLevel?: 1 | 2 | 3 }) {
+  // FXA-09: one main heading per page; a page that has its own main heading shows the quote's title a level lower
+  const Title = (["h1", "h2", "h3"] as const)[headingLevel - 1];
   const { design, business, customer, quote, lines } = data;
   const schedule = data.schedule ?? [];
   const sums = groupSubtotals(lines);
@@ -111,9 +113,9 @@ export function QuoteDocument({ data }: { data: QuoteDocumentData }) {
               <p>—</p>
             )}
           </div>
-          <h1 className="text-lead font-semibold break-words sm:max-w-[60%] sm:text-end">
+          <Title className="text-lead font-semibold break-words sm:max-w-[60%] sm:text-end">
             <bdi>{quote.title}</bdi>
-          </h1>
+          </Title>
         </section>
 
         {lines.length === 0 ? (

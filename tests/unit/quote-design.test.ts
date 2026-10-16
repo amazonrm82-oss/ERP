@@ -113,6 +113,14 @@ describe("the quote document (QUO-05)", () => {
     expect(html).toContain("שורות רשות שלא סומנו אינן כלולות בסיכום.");
   });
 
+  it("FXA-09: the title is the page's main heading, or a level lower inside a page that has its own", () => {
+    expect(renderToStaticMarkup(createElement(QuoteDocument, { data: data() }))).toMatch(/<h1[^>]*><bdi>/);
+    const preview = renderToStaticMarkup(createElement(QuoteDocument, { data: data(), headingLevel: 3 }));
+    expect(preview).not.toContain("<h1");
+    expect(preview).toMatch(/<h3[^>]*><bdi>/);
+    expect(renderToStaticMarkup(createElement(QuoteDocument, { data: data(), headingLevel: 2 }))).not.toContain("<h1");
+  });
+
   it("hides what the design turns off, and shows no VAT line on a quote without VAT", () => {
     const html = renderToStaticMarkup(
       createElement(QuoteDocument, {

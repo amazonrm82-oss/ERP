@@ -56,6 +56,7 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
                         className="block truncate font-medium text-accent-strong underline-offset-4 hover:underline print:hidden"
                       >
                         {file.name}
+                        {viewable ? <span className="sr-only"> (נפתח בחלון חדש)</span> : null}
                       </a>
                       <p className="hidden break-words font-medium print:block">{file.name}</p>
                       <p className="hidden text-sm text-ink-soft print:block">{printedFileLine(formatDateTime(file.createdAt), file.uploaderName)}</p>

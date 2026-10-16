@@ -402,7 +402,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
 
       {step === "preview" && sheet ? (
         <div className="space-y-5">
-          <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+          <div role="region" aria-label="בדיקה של השורות הראשונות" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-surface">
             <table className="w-full min-w-[36rem] text-md">
               <caption className="border-b border-line px-4 py-3 text-start font-semibold sm:px-5">בדיקה של {formatNumber(Math.min(PREVIEW_ROWS, sheet.rows.length))} השורות הראשונות</caption>
               <thead>

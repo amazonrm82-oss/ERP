@@ -7,6 +7,7 @@ import { IconButton } from "@/components/ui/button";
 import { CloseIcon, SearchIcon } from "@/components/ui/icons";
 
 import { searchAction, type SearchGroup, type SearchHit } from "../actions";
+import { isSearchShortcut } from "../shortcut";
 
 const GROUP_LABELS: Record<SearchGroup, string> = {
   leads: "לידים",
@@ -17,7 +18,7 @@ const GROUP_LABELS: Record<SearchGroup, string> = {
 };
 
 /**
- * Search everything from the top bar. Opens with the button, Ctrl+K (Cmd+K) or "/".
+ * Search everything from the top bar. Opens with the button or Ctrl+K (Cmd+K).
  * Arrow keys move between results, Enter opens one, Escape closes.
  */
 export function GlobalSearch({ orgId }: { orgId: string }) {
@@ -34,15 +35,11 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   const listId = useId();
   const titleId = useId();
 
-  // keyboard shortcuts, from anywhere but a text field
+  // the keyboard shortcut: only with Ctrl or Cmd (FXA-09, WCAG 2.1.4: a one-key shortcut cannot be turned off and
+  // fires for speech input users)
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const typing = target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
-      if ((event.key === "k" || event.key === "K") && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
-        setOpen(true);
-      } else if (event.key === "/" && !typing) {
+      if (isSearchShortcut(event)) {
         event.preventDefault();
         setOpen(true);
       }
@@ -106,7 +103,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className="flex min-h-10 items-center gap-2 rounded-md px-2 text-ink-soft hover:bg-canvas sm:min-w-56 sm:border sm:border-line sm:px-3"
-        aria-keyshortcuts="Control+K /"
+        aria-keyshortcuts="Control+K Meta+K"
       >
         <SearchIcon className="size-5 shrink-0" />
         <span className="sr-only sm:not-sr-only sm:text-md">

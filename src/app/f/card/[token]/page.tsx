@@ -64,6 +64,7 @@ export default async function PublicCardPage({ params }: Props) {
               <a href={`https://wa.me/${card.whatsapp}`} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "md", "w-full justify-start")}>
                 <ChatIcon className="size-4.5" aria-hidden="true" />
                 <span>הודעה ב-WhatsApp</span>
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
               </a>
             </li>
           ) : null}
@@ -79,6 +80,7 @@ export default async function PublicCardPage({ params }: Props) {
             <li>
               <a href={card.website} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "md", "w-full justify-start")}>
                 <span>לאתר</span>
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
               </a>
             </li>
           ) : null}

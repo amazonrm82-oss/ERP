@@ -69,6 +69,7 @@ export default async function BusinessCardPage({ params, searchParams }: Props) 
                     <p className="text-sm break-all" dir="ltr">
                       <Link href={publicCardPath(card.token)} className="text-accent-strong underline-offset-2 hover:underline" target="_blank">
                         {link}
+                        <span className="sr-only"> (נפתח בחלון חדש)</span>
                       </Link>
                     </p>
                     <p className="text-sm text-ink-soft">אפשר להעתיק את הקישור, או לצלם את הקוד ולהדפיס אותו.</p>

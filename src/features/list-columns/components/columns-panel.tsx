@@ -117,13 +117,13 @@ export function ColumnsPanel({ orgId, object, catalog, columns, saved, widths = 
           <ul className="max-h-[60vh] space-y-1 overflow-y-auto">
             {rows.map((row, index) => (
               <li key={row.key} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-canvas">
-                <label className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                <label className="flex min-h-9 min-w-0 flex-1 items-center gap-2 py-1">
                   <input
                     type="checkbox"
                     checked={row.visible}
                     disabled={!row.visible && full}
                     onChange={(e) => update(index, { visible: e.target.checked })}
-                    className="size-4 accent-accent"
+                    className="size-5 accent-accent"
                   />
                   <span className="truncate">{row.label}</span>
                 </label>

@@ -67,7 +67,7 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
           חיפוש
         </button>
       </form>
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <div role="region" aria-label="ארגונים" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[50rem] text-md">
           <thead>
             <tr className="border-b border-line text-sm text-ink-soft">

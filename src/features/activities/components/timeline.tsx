@@ -139,6 +139,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                               {formatBytes(file.sizeBytes)}
                               {file.versions > 1 ? ` · גרסה ${file.versions}` : ""}
                             </span>
+                            {viewable ? <span className="sr-only"> (נפתח בחלון חדש)</span> : null}
                           </a>
                         </li>
                       );

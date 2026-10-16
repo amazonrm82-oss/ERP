@@ -157,6 +157,7 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
                 {shown.href ? (
                   <a href={shown.href} target="_blank" rel="noopener noreferrer" dir="ltr" draggable={false} className="break-all text-accent-strong underline underline-offset-4">
                     {shown.text}
+                    <span className="sr-only"> (נפתח בחלון חדש)</span>
                   </a>
                 ) : shown.tone ? (
                   // FLD-06: a coloured status

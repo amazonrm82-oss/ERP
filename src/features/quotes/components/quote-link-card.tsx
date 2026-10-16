@@ -83,6 +83,7 @@ export function QuoteLinkCard({ orgId, quoteId, numberDisplay, active, createdTe
                 rel="noopener noreferrer"
               >
                 שליחה ב-WhatsApp
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
               </a>
               <Button
                 size="sm"

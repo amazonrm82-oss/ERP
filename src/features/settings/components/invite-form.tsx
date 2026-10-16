@@ -101,6 +101,7 @@ function InviteLink({ orgName, email, link, onDone }: { orgName: string; email: 
           className={buttonClasses("secondary", "sm")}
         >
           שליחה ב-WhatsApp
+          <span className="sr-only"> (נפתח בחלון חדש)</span>
         </a>
         <a
           href={`mailto:${email}?subject=${encodeURIComponent(`הזמנה להצטרף ל-${orgName}`)}&body=${encodeURIComponent(message)}`}

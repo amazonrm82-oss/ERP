@@ -116,7 +116,8 @@ export function InlineEdit({ orgId, object, id, field, children, label, kind, in
             setValue(initial);
             setEditing(true);
           }}
-          className="shrink-0 rounded p-0.5 text-ink-soft hover:bg-canvas hover:text-ink"
+          // FXA-09: a 32px touch target (the negative margin keeps the cell's layout)
+          className="-my-1.5 -me-1.5 shrink-0 rounded p-2 text-ink-soft hover:bg-canvas hover:text-ink"
         >
           <PencilIcon className="size-4" />
         </button>

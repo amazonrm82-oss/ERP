@@ -16,6 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { LONG_PRESS_MS, pressDistance, pressOutcome } from "@/features/calendar/long-press";
+import { STAGE_KIND_LABELS } from "@/features/customization/labels";
 
 import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
 import { cn } from "@/lib/cn";
@@ -506,6 +507,8 @@ export function DealsBoard({ orgId, board, canWrite, hrefs, stuck, lossReasons, 
                       </span>
                     </h2>
                     <p className="text-sm text-ink-soft">
+                      {/* FXA-09: a closed stage says so in words, not by its colour alone */}
+                      {stage.kind !== "open" ? <span className="me-2 font-medium text-ink">{STAGE_KIND_LABELS[stage.kind]} ·</span> : null}
                       <span className="sr-only">סך הכול </span>
                       {formatMoney(total)}
                     </p>

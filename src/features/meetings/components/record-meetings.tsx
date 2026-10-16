@@ -82,6 +82,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
             className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong"
           >
             כניסה לשיחת הווידאו
+            <span className="sr-only"> (נפתח בחלון חדש)</span>
           </a>
         </p>
       ) : null}

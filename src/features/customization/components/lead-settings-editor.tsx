@@ -61,9 +61,10 @@ function StatusRow({ orgId, status, editable, isFirst, isLast }: StatusRowProps)
   return (
     <li className="space-y-2 px-4 py-3 sm:px-5">
       <form action={formAction} className={rowGrid} noValidate>
+        {/* FXA-09: visible labels; the accessible name keeps the status's name (and holds the visible text) */}
         <TextField
-          label="שם הסטטוס"
-          hideLabel
+          label="שם"
+          aria-label={`שם הסטטוס ${status.name}`}
           name="name"
           required
           maxLength={60}
@@ -73,14 +74,14 @@ function StatusRow({ orgId, status, editable, isFirst, isLast }: StatusRowProps)
           defaultValue={failure?.values?.name ?? status.name}
           error={failure?.fieldErrors?.name}
         />
-        <SelectField key={`kind-${kind}`} label={`סוג הסטטוס ${status.name}`} hideLabel name="kind" controlSize="sm" defaultValue={kind}>
+        <SelectField key={`kind-${kind}`} label="סוג" aria-label={`סוג הסטטוס ${status.name}`} name="kind" controlSize="sm" defaultValue={kind}>
           {STATUS_KINDS.map((option) => (
             <option key={option} value={option}>
               {STATUS_KIND_LABELS[option]}
             </option>
           ))}
         </SelectField>
-        <SubmitButton size="sm" variant="secondary">
+        <SubmitButton size="sm" variant="secondary" className="sm:mt-6.5">
           שמירה
           <span className="sr-only">: {status.name}</span>
         </SubmitButton>
@@ -122,8 +123,8 @@ export function AddStatusForm({ orgId }: { orgId: string }) {
     <form action={formAction} className="space-y-2" noValidate>
       <div className={rowGrid}>
         <TextField
-          label="שם הסטטוס החדש"
-          hideLabel
+          label="שם"
+          aria-label="שם הסטטוס החדש"
           placeholder="סטטוס חדש"
           name="name"
           required
@@ -134,14 +135,14 @@ export function AddStatusForm({ orgId }: { orgId: string }) {
           defaultValue={failure?.values?.name}
           error={failure?.fieldErrors?.name}
         />
-        <SelectField label="סוג הסטטוס החדש" hideLabel name="kind" controlSize="sm" defaultValue={failure?.values?.kind ?? "open"}>
+        <SelectField label="סוג" aria-label="סוג הסטטוס החדש" name="kind" controlSize="sm" defaultValue={failure?.values?.kind ?? "open"}>
           {STATUS_KINDS.map((option) => (
             <option key={option} value={option}>
               {STATUS_KIND_LABELS[option]}
             </option>
           ))}
         </SelectField>
-        <SubmitButton size="sm" pendingText="מוסיפים…">
+        <SubmitButton size="sm" pendingText="מוסיפים…" className="sm:mt-6.5">
           הוספת סטטוס
         </SubmitButton>
       </div>

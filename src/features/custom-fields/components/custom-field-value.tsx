@@ -15,6 +15,7 @@ export function customFieldValue(field: CustomFieldDisplay, options: { compact?:
     return (
       <a href={field.href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
         {field.text.replace(/^https?:\/\//, "")}
+        <span className="sr-only"> (נפתח בחלון חדש)</span>
       </a>
     );
   }

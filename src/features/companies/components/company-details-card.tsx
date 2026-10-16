@@ -113,6 +113,7 @@ export function CompanyDetailsCard({ orgId, company, types, canEdit, focus, layo
               value: company.website ? (
                 <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
                   {company.website.replace(/^https?:\/\//, "")}
+                  <span className="sr-only"> (נפתח בחלון חדש)</span>
                 </a>
               ) : null,
             },

@@ -44,7 +44,8 @@ function Section({ section, id }: { section: ReportSection; id: string }) {
       {section.rows.length === 0 ? (
         <p className="px-4 py-6 text-md text-ink-soft sm:px-5">{section.empty}</p>
       ) : (
-        <div className="overflow-x-auto">
+        // FXA-09: the box that scrolls sideways is reachable and named, so a keyboard can scroll it
+        <div role="region" aria-label={section.title} tabIndex={0} className="overflow-x-auto">
           <table className="w-full min-w-[32rem] text-md">
             <thead>
               <tr className="border-b border-line text-sm text-ink-soft">

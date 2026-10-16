@@ -28,14 +28,17 @@ const SelectionContext = createContext<Selection | null>(null);
 export function RowCheck({ id, label }: { id: string; label: string }) {
   const selection = useContext(SelectionContext);
   if (!selection) return null;
+  // FXA-09: a 36px touch target around the box (the negative margin keeps the row's layout)
   return (
-    <input
-      type="checkbox"
-      aria-label={`בחירה: ${label}`}
-      checked={selection.picked.has(id)}
-      onChange={(e) => selection.toggle(id, e.target.checked)}
-      className="mt-1 size-4 shrink-0 accent-accent"
-    />
+    <label className="-m-2 inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-canvas">
+      <input
+        type="checkbox"
+        aria-label={`בחירה: ${label}`}
+        checked={selection.picked.has(id)}
+        onChange={(e) => selection.toggle(id, e.target.checked)}
+        className="size-5 accent-accent"
+      />
+    </label>
   );
 }
 
@@ -301,7 +304,7 @@ export function BulkSelection({
         aria-label="פעולות על הנבחרים"
         className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2"
       >
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-9 items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={allPicked}
@@ -309,7 +312,7 @@ export function BulkSelection({
               if (el) el.indeterminate = count > 0 && !allPicked;
             }}
             onChange={(e) => setPicked(e.target.checked ? new Set(ids) : new Set())}
-            className="size-4 accent-accent"
+            className="size-5 accent-accent"
           />
           <span>בחירת כל העמוד</span>
         </label>

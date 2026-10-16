@@ -164,9 +164,10 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
     <li className="space-y-2 px-3 py-3">
       <form action={formAction} className="space-y-2" noValidate>
         <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem]">
+          {/* FXA-09: visible labels; the accessible name keeps the stage's name (and holds the visible text) */}
           <TextField
-            label={`שם השלב`}
-            hideLabel
+            label="שם"
+            aria-label={`שם השלב ${stage.name}`}
             name="name"
             required
             maxLength={80}
@@ -178,8 +179,8 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
           />
           <SelectField
             key={`kind-${kind}`}
-            label={`סוג השלב ${stage.name}`}
-            hideLabel
+            label="סוג"
+            aria-label={`סוג השלב ${stage.name}`}
             name="kind"
             controlSize="sm"
             defaultValue={kind}
@@ -192,8 +193,8 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
             ))}
           </SelectField>
           <TextField
-            label={`הסתברות לסגירה בשלב ${stage.name} (באחוזים)`}
-            hideLabel
+            label="סיכוי לסגירה (%)"
+            aria-label={`סיכוי לסגירה (%) בשלב ${stage.name}`}
             name="probability"
             dir="ltr"
             inputMode="numeric"
@@ -247,8 +248,8 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
       <h3 className="text-sm font-medium text-ink-soft">שלב חדש</h3>
       <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_6rem]">
         <TextField
-          label="שם השלב החדש"
-          hideLabel
+          label="שם"
+          aria-label="שם השלב החדש"
           name="name"
           placeholder="שם השלב"
           required
@@ -259,7 +260,7 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
           defaultValue={values?.name}
           error={errors.name}
         />
-        <SelectField label="סוג השלב החדש" hideLabel name="kind" controlSize="sm" defaultValue={values?.kind ?? "open"}>
+        <SelectField label="סוג" aria-label="סוג השלב החדש" name="kind" controlSize="sm" defaultValue={values?.kind ?? "open"}>
           {STAGE_KINDS.map((option) => (
             <option key={option} value={option}>
               {STAGE_KIND_LABELS[option]}
@@ -267,8 +268,8 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
           ))}
         </SelectField>
         <TextField
-          label="הסתברות לסגירה בשלב החדש (באחוזים)"
-          hideLabel
+          label="סיכוי לסגירה (%)"
+          aria-label="סיכוי לסגירה (%) בשלב החדש"
           name="probability"
           dir="ltr"
           inputMode="numeric"

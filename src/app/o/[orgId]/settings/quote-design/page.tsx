@@ -50,7 +50,7 @@ export default async function QuoteDesignPage({ params }: Props) {
         <h2 id="quote-design-preview" className="text-base font-semibold">
           תצוגה מקדימה (הצעה לדוגמה, אחרי שמירה)
         </h2>
-        <QuoteDocument data={sample} />
+        <QuoteDocument data={sample} headingLevel={3} />
       </section>
     </div>
   );

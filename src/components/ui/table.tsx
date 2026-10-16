@@ -9,7 +9,8 @@ import { cn } from "@/lib/cn";
  */
 export function Table({ caption, hideCaption, className, children }: { caption: string; hideCaption?: boolean; className?: string; children: ReactNode }) {
   return (
-    <div className={cn("overflow-x-auto rounded-lg border border-line bg-surface", className)}>
+    // FXA-09: the box that scrolls sideways is reachable and named, so a keyboard can scroll it
+    <div role="region" aria-label={caption} tabIndex={0} className={cn("overflow-x-auto rounded-lg border border-line bg-surface", className)}>
       <table className="w-full border-collapse text-md">
         <caption className={cn("px-4 py-3 text-start font-semibold", hideCaption && "sr-only")}>{caption}</caption>
         {children}

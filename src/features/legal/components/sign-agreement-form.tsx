@@ -30,18 +30,16 @@ export function SignAgreementForm({ next, defaultName }: { next: string; default
 
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium">חתימה</legend>
-        <div role="radiogroup" aria-label="סוג החתימה" className="mb-2 flex gap-2">
+        {/* FXA-09: native radio buttons, so arrow keys move between the choices */}
+        <div className="mb-2 flex flex-wrap gap-2">
           {(["drawn", "typed"] as const).map((m) => (
-            <button
+            <label
               key={m}
-              type="button"
-              role="radio"
-              aria-checked={method === m}
-              onClick={() => setMethod(m)}
-              className={`min-h-10 rounded-md border px-3 text-md ${method === m ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line-control"}`}
+              className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${method === m ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line-control"}`}
             >
+              <input type="radio" name="signature_method" value={m} checked={method === m} onChange={() => setMethod(m)} className="size-4 accent-accent" />
               {m === "drawn" ? "ציור חתימה" : "הקלדת שם"}
-            </button>
+            </label>
           ))}
         </div>
         {method === "drawn" ? (

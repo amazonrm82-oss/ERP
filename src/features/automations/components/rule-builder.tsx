@@ -404,7 +404,7 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
                 אין סיבות מוגדרות בעסק.{" "}
                 <TextLink href={paths.settingsDisqualifyReasons(orgId)} target="_blank" className="font-medium">
                   להוספת סיבות
-                  <span className="sr-only"> (נפתח בלשונית חדשה)</span>
+                  <span className="sr-only"> (נפתח בחלון חדש)</span>
                 </TextLink>{" "}
                 אחרי שמוסיפים, מרעננים את הדף ובוחרים סיבה.
               </p>

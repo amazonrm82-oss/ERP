@@ -2388,7 +2388,7 @@ try {
   if (!new URL(ownerDesk.url()).pathname.startsWith("/login")) throw new Error("the other device stayed signed in after a backup code");
   console.log("backup code used, new authenticator set up");
 
-  step("global search: Ctrl+K, a typo, Enter opens the record; '/' opens it too");
+  step("global search: Ctrl+K, a typo, Enter opens the record; '/' no longer opens it (FXA-09)");
   await lost.goto(orgUrl);
   await lost.waitForLoadState("networkidle");
   await lost.keyboard.press("Control+k");
@@ -2398,7 +2398,11 @@ try {
   await shot(lost, "116-search-360");
   await searchBox.press("Enter");
   await lost.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+  // FXA-09: a single "/" types into fields and never opens the search
   await lost.keyboard.press("/");
+  await lost.waitForTimeout(500);
+  if (await searchBox.isVisible()) throw new Error("'/' still opens the search");
+  await lost.keyboard.press("Control+k");
   await searchBox.fill("0000000000xyz");
   await expectText(lost, "לא נמצא דבר");
   // FXA-04: a real modal: Tab stays inside, a close button is on a phone screen too
