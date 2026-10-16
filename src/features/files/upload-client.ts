@@ -30,8 +30,9 @@ export async function uploadFiles(
       continue;
     }
     const { error } = await supabase.storage.from(FILES_BUCKET).upload(prepared.path, file, { contentType: file.type, upsert: false });
-    await finishUploadAction(orgId, subject, prepared.id, !error);
+    const finished = await finishUploadAction(orgId, subject, prepared.id, !error);
     if (error) problems.push(`ההעלאה של ${file.name} נכשלה. נסו שוב.`);
+    else if (!finished.ok) problems.push(`${file.name}: ${finished.message}`);
   }
   return problems;
 }

@@ -7,7 +7,7 @@ import { paths } from "@/lib/paths";
 
 import { deleteFileAction } from "../actions";
 import { listFiles } from "../queries";
-import { ALLOWED_TYPES, formatBytes } from "../types";
+import { ALLOWED_TYPES, formatBytes, opensInBrowser } from "../types";
 import { versionGroups } from "../versions";
 import { FileUploader } from "./file-uploader";
 import { NewVersionButton } from "./new-version-button";
@@ -36,7 +36,7 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
         ) : (
           <ul className="divide-y divide-line">
             {groups.map(({ current: file, earlier }) => {
-              const viewable = file.mimeType.startsWith("image/") || file.mimeType === "application/pdf";
+              const viewable = opensInBrowser(file.mimeType);
               return (
                 <li key={file.id} className="py-2.5">
                   <div className="flex flex-wrap items-center gap-3">

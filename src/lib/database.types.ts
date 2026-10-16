@@ -941,6 +941,9 @@ export type FileRow = {
   // REC-07: the timeline entry it is attached to, and the earlier version it replaces (both set once, on insert)
   activity_id: string | null;
   previous_id: string | null;
+  // FXS-07: set (server only) while a person's upload waits for confirm_file_upload(); null = confirmed or made by the server
+  unconfirmed_since: string | null;
+  upload_checked_at: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2659,6 +2662,8 @@ export type Database = {
       };
       // stored files of deleted rows (migration 0021), service role only
       claim_orphan_files: { Args: { p_limit?: number }; Returns: Json };
+      // FXS-07: the uploader, after the upload: { ok: true } | { ok: false, reason: missing|empty|size|type|quota }
+      confirm_file_upload: { Args: { p_org: string; p_file: string }; Returns: Json };
       // every bucket (USR-01, migration avatar_cleanup): [{ bucket, path }]
       claim_orphan_objects: { Args: { p_limit?: number }; Returns: Json };
       finish_orphan_files: { Args: { p_paths: string[] }; Returns: number };

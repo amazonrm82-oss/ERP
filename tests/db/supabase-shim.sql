@@ -71,7 +71,8 @@ create table storage.buckets (
   id              text primary key,
   name            text not null,
   public          boolean default false,
-  file_size_limit bigint
+  file_size_limit bigint,
+  allowed_mime_types text[]
 );
 create table storage.objects (
   id         uuid primary key default gen_random_uuid(),
@@ -79,6 +80,7 @@ create table storage.objects (
   name       text,
   owner      uuid,
   created_at timestamptz default now(),
+  metadata   jsonb,  -- set by the Storage API after an upload: size, mimetype, ...
   unique (bucket_id, name)
 );
 alter table storage.objects enable row level security;

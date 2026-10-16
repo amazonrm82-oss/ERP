@@ -4,7 +4,7 @@ import type { TimelineSubject } from "@/features/activities/schema";
 import { getUserNames } from "@/features/shell/queries";
 import { createClient } from "@/lib/supabase/server";
 
-import { FILES_BUCKET, SUBJECT_COLUMN } from "./types";
+import { FILES_BUCKET, opensInBrowser, SUBJECT_COLUMN } from "./types";
 import { versionGroups } from "./versions";
 
 export type RecordFile = {
@@ -29,10 +29,12 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
     .select("id, name, mime_type, size_bytes, storage_path, uploaded_by, created_at, activity_id, previous_id")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id)
+    // FXS-07: an upload that has not been confirmed is not shown
+    .is("unconfirmed_since", null)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(`files query failed: ${error.message}`);
-  const images = data.filter((f) => f.mime_type.startsWith("image/") && f.mime_type !== "image/heic");
+  const images = data.filter((f) => f.mime_type.startsWith("image/") && opensInBrowser(f.mime_type));
   const thumbs = new Map<string, string>();
   if (images.length > 0) {
     const { data: signed, error: signError } = await supabase.storage.from(FILES_BUCKET).createSignedUrls(
@@ -70,6 +72,7 @@ export async function listNoteFiles(orgId: string, activityIds: string[]): Promi
     .select("id, name, mime_type, size_bytes, created_at, activity_id, previous_id")
     .eq("organization_id", orgId)
     .in("activity_id", activityIds)
+    .is("unconfirmed_since", null)
     .order("created_at", { ascending: true })
     .limit(500);
   if (error) throw new Error(`note files query failed: ${error.message}`);

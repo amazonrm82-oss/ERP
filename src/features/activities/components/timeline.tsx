@@ -3,7 +3,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { listNoteFiles } from "@/features/files/queries";
-import { formatBytes } from "@/features/files/types";
+import { formatBytes, opensInBrowser } from "@/features/files/types";
 import { getMentionCandidates } from "@/features/mentions/queries";
 import { mentionIds } from "@/features/mentions/token";
 import { printsTimelineEntry } from "@/features/print/print";
@@ -125,7 +125,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                 {noteFiles.get(item.id)?.length ? (
                   <ul className="mt-1.5 flex flex-wrap gap-2" aria-label="קבצים מצורפים">
                     {noteFiles.get(item.id)!.map((file) => {
-                      const viewable = file.mimeType.startsWith("image/") || file.mimeType === "application/pdf";
+                      const viewable = opensInBrowser(file.mimeType);
                       return (
                         <li key={file.id}>
                           <a

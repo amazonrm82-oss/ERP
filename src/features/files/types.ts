@@ -24,6 +24,25 @@ export const ALLOWED_TYPES: Record<string, string> = {
 };
 export const ACCEPT = Object.keys(ALLOWED_TYPES).join(",");
 
+// FXS-07: the types that open inside the browser (?view=1, thumbnails). Everything else downloads, SVG above all
+// (files from before the bucket refused it): an SVG opened on the storage domain can run a script.
+const INLINE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"]);
+export function opensInBrowser(mimeType: string): boolean {
+  return INLINE_TYPES.has(mimeType);
+}
+
+// FXS-07: why confirm_file_upload() refused what arrived (reason codes of the database function)
+const UPLOAD_PROBLEMS: Record<string, string> = {
+  missing: "הקובץ לא הגיע במלואו. נסו להעלות אותו שוב.",
+  empty: "הקובץ ריק.",
+  size: "הקובץ גדול מ-25 MB.",
+  type: "סוג הקובץ שהתקבל אינו מותר. אפשר: PDF, תמונות, Word, Excel, PowerPoint, טקסט, CSV ו-ZIP.",
+  quota: "נגמר נפח האחסון בחבילה. אפשר למחוק קבצים ישנים.",
+};
+export function uploadProblemMessage(reason: unknown): string {
+  return (typeof reason === "string" && UPLOAD_PROBLEMS[reason]) || UPLOAD_PROBLEMS.missing;
+}
+
 export const SUBJECT_COLUMN: Record<SubjectKind, "lead_id" | "contact_id" | "company_id" | "deal_id"> = {
   lead: "lead_id",
   contact: "contact_id",
