@@ -15,6 +15,7 @@ import { paths } from "@/lib/paths";
 import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
 import { DEAL_NAME_MAX, DEFAULT_DEAL_NAME, NOTE_BODY_MAX, openStagesOf } from "../create-records";
+import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
 import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
 import { setFieldChoices, type SetFieldChoice } from "../set-field";
@@ -78,6 +79,10 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   const [triggerKey, setTriggerKey] = useState(initial?.trigger ?? TRIGGERS[0].key);
   const [triggerTo, setTriggerTo] = useState(initial?.triggerTo ?? "");
   const [triggerNumber, setTriggerNumber] = useState(initial?.triggerNumber ?? "");
+  // AUT-03: a date trigger
+  const [dateField, setDateField] = useState(initial?.triggerField ?? "");
+  const [dateDirection, setDateDirection] = useState(initial?.triggerDirection ?? "before");
+  const [dateDays, setDateDays] = useState(initial?.triggerDays ?? "1");
   const [conditions, setConditions] = useState<Condition[]>(initial?.conditions ?? []);
   const [actions, setActions] = useState<Draft[]>(
     initial?.actions.length ? initial.actions.map((a) => ({ ...blankAction(a.type as ActionType), ...a })) : [blankAction("create_task")],
@@ -96,6 +101,8 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     setTriggerKey(key);
     setTriggerTo("");
     setTriggerNumber(next.number ? String(next.number.default) : "");
+    // a date field of another record type is picked again
+    if (next.entity !== entity) setDateField("");
     // drop what does not fit the new record type
     setConditions((list) => list.filter((c) => CONDITIONS.find((o) => o.key === c.key)?.entities.includes(next.entity)));
     setActions((list) => {
@@ -115,6 +122,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     trigger: triggerKey,
     ...(triggerTo ? { trigger_to: triggerTo } : {}),
     ...(trigger.number && triggerNumber ? { trigger_number: triggerNumber } : {}),
+    ...(trigger.date
+      ? { trigger_field: dateField, trigger_direction: dateDirection, ...(dateDirection === "on" ? {} : { trigger_days: dateDays }) }
+      : {}),
     conditions: conditions.map((c) => (c.value ? c : { key: c.key })),
     actions: actions.map(clean),
   });
@@ -184,6 +194,35 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
           ) : null}
           {trigger.number ? (
             <TextField label={trigger.number.label} value={triggerNumber} onChange={(e) => setTriggerNumber(e.target.value)} dir="ltr" inputMode="numeric" className="max-w-40" />
+          ) : null}
+          {trigger.date ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <SelectField label="שדה התאריך" value={dateField} onChange={(e) => setDateField(e.target.value)}>
+                <option value="">בחירת שדה</option>
+                {dateTriggerChoices(entity, lookups).map((choice) => (
+                  <option key={choice.key} value={choice.key}>
+                    {choice.label}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField label="מתי" value={dateDirection} onChange={(e) => setDateDirection(e.target.value)}>
+                <option value="before">לפני התאריך</option>
+                <option value="on">ביום התאריך</option>
+                <option value="after">אחרי התאריך</option>
+              </SelectField>
+              {dateDirection !== "on" ? (
+                <TextField
+                  label={`כמה ימים (עד ${DATE_TRIGGER_MAX_DAYS})`}
+                  value={dateDays}
+                  onChange={(e) => setDateDays(e.target.value)}
+                  dir="ltr"
+                  inputMode="numeric"
+                />
+              ) : null}
+              <p className="text-sm text-ink-soft sm:col-span-3">
+                האוטומציה רצה ביום הזה החל מ-{String(DATE_TRIGGER_HOUR).padStart(2, "0")}:00 לפי שעון העסק, פעם אחת לכל רשומה ותאריך. אם התאריך משתנה, היא תרוץ שוב לפי התאריך החדש.
+              </p>
+            </div>
           ) : null}
         </CardBody>
       </Card>

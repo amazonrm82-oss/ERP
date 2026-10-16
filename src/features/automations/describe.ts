@@ -1,6 +1,7 @@
 import { ACTION_LABELS, CONDITIONS, TASK_TYPES, triggerOf, type ActionType, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import { describeCreateDeal } from "./create-records";
+import { describeDateTrigger } from "./date-trigger";
 import { describeSetField } from "./set-field";
 
 type Json = Record<string, unknown>;
@@ -21,6 +22,9 @@ export function describeRule(
   if (trigger?.number) {
     const n = rule.triggerConfig[trigger.number.key];
     when += trigger.number.key === "days" ? ` (${n} ימים)` : ` (${n} דקות לפני)`;
+  }
+  if (trigger?.date) {
+    when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
   }
 
   const conditions = rule.conditions.map((c) => {

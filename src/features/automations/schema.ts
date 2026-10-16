@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
 import { DEAL_NAME_MAX, NOTE_BODY_MAX } from "./create-records";
+import { DATE_DIRECTIONS, DATE_TRIGGER_MAX_DAYS } from "./date-trigger";
 import { CONDITIONS, TASK_TYPES, TRIGGERS } from "./definitions";
 
 const id = z.guid({ error: "יש לבחור ערך." });
@@ -64,6 +65,10 @@ export const ruleSchema = z
     trigger: z.string().refine((key) => TRIGGERS.some((t) => t.key === key), { error: "יש לבחור מתי זה קורה." }),
     trigger_to: id.optional(),
     trigger_number: z.coerce.number().int().min(1).max(10_080).optional(),
+    // AUT-03: a date trigger's field, direction and days (checked against the record type in toDbRule)
+    trigger_field: z.string().max(100).optional(),
+    trigger_direction: z.enum(DATE_DIRECTIONS).optional(),
+    trigger_days: z.coerce.number({ error: "יש להזין מספר ימים." }).int({ error: "יש להזין מספר ימים שלם." }).min(0).max(DATE_TRIGGER_MAX_DAYS, { error: `עד ${DATE_TRIGGER_MAX_DAYS} ימים.` }).optional(),
     conditions: z
       .array(z.object({ key: z.string().refine((key) => CONDITIONS.some((c) => c.key === key)), value: z.string().max(100).optional() }))
       .max(5, { error: "עד 5 תנאים." }),

@@ -98,7 +98,16 @@ export const TEMPLATES: Template[] = [
   {
     key: "renewal_30d",
     title: "תזכורת חידוש 30 יום לפני",
-    description: "תזכורת לפני תום מנוי של לקוח.",
-    unavailable: "דורש תאריך חידוש בעסקה, שייבנה עם מנויים והכנסה חוזרת.",
+    description: "30 יום לפני תאריך החידוש של עסקה, משימה לאחראי לדבר עם הלקוח על החידוש.",
+    // AUT-03: the deal's renewal date (DEAL-07)
+    build: () => ({
+      name: "תזכורת חידוש 30 יום לפני",
+      trigger: "deal:date",
+      trigger_field: "renewal_date",
+      trigger_direction: "before",
+      trigger_days: 30,
+      conditions: [],
+      actions: [{ type: "create_task", title: "לדבר עם הלקוח על חידוש {{name}}", due_amount: 0, due_unit: "none", assign: "owner", task_type: "follow_up" }],
+    }),
   },
 ];

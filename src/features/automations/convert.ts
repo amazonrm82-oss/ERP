@@ -6,6 +6,7 @@ import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft } from "./create-records";
+import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
 import { customDefinition, setFieldDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
@@ -42,6 +43,11 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
   }
   if (trigger.number) {
     trigger_config[trigger.number.key] = rule.trigger_number ?? trigger.number.default;
+  }
+  if (trigger.date) {
+    const config = dateTriggerConfig(entity, { field: rule.trigger_field, days: rule.trigger_days, direction: rule.trigger_direction }, lookups);
+    if (typeof config === "string") return config;
+    Object.assign(trigger_config, config);
   }
 
   const conditions: DbRule["conditions"] = [];
@@ -133,6 +139,10 @@ export type BuilderInitial = {
   trigger: string;
   triggerTo: string;
   triggerNumber: string;
+  // AUT-03: a date trigger's field, days and direction ("on" = the day itself)
+  triggerField?: string;
+  triggerDays?: string;
+  triggerDirection?: string;
   conditions: Array<{ key: string; value: string }>;
   actions: Array<Record<string, string>>;
 };
@@ -211,11 +221,13 @@ export function fromDbRule(
         return [];
     }
   });
+  const date = trigger.date ? dateTriggerDraft(rule.triggerConfig) : null;
   return {
     name: rule.name,
     trigger: trigger.key,
     triggerTo: str(rule.triggerConfig.to),
     triggerNumber: trigger.number ? str(rule.triggerConfig[trigger.number.key] ?? trigger.number.default) : "",
+    ...(date ? { triggerField: date.field, triggerDays: date.days, triggerDirection: date.direction } : {}),
     conditions,
     actions,
   };

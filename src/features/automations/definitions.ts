@@ -11,7 +11,8 @@ export type TriggerType =
   | "no_activity"
   | "stuck_in_stage"
   | "birthday"
-  | "task_due_soon";
+  | "task_due_soon"
+  | "date_reached";
 
 export type TriggerOption = {
   key: string;
@@ -22,6 +23,8 @@ export type TriggerOption = {
   field?: "status_id" | "stage_id";
   // extra number the user enters
   number?: { key: "days" | "minutes"; label: string; default: number };
+  // AUT-03: X days before or after a date field (field, days and direction are chosen in the builder)
+  date?: true;
 };
 
 export const TRIGGERS: TriggerOption[] = [
@@ -41,6 +44,12 @@ export const TRIGGERS: TriggerOption[] = [
   { key: "task:created", label: "משימה חדשה נוצרה", entity: "task", type: "created" },
   { key: "task:completed", label: "משימה הושלמה", entity: "task", type: "task_completed" },
   { key: "task:due_soon", label: "משימה מתקרבת למועד", entity: "task", type: "task_due_soon", number: { key: "minutes", label: "דקות לפני המועד", default: 60 } },
+  // AUT-03
+  { key: "lead:date", label: "תאריך בליד", entity: "lead", type: "date_reached", date: true },
+  { key: "contact:date", label: "תאריך באיש קשר", entity: "contact", type: "date_reached", date: true },
+  { key: "company:date", label: "תאריך בחברה", entity: "company", type: "date_reached", date: true },
+  { key: "deal:date", label: "תאריך בעסקה", entity: "deal", type: "date_reached", date: true },
+  { key: "task:date", label: "תאריך במשימה", entity: "task", type: "date_reached", date: true },
 ];
 
 export type ConditionOption = {
