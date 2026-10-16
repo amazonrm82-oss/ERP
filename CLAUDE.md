@@ -90,6 +90,9 @@ and build this CRM here instead. The old code is preserved on the branch
    `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`. Since CAL-10b (owner 15 October 2026) the same
    file serves the customer's personal link (page `/f/book/manage/<token>`, route `/api/forms/booking/manage/<token>`), which calls only
    `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
+   In use (BIZ-02, owner 13 October 2026, migration 020235): the digital business card (`src/features/business-cards/public-server.ts`,
+   page `/f/card/<token>`, routes `POST /api/forms/card/<token>` and `GET /api/forms/card/<token>/vcard`), which calls only
+   `public.business_card_public()` and `public.business_card_submit()` (the form goes through `intake_submit`); in the eslint allow-list.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -328,6 +331,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   links, business type, series, reminder or buffers; planned or cancelled only). Booking slots, `meeting_busy` and the calendar feed treat
   blocks as busy unchanged; `public.report_meetings` (last redefined in 020115), My day and tomorrow's reminders leave them out. App:
   `src/features/calendar/blocks.ts`, `block-actions.ts`, `components/block-time.tsx`.
+- Business cards (BIZ-02, migration 020235): `public.business_cards` (one per rep, secret `token` server-only, public fields only); each card owns
+  one form of kind `card` (`forms.business_card_id`, `forms_card_shape`, made by `app.business_cards_make_form`, locked by
+  `app.forms_card_lock`); `app.guard_form` was last redefined in 020235. Views limited per card and keyed IP hash
+  (`app.business_card_view_counts`, `app.business_card_sender`); an inactive or deleted rep or card answers not found.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
