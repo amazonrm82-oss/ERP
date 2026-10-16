@@ -64,7 +64,16 @@ export function QuoteDocument({ data }: { data: QuoteDocumentData }) {
           </div>
           <div className="space-y-1 text-sm sm:text-end">
             <p className="text-lead font-semibold text-accent-strong">הצעת מחיר</p>
-            <p>{quote.status === "draft" ? "טיוטה, עוד ללא מספר" : null}</p>
+            {quote.status === "draft" ? (
+              <p>טיוטה, עוד ללא מספר</p>
+            ) : quote.numberDisplay ? (
+              <p>
+                מספר:{" "}
+                <bdi dir="ltr" className="font-medium tabular-nums">
+                  {quote.numberDisplay}
+                </bdi>
+              </p>
+            ) : null}
             <p>תאריך: {formatDate(quote.quoteDate)}</p>
             {quote.validUntil ? <p>בתוקף עד: {formatDate(quote.validUntil)}</p> : null}
           </div>

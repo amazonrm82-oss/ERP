@@ -40,6 +40,12 @@ export type Quote = {
   vatAgorot: number;
   totalAgorot: number;
   createdAt: string;
+  // QUO-07: set when it is sent; the customer as named then; "הלקוח נמחק" once its record is purged
+  numberDisplay: string | null;
+  sentAt: string | null;
+  customerName: string | null;
+  customerContactName: string | null;
+  customerDeletedAt: string | null;
 };
 
 export type QuoteLine = {
@@ -65,7 +71,7 @@ export type QuoteLine = {
 };
 
 const QUOTE_COLUMNS =
-  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at";
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at";
 
 type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
 type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
@@ -96,6 +102,11 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
     vatAgorot: Number(row.vat_agorot),
     totalAgorot: Number(row.total_agorot),
     createdAt: row.created_at,
+    numberDisplay: row.number_display,
+    sentAt: row.sent_at,
+    customerName: row.customer_name,
+    customerContactName: row.customer_contact_name,
+    customerDeletedAt: row.customer_deleted_at,
   };
 }
 
@@ -149,7 +160,7 @@ export async function listQuoteLines(orgId: string, quoteId: string): Promise<Qu
   return readQuoteLines(await createClient(), orgId, quoteId);
 }
 
-export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt">;
+export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt" | "numberDisplay">;
 
 /** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). */
 export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | "contact"; id: string }): Promise<QuoteSummary[]> {
@@ -157,7 +168,7 @@ export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | 
   const rows = must(
     await supabase
       .from("quotes")
-      .select("id, title, status, quote_date, valid_until, total_agorot, created_at")
+      .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display")
       .eq("organization_id", orgId)
       .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
       .order("created_at", { ascending: false })
@@ -173,6 +184,7 @@ export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | 
     validUntil: row.valid_until,
     totalAgorot: Number(row.total_agorot),
     createdAt: row.created_at,
+    numberDisplay: row.number_display,
   }));
 }
 

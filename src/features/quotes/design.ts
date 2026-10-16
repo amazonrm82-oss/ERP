@@ -84,3 +84,32 @@ export const quoteDesignSchema = z
   });
 
 export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "color_mode", "accent_color"] as const;
+
+export type DocumentCustomer = {
+  // the name for invoices, else the company, else the contact
+  name: string;
+  // the person, when the quote is to a company or an invoice name
+  attention: string | null;
+  address: string | null;
+  email: string | null;
+  taxId: string | null;
+};
+
+/**
+ * QUO-07: a sent quote shows the customer as it was printed when sent (quote_send keeps the names), even
+ * after the record was renamed or purged; the address and email still come from the record while it exists.
+ * An erased quote has no names left and shows no customer once the record is gone.
+ */
+export function sentCustomer(
+  quote: { status: string; customerName: string | null; customerContactName: string | null },
+  live: DocumentCustomer | null,
+): DocumentCustomer | null {
+  if (quote.status === "draft" || !quote.customerName) return live;
+  return {
+    name: quote.customerName,
+    attention: quote.customerContactName,
+    address: live?.address ?? null,
+    email: live?.email ?? null,
+    taxId: live?.taxId ?? null,
+  };
+}

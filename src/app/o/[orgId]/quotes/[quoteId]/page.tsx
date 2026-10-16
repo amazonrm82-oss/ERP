@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { sendQuoteAction } from "@/features/quotes/actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -57,13 +59,18 @@ export default async function QuotePage({ params, searchParams }: Props) {
     listQuoteTemplates(orgId),
     quote.dealId
       ? supabase.from("deals").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.dealId).maybeSingle()
-      : supabase.from("contacts").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.contactId ?? "").maybeSingle(),
+      : quote.contactId
+        ? supabase.from("contacts").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle()
+        : // QUO-07: a sent quote whose deal and contact were purged
+          null,
   ]);
-  const parentRow = must(parent, "quote parent");
+  const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const back = quote.dealId
     ? { href: paths.deal(orgId, quote.dealId), label: parties.deal ?? "עסקה" }
-    : { href: paths.contact(orgId, quote.contactId ?? ""), label: parties.contact ?? "איש קשר" };
+    : quote.contactId
+      ? { href: paths.contact(orgId, quote.contactId), label: parties.contact ?? "איש קשר" }
+      : { href: paths.home, label: "חזרה" };
 
   return (
     <div className="max-w-4xl">
@@ -71,14 +78,43 @@ export default async function QuotePage({ params, searchParams }: Props) {
         title={quote.title}
         back={back}
         actions={
-          // QUO-05: the quote as its customer sees it, to print or save as PDF
-          <ButtonLink href={quoteDocumentPath(orgId, quote.id)} variant="secondary" size="sm">
-            תצוגה והדפסה
-          </ButtonLink>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* QUO-05: the quote as its customer sees it, to print or save as PDF */}
+            <ButtonLink href={quoteDocumentPath(orgId, quote.id)} variant="secondary" size="sm">
+              תצוגה והדפסה
+            </ButtonLink>
+            {/* QUO-07: the draft gets its number and is locked; sending by link comes with QUO-08 */}
+            {canEdit ? (
+              <ConfirmButton
+                variant="primary"
+                size="sm"
+                title="לסמן את ההצעה כנשלחה?"
+                description="ההצעה תקבל את המספר הרץ הבא, והיא ננעלת לעריכה. שליחה ללקוח בקישור תגיע בהמשך; בינתיים שולחים אותה מודפסת או כקובץ PDF."
+                confirmLabel="סימון כנשלחה"
+                action={() => sendQuoteAction(orgId, quote.id)}
+              >
+                סימון כנשלחה
+              </ConfirmButton>
+            ) : null}
+          </div>
         }
       />
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <Badge>{QUOTE_STATUS_LABELS[quote.status]}</Badge>
+        {quote.numberDisplay ? (
+          <span>
+            מספר{" "}
+            <span dir="ltr" className="font-medium text-ink tabular-nums">
+              {quote.numberDisplay}
+            </span>
+          </span>
+        ) : null}
+        {quote.sentAt ? <span>נשלחה {formatDate(quote.sentAt)}</span> : null}
+        {quote.customerDeletedAt ? (
+          <Badge tone="warning">
+            הלקוח נמחק{quote.customerName ? `: ${quote.customerName}` : ""}
+          </Badge>
+        ) : null}
         <span>{formatDate(quote.quoteDate)}</span>
         {quote.dealId && parties.deal ? (
           <span>

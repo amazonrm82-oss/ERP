@@ -10,7 +10,7 @@ import { documentAddress } from "@/features/tax/settings";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
-import { designFromRow, quoteColor, type QuoteDesign } from "./design";
+import { designFromRow, quoteColor, sentCustomer, type DocumentCustomer, type QuoteDesign } from "./design";
 import { getQuoteParties, listQuoteLines, type Quote, type QuoteLine } from "./queries";
 
 /** QUO-05: the business's quote design (every member reads it; no row = the defaults). */
@@ -36,15 +36,7 @@ export type DocumentBusiness = {
   email: string | null;
 };
 
-export type DocumentCustomer = {
-  // the name for invoices, else the company, else the contact
-  name: string;
-  // the person, when the quote is to a company or an invoice name
-  attention: string | null;
-  address: string | null;
-  email: string | null;
-  taxId: string | null;
-};
+export type { DocumentCustomer } from "./design";
 
 export type QuoteDocumentData = {
   design: QuoteDesign;
@@ -119,7 +111,7 @@ export async function getQuoteDocumentData(orgId: string, quote: Quote, displayN
     color: quoteColor(design, branding.color),
     logoUrl: design.showLogo ? branding.logoUrl : null,
     business,
-    customer: customerFrom(billing ?? empty, { company: parties.company, contact: parties.contact }),
+    customer: sentCustomer(quote, customerFrom(billing ?? empty, { company: parties.company, contact: parties.contact })),
     quote,
     lines,
   };
@@ -160,7 +152,12 @@ export async function getSampleDocumentData(orgId: string, displayName: string):
     quote: {
       id: "sample",
       title: "הצעת מחיר לדוגמה",
-      status: "draft",
+      status: "sent",
+      numberDisplay: "1001",
+      sentAt: today,
+      customerName: null,
+      customerContactName: null,
+      customerDeletedAt: null,
       dealId: null,
       contactId: null,
       companyId: null,

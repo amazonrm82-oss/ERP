@@ -32,6 +32,11 @@ export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
             {quotes.map((quote) => (
               <li key={quote.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
                 <Link href={quotePath(orgId, quote.id)} className="min-w-0 flex-1 font-medium break-words text-accent-strong underline-offset-4 hover:underline">
+                  {quote.numberDisplay ? (
+                    <span dir="ltr" className="me-1 tabular-nums">
+                      {quote.numberDisplay}
+                    </span>
+                  ) : null}
                   <bdi>{quote.title}</bdi>
                 </Link>
                 <span className="flex items-center gap-2 text-sm text-ink-soft">

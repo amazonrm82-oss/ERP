@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
-import { DEFAULT_QUOTE_DESIGN, designFromRow, quoteColor, quoteDesignSchema } from "@/features/quotes/design";
+import { DEFAULT_QUOTE_DESIGN, designFromRow, quoteColor, quoteDesignSchema, sentCustomer } from "@/features/quotes/design";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
 
 const form = (values: Record<string, string>) => ({ header_text: "", footer_text: "", color_mode: "brand", ...values });
@@ -34,6 +34,11 @@ const quote = (extra: Partial<Quote> = {}): Quote => ({
   id: "q",
   title: "שיפוץ מטבח",
   status: "draft",
+  numberDisplay: null,
+  sentAt: null,
+  customerName: null,
+  customerContactName: null,
+  customerDeletedAt: null,
   dealId: null,
   contactId: null,
   companyId: null,
@@ -125,4 +130,31 @@ describe("the quote document (QUO-05)", () => {
     const exempt = renderToStaticMarkup(createElement(QuoteDocument, { data: data({ quote: quote({ vatRateBp: 0, vatAgorot: 0, totalAgorot: 27000 }) }) }));
     expect(exempt).not.toContain("מע&quot;מ 0%");
   });
+
+  it("a sent quote shows its number instead of the draft line (QUO-07)", () => {
+    const html = renderToStaticMarkup(createElement(QuoteDocument, { data: data({ quote: quote({ status: "sent", numberDisplay: "QT-1042" }) }) }));
+    expect(html).toContain("QT-1042");
+    expect(html).not.toContain("טיוטה, עוד ללא מספר");
+  });
 });
+
+describe("the customer on a sent quote (QUO-07)", () => {
+  const live = { name: "שם חדש בע\"מ", attention: "דנה", address: "הדוגמה 2", email: "c@example.com", taxId: "515555555" };
+  it("a draft shows the live record", () => {
+    expect(sentCustomer({ status: "draft", customerName: "שם ישן", customerContactName: null }, live)).toBe(live);
+  });
+  it("a sent quote keeps the names as printed, and the address from the record while it exists", () => {
+    expect(sentCustomer({ status: "sent", customerName: "שם ישן", customerContactName: "ישראל" }, live)).toEqual({ ...live, name: "שם ישן", attention: "ישראל" });
+    expect(sentCustomer({ status: "sent", customerName: "שם ישן", customerContactName: null }, null)).toEqual({
+      name: "שם ישן",
+      attention: null,
+      address: null,
+      email: null,
+      taxId: null,
+    });
+  });
+  it("an erased quote (no names left) falls back to the record, which is gone", () => {
+    expect(sentCustomer({ status: "sent", customerName: null, customerContactName: null }, null)).toBeNull();
+  });
+});
+

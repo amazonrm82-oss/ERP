@@ -402,3 +402,20 @@ export async function reorderQuoteLinesAction(orgId: string, quoteId: string, id
   revalidatePath(quotePath(orgId, quoteId));
   return ok();
 }
+
+// QUO-07 ---------------------------------------------------------------------
+
+/**
+ * Marks a draft as sent (public.quote_send): it gets its running number, the customer names are kept as
+ * they are now, and it is locked. Sending it to the customer by link comes with the customer page (QUO-08).
+ */
+export async function sendQuoteAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { error } = await context.supabase.rpc("quote_send", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  else revalidatePath(quotePath(orgId, quoteId));
+  return ok();
+}

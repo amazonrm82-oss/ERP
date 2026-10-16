@@ -1521,6 +1521,15 @@ export type QuoteRow = {
   net_total_agorot: number;
   vat_agorot: number;
   total_agorot: number;
+  // QUO-07: server-only; set by public.quote_send and by the purge of the quote's deal or contact
+  number: number | null;
+  number_display: string | null;
+  sent_at: string | null;
+  customer_name: string | null;
+  customer_contact_name: string | null;
+  former_deal_id: string | null;
+  former_contact_id: string | null;
+  customer_deleted_at: string | null;
   currency: string;
   created_by: string | null;
   created_at: string;
@@ -2604,6 +2613,8 @@ export type Database = {
       undo_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       // QUO-04: a template made from a quote the caller reads (security invoker); the new template's id
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
+      // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
+      quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };

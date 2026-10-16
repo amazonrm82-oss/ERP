@@ -449,6 +449,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quotes.sql",
       // SEG-01 redefines app.sample_untouched() last (a static segment keeps a sample lead or contact)
       "_segments.sql",
+      // QUO-07 redefines app.quotes_check(), app.quotes_detach_contact() and app.audit_erase_core() of _quotes.sql last
+      "_quote_send.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
