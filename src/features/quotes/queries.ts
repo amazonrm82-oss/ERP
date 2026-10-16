@@ -10,6 +10,7 @@ import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
 import type { Database } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
+import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
 import { isNoVatReason, isQuoteStatus, type NoVatReason, type QuoteStatus } from "./schema";
@@ -186,6 +187,44 @@ export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | 
     createdAt: row.created_at,
     numberDisplay: row.number_display,
   }));
+}
+
+export type DetachedQuote = QuoteSummary & { customerName: string | null; sentAt: string | null; customerDeletedAt: string };
+
+/**
+ * QUO-07: kept quotes whose customer was deleted (the deal and contact are both gone), newest deletion first,
+ * one page at a time. Read with the user's session: the select policy shows them to owners and admins only.
+ */
+export async function listDetachedQuotes(orgId: string, page: number): Promise<{ quotes: DetachedQuote[]; hasMore: boolean }> {
+  const supabase = await createClient();
+  const from = (page - 1) * PAGE_SIZE;
+  const rows = must(
+    await supabase
+      .from("quotes")
+      .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display, customer_name, sent_at, customer_deleted_at")
+      .eq("organization_id", orgId)
+      .not("customer_deleted_at", "is", null)
+      .order("customer_deleted_at", { ascending: false })
+      .order("id")
+      .range(from, from + PAGE_SIZE),
+    "quotes",
+  );
+  return {
+    hasMore: rows.length > PAGE_SIZE,
+    quotes: rows.slice(0, PAGE_SIZE).map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: isQuoteStatus(row.status) ? row.status : "sent",
+      quoteDate: row.quote_date,
+      validUntil: row.valid_until,
+      totalAgorot: Number(row.total_agorot),
+      createdAt: row.created_at,
+      numberDisplay: row.number_display,
+      customerName: row.customer_name,
+      sentAt: row.sent_at,
+      customerDeletedAt: row.customer_deleted_at as string,
+    })),
+  };
 }
 
 /**

@@ -167,14 +167,14 @@ export async function priceListTiers(supabase: Client, orgId: string, listId: st
   }));
 }
 
-export type PickedProduct = PricedProduct & { name: string; sku: string | null; barcode: string | null; offerable: boolean };
+export type PickedProduct = PricedProduct & { name: string; description: string | null; sku: string | null; barcode: string | null; offerable: boolean };
 
 /** One product for pricing, or null when it is not in the organization (or not readable). */
 export async function readPricedProduct(supabase: Client, orgId: string, productId: string): Promise<PickedProduct | null> {
   const row = must(
     await supabase
       .from("products")
-      .select("id, name, sku, barcode, price_agorot, price_includes_vat, vat_kind, is_active, archived_at")
+      .select("id, name, description, sku, barcode, price_agorot, price_includes_vat, vat_kind, is_active, archived_at")
       .eq("organization_id", orgId)
       .eq("id", productId)
       .maybeSingle(),
@@ -184,6 +184,7 @@ export async function readPricedProduct(supabase: Client, orgId: string, product
   return {
     id: row.id,
     name: row.name,
+    description: row.description,
     sku: row.sku,
     barcode: row.barcode,
     priceAgorot: Number(row.price_agorot),

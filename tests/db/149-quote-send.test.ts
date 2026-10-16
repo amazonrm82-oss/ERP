@@ -193,6 +193,17 @@ describe("sending a quote and keeping it (QUO-07)", () => {
     expect(leftover).toBe(0);
   });
 
+  it("a privacy erasure leaves a draft alone: a deal's draft that named the erased contact stays the deal's", async () => {
+    const contact = await newContact(member, "דנה לטיוטה");
+    const deal = await newDeal(member, contact);
+    const draft = await newQuote(member, { deal_id: deal }, "טיוטה של העסקה");
+    await purge("contacts", contact);
+    // the draft stays with its deal and remembers the contact it named, so the erasure finds it
+    expect(await quote(draft)).toMatchObject({ status: "draft", deal_id: deal, contact_id: null, former_contact_id: contact });
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    expect(await quote(draft)).toMatchObject({ status: "draft", title: "טיוטה של העסקה", notes: "הערה אישית" });
+  });
+
   it("deleting a whole business with kept quotes works", async () => {
     const boss = await createUser("qs-doomed");
     const doomed = await createOrg(boss.id, "עסק שנמחק עם הצעות");

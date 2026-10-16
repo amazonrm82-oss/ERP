@@ -23,6 +23,7 @@ import {
   DEFAULT_VALID_DAYS,
   defaultQuoteTitle,
   QUOTE_HEADER_FIELD_NAMES,
+  QUOTE_LINE_DESCRIPTION_MAX,
   QUOTE_LINE_FIELD_NAMES,
   QUOTE_LINES_MAX,
   quoteGroupSchema,
@@ -212,9 +213,12 @@ async function addLine(orgId: string, quoteId: string, formData: FormData): Prom
   const pricing = await readQuotePricing(context.supabase, orgId, quote);
 
   let price: { agorot: number; source: "product" | "price_list" | "manual"; listId: string | null };
+  // PRD-03: a product line left without a description takes the product's (the form fills it in too)
+  let description = input.description;
   if (input.productId) {
     const product = await readPricedProduct(context.supabase, orgId, input.productId);
     if (!product || !product.offerable) return fail(PRODUCT_GONE, { fieldErrors: { product_id: PRODUCT_GONE }, values });
+    if (!description && product.description) description = product.description.slice(0, QUOTE_LINE_DESCRIPTION_MAX);
     if (input.unitPriceAgorot === null) {
       const pulled = await automaticPrice(context, orgId, pricing, product.id, input.quantity);
       if (!pulled) return fail(PRODUCT_GONE, { values });
@@ -238,7 +242,7 @@ async function addLine(orgId: string, quoteId: string, formData: FormData): Prom
     kind: "item",
     product_id: input.productId,
     name: input.name,
-    description: input.description,
+    description,
     quantity: input.quantity,
     unit_price_agorot: price.agorot,
     discount_bp: input.discountBp,

@@ -26,7 +26,7 @@ import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
-import { quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
+import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -89,6 +89,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
           : []),
         ...(access.admin
           ? [
+              // QUO-07: kept quotes whose deal and contact were purged; only owners and admins read them
+              { href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו", description: "הצעות שנשלחו ונשארו אחרי שהלקוח נמחק לצמיתות", icon: FormIcon },
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },
               { href: paths.settingsSetupChecklist(orgId), label: "רשימת הקמה", description: "מה כבר מוכן בעסק, ונתוני דוגמה", icon: CheckSquareIcon },
             ]

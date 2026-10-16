@@ -61,6 +61,7 @@ export function QuoteLineForm({ orgId, quoteId, pricing, line, features, onDone,
   const startKind: DiscountKind | "" = line?.discountBp ? "percent" : line?.discountAgorot ? "amount" : "";
   const [product, setProduct] = useState<ProductHit | null>(null);
   const [name, setName] = useState(line?.name ?? "");
+  const [description, setDescription] = useState(line?.description ?? "");
   const [quantity, setQuantity] = useState(line ? String(line.quantity) : "1");
   const [price, setPrice] = useState(line ? agorotInput(line.unitPriceAgorot) : "");
   const [discountKind, setDiscountKind] = useState<DiscountKind | "">(startKind);
@@ -114,6 +115,8 @@ export function QuoteLineForm({ orgId, quoteId, pricing, line, features, onDone,
           onPick={(picked) => {
             setProduct(picked);
             if (picked && name.trim() === "") setName(picked.name);
+            // PRD-03: the product's description too, when the line has none yet (a quote line holds up to 2,000)
+            if (picked?.description && description.trim() === "") setDescription(picked.description.slice(0, QUOTE_LINE_DESCRIPTION_MAX));
           }}
         />
       ) : (
@@ -126,7 +129,8 @@ export function QuoteLineForm({ orgId, quoteId, pricing, line, features, onDone,
         name="description"
         rows={2}
         maxLength={QUOTE_LINE_DESCRIPTION_MAX}
-        defaultValue={line?.description ?? ""}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
         hint="מופיע מתחת לשם בהצעה. רשות."
         error={errors.description}
       />

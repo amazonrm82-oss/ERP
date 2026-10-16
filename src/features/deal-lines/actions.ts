@@ -273,6 +273,8 @@ export async function moveDealLineAction(orgId: string, dealId: string, lineId: 
 export type ProductHit = {
   id: string;
   name: string;
+  // PRD-03: a quote line made from the product copies its description (a deal line keeps the name only)
+  description: string | null;
   sku: string | null;
   barcode: string | null;
   priceAgorot: number;
@@ -295,7 +297,7 @@ export async function searchDealProductsAction(orgId: string, query: unknown, li
   if (!context.ok) return [];
   let request = context.supabase
     .from("products")
-    .select("id, name, sku, barcode, price_agorot, price_includes_vat, vat_kind, billing")
+    .select("id, name, description, sku, barcode, price_agorot, price_includes_vat, vat_kind, billing")
     .eq("organization_id", orgId)
     .eq("is_active", true)
     .is("archived_at", null);
@@ -324,6 +326,7 @@ export async function searchDealProductsAction(orgId: string, query: unknown, li
   return data.map((row) => ({
     id: row.id,
     name: row.name,
+    description: row.description,
     sku: row.sku,
     barcode: row.barcode,
     priceAgorot: Number(row.price_agorot),
@@ -383,6 +386,8 @@ export async function quickCreateProductAction(orgId: string, dealId: string, _p
   return ok({
     id: data.id,
     name: data.name,
+    // a quick product is made without a description
+    description: null,
     sku: data.sku,
     barcode: data.barcode,
     priceAgorot: Number(data.price_agorot),

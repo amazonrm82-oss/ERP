@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
 import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-tools";
-import { quoteDocumentPath } from "@/features/quotes/paths";
+import { detachedQuotesPath, quoteDocumentPath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -70,7 +70,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     ? { href: paths.deal(orgId, quote.dealId), label: parties.deal ?? "עסקה" }
     : quote.contactId
       ? { href: paths.contact(orgId, quote.contactId), label: parties.contact ?? "איש קשר" }
-      : { href: paths.home, label: "חזרה" };
+      : // QUO-07: a quote whose customer was deleted belongs to the list of such quotes
+        { href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו" };
 
   return (
     <div className="max-w-4xl">
