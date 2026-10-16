@@ -10,3 +10,6 @@ export const quoteDocumentPath = (orgId: string, quoteId: string) => `/o/${orgId
 
 /** QUO-07: kept quotes whose customer was deleted (settings, owners and admins). */
 export const detachedQuotesPath = (orgId: string) => `/o/${orgId}/settings/deleted-customer-quotes`;
+
+/** QUO-16: every quote of the business, with filters. */
+export const quotesPath = (orgId: string) => `/o/${orgId}/quotes`;

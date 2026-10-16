@@ -164,15 +164,15 @@ export async function listQuoteLines(orgId: string, quoteId: string): Promise<Qu
 
 export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt" | "numberDisplay">;
 
-/** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). */
-export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | "contact"; id: string }): Promise<QuoteSummary[]> {
+/** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). QUO-16: and of a company. */
+export async function listRecordQuotes(orgId: string, subject: { kind: "deal" | "contact" | "company"; id: string }): Promise<QuoteSummary[]> {
   const supabase = await createClient();
   const rows = must(
     await supabase
       .from("quotes")
       .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display")
       .eq("organization_id", orgId)
-      .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
+      .eq(subject.kind === "deal" ? "deal_id" : subject.kind === "contact" ? "contact_id" : "company_id", subject.id)
       .order("created_at", { ascending: false })
       .order("id")
       .limit(50),
@@ -317,4 +317,77 @@ export async function listQuoteSchedule(orgId: string, quoteId: string): Promise
     "quote payment schedule",
   );
   return rows.map((row) => ({ id: row.id, position: row.position, name: row.name, percentBp: row.percent_bp, dueDate: row.due_date, milestone: row.milestone }));
+}
+
+// QUO-16 ---------------------------------------------------------------------
+
+export type QuoteListFilters = {
+  status: QuoteStatus | null;
+  ownerId: string | null;
+  // quote dates, inclusive (YYYY-MM-DD)
+  from: string | null;
+  to: string | null;
+  page: number;
+};
+
+export type QuoteListItem = QuoteSummary & {
+  ownerId: string | null;
+  sentAt: string | null;
+  // the customer as the quote names it once sent, else the contact's name, else the deal's
+  customer: string | null;
+  dealId: string | null;
+  contactId: string | null;
+};
+
+/**
+ * QUO-16: the business's quotes, newest first, filtered by status, owner and quote date; one page at a time. Read with
+ * the user's session: the quotes RLS shows only the quotes of deals and contacts they read.
+ */
+export async function listQuotes(orgId: string, filters: QuoteListFilters): Promise<{ quotes: QuoteListItem[]; hasMore: boolean }> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("quotes")
+    .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display, owner_id, sent_at, customer_name, deal_id, contact_id")
+    .eq("organization_id", orgId);
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
+  if (filters.from) query = query.gte("quote_date", filters.from);
+  if (filters.to) query = query.lte("quote_date", filters.to);
+  const offset = (filters.page - 1) * PAGE_SIZE;
+  const rows = must(
+    await query
+      .order("quote_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(offset, offset + PAGE_SIZE),
+    "quotes list",
+  );
+  const page = rows.slice(0, PAGE_SIZE);
+  // the names of the deals and contacts on this page, read separately (RLS: only those the user reads)
+  const contactIds = [...new Set(page.flatMap((row) => (row.contact_id && !row.customer_name ? [row.contact_id] : [])))];
+  const dealIds = [...new Set(page.flatMap((row) => (row.deal_id && !row.customer_name && !row.contact_id ? [row.deal_id] : [])))];
+  const [contacts, deals] = await Promise.all([
+    contactIds.length > 0 ? supabase.from("contacts").select("id, full_name").eq("organization_id", orgId).in("id", contactIds) : null,
+    dealIds.length > 0 ? supabase.from("deals").select("id, name").eq("organization_id", orgId).in("id", dealIds) : null,
+  ]);
+  const contactNames = new Map((contacts ? must(contacts, "quote contacts") : []).map((row) => [row.id, row.full_name]));
+  const dealNames = new Map((deals ? must(deals, "quote deals") : []).map((row) => [row.id, row.name]));
+  return {
+    hasMore: rows.length > PAGE_SIZE,
+    quotes: page.map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: isQuoteStatus(row.status) ? row.status : "draft",
+      quoteDate: row.quote_date,
+      validUntil: row.valid_until,
+      totalAgorot: Number(row.total_agorot),
+      createdAt: row.created_at,
+      numberDisplay: row.number_display,
+      ownerId: row.owner_id,
+      sentAt: row.sent_at,
+      dealId: row.deal_id,
+      contactId: row.contact_id,
+      customer: row.customer_name ?? (row.contact_id ? contactNames.get(row.contact_id) : null) ?? (row.deal_id ? dealNames.get(row.deal_id) : null) ?? null,
+    })),
+  };
 }

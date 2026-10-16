@@ -3,6 +3,7 @@ import Form from "next/form";
 import Link from "next/link";
 
 import { Pagination } from "@/components/ui/pagination";
+import { quotesPath } from "@/features/quotes/paths";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
@@ -178,6 +179,10 @@ export default async function DealsPage({ params, searchParams }: Props) {
 
   const newDealButton = (
     <span className="flex flex-wrap gap-2">
+      {/* QUO-16: every quote of the business */}
+      <ButtonLink href={quotesPath(orgId)} variant="secondary">
+        הצעות מחיר
+      </ButtonLink>
       {/* MNY-05: the weekly cleanup of stuck and overdue deals */}
       <ButtonLink href={paths.dealsCleanup(orgId)} variant="secondary">
         ניקוי שבועי
@@ -349,10 +354,19 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
       עסקה חדשה
     </ButtonLink>
   ) : null;
+  // QUO-16: every quote of the business, next to the new deal button
+  const headerActions = (
+    <span className="flex flex-wrap gap-2">
+      <ButtonLink href={quotesPath(orgId)} variant="secondary">
+        הצעות מחיר
+      </ButtonLink>
+      {newDealButton}
+    </span>
+  );
 
   return (
     <>
-      <PageHeader title="עסקאות" description={`תהליך המכירה "${pipeline.name}"`} actions={newDealButton} />
+      <PageHeader title="עסקאות" description={`תהליך המכירה "${pipeline.name}"`} actions={headerActions} />
       <ViewNav orgId={orgId} pipelineId={pipeline.id} pipelines={pipelines} table />
       <SavedViewsBar
         orgId={orgId}

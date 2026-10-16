@@ -12,21 +12,28 @@ import { NewQuoteButton } from "./new-quote-button";
 
 type Props = {
   orgId: string;
-  subject: { kind: "deal" | "contact"; id: string };
+  // QUO-16: a company shows the quotes that name it; a quote is made from a deal or a contact
+  subject: { kind: "deal" | "contact" | "company"; id: string };
   // the plan holds quotes and the person may edit the record (RLS decides again)
   canCreate: boolean;
 };
 
 /** QUO-01: the quotes of a deal or a contact, with "הצעה חדשה". Hidden when there is nothing to show or do. */
 export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
-  const [quotes, templates] = await Promise.all([listRecordQuotes(orgId, subject), canCreate ? listQuoteTemplates(orgId) : []]);
-  if (quotes.length === 0 && !canCreate) return null;
+  const source = subject.kind === "company" ? null : { kind: subject.kind, id: subject.id };
+  const creates = canCreate && source !== null;
+  const [quotes, templates] = await Promise.all([listRecordQuotes(orgId, subject), creates ? listQuoteTemplates(orgId) : []]);
+  if (quotes.length === 0 && !creates) return null;
   return (
     <Card aria-labelledby={`quotes-${subject.id}`} className="print:hidden">
-      <CardHeader id={`quotes-${subject.id}`} title="הצעות מחיר" action={canCreate ? <NewQuoteButton orgId={orgId} source={subject} templates={templates.map((t) => ({ id: t.id, name: t.name }))} /> : null} />
+      <CardHeader id={`quotes-${subject.id}`} title="הצעות מחיר" action={
+          creates && source ? (
+            <NewQuoteButton orgId={orgId} source={source} templates={templates.map((t) => ({ id: t.id, name: t.name }))} />
+          ) : null
+        } />
       <CardBody>
         {quotes.length === 0 ? (
-          <p className="text-sm text-ink-soft">{subject.kind === "deal" ? "עוד אין הצעות מחיר לעסקה." : "עוד אין הצעות מחיר לאיש הקשר."}</p>
+          <p className="text-sm text-ink-soft">{subject.kind === "deal" ? "עוד אין הצעות מחיר לעסקה." : subject.kind === "contact" ? "עוד אין הצעות מחיר לאיש הקשר." : "עוד אין הצעות מחיר לחברה."}</p>
         ) : (
           <ul className="divide-y divide-line">
             {quotes.map((quote) => (

@@ -27,6 +27,7 @@ import { getContactDomainInfo } from "@/features/company-domain/queries";
 import { ChildCompaniesCard } from "@/features/companies/components/child-companies-card";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
+import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -186,6 +187,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             newDealQuery={context.canWrite ? `?company=${company.id}` : null}
             emptyText="עוד אין עסקאות עם החברה הזו."
           />
+          {/* QUO-16: the quotes that name the company (made from its deals and people) */}
+          <RecordQuotesCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={false} />
 
         </div>
       </div>
