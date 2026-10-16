@@ -806,6 +806,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   update an automation makes names the rule in its audit entry, from `app.automation_rule_runs` (65,536 fixed slots keyed by
   `txid_current() % 65536`, taken with SKIP LOCKED; never a session setting). `app.audit_row` and `app.execute_automation` were last
   redefined in 020020.
+- View seats (PRM-02, migration 020120): an active view seat needs room in `view_seats_per_paid_seat` x active full seats
+  (`app.view_seat_cap`, `app.assert_view_seat_available`, under the paid-seat check's subscription lock; hint
+  `limit:view_seats_per_paid_seat`); `app.guard_membership` (last redefined in 020120) calls it whenever a view seat becomes active.
+  A `view_seats` feature override alone no longer admits viewers: set the quota too. Seats over the allowance stay.
+  `public.org_plan_usage` (last redefined in 020120) lists `view_seats` while the plan has the flag.
 - Product costs (PRD-06, migration 020060; owner 15 October 2026, part of the `products` flag): `public.product_costs` (one row
   per product, `cost_agorot` per unit as typed: before VAT in a business that charges VAT, else the amount paid; product FK
   cascades). Every policy needs `app.can_view_costs(org)` (owner/admin/manager by role, or the PRM-01 grant `view_costs`); writes
