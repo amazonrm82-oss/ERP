@@ -92,6 +92,8 @@ and build this CRM here instead. The old code is preserved on the branch
    `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
    In use (QUO-08 part one, owner 8 October 2026, migration 020290): the customer's quote page (`src/features/quotes/public-server.ts`,
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
+   In use (BIZ-03 part one, owner 13 October 2026, migration 020295): the QR scan route (`src/features/qr-codes/scan-server.ts`, route
+   `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>` or `/f/book/<token>`; in the eslint allow-list.
    In use (BIZ-02, owner 13 October 2026, migration 020235): the digital business card (`src/features/business-cards/public-server.ts`,
    page `/f/card/<token>`, routes `POST /api/forms/card/<token>` and `GET /api/forms/card/<token>/vcard`), which calls only
    `public.business_card_public()` and `public.business_card_submit()` (the form goes through `intake_submit`); in the eslint allow-list.
@@ -345,6 +347,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   one form of kind `card` (`forms.business_card_id`, `forms_card_shape`, made by `app.business_cards_make_form`, locked by
   `app.forms_card_lock`); `app.guard_form` was last redefined in 020235. Views limited per card and keyed IP hash
   (`app.business_card_view_counts`, `app.business_card_sender`); an inactive or deleted rep or card answers not found.
+- QR codes (BIZ-03 part one, migration 020295; flag `qr_codes`, quota `max_qr_codes` counting every code): `public.qr_codes` (a form of
+  kind `form` or a booking page, composite FKs set null; server-made `token`; owners/admins of a writable org only, because a code
+  leads to a booking page's link; outsider guard first in `app.qr_codes_check`). Scans are a counter only: `app.qr_code_scan_days`
+  (per code and day) and `app.qr_scan_windows` (60 counted per code per minute); `public.qr_scan` (service_role) answers only
+  `{path, campaign}`; `public.qr_code_scans(org, days)` (owners/admins). Campaign tags only (utm_source=qr); Google review and card
+  targets wait for the owner.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
