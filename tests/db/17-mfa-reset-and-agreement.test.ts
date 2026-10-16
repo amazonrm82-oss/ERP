@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addMember, asAdmin, asMfaUser, asUser, closePool, count, createOrg, createUser, pgError, type Query } from "./helpers";
+import { AGREEMENT_VERSION, agreementSnapshot } from "@/features/legal/agreement";
 
 afterAll(closePool);
 
@@ -121,15 +122,16 @@ describe("two-step verification reset by platform support", () => {
 });
 
 describe("signed agreement", () => {
-  const docs = JSON.stringify([{ slug: "terms", title: "תנאי שימוש", text: "סעיף 1. כללי." }]);
+  // the app's own texts: sign_agreement() accepts only the registered texts of a version (FXS-09)
+  const docs = JSON.stringify(agreementSnapshot());
   const sign = (userId: string, method = "typed", signature: string | null = null) =>
-    asUser(userId, (q) => q("select public.sign_agreement('2026-10-07', $1, 'דנה כהן', $2, $3)", [docs, method, signature]));
+    asUser(userId, (q) => q("select public.sign_agreement($1, $2, 'דנה כהן', $3, $4)", [AGREEMENT_VERSION, docs, method, signature]));
 
   it("a user signs their own copy, which keeps the text and its hash, and nobody can change it", async () => {
     const user = await createUser("signer");
     expect(await asUser(user.id, async (q) => (await q<{ r: string | null }>("select public.agreement_status() as r")).rows[0].r)).toBeNull();
     await sign(user.id);
-    expect(await asUser(user.id, async (q) => (await q<{ r: string }>("select public.agreement_status() as r")).rows[0].r)).toBe("2026-10-07");
+    expect(await asUser(user.id, async (q) => (await q<{ r: string }>("select public.agreement_status() as r")).rows[0].r)).toBe(AGREEMENT_VERSION);
     const copy = await asUser(user.id, async (q) => (await q<{ r: Record<string, unknown> }>("select public.my_agreement() as r")).rows[0].r);
     expect(copy.full_name).toBe("דנה כהן");
     expect(copy.documents).toEqual(JSON.parse(docs));

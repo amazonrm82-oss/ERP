@@ -44,6 +44,9 @@ export const VAT_BEFORE_TABLE = 'תאריך המסמך מוקדם מכל שיע�
 export const VAT_RATE_FUTURE_ONLY = 'אפשר לקבוע שיעור מע"מ רק מיום שאחרי היום. שיעור שכבר התחיל נעול.';
 
 const LIMIT_MESSAGES: Record<string, string> = {
+  // FXS-09: sign_agreement() accepts only the registered texts of a version; for the app this happens only while a
+  // deploy and its migration are out of step, so the message asks to try again soon
+  "agreement:changed": `לא ניתן לחתום כרגע על ההסכם. נסו שוב בעוד כמה דקות, ואם זה חוזר פנו לתמיכה: ${SUPPORT_LINE}.`,
   "limit:max_records": "הגעתם למספר הרשומות המרבי בחבילה. אפשר לפנות מקום, או לבקש מבעלי העסק חבילה גדולה יותר. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:max_users": "הגעתם למספר המשתמשים המרבי בחבילה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "limit:seats": "כל המושבים שנרכשו תפוסים. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",

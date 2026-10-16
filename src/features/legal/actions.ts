@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { fail, formValues, type FormState } from "@/lib/action-result";
 import { sessionCheck } from "@/lib/auth";
+import { dbErrorMessage } from "@/lib/errors";
 
 import { safeNextPath } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -42,6 +43,7 @@ export async function signAgreementAction(_prev: FormState, formData: FormData):
     p_method: method,
     p_signature: method === "drawn" ? (signature ?? null) : null,
   });
-  if (error) return fail("לא הצלחנו לשמור את החתימה. נסו שוב.", { values: formValues(formData) });
+  // FXS-09: a text the database does not know for this version (a deploy and its migration out of step) says so
+  if (error) return fail(dbErrorMessage(error, "לא הצלחנו לשמור את החתימה. נסו שוב."), { values: formValues(formData) });
   redirect(safeNextPath(formData.get("next")?.toString()));
 }

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addMember, asAdmin, asMfaUser, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
+import { AGREEMENT_VERSION, agreementSnapshot } from "@/features/legal/agreement";
 
 afterAll(closePool);
 
@@ -102,8 +103,9 @@ describe("two-step verification guards the personal tables too (FXS-03)", () => 
   });
 
   it("a password-only session can read neither its signed agreement nor its backup code status (RVW-13)", async () => {
-    const docs = JSON.stringify([{ slug: "terms", title: "תנאים", version: "v", text: "טקסט" }]);
-    const sign = (userId: string) => asUser(userId, (q) => q("select public.sign_agreement('v', $1, 'דנה כהן', 'typed', null)", [docs]));
+    const docs = JSON.stringify(agreementSnapshot());
+    const sign = (userId: string) =>
+      asUser(userId, (q) => q("select public.sign_agreement($1, $2, 'דנה כהן', 'typed', null)", [AGREEMENT_VERSION, docs]));
     await sign(owner.id); // signing stays open to a password-only session
     await sign(plain.id);
     const agreement = (run: typeof asUser, userId: string) =>
