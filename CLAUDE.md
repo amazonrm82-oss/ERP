@@ -85,6 +85,9 @@ and build this CRM here instead. The old code is preserved on the branch
    platform owner only); database tests and an independent review before merge.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
+   In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
+   `/f/book/<token>`, route `/api/forms/booking/<token>`), which calls only `public.booking_page_public()` and
+   `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`.
 6. If something looks like it belongs to another system, stop and ask.
 
 ## Stack
@@ -286,6 +289,19 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
   (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020050) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
+- Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
+  `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
+  Managed by the rep, owners/admins and a team manager for the `member`-role people of teams they manage
+  (`app.booking_manages_rep`). No working hours (`app.booking_rep_has_hours`) = cannot be turned on (hint `booking_page:no_hours`)
+  and the public page answers not found. Slots: `app.booking_slots` (one multirange pass, the rule of `app.member_in_hours`;
+  keep the two in step; each meeting's own buffers). Views: 60 per IP hash in 10 minutes in `app.booking_view_counts` (1,024
+  reused buckets, no hash kept); views never close a page. `booking_submit` locks per page before its counts: 5 per IP hash in
+  10 minutes (spam and invalid times included); a real race (a time taken by a meeting made in the last hour) counts once per
+  start time, and 200 within an hour close the page for an hour (`app.booking_page_closures`, hint `booking:closed`) with one
+  `system` notice to the rep and the owners; answers `{status: booked|slot_taken|invalid_time|spam}`. Links by phone a live lead,
+  else a live contact (CON-01 phones), else a new lead with the page's source or "דף קביעת תור" (kind `booking`, made once) and
+  campaign = utm_campaign, else the page title. pg_cron `crm-booking-ip-hashes` clears hashes after 15 minutes.
+  Follow-ups: CAL-10b (customer cancel/change link), CAL-12 (team pages), token rotation.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
