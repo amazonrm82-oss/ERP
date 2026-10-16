@@ -258,6 +258,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Advanced filters (LST-05, no migration): `src/features/list-filters/`. The tree travels as JSON in `f=`;
   `filterToPostgrest()` checks every field/op/value against the list's fields and builds one PostgREST
   logic tree for `.or()`. Values are double-quoted with `"` and `\` removed; ids must be in the options.
+- One call per multi-step operation (FXD-07, migration 020220): `public.set_default_pipeline`, `set_default_lead_status` (open only),
+  `reorder_positions(table, org, ids)` (closed table list mirrored by `ReorderTable` in `src/lib/reorder.ts`; all or nothing) and
+  `undo_import(org, job)` (owners/admins/managers; all or nothing, hint `import_undo:left` with the count; `app.import_rows_left`
+  counts for the importer only). All invoker. A new managed list with up/down buttons goes into both table lists.
 - Inline editing (LST-06, no migration): `src/features/inline-edit/`. `inlineEditAction()` updates name /
   owner with the user's session (0 rows = not permitted); lead status goes through `setLeadStatus()`
   (`src/features/leads/status.ts`), shared with the status form and the board.
