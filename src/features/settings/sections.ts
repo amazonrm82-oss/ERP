@@ -28,6 +28,7 @@ import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
+import { siteWidgetSettingsPath } from "@/features/site-widgets/paths";
 import { qrCodesSettingsPath } from "@/features/qr-codes/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -149,6 +150,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: bookingPagesPath(orgId), label: "דפי קביעת תור", description: "קישור שבו לקוחות קובעים פגישה בזמן פנוי", icon: CalendarIcon },
         // BIZ-02: each person their own card; owners and admins every card
         { href: businessCardSettingsPath(orgId), label: "כרטיס ביקור", description: "קישור וקוד QR לכרטיס דיגיטלי, עם טופס שנכנס כליד שלך", icon: UsersIcon },
+        // SPD-07: owners and admins only
+        ...(access.admin
+          ? [{ href: siteWidgetSettingsPath(orgId), label: "כפתור באתר", description: "כפתור צף לאתר שלכם: WhatsApp, חיוג וטופס קצר שנכנס כליד", icon: ChatIcon }]
+          : []),
         // BIZ-03: owners and admins only
         ...(access.admin
           ? [{ href: qrCodesSettingsPath(orgId), label: "קודי QR", description: "קוד לכל שלט או פלייר, שפותח טופס או דף קביעת תור, עם ספירת סריקות", icon: FormIcon }]

@@ -22,8 +22,8 @@ export async function listIntakes(orgId: string): Promise<IntakeSummary[]> {
     .from("forms")
     .select("id, kind, name, is_active")
     .eq("organization_id", orgId)
-    // BIZ-02: a business card's form is managed with its card, not here
-    .neq("kind", "card")
+    // BIZ-02 / SPD-07: a business card's or site widget's form is managed with its card or widget, not here
+    .in("kind", ["form", "webhook"])
     .order("created_at", { ascending: false });
   if (error) {
     throw new Error(`forms query failed: ${error.message}`);
@@ -85,8 +85,8 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice")
     .eq("organization_id", orgId)
     .eq("id", formId)
-    // BIZ-02: a business card's form is managed with its card, not here
-    .neq("kind", "card")
+    // BIZ-02 / SPD-07: a business card's or site widget's form is managed with its card or widget, not here
+    .in("kind", ["form", "webhook"])
     .maybeSingle();
   if (error) {
     throw new Error(`form query failed: ${error.message}`);

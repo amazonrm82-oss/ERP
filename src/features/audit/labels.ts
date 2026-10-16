@@ -39,6 +39,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   business_cards: "כרטיס ביקור",
   // BIZ-03
   qr_codes: "קוד QR",
+  // SPD-07
+  site_widgets: "כפתור באתר",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // GOL-01

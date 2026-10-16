@@ -12,6 +12,7 @@ const TOKEN_PREFIXES = [
   "/api/forms/booking/manage/",
   "/api/forms/booking/",
   "/api/forms/card/",
+  "/api/forms/widget/",
   "/api/calendar-feed/",
   "/api/in/",
   "/f/book/manage/",
@@ -19,11 +20,13 @@ const TOKEN_PREFIXES = [
   "/f/card/",
   "/f/quote/",
   "/f/q/",
+  "/f/w/",
+  "/f/widget/",
 ] as const;
 // a form's own link (/f/<token>, /api/forms/<token>): the next segment, unless it is one of the fixed words above
 const FORM_PREFIXES: { prefix: string; fixed: readonly string[] }[] = [
-  { prefix: "/api/forms/", fixed: ["booking", "card"] },
-  { prefix: "/f/", fixed: ["book", "card", "quote", "q", "embed.js"] },
+  { prefix: "/api/forms/", fixed: ["booking", "card", "widget"] },
+  { prefix: "/f/", fixed: ["book", "card", "quote", "q", "w", "widget", "embed.js"] },
 ];
 
 function redactSegment(path: string, prefix: string): string {

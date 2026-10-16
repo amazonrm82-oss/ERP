@@ -60,6 +60,8 @@ const eslintConfig = defineConfig([
       "src/features/quotes/public-server.ts",
       // BIZ-03: the QR scan counter, approved public secret-link pattern (owner, 13 October 2026)
       "src/features/qr-codes/scan-server.ts",
+      // SPD-07: the site widget's script and short form, approved public secret-link pattern (owner, 13 October 2026)
+      "src/features/site-widgets/public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

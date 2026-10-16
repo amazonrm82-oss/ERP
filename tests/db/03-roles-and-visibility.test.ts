@@ -1684,3 +1684,39 @@ describe("QR codes by role", () => {
     expect(removed).toBe(1);
   });
 });
+
+// SPD-07: site widgets are managed and seen by owners and admins only (the rest is in 155-site-widgets)
+describe("site widgets by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("swrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `swrole-${role}`);
+    }
+    await asAdmin((q) => q(`update public.subscriptions set limit_overrides = '{"max_site_widgets": 10}' where organization_id = $1`, [org]));
+  });
+
+  it("owners and admins make, see, change and remove widgets; a manager, a member and a viewer can do none of it", async () => {
+    const make = (who: string) =>
+      asUser(people[who].id, (q) => q("insert into public.site_widgets (organization_id, name) values ($1, $2)", [org, `אתר ${who}`]));
+    await make("owner");
+    await make("admin");
+    for (const role of ["manager", "member", "viewer"]) expect((await pgError(make(role))).code, role).toBe("42501");
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.site_widgets where organization_id = $1", [org]));
+      expect(seen, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+      const renamed = await asUser(people[role].id, async (q) => (await q("update public.site_widgets set name = name where organization_id = $1", [org])).rowCount);
+      expect(renamed, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+    }
+    for (const role of ["manager", "member", "viewer"]) {
+      const removed = await asUser(people[role].id, async (q) => (await q("delete from public.site_widgets where organization_id = $1", [org])).rowCount);
+      expect(removed, role).toBe(0);
+    }
+    const removed = await asUser(people.admin.id, async (q) => (await q("delete from public.site_widgets where organization_id = $1 and name = 'אתר admin'", [org])).rowCount);
+    expect(removed).toBe(1);
+  });
+});

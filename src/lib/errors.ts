@@ -229,6 +229,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "business_card:rep": "כרטיס ביקור שייך למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
   // BIZ-03 (migration qr_codes)
   "qr_code:target": "קוד QR פותח טופס אתר או דף קביעת תור של העסק. בחרו אחד מהם.",
+  // SPD-07 (migration site_widgets)
+  "site_widget:owner": "פניות מהכפתור באתר עוברות למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
+  "form:widget": "הטופס של הכפתור באתר משתנה רק דרך הגדרות הכפתור.",
   "form:card": "הטופס של כרטיס ביקור משתנה רק דרך הכרטיס עצמו.",
   "booking_page:no_hours": "אי אפשר להפעיל את הדף: לא הוגדרו שעות עבודה לנציג או לעסק, ובלי שעות אין זמנים פנויים. הגדירו שעות עבודה, או שמרו את הדף כשהוא כבוי.",
   // CON-03 follow-up: the roles of a contact on a deal

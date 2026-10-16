@@ -44,6 +44,10 @@ describe("server log line of a request error", () => {
       [`/api/forms/card/${t}/vcard`, "/api/forms/card/[token]/vcard"],
       [`/api/in/${t}`, "/api/in/[token]"],
       [`/api/calendar-feed/${t}.ics`, "/api/calendar-feed/[token]"],
+      // SPD-07: the site widget's script, form page and form route
+      [`/f/w/${t}.js`, "/f/w/[token]"],
+      [`/f/widget/${t}`, "/f/widget/[token]"],
+      [`/api/forms/widget/${t}`, "/api/forms/widget/[token]"],
     ];
     for (const [path, shown] of cases) {
       expect(redactPublicPath(path), path).toBe(shown);
@@ -64,6 +68,9 @@ describe("server log line of a request error", () => {
       "/f/book/",
       "/f/card/",
       "/api/forms/booking/",
+      "/api/forms/widget/",
+      "/f/w/",
+      "/f/widget",
       "/api/push/dispatch",
       "/api/files/cleanup",
       "/login",

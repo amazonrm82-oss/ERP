@@ -469,6 +469,41 @@ export type BusinessCardWrite = {
 
 // BIZ-03: a QR code that opens a form or a booking page (target_kind 'form' | 'booking'); token = its link (/f/q/<token>);
 // an empty target = deleted
+// SPD-07: a floating button for the business's own website; token = its public script (/f/w/<token>.js) and form
+// (/f/widget/<token>); position 'left' | 'right'; assign_mode 'owner' | 'round_robin' (copied to its form)
+export type SiteWidgetRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  token: string;
+  is_active: boolean;
+  button_label: string;
+  show_whatsapp: boolean;
+  show_call: boolean;
+  show_form: boolean;
+  phone: string | null;
+  position: string;
+  assign_mode: string;
+  owner_id: string | null;
+  team_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type SiteWidgetWrite = {
+  name?: string;
+  is_active?: boolean;
+  button_label?: string;
+  show_whatsapp?: boolean;
+  show_call?: boolean;
+  show_form?: boolean;
+  phone?: string | null;
+  position?: string;
+  assign_mode?: string;
+  owner_id?: string | null;
+  team_id?: string | null;
+};
+
 export type QrCodeRow = {
   id: string;
   organization_id: string;
@@ -850,6 +885,8 @@ export type FormRow = {
   locale_choice: boolean;
   // BIZ-02: the business card this form belongs to (kind 'card' only; made and changed by the card's triggers)
   business_card_id: string | null;
+  // SPD-07: the site widget this form belongs to (kind 'widget' only; made and changed by the widget's triggers)
+  site_widget_id: string | null;
 };
 
 export type FormSubmissionRow = {
@@ -2331,6 +2368,8 @@ export type Database = {
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
       // BIZ-03: owners and admins only; column grants (token made by the database)
+      // SPD-07: owners and admins only; column grants (token made by the database; the form by the widget's trigger)
+      site_widgets: Table<SiteWidgetRow, SiteWidgetWrite & { organization_id: string; name: string }, SiteWidgetWrite>;
       qr_codes: Table<QrCodeRow, QrCodeWrite & { organization_id: string; name: string; target_kind: string }, QrCodeWrite>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
@@ -2558,6 +2597,12 @@ export type Database = {
       // BIZ-02: the public business card and its "leave details" form; service_role only
       // BIZ-03: the scan (service_role only): {path, campaign} or P0002; the counts per code (owners/admins)
       qr_scan: { Args: { p_token: string }; Returns: Json };
+      // SPD-07: the site widget's display settings and its short form (service_role only)
+      site_widget_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      site_widget_submit: {
+        Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
+        Returns: Json;
+      };
       qr_code_scans: { Args: { p_org: string; p_days?: number }; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_card_submit: {

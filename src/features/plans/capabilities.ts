@@ -30,6 +30,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "business_card", label: "כרטיס ביקור דיגיטלי", built: true },
   // BIZ-03 part one: codes that open a form or a booking page, with scan counts
   { feature: "qr_codes", label: "קודי QR לטופס ולקביעת תור, עם ספירת סריקות", built: true },
+  // SPD-07
+  { feature: "site_widget", label: "כפתור צף לאתר: WhatsApp, חיוג וטופס קצר", built: true },
   { feature: "money_waiting", label: "כסף שמחכה", built: true },
   { feature: "instant_reply", label: "מענה מיידי ללקוח", built: false },
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
