@@ -129,6 +129,30 @@ describe("report shaping from the saved samples", () => {
     expect(funnel.sections[0].rows.map((r) => r.count)).toEqual([3, 2, 1, 1]);
   });
 
+  it("RPT-01: revenue by product names free lines and billing, links products, and counts deals without lines apart", async () => {
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "products", filters);
+    const [section] = view.sections;
+    expect(section.rows.map((r) => [r.product, r.billing, r.quantity, r.deals, r.amount])).toEqual([
+      ["ייעוץ", "חד-פעמי", 2, 1, 60000],
+      ["שורות בלי מוצר", "חודשי", 1, 1, 5000],
+    ]);
+    expect(section.rows[0]._href).toMatch(/\/products\//);
+    expect(section.rows[1]._href).toBeNull();
+    // one figure per billing type, one-time first; a monthly total is never added to one-time sales
+    expect(view.kpis.map((k) => k.label)).toEqual(["מכירות חד-פעמיות", "חיוב חודשי", "מוצרים שנמכרו", "עסקאות בלי שורות"]);
+    expect(view.kpis[1].hint).toContain("לחודש אחד");
+    expect(view.kpis[3].hint).toContain("לא נספרו כאן");
+    expect(section.note).toContain('לפני מע"מ');
+    expect(section.note).not.toContain("שימו לב");
+  });
+
+  it("RPT-01: a period that mixes deals priced with and without VAT says so", async () => {
+    const data = sample("report_revenue_by_product") as { totals: Record<string, number> };
+    results.report_revenue_by_product = { ...data, totals: { ...data.totals, deals_with_vat: 2, deals_without_vat: 3 } };
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "products", filters);
+    expect(view.sections[0].note).toContain('שימו לב: בתקופה יש עסקאות שתמחרו כולל מע"מ (2) ועסקאות שתמחרו לפני מע"מ (3)');
+  });
+
   it("a sample with a renamed key stops the report instead of showing zeros", async () => {
     results.report_rep_performance = (sample("report_rep_performance") as Record<string, unknown>[]).map(({ won_amount, ...rest }) => ({
       ...rest,

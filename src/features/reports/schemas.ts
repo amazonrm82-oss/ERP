@@ -157,6 +157,30 @@ export const REPORT_SCHEMAS = {
     by_owner: z.array(z.object({ owner_id: id, deals: count, amount })),
     by_customer: z.array(z.object({ name: text, company_id: id, contact_id: id, deals: count, amount })),
   }),
+  // RPT-01: the lines of the deals won in the period, by product and billing; stored line totals
+  report_revenue_by_product: z.object({
+    totals: z.object({
+      deals: count,
+      deals_with_lines: count,
+      products: count,
+      deals_without_lines: count,
+      amount_without_lines: amount,
+      deals_with_vat: count,
+      deals_without_vat: count,
+    }),
+    // one total per billing (null = a line saved before DLI-04, in its deal's period); never added together
+    by_billing: z.array(z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, amount })),
+    by_product: z.array(
+      z.object({
+        product_id: id,
+        name: text,
+        billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(),
+        quantity: z.number(),
+        deals: count,
+        amount,
+      }),
+    ),
+  }),
   report_summary: z.object({
     leads: count,
     leads_prev: count,

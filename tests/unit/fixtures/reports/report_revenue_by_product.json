@@ -1,0 +1,43 @@
+{
+  "totals": {
+    "deals": 2,
+    "products": 1,
+    "deals_with_vat": 0,
+    "deals_with_lines": 1,
+    "deals_without_vat": 1,
+    "deals_without_lines": 1,
+    "amount_without_lines": 40000
+  },
+  "by_billing": [
+    {
+      "deals": 1,
+      "lines": 1,
+      "amount": 5000,
+      "billing": "monthly"
+    },
+    {
+      "deals": 1,
+      "lines": 1,
+      "amount": 60000,
+      "billing": "one_time"
+    }
+  ],
+  "by_product": [
+    {
+      "name": "ייעוץ",
+      "deals": 1,
+      "amount": 60000,
+      "billing": "one_time",
+      "quantity": 2,
+      "product_id": "00000000-0000-4000-8000-000000000014"
+    },
+    {
+      "name": null,
+      "deals": 1,
+      "amount": 5000,
+      "billing": "monthly",
+      "quantity": 1,
+      "product_id": null
+    }
+  ]
+}

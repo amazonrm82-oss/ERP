@@ -1,4 +1,4 @@
-// The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06; products: RPT-01). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -22,6 +22,8 @@ export const REPORTS: ReportDefinition[] = [
   { key: "cycle", title: "אורך מחזור מכירה", description: "ימים מליד לסגירה, וימים בכל שלב.", filters: ["period", "owner", "pipeline"] },
   { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות שנמצאות בשלב יותר מדי זמן, או בלי משימה או פגישה הבאה.", filters: ["owner", "pipeline"] },
   { key: "revenue", title: "הכנסות", description: "הכנסה שנסגרה לפי חודש, אחראי ולקוח.", filters: ["period", "owner", "pipeline"] },
+  // RPT-01
+  { key: "products", title: "הכנסה לפי מוצר", description: "מה נמכר בעסקאות שנסגרו: כמות, מספר עסקאות וסכום לכל מוצר.", filters: ["period", "owner", "pipeline"] },
   { key: "meetings", title: "פגישות", description: "פגישות לפי מארגן, אחוז אי-הגעה, ופגישות שהובילו לעסקה שנסגרה.", filters: ["period", "owner"], ownerLabel: "מארגן" },
   // CON-06
   { key: "referrals", title: "הפניות", description: "מי הפנה אליכם אנשי קשר, כמה מהם הפכו ללקוחות ומה ההכנסה מהם.", filters: ["period"] },

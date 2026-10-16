@@ -44,6 +44,17 @@ describe("report result shapes (FXC-12)", () => {
     const wonDeal = await asUser(owner.id, async (q) =>
       (await q<{ r: { deal_id: string } }>("select public.convert_lead($1, true, null, 100000) as r", [lead1])).rows[0].r.deal_id,
     );
+    // RPT-01: a product line and a free monthly line on the won deal (report_revenue_by_product)
+    await asUser(owner.id, async (q) => {
+      const product = (
+        await q<{ id: string }>("insert into public.products (organization_id, name, price_agorot, vat_kind, price_includes_vat) values ($1, 'ייעוץ', 30000, 'taxable', false) returning id", [org])
+      ).rows[0].id;
+      await q(
+        "insert into public.deal_lines (organization_id, deal_id, product_id, description, quantity, unit_price_agorot, price_source) values ($1, $2, $3, 'ייעוץ', 2, 30000, 'product')",
+        [org, wonDeal, product],
+      );
+      await q("insert into public.deal_lines (organization_id, deal_id, description, quantity, unit_price_agorot, billing) values ($1, $2, 'תחזוקה', 1, 5000, 'monthly')", [org, wonDeal]);
+    });
     await asUser(owner.id, async (q) => {
       await q(
         `update public.deals d set stage_id = s.id from public.stages s
@@ -174,6 +185,7 @@ describe("report result shapes (FXC-12)", () => {
       report_cycle_length: ["public.report_cycle_length($1, $2, $3)", range],
       report_stuck_deals: ["public.report_stuck_deals($1)", [org]],
       report_revenue: ["public.report_revenue($1, $2, $3)", range],
+      report_revenue_by_product: ["public.report_revenue_by_product($1, $2, $3)", range],
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],
       report_goal_progress: ["public.report_goal_progress($1)", [org]],
       report_goal_forecast: ["public.report_goal_forecast($1)", [org]],
