@@ -136,24 +136,32 @@ export default async function AuditPage({ params, searchParams }: Props) {
           {events.length === 0 ? (
             <p className="px-4 py-6 text-ink-soft sm:px-5">אין כניסות רשומות בתקופה שהחבילה שומרת.</p>
           ) : (
-            <ul className="divide-y divide-line">
-              {events.map((e, i) => (
-                <li key={i} className="flex flex-wrap justify-between gap-2 px-4 py-3 sm:px-5">
-                  <span>
-                    <span className="font-medium">{LOGIN_ACTION_LABELS[e.action] ?? e.action}</span> · {e.userName}
-                  </span>
-                  <span className="text-sm text-ink-soft">
-                    {formatDateTime(e.createdAt)}
-                    {e.ip ? (
-                      <>
-                        {" · "}
-                        <span dir="ltr">{e.ip}</span>
-                      </>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {/* FXS-10: a person's sign-ins are theirs, across businesses */}
+              <p className="border-b border-line px-4 py-3 text-sm text-ink-soft sm:px-5">
+                מוצגות כניסות מהיום שבו המשתמש הצטרף לעסק. כתובת ה-IP מוסתרת אצל מי שחבר גם בעסק אחר.
+              </p>
+              <ul className="divide-y divide-line">
+                {events.map((e, i) => (
+                  <li key={i} className="flex flex-wrap justify-between gap-2 px-4 py-3 sm:px-5">
+                    <span>
+                      <span className="font-medium">{LOGIN_ACTION_LABELS[e.action] ?? e.action}</span> · {e.userName}
+                    </span>
+                    <span className="text-sm text-ink-soft">
+                      {formatDateTime(e.createdAt)}
+                      {e.ip ? (
+                        <>
+                          {" · "}
+                          <span dir="ltr">{e.ip}</span>
+                        </>
+                      ) : e.ipHidden ? (
+                        " · כתובת IP מוסתרת"
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Card>
       </>

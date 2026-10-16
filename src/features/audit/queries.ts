@@ -153,15 +153,22 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
   }));
 }
 
-export type LoginEvent = { createdAt: string; action: string; ip: string | null; userName: string };
+// FXS-10: ipHidden = the person belongs to another business too, so the address is not this business's to see
+export type LoginEvent = { createdAt: string; action: string; ip: string | null; ipHidden: boolean; userName: string };
 
 export async function listLoginEvents(orgId: string): Promise<LoginEvent[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("org_login_events", { p_org: orgId, p_limit: 200 });
   if (error) return [];
-  const rows = (Array.isArray(data) ? data : []) as Array<{ created_at: string; action: string; ip: string | null; user_id: string | null }>;
+  const rows = (Array.isArray(data) ? data : []) as Array<{ created_at: string; action: string; ip: string | null; ip_hidden?: boolean; user_id: string | null }>;
   const names = await getUserNames(rows.map((r) => r.user_id));
-  return rows.map((r) => ({ createdAt: r.created_at, action: r.action, ip: r.ip || null, userName: r.user_id ? (names.get(r.user_id) ?? "משתמש") : "—" }));
+  return rows.map((r) => ({
+    createdAt: r.created_at,
+    action: r.action,
+    ip: r.ip || null,
+    ipHidden: r.ip_hidden === true,
+    userName: r.user_id ? (names.get(r.user_id) ?? "משתמש") : "—",
+  }));
 }
 
 export type EraseCandidate = { entityType: string; entityId: string; deletedAt: string; name: string | null; email: string | null; phone: string | null };
