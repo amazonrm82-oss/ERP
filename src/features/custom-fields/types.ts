@@ -14,10 +14,12 @@ export const FIELD_OBJECT_LABELS: Record<FieldObject, string> = {
   deal: RECORD_TYPES.deal.plural,
 };
 
-// Every field type the database accepts (FLD-01 added the last eight to the screens).
+// Every field type the database accepts (FLD-01 added eight to the screens; FLD-06 part A added rich_text,
+// duration and status). A new type also needs its decision in every place listed in type-decisions.ts.
 export const FIELD_TYPES = [
   "text", "long_text", "number", "currency", "percent", "rating", "select", "multi_select", "checkbox",
   "date", "datetime", "phone", "email", "url", "il_id", "il_company_id", "user",
+  "rich_text", "duration", "status",
 ] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
@@ -39,18 +41,23 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   il_id: "תעודת זהות",
   il_company_id: "ח.פ. / מספר עוסק",
   user: "משתמש בעסק",
+  rich_text: "טקסט מעוצב",
+  duration: "משך זמן",
+  status: "סטטוס צבעוני",
 };
 
 // types whose choices are typed in the field settings
-export const TYPES_WITH_OPTIONS: readonly FieldType[] = ["select", "multi_select"];
+export const TYPES_WITH_OPTIONS: readonly FieldType[] = ["select", "multi_select", "status"];
 
 export type FieldDefinition = {
   id: string;
   key: string;
   label: string;
   type: FieldType;
-  // select and multi_select: the choices, in order
+  // select, multi_select and status: the choices, in order
   options: string[];
+  // FLD-06 status: each option's palette key (status-colors.ts); a missing one shows neutral
+  optionColors?: Record<string, string>;
   // user: the business's members, filled in when the definitions are read
   choices?: Array<{ value: string; label: string }>;
   isRequired: boolean;

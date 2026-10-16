@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { FieldDefinition } from "@/features/custom-fields/types";
+import type { FieldDefinition, FieldType } from "@/features/custom-fields/types";
 import type { ListObject } from "@/features/list-columns/columns";
 import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "@/features/contacts/preferences";
 import { INDUSTRIES } from "@/features/onboarding/options";
@@ -10,6 +10,31 @@ import { zoneDate, zonedIso } from "@/lib/format";
 
 import { OPS_BY_KIND, valueKind, type FilterField, type FilterKind, type FilterOp, type FilterTree } from "./model";
 import { isCalendarDate } from "@/lib/calendar-date";
+
+// How a list filters a custom field of each type (null: not filterable). A Record, so a new type does not build
+// until it has its entry (FLD-06; src/features/custom-fields/type-decisions.ts).
+const FILTER_KINDS: Record<FieldType, FilterKind | null> = {
+  text: "text",
+  long_text: "text",
+  rich_text: "text",
+  number: "number",
+  currency: "number",
+  percent: "number",
+  rating: "number",
+  duration: "number",
+  select: "select",
+  status: "select",
+  user: "select",
+  multi_select: null,
+  checkbox: "checkbox",
+  date: "day",
+  datetime: null,
+  phone: "text",
+  email: "text",
+  url: "text",
+  il_id: "text",
+  il_company_id: "text",
+};
 
 export type FilterObject = ListObject;
 
@@ -153,25 +178,17 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
     ],
   };
 
-  // a multiple choice (a JSON array) and a date with time are not filterable yet
+  // a multiple choice (a JSON array) and a date with time are not filterable yet (FILTER_KINDS: null)
   const custom = lookups.fields
-    .filter((field) => field.type !== "multi_select" && field.type !== "datetime")
+    .filter((field) => FILTER_KINDS[field.type] !== null)
     .map((field): ServerField => {
-      const numeric = field.type === "number" || field.type === "currency" || field.type === "percent" || field.type === "rating";
-      const kind: FilterKind = numeric
-        ? "number"
-        : field.type === "checkbox"
-          ? "checkbox"
-          : field.type === "date"
-            ? "day"
-            : field.type === "select" || field.type === "user"
-              ? "select"
-              : "text";
+      const kind = FILTER_KINDS[field.type] as FilterKind;
       // numbers and true/false compare as JSON; everything else as text
       const column = kind === "number" || kind === "checkbox" ? `custom_fields->${field.key}` : `custom_fields->>${field.key}`;
       return {
         key: `cf:${field.key}`,
-        label: field.label,
+        // FLD-06: a duration is filtered in minutes, as it is stored
+        label: field.type === "duration" ? `${field.label} (בדקות)` : field.label,
         kind,
         column,
         // a sum is typed in shekels and stored in agorot

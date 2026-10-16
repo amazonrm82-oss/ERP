@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/sortable-header";
 import { displayCustomFields } from "@/features/custom-fields/values";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
@@ -84,6 +85,9 @@ export function ListTable<R>({
                           <a href={shown.href} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all text-accent-strong underline underline-offset-4">
                             {shown.text}
                           </a>
+                        ) : shown.tone ? (
+                          // FLD-06: a coloured status
+                          <Badge tone={shown.tone}>{shown.text}</Badge>
                         ) : (
                           <span dir={shown.ltr ? "ltr" : undefined} className="break-words">
                             {shown.text}

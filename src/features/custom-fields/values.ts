@@ -1,5 +1,8 @@
 import { formatDate, formatDateTime, formatMoney, formatNumber, parseMoneyToAgorot, zoneDate, zonedIso, zoneTime } from "@/lib/format";
 
+import { notePlainText, sanitizeNote } from "@/features/activities/markdown";
+
+import { statusTone, type StatusColor } from "./status-colors";
 import { inputName, type CustomValues, type FieldDefinition } from "./types";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { israeliIdNumber } from "@/lib/israeli-id";
@@ -9,6 +12,40 @@ export { israeliIdNumber };
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_RE = /^\+?[\d\s\-().*]{3,24}$/;
 const DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/;
+
+// FLD-06: a duration is whole minutes, from 0 to a year (app.custom_value_ok holds the same)
+export const MAX_DURATION_MINUTES = 525_600;
+export const MAX_RICH_TEXT_LENGTH = 5000;
+
+/** "90" (minutes) or "1:30" (hours and minutes) -> minutes; null when it is neither, or past a year. */
+export function parseDuration(text: string): number | null {
+  const trimmed = text.trim();
+  let minutes: number;
+  if (/^\d{1,6}$/.test(trimmed)) {
+    minutes = Number(trimmed);
+  } else {
+    const match = /^(\d{1,4}):([0-5]\d)$/.exec(trimmed);
+    if (!match) return null;
+    minutes = Number(match[1]) * 60 + Number(match[2]);
+  }
+  return minutes <= MAX_DURATION_MINUTES ? minutes : null;
+}
+
+/** Minutes as the duration input shows them: "1:30", or "45" under an hour. */
+export function durationInput(minutes: number): string {
+  if (minutes < 60) return String(minutes);
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/** Minutes in words: "45 דקות", "שעה", "שעתיים ו-15 דקות". */
+export function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const minuteText = rest === 1 ? "דקה" : `${rest} דקות`;
+  if (hours === 0) return minuteText;
+  const hourText = hours === 1 ? "שעה" : hours === 2 ? "שעתיים" : `${hours} שעות`;
+  return rest === 0 ? hourText : `${hourText} ו-${minuteText}`;
+}
 
 /** Picked values of a multiple choice: several inputs, or one text with commas (imports). */
 function multiValues(formData: FormData, name: string): string[] {
@@ -110,6 +147,20 @@ export function parseCustomFields(
         else values[field.key] = id;
         break;
       }
+      case "duration": {
+        const minutes = parseDuration(text);
+        if (minutes === null) errors[name] = "יש להזין משך בדקות (90) או בשעות ודקות (1:30), עד שנה.";
+        else values[field.key] = minutes;
+        break;
+      }
+      case "rich_text": {
+        // REC-04: stored as cleaned Markdown, never HTML
+        const clean = sanitizeNote(text);
+        if (clean.length > MAX_RICH_TEXT_LENGTH) errors[name] = "הטקסט ארוך מדי (עד 5,000 תווים).";
+        else values[field.key] = clean;
+        break;
+      }
+      case "status":
       case "select":
         if (!field.options.includes(text)) {
           errors[name] = "יש לבחור ערך מהרשימה.";
@@ -183,6 +234,9 @@ export function inputValue(field: FieldDefinition, values: CustomValues): string
   if (field.type === "currency" && typeof value === "number") {
     return String(value / 100);
   }
+  if (field.type === "duration" && typeof value === "number") {
+    return durationInput(value);
+  }
   if (field.type === "datetime" && typeof value === "string") {
     const at = new Date(value);
     return Number.isNaN(at.getTime()) ? "" : `${zoneDate(at)}T${zoneTime(at)}`;
@@ -190,7 +244,18 @@ export function inputValue(field: FieldDefinition, values: CustomValues): string
   return String(value);
 }
 
-export type CustomFieldDisplay = { key: string; label: string; text: string | null; ltr: boolean; href: string | null };
+export type CustomFieldDisplay = {
+  key: string;
+  label: string;
+  // plain text (lists, exports, the board); a rich text field's words without its marks
+  text: string | null;
+  ltr: boolean;
+  href: string | null;
+  // FLD-06: a rich text field's cleaned Markdown, for the details card (rendered by NoteText, never as HTML)
+  markdown?: string | null;
+  // FLD-06: a status value's palette key
+  tone?: StatusColor | null;
+};
 
 /** Active fields with their values, formatted for a details card. */
 export function displayCustomFields(definitions: FieldDefinition[], values: CustomValues): CustomFieldDisplay[] {
@@ -207,6 +272,8 @@ export function displayCustomFields(definitions: FieldDefinition[], values: Cust
       else if (field.type === "date" && typeof value === "string") text = formatDate(value);
       else if (field.type === "datetime" && typeof value === "string") text = formatDateTime(value);
       else if (field.type === "user" && typeof value === "string") text = field.choices?.find((c) => c.value === value)?.label ?? "משתמש שאינו בעסק";
+      else if (field.type === "duration" && typeof value === "number") text = formatDuration(value);
+      else if (field.type === "rich_text" && typeof value === "string") text = notePlainText(value) || null;
       else text = String(value);
     } else if (field.type === "checkbox") {
       text = "לא";
@@ -217,6 +284,8 @@ export function displayCustomFields(definitions: FieldDefinition[], values: Cust
       text,
       ltr: ["phone", "email", "url", "number", "percent", "il_id", "il_company_id"].includes(field.type),
       href: field.type === "url" && typeof value === "string" ? value : null,
+      markdown: field.type === "rich_text" && typeof value === "string" && value.trim() !== "" ? value : null,
+      tone: field.type === "status" && typeof value === "string" && value !== "" ? statusTone(field, value) : null,
     };
   });
 }

@@ -3,6 +3,7 @@ import { Detail } from "@/components/detail-list";
 import { fieldState } from "../conditions";
 import type { CustomValues, FieldDefinition, FieldObject } from "../types";
 import { displayCustomFields } from "../values";
+import { customFieldValue } from "./custom-field-value";
 
 type Props = {
   definitions: FieldDefinition[];
@@ -23,15 +24,7 @@ export function CustomFieldDetails({ definitions, values, objectType, builtins }
           key={field.key}
           label={field.label}
           ltr={field.ltr}
-          value={
-            field.href && field.text ? (
-              <a href={field.href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
-                {field.text.replace(/^https?:\/\//, "")}
-              </a>
-            ) : (
-              field.text
-            )
-          }
+          value={customFieldValue(field)}
         />
       ))}
     </>

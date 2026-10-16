@@ -545,6 +545,7 @@ function SetFieldValue({
   );
   switch (field.type) {
     case "select":
+    case "status":
       return list(field.options.map((option) => ({ value: option, label: option })));
     case "rating":
       return list(["1", "2", "3", "4", "5"].map((v) => ({ value: v, label: `${v} מתוך 5` })));
@@ -594,7 +595,18 @@ function SetFieldValue({
     case "il_id":
     case "il_company_id":
       return text({ dir: "ltr", inputMode: "numeric" });
-    default:
+    // FLD-06: minutes or hours:minutes, as the record form takes it
+    case "duration":
+      return text({ dir: "ltr", inputMode: "numeric", hint: "בדקות (90) או בשעות ודקות (1:30). ריק: השדה יתרוקן." });
+    // FLD-06: Markdown marks typed here work as in a note (bold, lists, links)
+    case "rich_text":
+    case "long_text":
+    case "text":
       return text({});
+    default: {
+      // every type has its own input: a new type fails the build here until it gets one
+      const unhandled: never = field.type;
+      return unhandled;
+    }
   }
 }

@@ -57,6 +57,20 @@ const CASES: Array<[FieldType, string]> = [
   ["il_id", "123456782"],
   ["il_id", "123456789"],
   ["il_company_id", "51-428562-6"],
+  // FLD-06 part A
+  ["rich_text", "**חשוב**\n- אחד\n- [קישור](https://example.com)"],
+  ["rich_text", "[רע](javascript:alert(1))"],
+  ["rich_text", "x".repeat(5000)],
+  ["rich_text", "x".repeat(5001)],
+  ["duration", "90"],
+  ["duration", "1:30"],
+  ["duration", "0"],
+  ["duration", "8760:00"],
+  ["duration", "8760:01"],
+  ["duration", "1:75"],
+  ["duration", "1.5"],
+  ["status", "גדול"],
+  ["status", "בינוני"],
 ];
 
 describe("custom field values: the app and the database agree", () => {

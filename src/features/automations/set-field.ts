@@ -1,5 +1,5 @@
 import { inputName, type FieldDefinition } from "@/features/custom-fields/types";
-import { displayCustomFields, parseCustomFields } from "@/features/custom-fields/values";
+import { displayCustomFields, durationInput, parseCustomFields } from "@/features/custom-fields/values";
 import type { Json } from "@/lib/database.types";
 import { zoneDate, zoneTime } from "@/lib/format";
 
@@ -65,6 +65,7 @@ export function setFieldDraft(definition: FieldDefinition | undefined, value: un
   if (Array.isArray(value)) return value.map(String).join("\n");
   if (typeof value === "boolean") return value ? "true" : "";
   if (definition?.type === "currency" && typeof value === "number") return String(value / 100);
+  if (definition?.type === "duration" && typeof value === "number") return durationInput(value);
   if (definition?.type === "datetime" && typeof value === "string") {
     const at = new Date(value);
     return Number.isNaN(at.getTime()) ? "" : `${zoneDate(at, timeZone)}T${zoneTime(at, timeZone).slice(0, 5)}`;

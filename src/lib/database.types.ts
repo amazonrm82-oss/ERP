@@ -771,6 +771,8 @@ export type FieldDefinitionRow = {
   condition: Json | null;
   // server only (FLD-09 part B): set by the pipeline cleanup, cleared by trigger field_definitions_condition_mark
   condition_removed_at: string | null;
+  // FLD-06: a status field's {option: palette key}; '{}' for every other type (check field_definitions_option_colors_check)
+  option_colors: Json;
 };
 
 export type SavedViewRow = {
@@ -1989,6 +1991,7 @@ export type Database = {
           is_read_only?: boolean;
           default_value?: Json | null;
           condition?: Json | null;
+          option_colors?: Json;
         }
       >;
       saved_views: Table<

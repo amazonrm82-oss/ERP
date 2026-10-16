@@ -14,6 +14,7 @@ import type { FormState } from "@/lib/action-result";
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
 import { conditionReminder, describeCondition, type BuiltinChoices } from "../conditions";
 import { canBeUnique, canHaveDefault } from "../settings";
+import { STATUS_COLORS, statusTone } from "../status-colors";
 import { FIELD_TYPE_LABELS, FIELD_TYPES, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
 import { displayCustomFields } from "../values";
 import { ConditionEditor } from "./condition-editor";
@@ -193,7 +194,18 @@ function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWa
           </span>
         ) : null}
       </div>
-      {TYPES_WITH_OPTIONS.includes(field.type) && !editing ? <p className="text-sm text-ink-soft">אפשרויות: {field.options.join(", ")}</p> : null}
+      {field.type === "status" && !editing ? (
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
+          אפשרויות:
+          {field.options.map((option) => (
+            <Badge key={option} tone={statusTone(field, option)}>
+              {option}
+            </Badge>
+          ))}
+        </p>
+      ) : TYPES_WITH_OPTIONS.includes(field.type) && !editing ? (
+        <p className="text-sm text-ink-soft">אפשרויות: {field.options.join(", ")}</p>
+      ) : null}
       {hasDefault(field) && !editing ? (
         <p className="text-sm text-ink-soft">
           ברירת מחדל: <span dir="auto">{displayCustomFields([field], { [field.key]: field.defaultValue ?? null })[0].text}</span>
@@ -248,6 +260,7 @@ function EditFieldForm({ orgId, objectType, fields, builtins, field, onDone }: E
           error={errors.options}
         />
       ) : null}
+      {field.type === "status" ? <StatusColorPickers field={field} /> : null}
       <TextField label="הסבר קצר" name="help_text" maxLength={200} autoComplete="off" defaultValue={values?.help_text ?? field.helpText ?? ""} error={errors.help_text} />
       <label className="flex items-center gap-2.5 text-md">
         <input
@@ -270,5 +283,34 @@ function EditFieldForm({ orgId, objectType, fields, builtins, field, onDone }: E
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * FLD-06: a colour for each saved option of a status field, from the design system's palette. An option added in
+ * the box above gets its colour after saving (it starts grey); a renamed option starts grey again.
+ */
+function StatusColorPickers({ field }: { field: FieldDefinition }) {
+  if (field.options.length === 0) return null;
+  return (
+    <fieldset className="space-y-2">
+      <legend className="mb-1.5 text-sm font-medium">צבע לכל אפשרות</legend>
+      <ul className="space-y-2">
+        {field.options.map((option) => (
+          <li key={option} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="color_option" value={option} />
+            <Badge tone={statusTone(field, option)}>{option}</Badge>
+            <SelectField label={`הצבע של "${option}"`} hideLabel name="color_value" defaultValue={statusTone(field, option)} controlSize="sm" className="w-32">
+              {STATUS_COLORS.map((color) => (
+                <option key={color.value} value={color.value}>
+                  {color.label}
+                </option>
+              ))}
+            </SelectField>
+          </li>
+        ))}
+      </ul>
+      <p className="text-sm text-ink-soft">אפשרות חדשה מקבלת צבע אחרי השמירה. עד אז היא באפור.</p>
+    </fieldset>
   );
 }

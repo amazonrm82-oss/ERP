@@ -18,9 +18,22 @@ import { conditionBuiltinChoices } from "./condition-queries";
 import { listFieldDefinitions } from "./queries";
 import { createFieldSchema, updateFieldSchema } from "./schema";
 import { canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
+import { colorsForOptions } from "./status-colors";
 import { FIELD_OBJECTS, inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
 import { parseCustomFields } from "./values";
 import { saveOrder } from "@/lib/reorder";
+
+/** FLD-06: the colour pickers of a status field's options, sent as pairs (color_option[i], color_value[i]). */
+function colorsFromForm(formData: FormData): Record<string, string> {
+  const options = formData.getAll("color_option");
+  const colors = formData.getAll("color_value");
+  const out: Record<string, string> = {};
+  options.forEach((option, index) => {
+    const color = colors[index];
+    if (typeof option === "string" && typeof color === "string") out[option] = color;
+  });
+  return out;
+}
 
 function revalidateFields(orgId: string) {
   // the fields show in the forms and cards of every record type
@@ -205,6 +218,8 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
       is_read_only: parsed.data.is_read_only,
       default_value: defaultValue,
       ...(withOptions ? { options: parsed.data.options } : {}),
+      // FLD-06: a status field's colours, for the options it keeps (a removed option's colour goes with it)
+      ...(type === "status" ? { option_colors: colorsForOptions(colorsFromForm(formData), parsed.data.options) } : {}),
     })
     .eq("organization_id", orgId)
     .eq("id", fieldId)

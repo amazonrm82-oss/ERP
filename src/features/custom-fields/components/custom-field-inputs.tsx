@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { NoteEditor } from "@/features/activities/components/note-editor";
 
 import { conditionApplies, fieldState, hasConditions, shownMarkerName, type ConditionValues } from "../conditions";
 import { readConditionValues } from "../live-conditions";
@@ -142,6 +143,28 @@ function fieldInput(
   switch (field.type) {
     case "long_text":
       return <TextareaField key={field.id} {...common} maxLength={5000} defaultValue={value} />;
+    case "rich_text":
+      // FLD-06: REC-04's editor (bold, lists, links), stored as cleaned Markdown
+      return (
+        <div key={field.id}>
+          <NoteEditor label={required ? `${field.label} (חובה)` : field.label} name={name} rows={4} maxLength={5000} defaultValue={value} error={errors[name]} />
+          {common.hint ? <p className="mt-1 text-sm text-ink-soft">{common.hint}</p> : null}
+        </div>
+      );
+    case "duration":
+      return (
+        <TextField
+          key={field.id}
+          {...common}
+          hint={common.hint ?? "בדקות (90) או בשעות ודקות (1:30)"}
+          dir="ltr"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={10}
+          defaultValue={value}
+        />
+      );
+    case "status":
     case "select":
       return (
         <SelectField key={`${field.id}-${value}`} {...common} defaultValue={value}>
@@ -239,7 +262,12 @@ function fieldInput(
       return <TextField key={field.id} {...common} type="email" dir="ltr" inputMode="email" autoComplete="off" defaultValue={value} />;
     case "url":
       return <TextField key={field.id} {...common} dir="ltr" inputMode="url" autoComplete="off" defaultValue={value} />;
-    default:
+    case "text":
       return <TextField key={field.id} {...common} maxLength={500} autoComplete="off" defaultValue={value} />;
+    default: {
+      // every type has its own input: a new type fails the build here until it gets one
+      const unhandled: never = field.type;
+      return unhandled;
+    }
   }
 }

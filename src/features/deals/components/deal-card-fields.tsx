@@ -158,6 +158,9 @@ export function DealCardFields({ orgId, deal, keys, stuck, lookups }: { orgId: s
                   <a href={shown.href} target="_blank" rel="noopener noreferrer" dir="ltr" draggable={false} className="break-all text-accent-strong underline underline-offset-4">
                     {shown.text}
                   </a>
+                ) : shown.tone ? (
+                  // FLD-06: a coloured status
+                  <Badge tone={shown.tone}>{shown.text}</Badge>
                 ) : (
                   <span dir={shown.ltr ? "ltr" : undefined}>{shown.text}</span>
                 )}

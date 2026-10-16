@@ -6,6 +6,7 @@ import type { CustomValues, FieldDefinition, FieldObject } from "@/features/cust
 import { displayCustomFields } from "@/features/custom-fields/values";
 
 import { CARD_LAYOUT_BUILT_IN, CUSTOM_PREFIX, groupHeadings, resolveLayout, splitColumns, unsavedLayout, type CardLayoutGroup, type CardLayoutType } from "../layout";
+import { customFieldValue } from "@/features/custom-fields/components/custom-field-value";
 
 // a built-in field as the card shows it; null/undefined = not shown on this record (e.g. the loss reason of an open deal)
 export type BuiltInDetail = { value: ReactNode; ltr?: boolean; label?: string } | null | undefined;
@@ -42,14 +43,7 @@ export function LayoutDetails({ type, layout, builtIn, custom, idPrefix }: Props
       key: `${CUSTOM_PREFIX}${field.key}`,
       label: field.label,
       ltr: field.ltr,
-      value:
-        field.href && field.text ? (
-          <a href={field.href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
-            {field.text.replace(/^https?:\/\//, "")}
-          </a>
-        ) : (
-          field.text
-        ),
+      value: customFieldValue(field),
     });
   }
 
