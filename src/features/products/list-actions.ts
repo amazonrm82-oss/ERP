@@ -10,6 +10,7 @@ import { pick } from "@/lib/validation";
 
 import { categorySchema, unitSchema } from "./lists";
 import { productListsSettingsPath, productsPath } from "./paths";
+import { saveOrder } from "@/lib/reorder";
 
 // PRD-04: owners and admins manage product categories and units; RLS refuses everyone else (0 rows / 42501).
 
@@ -57,19 +58,9 @@ async function reorder(
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, item] of ordered.entries()) {
-    if (item.position !== position) {
-      const { data, error } = await context.supabase
-        .from(table)
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", item.id)
-        .select("id");
-      if (error) return fail(dbErrorMessage(error));
-      if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-    }
-  }
-  return ok();
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, table, orgId, ordered.map((item) => item.id));
+  return orderError ? fail(orderError) : ok();
 }
 
 // ---------------------------------------------------------------------------

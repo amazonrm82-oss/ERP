@@ -10,6 +10,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { recordTypeObjectArg, typeSchema, type RecordTypeObject } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 // CON-02: owners and admins manage the lists; RLS refuses everyone else (0 rows / 42501).
 
@@ -123,21 +124,10 @@ export async function moveTypeAction(orgId: string, object: RecordTypeObject, ty
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, type] of ordered.entries()) {
-    if (type.position !== position) {
-      const { data, error } = await context.supabase
-        .from("record_type_options")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", type.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "record_type_options", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateTypes(orgId);
   return ok();

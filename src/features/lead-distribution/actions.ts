@@ -11,6 +11,7 @@ import { pick } from "@/lib/validation";
 import { distributionSettingsPath } from "./paths";
 import { parseDistributionForm, RULE_FIELD_NAMES, ruleSchema } from "./schema";
 import { weightsToSave } from "./settings";
+import { saveOrder } from "@/lib/reorder";
 
 // CAP-08: owners and admins of a writable business change the settings and the rules; RLS
 // refuses everyone else (0 rows / 42501), and the database checks the plan key (hint
@@ -129,21 +130,10 @@ export async function moveRuleAction(orgId: string, ruleId: string, direction: "
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, rule] of ordered.entries()) {
-    if (rule.position !== position) {
-      const { data, error } = await context.supabase
-        .from("lead_routing_rules")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", rule.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "lead_routing_rules", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidatePath(distributionSettingsPath(orgId));
   return ok();

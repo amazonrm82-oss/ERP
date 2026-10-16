@@ -124,6 +124,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import_undo:status": "הייבוא עדיין רץ או שכבר בוטל.",
   "import_undo:type": "את הייבוא הזה אי אפשר לבטל כאן.",
   "import_undo:expired": "אפשר לבטל ייבוא רק בשבעת הימים הראשונים.",
+  // FXD-07 (public.undo_import): nothing is undone while a record of the import is no longer the user's to change
+  "import_undo:left": "חלק מהרשומות שנוצרו בייבוא כבר אינן שלכם לשנות, ולכן הייבוא לא בוטל ושום רשומה לא הועברה לסל המחזור.",
   // FLD-08 (migration card_layouts)
   "card_layout:invalid": "התצוגה אינה תקינה, או שאחד השדות הוסר בינתיים. רעננו את הדף ונסו שוב.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",

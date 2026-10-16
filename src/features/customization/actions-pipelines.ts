@@ -11,6 +11,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { pipelineNameSchema, STAGE_FIELDS, stageSchema } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 function revalidatePipelines(orgId: string) {
   revalidatePath(paths.settingsPipelines(orgId));
@@ -100,28 +101,10 @@ export async function setDefaultPipelineAction(orgId: string, pipelineId: string
   if (!context.ok) {
     return context;
   }
-  // one default per organization (unique index): clear the old one first
-  const { error: clearError } = await context.supabase
-    .from("pipelines")
-    .update({ is_default: false })
-    .eq("organization_id", orgId)
-    .eq("is_default", true)
-    .neq("id", pipelineId);
-  if (clearError) {
-    return fail(dbErrorMessage(clearError));
-  }
-  const { data, error } = await context.supabase
-    .from("pipelines")
-    .update({ is_default: true })
-    .eq("organization_id", orgId)
-    .eq("id", pipelineId)
-    .is("deleted_at", null)
-    .select("id");
+  // FXD-07: the old default cleared and the new one set in one call, all or nothing
+  const { error } = await context.supabase.rpc("set_default_pipeline", { p_org: orgId, p_pipeline: pipelineId });
   if (error) {
-    return fail(dbErrorMessage(error));
-  }
-  if (data.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
+    return fail(error.code === "42501" ? NOT_FOUND_OR_FORBIDDEN : dbErrorMessage(error));
   }
   revalidatePipelines(orgId);
   return ok();
@@ -185,21 +168,13 @@ async function stagesOf(context: Extract<Awaited<ReturnType<typeof actionContext
   return (data ?? []) as StageRowLite[];
 }
 
-/** Writes positions 0..n-1 in the given order, touching only rows that change. */
+/** Writes positions 0..n-1 in the given order, in one call (FXD-07): all of it or none of it. */
 async function writeOrder(
   context: Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>,
   orgId: string,
   ordered: StageRowLite[],
 ): Promise<string | null> {
-  for (const [index, stage] of ordered.entries()) {
-    if (stage.position !== index) {
-      const { error } = await context.supabase.from("stages").update({ position: index }).eq("organization_id", orgId).eq("id", stage.id);
-      if (error) {
-        return dbErrorMessage(error);
-      }
-    }
-  }
-  return null;
+  return saveOrder(context.supabase, "stages", orgId, ordered.map((stage) => stage.id));
 }
 
 export async function addStageAction(orgId: string, pipelineId: string, _prev: FormState, formData: FormData): Promise<FormState> {

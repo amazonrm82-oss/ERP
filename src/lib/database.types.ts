@@ -2552,6 +2552,11 @@ export type Database = {
       my_permissions: { Args: { p_org: string }; Returns: string[] };
       // QUO-02: the lines of a quote in a new order (security invoker); the number moved
       quote_lines_reorder: { Args: { p_org: string; p_quote: string; p_ids: string[] }; Returns: number };
+      // FXD-07: one call per multi-step operation (migration 020220)
+      set_default_pipeline: { Args: { p_org: string; p_pipeline: string }; Returns: undefined };
+      set_default_lead_status: { Args: { p_org: string; p_status: string }; Returns: undefined };
+      reorder_positions: { Args: { p_table: string; p_org: string; p_ids: string[] }; Returns: number };
+      undo_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       // QUO-04: a template made from a quote the caller reads (security invoker); the new template's id
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})

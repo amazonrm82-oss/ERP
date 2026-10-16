@@ -11,6 +11,7 @@ import { pick } from "@/lib/validation";
 
 import { addRelationSchema, LEAD_REFERRAL_FIELD_NAMES, leadReferralSchema, RELATION_FIELD_NAMES, relationTypeSchema } from "./schema";
 import { REFERRAL_TYPE_KEY } from "./types";
+import { saveOrder } from "@/lib/reorder";
 
 const CANNOT_RELATE =
   "אי אפשר לשמור את הקשר. ייתכן שאחד מאנשי הקשר בסל המחזור, שאין לכם גישה אליו, או שאין לכם הרשאה לערוך אף אחד מהם.";
@@ -245,21 +246,10 @@ export async function moveRelationTypeAction(orgId: string, typeId: string, dire
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, type] of ordered.entries()) {
-    if (type.position !== position) {
-      const { data, error } = await context.supabase
-        .from("contact_relation_types")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", type.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "contact_relation_types", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateTypes(orgId);
   return ok();

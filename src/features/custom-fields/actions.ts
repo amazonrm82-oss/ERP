@@ -20,6 +20,7 @@ import { createFieldSchema, updateFieldSchema } from "./schema";
 import { canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
 import { FIELD_OBJECTS, inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
 import { parseCustomFields } from "./values";
+import { saveOrder } from "@/lib/reorder";
 
 function revalidateFields(orgId: string) {
   // the fields show in the forms and cards of every record type
@@ -311,13 +312,10 @@ export async function moveFieldAction(orgId: string, fieldId: string, direction:
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, row] of ordered.entries()) {
-    if (row.position !== position) {
-      const { error } = await context.supabase.from("field_definitions").update({ position }).eq("organization_id", orgId).eq("id", row.id);
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "field_definitions", orgId, ordered.map((row) => row.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateFields(orgId);
   return ok();

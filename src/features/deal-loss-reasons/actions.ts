@@ -10,6 +10,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { lossReasonSchema } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 // DEAL-03: owners and admins manage the list of loss reasons; RLS refuses everyone else (0 rows / 42501).
 
@@ -120,21 +121,10 @@ export async function moveLossReasonAction(orgId: string, reasonId: string, dire
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, reason] of ordered.entries()) {
-    if (reason.position !== position) {
-      const { data, error } = await context.supabase
-        .from("deal_loss_reasons")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", reason.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "deal_loss_reasons", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateLossReasons(orgId);
   return ok();

@@ -8,9 +8,8 @@ import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
+import { readAllPages } from "@/lib/paged-read";
 import { paths } from "@/lib/paths";
-import { RECORD_TYPES } from "@/lib/record-types";
 import { productsPath } from "@/features/products/paths";
 
 import {
@@ -336,60 +335,6 @@ class ReadFailed {
 }
 
 /**
- * The companies a contacts import created go to the recycle bin with its contacts,
- * except one that a contact from outside the import uses by now.
- */
-async function trashImportedCompanies(supabase: ImportContext["supabase"], orgId: string, jobId: string): Promise<string | null> {
-  const checkFailed = "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו לבדוק את החברות שנוצרו בייבוא.";
-  // both reads page through: a read returns at most 1,000 rows (RVW-2)
-  let ids: string[];
-  const inUse = new Set<string>();
-  try {
-    const { rows: companies } = await readAllPages(async (from, to) => {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("id")
-        .eq("organization_id", orgId)
-        .eq("import_job_id", jobId)
-        .is("deleted_at", null)
-        .order("id", { ascending: true })
-        .range(from, to);
-      if (error) throw new ReadFailed(error);
-      return data;
-    });
-    if (companies.length === 0) return null;
-    ids = companies.map((c) => c.id);
-    const users = await readAllPagesByIds(ids, async (slice, from, to) => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("company_id, import_job_id")
-        .eq("organization_id", orgId)
-        .in("company_id", slice)
-        .is("deleted_at", null)
-        .order("id", { ascending: true })
-        .range(from, to);
-      if (error) throw new ReadFailed(error);
-      return data;
-    });
-    for (const u of users) if (u.company_id && u.import_job_id !== jobId) inUse.add(u.company_id);
-  } catch (e) {
-    if (e instanceof ReadFailed) return dbErrorMessage(e.error, checkFailed);
-    throw e;
-  }
-  const unused = ids.filter((id) => !inUse.has(id));
-  for (let i = 0; i < unused.length; i += 200) {
-    const { error: trashError } = await supabase
-      .from("companies")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("organization_id", orgId)
-      .in("id", unused.slice(i, i + 200))
-      .is("deleted_at", null);
-    if (trashError) return dbErrorMessage(trashError, "אנשי הקשר הועברו לסל המחזור, אבל לא הצלחנו להעביר את החברות שנוצרו בייבוא.");
-  }
-  return null;
-}
-
-/**
  * PRD-05: removes the products an import created, and only those (products have no recycle bin).
  * A product that a document uses by now cannot be removed (no action foreign key, 23503): it is
  * archived instead, like the product page does.
@@ -435,25 +380,6 @@ async function removeImportedProducts(supabase: Supabase, orgId: string, jobId: 
   return null;
 }
 
-/**
- * IMP-03: the imported deals or tasks still in place after the undo (one that is no longer the
- * user's to change, e.g. passed to another team meanwhile). null when none is left.
- * Known limit: the count runs with the user's session, so a row the user can no longer read at all
- * is not counted, and the import is then marked undone with that row still in place.
- */
-async function importedLeft(supabase: Supabase, orgId: string, entity: "deal" | "task", jobId: string): Promise<string | null> {
-  const { count, error } = await supabase
-    .from(IMPORT_TABLES[entity])
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId)
-    .eq("import_job_id", jobId)
-    .is("deleted_at", null);
-  if (error) return dbErrorMessage(error, "לא הצלחנו לבדוק שהייבוא בוטל.");
-  if (!count) return null;
-  const what = entity === "deal" ? (count === 1 ? "עסקה אחת" : `${count} עסקאות`) : count === 1 ? "משימה אחת" : `${count} משימות`;
-  return `${what} מהייבוא לא הוסרו, כי כבר אין לכם הרשאה לשנות אותן. הייבוא לא סומן כמבוטל.`;
-}
-
 /** Moves the records an import created to the recycle bin (within 7 days). Updates are not reverted. */
 export async function undoImportAction(orgId: string, jobId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, jobId);
@@ -495,28 +421,18 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
     revalidatePath(productsPath(orgId));
     return ok();
   }
-  const { error } = await context.supabase
-    .from(RECORD_TYPES[entity].table)
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("organization_id", orgId)
-    .eq("import_job_id", jobId)
-    .is("deleted_at", null);
-  if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
-  if (entity === "deal" || entity === "task") {
-    // IMP-03: an update RLS filters out answers no error; say so instead of marking the import undone
-    const left = await importedLeft(context.supabase, orgId, entity, jobId);
-    if (left) return fail(left);
+  // FXD-07: the records to the recycle bin (for contacts, also the companies the import made that no live contact
+  // uses) and the import marked undone, in one call: all or nothing. A record the user may no longer change keeps the
+  // whole import as it was.
+  const { error } = await context.supabase.rpc("undo_import", { p_org: orgId, p_job: jobId });
+  if (error) {
+    if (error.hint === "import_undo:left") {
+      const left = Number(error.details);
+      const what = Number.isFinite(left) && left > 0 ? (left === 1 ? "רשומה אחת" : `${left} רשומות`) : "חלק מהרשומות";
+      return fail(`${what} מהייבוא כבר אינן שלכם לשנות, ולכן הייבוא לא בוטל ושום רשומה לא הועברה לסל המחזור.`);
+    }
+    return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
   }
-  if (entity === "contact") {
-    const companiesError = await trashImportedCompanies(context.supabase, orgId, jobId);
-    if (companiesError) return fail(companiesError);
-  }
-  const { error: jobError } = await context.supabase
-    .from("import_jobs")
-    .update({ status: "undone", undone_at: new Date().toISOString() })
-    .eq("organization_id", orgId)
-    .eq("id", jobId);
-  if (jobError) return fail(dbErrorMessage(jobError, "הרשומות הועברו לסל המחזור, אבל לא הצלחנו לעדכן את סטטוס הייבוא."));
   revalidatePath(paths.imports(orgId));
   revalidatePath(paths.org(orgId), "layout");
   return ok();

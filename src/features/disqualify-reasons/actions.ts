@@ -10,6 +10,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { reasonSchema } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 // LEAD-03: owners and admins manage the list; RLS refuses everyone else (0 rows / 42501).
 
@@ -120,21 +121,10 @@ export async function moveReasonAction(orgId: string, reasonId: string, directio
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, reason] of ordered.entries()) {
-    if (reason.position !== position) {
-      const { data, error } = await context.supabase
-        .from("disqualify_reasons")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", reason.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "disqualify_reasons", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateReasons(orgId);
   return ok();

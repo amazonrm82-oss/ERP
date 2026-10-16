@@ -16,6 +16,7 @@ import { nextPosition, plainMentions } from "./templates";
 
 import { whatsappTemplatesPath } from "./paths";
 import { sentMessageSchema, templateSchema, type SentMessage } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 // WA-01: owners and admins manage the list; RLS refuses everyone else (0 rows / 42501).
 
@@ -166,21 +167,10 @@ export async function moveTemplateAction(orgId: string, templateId: string, dire
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, template] of ordered.entries()) {
-    if (template.position !== position) {
-      const { data, error } = await context.supabase
-        .from("whatsapp_templates")
-        .update({ position })
-        .eq("organization_id", orgId)
-        .eq("id", template.id)
-        .select("id");
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-      if (data.length === 0) {
-        return fail(NOT_FOUND_OR_FORBIDDEN);
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "whatsapp_templates", orgId, ordered.map((item) => item.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidatePath(whatsappTemplatesPath(orgId));
   return ok();

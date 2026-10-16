@@ -11,6 +11,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { sourceSchema, statusSchema } from "./schema";
+import { saveOrder } from "@/lib/reorder";
 
 function revalidateLeadSettings(orgId: string) {
   revalidatePath(paths.settingsLeads(orgId));
@@ -109,13 +110,10 @@ export async function moveStatusAction(orgId: string, statusId: string, directio
     return ok();
   }
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-  for (const [position, status] of ordered.entries()) {
-    if (status.position !== position) {
-      const { error } = await context.supabase.from("lead_statuses").update({ position }).eq("organization_id", orgId).eq("id", status.id);
-      if (error) {
-        return fail(dbErrorMessage(error));
-      }
-    }
+  // FXD-07: the whole order in one call
+  const orderError = await saveOrder(context.supabase, "lead_statuses", orgId, ordered.map((s) => s.id));
+  if (orderError) {
+    return fail(orderError);
   }
   revalidateLeadSettings(orgId);
   return ok();
@@ -134,27 +132,10 @@ export async function setDefaultStatusAction(orgId: string, statusId: string): P
   if (status.kind !== "open") {
     return fail("רק סטטוס מסוג פתוח יכול להיות ברירת מחדל.");
   }
-  // one default per organization (unique index): clear the old one first
-  const { error: clearError } = await context.supabase
-    .from("lead_statuses")
-    .update({ is_default: false })
-    .eq("organization_id", orgId)
-    .eq("is_default", true)
-    .neq("id", statusId);
-  if (clearError) {
-    return fail(dbErrorMessage(clearError));
-  }
-  const { data, error } = await context.supabase
-    .from("lead_statuses")
-    .update({ is_default: true })
-    .eq("organization_id", orgId)
-    .eq("id", statusId)
-    .select("id");
+  // FXD-07: the old default cleared and the new one set in one call, all or nothing
+  const { error } = await context.supabase.rpc("set_default_lead_status", { p_org: orgId, p_status: statusId });
   if (error) {
-    return fail(dbErrorMessage(error));
-  }
-  if (data.length === 0) {
-    return fail(NOT_FOUND_OR_FORBIDDEN);
+    return fail(error.code === "42501" ? NOT_FOUND_OR_FORBIDDEN : dbErrorMessage(error));
   }
   revalidateLeadSettings(orgId);
   return ok();
