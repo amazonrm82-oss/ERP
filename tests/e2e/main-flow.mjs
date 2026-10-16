@@ -380,7 +380,10 @@ try {
   const booked = recordMeetings.getByRole("listitem").filter({ hasText: "פגישת היכרות" }).first();
   await Promise.race([booked.waitFor({ timeout: 15000 }).catch(() => {}), bookAnyway.waitFor({ timeout: 15000 }).catch(() => {})]);
   if (await bookAnyway.isVisible()) await bookAnyway.click();
-  await recordMeetings.getByText("פגישת היכרות", { exact: true }).waitFor();
+  // The open sheet lives inside the meetings section too, and its meeting-type list holds the default type "פגישת היכרות"
+  // (CAL-08), so a bare text wait in the section matched the sheet. Wait for the sheet to close, then for the meeting's row.
+  await meetingSheet.waitFor({ state: "hidden", timeout: 15000 });
+  await booked.waitFor({ timeout: 15000 });
   await expectText(owner, "הפגישה נקבעה");
   const [{ n: linkedMeetings }] = await sql("select count(*)::int as n from public.meetings where title = 'פגישת היכרות' and lead_id = $1", [leadIdNow]);
   if (linkedMeetings !== 1) throw new Error(`the meeting was not saved on the lead (${linkedMeetings})`);
@@ -388,7 +391,17 @@ try {
   const statusSheet = owner.getByRole("dialog", { name: "סטטוס ותוצאה" });
   await statusSheet.getByRole("radio", { name: "הלקוח לא הגיע" }).check();
   await statusSheet.getByRole("button", { name: "שמירה", exact: true }).click();
-  await recordMeetings.getByText("הלקוח לא הגיע", { exact: true }).waitFor();
+  // The open sheet lives inside the meetings section and holds a radio labelled "הלקוח לא הגיע", so waiting for that
+  // text alone passed at once, while the save was still on its way, and the calendar below was read before it landed.
+  // Wait for the sheet to close, for the meeting's own badge, and for the saved row.
+  await statusSheet.waitFor({ state: "hidden", timeout: 15000 });
+  await booked.getByText("הלקוח לא הגיע", { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+  for (let i = 0; ; i++) {
+    const [{ status }] = await sql("select status from public.meetings where title = 'פגישת היכרות' and lead_id = $1", [leadIdNow]);
+    if (status === "no_show") break;
+    if (i >= 60) throw new Error(`the meeting's status was not saved as no_show (${status})`);
+    await new Promise((r) => setTimeout(r, 250));
+  }
 
   step("calendar: the no-show meeting is hidden until 'show what was done or cancelled' is on, then moves to 12:30 with the 'move' form, keeping its hour (CAL-02)");
   const leadUrlForCalendar = owner.url();
