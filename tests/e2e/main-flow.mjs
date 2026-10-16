@@ -375,6 +375,11 @@ try {
   await meetingSheet.getByLabel("כותרת").fill("פגישת היכרות");
   await meetingSheet.getByLabel("מיקום (לא חובה)").fill("המשרד בתל אביב");
   await meetingSheet.getByRole("button", { name: "קביעת הפגישה" }).click();
+  // on a rest day or off hours the conflict warning asks first (CAL-05), as when editing below
+  const bookAnyway = meetingSheet.getByRole("button", { name: "לקבוע בכל זאת" });
+  const booked = recordMeetings.getByRole("listitem").filter({ hasText: "פגישת היכרות" }).first();
+  await Promise.race([booked.waitFor({ timeout: 15000 }).catch(() => {}), bookAnyway.waitFor({ timeout: 15000 }).catch(() => {})]);
+  if (await bookAnyway.isVisible()) await bookAnyway.click();
   await recordMeetings.getByText("פגישת היכרות", { exact: true }).waitFor();
   await expectText(owner, "הפגישה נקבעה");
   const [{ n: linkedMeetings }] = await sql("select count(*)::int as n from public.meetings where title = 'פגישת היכרות' and lead_id = $1", [leadIdNow]);
@@ -970,10 +975,11 @@ try {
   }
 
   step("tasks: put off to next week and hand over, straight from the list (TASK-05)");
+  // "בעוד שבוע" lands on the next working day when a week from today is a rest day (HEB-02)
   const taskOrg = orgUrl.split("/").pop();
   const quoteTask = () =>
     sql(
-      "select to_char(due_at at time zone 'Asia/Jerusalem', 'YYYY-MM-DD HH24:MI') as due, (now() at time zone 'Asia/Jerusalem')::date + 7 as week, owner_id from public.tasks where title = 'לשלוח הצעת מחיר למשה' and organization_id = $1",
+      "select to_char(due_at at time zone 'Asia/Jerusalem', 'YYYY-MM-DD HH24:MI') as due, app.add_business_days(organization_id, (now() at time zone 'Asia/Jerusalem')::date + 7, 0) as week, owner_id from public.tasks where title = 'לשלוח הצעת מחיר למשה' and organization_id = $1",
       [taskOrg],
     );
   await ownerDesk.goto(`${orgUrl}/tasks?who=all`);
