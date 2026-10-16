@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } fr
 import { Button, IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { focusIsLost, focusLanding, setDialogLanding, type FocusLanding, type FocusNode } from "@/lib/focus-rescue";
 
 type DialogProps = {
   open: boolean;
@@ -103,13 +104,17 @@ function DialogFrame({
     if (!dialog || !open) return;
     // what had focus before the window opened; focus goes back there when it closes or unmounts
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // FXA-08: if the opener is gone by the time the window closes (its row was deleted), focus lands on the next row
+    // of the same list instead; worked out now, while the opener is still on the page
+    const landing = opener && opener !== document.body ? focusLanding(opener as unknown as FocusNode) : null;
+    if (landing) setDialogLanding(dialog, landing);
     if (!dialog.open) dialog.showModal();
     // React's autoFocus runs while the window is still closed and cannot focus, and showModal picks the
     // first button (the X): move focus to the button marked autoFocus ("ביטול", "להישאר")
     dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     return () => {
       if (dialog.open) dialog.close();
-      restoreFocus(opener, dialog);
+      restoreFocus(opener, dialog, landing);
     };
   }, [open, ref]);
 
@@ -156,9 +161,14 @@ function DialogFrame({
   );
 }
 
-function restoreFocus(target: HTMLElement | null, dialog: HTMLDialogElement) {
-  if (!target?.isConnected) return;
+function restoreFocus(target: HTMLElement | null, dialog: HTMLDialogElement, landing: FocusLanding | null) {
   const active = document.activeElement;
   // only when focus was lost (the body, a removed element) or is still inside the closed window
-  if (!active || active === document.body || !active.isConnected || dialog.contains(active)) target.focus();
+  if (!focusIsLost(active as FocusNode | null, document.body as unknown as FocusNode) && !(active && dialog.contains(active))) return;
+  if (target?.isConnected) {
+    target.focus();
+    return;
+  }
+  // the opener went away with its row: the next row, else the previous one, else the page's main heading
+  (landing?.() as HTMLElement | null)?.focus();
 }

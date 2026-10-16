@@ -6,6 +6,7 @@ import "@fontsource-variable/heebo";
 import "./globals.css";
 
 import { ConfigMissing } from "@/components/config-missing";
+import { FocusRescue } from "@/components/focus-rescue";
 import { ServiceWorker } from "@/components/service-worker";
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 import { getSupabaseEnv } from "@/lib/env";
@@ -52,6 +53,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="min-h-dvh antialiased">
         {isConfigured ? children : <ConfigMissing />}
         <ServiceWorker />
+        {/* FXA-08: focus never falls back to the top of the page when the focused control disappears */}
+        <FocusRescue />
       </body>
     </html>
   );

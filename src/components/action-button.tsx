@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ActionResult } from "@/lib/action-result";
+import { focusIsLost, type FocusNode } from "@/lib/focus-rescue";
 
 type Props = {
   // a bound Server Action
@@ -30,6 +31,15 @@ export function ActionButton({ action, children, pendingText, variant = "seconda
   const [pending, startTransition] = useTransition();
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mainRef = useRef<HTMLButtonElement>(null);
+  const wasAsking = useRef(false);
+
+  // FXA-08: when the question goes away ("לא עכשיו", or the action ran and the row is still here), the button that
+  // asked it gets the focus back instead of the top of the page. Before paint, so the page-wide net sees focus in place.
+  useLayoutEffect(() => {
+    if (wasAsking.current && !asking) returnFocus(mainRef.current);
+    wasAsking.current = asking;
+  }, [asking]);
 
   function run() {
     setError(null);
@@ -56,6 +66,7 @@ export function ActionButton({ action, children, pendingText, variant = "seconda
         </span>
       ) : (
         <Button
+          ref={mainRef}
           variant={variant}
           size="sm"
           onClick={confirm ? () => setAsking(true) : run}
@@ -73,4 +84,11 @@ export function ActionButton({ action, children, pendingText, variant = "seconda
       ) : null}
     </span>
   );
+}
+
+/** Focuses `button` only when focus was lost (it sat on a control that has just gone), never taking it from elsewhere. */
+export function returnFocus(button: HTMLElement | null): void {
+  if (!button) return;
+  const active = document.activeElement;
+  if (focusIsLost(active as FocusNode | null, document.body as unknown as FocusNode)) button.focus();
 }

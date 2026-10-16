@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -215,6 +216,10 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         </Dialog>
       </Section>
 
+      <Section title="מיקוד אחרי מחיקה (FXA-08)">
+        <FocusSample />
+      </Section>
+
       <Section title="שינויים שלא נשמרו">
         <UnsavedSample prefix={p("unsaved")} />
       </Section>
@@ -332,6 +337,44 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
           ))}
         </div>
       </Section>
+    </div>
+  );
+}
+
+const FOCUS_SAMPLE_ROWS = ["דנה כהן", "יוסי לוי", "מיכל אברהם"];
+
+/**
+ * FXA-08: delete a row with the keyboard; focus moves to the next row (else the previous one, else the page heading),
+ * never back to the top of the page. "לא עכשיו" gives focus back to the button that asked.
+ */
+function FocusSample() {
+  const [rows, setRows] = useState(FOCUS_SAMPLE_ROWS);
+  const remove = (name: string) => async () => {
+    setRows((list) => list.filter((row) => row !== name));
+    return { ok: true as const };
+  };
+  return (
+    <div className="flex max-w-xl flex-col gap-3">
+      <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
+        {rows.map((name) => (
+          <li key={name} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+            <span>{name}</span>
+            <span className="flex flex-wrap gap-2">
+              <ActionButton action={remove(name)} pendingText="מוחקים…" variant="danger-ghost" confirm="למחוק את השורה?" srLabel={name}>
+                מחיקה
+              </ActionButton>
+              <ConfirmButton title={`להעביר את ${name} לסל המחזור?`} confirmLabel="כן, להעביר" action={remove(name)}>
+                לסל המחזור
+              </ConfirmButton>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {rows.length < FOCUS_SAMPLE_ROWS.length ? (
+        <Button variant="secondary" size="sm" className="self-start" onClick={() => setRows(FOCUS_SAMPLE_ROWS)}>
+          החזרת השורות
+        </Button>
+      ) : null}
     </div>
   );
 }
