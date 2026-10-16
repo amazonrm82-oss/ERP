@@ -758,6 +758,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quote:frozen`). No number on a draft (QUO-03 takes it on sending). Purging a contact detaches deal quotes that name it
   (`contacts_quotes_detach`, skipped while the org itself is deleted). Sent quotes still cascade with their record until QUO-07.
   Merge, erasure, sample data and import undo know quotes.
+- Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
+  writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
+  line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
+  (invoker). Applying a template happens in the app with the user's session and adds lines to an editable draft only.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
