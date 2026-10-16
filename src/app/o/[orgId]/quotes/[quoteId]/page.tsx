@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
+import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-tools";
+import { listQuoteTemplates } from "@/features/quotes/template-server";
+import { appliedText } from "@/features/quotes/templates";
+import { isAdminRole } from "@/features/settings/permissions";
 import { getQuote, getQuoteParties, getQuotePricing, listQuoteLines } from "@/features/quotes/queries";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -16,7 +21,15 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "הצעת מחיר" };
 
-type Props = { params: Promise<{ orgId: string; quoteId: string }> };
+type Props = {
+  params: Promise<{ orgId: string; quoteId: string }>;
+  // QUO-04: the outcome of starting from a template (createQuoteAction)
+  searchParams: Promise<{ template?: string; added?: string; skipped?: string }>;
+};
+
+function count(value: string | undefined): number {
+  return value && /^\d{1,3}$/.test(value) ? Number(value) : 0;
+}
 
 const linkClass = "text-accent-strong underline-offset-4 hover:underline";
 
@@ -24,19 +37,22 @@ const linkClass = "text-accent-strong underline-offset-4 hover:underline";
  * QUO-01, QUO-02: one quote and its editor. Whoever reads the quote's deal (else its contact) reads it;
  * whoever may edit that deal or contact edits it while it is a draft (RLS decides again on every write).
  */
-export default async function QuotePage({ params }: Props) {
-  const { orgId, quoteId } = await params;
+export default async function QuotePage({ params, searchParams }: Props) {
+  const [{ orgId, quoteId }, started] = await Promise.all([params, searchParams]);
   if (!isUuid(quoteId)) notFound();
   const context = await getOrgContext(orgId);
   const quote = await getQuote(orgId, quoteId);
   if (!quote) notFound();
   const supabase = await createClient();
-  const [lines, pricing, parties, hasProducts, hasDiscounts, parent] = await Promise.all([
+  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent] = await Promise.all([
     listQuoteLines(orgId, quote.id),
     getQuotePricing(orgId, quote),
     getQuoteParties(orgId, quote),
     orgHasFeature(orgId, "products"),
     orgHasFeature(orgId, "discounts"),
+    orgHasFeature(orgId, "quotes"),
+    // QUO-04
+    listQuoteTemplates(orgId),
     quote.dealId
       ? supabase.from("deals").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.dealId).maybeSingle()
       : supabase.from("contacts").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.contactId ?? "").maybeSingle(),
@@ -78,11 +94,26 @@ export default async function QuotePage({ params }: Props) {
           </span>
         ) : null}
       </div>
+      {started.template === "ok" ? (
+        <FormNotice className="mb-5" message={appliedText(count(started.added), count(started.skipped))} />
+      ) : started.template === "failed" ? (
+        <FormError className="mb-5" message="ההצעה נוצרה, אבל השורות מהתבנית לא נוספו. אפשר לנסות שוב בכפתור &quot;מתבנית&quot;." />
+      ) : null}
       {quote.status === "draft" ? (
         <p className="mb-5 rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong">
           טיוטה: כל שינוי נשמר בהצעה, והלקוח עוד לא רואה אותה. המספר הרץ ניתן כשההצעה נשלחת.
         </p>
       ) : null}
+      <div className="mb-5">
+        <QuoteTemplateTools
+          orgId={orgId}
+          quoteId={quote.id}
+          quoteTitle={quote.title}
+          templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+          canApply={canEdit}
+          canSave={hasQuotes && context.canWrite && isAdminRole(context.role)}
+        />
+      </div>
       <QuoteEditor
         orgId={orgId}
         quote={quote}

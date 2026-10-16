@@ -139,6 +139,11 @@ describe("currency next to every amount", () => {
         const quote = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה עם שורה', $2) returning id", [org, deal])).rows[0].id;
         await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, quote]);
       },
+      // QUO-04
+      quote_template_lines: async (q) => {
+        const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;
+        await q("insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, template]);
+      },
     };
     expect(tables.filter((table) => !(table in SAMPLE_ROWS)), "add a sample row for every table with a currency").toEqual([]);
     await asAdmin(async (q) => {

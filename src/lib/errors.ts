@@ -186,6 +186,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_lines:max": "אפשר עד 200 שורות בהצעה אחת. מחקו שורה כדי להוסיף חדשה.",
   "quote_lines:product": "המוצר שנבחר לא פעיל או בארכיון. בחרו מוצר פעיל מהקטלוג.",
   "quote_lines:price_list": "חסר המחירון שממנו נלקח המחיר. רעננו את הדף ונסו שוב.",
+  // QUO-04 (migration quote_templates)
+  "quote_template_lines:max": "אפשר עד 200 שורות בתבנית אחת.",
+  "quote_templates:quote": "ההצעה לא נמצאה. רעננו את הדף ונסו שוב.",
   "quote_lines:order": "סדר השורות לא תקין. רעננו את הדף ונסו שוב.",
   // QUO-03 (migration number_sequences)
   "number_sequences:start_locked": "כבר ניתן מספר בסדרה הזו, ולכן אי אפשר לשנות את המספר ההתחלתי. אפשר לשנות את הקידומת.",

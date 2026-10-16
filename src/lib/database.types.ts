@@ -1345,6 +1345,57 @@ export type PriceListLineRow = {
   updated_at: string;
 };
 
+// QUO-04: a quote saved as a template (migration quote_templates). created_by is set by app.touch_row.
+export type QuoteTemplateRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  notes: string | null;
+  terms: string | null;
+  prices_include_vat: boolean;
+  currency: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// QUO-04: a line of a template. unit_price_agorot null = the product's automatic price when the template is used.
+export type QuoteTemplateLineRow = {
+  id: string;
+  organization_id: string;
+  template_id: string;
+  position: number;
+  kind: string;
+  product_id: string | null;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unit_price_agorot: number | null;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  vat_exempt: boolean;
+  billing: string;
+  is_optional: boolean;
+  optional_selected: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type QuoteTemplateLineWrite = {
+  position?: number;
+  name?: string;
+  description?: string | null;
+  quantity?: number;
+  unit_price_agorot?: number | null;
+  discount_bp?: number | null;
+  discount_agorot?: number | null;
+  vat_exempt?: boolean;
+  billing?: string;
+  is_optional?: boolean;
+  optional_selected?: boolean;
+};
+
 // QUO-01, QUO-02: a quote made from a deal or a contact (migration quotes). status is server-only (draft until
 // QUO-07 sends it); quote_date, owner_id, vat_rate_bp and every *_agorot total are set by trigger quotes_check.
 export type QuoteRow = {
@@ -2064,6 +2115,18 @@ export type Database = {
         },
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
+      // QUO-04: column grants; the VAT mode is set when the template is made
+      quote_templates: Table<
+        QuoteTemplateRow,
+        { organization_id: string; name: string; notes?: string | null; terms?: string | null; prices_include_vat?: boolean; currency?: string },
+        { name?: string; notes?: string | null; terms?: string | null }
+      >;
+      // QUO-04: column grants; the template, the kind and the product are fixed once inserted
+      quote_template_lines: Table<
+        QuoteTemplateLineRow,
+        QuoteTemplateLineWrite & { organization_id: string; template_id: string; name: string; kind?: string; product_id?: string | null; currency?: string },
+        QuoteTemplateLineWrite
+      >;
       // QUO-01: column grants; the deal is fixed once inserted; status and the totals are the server's
       quotes: Table<QuoteRow, QuoteWrite & { organization_id: string; title: string; deal_id?: string | null }, QuoteWrite>;
       // QUO-02: column grants; the quote, the kind and the product are fixed once inserted
@@ -2420,6 +2483,8 @@ export type Database = {
       my_permissions: { Args: { p_org: string }; Returns: string[] };
       // QUO-02: the lines of a quote in a new order (security invoker); the number moved
       quote_lines_reorder: { Args: { p_org: string; p_quote: string; p_ids: string[] }; Returns: number };
+      // QUO-04: a template made from a quote the caller reads (security invoker); the new template's id
+      quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };

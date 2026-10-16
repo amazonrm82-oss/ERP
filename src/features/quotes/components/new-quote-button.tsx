@@ -3,15 +3,34 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 
 import { createQuoteAction } from "../actions";
 
-/** QUO-01: a new draft quote for this deal or contact; the editor opens when it is made. */
-export function NewQuoteButton({ orgId, source }: { orgId: string; source: { kind: "deal" | "contact"; id: string } }) {
+type Props = {
+  orgId: string;
+  source: { kind: "deal" | "contact"; id: string };
+  // QUO-04: the business's templates; with none the button makes an empty quote at once
+  templates?: { id: string; name: string }[];
+};
+
+/** QUO-01: a new draft quote for this deal or contact, empty or from a template (QUO-04); the editor opens. */
+export function NewQuoteButton({ orgId, source, templates = [] }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  function create(templateId: string | null) {
+    setError(null);
+    startTransition(async () => {
+      const outcome = await createQuoteAction(orgId, source, templateId);
+      // success navigates to the editor; only a refusal comes back
+      if (outcome && !outcome.ok) setError(outcome.message);
+    });
+  }
+
   return (
     <span className="flex flex-col items-end gap-1">
       <Button
@@ -19,19 +38,34 @@ export function NewQuoteButton({ orgId, source }: { orgId: string; source: { kin
         size="sm"
         className="print:hidden"
         disabled={pending}
-        onClick={() => {
-          setError(null);
-          startTransition(async () => {
-            const outcome = await createQuoteAction(orgId, source);
-            // success navigates to the editor; only a refusal comes back
-            if (outcome && !outcome.ok) setError(outcome.message);
-          });
-        }}
+        onClick={() => (templates.length > 0 ? setOpen(true) : create(null))}
       >
         <PlusIcon className="size-4" />
         {pending ? "יוצרים…" : "הצעה חדשה"}
       </Button>
-      <FormError message={error} />
+      {open ? null : <FormError message={error} />}
+      {templates.length > 0 ? (
+        <Dialog open={open} onClose={() => setOpen(false)} title="הצעה חדשה" description="אפשר להתחיל מהצעה ריקה או מתבנית שמורה.">
+          <div className="space-y-3">
+            <FormError message={error} />
+            <ul className="space-y-2">
+              <li>
+                <Button variant="secondary" className="w-full justify-start" disabled={pending} onClick={() => create(null)}>
+                  הצעה ריקה
+                </Button>
+              </li>
+              {templates.map((template) => (
+                <li key={template.id}>
+                  <Button variant="ghost" className="w-full justify-start" disabled={pending} onClick={() => create(template.id)}>
+                    <bdi className="truncate">{template.name}</bdi>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            {pending ? <p className="text-sm text-ink-soft">יוצרים את ההצעה…</p> : null}
+          </div>
+        </Dialog>
+      ) : null}
     </span>
   );
 }

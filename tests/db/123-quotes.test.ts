@@ -529,4 +529,25 @@ describe("quotes (QUO-01, QUO-02)", () => {
       await setVat("licensed");
     }
   });
+
+  it("a quote that is no longer a draft keeps its stored amounts even when the server writes them (QUO-04 follow-up)", async () => {
+    const deal = await newDeal(member, null);
+    const qr = await newQuote(member, { deal_id: deal });
+    await newLine(member, qr.id, { name: "שורה", unit_price_agorot: 10000 });
+    await asAdmin((q) => q("update public.quotes set status = 'sent' where id = $1", [qr.id]));
+    await asAdmin((q) =>
+      q(
+        "update public.quotes set total_agorot = 1, vat_rate_bp = 0, vat_agorot = 0, subtotal_agorot = 1, net_total_agorot = 1, discount_total_agorot = 5 where id = $1",
+        [qr.id],
+      ),
+    );
+    expect(await quote(qr.id)).toMatchObject({
+      vat_rate_bp: 1800,
+      subtotal_agorot: "10000",
+      discount_total_agorot: "0",
+      net_total_agorot: "10000",
+      vat_agorot: "1800",
+      total_agorot: "11800",
+    });
+  });
 });

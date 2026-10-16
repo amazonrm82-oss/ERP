@@ -25,6 +25,7 @@ import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
+import { quoteTemplatesPath } from "@/features/quotes/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -77,6 +78,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
         // QUO-03: everyone reads it; owners and admins change it
         { href: numberingSettingsPath(orgId), label: "מספור הצעות והזמנות", description: "קידומת ומספר התחלתי למספרים של הצעות מחיר והזמנות", icon: FormIcon },
+        // QUO-04: everyone reads the templates; owners and admins rename and delete them
+        { href: quoteTemplatesPath(orgId), label: "תבניות הצעת מחיר", description: "הצעות שמורות עם שורות ותנאים, להתחלה מהירה", icon: FormIcon },
         // PL-01: everyone reads the price lists; owners and admins edit them. Hidden without the capability.
         ...(access.priceLists
           ? [{ href: priceListsPath(orgId), label: "מחירונים", description: "מחירים אחרים או הנחות לחלק מהמוצרים, לתקופה מסוימת", icon: TagIcon }]

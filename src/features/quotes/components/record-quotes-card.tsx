@@ -6,6 +6,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 
 import { quotePath } from "../paths";
 import { listRecordQuotes } from "../queries";
+import { listQuoteTemplates } from "../template-server";
 import { QUOTE_STATUS_LABELS } from "../schema";
 import { NewQuoteButton } from "./new-quote-button";
 
@@ -18,11 +19,11 @@ type Props = {
 
 /** QUO-01: the quotes of a deal or a contact, with "הצעה חדשה". Hidden when there is nothing to show or do. */
 export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
-  const quotes = await listRecordQuotes(orgId, subject);
+  const [quotes, templates] = await Promise.all([listRecordQuotes(orgId, subject), canCreate ? listQuoteTemplates(orgId) : []]);
   if (quotes.length === 0 && !canCreate) return null;
   return (
     <Card aria-labelledby={`quotes-${subject.id}`} className="print:hidden">
-      <CardHeader id={`quotes-${subject.id}`} title="הצעות מחיר" action={canCreate ? <NewQuoteButton orgId={orgId} source={subject} /> : null} />
+      <CardHeader id={`quotes-${subject.id}`} title="הצעות מחיר" action={canCreate ? <NewQuoteButton orgId={orgId} source={subject} templates={templates.map((t) => ({ id: t.id, name: t.name }))} /> : null} />
       <CardBody>
         {quotes.length === 0 ? (
           <p className="text-sm text-ink-soft">{subject.kind === "deal" ? "עוד אין הצעות מחיר לעסקה." : "עוד אין הצעות מחיר לאיש הקשר."}</p>

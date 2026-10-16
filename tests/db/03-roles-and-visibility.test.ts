@@ -268,6 +268,20 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("quote templates: everyone reads them, only owners and admins write them (QUO-04)", async () => {
+    const template = await asUser(admin.id, async (q) =>
+      (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת תפקידים') returning id", [org])).rows[0].id,
+    );
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.quote_templates where id = $1", [template])), u.email).toBe(1);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.quote_templates set notes = 'x' where id = $1", [template])).rowCount), u.email).toBe(0);
+      expect((await pgError(asUser(u.id, (q) => q("insert into public.quote_templates (organization_id, name) values ($1, $2)", [org, `של ${u.email}`])))).code, u.email).toBe("42501");
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.quote_templates set notes = 'x' where id = $1", [template])).rowCount)).toBe(1);
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

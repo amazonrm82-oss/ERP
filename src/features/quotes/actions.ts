@@ -18,6 +18,7 @@ import { pick } from "@/lib/validation";
 
 import { quotePath } from "./paths";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
+import { applyTemplateToQuote } from "./template-server";
 import {
   DEFAULT_VALID_DAYS,
   defaultQuoteTitle,
@@ -61,8 +62,10 @@ const sourceArg = z.object({ kind: z.enum(["deal", "contact"]), id: z.guid() });
  * QUO-01: a new draft from a deal (its contact and company come with it) or from a contact (its company
  * comes with it), titled after the deal or the contact and valid for 30 days; then the editor opens.
  */
-export async function createQuoteAction(orgId: string, source: unknown): Promise<ActionResult> {
+export async function createQuoteAction(orgId: string, source: unknown, templateId: unknown = null): Promise<ActionResult> {
   if (!validArg(sourceArg, source)) return fail(INVALID_ARGS);
+  // QUO-04: a template to start from (its lines, notes and terms)
+  if (templateId !== null && !validArg(z.guid(), templateId)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, source.id);
   if (!context.ok) return context;
   const { supabase } = context;
@@ -88,7 +91,15 @@ export async function createQuoteAction(orgId: string, source: unknown): Promise
     .single();
   if (error) return fail(error.code === "42501" ? CANNOT_CREATE : dbErrorMessage(error));
   revalidateQuote(orgId, { id: data.id, dealId: data.deal_id, contactId: data.contact_id });
-  redirect(quotePath(orgId, data.id));
+  if (templateId === null) redirect(quotePath(orgId, data.id));
+  const quote = await readQuote(supabase, orgId, data.id);
+  const applied = quote ? await applyTemplateToQuote(supabase, orgId, quote, templateId) : null;
+  // the quote exists either way; the editor says what came from the template
+  redirect(
+    `${quotePath(orgId, data.id)}?${
+      applied?.ok ? new URLSearchParams({ template: "ok", added: String(applied.added), skipped: String(applied.skipped) }) : "template=failed"
+    }`,
+  );
 }
 
 // QUO-02: the quote's own details ---------------------------------------------
