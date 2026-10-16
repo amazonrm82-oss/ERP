@@ -166,7 +166,7 @@ describe("seats and plan user limits", () => {
     await asAdmin((q) =>
       q(
         `update public.subscriptions
-            set plan_key = 'free', status = 'active', limit_overrides = '{"max_users": 3}', feature_overrides = '{"view_seats": true}'
+            set plan_key = 'free', status = 'active', limit_overrides = '{"max_users": 3, "view_seats_per_paid_seat": 1}', feature_overrides = '{"view_seats": true}'
           where organization_id = $1`,
         [org],
       ),

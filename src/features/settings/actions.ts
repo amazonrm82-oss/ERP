@@ -12,6 +12,8 @@ import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { pick } from "@/lib/validation";
 
+import { getViewSeatUsage } from "./plan-usage";
+import { NO_VIEW_SEAT_LEFT, viewSeatsLeft } from "./view-seats";
 import {
   addTeamMemberSchema,
   changeRoleSchema,
@@ -80,6 +82,14 @@ export async function inviteUserAction(
   const parsed = inviteSchema.safeParse(pick(formData, ["email", "role"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
+  }
+
+  // PRM-02: a viewer invitation only while a view seat is free (open viewer invitations count too)
+  if (parsed.data.role === "viewer") {
+    const seats = await getViewSeatUsage(orgId);
+    if (seats && viewSeatsLeft(seats) === 0) {
+      return fail(NO_VIEW_SEAT_LEFT, { values: formValues(formData) });
+    }
   }
 
   const { data: token, error } = await context.supabase.rpc("create_invitation", {

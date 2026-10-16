@@ -3,6 +3,8 @@ import "server-only";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import type { ViewSeatUsage } from "./view-seats";
+
 export type UsageRow = { key: string; label: string; limit: number | null; used: number; unit?: string };
 export type PlanUsage = { planKey: string | null; planName: string; status: string; trialEndsAt: string | null; usage: UsageRow[] };
 
@@ -16,6 +18,8 @@ const LABELS: Record<string, { label: string; unit?: string }> = {
   max_products: { label: "מוצרים בקטלוג (כולל מוצרים בארכיון)" },
   // PL-01: besides the default price list (the products' own prices)
   max_price_lists: { label: "מחירונים (נוסף על מחירי המוצרים)" },
+  // PRM-02: per paid seat x active paid seats
+  view_seats: { label: "מושבי צפייה (לפי מספר המושבים בתשלום)" },
 };
 
 /** The business's plan, trial and usage against each limit (FXU-04, migration 0046). */
@@ -42,4 +46,24 @@ export async function getPlanUsage(orgId: string): Promise<PlanUsage | null> {
       used: Number(row.used),
     })),
   };
+}
+
+/** PRM-02: view seats in use, the allowance and open viewer invitations; null when the plan has no view seats. */
+export async function getViewSeatUsage(orgId: string): Promise<ViewSeatUsage | null> {
+  const usage = await getPlanUsage(orgId);
+  const row = usage?.usage.find((item) => item.key === "view_seats");
+  if (!row) return null;
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("invitations")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("role", "viewer")
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString());
+  if (error) {
+    throw new Error(`viewer invitations query failed: ${error.message}`);
+  }
+  return { limit: row.limit, used: row.used, pending: count ?? 0 };
 }

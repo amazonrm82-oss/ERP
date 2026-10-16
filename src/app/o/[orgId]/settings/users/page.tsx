@@ -7,7 +7,9 @@ import { MembersList } from "@/features/settings/components/members-list";
 import { PendingInvitations } from "@/features/settings/components/pending-invitations";
 import { TransferOwnershipForm } from "@/features/settings/components/transfer-ownership-form";
 import { assignableRoles, isAdminRole } from "@/features/settings/permissions";
+import { getViewSeatUsage } from "@/features/settings/plan-usage";
 import { listMembers, listMembersWithMfa, listPendingInvitations, orgHasFeature } from "@/features/settings/queries";
+import { viewSeatsLine } from "@/features/settings/view-seats";
 import { getOrgContext } from "@/features/shell/queries";
 import { absenceLabel } from "@/features/work-hours/leave";
 import { getCurrentAbsences } from "@/features/work-hours/queries";
@@ -37,6 +39,8 @@ export default async function UsersSettingsPage({ params }: Props) {
   const absences = Object.fromEntries(
     [...away.values()].map((a) => [a.userId, { label: `${absenceLabel(a.kind)} עד ${shortDay(a.endsOn)}`, deputyName: a.deputyId ? (a.deputyName ?? "משתמש") : null }]),
   );
+  // PRM-02: the view seats in use against the plan's allowance
+  const viewSeats = isAdmin && hasViewSeats ? await getViewSeatUsage(orgId) : null;
   const roles = assignableRoles(role, hasViewSeats);
   const transferCandidates = members
     .filter((member) => member.userId !== user.id && member.status === "active" && member.seatType === "full")
@@ -49,6 +53,7 @@ export default async function UsersSettingsPage({ params }: Props) {
           <CardHeader id="invite-title" title="הזמנת משתמש" />
           <CardBody>
             <InviteForm orgId={orgId} orgName={org.name} roles={roles} />
+            {viewSeats ? <p className="mt-3 text-sm text-ink-soft">{viewSeatsLine(viewSeats)}</p> : null}
           </CardBody>
         </Card>
       ) : null}
