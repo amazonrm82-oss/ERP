@@ -23,6 +23,10 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
+import { SaveAsSegment } from "@/features/segments/components/segment-forms";
+import { canWriteSegments } from "@/features/segments/model";
+import { segmentsPath } from "@/features/segments/paths";
+import { staticSegmentOptions } from "@/features/segments/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
@@ -66,7 +70,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
-  const [editing, lookups, tags, viewData, list, board, reasons] = await Promise.all([
+  // SEG-01: owners, admins and managers save filters as segments and add rows to hand-picked ones
+  const segmentWriter = canWriteSegments(context.role, canWrite);
+  const [editing, lookups, tags, viewData, list, board, reasons, segmentOptions] = await Promise.all([
     inlineEditing(orgId, context),
     getLeadLookups(orgId),
     listTags(orgId),
@@ -74,6 +80,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort, filter: filter.logic }),
     boardView ? getLeadBoard(orgId, { search, tagId, filter: filter.logic }) : null,
     canWrite ? activeReasonNames(orgId) : [],
+    segmentWriter && !boardView ? staticSegmentOptions(orgId, "lead") : null,
   ]);
   const leads = list?.leads ?? [];
   const hasMore = list?.hasMore ?? false;
@@ -132,6 +139,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
             <ButtonLink href={paths.leadsWaiting(orgId)} variant="secondary">
               לידים שמחכים
             </ButtonLink>
+            <ButtonLink href={segmentsPath(orgId)} variant="secondary">
+              סגמנטים
+            </ButtonLink>
             {newLeadButton}
           </>
         }
@@ -161,6 +171,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               Object.entries({ q: search, status: boardView ? "" : (statusId ?? ""), tag: tagId ?? "", view: boardView ? "board" : "" }).filter(([, v]) => v),
             )}
           />
+          {segmentWriter && filter.tree ? <SaveAsSegment orgId={orgId} objectType="lead" filter={filter.tree} /> : null}
           {boardView ? null : activeView?.config.columns ? (
             <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
           ) : (
@@ -215,6 +226,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               reasons={reasons}
               completeness={completeness}
               whatsapp={whatsappListContext(context)}
+              segments={segmentOptions}
             />
           </div>
         </>

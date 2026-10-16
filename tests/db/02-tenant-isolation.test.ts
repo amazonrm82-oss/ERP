@@ -156,6 +156,11 @@ describe("tenant isolation", () => {
         "insert into public.booking_pages (organization_id, user_id, title, meeting_type_id, is_active) select $1, $2, 'דף של א', t.id, false from public.meeting_types t where t.organization_id = $1 order by t.position limit 1",
         [orgA, a.id],
       );
+      // SEG-01: a static segment of A with A's lead in it
+      ids.segmentA = (
+        await q<{ id: string }>("insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'סגמנט של א') returning id", [orgA])
+      ).rows[0].id;
+      await q("insert into public.segment_members (organization_id, segment_id, lead_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.leadA]);
       ids.productA = (
         await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
       ).rows[0].id;
@@ -261,6 +266,9 @@ describe("tenant isolation", () => {
     "meeting_types",
     // CAL-10
     "booking_pages",
+    // SEG-01
+    "segments",
+    "segment_members",
     // GOL-01
     "goals",
     // PRD-04, seeded for every new organization
@@ -429,6 +437,9 @@ describe("tenant isolation", () => {
       deal_contact_roles: "name = name",
       meeting_types: "name = name",
       booking_pages: "title = title",
+      segments: "name = name",
+      // no update grant at all: a permission error is the expected outcome
+      segment_members: "lead_id = lead_id",
       goals: "target = target",
       product_categories: "name = name",
       product_units: "name = name",
@@ -538,6 +549,8 @@ describe("tenant isolation", () => {
       ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.meeting_types (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.booking_pages (organization_id, user_id, title) values ($1, $2, 'x')", [orgA, a.id]],
+      ["insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'x')", [orgA]],
+      ["insert into public.segment_members (organization_id, segment_id, contact_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.contactA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
@@ -630,6 +643,8 @@ describe("tenant isolation", () => {
       ["deal_contact_roles", "is_active = false", "not is_active"],
       ["meeting_types", "is_active = false", "not is_active"],
       ["booking_pages", "title = 'HACKED'", "title = 'HACKED'"],
+      ["segments", "name = 'HACKED'", "name = 'HACKED'"],
+      ["segment_members", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["goals", "target = 777", "target = 777"],
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],

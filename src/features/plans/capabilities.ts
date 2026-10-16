@@ -31,6 +31,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
   { feature: "whatsapp_inbox", label: "תיבת WhatsApp (ההודעות מהארנק)", built: false },
   { feature: "goals", label: "יעד לעסק", built: true },
+  // SEG-01
+  { feature: "segments", label: "סגמנטים של לידים ואנשי קשר", built: true },
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },
   // CAP-08
   { feature: "lead_distribution", label: "חלוקת לידים לפי משקל, עומס וכללים", built: true },

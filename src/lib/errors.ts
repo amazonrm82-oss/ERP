@@ -173,6 +173,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // PL-01 follow-up (migration price_list_vat): the VAT setting of a list that has prices
   "price_lists:vat_locked": "אי אפשר לשנות את הגדרת המע\"מ של מחירון שיש בו מחירים. כדי לעבוד אחרת, צרו מחירון חדש.",
   "price_list_lines:tiers": "אפשר לשמור עד 20 מדרגות כמות למוצר אחד במחירון. מחקו מדרגה כדי להוסיף חדשה.",
+  // SEG-01 (migration segments)
+  "segment_member:invalid": "אפשר להוסיף רשומות רק לסגמנט ידני, ורק מהסוג שלו (לידים או אנשי קשר).",
+  "segment_members:max": "סגמנט ידני מחזיק עד 10,000 רשומות. הסירו רשומות או צרו סגמנט נוסף.",
   // DLI-01, DLI-02, PL-03 (migration deal_lines)
   "deal_lines:max": "אפשר עד 200 שורות מוצר בעסקה אחת. מחקו שורה כדי להוסיף חדשה.",
   "deal_lines:vat_mode": "הגדרת המע\"מ של השורות השתנתה בזמן שמילאתם. רעננו את הדף ונסו שוב.",

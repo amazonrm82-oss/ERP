@@ -22,6 +22,10 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
+import { SaveAsSegment } from "@/features/segments/components/segment-forms";
+import { canWriteSegments } from "@/features/segments/model";
+import { segmentsPath } from "@/features/segments/paths";
+import { staticSegmentOptions } from "@/features/segments/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { listWhatsappLog, whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
@@ -60,11 +64,14 @@ export default async function ContactsPage({ params, searchParams }: Props) {
     keyof typeof CONTACT_SORT_COLUMNS | CustomSortKey
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
-  const [editing, tags, viewData, { contacts, hasMore }] = await Promise.all([
+  // SEG-01: owners, admins and managers save filters as segments and add rows to hand-picked ones
+  const segmentWriter = canWriteSegments(context.role, canWrite);
+  const [editing, tags, viewData, { contacts, hasMore }, segmentOptions] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "contact", context),
     listContacts(orgId, { search, tagId, page, sort, filter: filter.logic }),
+    segmentWriter ? staticSegmentOptions(orgId, "contact") : null,
   ]);
 
   const views = viewData.chips;
@@ -98,7 +105,18 @@ export default async function ContactsPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title="אנשי קשר" description="הלקוחות והאנשים שהעסק עובד איתם." actions={newContactButton} />
+      <PageHeader
+        title="אנשי קשר"
+        description="הלקוחות והאנשים שהעסק עובד איתם."
+        actions={
+          <>
+            <ButtonLink href={segmentsPath(orgId)} variant="secondary">
+              סגמנטים
+            </ButtonLink>
+            {newContactButton}
+          </>
+        }
+      />
 
       <ListTools active={(filter.tree ? 1 : 0) + (tagId ? 1 : 0)}>
         <SavedViewsBar
@@ -124,6 +142,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
             listPath={paths.contacts(orgId)}
             keep={Object.fromEntries(Object.entries({ q: search, tag: tagId ?? "" }).filter(([, v]) => v))}
           />
+          {segmentWriter && filter.tree ? <SaveAsSegment orgId={orgId} objectType="contact" filter={filter.tree} /> : null}
           {activeView?.config.columns ? (
             <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
           ) : (
@@ -191,6 +210,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               tags={tags}
               completeness={completeness}
               whatsapp={whatsappListContext(context)}
+              segments={segmentOptions}
             />
           </div>
         </>

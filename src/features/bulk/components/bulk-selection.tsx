@@ -11,6 +11,8 @@ import { DisqualifyReasonField } from "@/features/disqualify-reasons/components/
 
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { addToSegmentAction } from "@/features/segments/actions";
+
 import { bulkAction, undoBulkAction, type BulkChange, type BulkObject, type BulkUndo } from "../actions";
 
 // won: a deal stage of kind won, which opens the bulk close window (DEAL-04)
@@ -58,11 +60,14 @@ type Props = {
   reasons?: string[];
   // deals: the organization's day and zone, and the amounts of the deals on the page, for the bulk close window (DEAL-04)
   wonWindow?: (BulkWonSetup & { amounts: Record<string, number> }) | null;
+  // SEG-01: the static segments the picked leads or contacts can be added to; null for someone who may not
+  segments?: Option[] | null;
   children: ReactNode;
 };
 
-// "export" is not a change: it downloads the picked rows through the list's export route
-type Kind = BulkChange["kind"] | "export";
+// "export" is not a change: it downloads the picked rows through the list's export route.
+// "segment" adds the rows to a static segment (SEG-01); it changes no record, so it has no undo here.
+type Kind = BulkChange["kind"] | "export" | "segment";
 const NO_OWNER = "none";
 const FORMATS: Option[] = [
   { value: "xlsx", label: "Excel" },
@@ -74,6 +79,7 @@ const KIND_LABELS: Record<Kind, string> = {
   stage: "שינוי שלב",
   tag: "הוספת תגית",
   trash: "העברה לסל המחזור",
+  segment: "הוספה לסגמנט",
   export: "ייצוא הנבחרים",
 };
 
@@ -82,7 +88,7 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], wonWindow = null, children }: Props) {
+export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], wonWindow = null, segments = null, children }: Props) {
   // a task has a "state" (מצב) rather than a status, and an assignee rather than an owner
   const labels: Record<Kind, string> =
     object === "task" ? { ...KIND_LABELS, status: "שינוי מצב", owner: "שינוי אחראי" } : KIND_LABELS;
@@ -121,9 +127,10 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
       (k !== "stage" || stages) &&
       (k !== "tag" || tags.length > 0) &&
       (k !== "trash" || canTrash) &&
+      (k !== "segment" || (segments !== null && segments.length > 0 && (object === "lead" || object === "contact"))) &&
       (k !== "export" || exportPath),
   );
-  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "export" ? FORMATS : [];
+  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "segment" ? (segments ?? []) : kind === "export" ? FORMATS : [];
   const needsReason = (kind === "status" || kind === "stage") && options.find((o) => o.value === value)?.needsReason;
   const toWon = kind === "stage" && wonWindow !== null && options.find((o) => o.value === value)?.won === true;
   // a deal's loss reason is optional; a lead's "not relevant" reason is not
@@ -145,9 +152,11 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             ? `הוספת התגית "${chosen}" ל${count === 1 ? many : `-${many}`}`
             : kind === "trash"
               ? `העברת ${many} לסל המחזור`
-              : kind === "export"
-                ? `ייצוא ${many} לקובץ ${chosen}`
-                : "";
+              : kind === "segment"
+                ? `הוספת ${many} לסגמנט "${chosen}"`
+                : kind === "export"
+                  ? `ייצוא ${many} לקובץ ${chosen}`
+                  : "";
 
   function run(close?: BulkWonChoice) {
     if (!kind) return;
@@ -159,6 +168,25 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
       link.download = "";
       link.click();
       setNotice(count === 1 ? "הקובץ של הרשומה יורד." : `הקובץ של ${count} הרשומות יורד.`);
+      return;
+    }
+    if (kind === "segment") {
+      if (object !== "lead" && object !== "contact") return;
+      const segmentId = value;
+      setError(null);
+      setNotice(null);
+      setLastUndo(null);
+      startTransition(async () => {
+        const result = await addToSegmentAction(orgId, object, segmentId, [...shown]);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        setNotice(result.data!.message);
+        setPicked(new Set());
+        setKind("");
+        setValue("");
+      });
       return;
     }
     const change: BulkChange =
@@ -263,7 +291,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 ))}
               </Select>
             </div>
-            {kind === "owner" || kind === "status" || kind === "stage" || kind === "tag" || kind === "export" ? (
+            {kind === "owner" || kind === "status" || kind === "stage" || kind === "tag" || kind === "segment" || kind === "export" ? (
               <div className="w-44">
                 <Select
                   aria-label={
@@ -279,7 +307,9 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                           ? "שלב חדש"
                           : kind === "export"
                             ? "סוג הקובץ"
-                            : "תגית"
+                            : kind === "segment"
+                              ? "סגמנט"
+                              : "תגית"
                   }
                   controlSize="sm"
                   value={value}
@@ -309,8 +339,9 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 variant={kind === "trash" ? "danger" : "primary"}
                 disabled={pending || !ready}
                 aria-busy={pending || undefined}
-                // export changes nothing, so it runs at once; a move into won asks in its window; every other change is asked first
-                onClick={() => (kind === "export" ? run() : toWon ? setWonOpen(true) : setConfirming(true))}
+                // export and "add to segment" change no record, so they run at once; a move into won asks in its window;
+                // every other change is asked first
+                onClick={() => (kind === "export" || kind === "segment" ? run() : toWon ? setWonOpen(true) : setConfirming(true))}
               >
                 {pending ? "מעדכנים…" : actionText || `ביצוע על ${count}`}
               </Button>
@@ -320,7 +351,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             </Button>
           </>
         ) : null}
-        {confirming && kind && kind !== "export" ? (
+        {confirming && kind && kind !== "export" && kind !== "segment" ? (
           <div role="group" aria-label="אישור הפעולה" className="flex w-full flex-wrap items-center gap-2 rounded-md bg-canvas px-3 py-2">
             <span className="text-md">
               {actionText}?{kind === "trash" ? " אפשר לשחזר מסל המחזור במשך 30 יום." : " אפשר לבטל מיד אחרי."}

@@ -1567,3 +1567,35 @@ describe("plan waitlist: own rows, every role", () => {
     }
   });
 });
+
+// SEG-01: segments are read by every member and written by owners, admins and managers; a static member is seen only
+// with its record (the rest is in 134-segments).
+describe("segments by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("segrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `segrole-${role}`);
+    }
+  });
+
+  it("writers are owners, admins and managers; every role reads", async () => {
+    for (const [role, user] of Object.entries(people)) {
+      const insert = asUser(user.id, (q) =>
+        q("insert into public.segments (organization_id, object_type, kind, name) values ($1, 'contact', 'static', $2)", [org, `של ${role}`]),
+      );
+      if (role === "member" || role === "viewer") expect((await pgError(insert)).code, role).toBe("42501");
+      else await insert;
+    }
+    for (const [role, user] of Object.entries(people)) {
+      const seen = await asUser(user.id, (q) => count(q, "select 1 from public.segments where organization_id = $1", [org]));
+      expect(seen, role).toBe(3);
+      const renamed = await asUser(user.id, async (q) => (await q("update public.segments set name = name where organization_id = $1", [org])).rowCount);
+      expect(renamed, role).toBe(role === "member" || role === "viewer" ? 0 : 3);
+    }
+  });
+});

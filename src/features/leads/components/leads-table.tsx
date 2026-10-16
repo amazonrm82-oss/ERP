@@ -39,10 +39,12 @@ type Props = {
   completeness?: Map<string, number>;
   // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
   whatsapp?: WhatsappListContext | null;
+  // SEG-01: static segments for the bulk "add to segment"; null for someone who does not write segments
+  segments?: Array<{ value: string; label: string }> | null;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -65,6 +67,7 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
       canTrash={editing.bulk?.trash ?? false}
       exportPath={editing.bulk?.exportable ? `${paths.leads(orgId)}/export` : null}
       enabled={editing.bulk !== null}
+      segments={segments}
       reasons={reasons}
     >
       <ListTable

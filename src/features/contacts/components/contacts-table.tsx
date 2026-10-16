@@ -35,10 +35,12 @@ type Props = {
   completeness?: Map<string, number>;
   // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
   whatsapp?: WhatsappListContext | null;
+  // SEG-01: static segments for the bulk "add to segment"; null for someone who does not write segments
+  segments?: Array<{ value: string; label: string }> | null;
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, whatsapp = null }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, whatsapp = null, segments = null }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -50,6 +52,7 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
       canTrash={editing.bulk?.trash ?? false}
       exportPath={editing.bulk?.exportable ? `${paths.contacts(orgId)}/export` : null}
       enabled={editing.bulk !== null}
+      segments={segments}
     >
       <ListTable
         label="טבלת אנשי קשר"

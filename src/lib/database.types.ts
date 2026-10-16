@@ -401,6 +401,44 @@ export type MeetingTypeInsert = {
 // CAL-10 (migration 020120): public booking pages
 export type BookingQuestion = { id: string; label: string; required: boolean };
 
+// SEG-01 (migration 020150): segments of leads or contacts; a dynamic one keeps the list filter (LST-05), a static one has members
+export type SegmentRow = {
+  id: string;
+  organization_id: string;
+  object_type: string;
+  kind: string;
+  name: string;
+  filter: Json | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SegmentInsert = {
+  organization_id: string;
+  object_type: string;
+  kind: string;
+  name: string;
+  filter?: Json | null;
+};
+
+export type SegmentMemberRow = {
+  id: string;
+  organization_id: string;
+  segment_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  added_by: string | null;
+  created_at: string;
+};
+
+export type SegmentMemberInsert = {
+  organization_id: string;
+  segment_id: string;
+  lead_id?: string | null;
+  contact_id?: string | null;
+};
+
 export type BookingPageRow = {
   id: string;
   organization_id: string;
@@ -2190,6 +2228,8 @@ export type Database = {
       meetings: Table<MeetingRow, MeetingInsert, MeetingUpdate>;
       meeting_types: Table<MeetingTypeRow, MeetingTypeInsert, Partial<Omit<MeetingTypeInsert, "organization_id">>>;
       booking_pages: Table<BookingPageRow, BookingPageInsert, Partial<Omit<BookingPageInsert, "organization_id">>>;
+      segments: Table<SegmentRow, SegmentInsert, { name?: string; filter?: Json | null }>;
+      segment_members: Table<SegmentMemberRow, SegmentMemberInsert, Record<string, never>>;
       meeting_participants: Table<MeetingParticipantRow, { organization_id: string; meeting_id: string; user_id: string }, Record<string, never>>;
       org_calendar_settings: Table<OrgCalendarSettingsRow, OrgCalendarSettingsWrite & { organization_id: string }, OrgCalendarSettingsWrite>;
       // FLD-08: the card layout per record type; no row = the default layout; no delete grant

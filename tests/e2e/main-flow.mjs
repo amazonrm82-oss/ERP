@@ -1337,7 +1337,8 @@ try {
   // the filter is part of a saved view
   await ownerDesk.getByRole("button", { name: "שמירת התצוגה" }).click();
   await ownerDesk.getByLabel("שם התצוגה").fill("סינון מתקדם שמור");
-  await ownerDesk.getByRole("button", { name: "שמירה" }).click();
+  // exact: the list also offers "שמירה כסגמנט" next to the filter (SEG-01)
+  await ownerDesk.getByRole("button", { name: "שמירה", exact: true }).click();
   await ownerDesk.getByRole("link", { name: /סינון מתקדם שמור/ }).waitFor({ timeout: 15000 });
   await ownerDesk.goto(`${orgUrl}/leads`);
   await ownerDesk.getByRole("link", { name: /סינון מתקדם שמור/ }).click();
