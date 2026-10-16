@@ -557,8 +557,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   'erasure', 'blocked') and is lifted only by a form consent. `consent_prepare`'s refusal is a message only: for non-admins it
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
-  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was last redefined in 015510 (`app.audit_erase_core` and
-  `app.sample_untouched` in 0185); a new table linking to leads/contacts must also be checked there.
+  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links`, `app.audit_erase_core` and
+  `app.sample_untouched` were last redefined in 020105 (QUO-01); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -677,7 +677,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   in the bin) and a readable company, and update/delete repeat the company check. At most 50 per contact (hint `contact_company:max`,
   definer count `app.contact_company_count` after the outsider guard). Audited as a `company_link` change of the contact. Merge
   copies links through the `merged` timeline entry (`app.merge_contact_companies`, until `merge_move_links` takes it over).
-  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020090 (CON-06).
+  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020105 (QUO-01).
 - Contact relations (CON-06, migration 020090; owner 15 October 2026: core, every plan): `public.contact_relation_types` (managed
   list, 20 per org, server-only `key` spouse|family|parent|referral on the seeded defaults; a type in use is hidden, not deleted:
   FK with no action) and `public.contact_relations` (first side a contact or a lead, exactly one; a lead only as the referrer of
@@ -746,6 +746,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   of a writable org write; audited; no delete). Invoker trigger `app.card_layouts_check` (hint `card_layout:invalid`). No row =
   the default order; details cards render through `LayoutDetails`; a field in no group shows in a final group; FLD-09 hidden
   fields stay hidden. A new field on a details card is added to both key lists.
+- Quotes (QUO-01/02, migration 020105): `public.quotes` (child of its deal, else its contact: select follows their RLS; insert,
+  update, delete need `app.quote_editable` = may edit that live deal/contact in a writable org, drafts only, insert needs flag
+  `quotes`) and `public.quote_lines` (follow their quote; 200 per quote; product FK with no on delete action). Trigger
+  `app.quotes_check` (definer, outsider guard first) sets status/owner/date/VAT mode and the totals by `app.document_totals`; a
+  quote that is no longer a draft keeps its rate and amounts and refuses changes to its pricing inputs for every writer (hint
+  `quote:frozen`). No number on a draft (QUO-03 takes it on sending). Purging a contact detaches deal quotes that name it
+  (`contacts_quotes_detach`, skipped while the org itself is deleted). Sent quotes still cascade with their record until QUO-07.
+  Merge, erasure, sample data and import undo know quotes.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
