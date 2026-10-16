@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
 import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-tools";
+import { quoteDocumentPath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -65,7 +67,16 @@ export default async function QuotePage({ params, searchParams }: Props) {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title={quote.title} back={back} />
+      <PageHeader
+        title={quote.title}
+        back={back}
+        actions={
+          // QUO-05: the quote as its customer sees it, to print or save as PDF
+          <ButtonLink href={quoteDocumentPath(orgId, quote.id)} variant="secondary" size="sm">
+            תצוגה והדפסה
+          </ButtonLink>
+        }
+      />
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <Badge>{QUOTE_STATUS_LABELS[quote.status]}</Badge>
         <span>{formatDate(quote.quoteDate)}</span>

@@ -558,7 +558,7 @@ try {
   await owner.goto(`${orgUrl}/settings`);
 
   step("settings: business details");
-  await owner.getByRole("link", { name: /פרטי העסק/ }).click();
+  await owner.getByRole("link", { name: /^פרטי העסק/ }).click();
   await owner.waitForURL(/\/settings\/business$/);
   await owner.getByRole("link", { name: "הגדרות" }).first().waitFor();
   await owner.getByLabel("טלפון העסק").fill("03-5551234");

@@ -100,6 +100,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   // QUO-04
   { table: "quote_templates", file: "quote_templates.csv" },
   { table: "quote_template_lines", file: "quote_template_lines.csv" },
+  // QUO-05
+  { table: "quote_designs", file: "quote_design.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   // CAP-09
   { table: "member_leaves", file: "member_leaves.csv" },

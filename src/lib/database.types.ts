@@ -1383,6 +1383,28 @@ export type PriceListLineRow = {
   updated_at: string;
 };
 
+// QUO-05: the design of quotes, one row per business (migration quote_design).
+export type QuoteDesignDbRow = {
+  id: string;
+  organization_id: string;
+  header_text: string | null;
+  footer_text: string | null;
+  show_logo: boolean;
+  show_business_details: boolean;
+  accent_color: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type QuoteDesignWrite = {
+  header_text?: string | null;
+  footer_text?: string | null;
+  show_logo?: boolean;
+  show_business_details?: boolean;
+  accent_color?: string | null;
+};
+
 // QUO-04: a quote saved as a template (migration quote_templates). created_by is set by app.touch_row.
 export type QuoteTemplateRow = {
   id: string;
@@ -2153,6 +2175,8 @@ export type Database = {
         },
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
+      // QUO-05: column grants; no delete (a row is changed, never removed)
+      quote_designs: Table<QuoteDesignDbRow, QuoteDesignWrite & { organization_id: string }, QuoteDesignWrite>;
       // QUO-04: column grants; the VAT mode is set when the template is made
       quote_templates: Table<
         QuoteTemplateRow,

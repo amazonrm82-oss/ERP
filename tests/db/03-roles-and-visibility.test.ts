@@ -282,6 +282,19 @@ describe("roles and record visibility", () => {
     expect(await asUser(owner.id, async (q) => (await q("update public.quote_templates set notes = 'x' where id = $1", [template])).rowCount)).toBe(1);
   });
 
+  it("the quote design: everyone reads it, only owners and admins write it (QUO-05)", async () => {
+    await asUser(admin.id, (q) =>
+      q("insert into public.quote_designs (organization_id, footer_text) values ($1, 'תודה') on conflict (organization_id) do update set footer_text = 'תודה'", [org]),
+    );
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.quote_designs where organization_id = $1", [org])), u.email).toBe(1);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.quote_designs set footer_text = 'x' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.quote_designs set footer_text = 'שלום' where organization_id = $1", [org])).rowCount)).toBe(1);
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);
