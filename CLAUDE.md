@@ -293,7 +293,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020090) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020090; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -315,6 +315,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   holds back `meeting_scheduled`). The sender is the server's keyed IP hash scoped per page by `app.booking_sender`; views, bookings,
   cancels and changes share the page's limits. `app.booking_slots` takes `p_ignore_meeting` (old signature retired).
   Follow-ups: CAL-12 (team pages), token rotation, `meeting_cancelled` for a person's own cancel.
+- Blocked time (GAP-07, migration 020115): `meetings.is_block` (insert-only column grant); constraint `meetings_block_shape` (no record
+  links, business type, series, reminder or buffers; planned or cancelled only). Booking slots, `meeting_busy` and the calendar feed treat
+  blocks as busy unchanged; `public.report_meetings` (last redefined in 020115), My day and tomorrow's reminders leave them out. App:
+  `src/features/calendar/blocks.ts`, `block-actions.ts`, `components/block-time.tsx`.
 - Meeting reminders (CAL-06, migration 0100): `meetings.reminder_minutes` (5/15/30/60/1440 or null, default 15, column
   grants). pg_cron `crm-meeting-reminders` (every minute) runs `app.send_meeting_reminders()`: organizer and active
   participants of planned meetings, once per (meeting, person, start) in `app.meeting_reminders_sent`; read-only orgs skipped.
