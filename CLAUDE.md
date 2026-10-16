@@ -90,6 +90,8 @@ and build this CRM here instead. The old code is preserved on the branch
    `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`. Since CAL-10b (owner 15 October 2026) the same
    file serves the customer's personal link (page `/f/book/manage/<token>`, route `/api/forms/booking/manage/<token>`), which calls only
    `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
+   In use (QUO-08 part one, owner 8 October 2026, migration 020290): the customer's quote page (`src/features/quotes/public-server.ts`,
+   page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
    In use (BIZ-02, owner 13 October 2026, migration 020235): the digital business card (`src/features/business-cards/public-server.ts`,
    page `/f/card/<token>`, routes `POST /api/forms/card/<token>` and `GET /api/forms/card/<token>/vcard`), which calls only
    `public.business_card_public()` and `public.business_card_submit()` (the form goes through `intake_submit`); in the eslint allow-list.
@@ -805,6 +807,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   when nothing is left); drafts go with the cascade; `quotes_has_parent` holds for drafts only; a quote with no parent is read by
   owners/admins only (`quotes_select`, last altered in 020270). Erasure empties its personal details. `app.quotes_check`,
   `app.quotes_detach_contact` and `app.audit_erase_core` were last redefined in 020270.
+- Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
+  replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
+  `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
+  (service_role) answers not found for a draft, cancelled, expired or customer-deleted quote, a missing flag or closed public pages; 120
+  views per link in 10 minutes; returns no ids. Accept/sign (QUO-09), PDF (QUO-06), views (QUO-10) and versions (QUO-12) come later.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
