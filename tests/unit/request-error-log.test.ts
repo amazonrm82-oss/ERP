@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { requestErrorLine } from "@/lib/request-error-log";
+import { redactPublicPath, requestErrorLine } from "@/lib/request-error-log";
 
 // FXC-13: the server log line of a captured error carries the code shown on the error screen, and nothing private.
 describe("server log line of a request error", () => {
@@ -25,5 +25,50 @@ describe("server log line of a request error", () => {
   it("copes with an error without a digest, and with a thrown non-error", () => {
     expect(requestErrorLine(new TypeError("boom"), { path: "/", method: "GET" }, {})).toBe("[error] code=none route=? type=? GET / TypeError: boom");
     expect(requestErrorLine("text", { path: "/x", method: "GET" }, {})).toBe("[error] code=none route=? type=? GET /x string");
+  });
+
+  it("hides the secret token of every public link's path, and keeps the rest of the path", () => {
+    const t = "0123456789abcdef0123456789abcdef";
+    const cases: [string, string][] = [
+      [`/f/${t}`, "/f/[token]"],
+      [`/f/${t}/qr`, "/f/[token]/qr"],
+      [`/f/book/${t}`, "/f/book/[token]"],
+      [`/f/book/manage/${t}`, "/f/book/manage/[token]"],
+      [`/f/card/${t}`, "/f/card/[token]"],
+      [`/f/quote/${t}`, "/f/quote/[token]"],
+      [`/f/q/${t}`, "/f/q/[token]"],
+      [`/api/forms/${t}`, "/api/forms/[token]"],
+      [`/api/forms/booking/${t}`, "/api/forms/booking/[token]"],
+      [`/api/forms/booking/manage/${t}`, "/api/forms/booking/manage/[token]"],
+      [`/api/forms/card/${t}`, "/api/forms/card/[token]"],
+      [`/api/forms/card/${t}/vcard`, "/api/forms/card/[token]/vcard"],
+      [`/api/in/${t}`, "/api/in/[token]"],
+      [`/api/calendar-feed/${t}.ics`, "/api/calendar-feed/[token]"],
+    ];
+    for (const [path, shown] of cases) {
+      expect(redactPublicPath(path), path).toBe(shown);
+      const line = requestErrorLine(new Error("boom"), { path: `${path}?utm_source=qr`, method: "GET" }, {});
+      expect(line, path).not.toContain(t);
+      expect(line, path).toContain(`GET ${shown} `);
+    }
+  });
+
+  it("leaves paths that carry no secret readable", () => {
+    for (const path of [
+      "/",
+      "/app",
+      "/o/abc/leads",
+      "/o/abc/settings/qr-codes",
+      "/f/embed.js",
+      "/f/book",
+      "/f/book/",
+      "/f/card/",
+      "/api/forms/booking/",
+      "/api/push/dispatch",
+      "/api/files/cleanup",
+      "/login",
+    ]) {
+      expect(redactPublicPath(path), path).toBe(path);
+    }
   });
 });
