@@ -313,7 +313,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020090; `report_meetings` in 020115) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020275, RPT-01 `products`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -479,6 +479,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   only goals whose actual the caller sees in full are returned (own meetings goal via `app.goal_entries_readable`). Overdue
   open deals are their own line, never inside a month; the goal comparison is null when the view is partial or a pipeline is
   picked. Pace shows after a quarter of the period (`src/features/goals/progress.ts`).
+- Revenue by product (RPT-01 part one, migration 020275): `public.report_revenue_by_product(org, from, to, pipeline, owner)` (invoker)
+  takes `report_revenue`'s won-deal rule (keep in step) and sums stored `deal_lines.total_agorot` by product and billing; `by_billing`
+  keeps one-time and each recurring period apart (never summed together); `totals.deals_with_vat/without_vat` let the screen warn
+  about mixed VAT modes. Report key `products`.
 - Pipeline cleanup and money waiting (MNY-05/01/02, migrations 0144, 0145): `report_pipeline_cleanup(org, owner)` (security
   invoker) copies `report_stuck_deals`' stuck rule (keep in step; test 93 compares them in two far time zones); overdue =
   expected close date before the org's today; postponed deals left out; each deal once (stuck, else overdue); 300 rows.
