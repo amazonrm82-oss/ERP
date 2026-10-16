@@ -585,8 +585,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   'erasure', 'blocked') and is lifted only by a form consent. `consent_prepare`'s refusal is a message only: for non-admins it
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
-  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` and `app.audit_erase_core` were
-  last redefined in 020105 (QUO-01), `app.sample_untouched` in 020150 (SEG-01); a new table linking to leads/contacts must also be checked there.
+  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020270 (QUO-07), `app.sample_untouched` in 020150 (SEG-01); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -791,6 +791,13 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quote:frozen`). No number on a draft (QUO-03 takes it on sending). Purging a contact detaches deal quotes that name it
   (`contacts_quotes_detach`, skipped while the org itself is deleted). Sent quotes still cascade with their record until QUO-07.
   Merge, erasure, sample data and import undo know quotes.
+- Sending quotes (QUO-07 without the customer page, migration 020270): `public.quote_send(org, quote)` (definer; whoever may edit the
+  draft, flag `quotes`, at least one item line, VAT known; hints `quote:empty`, `quote:vat_unknown`, `quote:frozen`) takes the number
+  from `app.next_document_number(org, 'quote')` and stamps `sent_at`, `customer_name`, `customer_contact_name` (server only). A purge
+  detaches a sent quote (`deals_quotes_detach`, `contacts_quotes_detach`: `former_deal_id` / `former_contact_id`, `customer_deleted_at`
+  when nothing is left); drafts go with the cascade; `quotes_has_parent` holds for drafts only; a quote with no parent is read by
+  owners/admins only (`quotes_select`, last altered in 020270). Erasure empties its personal details. `app.quotes_check`,
+  `app.quotes_detach_contact` and `app.audit_erase_core` were last redefined in 020270.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
