@@ -870,6 +870,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   intake leads too, conversion via `app.convert_custom_fields`); read-only values may be filled once, then
   `app.check_custom_fields()` (last redefined in 0175) refuses changing or clearing them. Mirrors in
   `src/features/custom-fields/settings.ts`.
+- Field types (FLD-06 part A, migration 020265): `rich_text` (REC-04 cleaned Markdown, 5,000, rendered only through `NoteText`),
+  `duration` (whole minutes 0..525600) and `status` (a select whose options carry palette keys in `field_definitions.option_colors`,
+  checked by `app.field_option_colors_ok`). `app.custom_value_ok` was last redefined in 020265. Every switch on `field_type` is listed
+  in `src/features/custom-fields/type-decisions.ts` (unit test `field-type-switches`): a new type needs a decision at each one.
+  Public forms leave the three out (`FORM_EXCLUDED_TYPES`, app only).
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
