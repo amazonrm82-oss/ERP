@@ -203,6 +203,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   policies look up `public.files` with the caller's rights; write `objects.name` there, never bare
   `name` (files has a `name` column). The browser uploads with the user's session after
   `prepareUploadAction`; downloads go through `/o/[orgId]/files/[fileId]` (one-minute signed link).
+- Files on notes and versions (REC-07, migration 020210): `files.activity_id` (composite FK cascade; only the entry's author attaches,
+  to a person-logged entry of the same record, hint `file:note`; the files select/insert/delete policies also require the note to be
+  visible, so a private note's files stay private) and `files.previous_id` (one newer version per file, deferred unique; same record
+  and note, hint `file:version`). Deleting versions relinks the survivor in AFTER trigger `"A_files_relink_versions"` (transition
+  table; named to run before the RI set-null). The files policies were last altered in 020210.
 - File cleanup (migration 0021): deleted `files` rows leave their path in `app.orphan_files`;
   pg_cron `crm-file-cleanup` (03:00 UTC) calls `app.cleanup_files()`, which wakes
   `/api/files/cleanup` (URL from `app.settings` `files_cleanup_url`, else derived from
