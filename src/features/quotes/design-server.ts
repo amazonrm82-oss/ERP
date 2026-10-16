@@ -11,7 +11,8 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { designFromRow, quoteColor, sentCustomer, type DocumentCustomer, type QuoteDesign } from "./design";
-import { getQuoteParties, listQuoteLines, type Quote, type QuoteLine } from "./queries";
+import { getQuoteParties, listQuoteLines, listQuoteSchedule, type Quote, type QuoteLine } from "./queries";
+import { scheduleRows, type ScheduleRow } from "./schedule";
 
 /** QUO-05: the business's quote design (every member reads it; no row = the defaults). */
 export const getQuoteDesign = cache(async (orgId: string): Promise<QuoteDesign> => {
@@ -46,6 +47,8 @@ export type QuoteDocumentData = {
   customer: DocumentCustomer | null;
   quote: Quote;
   lines: QuoteLine[];
+  // GAP-09: the payment schedule with each step's share of the total (none = no section)
+  schedule?: ScheduleRow[];
 };
 
 /** The business as its documents show it. */
@@ -97,6 +100,8 @@ export async function getQuoteDocumentData(orgId: string, quote: Quote, displayN
     listQuoteLines(orgId, quote.id),
     getQuoteParties(orgId, quote),
   ]);
+  // GAP-09
+  const schedule = scheduleRows(quote.totalAgorot, await listQuoteSchedule(orgId, quote.id));
   let billing: Billing | null = null;
   if (quote.contactId) {
     const record = await getRecordBilling(orgId, "contact", quote.contactId);
@@ -114,6 +119,7 @@ export async function getQuoteDocumentData(orgId: string, quote: Quote, displayN
     customer: sentCustomer(quote, customerFrom(billing ?? empty, { company: parties.company, contact: parties.contact })),
     quote,
     lines,
+    schedule,
   };
 }
 

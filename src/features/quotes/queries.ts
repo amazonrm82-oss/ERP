@@ -13,6 +13,7 @@ import { must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
+import type { ScheduleStep } from "./schedule";
 import { isNoVatReason, isQuoteStatus, type NoVatReason, type QuoteStatus } from "./schema";
 
 type Client = SupabaseClient<Database>;
@@ -300,4 +301,20 @@ export async function getQuoteLinkStatus(orgId: string, quoteId: string): Promis
   }
   const value = data as { active?: unknown; created_at?: unknown } | null;
   return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };
+}
+
+// GAP-09: the quote's payment schedule, in order (RLS: whoever reads the quote)
+export async function listQuoteSchedule(orgId: string, quoteId: string): Promise<ScheduleStep[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("quote_payment_steps")
+      .select("id, position, name, percent_bp, due_date, milestone")
+      .eq("organization_id", orgId)
+      .eq("quote_id", quoteId)
+      .order("position")
+      .order("id"),
+    "quote payment schedule",
+  );
+  return rows.map((row) => ({ id: row.id, position: row.position, name: row.name, percentBp: row.percent_bp, dueDate: row.due_date, milestone: row.milestone }));
 }

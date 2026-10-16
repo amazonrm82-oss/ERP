@@ -129,7 +129,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     await send(member, org, quote);
     const token = await create(member, org, quote);
     const page = await publicPage(token);
-    expect(Object.keys(page).sort()).toEqual(["brand", "built_with", "business", "customer", "design", "lines", "quote"]);
+    expect(Object.keys(page).sort()).toEqual(["brand", "built_with", "business", "customer", "design", "lines", "quote", "schedule"]);
     expect(Object.keys(page.quote).sort()).toEqual(
       [
         "currency",

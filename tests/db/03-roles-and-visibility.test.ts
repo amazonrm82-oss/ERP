@@ -268,6 +268,41 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a quote's payment schedule follows the quote: its editors write, readers only read (GAP-09; the lock once sent is in test 155)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה ללוח תשלומים', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const quote = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה עם לוח', $2) returning id", [org, deal])).rows[0].id,
+    );
+    const step = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'בחתימה') returning id", [
+          org,
+          quote,
+        ])
+      ).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.quote_payment_steps where id = $1", [step]));
+    const edits = (u: U) => asUser(u.id, async (q) => (await q("update public.quote_payment_steps set name = 'מקדמה' where id = $1", [step])).rowCount);
+    const adds = (u: U) => pgError(asUser(u.id, (q) => q("insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [org, quote])));
+    for (const u of [owner, admin, m1]) {
+      expect(await seen(u), u.email).toBe(1);
+      expect(await edits(u), u.email).toBe(1);
+    }
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await setVisibility("org");
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(1);
+      expect(await edits(u), u.email).toBe(0);
+      expect(await asUser(u.id, async (q) => (await q("delete from public.quote_payment_steps where id = $1", [step])).rowCount), u.email).toBe(0);
+      expect((await adds(u)).code, u.email).toBe("42501");
+    }
+  });
+
   it("quote templates: everyone reads them, only owners and admins write them (QUO-04)", async () => {
     const template = await asUser(admin.id, async (q) =>
       (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת תפקידים') returning id", [org])).rows[0].id,

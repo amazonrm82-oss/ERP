@@ -75,6 +75,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // QUO-01, QUO-02
   quotes: "הצעת מחיר",
   quote_lines: "שורה בהצעת מחיר",
+  // GAP-09
+  quote_payment_steps: "תשלום בלוח התשלומים של הצעה",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",
   quote_template_lines: "שורה בתבנית הצעת מחיר",

@@ -14,7 +14,8 @@ import { detachedQuotesPath, quoteDocumentPath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteLinkStatus, getQuoteParties, getQuotePricing, listQuoteLines } from "@/features/quotes/queries";
+import { getQuote, getQuoteLinkStatus, getQuoteParties, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -49,7 +50,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const quote = await getQuote(orgId, quoteId);
   if (!quote) notFound();
   const supabase = await createClient();
-  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent] = await Promise.all([
+  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule] = await Promise.all([
     listQuoteLines(orgId, quote.id),
     getQuotePricing(orgId, quote),
     getQuoteParties(orgId, quote),
@@ -64,6 +65,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
         ? supabase.from("contacts").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle()
         : // QUO-07: a sent quote whose deal and contact were purged
           null,
+    // GAP-09
+    listQuoteSchedule(orgId, quote.id),
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -186,6 +189,10 @@ export default async function QuotePage({ params, searchParams }: Props) {
         canEdit={canEdit}
         features={{ products: hasProducts, discounts: hasDiscounts }}
       />
+      {/* GAP-09: the payment schedule, shown on the document and the customer's page too */}
+      <div className="mt-5">
+        <QuoteScheduleCard orgId={orgId} quoteId={quote.id} steps={schedule} totalAgorot={quote.totalAgorot} canEdit={canEdit} />
+      </div>
     </div>
   );
 }

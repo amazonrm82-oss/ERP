@@ -6,6 +6,7 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 
 import type { QuoteDocumentData } from "../design-server";
 import type { QuoteLine } from "../queries";
+import { percentText } from "../schedule";
 import { noVatText } from "../schema";
 import { groupSubtotals, isCounted } from "../totals";
 
@@ -28,6 +29,7 @@ function optionalNote(line: QuoteLine): string | null {
  */
 export function QuoteDocument({ data }: { data: QuoteDocumentData }) {
   const { design, business, customer, quote, lines } = data;
+  const schedule = data.schedule ?? [];
   const sums = groupSubtotals(lines);
   const vatWord = quote.pricesIncludeVat ? 'כולל מע"מ' : 'לפני מע"מ';
   const showVat = quote.noVatReason === null && quote.vatRateBp !== null && quote.vatRateBp > 0;
@@ -234,6 +236,33 @@ export function QuoteDocument({ data }: { data: QuoteDocumentData }) {
             {optionalOut ? <p className="text-sm text-ink-soft">שורות רשות שלא סומנו אינן כלולות בסיכום.</p> : null}
           </dl>
         </section>
+
+        {schedule.length > 0 ? (
+          // GAP-09: the payment schedule, each step with its share of the total
+          <section aria-labelledby="quote-schedule" className="space-y-2" data-print-keep="">
+            <h2 id="quote-schedule" className="text-sm font-semibold">
+              לוח תשלומים
+            </h2>
+            <ol className="divide-y divide-line rounded-md border border-line text-sm">
+              {schedule.map((step) => (
+                <li key={step.key} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium break-words">
+                      <bdi>{step.name}</bdi>
+                    </p>
+                    {step.dueDate || step.milestone ? (
+                      <p className="text-ink-soft">{[step.dueDate ? formatDate(`${step.dueDate}T12:00:00Z`) : null, step.milestone].filter(Boolean).join(", ")}</p>
+                    ) : null}
+                  </div>
+                  <p className="shrink-0 text-end">
+                    <span className="block font-medium tabular-nums">{formatMoney(step.amountAgorot)}</span>
+                    <span className="block text-ink-soft tabular-nums">{percentText(step.percentBp)}</span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
 
         {quote.notes ? (
           <section aria-label="הערות" className="space-y-1" data-print-keep="">

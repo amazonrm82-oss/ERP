@@ -191,6 +191,8 @@ describe("tenant isolation", () => {
       // QUO-01: a draft quote on the deal, with a line
       ids.quoteA = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה של א', $2) returning id", [orgA, ids.dealA])).rows[0].id;
       await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.quoteA]);
+      // GAP-09
+      await q("insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'בחתימה')", [orgA, ids.quoteA]);
       // QUO-04: a template with a product line
       ids.templateA = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית של א') returning id", [orgA])).rows[0].id;
       await q("insert into public.quote_template_lines (organization_id, template_id, product_id, name) values ($1, $2, $3, 'מוצר של א')", [orgA, ids.templateA, ids.productA]);
@@ -303,6 +305,7 @@ describe("tenant isolation", () => {
     // QUO-01
     "quotes",
     "quote_lines",
+    "quote_payment_steps",
     // QUO-04
     "quote_templates",
     "quote_template_lines",
@@ -470,6 +473,7 @@ describe("tenant isolation", () => {
       deal_lines: "quantity = quantity",
       quotes: "title = title",
       quote_lines: "name = name",
+      quote_payment_steps: "name = name",
       quote_templates: "name = name",
       quote_template_lines: "name = name",
       completeness_settings: "fields = fields",
@@ -586,6 +590,7 @@ describe("tenant isolation", () => {
       ["insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgA, ids.dealA, ids.productA]],
       ["insert into public.quotes (organization_id, title, deal_id) values ($1, 'x', $2)", [orgA, ids.dealA]],
       ["insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgA, ids.quoteA]],
+      ["insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.quoteA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
@@ -683,6 +688,7 @@ describe("tenant isolation", () => {
       ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["quotes", "title = 'HACKED'", "title = 'HACKED'"],
       ["quote_lines", "name = 'HACKED'", "name = 'HACKED'"],
+      ["quote_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
@@ -907,6 +913,11 @@ describe("tenant isolation", () => {
     );
     const viaQuoteLine = await pgError(asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgB, ids.quoteA])));
     expect(["42501", "23503"]).toContain(viaQuoteLine.code);
+    // GAP-09: B cannot add a payment step to A's quote
+    const viaQuoteStep = await pgError(
+      asUser(b.id, (q) => q("insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgB, ids.quoteA])),
+    );
+    expect(["42501", "23503"]).toContain(viaQuoteStep.code);
     const viaQuoteProduct = await pgError(
       asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, product_id, name, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, quoteB, ids.productA])),
     );

@@ -1596,6 +1596,21 @@ export type QuoteRow = {
   updated_at: string;
 };
 
+// GAP-09: a step of a quote's payment schedule (migration quote_payment_schedule). A date or a milestone at least;
+// percent_bp 1..10000, the steps of a quote never pass 100% and add up to exactly 100% when it is sent.
+export type QuotePaymentStepRow = {
+  id: string;
+  organization_id: string;
+  quote_id: string;
+  position: number;
+  name: string;
+  percent_bp: number;
+  due_date: string | null;
+  milestone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // QUO-02: a line of a quote (migration quotes). kind item | group; unit_name, total_agorot and a product line's
 // vat_exempt and billing are set by trigger quote_lines_check.
 export type QuoteLineRow = {
@@ -2307,6 +2322,12 @@ export type Database = {
         QuoteLineRow,
         QuoteLineWrite & { organization_id: string; quote_id: string; name: string; kind?: string; product_id?: string | null },
         QuoteLineWrite
+      >;
+      // GAP-09: column grants; the quote is fixed once inserted
+      quote_payment_steps: Table<
+        QuotePaymentStepRow,
+        { organization_id: string; quote_id: string; position?: number; name: string; percent_bp: number; due_date?: string | null; milestone?: string | null },
+        { position?: number; name?: string; percent_bp?: number; due_date?: string | null; milestone?: string | null }
       >;
       // DLI-01: column grants; the deal and the product are fixed once inserted; price_includes_vat may be sent on
       // insert only (it must match the deal's mode); the totals and the copied names come from the server

@@ -453,6 +453,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_send.sql",
       // RPT-01 redefines public.log_export() last (the 'products' report key)
       "_report_revenue_by_product.sql",
+      // GAP-09 redefines public.quote_send() and app.audit_erase_core() of _quote_send.sql last
+      "_quote_payment_schedule.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

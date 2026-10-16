@@ -55,6 +55,7 @@ export default async function PublicQuotePage({ params }: Props) {
           customer: page.customer,
           quote: page.quote,
           lines: page.lines,
+          schedule: page.schedule,
         }}
       />
       <div className="print:hidden">

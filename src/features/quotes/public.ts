@@ -5,6 +5,7 @@ import { BILLINGS } from "@/features/products/schema";
 import { quoteColor, type DocumentCustomer, type QuoteDesign } from "./design";
 import type { DocumentBusiness } from "./design-server";
 import type { Quote, QuoteLine } from "./queries";
+import type { ScheduleRow } from "./schedule";
 import { isNoVatReason, isQuoteStatus } from "./schema";
 
 // QUO-08: the customer's page of a sent quote, from public.quote_public(token) (service_role only). The answer holds
@@ -78,6 +79,16 @@ const answerSchema = z.object({
   }),
   brand: z.object({ logo: text, color: text }),
   built_with: z.boolean(),
+  // GAP-09: the payment schedule, each step's share of the total worked out by the database
+  schedule: z.array(
+    z.object({
+      name: z.string(),
+      percent_bp: z.number().int(),
+      due_date: text,
+      milestone: text,
+      amount_agorot: money,
+    }),
+  ),
 });
 
 export type PublicQuote = {
@@ -89,6 +100,7 @@ export type PublicQuote = {
   customer: DocumentCustomer | null;
   quote: Quote;
   lines: QuoteLine[];
+  schedule: ScheduleRow[];
   builtWith: boolean;
 };
 
@@ -96,7 +108,7 @@ export type PublicQuote = {
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -164,6 +176,15 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
       priceListId: null,
       priceListName: null,
       totalAgorot: line.total_agorot,
+    })),
+    schedule: schedule.map((step, index) => ({
+      // no ids in the answer: a key per step, for the page only
+      key: `step-${index + 1}`,
+      name: step.name,
+      percentBp: step.percent_bp,
+      dueDate: step.due_date,
+      milestone: step.milestone,
+      amountAgorot: step.amount_agorot,
     })),
     builtWith: built_with,
   };

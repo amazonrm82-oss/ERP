@@ -40,6 +40,7 @@ const answer = (extra: Record<string, unknown> = {}) => ({
   design: { header_text: null, footer_text: "פרטי חשבון", show_logo: true, show_business_details: true, accent_color: null },
   brand: { logo: null, color: "#1e56d6" },
   built_with: true,
+  schedule: [],
   ...extra,
 });
 
@@ -78,6 +79,31 @@ describe("the customer's quote page (QUO-08)", () => {
     );
     for (const text of ["QT-1042", "שיפוץ מטבח", "לקוח בע&quot;מ", "דנה", "שלב א", "עבודה", "236", "פרטי חשבון"]) expect(html, text).toContain(text);
     expect(html).not.toContain("טיוטה");
+  });
+
+  it("GAP-09: the payment schedule comes with keys of its own and is drawn under the totals", () => {
+    const page = publicQuoteFrom(
+      answer({
+        schedule: [
+          { name: "מקדמה", percent_bp: 3000, due_date: null, milestone: "בחתימה", amount_agorot: 7080 },
+          { name: "יתרה", percent_bp: 7000, due_date: "2027-01-15", milestone: null, amount_agorot: 16520 },
+        ],
+      }),
+    )!;
+    expect(page.schedule.map((s) => [s.key, s.name, s.percentBp, s.amountAgorot])).toEqual([
+      ["step-1", "מקדמה", 3000, 7080],
+      ["step-2", "יתרה", 7000, 16520],
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(QuoteDocument, {
+        data: { design: page.design, color: page.color, logoUrl: null, business: page.business, customer: page.customer, quote: page.quote, lines: page.lines, schedule: page.schedule },
+      }),
+    );
+    for (const text of ["לוח תשלומים", "מקדמה", "בחתימה", "30%", "יתרה", "70%", "165.20"]) expect(html, text).toContain(text);
+    // no schedule, no section; a schedule of the wrong shape is not a page
+    expect(renderToStaticMarkup(createElement(QuoteDocument, { data: { ...page, logoUrl: null, schedule: [] } }))).not.toContain("לוח תשלומים");
+    expect(publicQuoteFrom(answer({ schedule: [{ name: "x" }] }))).toBeNull();
+    expect(publicQuoteFrom(answer({ schedule: undefined }))).toBeNull();
   });
 
   it("the link: 64 base64url characters, its path, and the WhatsApp message", () => {
