@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migrationFile, rerunClosure, staleRestores } from "./rerun";
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser } from "./helpers";
 
 afterAll(closePool);
@@ -165,16 +167,20 @@ describe("the inquiry log outlives its form (CAP-04)", () => {
   });
 
   it("the migration can run twice", async () => {
-    const { readFileSync, readdirSync } = await import("node:fs");
-    const dir = "supabase/migrations";
-    const file = readdirSync(dir).find((name) => name.endsWith("_keep_submissions.sql"));
-    expect(file).toBeDefined();
-    const sql = readFileSync(`${dir}/${file}`, "utf8");
+    const file = migrationFile("_keep_submissions.sql");
+    // re-running it puts back its own body of app.keep_form_submissions(); the later migrations that redefine its
+    // functions (the closure) run again after it, so the test leaves every body as a fresh build made it
+    const rerun = rerunClosure([file]);
+    expect(rerun.files[0]).toBe(file);
+    expect(staleRestores(rerun.files)).toEqual([]);
+    const sql = rerun.sql[0];
     // no statement starts with drop (the hosted connector stops on those)
     const statements = sql.replace(/--.*$/gm, "").split(";").map((part) => part.trim().toLowerCase());
     expect(statements.filter((part) => part.startsWith("drop"))).toEqual([]);
     expect(sql).not.toMatch(/delete\s+from/i);
-    await asAdmin((q) => q(sql));
+    await asAdmin(async (q) => {
+      for (const text of rerun.sql) await q(text);
+    });
     await asAdmin(async (q) => {
       const fks = await q<{ def: string }>(
         "select pg_get_constraintdef(oid) as def from pg_constraint where conrelid = 'public.form_submissions'::regclass and contype = 'f' order by conname",
