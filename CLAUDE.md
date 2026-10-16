@@ -905,6 +905,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   skips it). Custom fields: active field of the record's type, `app.custom_value_ok`,
   a user value must be a member, read-only filled once, unique judged inside the step (constraint set immediate, then deferred again).
   App: `src/features/automations/set-field.ts`, builder action "עדכון שדה".
+- Date triggers (AUT-03 part one, migration 020245): trigger type `date_reached` {field, days 0..365, direction before|after} on
+  every record type; fields `app.automation_date_fields(entity)` (mirrored by `DATE_TRIGGER_FIELDS` in
+  `src/features/automations/date-trigger.ts`) plus active date/datetime custom fields. Once per record and date (run key), from
+  08:00 in the org zone (`app.date_trigger_hour()`); bin records, converted leads and closed deals/tasks (for their close/due date)
+  never run. pg_cron `crm-date-automations` (every 15 minutes) runs `app.run_date_automations()` (per-rule exception block, scan cursor).
 - Platform admin (migration 0013): `app.platform_staff` (owner | support | finance | readonly) and the
   append-only `app.platform_log`, neither exposed by the API. Every `public.platform_*` function starts
   with `app.require_platform(roles)`, which demands the JWT claim `aal = 'aal2'` (Supabase MFA).
