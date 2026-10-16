@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 
 import type { TimelineSubject } from "@/features/activities/schema";
-import { createClient } from "@/lib/supabase/client";
-
-import { finishUploadAction, prepareUploadAction } from "../actions";
-import { ACCEPT, FILES_BUCKET } from "../types";
+import { ACCEPT } from "../types";
+import { uploadFiles } from "../upload-client";
 
 /** Drop zone and file picker. Each file: a row on the server, then a direct upload to Storage. */
 export function FileUploader({ orgId, subject }: { orgId: string; subject: TimelineSubject }) {
@@ -24,19 +22,7 @@ export function FileUploader({ orgId, subject }: { orgId: string; subject: Timel
     if (files.length === 0) return;
     setBusy(true);
     setErrors([]);
-    const problems: string[] = [];
-    const supabase = createClient();
-    for (const [index, file] of files.entries()) {
-      setStatus(`מעלה ${index + 1} מתוך ${files.length}: ${file.name}`);
-      const prepared = await prepareUploadAction(orgId, subject, { name: file.name, size: file.size, type: file.type || "application/octet-stream" });
-      if (!prepared.ok) {
-        problems.push(prepared.message);
-        continue;
-      }
-      const { error } = await supabase.storage.from(FILES_BUCKET).upload(prepared.path, file, { contentType: file.type, upsert: false });
-      await finishUploadAction(orgId, subject, prepared.id, !error);
-      if (error) problems.push(`ההעלאה של ${file.name} נכשלה. נסו שוב.`);
-    }
+    const problems = await uploadFiles(orgId, subject, files, {}, (index, file) => setStatus(`מעלה ${index + 1} מתוך ${files.length}: ${file.name}`));
     setBusy(false);
     setStatus(problems.length === files.length ? null : "הקבצים הועלו.");
     setErrors(problems);

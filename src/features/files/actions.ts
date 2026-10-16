@@ -18,6 +18,11 @@ const fileSchema = z.object({
   type: z.string().refine((t) => t in ALLOWED_TYPES),
 });
 
+// REC-07: a file on a timeline entry, and/or a new version of an earlier file
+const linkSchema = z
+  .object({ activityId: z.uuid().optional(), previousId: z.uuid().optional() })
+  .strict();
+
 const RECORD_PATH = {
   lead: paths.lead,
   contact: paths.contact,
@@ -33,7 +38,9 @@ export async function prepareUploadAction(
   orgId: string,
   subject: TimelineSubject,
   file: { name: string; size: number; type: string },
+  link: { activityId?: string; previousId?: string } = {},
 ): Promise<{ ok: true; id: string; path: string } | { ok: false; message: string }> {
+  if (!validArg(linkSchema, link)) return fail(INVALID_ARGS);
   const parsedSubject = subjectSchema.safeParse(subject);
   if (!parsedSubject.success) return fail(NOT_FOUND_OR_FORBIDDEN);
   const parsed = fileSchema.safeParse(file);
@@ -55,6 +62,8 @@ export async function prepareUploadAction(
       name: parsed.data.name,
       mime_type: parsed.data.type,
       size_bytes: parsed.data.size,
+      activity_id: link.activityId ?? null,
+      previous_id: link.previousId ?? null,
     })
     .select("id, storage_path")
     .single();

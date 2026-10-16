@@ -39,13 +39,13 @@ function subjectPath(orgId: string, subject: TimelineSubject): string | null {
   }
 }
 
-/** Adds a user note to the timeline of a lead, contact, company or deal. */
+/** Adds a user note to the timeline of a lead, contact, company or deal; answers its id (REC-07 attaches files to it). */
 export async function addNoteAction(
   orgId: string,
   subject: TimelineSubject,
-  _prev: FormState,
+  _prev: FormState<{ id: string }>,
   formData: FormData,
-): Promise<FormState> {
+): Promise<FormState<{ id: string }>> {
   const parsedSubject = subjectSchema.safeParse(subject);
   if (!parsedSubject.success) {
     return fail(NOT_FOUND);
@@ -64,7 +64,7 @@ export async function addNoteAction(
   // GAP-05: a private note is seen by its author and the owners/admins only (activities_select).
   const row: ActivityInsert = { organization_id: orgId, type: parsed.data.type, body: parsed.data.body, is_private: parsed.data.private };
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
-  const { error } = await context.supabase.from("activities").insert(row);
+  const { data, error } = await context.supabase.from("activities").insert(row).select("id").single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את ההערה. נסו שוב."), { values: formValues(formData) });
   }
@@ -73,7 +73,7 @@ export async function addNoteAction(
   if (path) {
     revalidatePath(path);
   }
-  return ok();
+  return ok({ id: data.id });
 }
 
 const NEXT_DAYS = { tomorrow: 1, week: 7 } as const;

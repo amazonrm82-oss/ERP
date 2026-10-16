@@ -2,12 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
+import { listNoteFiles } from "@/features/files/queries";
+import { formatBytes } from "@/features/files/types";
 import { getMentionCandidates } from "@/features/mentions/queries";
 import { mentionIds } from "@/features/mentions/token";
 import { printsTimelineEntry } from "@/features/print/print";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
+import { paths } from "@/lib/paths";
 import { recordPage } from "@/lib/record-types";
 
 import { getTimeline, managesRecordTeam } from "../queries";
@@ -35,9 +38,11 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
   const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
   const writable = canWrite && context.canWrite;
   // REC-02: who may be mentioned here, and the current names of those mentioned in the entries shown
-  const [mentions, mentionedNames] = await Promise.all([
+  const [mentions, mentionedNames, noteFiles] = await Promise.all([
     writable ? getMentionCandidates(orgId, subject) : Promise.resolve(undefined),
     getUserNames(items.filter((item) => isPinnableType(item.type)).flatMap((item) => mentionIds(item.body))),
+    // REC-07: files attached to the entries shown (RLS: only entries the user sees)
+    listNoteFiles(orgId, items.filter((item) => isPinnableType(item.type)).map((item) => item.id)),
   ]);
   const names = Object.fromEntries(mentionedNames);
   // REC-01: a team manager pins (only pins) the entries on their team's records
@@ -116,6 +121,29 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                   <p className={cn("mt-1 break-words whitespace-pre-wrap", !item.isUserContent && "text-ink-soft")}>
                     {item.text}
                   </p>
+                ) : null}
+                {noteFiles.get(item.id)?.length ? (
+                  <ul className="mt-1.5 flex flex-wrap gap-2" aria-label="קבצים מצורפים">
+                    {noteFiles.get(item.id)!.map((file) => {
+                      const viewable = file.mimeType.startsWith("image/") || file.mimeType === "application/pdf";
+                      return (
+                        <li key={file.id}>
+                          <a
+                            href={`${paths.file(orgId, file.id)}${viewable ? "?view=1" : ""}`}
+                            target={viewable ? "_blank" : undefined}
+                            rel="noopener"
+                            className="inline-flex max-w-full items-center gap-1 rounded-md border border-line px-2 py-1 text-sm text-accent-strong underline-offset-4 hover:underline print:border-0 print:p-0 print:text-ink"
+                          >
+                            <span className="truncate">{file.name}</span>
+                            <span className="shrink-0 text-ink-soft">
+                              {formatBytes(file.sizeBytes)}
+                              {file.versions > 1 ? ` · גרסה ${file.versions}` : ""}
+                            </span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 ) : null}
                 {canPinHint(item, viewer) ? (
                   // REC-01 pin: the author at any time, and a manager of the record's team; REC-05 edit

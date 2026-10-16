@@ -907,6 +907,9 @@ export type FileRow = {
   storage_path: string;
   uploaded_by: string | null;
   created_at: string;
+  // REC-07: the timeline entry it is attached to, and the earlier version it replaces (both set once, on insert)
+  activity_id: string | null;
+  previous_id: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2055,6 +2058,8 @@ export type Database = {
           name: string;
           mime_type: string;
           size_bytes: number;
+          activity_id?: string | null;
+          previous_id?: string | null;
         },
         Record<string, never>
       >;

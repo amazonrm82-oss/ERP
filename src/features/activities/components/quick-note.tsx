@@ -16,7 +16,7 @@ import { PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
  * the timeline like any note.
  */
 export function QuickNote({ orgId, subject, className }: { orgId: string; subject: TimelineSubject; className?: string }) {
-  const [state, formAction] = useActionState<FormState, FormData>(addNoteAction.bind(null, orgId, subject), null);
+  const [state, formAction] = useActionState<FormState<{ id: string }>, FormData>(addNoteAction.bind(null, orgId, subject), null);
   const failure = state && !state.ok ? state : null;
   return (
     <form action={formAction} className={className}>
