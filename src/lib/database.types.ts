@@ -1238,6 +1238,33 @@ export type LeadInsert = {
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
 // CON-03 follow-up: the roles a contact may have on a deal, a managed list per organization; key is server-only
+// CON-06: a type of relation between two contacts (managed list); "A <name> B", "B <reverse_name ?? name> A"
+export type ContactRelationTypeRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  reverse_name: string | null;
+  // server-only: the seeded default ('spouse' | 'family' | 'parent' | 'referral'); the referrals report counts 'referral'
+  key: string | null;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+// CON-06: a relation between two contacts of the same business; the first side is a contact or a referring lead
+export type ContactRelationRow = {
+  id: string;
+  organization_id: string;
+  contact_id: string | null;
+  lead_id: string | null;
+  related_contact_id: string;
+  type_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealContactRoleRow = {
   id: string;
   organization_id: string;
@@ -1885,6 +1912,18 @@ export type Database = {
       >;
       deals: Table<DealRow, DealInsert & { import_job_id?: string | null }, Partial<DealInsert>>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // CON-06: column grants (key is server-only)
+      contact_relation_types: Table<
+        ContactRelationTypeRow,
+        { organization_id: string; name: string; reverse_name?: string | null; position?: number; is_active?: boolean },
+        { name?: string; reverse_name?: string | null; position?: number; is_active?: boolean }
+      >;
+      // CON-06: no update (a relation is removed and added again)
+      contact_relations: Table<
+        ContactRelationRow,
+        { organization_id: string; contact_id?: string | null; lead_id?: string | null; related_contact_id: string; type_id: string },
+        Record<string, never>
+      >;
       // CON-03 follow-up: column grants (key is server-only; organization_id fixed once inserted)
       deal_contact_roles: Table<
         DealContactRoleRow,
@@ -2061,6 +2100,8 @@ export type Database = {
       report_cycle_length: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       report_stuck_deals: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null; p_days?: number }; Returns: Json };
       report_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // CON-06
+      report_referrals: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       report_summary: {
         Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
         Returns: Json;

@@ -170,6 +170,29 @@ describe("full export: contact channels, deal contacts, team members, WhatsApp t
     expect(row).toBe(`l1,${ORG},${CONTACT},דנה כהן,${COMPANY},"ענן בע""מ",יועצת,false`);
   });
 
+  it("names both contacts and the type in contact_relations.csv (CON-06)", () => {
+    const OTHER = "00000000-0000-0000-0000-0000000000c8";
+    const TYPE = "00000000-0000-0000-0000-0000000000c7";
+    for (const table of ["contact_relations", "contact_relation_types"]) {
+      const entry = EXPORT_TABLES.find((t) => t.table === table);
+      expect(entry?.file).toBe(`${table}.csv`);
+      expect(exportKey(entry!)).toEqual(["id"]);
+      expect(EXPORT_README).toContain(`${table}.csv`);
+    }
+    const { names, tagNames } = exportNames(
+      [
+        { table: "contacts", rows: [{ id: CONTACT, full_name: "דנה כהן" }, { id: OTHER, full_name: "יואב כהן" }] },
+        { table: "contact_relation_types", rows: [{ id: TYPE, name: "הורה של" }] },
+      ],
+      [],
+    );
+    const [header, row] = lines(
+      toCsv([{ id: "r1", organization_id: ORG, contact_id: CONTACT, related_contact_id: OTHER, type_id: TYPE }], names, tagNames, "contact_relations"),
+    );
+    expect(header).toBe("id,organization_id,contact_id,contact,related_contact_id,related_contact,type_id,type");
+    expect(row).toBe(`r1,${ORG},${CONTACT},דנה כהן,${OTHER},יואב כהן,${TYPE},הורה של`);
+  });
+
   it("names the team and the member in team_members.csv", () => {
     const { names, tagNames } = exportNames([{ table: "teams", rows: [{ id: TEAM, name: "צוות צפון" }] }], [{ id: GUEST, full_name: "רון", email: null }]);
     const [header, row] = lines(

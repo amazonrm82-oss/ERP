@@ -44,6 +44,9 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "contact_channels", file: "contact_channels.csv" },
   // CON-05: every company of a contact, with the role there; is_primary = the contact's company_id
   { table: "contact_companies", file: "contact_companies.csv" },
+  // CON-06: relations between contacts, and the business's types of relation
+  { table: "contact_relations", file: "contact_relations.csv" },
+  { table: "contact_relation_types", file: "contact_relation_types.csv" },
   // CNS-01: the consent history of leads and contacts (rows of purged records are not readable, so not exported)
   { table: "consents", file: "consents.csv" },
   { table: "companies", file: "companies.csv" },
@@ -147,6 +150,8 @@ export const LOOKUPS: Record<string, string> = {
   deputy_id: "deputy",
   // CON-03 follow-up: a contact's role on a deal, from the list (the old code keeps "role_name")
   role_id: "role_label",
+  // CON-06: the other contact of a relation
+  related_contact_id: "related_contact",
 };
 
 export type ExportRow = Record<string, unknown>;
@@ -179,7 +184,7 @@ const READABLE: Record<string, { header: string; get: (value: unknown, row: Expo
 // tables whose rows are named by their name column
 const NAMED_BY_NAME = new Set<string>([
   "lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams", "record_type_options", "product_categories", "product_units",
-  "price_lists", "products", "deal_contact_roles",
+  "price_lists", "products", "deal_contact_roles", "contact_relation_types",
 ]);
 
 /**
@@ -248,6 +253,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.
 כל החברות של כל איש קשר נמצאות ב-contact_companies.csv, עם התפקיד שלו באותה חברה (title); is_primary מסמן את החברה הראשית, שהיא גם company_id ב-contacts.csv.
+הקשרים בין אנשי קשר נמצאים ב-contact_relations.csv: contact_id הוא הצד הראשון (או lead_id, כשליד הפנה את איש הקשר), related_contact_id הצד השני, ו-type_id סוג הקשר. סוגי הקשר נמצאים ב-contact_relation_types.csv: name נקרא מהצד הראשון ("הורה של"), ו-reverse_name מהצד השני ("ילד/ה של"; ריק = אותו דבר משני הצדדים).
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
 שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר.
 חלוקת הלידים נמצאת ב-lead_distribution.csv: method הוא round_robin (סבב), weighted (לפי משקל) או load (לפי עומס פתוח), ו-weights הם המשקלים של העובדים (מזהה משתמש ומספר מ-1 עד 10; מי שלא מופיע שוקל 1). כללי החלוקה נמצאים ב-lead_routing_rules.csv: ליד מהמקור source_id, עם המוצר product_id, בשפה locale ו/או עם הערך field_value בשדה field_key (כל מה שמולא בכלל צריך להתאים) נשלח לצוות team_id או לאדם user_id, לפי הסדר position, ורק כללים עם is_active.

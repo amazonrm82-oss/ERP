@@ -10,6 +10,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "billing_details", label: "פרטי חיוב בחברה ובאיש קשר", built: true, core: true },
   // CON-05 (owner, 15 October 2026): core, open in every plan
   { feature: "contact_companies", label: "איש קשר בכמה חברות, עם תפקיד בכל אחת", built: true, core: true },
+  // CON-06 (owner, 15 October 2026): core, open in every plan
+  { feature: "contact_relations", label: "קשרים בין אנשי קשר ודוח הפניות", built: true, core: true },
   // DEAL-07: deal data, no plan key (to be confirmed by the owner)
   { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
   // LEAD-05 (owner, 14 October 2026): core, open in every plan

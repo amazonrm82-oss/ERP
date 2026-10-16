@@ -229,6 +229,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-05 (trigger contact_companies_check)
   "contact_company:primary": "את החברה הראשית מחליפים או מסירים בפרטי איש הקשר.",
   "contact_company:max": "אפשר לקשר איש קשר לעד 50 חברות.",
+  // CON-06 (trigger contact_relations_check, contact_relation_types_cap)
+  "contact_relation:exists": "הקשר הזה כבר רשום בין שני אנשי הקשר.",
+  "contact_relation:type": "סוג הקשר הזה כבר לא ברשימה. בחרו סוג אחר.",
+  "contact_relation:max": "אפשר לשמור עד 50 קשרים לאיש קשר.",
+  "contact_relation:lead_type": "ליד נרשם רק כמי שהפנה איש קשר.",
+  "contact_relation_types:max": "אפשר לשמור עד 20 סוגי קשר.",
   // CNS-01, CNS-03 (trigger consents_prepare, guard consents_guard)
   "consent:subject": "הסכמה נרשמת לליד אחד או לאיש קשר אחד. רעננו את הדף ונסו שוב.",
   // owner's rules of 13 October 2026 (trigger consents_prepare)

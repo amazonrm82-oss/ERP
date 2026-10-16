@@ -866,6 +866,49 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         ],
       };
     }
+
+    case "referrals": {
+      // CON-06: the relations of the referral type made in the period (RLS: both sides readable); a referrer is a contact or a lead
+      const data = obj(await rpc("report_referrals", range));
+      const totals = obj(data.totals as Json);
+      const rows = list(data.by_referrer as Json);
+      return {
+        kpis: [
+          { label: "הפניות", value: formatNumber(num(totals.referrals)) },
+          { label: "מפנים", value: formatNumber(num(totals.referrers)) },
+          { label: "הפכו ללקוחות", value: formatNumber(num(totals.customers)) },
+          { label: "הכנסה מהם", value: formatMoney(num(totals.won_amount)) },
+        ],
+        sections: [
+          {
+            title: "לפי מפנה",
+            columns: [
+              { key: "referrer", label: "מפנה", kind: "text" },
+              { key: "referred", label: "הפנה", kind: "number" },
+              { key: "customers", label: "הפכו ללקוחות", kind: "number" },
+              { key: "won_amount", label: "הכנסה מהם", kind: "money" },
+            ],
+            rows: rows.map(
+              (r): ReportRow => ({
+                _href: str(r.referrer_id)
+                  ? r.referrer_kind === "lead"
+                    ? paths.lead(orgId, str(r.referrer_id) as string)
+                    : paths.contact(orgId, str(r.referrer_id) as string)
+                  : null,
+                referrer: r.referrer_kind === "lead" ? `${str(r.name) ?? "ליד ללא שם"} (ליד)` : (str(r.name) ?? "איש קשר ללא שם"),
+                referred: num(r.referred),
+                customers: num(r.customers),
+                won_amount: num(r.won_amount),
+              }),
+            ),
+            bar: "referred",
+            empty: "לא נרשמו הפניות בתקופה הזו.",
+            note:
+              "הפניה נספרת כשנרשם בכרטיס איש הקשר או הליד הקשר 'הפנה/תה את' (או השם שנתתם לו בהגדרות), לפי התאריך שבו נרשם. מפנה יכול להיות איש קשר או ליד. לקוח: איש קשר שהופנה ויש לו עסקה שנסגרה בהצלחה אחרי שההפניה נרשמה.",
+          },
+        ],
+      };
+    }
   }
   throw new Error(`unknown report ${key}`);
 }

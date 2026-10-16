@@ -1293,6 +1293,106 @@ describe("roles and record visibility", () => {
     expect(await remove(m1, mine)).toBe(1);
   });
 
+  it("a relation between two contacts is seen by whoever reads both and made or removed by whoever edits one of them (CON-06)", async () => {
+    await setVisibility("own");
+    const make = (u: U, name: string, teamId: string | null) =>
+      asUser(u.id, async (q) => (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, team_id) values ($1, $2, $3) returning id", [org, name, teamId])).rows[0].id);
+    const [mine, theirs] = [await make(m1, "של m1", team), await make(m2, "של m2", null)];
+    const spouse = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.contact_relation_types where organization_id = $1 and key = 'spouse'", [org])).rows[0].id);
+    const add = (u: U) =>
+      asUser(u.id, (q) =>
+        q<{ id: string }>("insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) values ($1, $2, $3, $4) returning id", [org, mine, theirs, spouse]),
+      );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.contact_relations where contact_id = $1", [mine]));
+    const remove = (u: U) => asUser(u.id, async (q) => (await q("delete from public.contact_relations where contact_id = $1", [mine])).rowCount);
+
+    // m1 edits their contact but cannot read m2's: no relation
+    expect((await pgError(add(m1))).code).toBe("42501");
+    // an admin makes it; only someone who reads both sees it
+    expect((await add(admin)).rowCount).toBe(1);
+    expect(await seen(admin)).toBe(1);
+    for (const u of [m1, m2, manager]) expect(await seen(u), u.email).toBe(0);
+    expect(await remove(m1)).toBe(0);
+
+    // visibility "org": everyone reads both; a viewer changes nothing; m2 (who edits one of them) removes it
+    await setVisibility("org");
+    for (const u of [m1, m2, viewer]) expect(await seen(u), u.email).toBe(1);
+    expect((await pgError(asUser(viewer.id, (q) => q("insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) values ($1, $3, $2, $4)", [org, mine, theirs, spouse])))).code).toBe("42501");
+    expect(await remove(viewer)).toBe(0);
+    // no update at all: a relation is removed and added again
+    expect((await pgError(asUser(admin.id, (q) => q("update public.contact_relations set type_id = type_id where contact_id = $1", [mine])))).code).toBe("42501");
+
+    // a read-only organization keeps it readable and unchanged
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await seen(m2)).toBe(1);
+      expect(await remove(m2)).toBe(0);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+    expect(await remove(m2)).toBe(1);
+    // and m1 may now make it themselves (they edit one side and read the other)
+    expect((await add(m1)).rowCount).toBe(1);
+    expect(await remove(m1)).toBe(1);
+  });
+
+  it("a lead's referral follows the lead's own rights on its side and the contact's on the other (CON-06)", async () => {
+    await setVisibility("own");
+    const lead = await insertLead(m1.id, org, { phone: "052-1130001", team_id: team });
+    const contact = await asUser(m2.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'הופנתה על ידי ליד') returning id", [org])).rows[0].id,
+    );
+    const mine = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, team_id) values ($1, 'של m1', $2) returning id", [org, team])).rows[0].id,
+    );
+    const referral = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.contact_relation_types where organization_id = $1 and key = 'referral'", [org])).rows[0].id);
+    const add = (u: U, leadId = lead, contactId = contact) =>
+      asUser(u.id, (q) =>
+        q("insert into public.contact_relations (organization_id, lead_id, related_contact_id, type_id) values ($1, $2, $3, $4)", [org, leadId, contactId, referral]),
+      );
+    const seen = (u: U, leadId = lead) => asUser(u.id, (q) => count(q, "select 1 from public.contact_relations where lead_id = $1", [leadId]));
+    const remove = (u: U, leadId = lead) => asUser(u.id, async (q) => (await q("delete from public.contact_relations where lead_id = $1", [leadId])).rowCount);
+
+    // m1 edits the lead but cannot read m2's contact; m2 edits the contact but cannot read m1's lead
+    expect((await pgError(add(m1))).code).toBe("42501");
+    expect((await pgError(add(m2))).code).toBe("42501");
+    // an admin makes it; only someone who reads both sides sees it, and neither side alone removes it
+    expect((await add(admin)).rowCount).toBe(1);
+    expect(await seen(admin)).toBe(1);
+    for (const u of [m1, m2, manager]) expect(await seen(u), u.email).toBe(0);
+    expect(await remove(m1)).toBe(0);
+    expect(await remove(m2)).toBe(0);
+    // a DELETE with no WHERE is filtered by the delete policy alone: m2 edits the contact but cannot read the lead
+    await asUser(m2.id, (q) => q("delete from public.contact_relations"));
+    expect(await seen(admin)).toBe(1);
+
+    // visibility "org": everyone reads both sides; a viewer changes nothing
+    await setVisibility("org");
+    for (const u of [m1, m2, viewer]) expect(await seen(u), u.email).toBe(1);
+    expect(await remove(viewer)).toBe(0);
+    // m2 reads m1's lead and m1's contact but edits neither: no new referral, no removal of one
+    expect((await pgError(add(m2, lead, mine))).code).toBe("42501");
+    await asUser(m1.id, (q) => q("insert into public.contact_relations (organization_id, lead_id, related_contact_id, type_id) values ($1, $2, $3, $4)", [org, lead, mine, referral]));
+    expect(await asUser(m2.id, async (q) => (await q("delete from public.contact_relations where lead_id = $1 and related_contact_id = $2", [lead, mine])).rowCount)).toBe(0);
+    // m1 edits the lead: removes both; m2 edits the contact: adds it back and removes it
+    expect(await remove(m1)).toBe(2);
+    expect((await add(m2)).rowCount).toBe(1);
+    expect(await remove(m2)).toBe(1);
+
+    // a lead in the recycle bin: no new referral; the side in the bin no longer gives the right to remove one
+    const binned = await insertLead(m1.id, org, { phone: "052-1130002", team_id: team });
+    await add(admin, binned);
+    await asAdmin((q) => q("update public.leads set deleted_at = now() where id = $1", [binned]));
+    expect((await pgError(add(m1, binned, mine))).code).toBe("42501");
+    expect(await remove(m1, binned)).toBe(0);
+    // a converted lead takes no new referral (its referrals moved to its contact)
+    const converted = await insertLead(m1.id, org, { phone: "052-1130003", team_id: team });
+    await asAdmin((q) => q("update public.leads set converted_at = now() where id = $1", [converted]));
+    expect((await pgError(add(m1, converted, mine))).code).toBe("42501");
+    expect((await pgError(add(admin, converted, contact))).code).toBe("42501");
+  });
+
   it("a lead's consents follow the lead: who reads it reads them, who edits it records a new one; nobody changes one (CNS-01)", async () => {
     await setVisibility("own");
     const lead = await insertLead(m1.id, org, { phone: "052-1120001", team_id: team });

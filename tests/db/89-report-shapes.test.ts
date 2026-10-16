@@ -143,6 +143,22 @@ describe("report result shapes (FXC-12)", () => {
         [org],
       ),
     );
+    // CON-06: a referral, and the referred contact won a deal (report_referrals)
+    await asUser(owner.id, async (q) => {
+      const referrer = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מפנה') returning id", [org])).rows[0].id;
+      const referred = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מופנה') returning id", [org])).rows[0].id;
+      await q(
+        "insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) select $1, $2, $3, t.id from public.contact_relation_types t where t.organization_id = $1 and t.key = 'referral'",
+        [org, referrer, referred],
+      );
+      await q(
+        `insert into public.deals (organization_id, name, amount_agorot, pipeline_id, stage_id, owner_id, contact_id)
+         select $1, 'עסקה מהפניה', 40000, p.id, s.id, $2, $3
+           from public.pipelines p join public.stages s on s.pipeline_id = p.id and s.kind = 'won'
+          where p.organization_id = $1 and p.is_default limit 1`,
+        [org, owner.id, referred],
+      );
+    });
 
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
@@ -163,6 +179,7 @@ describe("report result shapes (FXC-12)", () => {
       report_goal_forecast: ["public.report_goal_forecast($1)", [org]],
       report_pipeline_cleanup: ["public.report_pipeline_cleanup($1)", [org]],
       report_money_waiting: ["public.report_money_waiting($1)", [org]],
+      report_referrals: ["public.report_referrals($1, $2, $3)", range],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

@@ -135,6 +135,21 @@ describe("tenant isolation", () => {
       // CON-05: contactA's company is its primary link (by trigger); a second company as a further one
       ids.company2A = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה שנייה של א') returning id", [orgA])).rows[0].id;
       await q("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, 'יועצת')", [orgA, ids.contactA, ids.company2A]);
+      // CON-06: a relation between two of A's contacts (a seeded type)
+      ids.contact2A = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'בת זוג של א') returning id", [orgA])).rows[0].id;
+      ids.parentTypeA = (await q<{ id: string }>("select id from public.contact_relation_types where organization_id = $1 and key = 'parent'", [orgA])).rows[0].id;
+      await q(
+        "insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) select $1, $2, $3, t.id from public.contact_relation_types t where t.organization_id = $1 and t.key = 'spouse'",
+        [orgA, ids.contactA, ids.contact2A],
+      );
+      // CON-06: a lead of A referred A's second contact
+      ids.referralTypeA = (await q<{ id: string }>("select id from public.contact_relation_types where organization_id = $1 and key = 'referral'", [orgA])).rows[0].id;
+      await q("insert into public.contact_relations (organization_id, lead_id, related_contact_id, type_id) values ($1, $2, $3, $4)", [
+        orgA,
+        ids.leadA,
+        ids.contact2A,
+        ids.referralTypeA,
+      ]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
       // CAL-10: a booking page of a's own (off: a has no working hours, and a page without hours cannot be on)
       await q(
@@ -225,6 +240,9 @@ describe("tenant isolation", () => {
     "contact_channels",
     // CON-05
     "contact_companies",
+    // CON-06 (the types are seeded for every new organization)
+    "contact_relation_types",
+    "contact_relations",
     "plan_waitlist",
     "consents",
     // seeded for every new organization (WA-01)
@@ -387,6 +405,9 @@ describe("tenant isolation", () => {
       record_type_options: "name = name",
       contact_channels: "label = label",
       contact_companies: "title = title",
+      contact_relation_types: "name = name",
+      // no update grant at all: a permission error is the expected outcome
+      contact_relations: "type_id = type_id",
       // no update or delete grant at all: a permission error is the expected outcome
       plan_waitlist: "plan_key = plan_key",
       // append-only (CNS-02): no update or delete grant, a permission error is the expected outcome
@@ -491,6 +512,9 @@ describe("tenant isolation", () => {
       ["insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'x')", [orgA]],
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
       ["insert into public.contact_companies (organization_id, contact_id, company_id) values ($1, $2, $3)", [orgA, ids.contactA, ids.companyA]],
+      ["insert into public.contact_relation_types (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) values ($1, $3, $2, $4)", [orgA, ids.contactA, ids.contact2A, ids.parentTypeA]],
+      ["insert into public.contact_relations (organization_id, lead_id, related_contact_id, type_id) values ($1, $2, $3, $4)", [orgA, ids.leadA, ids.contactA, ids.referralTypeA]],
       ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
       ["insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'x')", [orgA, ids.leadA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
@@ -577,6 +601,8 @@ describe("tenant isolation", () => {
       ["record_type_options", "is_active = false", "not is_active"],
       ["contact_channels", "label = 'work'", "label = 'work'"],
       ["contact_companies", "title = 'HACKED'", "title = 'HACKED'"],
+      ["contact_relation_types", "is_active = false", "not is_active"],
+      ["contact_relations", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["plan_waitlist", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["consents", "state = 'denied'", "state = 'denied'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],

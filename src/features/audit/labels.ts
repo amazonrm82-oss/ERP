@@ -29,6 +29,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   deal_loss_reasons: "סיבת הפסד",
   // CON-03 follow-up
   deal_contact_roles: "תפקיד בעסקה",
+  // CON-06
+  contact_relation_types: "סוג קשר בין אנשי קשר",
   // CAL-08
   meeting_types: "סוג פגישה",
   // CAL-10
@@ -262,6 +264,9 @@ export const FIELD_LABELS: Record<string, string> = {
   extra_phone: "טלפון נוסף",
   // CON-05: a further company of the contact, with the role there
   company_link: "חברה מקושרת",
+  // CON-06: this contact's relation to another one (the phrase of its side; the other person is not named)
+  relation: "קשר לאיש קשר אחר",
+  reverse_name: "הקשר מהצד השני",
   extra_email: "אימייל נוסף",
   // PRD-01, PRD-04 (products, product categories and units)
   sku: 'מק"ט',

@@ -442,6 +442,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // CON-05 redefines app.sample_untouched() last (links a person made keep the record), and with it
       // app.import_record_worked() of undo_own_import, which no file above touches
       "_contact_companies.sql",
+      // CON-06 redefines app.sample_untouched() last (a relation keeps a sample contact), and with it
+      // app.import_record_worked() and public.log_export(), whose latest bodies no file above puts back
+      "_contact_relations.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

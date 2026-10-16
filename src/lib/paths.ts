@@ -63,6 +63,8 @@ export const paths = {
   settingsDisqualifyReasons: (orgId: string) => `/o/${orgId}/settings/lead-reasons`,
   settingsDealLossReasons: (orgId: string) => `/o/${orgId}/settings/deal-loss-reasons`,
   settingsDealContactRoles: (orgId: string) => `/o/${orgId}/settings/deal-contact-roles`,
+  // CON-06
+  settingsContactRelationTypes: (orgId: string) => `/o/${orgId}/settings/contact-relation-types`,
   settingsRecordTypes: (orgId: string) => `/o/${orgId}/settings/record-types`,
   settingsFields: (orgId: string) => `/o/${orgId}/settings/fields`,
   settingsTags: (orgId: string) => `/o/${orgId}/settings/tags`,

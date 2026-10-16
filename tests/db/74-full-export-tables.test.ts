@@ -109,6 +109,12 @@ describe("full export: tables (SPEC 12.4)", () => {
         // CON-05: a further company of the contact, with the role there
         const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'ענן בע\"מ') returning id", [orgId])).rows[0].id;
         await q("insert into public.contact_companies (organization_id, contact_id, company_id, title) values ($1, $2, $3, 'יועצת')", [orgId, contact, company]);
+        // CON-06: Ruth's spouse
+        const spouse = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'דוד') returning id", [orgId])).rows[0].id;
+        await q(
+          "insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) select $1, $2, $3, t.id from public.contact_relation_types t where t.organization_id = $1 and t.key = 'spouse'",
+          [orgId, contact, spouse],
+        );
         return { contactId: contact, dealId: deal };
       }));
       // a link saved before the role list carries the old code, which only the server writes now
@@ -135,6 +141,11 @@ describe("full export: tables (SPEC 12.4)", () => {
         await q("insert into public.deal_contacts (organization_id, deal_id, contact_id) values ($1, $2, $3)", [otherOrg, deal, contact]);
         const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'זרה') returning id", [otherOrg])).rows[0].id;
         await q("insert into public.contact_companies (organization_id, contact_id, company_id) values ($1, $2, $3)", [otherOrg, contact, company]);
+        const other = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'זר שני') returning id", [otherOrg])).rows[0].id;
+        await q(
+          "insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) select $1, $2, $3, t.id from public.contact_relation_types t where t.organization_id = $1 and t.key = 'parent'",
+          [otherOrg, contact, other],
+        );
         const team = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות זר') returning id", [otherOrg])).rows[0].id;
         await q("insert into public.team_members (organization_id, team_id, user_id) values ($1, $2, $3)", [otherOrg, team, stranger.id]);
       });
@@ -164,6 +175,13 @@ describe("full export: tables (SPEC 12.4)", () => {
       expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, contact_id: contactId, title: "יועצת", is_primary: false })]);
     });
 
+    it("sees the relations between the business's contacts, and its relation types (CON-06)", async () => {
+      const rows = await read("contact_relations", orgId);
+      expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, contact_id: contactId })]);
+      const types = await read("contact_relation_types", orgId);
+      expect(types.map((t) => t.key).sort()).toEqual(["family", "parent", "referral", "spouse"]);
+    });
+
     it("sees the team members", async () => {
       const rows = await read("team_members", orgId);
       expect(rows).toEqual([expect.objectContaining({ organization_id: orgId, team_id: teamId, user_id: member.id, is_manager: true })]);
@@ -181,7 +199,7 @@ describe("full export: tables (SPEC 12.4)", () => {
     });
 
     it("sees nothing of another business", async () => {
-      for (const table of ["contact_channels", "contact_companies", "deal_contacts", "team_members", "whatsapp_templates", "deal_contact_roles"]) expect(await read(table, otherOrg)).toEqual([]);
+      for (const table of ["contact_channels", "contact_companies", "contact_relations", "contact_relation_types", "deal_contacts", "team_members", "whatsapp_templates", "deal_contact_roles"]) expect(await read(table, otherOrg)).toEqual([]);
     });
   });
 

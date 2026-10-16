@@ -238,6 +238,13 @@ export const REPORT_SCHEMAS = {
       elapsed: z.number().min(0).max(1),
     }),
   ),
+  // CON-06: referrals made in the period, by the contact who referred
+  report_referrals: z.object({
+    totals: z.object({ referrals: count, referrers: count, customers: count, won_amount: amount }),
+    by_referrer: z.array(
+      z.object({ referrer_id: uuid, referrer_kind: z.enum(["contact", "lead"]), name: text, referred: count, customers: count, won_amount: amount }),
+    ),
+  }),
 } as const;
 
 export type ReportFunction = keyof typeof REPORT_SCHEMAS;

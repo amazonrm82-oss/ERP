@@ -98,6 +98,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
               // CON-03 follow-up
               { href: paths.settingsDealContactRoles(orgId), label: "תפקידים בעסקה", description: "התפקידים של אנשי הקשר בעסקה", icon: BoardIcon },
+              // CON-06
+              { href: paths.settingsContactRelationTypes(orgId), label: "קשרים בין אנשי קשר", description: "בן/בת זוג, הורה, מי הפנה את מי", icon: BoardIcon },
             ]
           : []),
         // PRD-04; PRM-01: also for a member with the catalog permission

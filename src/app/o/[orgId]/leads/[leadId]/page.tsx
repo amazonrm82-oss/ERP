@@ -45,6 +45,10 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { LeadScoreCard } from "@/features/lead-score/components/lead-score-card";
+import { LeadReferralsCard } from "@/features/contact-relations/components/lead-referrals-card";
+import { listLeadReferrals, listRelationTypes } from "@/features/contact-relations/queries";
+import { REFERRAL_TYPE_KEY } from "@/features/contact-relations/types";
+import { listContactOptions } from "@/features/contacts/queries";
 
 export const metadata: Metadata = { title: "ליד" };
 
@@ -88,6 +92,11 @@ export default async function LeadPage({ params, searchParams }: Props) {
   const name = leadDisplayName({ fullName: lead.full_name, email: lead.email, phone: lead.phone });
   const status = lookups.statuses.find((option) => option.id === lead.status_id);
   const isConverted = lead.converted_at !== null;
+  // CON-06: the contacts this lead referred; added while the lead is not converted (then they live on its contact)
+  const canRefer = canWrite && canEditRecordHint(context, lead.owner_id) && !isConverted;
+  const [relationTypes, referralPeople] = await Promise.all([listRelationTypes(orgId), canRefer ? listContactOptions(orgId) : []]);
+  const referrals = await listLeadReferrals(orgId, lead.id, relationTypes);
+  const referralType = relationTypes.find((type) => type.key === REFERRAL_TYPE_KEY && type.isActive) ?? null;
 
   return (
     <>
@@ -230,6 +239,17 @@ export default async function LeadPage({ params, searchParams }: Props) {
               preferredLocale: lead.preferred_locale,
             }}
           />
+
+          {!isConverted || referrals.length > 0 ? (
+            <LeadReferralsCard
+              orgId={orgId}
+              leadId={lead.id}
+              canEdit={canRefer}
+              items={referrals}
+              phrase={referralType?.name ?? null}
+              people={referralPeople}
+            />
+          ) : null}
 
           <TagPicker
             orgId={orgId}

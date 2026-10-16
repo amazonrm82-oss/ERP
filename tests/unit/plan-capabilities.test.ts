@@ -8,6 +8,8 @@ describe("plan capabilities", () => {
     expect(planCapabilities(null).map((item) => item.feature)).toContain("billing_details");
     // CON-05 (owner, 15 October 2026): core
     expect(planCapabilities({}).map((item) => item.feature)).toContain("contact_companies");
+    // CON-06 (owner, 15 October 2026): core
+    expect(planCapabilities({}).map((item) => item.feature)).toContain("contact_relations");
   });
 
   it("lists a flagged capability only when the plan holds its flag", () => {

@@ -1,0 +1,18 @@
+{
+  "totals": {
+    "customers": 1,
+    "referrals": 1,
+    "referrers": 1,
+    "won_amount": 40000
+  },
+  "by_referrer": [
+    {
+      "name": "מפנה",
+      "referred": 1,
+      "customers": 1,
+      "won_amount": 40000,
+      "referrer_id": "00000000-0000-4000-8000-000000000015",
+      "referrer_kind": "contact"
+    }
+  ]
+}
