@@ -12,7 +12,8 @@ export type Lookups = {
   statuses: Array<{ id: string; name: string; kind: string }>;
   sources: Array<{ id: string; name: string }>;
   tags: Array<{ id: string; name: string }>;
-  pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string }> }>;
+  // AUT-02: the stage kind, so a "create deal" step offers open stages only
+  pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string; kind: string }> }>;
   members: Array<{ id: string; name: string }>;
   teams: Array<{ id: string; name: string }>;
   // the active "not relevant" reasons (RVW-9), in the admin's order
@@ -43,7 +44,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
-    supabase.from("stages").select("id, name, pipeline_id").eq("organization_id", orgId).order("position"),
+    supabase.from("stages").select("id, name, pipeline_id, kind").eq("organization_id", orgId).order("position"),
     listTags(orgId),
     listMembers(orgId),
     listTeams(orgId),
@@ -66,7 +67,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       pipelines: (pipelines.data ?? []).map((p) => ({
         id: p.id,
         name: p.name,
-        stages: (stages.data ?? []).filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name })),
+        stages: (stages.data ?? []).filter((s) => s.pipeline_id === p.id).map((s) => ({ id: s.id, name: s.name, kind: s.kind })),
       })),
       members: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ id: m.userId, name: m.name })),
       teams: teams.map((t) => ({ id: t.id, name: t.name })),

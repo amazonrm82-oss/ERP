@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
+import { DEAL_NAME_MAX, NOTE_BODY_MAX } from "./create-records";
 import { CONDITIONS, TASK_TYPES, TRIGGERS } from "./definitions";
 
 const id = z.guid({ error: "יש לבחור ערך." });
@@ -40,6 +41,18 @@ const actionSchema = z.discriminatedUnion("type", [
     field: z.string().min(1, { error: "יש לבחור שדה." }).max(100),
     value: z.string().max(10_000, { error: "הערך ארוך מדי." }).optional(),
   }),
+  // AUT-02: a new deal for the record's customer; the amount in shekels as typed (empty = no amount)
+  z.object({
+    type: z.literal("create_deal"),
+    name: z.string().trim().max(DEAL_NAME_MAX, { error: "שם העסקה ארוך מדי." }).optional(),
+    pipeline_id: z.guid({ error: "יש לבחור תהליך מכירה." }),
+    stage_id: id.optional(),
+    amount: z.string().max(30, { error: "הסכום ארוך מדי." }).optional(),
+    assign: z.enum(["owner", "user"]).default("owner"),
+    user_id: id.optional(),
+  }),
+  // AUT-02: a note on the record's timeline
+  z.object({ type: z.literal("create_note"), body: text(NOTE_BODY_MAX, "יש לכתוב את ההערה.") }),
 ]);
 
 export type RuleAction = z.infer<typeof actionSchema>;
@@ -59,7 +72,7 @@ export const ruleSchema = z
   .superRefine((rule, ctx) => {
     rule.actions.forEach((action, index) => {
       const needsUser =
-        (action.type === "create_task" && action.assign === "user") ||
+        ((action.type === "create_task" || action.type === "create_deal") && action.assign === "user") ||
         (action.type === "notify" && action.to === "user") ||
         (action.type === "assign_owner" && action.mode === "user");
       if (needsUser && !("user_id" in action && action.user_id)) {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DateField } from "@/components/ui/date-picker";
 import { FormError } from "@/components/ui/feedback";
-import { Checkbox, Select, SelectField, TextField } from "@/components/ui/field";
+import { Checkbox, Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextLink } from "@/components/ui/text-link";
 import type { FormState } from "@/lib/action-result";
@@ -14,6 +14,7 @@ import { paths } from "@/lib/paths";
 
 import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
+import { DEAL_NAME_MAX, DEFAULT_DEAL_NAME, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
 import { setFieldChoices, type SetFieldChoice } from "../set-field";
@@ -45,6 +46,10 @@ function blankAction(type: ActionType): Draft {
       return { type, stage_id: "" };
     case "set_field":
       return { type, field: "", value: "" };
+    case "create_deal":
+      return { type, name: "", pipeline_id: "", stage_id: "", amount: "", assign: "owner", user_id: "" };
+    case "create_note":
+      return { type, body: "" };
   }
 }
 
@@ -252,7 +257,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
               הוספת פעולה
             </Button>
           ) : null}
-          <p className="text-sm text-ink-soft">בכותרות אפשר לכתוב {"{{name}}"} במקום שם הרשומה.</p>
+          <p className="text-sm text-ink-soft">בכותרות, בשם העסקה ובהערה אפשר לכתוב {"{{name}}"} במקום שם הרשומה.</p>
         </CardBody>
       </Card>
 
@@ -374,6 +379,61 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
         "שלב",
         "stage_id",
         lookups.pipelines.flatMap((p) => p.stages.map((s) => ({ id: s.id, name: `${p.name}: ${s.name}` }))),
+      );
+    case "create_deal": {
+      // AUT-02: the deal is linked to the record's customer (the engine decides which); open stages only
+      const stages = action.pipeline_id ? openStagesOf(lookups.pipelines, action.pipeline_id) : [];
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField
+            label={`שם העסקה (פעולה ${n})`}
+            value={action.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+            maxLength={DEAL_NAME_MAX}
+            placeholder={DEFAULT_DEAL_NAME}
+            hint={`ריק: "${DEFAULT_DEAL_NAME}"`}
+            className="sm:col-span-2"
+            controlSize="sm"
+          />
+          <SelectField label="תהליך מכירה" value={action.pipeline_id} onChange={(e) => onChange({ pipeline_id: e.target.value, stage_id: "" })} controlSize="sm">
+            <option value="">בחירה</option>
+            {lookups.pipelines.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="שלב" value={action.stage_id} onChange={(e) => onChange({ stage_id: e.target.value })} controlSize="sm" disabled={!action.pipeline_id}>
+            <option value="">השלב הפתוח הראשון</option>
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </SelectField>
+          <TextField label="שווי (₪, לא חובה)" value={action.amount} onChange={(e) => onChange({ amount: e.target.value })} dir="ltr" inputMode="decimal" controlSize="sm" placeholder="10,000" />
+          <SelectField label="באחריות" value={action.assign} onChange={(e) => onChange({ assign: e.target.value })} controlSize="sm">
+            <option value="owner">האחראי על הרשומה</option>
+            <option value="user">משתמש מסוים</option>
+          </SelectField>
+          {action.assign === "user" ? memberSelect("משתמש") : null}
+          <p className="text-sm text-ink-soft sm:col-span-2">
+            העסקה מקושרת ללקוח של הרשומה: איש הקשר והחברה שלו, החברה, או איש הקשר והחברה של העסקה או המשימה.
+            {entity === "deal" ? " עסקה שנוצרת מעסקה נרשמת כהמשך שלה." : ""}
+          </p>
+        </div>
+      );
+    }
+    case "create_note":
+      return (
+        <TextareaField
+          label={`נוסח ההערה (פעולה ${n})`}
+          value={action.body}
+          onChange={(e) => onChange({ body: e.target.value })}
+          maxLength={NOTE_BODY_MAX}
+          rows={3}
+          hint={entity === "task" ? "ההערה נכתבת על הרשומות שהמשימה מקושרת אליהן, ומסומנת כהערה מאוטומציה." : "ההערה מסומנת כהערה מאוטומציה, ואינה נחשבת פעילות או קשר עם הלקוח."}
+        />
       );
     case "set_field": {
       const choices = setFieldChoices(entity, lookups);

@@ -5,6 +5,7 @@ import type { Json } from "@/lib/database.types";
 import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
+import { createDealAction, createDealDraft } from "./create-records";
 import { customDefinition, setFieldDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
@@ -114,6 +115,12 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       const built = setFieldValue(entity, action.field, action.value ?? "", lookups);
       if (typeof built === "string") return built;
       actions.push({ type: "set_field", field: action.field, value: built.value });
+    } else if (action.type === "create_deal") {
+      const built = createDealAction(entity, action, lookups);
+      if (typeof built === "string") return built;
+      actions.push(built);
+    } else if (action.type === "create_note") {
+      actions.push({ type: "create_note", body: action.body });
     }
   }
 
@@ -196,6 +203,10 @@ export function fromDbRule(
         const field = str(a.field);
         return [{ type: "set_field", field, value: setFieldDraft(customDefinition(trigger.entity, field, set), a.value, set.timeZone) }];
       }
+      case "create_deal":
+        return [createDealDraft(a)];
+      case "create_note":
+        return [{ type: "create_note", body: str(a.body) }];
       default:
         return [];
     }

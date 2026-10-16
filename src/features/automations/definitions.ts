@@ -63,7 +63,16 @@ export const CONDITIONS: ConditionOption[] = [
   { key: "task_type", label: "סוג המשימה הוא", entities: ["task"], field: "task_type", op: "eq", input: "task_type" },
 ];
 
-export type ActionType = "create_task" | "notify" | "assign_owner" | "add_tag" | "set_lead_status" | "move_deal_stage" | "set_field";
+export type ActionType =
+  | "create_task"
+  | "notify"
+  | "assign_owner"
+  | "add_tag"
+  | "set_lead_status"
+  | "move_deal_stage"
+  | "set_field"
+  | "create_deal"
+  | "create_note";
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
@@ -73,12 +82,26 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   set_lead_status: "שינוי סטטוס ליד",
   move_deal_stage: "העברת עסקה לשלב",
   set_field: "עדכון שדה",
+  create_deal: "יצירת עסקה",
+  create_note: "הוספת הערה",
 };
 
 export function actionsFor(entity: Entity): ActionType[] {
-  const all: ActionType[] = ["create_task", "notify", "assign_owner", "add_tag", "set_lead_status", "move_deal_stage", "set_field"];
+  const all: ActionType[] = [
+    "create_task",
+    "create_deal",
+    "create_note",
+    "notify",
+    "assign_owner",
+    "add_tag",
+    "set_lead_status",
+    "move_deal_stage",
+    "set_field",
+  ];
   return all.filter(
     (type) =>
+      // AUT-02: a lead becomes a deal by conversion
+      (type !== "create_deal" || entity !== "lead") &&
       (type !== "add_tag" || entity !== "task") &&
       (type !== "set_lead_status" || entity === "lead") &&
       (type !== "move_deal_stage" || entity === "deal"),

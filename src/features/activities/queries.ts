@@ -42,6 +42,8 @@ const TYPE_LABELS: Record<string, string> = {
   assignment: "הקצאה",
   system: "מערכת",
   inquiry: "פנייה חוזרת",
+  // AUT-02: written by an automation step; not contact with the customer
+  automation_note: "הערה מאוטומציה",
 };
 
 function metaString(metadata: Json, key: string): string | null {
@@ -149,7 +151,13 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       isUserContent,
       body: activity.body ?? "",
       occurredAt: activity.occurred_at,
-      authorName: activity.created_by ? (authors.get(activity.created_by) ?? null) : null,
+      // AUT-02: an automation's note names the rule (as it was called then), not the person who ran it
+      authorName:
+        activity.type === "automation_note"
+          ? metaString(activity.metadata, "automation_name")
+          : activity.created_by
+            ? (authors.get(activity.created_by) ?? null)
+            : null,
       createdBy: activity.created_by,
       createdAt: activity.created_at,
       pinned: activity.is_pinned,

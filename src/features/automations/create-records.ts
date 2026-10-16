@@ -1,0 +1,97 @@
+import type { Json } from "@/lib/database.types";
+
+import type { Entity } from "./definitions";
+
+// AUT-02: the steps that create a deal ("create_deal") or a note ("create_note"). The engine
+// (app.run_automation_actions, migration 020160) checks every id again when the rule runs; these helpers only
+// turn the builder's values into the stored rule and back, and say a rule in Hebrew.
+
+/** The record types a "create deal" step fits: a lead becomes a deal by conversion, not by an automation. */
+export const CREATE_DEAL_ENTITIES: readonly Entity[] = ["contact", "company", "deal", "task"];
+
+// the engine refuses more than a billion shekels
+export const DEAL_AMOUNT_MAX_AGOROT = 100_000_000_000;
+export const DEAL_NAME_MAX = 200;
+export const NOTE_BODY_MAX = 2000;
+export const DEFAULT_DEAL_NAME = "עסקה: {{name}}";
+
+type PipelineLookup = { id: string; name: string; stages: Array<{ id: string; name: string; kind?: string }> };
+
+/** The open stages of a pipeline, in the pipeline's order (a step may start a deal only in an open stage). */
+export function openStagesOf(pipelines: PipelineLookup[], pipelineId: string): Array<{ id: string; name: string }> {
+  const pipeline = pipelines.find((p) => p.id === pipelineId);
+  return (pipeline?.stages ?? []).filter((stage) => stage.kind === "open").map((stage) => ({ id: stage.id, name: stage.name }));
+}
+
+/** Shekels as typed ("2,500", "₪ 99.90") -> agorot, or null when it is not a valid amount. Empty = 0. */
+export function shekelsToAgorot(raw: string): number | null {
+  const text = raw.replace(/[,\s₪]/g, "");
+  if (text === "") return 0;
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const agorot = Math.round(Number(text) * 100);
+  return Number.isSafeInteger(agorot) && agorot <= DEAL_AMOUNT_MAX_AGOROT ? agorot : null;
+}
+
+export type CreateDealInput = {
+  name?: string;
+  pipeline_id: string;
+  stage_id?: string;
+  amount?: string;
+  assign: "owner" | "user";
+  user_id?: string;
+};
+
+/** The builder's "create deal" values -> the stored action, or a Hebrew message. */
+export function createDealAction(
+  entity: Entity,
+  input: CreateDealInput,
+  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string }> },
+): Record<string, Json> | string {
+  if (!CREATE_DEAL_ENTITIES.includes(entity)) return "ליד הופך לעסקה בהמרה. יצירת עסקה מתאימה לאנשי קשר, חברות, עסקאות ומשימות.";
+  if (!lookups.pipelines.some((p) => p.id === input.pipeline_id)) return "תהליך המכירה שנבחר כבר לא קיים.";
+  if (input.stage_id && !openStagesOf(lookups.pipelines, input.pipeline_id).some((s) => s.id === input.stage_id)) {
+    return "השלב שנבחר אינו שלב פתוח בתהליך המכירה.";
+  }
+  if (input.assign === "user" && !lookups.members.some((m) => m.id === input.user_id)) return "המשתמש שנבחר כבר לא פעיל.";
+  const amount = shekelsToAgorot(input.amount ?? "");
+  if (amount === null) return "יש להזין סכום תקין לעסקה (עד מיליארד ₪).";
+  const out: Record<string, Json> = { type: "create_deal", pipeline_id: input.pipeline_id, assign: input.assign };
+  const name = input.name?.trim();
+  if (name) out.name = name;
+  if (input.stage_id) out.stage_id = input.stage_id;
+  if (amount > 0) out.amount_agorot = amount;
+  if (input.assign === "user" && input.user_id) out.user_id = input.user_id;
+  return out;
+}
+
+const str = (value: unknown) => (value === undefined || value === null ? "" : String(value));
+
+/** A stored "create deal" action -> the builder's values. */
+export function createDealDraft(action: Record<string, unknown>): Record<string, string> {
+  return {
+    type: "create_deal",
+    name: str(action.name),
+    pipeline_id: str(action.pipeline_id),
+    stage_id: str(action.stage_id),
+    amount: typeof action.amount_agorot === "number" && action.amount_agorot > 0 ? String(action.amount_agorot / 100) : "",
+    assign: action.assign === "user" ? "user" : "owner",
+    user_id: str(action.user_id),
+  };
+}
+
+const nameIn = (list: Array<{ id: string; name: string }>, id: unknown) => list.find((item) => item.id === id)?.name ?? "(נמחק)";
+
+/** `"<name>" בתהליך X, בשלב Y, ₪ Z, לאחראי` for a rule's description. */
+export function describeCreateDeal(
+  action: Record<string, unknown>,
+  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string; name: string }> },
+): string {
+  const parts = [`"${str(action.name) || DEFAULT_DEAL_NAME}"`, `בתהליך ${nameIn(lookups.pipelines, action.pipeline_id)}`];
+  const stages = lookups.pipelines.find((p) => p.id === action.pipeline_id)?.stages ?? [];
+  parts.push(action.stage_id ? `בשלב ${nameIn(stages, action.stage_id)}` : "בשלב הפתוח הראשון");
+  if (typeof action.amount_agorot === "number" && action.amount_agorot > 0) {
+    parts.push(`₪${(action.amount_agorot / 100).toLocaleString("he-IL")}`);
+  }
+  parts.push(action.assign === "user" ? `ל${nameIn(lookups.members, action.user_id)}` : "לאחראי");
+  return parts.join(", ");
+}

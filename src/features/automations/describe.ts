@@ -1,5 +1,6 @@
 import { ACTION_LABELS, CONDITIONS, TASK_TYPES, triggerOf, type ActionType, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
+import { describeCreateDeal } from "./create-records";
 import { describeSetField } from "./set-field";
 
 type Json = Record<string, unknown>;
@@ -78,6 +79,10 @@ export function describeRule(
         return `${label}: ${nameIn(stages, a.stage_id)}`;
       case "set_field":
         return `${label}: ${describeSetField(rule.entity as Entity, String(a.field ?? ""), a.value, lookups)}`;
+      case "create_deal":
+        return `${label}: ${describeCreateDeal(a, lookups)}`;
+      case "create_note":
+        return `${label}: "${String(a.body ?? "")}"`;
       default:
         return label;
     }
@@ -102,6 +107,15 @@ export const STEP_ERRORS: Record<string, string> = {
   "the field is read-only": "השדה לקריאה בלבד וכבר מלא",
   "the value is already on another record": "הערך כבר קיים ברשומה אחרת, והשדה ייחודי",
   "the source no longer exists": "המקור נמחק או הוסתר",
+  // AUT-02: create_deal and create_note steps
+  "a lead becomes a deal by conversion": "ליד הופך לעסקה בהמרה, לא באוטומציה",
+  "the pipeline no longer exists": "תהליך המכירה נמחק",
+  "the stage is not an open stage of the pipeline": "השלב נמחק, נסגר או לא שייך לתהליך המכירה",
+  "the pipeline has no open stage": "בתהליך המכירה אין שלב פתוח",
+  "the amount is invalid": "סכום העסקה לא תקין",
+  "the plan record limit is reached": "הגעתם למספר הרשומות שהחבילה מאפשרת",
+  "the note is empty": "ההערה ריקה",
+  "the task is not linked to a record": "המשימה לא מקושרת לרשומה פעילה",
 };
 
 /** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */
