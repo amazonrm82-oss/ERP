@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
@@ -7,8 +9,8 @@ import type { ProductCategory, ProductUnit } from "./lists";
 
 // at most 200 categories and 50 units per organization (database caps), so one read each is enough
 
-/** Every product category of the organization (PRD-04). */
-export async function listProductCategories(orgId: string): Promise<ProductCategory[]> {
+/** Every product category of the organization (PRD-04). Memoized per request (the list page and its filter read it). */
+export const listProductCategories = cache(async (orgId: string): Promise<ProductCategory[]> => {
   const supabase = await createClient();
   const rows =
     must(
@@ -21,10 +23,10 @@ export async function listProductCategories(orgId: string): Promise<ProductCateg
       "product categories",
     ) ?? [];
   return rows.map((row) => ({ id: row.id, parentId: row.parent_id, name: row.name, position: row.position }));
-}
+});
 
-/** Every unit of measure of the organization, in the order the admin set (PRD-04). */
-export async function listProductUnits(orgId: string): Promise<ProductUnit[]> {
+/** Every unit of measure of the organization, in the order the admin set (PRD-04). Memoized per request. */
+export const listProductUnits = cache(async (orgId: string): Promise<ProductUnit[]> => {
   const supabase = await createClient();
   const rows =
     must(
@@ -37,4 +39,4 @@ export async function listProductUnits(orgId: string): Promise<ProductUnit[]> {
       "product units",
     ) ?? [];
   return rows.map((row) => ({ id: row.id, name: row.name, position: row.position }));
-}
+});

@@ -82,6 +82,7 @@ function toProduct(row: Row): Product {
 export const PRODUCT_SORT_COLUMNS = {
   name: "name",
   sku: "sku",
+  barcode: "barcode",
   category: "sort_category",
   kind: "kind",
   price: "price_agorot",
@@ -107,6 +108,10 @@ export type ProductListOptions = {
   sort?: Sort<ProductSortKey>;
   // PRD-05: an export reads the list in larger chunks instead of a page
   chunk?: { from: number; size: number };
+  // LST-05: the advanced filter as one PostgREST logic tree (prepareListFilter), or null
+  filter?: string | null;
+  // LST-08: only these products (the rows picked in the list), whatever their state
+  ids?: string[];
 };
 
 /** One page of the catalog (PRD-01). Fetches one extra row to know if there is a next page. */
@@ -119,13 +124,17 @@ export async function listProducts(orgId: string, options: ProductListOptions): 
   if (search) query = query.or(search);
   if (options.categoryIds && options.categoryIds.length > 0) query = query.in("category_id", options.categoryIds);
   if (options.kind) query = query.eq("kind", options.kind);
-  if (options.status === "archived") {
+  if (options.ids) {
+    // picked rows: archived ones included, as they were on screen
+    query = query.in("id", options.ids);
+  } else if (options.status === "archived") {
     query = query.not("archived_at", "is", null);
   } else {
     query = query.is("archived_at", null);
     if (options.status === "active") query = query.eq("is_active", true);
     if (options.status === "inactive") query = query.eq("is_active", false);
   }
+  if (options.filter) query = query.or(options.filter);
   const sort = options.sort ?? PRODUCT_DEFAULT_SORT;
   const rows =
     must(

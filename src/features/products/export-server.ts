@@ -11,6 +11,7 @@ import { readAllPages } from "@/lib/paged-read";
 import { isUuid } from "@/lib/paths";
 import { parseSort, sortValue } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
+import { prepareListFilter } from "@/features/list-filters/prepare";
 import { xlsxFile } from "@/lib/xlsx";
 
 import { productExportHeader, productExportRows } from "./export-table";
@@ -24,6 +25,8 @@ import { PRODUCT_KINDS, type ProductKind } from "./schema";
 // every list export (LST-08), and written to the audit log first (log_list_export, 'product').
 
 const MAX_ROWS = 50_000;
+// LST-08: "export the picked rows" sends at most one page's worth
+const MAX_PICKED = 100;
 const text = (message: string, status: number) => new Response(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
 export async function exportProducts(request: Request, orgId: string): Promise<Response> {
@@ -35,6 +38,11 @@ export async function exportProducts(request: Request, orgId: string): Promise<R
   }
   const params = new URL(request.url).searchParams;
   const format = params.get("format") === "xlsx" ? "xlsx" : "csv";
+  const picked = (params.get("ids") ?? "").split(",").filter(isUuid);
+  if (picked.length > MAX_PICKED) {
+    return text(`אפשר לייצא עד ${MAX_PICKED} מוצרים נבחרים. לייצוא של יותר, השתמשו בסינון.`, 400);
+  }
+  const scope = params.has("ids") ? "selected" : "filtered";
   const search = (params.get("q") ?? "").trim();
   const kindParam = params.get("kind") ?? "";
   const statusParam = params.get("status") ?? "";
@@ -45,19 +53,28 @@ export async function exportProducts(request: Request, orgId: string): Promise<R
   const [categories, units] = await Promise.all([listProductCategories(orgId), listProductUnits(orgId)]);
   const categoryParam = params.get("category") ?? "";
   const categoryId = isUuid(categoryParam) && categories.some((c) => c.id === categoryParam) ? categoryParam : null;
+  // LST-05: the advanced filter, checked against the catalog's fields as on the page
+  const filter = await prepareListFilter(orgId, "product", params.get("f") ?? "", context.user.id, []);
 
   const { rows: products, complete } = await readAllPages<Product>(
     async (from, to) =>
       (
-        await listProducts(orgId, {
-          search,
-          categoryIds: categoryId ? categoryWithChildren(categories, categoryId) : null,
-          kind,
-          status,
-          page: 1,
-          sort,
-          chunk: { from, size: to - from + 1 },
-        })
+        await listProducts(
+          orgId,
+          // picked rows ignore the list's filters: they were picked on screen
+          scope === "selected"
+            ? { search: "", status: "", page: 1, sort, ids: picked, chunk: { from, size: to - from + 1 } }
+            : {
+                search,
+                categoryIds: categoryId ? categoryWithChildren(categories, categoryId) : null,
+                kind,
+                status,
+                page: 1,
+                sort,
+                filter: filter.logic,
+                chunk: { from, size: to - from + 1 },
+              },
+        )
       ).products,
     { limit: MAX_ROWS },
   );
@@ -67,15 +84,19 @@ export async function exportProducts(request: Request, orgId: string): Promise<R
 
   // the audit entry comes first: no entry, no file (only the shape of the filters is kept)
   const supabase = await createClient();
-  const filters: Record<string, string> = Object.fromEntries(
-    Object.entries({ q: search, sort: sortValue(sort) }).filter(([, value]) => value !== ""),
-  );
+  // only the shape of the filters is kept (RVW-4): the conditions the list applied, never typed text
+  const filters: Record<string, string | number> =
+    scope === "selected"
+      ? { picked: picked.length }
+      : Object.fromEntries(
+          Object.entries({ q: search, f: filter.applied ? JSON.stringify(filter.applied) : "", sort: sortValue(sort) }).filter(([, value]) => value !== ""),
+        );
   const { error } = await supabase.rpc("log_list_export", {
     p_org: orgId,
     p_object: "product",
     p_format: format,
     p_rows: products.length,
-    p_scope: "filtered",
+    p_scope: scope,
     p_filters: filters,
   });
   if (error) {

@@ -13,12 +13,14 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import type { Database } from "@/lib/database.types";
 import { isUuid } from "@/lib/paths";
 import { isRecordType, RECORD_TYPES, recordPage } from "@/lib/record-types";
+import { productPath, productsPath } from "@/features/products/paths";
+import { PRODUCT_NAME_MAX } from "@/features/products/schema";
 
 // What can be edited in a list's cell (LST-06), per list. The database decides
 // who may: the update runs with the user's session, and 0 rows means "not allowed".
-export type InlineObject = "lead" | "contact" | "company" | "deal" | "task";
-// a task's "name" is its title, and its owner is the person it is assigned to
-export type InlineField = "name" | "status" | "owner" | "stage";
+export type InlineObject = "lead" | "contact" | "company" | "deal" | "task" | "product";
+// a task's "name" is its title, and its owner is the person it is assigned to; "category": a product's (LST-09)
+export type InlineField = "name" | "status" | "owner" | "stage" | "category";
 export type InlineValue = { text?: string; first?: string; last?: string; id?: string | null; reason?: string };
 
 const ALLOWED: Record<InlineObject, InlineField[]> = {
@@ -27,6 +29,7 @@ const ALLOWED: Record<InlineObject, InlineField[]> = {
   company: ["name", "owner"],
   deal: ["name", "stage", "owner"],
   task: ["name", "owner"],
+  product: ["name", "category"],
 };
 // tasks have no page of their own
 
@@ -49,6 +52,9 @@ const valueSchema = z.object({
 export async function inlineEditAction(orgId: string, object: InlineObject, id: string, field: InlineField, value: InlineValue): Promise<ActionResult | MoveRefusal> {
   if (!validArg(valueSchema, value) || typeof object !== "string" || typeof field !== "string") {
     return fail(INVALID_ARGS);
+  }
+  if (object === "product" && ALLOWED.product.includes(field)) {
+    return productInlineEdit(orgId, id, field, value);
   }
   if (!isRecordType(object) || !ALLOWED[object].includes(field)) {
     return fail("אי אפשר לערוך את השדה הזה מהרשימה.");
@@ -119,5 +125,37 @@ export async function inlineEditAction(orgId: string, object: InlineObject, id: 
   }
   revalidatePath(RECORD_TYPES[object].list(orgId));
   revalidatePath(recordPage(object, orgId, id));
+  return ok();
+}
+
+/**
+ * LST-09: a product's name or category from the catalog's table. The products policies decide who may
+ * (catalog editors, PRM-01 included; 0 rows = not allowed), as on the product's own page.
+ */
+async function productInlineEdit(orgId: string, id: string, field: InlineField, value: InlineValue): Promise<ActionResult> {
+  let patch: { name?: string; category_id?: string | null };
+  if (field === "name") {
+    const name = text(PRODUCT_NAME_MAX).safeParse(value.text ?? "");
+    if (!name.success) return fail(name.error.issues[0]?.message ?? "השם אינו תקין.");
+    if (!name.data) return fail("יש לכתוב שם למוצר.");
+    patch = { name: name.data };
+  } else {
+    const category = value.id ?? null;
+    if (category !== null && !isUuid(category)) return fail("יש לבחור קטגוריה.");
+    patch = { category_id: category };
+  }
+  const context = await actionContext(orgId, id);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase.from("products").update(patch).eq("organization_id", orgId).eq("id", id).select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidatePath(productsPath(orgId));
+  revalidatePath(productPath(orgId, id));
   return ok();
 }

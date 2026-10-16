@@ -62,6 +62,8 @@ type Props = {
   wonWindow?: (BulkWonSetup & { amounts: Record<string, number> }) | null;
   // SEG-01: the static segments the picked leads or contacts can be added to; null for someone who may not
   segments?: Option[] | null;
+  // LST-09: the product catalog's categories, for "change category"; null or missing: no such action
+  categories?: Option[] | null;
   children: ReactNode;
 };
 
@@ -69,6 +71,7 @@ type Props = {
 // "segment" adds the rows to a static segment (SEG-01); it changes no record, so it has no undo here.
 type Kind = BulkChange["kind"] | "export" | "segment";
 const NO_OWNER = "none";
+const NO_CATEGORY = "none";
 const FORMATS: Option[] = [
   { value: "xlsx", label: "Excel" },
   { value: "csv", label: "CSV" },
@@ -78,6 +81,7 @@ const KIND_LABELS: Record<Kind, string> = {
   status: "שינוי סטטוס",
   stage: "שינוי שלב",
   tag: "הוספת תגית",
+  category: "שינוי קטגוריה",
   trash: "העברה לסל המחזור",
   segment: "הוספה לסגמנט",
   export: "ייצוא הנבחרים",
@@ -88,10 +92,26 @@ const KIND_LABELS: Record<Kind, string> = {
  * above the table picks the whole page, counts what is picked, and runs one
  * action on it. Rows the user may not change are skipped and counted.
  */
-export function BulkSelection({ orgId, object, ids, owners, statuses, stages = null, tags, canTrash, exportPath, enabled, reasons = [], wonWindow = null, segments = null, children }: Props) {
-  // a task has a "state" (מצב) rather than a status, and an assignee rather than an owner
-  const labels: Record<Kind, string> =
-    object === "task" ? { ...KIND_LABELS, status: "שינוי מצב", owner: "שינוי אחראי" } : KIND_LABELS;
+export function BulkSelection({
+  orgId,
+  object,
+  ids,
+  owners,
+  statuses,
+  stages = null,
+  tags,
+  canTrash,
+  exportPath,
+  enabled,
+  reasons = [],
+  wonWindow = null,
+  segments = null,
+  categories = null,
+  children,
+}: Props) {
+  // a task and a product have a "state" (מצב) rather than a status
+  const hasState = object === "task" || object === "product";
+  const labels: Record<Kind, string> = hasState ? { ...KIND_LABELS, status: "שינוי מצב" } : KIND_LABELS;
   const barId = useId();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<Kind | "">("");
@@ -126,31 +146,56 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
       (k !== "status" || statuses) &&
       (k !== "stage" || stages) &&
       (k !== "tag" || tags.length > 0) &&
+      (k !== "category" || categories !== null) &&
       (k !== "trash" || canTrash) &&
       (k !== "segment" || (segments !== null && segments.length > 0 && (object === "lead" || object === "contact"))) &&
       (k !== "export" || exportPath),
   );
-  const options = kind === "owner" ? (owners ?? []) : kind === "status" ? (statuses ?? []) : kind === "stage" ? (stages ?? []) : kind === "tag" ? tags : kind === "segment" ? (segments ?? []) : kind === "export" ? FORMATS : [];
+  const options =
+    kind === "owner"
+      ? (owners ?? [])
+      : kind === "status"
+        ? (statuses ?? [])
+        : kind === "stage"
+          ? (stages ?? [])
+          : kind === "tag"
+            ? tags
+            : kind === "category"
+              ? (categories ?? [])
+              : kind === "segment"
+                ? (segments ?? [])
+                : kind === "export"
+                  ? FORMATS
+                  : [];
   const needsReason = (kind === "status" || kind === "stage") && options.find((o) => o.value === value)?.needsReason;
   const toWon = kind === "stage" && wonWindow !== null && options.find((o) => o.value === value)?.won === true;
   // a deal's loss reason is optional; a lead's "not relevant" reason is not
   const ready = kind === "trash" || (kind !== "" && value !== "" && (!needsReason || kind === "stage" || reason.trim() !== ""));
 
   // what the button says: the action, how many, and to what (FXU-06)
-  const plural = RECORD_TYPES[object].plural;
+  // the product catalog is not a record type (LST-09)
+  const names = object === "product" ? { singular: "מוצר", plural: "מוצרים" } : RECORD_TYPES[object];
+  const plural = names.plural;
   const feminine = object === "company" || object === "deal" || object === "task";
-  const many = count === 1 ? `${RECORD_TYPES[object].singular} ${feminine ? "אחת" : "אחד"}` : `${count} ${plural}`;
-  const chosen = value === NO_OWNER ? "ללא אחראי" : (options.find((o) => o.value === value)?.label ?? "");
+  const many = count === 1 ? `${names.singular} ${feminine ? "אחת" : "אחד"}` : `${count} ${plural}`;
+  const chosen =
+    kind === "owner" && value === NO_OWNER
+      ? "ללא אחראי"
+      : kind === "category" && value === NO_CATEGORY
+        ? "ללא קטגוריה"
+        : (options.find((o) => o.value === value)?.label ?? "");
   const actionText =
     kind === "owner"
       ? `העברת ${many} ל${chosen}`
       : kind === "status"
-        ? `שינוי ${object === "task" ? "המצב" : "הסטטוס"} של ${many} ל"${chosen}"`
+        ? `שינוי ${hasState ? "המצב" : "הסטטוס"} של ${many} ל"${chosen}"`
         : kind === "stage"
           ? `העברת ${many} לשלב "${chosen}"`
           : kind === "tag"
             ? `הוספת התגית "${chosen}" ל${count === 1 ? many : `-${many}`}`
-            : kind === "trash"
+            : kind === "category"
+              ? `שינוי הקטגוריה של ${many} ל"${chosen}"`
+              : kind === "trash"
               ? `העברת ${many} לסל המחזור`
               : kind === "segment"
                 ? `הוספת ${many} לסגמנט "${chosen}"`
@@ -198,7 +243,9 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
             ? { kind, stageId: value, reason: needsReason ? reason : undefined, ...(close ? { close } : {}) }
             : kind === "tag"
               ? { kind, tagId: value }
-              : { kind: "trash" };
+              : kind === "category"
+                ? { kind, categoryId: value === NO_CATEGORY ? null : value }
+                : { kind: "trash" };
     setConfirming(false);
     setError(null);
     setNotice(null);
@@ -291,7 +338,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 ))}
               </Select>
             </div>
-            {kind === "owner" || kind === "status" || kind === "stage" || kind === "tag" || kind === "segment" || kind === "export" ? (
+            {kind === "owner" || kind === "status" || kind === "stage" || kind === "tag" || kind === "category" || kind === "segment" || kind === "export" ? (
               <div className="w-44">
                 <Select
                   aria-label={
@@ -300,11 +347,13 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                         ? "אחראי חדש"
                         : "אחראי חדש"
                       : kind === "status"
-                        ? object === "task"
+                        ? hasState
                           ? "מצב חדש"
                           : "סטטוס חדש"
                         : kind === "stage"
                           ? "שלב חדש"
+                          : kind === "category"
+                            ? "קטגוריה חדשה"
                           : kind === "export"
                             ? "סוג הקובץ"
                             : kind === "segment"
@@ -320,6 +369,7 @@ export function BulkSelection({ orgId, object, ids, owners, statuses, stages = n
                 >
                   <option value="">בחירה</option>
                   {kind === "owner" ? <option value={NO_OWNER}>ללא אחראי</option> : null}
+                  {kind === "category" ? <option value={NO_CATEGORY}>ללא קטגוריה</option> : null}
                   {options.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}

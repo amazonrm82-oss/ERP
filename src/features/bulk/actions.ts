@@ -16,17 +16,21 @@ import { dbErrorMessage } from "@/lib/errors";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
+import { productBulkAction, productUndoAction } from "@/features/products/bulk-server";
 import { setTrashed, type TrashableTable } from "@/lib/record-trash";
 import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
 // Bulk actions on the rows picked in a list (LST-07). Each record is changed on
 // its own, with the user's session, so the usual rules hold row by row: a row
 // the user may not change is skipped and counted, and the rest still go through.
-export type BulkObject = "lead" | "contact" | "company" | "deal" | "task";
+// "product": the product catalog (LST-09); its changes live in src/features/products/bulk-server.ts
+export type BulkObject = "lead" | "contact" | "company" | "deal" | "task" | "product";
 export type BulkChange =
   | { kind: "owner"; ownerId: string | null }
-  // a lead's status (lead_statuses id), or a task's status (open | done | cancelled)
+  // a lead's status (lead_statuses id), a task's status (open | done | cancelled), or a product's (active | inactive | archived)
   | { kind: "status"; statusId: string; reason?: string }
+  // a product's category (null = none)
+  | { kind: "category"; categoryId: string | null }
   // close: a move into a won stage (DEAL-04 bulk window): one close date for all, and onboarding tasks when asked
   | { kind: "stage"; stageId: string; reason?: string; close?: BulkClose }
   | { kind: "tag"; tagId: string }
@@ -44,6 +48,10 @@ export type BulkUndoRow = {
   lossText?: string | null;
   closedAt?: string | null;
   tag?: string;
+  // a product (LST-09): its active flag, whether it was archived, and its category
+  active?: boolean;
+  archived?: boolean;
+  category?: string | null;
 };
 export type BulkClose = { closedDate: string; onboarding: boolean };
 export type BulkUndo = { kind: BulkChange["kind"]; rows: BulkUndoRow[] };
@@ -76,7 +84,7 @@ async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): P
 }
 
 // the columns a change may need to put back
-const BEFORE_COLUMNS: Record<BulkObject, string> = {
+const BEFORE_COLUMNS: Record<Exclude<BulkObject, "product">, string> = {
   lead: "id, tag_ids, owner_id, status_id, disqualify_reason",
   contact: "id, tag_ids, owner_id",
   company: "id, tag_ids, owner_id",
@@ -112,6 +120,7 @@ const changeSchema = z.discriminatedUnion("kind", [
     close: z.object({ closedDate: z.string().max(10), onboarding: z.boolean() }).optional(),
   }),
   z.object({ kind: z.literal("tag"), tagId: z.string() }),
+  z.object({ kind: z.literal("category"), categoryId: z.string().nullable() }),
   z.object({ kind: z.literal("trash") }),
 ]);
 
@@ -119,7 +128,7 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   if (!validArg(changeSchema, change) || !validArg(z.array(z.string()), ids)) {
     return fail(INVALID_ARGS);
   }
-  if (!isRecordType(object) || !Array.isArray(ids) || ids.length === 0) {
+  if ((object !== "product" && !isRecordType(object)) || !Array.isArray(ids) || ids.length === 0) {
     return fail("לא נבחרו רשומות.");
   }
   if (ids.length > MAX_IDS) {
@@ -131,6 +140,11 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
     return context;
   }
   const { supabase } = context;
+  if (object === "product") {
+    if (change.kind !== "status" && change.kind !== "category") return fail("פעולה לא מוכרת.");
+    return productBulkAction(supabase, orgId, unique, change);
+  }
+  if (change.kind === "category") return fail("לרשומות האלה אין קטגוריה.");
   const table = RECORD_TYPES[object].table;
 
   // the picked rows the user can see; the rest are counted as skipped
@@ -338,7 +352,7 @@ async function wonMove(
 }
 
 const undoSchema = z.object({
-  kind: z.enum(["owner", "status", "stage", "tag", "trash"]),
+  kind: z.enum(["owner", "status", "stage", "tag", "category", "trash"]),
   rows: z
     .array(
       z.object({
@@ -351,6 +365,9 @@ const undoSchema = z.object({
         lossText: z.string().max(LOSS_TEXT_MAX).nullish(),
         closedAt: z.iso.datetime({ offset: true }).nullish(),
         tag: z.guid().optional(),
+        active: z.boolean().optional(),
+        archived: z.boolean().optional(),
+        category: z.guid().nullish(),
       }),
     )
     .max(MAX_IDS),
@@ -361,7 +378,7 @@ const undoSchema = z.object({
  * session: the same rules as any change, so nothing the user may not do.
  */
 export async function undoBulkAction(orgId: string, object: BulkObject, undo: BulkUndo): Promise<ActionResult<{ done: number }>> {
-  if (!isRecordType(object) || !validArg(undoSchema, undo)) {
+  if ((object !== "product" && !isRecordType(object)) || !validArg(undoSchema, undo)) {
     return fail(INVALID_ARGS);
   }
   if (undo.rows.length === 0) return ok({ done: 0 });
@@ -370,6 +387,10 @@ export async function undoBulkAction(orgId: string, object: BulkObject, undo: Bu
     return context;
   }
   const { supabase } = context;
+  if (object === "product") {
+    if (undo.kind !== "status" && undo.kind !== "category") return fail(INVALID_ARGS);
+    return productUndoAction(supabase, orgId, undo.kind, undo.rows);
+  }
   const table = RECORD_TYPES[object].table;
   // one column of one row; the table differs by object, the column is checked by the database
   const update = async (

@@ -64,7 +64,7 @@ describe("the database's list of plain choice values", () => {
 
   it("holds every option of every built-in plain choice field", () => {
     expect(listed.size).toBeGreaterThan(0);
-    for (const object of ["lead", "contact", "company", "deal", "task"] as const) {
+    for (const object of ["lead", "contact", "company", "deal", "task", "product"] as const) {
       for (const field of filterFields(object, lookups)) {
         if (!("plain" in field) || !field.plain) continue;
         for (const option of field.options ?? []) {

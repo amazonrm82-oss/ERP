@@ -9,9 +9,13 @@ import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors"
 import { pick, requiredText } from "@/lib/validation";
 
 import { columnChoicesSchema } from "@/features/list-columns/columns";
+import { productsPath } from "@/features/products/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { cleanFilters, VIEW_OBJECTS, VIEW_SORT_RE, type ViewObject } from "./types";
+
+// the list a view belongs to; the product catalog is not a record type (LST-09)
+const listPathOf = (orgId: string, objectType: ViewObject) => (objectType === "product" ? productsPath(orgId) : RECORD_TYPES[objectType].list(orgId));
 
 
 const viewSchema = z
@@ -48,7 +52,7 @@ export async function saveViewAction(orgId: string, objectType: ViewObject, _pre
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const filters = cleanFilters(pick(formData, ["q", "status", "tag", "f"]));
+  const filters = cleanFilters(pick(formData, ["q", "status", "tag", "f", "category", "kind"]));
   const sortRaw = String(formData.get("sort") ?? "");
   const sort = VIEW_SORT_RE.test(sortRaw) ? sortRaw : null;
   const columns = readColumns(formData.get("columns"));
@@ -66,7 +70,7 @@ export async function saveViewAction(orgId: string, objectType: ViewObject, _pre
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את התצוגה. נסו שוב."), { values: formValues(formData) });
   }
-  revalidatePath(RECORD_TYPES[objectType].list(orgId));
+  revalidatePath(listPathOf(orgId, objectType));
   return { ok: true, message: "התצוגה נשמרה." };
 }
 
@@ -85,6 +89,6 @@ export async function deleteViewAction(orgId: string, objectType: ViewObject, vi
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
-  revalidatePath(RECORD_TYPES[objectType].list(orgId));
+  revalidatePath(listPathOf(orgId, objectType));
   return ok();
 }

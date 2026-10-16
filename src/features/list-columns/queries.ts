@@ -13,8 +13,8 @@ export type ListColumns = { catalog: CatalogColumn[]; columns: ColumnChoice[]; f
 export async function getListColumns(orgId: string, object: ListObject): Promise<ListColumns> {
   const supabase = await createClient();
   const [fields, { data }, products] = await Promise.all([
-    // tasks have no custom fields
-    object === "task" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
+    // tasks and products have no custom fields
+    object === "task" || object === "product" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
     supabase.from("list_preferences").select("columns").eq("organization_id", orgId).eq("object_type", object).maybeSingle(),
     // LEAD-04: the leads' product column only with the product catalog
     object === "lead" ? requestedProductEnabled(orgId) : Promise.resolve(false),

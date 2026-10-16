@@ -3,7 +3,7 @@ import { z } from "zod";
 // Which columns a list shows, in what order and how wide (LST-03). Shared by the
 // server (resolving a saved choice) and the "columns" panel in the browser.
 
-export type ListObject = "lead" | "contact" | "company" | "deal" | "task";
+export type ListObject = "lead" | "contact" | "company" | "deal" | "task" | "product";
 // a saved choice in list_preferences: a list's columns, or the fields of a deal card on the board (DEAL-09)
 export type PreferenceKey = ListObject | "deal_board";
 export type ColumnWidth = "narrow" | "normal" | "wide";
@@ -92,6 +92,21 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "created", label: "נוצרה" },
     ],
     defaults: ["due", "type", "related", "owner", "status"],
+  },
+  // LST-09: the product catalog (PRD-01); no custom fields yet
+  product: {
+    columns: [
+      { key: "sku", label: 'מק"ט' },
+      { key: "barcode", label: "ברקוד" },
+      { key: "category", label: "קטגוריה" },
+      { key: "kind", label: "סוג" },
+      { key: "price", label: "מחיר" },
+      { key: "unit", label: "יחידה" },
+      { key: "vat", label: 'מע"מ' },
+      { key: "status", label: "מצב" },
+      { key: "created", label: "נוצר" },
+    ],
+    defaults: ["sku", "category", "kind", "price", "unit", "vat", "status"],
   },
 };
 

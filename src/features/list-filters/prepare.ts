@@ -3,6 +3,8 @@ import "server-only";
 import { listCompanyOptions } from "@/features/companies/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { getLeadLookups } from "@/features/leads/queries";
+import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
+import { categoryOptions } from "@/features/products/lists";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
@@ -16,10 +18,16 @@ import { appliedFilter, filterFields, filterToPostgrest, publicFields, type Filt
 function filterLookups(orgId: string, object: FilterObject) {
   return Promise.all([
     object === "lead" || object === "contact" ? getLeadLookups(orgId) : null,
-    listMembers(orgId),
-    object === "task" ? [] : listTags(orgId),
+    // products have no owner
+    object === "product" ? [] : listMembers(orgId),
+    object === "task" || object === "product" ? [] : listTags(orgId),
     object === "contact" || object === "company" ? listRecordTypes(orgId, object) : [],
   ]);
+}
+
+// LST-09: the product catalog's categories and units, for its filter
+function productLookups(orgId: string, object: FilterObject) {
+  return object === "product" ? Promise.all([listProductCategories(orgId), listProductUnits(orgId)]) : Promise.resolve([[], []] as const);
 }
 
 /**
@@ -27,7 +35,7 @@ function filterLookups(orgId: string, object: FilterObject) {
  * them. Resolves to nothing; prepareListFilter() then gets the same reads from the request's memo.
  */
 export async function startListFilterLookups(orgId: string, object: FilterObject): Promise<void> {
-  await filterLookups(orgId, object);
+  await Promise.all([filterLookups(orgId, object), productLookups(orgId, object)]);
 }
 
 /**
@@ -45,11 +53,12 @@ export async function prepareListFilter(
   extra: { stages?: Array<{ id: string; name: string }> } = {},
 ): Promise<PreparedFilter> {
   // memoized per request: the page has already read the context, and started the rest (startListFilterLookups)
-  const [context, [lookups, members, tags, types], companies] = await Promise.all([
+  const [context, [lookups, members, tags, types], companies, [categories, units]] = await Promise.all([
     getOrgContext(orgId),
     filterLookups(orgId, object),
     // CON-05: the primary company of a contact
     object === "contact" ? listCompanyOptions(orgId) : [],
+    productLookups(orgId, object),
   ]);
   const fields = filterFields(object, {
     statuses: object === "lead" ? lookups?.statuses.map((s) => ({ value: s.id, label: s.name })) : undefined,
@@ -58,6 +67,8 @@ export async function prepareListFilter(
     // hidden types too: records may still have them
     types: types.map((t) => ({ value: t.id, label: t.isActive ? t.name : `${t.name} (מוסתר)` })),
     companies: companies.map((c) => ({ value: c.id, label: c.name })),
+    categories: categoryOptions(categories).map((c) => ({ value: c.id, label: c.label })),
+    units: units.map((u) => ({ value: u.id, label: u.name })),
     members: members.map((m) => ({ value: m.userId, label: m.name })),
     tags: tags.map((t) => ({ value: t.id, label: t.name })),
     fields: customFields,

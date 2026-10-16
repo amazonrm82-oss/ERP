@@ -8,7 +8,12 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, TagIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
+import { resolveColumns } from "@/features/list-columns/columns";
+import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
+import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
+import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
+import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { ProductsTable, ProductStatusBadge } from "@/features/products/components/products-table";
 import { billingSuffix, productPriceText } from "@/features/products/display";
@@ -29,6 +34,8 @@ import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
+import { viewChips } from "@/features/views/server";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
 import { nextSort, parseSort, sortValue } from "@/lib/sort";
@@ -42,7 +49,11 @@ type Props = {
 
 const STATUS_LABELS: Record<Exclude<ProductStatusFilter, "">, string> = { active: "פעילים", inactive: "לא פעילים", archived: "בארכיון" };
 
-/** PRD-01: the organization's catalog of products and services. Everyone reads it; owners and admins edit. */
+/**
+ * PRD-01: the organization's catalog of products and services. Everyone reads it; owners and admins edit.
+ * LST-09: the shared list pieces too: advanced filter, the user's columns, saved views, editing in the
+ * cell, bulk actions and export (all of it, or the picked rows).
+ */
 export default async function ProductsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
@@ -62,20 +73,33 @@ export default async function ProductsPage({ params, searchParams }: Props) {
   const page = parsePage(query.page);
   const sort = parseSort(firstParam(query.sort), Object.keys(PRODUCT_SORT_COLUMNS) as ProductSortKey[], PRODUCT_DEFAULT_SORT);
 
-  const [categories, units, hasPriceLists] = await Promise.all([
+  // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
+  const [categories, units, hasPriceLists, listColumns] = await Promise.all([
     listProductCategories(orgId),
     listProductUnits(orgId),
     orgHasFeature(orgId, "price_lists"),
+    getListColumns(orgId, "product"),
+    startListFilterLookups(orgId, "product"),
   ]);
+  const filter = await prepareListFilter(orgId, "product", firstParam(query.f), context.user.id, []);
+  const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   const categoryId = isUuid(categoryParam) && categories.some((c) => c.id === categoryParam) ? categoryParam : null;
-  const { products, hasMore } = await listProducts(orgId, {
-    search,
-    categoryIds: categoryId ? categoryWithChildren(categories, categoryId) : null,
-    kind,
-    status,
-    page,
-    sort,
-  });
+  const [{ products, hasMore }, viewData] = await Promise.all([
+    listProducts(orgId, {
+      search,
+      categoryIds: categoryId ? categoryWithChildren(categories, categoryId) : null,
+      kind,
+      status,
+      page,
+      sort,
+      filter: filter.logic,
+    }),
+    viewChips(orgId, "product", context),
+  ]);
+  const views = viewData.chips;
+  const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
+  const shownColumns = activeView?.config.columns ? resolveColumns("product", activeView.config.columns, listColumns.catalog) : listColumns.columns;
+  const exportAllowed = canExport(context.role, granted);
 
   const categoryLabels = new Map(categories.map((c) => [c.id, categoryLabel(categories, c.id) ?? c.name]));
   const unitNames = new Map(units.map((u) => [u.id, u.name]));
@@ -87,6 +111,8 @@ export default async function ProductsPage({ params, searchParams }: Props) {
     if (kind) next.set("kind", kind);
     if (status) next.set("status", status);
     if (sortParam !== sortValue(PRODUCT_DEFAULT_SORT)) next.set("sort", sortParam);
+    if (filterParam) next.set("f", filterParam);
+    if (activeView) next.set("sv", activeView.id);
     if (target > 1) next.set("page", String(target));
     const suffix = next.toString();
     return suffix ? `${productsPath(orgId)}?${suffix}` : productsPath(orgId);
@@ -94,7 +120,11 @@ export default async function ProductsPage({ params, searchParams }: Props) {
   const hrefFor = (target: number) => listHref(target, sortValue(sort));
   // a new sort starts again from the first page; dates and prices start with the highest
   const sortHref = (key: string) => listHref(1, sortValue(nextSort(sort, key as ProductSortKey, key !== "created" && key !== "price")));
-  const filtered = search !== "" || categoryId !== null || kind !== null || status !== "" || page > 1;
+  const filtered = search !== "" || categoryId !== null || kind !== null || status !== "" || filter.tree !== null || page > 1;
+  // what the advanced filter and a saved view keep from the page's own search and selects
+  const kept: Record<string, string> = Object.fromEntries(
+    Object.entries({ q: search, category: categoryId ?? "", kind: kind ?? "", status }).filter(([, value]) => value !== ""),
+  );
 
   const newButton = canEdit ? (
     <ButtonLink href={productNewPath(orgId)}>
@@ -116,10 +146,10 @@ export default async function ProductsPage({ params, searchParams }: Props) {
                 מחירונים
               </ButtonLink>
             ) : null}
-            {newButton || canExport(context.role, granted) ? (
+            {newButton || exportAllowed ? (
               <>
               {/* PRD-05: export with the list's filters; import through the import wizard */}
-              {canExport(context.role, granted) ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
+              {exportAllowed ? <ExportMenu href={exportHref(productsPath(orgId), listHref(1, sortValue(sort)))} /> : null}
               {canImportProducts ? (
                 <ButtonLink href={`${paths.importNew(orgId)}?entity=product`} variant="secondary">
                   ייבוא
@@ -132,7 +162,31 @@ export default async function ProductsPage({ params, searchParams }: Props) {
         }
       />
 
+      <SavedViewsBar
+        orgId={orgId}
+        objectType="product"
+        listPath={productsPath(orgId)}
+        views={views}
+        activeViewId={activeView?.id ?? null}
+        current={{ ...kept, f: filterParam ?? undefined }}
+        currentSort={sortValue(sort)}
+        currentColumns={shownColumns}
+        teams={viewData.teams}
+        canSave={context.role !== "viewer"}
+        canShare={context.role === "owner" || context.role === "admin"}
+      />
+      <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+        <AdvancedFilter fields={filter.fields} current={filter.tree} skipped={filter.skipped} listPath={productsPath(orgId)} keep={kept} />
+        {activeView?.config.columns ? (
+          <p className="py-2 text-sm text-ink-soft">העמודות לפי התצוגה &quot;{activeView.name}&quot;</p>
+        ) : (
+          <ColumnsPanel orgId={orgId} object="product" catalog={listColumns.catalog} columns={listColumns.columns} saved={listColumns.saved} />
+        )}
+      </div>
+
       <Form action={productsPath(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
+        {/* the advanced filter stays when the search or a select changes */}
+        {filterParam ? <input type="hidden" name="f" value={filterParam} /> : null}
         <TextField
           label="חיפוש מוצרים"
           hideLabel
@@ -198,7 +252,19 @@ export default async function ProductsPage({ params, searchParams }: Props) {
             })}
           </ul>
           <div className="hidden md:block">
-            <ProductsTable orgId={orgId} products={products} categoryLabels={categoryLabels} unitNames={unitNames} sort={sort} sortHref={sortHref} />
+            <ProductsTable
+              orgId={orgId}
+              products={products}
+              columns={shownColumns}
+              catalog={listColumns.catalog}
+              categoryLabels={categoryLabels}
+              categories={categoryOptions(categories).map((option) => ({ value: option.id, label: option.label }))}
+              unitNames={unitNames}
+              sort={sort}
+              sortHref={sortHref}
+              canEdit={canEdit}
+              exportPath={exportAllowed ? `${productsPath(orgId)}/export` : null}
+            />
           </div>
         </>
       ) : (

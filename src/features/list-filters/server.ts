@@ -4,6 +4,7 @@ import type { FieldDefinition, FieldType } from "@/features/custom-fields/types"
 import type { ListObject } from "@/features/list-columns/columns";
 import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "@/features/contacts/preferences";
 import { INDUSTRIES } from "@/features/onboarding/options";
+import { BILLING_LABELS, BILLINGS, PRODUCT_KIND_LABELS, PRODUCT_KINDS, VAT_KIND_LABELS, VAT_KINDS } from "@/features/products/schema";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
@@ -52,6 +53,9 @@ type Lookups = {
   types?: Option[];
   // contacts: the live companies, for the primary company (CON-05)
   companies?: Option[];
+  // products (LST-09): the catalog's categories (with their parent) and units of measure
+  categories?: Option[];
+  units?: Option[];
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -174,6 +178,22 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       },
       { ...owner, label: "אחראי" },
       { key: "due", label: "תאריך יעד", kind: "date", column: "due_at" },
+      created,
+    ],
+    // LST-09: the product catalog (no owner, tags or custom fields); the page's own selects keep the status
+    product: [
+      text("name", "שם", "name"),
+      text("sku", 'מק"ט', "sku"),
+      text("barcode", "ברקוד", "barcode"),
+      text("description", "תיאור", "description"),
+      { key: "category", label: "קטגוריה", kind: "select", column: "category_id", options: lookups.categories ?? [] },
+      { key: "unit", label: "יחידה", kind: "select", column: "unit_id", options: lookups.units ?? [] },
+      { key: "kind", label: "סוג", kind: "select", column: "kind", plain: true, options: PRODUCT_KINDS.map((k) => ({ value: k, label: PRODUCT_KIND_LABELS[k] })) },
+      { key: "vat", label: 'מע"מ', kind: "select", column: "vat_kind", plain: true, options: VAT_KINDS.map((k) => ({ value: k, label: VAT_KIND_LABELS[k] })) },
+      { key: "billing", label: "חיוב", kind: "select", column: "billing", plain: true, options: BILLINGS.map((k) => ({ value: k, label: BILLING_LABELS[k] })) },
+      // the price as typed (before or with VAT, as the product says)
+      { key: "price", label: "מחיר (₪)", kind: "number", column: "price_agorot", scale: 100 },
+      { key: "active", label: "פעיל", kind: "checkbox", column: "is_active" },
       created,
     ],
   };

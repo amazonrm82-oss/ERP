@@ -10,15 +10,17 @@ import { dbErrorMessage } from "@/lib/errors";
 import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
 import { BOARD_PREFERENCE, boardCatalog, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
+import { productsPath } from "@/features/products/paths";
 import { paths } from "@/lib/paths";
 
 import { catalogFor, columnChoicesSchema, type ColumnChoice, type PreferenceKey } from "./columns";
 
 
-const isPreferenceKey = (object: unknown): object is PreferenceKey => object === BOARD_PREFERENCE || isRecordType(object);
+const isPreferenceKey = (object: unknown): object is PreferenceKey => object === BOARD_PREFERENCE || object === "product" || isRecordType(object);
 
-// the page that shows a list's columns (or the board's card fields)
-const pageOf = (orgId: string, object: PreferenceKey) => (object === BOARD_PREFERENCE ? paths.deals(orgId) : RECORD_TYPES[object].list(orgId));
+// the page that shows a list's columns (or the board's card fields); the product catalog is not a record type (LST-09)
+const pageOf = (orgId: string, object: PreferenceKey) =>
+  object === BOARD_PREFERENCE ? paths.deals(orgId) : object === "product" ? productsPath(orgId) : RECORD_TYPES[object].list(orgId);
 
 /** What can be picked for a list: its columns, or the fields of a board card (DEAL-09). */
 async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<string>> {
@@ -26,7 +28,7 @@ async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<stri
     return new Set(boardCatalog(await listFieldDefinitions(orgId, "deal")).map((column) => column.key));
   }
   const [fields, products] = await Promise.all([
-    object === "task" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
+    object === "task" || object === "product" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
     // LEAD-04: the leads' product column only with the product catalog
     object === "lead" ? requestedProductEnabled(orgId) : Promise.resolve(false),
   ]);
