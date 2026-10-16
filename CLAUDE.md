@@ -595,6 +595,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `readAllPages`, ordered by `created_at` and the table's key (`id`, or the primary key named in `key` for a table without
   `id`; test 74 checks it is unique). A new public table with `organization_id` must be added there or to `LEFT_OUT` in
   `tests/db/74-full-export-tables.test.ts` with a reason.
+- Person export (PRV-02, migration 020260; privacy, no plan key): `/o/[org]/privacy-export/[lead|contact]/[id]` (owners/admins)
+  collects everything about one person with the user's session (`src/features/privacy-export/collect.ts`; conversion relatives; others'
+  private notes and their files left out by `withoutOthersPrivate()`, the print rule), calls `public.log_person_export()` (definer,
+  `app.is_admin`, record of this org, counts only; audit action `person_export`) before any byte, then streams the ZIP
+  (`personZipStream()`, one file per pull, 100 MB of real bytes; skipped files listed in README.txt).
 - List export (LST-08, migration 0034): `/o/[org]/{leads,contacts,companies}/export` → `exportList()`
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
