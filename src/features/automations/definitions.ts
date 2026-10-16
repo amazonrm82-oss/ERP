@@ -63,7 +63,7 @@ export const CONDITIONS: ConditionOption[] = [
   { key: "task_type", label: "סוג המשימה הוא", entities: ["task"], field: "task_type", op: "eq", input: "task_type" },
 ];
 
-export type ActionType = "create_task" | "notify" | "assign_owner" | "add_tag" | "set_lead_status" | "move_deal_stage";
+export type ActionType = "create_task" | "notify" | "assign_owner" | "add_tag" | "set_lead_status" | "move_deal_stage" | "set_field";
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
@@ -72,10 +72,11 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   add_tag: "הוספת תגית",
   set_lead_status: "שינוי סטטוס ליד",
   move_deal_stage: "העברת עסקה לשלב",
+  set_field: "עדכון שדה",
 };
 
 export function actionsFor(entity: Entity): ActionType[] {
-  const all: ActionType[] = ["create_task", "notify", "assign_owner", "add_tag", "set_lead_status", "move_deal_stage"];
+  const all: ActionType[] = ["create_task", "notify", "assign_owner", "add_tag", "set_lead_status", "move_deal_stage", "set_field"];
   return all.filter(
     (type) =>
       (type !== "add_tag" || entity !== "task") &&
@@ -83,6 +84,15 @@ export function actionsFor(entity: Entity): ActionType[] {
       (type !== "move_deal_stage" || entity === "deal"),
   );
 }
+
+/**
+ * AUT-01: the built-in fields a "set_field" step may write (the engine, app.run_automation_actions, accepts the
+ * same list). Status, stage, owner and tags have their own actions; custom fields are "cf:<key>".
+ */
+export const BUILTIN_SET_FIELDS: Array<{ key: "source_id" | "task_type"; label: string; entities: Entity[] }> = [
+  { key: "source_id", label: "מקור", entities: ["lead", "contact", "deal"] },
+  { key: "task_type", label: "סוג המשימה", entities: ["task"] },
+];
 
 export const TASK_TYPES = [
   { value: "todo", label: "משימה" },

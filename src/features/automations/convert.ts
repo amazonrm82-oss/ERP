@@ -1,8 +1,11 @@
 import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
+import type { Json } from "@/lib/database.types";
+
 import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
+import { customDefinition, setFieldDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
 
@@ -12,7 +15,8 @@ export type DbRule = {
   trigger_type: string;
   trigger_config: Record<string, string | number>;
   conditions: Array<{ field: string; op: string; value?: string }>;
-  actions: Array<Record<string, string | number>>;
+  // AUT-01: a set_field step keeps the field's JSON value
+  actions: Array<Record<string, Json>>;
 };
 
 /**
@@ -106,6 +110,10 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       if (entity !== "deal") return "העברת שלב מתאימה רק לעסקאות.";
       if (!has(stages, action.stage_id)) return "השלב שנבחר כבר לא קיים.";
       actions.push({ type: "move_deal_stage", stage_id: action.stage_id });
+    } else if (action.type === "set_field") {
+      const built = setFieldValue(entity, action.field, action.value ?? "", lookups);
+      if (typeof built === "string") return built;
+      actions.push({ type: "set_field", field: action.field, value: built.value });
     }
   }
 
@@ -124,14 +132,18 @@ export type BuilderInitial = {
 
 const str = (value: unknown) => (value === undefined || value === null ? "" : String(value));
 
-export function fromDbRule(rule: {
-  name: string;
-  entity: string;
-  triggerType: string;
-  triggerConfig: Record<string, unknown>;
-  conditions: Array<Record<string, unknown>>;
-  actions: Array<Record<string, unknown>>;
-}): BuilderInitial | null {
+export function fromDbRule(
+  rule: {
+    name: string;
+    entity: string;
+    triggerType: string;
+    triggerConfig: Record<string, unknown>;
+    conditions: Array<Record<string, unknown>>;
+    actions: Array<Record<string, unknown>>;
+  },
+  // AUT-01: to show a set_field value as typed (currency in shekels, date and time in the business's zone)
+  set: { fields: Lookups["fields"]; timeZone?: string } = { fields: {} },
+): BuilderInitial | null {
   const trigger = triggerOf(rule.entity, rule.triggerType, rule.triggerConfig);
   if (!trigger) return null;
   const conditions = rule.conditions.flatMap((c) => {
@@ -180,6 +192,10 @@ export function fromDbRule(rule: {
         return [{ type: "set_lead_status", status_id: str(a.status_id), reason_id: str(a.reason_id) }];
       case "move_deal_stage":
         return [{ type: "move_deal_stage", stage_id: str(a.stage_id) }];
+      case "set_field": {
+        const field = str(a.field);
+        return [{ type: "set_field", field, value: setFieldDraft(customDefinition(trigger.entity, field, set), a.value, set.timeZone) }];
+      }
       default:
         return [];
     }

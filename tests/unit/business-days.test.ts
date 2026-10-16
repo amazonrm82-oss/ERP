@@ -51,7 +51,7 @@ describe("addBusinessDays", () => {
   });
 });
 
-const lookups: Lookups = { statuses: [], sources: [], tags: [], pipelines: [], members: [], teams: [], reasons: [] };
+const lookups: Lookups = { statuses: [], sources: [], tags: [], pipelines: [], members: [], teams: [], reasons: [], fields: {} };
 const rule = (action: Record<string, unknown>) => ({ name: "בדיקה", trigger: "lead:created", conditions: [], actions: [action] });
 const task = (extra: Record<string, unknown>) => ({ type: "create_task", title: "להתקשר", assign: "owner", task_type: "call", ...extra });
 

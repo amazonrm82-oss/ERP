@@ -302,12 +302,18 @@ describe("custom field settings (FLD-07)", () => {
       expect(await customOf("leads", id)).toMatchObject({ origin: "חדש" });
     });
 
-    it("automations write no custom fields (an action that does must follow the fill-once rule)", async () => {
+    it("an automation that writes a custom field follows the fill-once rule (AUT-01; the behaviour is tested in 129)", async () => {
       const defs = await asAdmin(async (q) =>
         (await q<{ def: string }>("select pg_get_functiondef(p.oid) as def from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname = 'run_automation_actions'")).rows,
       );
       expect(defs.length).toBeGreaterThan(0);
-      for (const { def } of defs) expect(def).not.toContain("custom_fields");
+      for (const { def } of defs) {
+        if (!def.includes("custom_fields")) continue;
+        // the set_field step reads the field's read-only flag and refuses changing a filled value
+        expect(def).toContain("is_read_only");
+        expect(def).toContain("app.custom_value_empty(v_record -> 'custom_fields' -> v_key)");
+        expect(def).toContain("'the field is read-only'");
+      }
     });
 
     it("a merge fills a missing value from the duplicate and never overwrites a kept one", async () => {

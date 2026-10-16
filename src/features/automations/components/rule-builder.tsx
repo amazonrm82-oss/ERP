@@ -4,8 +4,9 @@ import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { DateField } from "@/components/ui/date-picker";
 import { FormError } from "@/components/ui/feedback";
-import { Select, SelectField, TextField } from "@/components/ui/field";
+import { Checkbox, Select, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextLink } from "@/components/ui/text-link";
 import type { FormState } from "@/lib/action-result";
@@ -13,8 +14,9 @@ import { paths } from "@/lib/paths";
 
 import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
-import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType } from "../definitions";
+import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
+import { setFieldChoices, type SetFieldChoice } from "../set-field";
 
 type Draft = Record<string, string>;
 type Condition = { key: string; value: string };
@@ -41,6 +43,8 @@ function blankAction(type: ActionType): Draft {
       return { type, status_id: "", reason_id: "" };
     case "move_deal_stage":
       return { type, stage_id: "" };
+    case "set_field":
+      return { type, field: "", value: "" };
   }
 }
 
@@ -90,7 +94,10 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     // drop what does not fit the new record type
     setConditions((list) => list.filter((c) => CONDITIONS.find((o) => o.key === c.key)?.entities.includes(next.entity)));
     setActions((list) => {
-      const kept = list.filter((a) => actionsFor(next.entity).includes(a.type as ActionType));
+      const kept = list
+        .filter((a) => actionsFor(next.entity).includes(a.type as ActionType))
+        // AUT-01: a field of another record type is picked again
+        .map((a) => (a.type === "set_field" && next.entity !== entity ? blankAction("set_field") : a));
       return kept.length > 0 ? kept : [blankAction("create_task")];
     });
   }
@@ -237,7 +244,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
                   </Button>
                 ) : null}
               </div>
-              <ActionFields orgId={orgId} action={action} index={index} lookups={lookups} onChange={(patch) => updateAction(index, patch)} />
+              <ActionFields orgId={orgId} entity={entity} action={action} index={index} lookups={lookups} onChange={(patch) => updateAction(index, patch)} />
             </fieldset>
           ))}
           {actions.length < 10 ? (
@@ -254,9 +261,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   );
 }
 
-type FieldsProps = { orgId: string; action: Draft; index: number; lookups: Lookups; onChange: (patch: Draft) => void };
+type FieldsProps = { orgId: string; entity: Entity; action: Draft; index: number; lookups: Lookups; onChange: (patch: Draft) => void };
 
-function ActionFields({ orgId, action, index, lookups, onChange }: FieldsProps) {
+function ActionFields({ orgId, entity, action, index, lookups, onChange }: FieldsProps) {
   const n = index + 1;
   const memberSelect = (label: string) => (
     <SelectField label={label} value={action.user_id} onChange={(e) => onChange({ user_id: e.target.value })} controlSize="sm">
@@ -368,7 +375,127 @@ function ActionFields({ orgId, action, index, lookups, onChange }: FieldsProps) 
         "stage_id",
         lookups.pipelines.flatMap((p) => p.stages.map((s) => ({ id: s.id, name: `${p.name}: ${s.name}` }))),
       );
+    case "set_field": {
+      const choices = setFieldChoices(entity, lookups);
+      const choice = choices.find((item) => item.key === action.field);
+      if (choices.length === 0) {
+        return <p className="text-sm text-ink-soft">לסוג הרשומה הזה עוד אין שדות שאפשר לעדכן. אפשר להוסיף שדות מותאמים בהגדרות.</p>;
+      }
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SelectField label={`שדה (פעולה ${n})`} value={action.field} onChange={(e) => onChange({ field: e.target.value, value: "" })} controlSize="sm">
+            <option value="">בחירת שדה</option>
+            {choices.map((item) => (
+              <option key={item.key} value={item.key}>
+                {item.label}
+              </option>
+            ))}
+          </SelectField>
+          {choice ? <SetFieldValue key={choice.key} choice={choice} value={action.value ?? ""} n={n} lookups={lookups} onChange={(value) => onChange({ value })} /> : null}
+        </div>
+      );
+    }
     default:
       return null;
+  }
+}
+
+const CLEAR = "ריקון השדה";
+
+/** AUT-01: the value a set_field step writes, in the field's own kind of input. Empty clears the field. */
+function SetFieldValue({
+  choice,
+  value,
+  n,
+  lookups,
+  onChange,
+}: {
+  choice: SetFieldChoice;
+  value: string;
+  n: number;
+  lookups: Lookups;
+  onChange: (value: string) => void;
+}) {
+  const label = `הערך החדש (פעולה ${n})`;
+  const list = (items: Array<{ value: string; label: string }>, clearable = true) => (
+    <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)} controlSize="sm">
+      {clearable ? <option value="">{CLEAR}</option> : <option value="">בחירה</option>}
+      {items.map((item) => (
+        <option key={item.value} value={item.value}>
+          {item.label}
+        </option>
+      ))}
+    </SelectField>
+  );
+  if (choice.key === "source_id") return list(lookups.sources.map((s) => ({ value: s.id, label: s.name })));
+  if (choice.key === "task_type") return list(TASK_TYPES.map((t) => ({ value: t.value, label: t.label })), false);
+  const field = choice.definition;
+  if (!field) return null;
+  const text = (props: { dir?: "ltr"; inputMode?: "decimal" | "numeric" | "tel" | "email" | "url"; type?: string; hint?: string }) => (
+    <TextField
+      label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      controlSize="sm"
+      maxLength={2000}
+      hint={props.hint ?? "ריק: השדה יתרוקן."}
+      dir={props.dir}
+      inputMode={props.inputMode}
+      type={props.type}
+    />
+  );
+  switch (field.type) {
+    case "select":
+      return list(field.options.map((option) => ({ value: option, label: option })));
+    case "rating":
+      return list(["1", "2", "3", "4", "5"].map((v) => ({ value: v, label: `${v} מתוך 5` })));
+    case "user":
+      return list((field.choices ?? lookups.members.map((m) => ({ value: m.id, label: m.name }))).map((c) => ({ value: c.value, label: c.label })));
+    case "checkbox":
+      return (
+        <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)} controlSize="sm">
+          <option value="true">כן</option>
+          <option value="">לא</option>
+        </SelectField>
+      );
+    case "multi_select": {
+      const picked = value.split("\n").filter(Boolean);
+      return (
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-1.5 text-sm font-medium">{label}</legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {field.options.map((option) => (
+              <Checkbox
+                key={option}
+                label={option}
+                checked={picked.includes(option)}
+                onChange={(e) => onChange(field.options.filter((o) => (o === option ? e.target.checked : picked.includes(o))).join("\n"))}
+              />
+            ))}
+          </div>
+          <p className="mt-1 text-sm text-ink-soft">בלי בחירה: השדה יתרוקן.</p>
+        </fieldset>
+      );
+    }
+    case "date":
+      return <DateField label={label} value={value} onChange={onChange} hint="בלי תאריך: השדה יתרוקן." />;
+    case "datetime":
+      return text({ type: "datetime-local", dir: "ltr" });
+    case "number":
+    case "percent":
+      return text({ dir: "ltr", inputMode: "decimal" });
+    case "currency":
+      return text({ dir: "ltr", inputMode: "decimal", hint: "בשקלים. ריק: השדה יתרוקן." });
+    case "phone":
+      return text({ dir: "ltr", inputMode: "tel" });
+    case "email":
+      return text({ dir: "ltr", inputMode: "email" });
+    case "url":
+      return text({ dir: "ltr", inputMode: "url" });
+    case "il_id":
+    case "il_company_id":
+      return text({ dir: "ltr", inputMode: "numeric" });
+    default:
+      return text({});
   }
 }

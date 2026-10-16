@@ -1,5 +1,6 @@
-import { ACTION_LABELS, CONDITIONS, TASK_TYPES, triggerOf, type ActionType } from "./definitions";
+import { ACTION_LABELS, CONDITIONS, TASK_TYPES, triggerOf, type ActionType, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
+import { describeSetField } from "./set-field";
 
 type Json = Record<string, unknown>;
 
@@ -75,6 +76,8 @@ export function describeRule(
       }
       case "move_deal_stage":
         return `${label}: ${nameIn(stages, a.stage_id)}`;
+      case "set_field":
+        return `${label}: ${describeSetField(rule.entity as Entity, String(a.field ?? ""), a.value, lookups)}`;
       default:
         return label;
     }
@@ -92,6 +95,13 @@ export const STEP_ERRORS: Record<string, string> = {
   "the status no longer exists": "הסטטוס נמחק",
   "the stage is not in this deal's pipeline": "השלב לא שייך לתהליך המכירה של העסקה",
   "daily limit for this record reached": "הגיע למגבלה של 20 הרצות ביום לרשומה",
+  // AUT-01: a set_field step
+  "the field does not fit this record": "השדה לא מתאים לסוג הרשומה",
+  "the field no longer exists": "השדה נמחק או הוסתר",
+  "the value does not fit the field": "הערך לא מתאים לשדה",
+  "the field is read-only": "השדה לקריאה בלבד וכבר מלא",
+  "the value is already on another record": "הערך כבר קיים ברשומה אחרת, והשדה ייחודי",
+  "the source no longer exists": "המקור נמחק או הוסתר",
 };
 
 /** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */

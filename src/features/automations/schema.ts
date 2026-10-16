@@ -33,6 +33,13 @@ const actionSchema = z.discriminatedUnion("type", [
   // reason_id: required when the status is "not relevant" (checked against the organization's list in toDbRule)
   z.object({ type: z.literal("set_lead_status"), status_id: id, reason_id: id.optional() }),
   z.object({ type: z.literal("move_deal_stage"), stage_id: id }),
+  // AUT-01: "cf:<key>" or a built-in field of BUILTIN_SET_FIELDS; the value as typed (empty = clear), read by the
+  // field's own rules in toDbRule
+  z.object({
+    type: z.literal("set_field"),
+    field: z.string().min(1, { error: "יש לבחור שדה." }).max(100),
+    value: z.string().max(10_000, { error: "הערך ארוך מדי." }).optional(),
+  }),
 ]);
 
 export type RuleAction = z.infer<typeof actionSchema>;

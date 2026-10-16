@@ -1,5 +1,7 @@
 import "server-only";
 
+import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import type { FieldDefinition } from "@/features/custom-fields/types";
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
 import { RECORD_TYPES } from "@/lib/record-types";
@@ -15,6 +17,8 @@ export type Lookups = {
   teams: Array<{ id: string; name: string }>;
   // the active "not relevant" reasons (RVW-9), in the admin's order
   reasons: Array<{ id: string; name: string }>;
+  // AUT-01: the active custom fields a "set_field" step may write, per record type (tasks have none)
+  fields: Partial<Record<"lead" | "contact" | "company" | "deal", FieldDefinition[]>>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -26,6 +30,15 @@ type ReadFailure = { message: string; code?: string | null };
  */
 export async function readLookups(orgId: string): Promise<{ data: Lookups; error: null } | { data: null; error: ReadFailure }> {
   const supabase = await createClient();
+  let fields: Lookups["fields"];
+  try {
+    const [lead, contact, company, deal] = await Promise.all(
+      (["lead", "contact", "company", "deal"] as const).map((type) => listFieldDefinitions(orgId, type)),
+    );
+    fields = { lead, contact, company, deal };
+  } catch (error) {
+    return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
+  }
   const [statuses, sources, pipelines, stages, tags, members, teams, reasons] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
@@ -58,6 +71,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       members: members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ id: m.userId, name: m.name })),
       teams: teams.map((t) => ({ id: t.id, name: t.name })),
       reasons: reasons.data ?? [],
+      fields,
     },
     error: null,
   };

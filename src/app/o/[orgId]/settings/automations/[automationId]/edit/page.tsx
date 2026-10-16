@@ -17,13 +17,13 @@ type Props = { params: Promise<{ orgId: string; automationId: string }> };
 
 export default async function EditAutomationPage({ params }: Props) {
   const { orgId, automationId } = await params;
-  const { role, canWrite } = await getOrgContext(orgId);
+  const { role, canWrite, org } = await getOrgContext(orgId);
   // PRM-01: a member with the automations permission manages them too
   if (!canManageAutomations(role, await getMyPermissions(orgId)) || !canWrite || !isUuid(automationId)) {
     notFound();
   }
   const [automation, lookups] = await Promise.all([getAutomation(orgId, automationId), getLookups(orgId)]);
-  const initial = automation ? fromDbRule(automation) : null;
+  const initial = automation ? fromDbRule(automation, { fields: lookups.fields, timeZone: org.timeZone }) : null;
   if (!automation || !initial) {
     notFound();
   }

@@ -25,6 +25,7 @@ const lookups: Lookups = {
   members: [],
   teams: [],
   reasons: [{ id: REASON, name: "יקר מדי" }],
+  fields: {},
 };
 
 const rule = (action: Record<string, unknown>) => ({ name: "בדיקה", trigger: "lead:created", conditions: [], actions: [action] });
