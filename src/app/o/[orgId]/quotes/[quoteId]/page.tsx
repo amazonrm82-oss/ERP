@@ -14,7 +14,8 @@ import { detachedQuotesPath, quoteDocumentPath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteParties, getQuotePricing, listQuoteLines } from "@/features/quotes/queries";
+import { getQuote, getQuoteLinkStatus, getQuoteParties, getQuotePricing, listQuoteLines } from "@/features/quotes/queries";
+import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -66,6 +67,11 @@ export default async function QuotePage({ params, searchParams }: Props) {
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+  // QUO-08: the customer's link of a sent quote, for those who may edit its deal or contact (the database decides)
+  const linkStatus =
+    quote.status !== "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id)
+      ? await getQuoteLinkStatus(orgId, quote.id)
+      : null;
   const back = quote.dealId
     ? { href: paths.deal(orgId, quote.dealId), label: parties.deal ?? "עסקה" }
     : quote.contactId
@@ -90,7 +96,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 variant="primary"
                 size="sm"
                 title="לסמן את ההצעה כנשלחה?"
-                description="ההצעה תקבל את המספר הרץ הבא, והיא ננעלת לעריכה. שליחה ללקוח בקישור תגיע בהמשך; בינתיים שולחים אותה מודפסת או כקובץ PDF."
+                description="ההצעה תקבל את המספר הרץ הבא, והיא ננעלת לעריכה. אחר כך אפשר ליצור לה קישור ללקוח, או לשלוח אותה מודפסת או כקובץ PDF."
                 confirmLabel="סימון כנשלחה"
                 action={() => sendQuoteAction(orgId, quote.id)}
               >
@@ -142,6 +148,15 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </span>
         ) : null}
       </div>
+      {linkStatus ? (
+        <QuoteLinkCard
+          orgId={orgId}
+          quoteId={quote.id}
+          numberDisplay={quote.numberDisplay}
+          active={linkStatus.active}
+          createdText={linkStatus.createdAt ? formatDate(linkStatus.createdAt) : ""}
+        />
+      ) : null}
       {started.template === "ok" ? (
         <FormNotice className="mb-5" message={appliedText(count(started.added), count(started.skipped))} />
       ) : started.template === "failed" ? (

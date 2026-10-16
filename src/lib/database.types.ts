@@ -2617,6 +2617,11 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-08: the customer's link (create returns the token once; status never the hash) and its page (service_role only)
+      quote_link_create: { Args: { p_org: string; p_quote: string }; Returns: string };
+      quote_link_revoke: { Args: { p_org: string; p_quote: string }; Returns: boolean };
+      quote_link_status: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      quote_public: { Args: { p_token: string }; Returns: Json };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };

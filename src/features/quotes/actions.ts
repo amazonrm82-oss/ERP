@@ -16,7 +16,10 @@ import { zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
+import { siteOrigin } from "@/lib/site-origin";
+
 import { quotePath } from "./paths";
+import { publicQuotePath, QUOTE_LINK_TOKEN } from "./public";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
 import { applyTemplateToQuote } from "./template-server";
 import {
@@ -421,5 +424,29 @@ export async function sendQuoteAction(orgId: string, quoteId: string): Promise<A
   const quote = await readQuote(context.supabase, orgId, quoteId);
   if (quote) revalidateQuote(orgId, quote);
   else revalidatePath(quotePath(orgId, quoteId));
+  return ok();
+}
+
+/**
+ * QUO-08: a new link for the customer to a sent quote (public.quote_link_create). The address is returned once: only
+ * its hash is kept, and the previous link of the quote stops working.
+ */
+export async function createQuoteLinkAction(orgId: string, quoteId: string): Promise<ActionResult<{ url: string }>> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("quote_link_create", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  if (typeof data !== "string" || !QUOTE_LINK_TOKEN.test(data)) return fail("לא הצלחנו ליצור קישור. נסו שוב.");
+  revalidatePath(quotePath(orgId, quoteId));
+  return ok({ url: `${await siteOrigin()}${publicQuotePath(data)}` });
+}
+
+/** QUO-08: turns the customer's link off; the page answers "not found" from now on. */
+export async function revokeQuoteLinkAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { error } = await context.supabase.rpc("quote_link_revoke", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  revalidatePath(quotePath(orgId, quoteId));
   return ok();
 }

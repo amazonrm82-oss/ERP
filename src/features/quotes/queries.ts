@@ -283,3 +283,21 @@ export async function getQuoteParties(orgId: string, quote: Quote): Promise<{ de
     company: company ? (must(company, "company")?.name ?? null) : null,
   };
 }
+
+export type QuoteLinkStatus = { active: boolean; createdAt: string | null };
+
+/**
+ * QUO-08: whether a sent quote has a working customer link, for those who manage it (public.quote_link_status;
+ * the hash never leaves the database). Null for anyone else.
+ */
+export async function getQuoteLinkStatus(orgId: string, quoteId: string): Promise<QuoteLinkStatus | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("quote_link_status", { p_org: orgId, p_quote: quoteId });
+  if (error) {
+    // not someone who manages the quote, or the plan has no quotes: no link card
+    if (error.code === "42501" || error.code === "P0001") return null;
+    throw new Error(`quote_link_status failed: ${error.code} ${error.message}`);
+  }
+  const value = data as { active?: unknown; created_at?: unknown } | null;
+  return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };
+}
