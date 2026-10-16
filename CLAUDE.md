@@ -561,8 +561,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   'erasure', 'blocked') and is lifted only by a form consent. `consent_prepare`'s refusal is a message only: for non-admins it
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
-  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links`, `app.audit_erase_core` and
-  `app.sample_untouched` were last redefined in 020105 (QUO-01); a new table linking to leads/contacts must also be checked there.
+  it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` and `app.audit_erase_core` were
+  last redefined in 020105 (QUO-01), `app.sample_untouched` in 020150 (SEG-01); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -575,6 +575,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
   before it answers, and returns CSV or `.xlsx` (`src/lib/xlsx.ts`, no dependency).
+- Segments (SEG-01, migration 020150): `public.segments` (lead|contact, dynamic = a saved LST-05 filter, re-validated on every use;
+  static = members; members read; owners, admins and managers of a writable org write, `app.segments_writable`; flag `segments`,
+  quota `max_segments`) and `public.segment_members` (one lead or contact, seen and removed only with a readable record; 10,000 per
+  segment). A merge carries memberships through the `merged` entry; sample data and import undo count a membership as work.
 - Record completeness (DQL-01, migration 0157; DQL-02 no migration): `public.completeness_settings` (one row per org and type
   lead|contact|company|deal, `fields` = built-in keys of `app.completeness_builtin_keys()` mirrored by `COMPLETENESS_BUILT_IN` in
   `src/features/data-quality/completeness.ts`, test 96, or `cf:<key>`; seeded by `organizations_seed_completeness`; members read,
@@ -681,7 +685,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   in the bin) and a readable company, and update/delete repeat the company check. At most 50 per contact (hint `contact_company:max`,
   definer count `app.contact_company_count` after the outsider guard). Audited as a `company_link` change of the contact. Merge
   copies links through the `merged` timeline entry (`app.merge_contact_companies`, until `merge_move_links` takes it over).
-  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020105 (QUO-01).
+  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020150 (SEG-01).
 - Contact relations (CON-06, migration 020090; owner 15 October 2026: core, every plan): `public.contact_relation_types` (managed
   list, 20 per org, server-only `key` spouse|family|parent|referral on the seeded defaults; a type in use is hidden, not deleted:
   FK with no action) and `public.contact_relations` (first side a contact or a lead, exactly one; a lead only as the referrer of
