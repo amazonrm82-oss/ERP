@@ -612,7 +612,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020310 (GAP-09), `app.sample_untouched` in 020150 (SEG-01); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020310 (GAP-09), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -927,6 +927,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   use the same pieces (`ListTable`, columns, filters, views, inline edit, bulk, export) with object types
   `deal` and `task`. Sort fields `sort_stage|sort_contact|sort_company|sort_owner(deals)`, `sort_owner(tasks)`.
   Tasks have no tags, custom fields or recycle bin. A filter field with `plain` compares enum values, not ids.
+- Task checklists (TASK-06, migration 020315; owner 18 October 2026: every plan, no key): `public.task_checklist_items` (steps of one
+  task; seen with the task, written by whoever may update the task (the `tasks_update` rule, keep in step) while it is not removed;
+  `done_at`/`done_by` by trigger; at most 100 per task, hint `task_checklist:max`; not audited) and `public.checklist_templates` (managed
+  list, members read, owners/admins of a writable org write, 50 per org, hint `checklist_templates:max`, audited, two seeded defaults
+  mirrored by `DEFAULT_CHECKLIST_TEMPLATES`). A recurring task's next occurrence copies the steps unticked (`tasks_checklist_carry`).
+  `app.sample_untouched` was last redefined in 020315 (steps keep a sample task).
 - Recurring tasks (TASK-04, migration 0063): completing a task with `recurrence` makes `app.spawn_recurring_task()`
   (security definer, trigger) create the next one, once (`recurrence_source_id`, unique; clients may not write it).
   Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
