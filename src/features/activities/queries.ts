@@ -6,6 +6,7 @@ import { must } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
+import { quoteEntryKind, quoteEntryText } from "./quote-entries";
 import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
@@ -87,7 +88,16 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
   // Names behind the ids that system events carry in their metadata.
   const needsStatuses = activities.some((a) => a.type === "status_change");
   const needsStages = activities.some((a) => a.type === "stage_change");
-  const [statuses, stages, authors] = await Promise.all([
+  // QUO-16: the quotes the entries name, read with the user's session (a quote the user cannot read shows its number only)
+  const quoteIds = [
+    ...new Set(
+      activities
+        .filter((a) => quoteEntryKind(a.type, metaString(a.metadata, "kind")))
+        .map((a) => metaString(a.metadata, "quote_id"))
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const [statuses, stages, authors, quotes] = await Promise.all([
     needsStatuses
       ? supabase.from("lead_statuses").select("id, name").eq("organization_id", orgId)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
@@ -95,7 +105,11 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       ? supabase.from("stages").select("id, name").eq("organization_id", orgId)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
     getUserNames(activities.map((a) => a.created_by)),
+    quoteIds.length > 0
+      ? supabase.from("quotes").select("id, title").eq("organization_id", orgId).in("id", quoteIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; title: string }>, error: null }),
   ]);
+  const quoteTitles = new Map(must(quotes, "timeline quotes").map((row) => [row.id, row.title]));
   const statusNames = new Map((statuses.data ?? []).map((row) => [row.id, row.name]));
   const stageNames = new Map((stages.data ?? []).map((row) => [row.id, row.name]));
 
@@ -103,8 +117,14 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
     const body = activity.body?.trim() ?? "";
     let text = body;
     let isUserContent = body !== "";
+    const quoteKind = quoteEntryKind(activity.type, metaString(activity.metadata, "kind"));
 
-    if (activity.type === "status_change") {
+    if (quoteKind) {
+      // QUO-16: written by the database when the quote was sent, accepted or declined; shown as an event, never as a note
+      // to edit, even though "sent" is stored as the sender's note so it counts as contact with the customer
+      text = quoteEntryText(quoteKind, metaString(activity.metadata, "number"), quoteTitles.get(metaString(activity.metadata, "quote_id") ?? "") ?? null);
+      isUserContent = false;
+    } else if (activity.type === "status_change") {
       const from = statusNames.get(metaString(activity.metadata, "from_status_id") ?? "");
       const to = statusNames.get(metaString(activity.metadata, "to_status_id") ?? "");
       text = from && to ? `הסטטוס שונה מ"${from}" ל"${to}".` : "הסטטוס שונה.";
@@ -141,10 +161,12 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
 
     return {
       id: activity.id,
-      type: activity.type,
+      // a quote entry is an event on screen: no edit, delete or pin buttons
+      type: quoteKind ? "system" : activity.type,
       // WA-01: a message opened from the record's WhatsApp button
-      label:
-        activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
+      label: quoteKind
+        ? "הצעת מחיר"
+        : activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
           ? "נשלחה הודעת WhatsApp"
           : (TYPE_LABELS[activity.type] ?? "פעילות"),
       text,
