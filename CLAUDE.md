@@ -833,7 +833,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020345 (`app.audit_erase_core` in 020320).
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020345, `app.audit_erase_core` in 020320).
 - Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
   execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
   `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
