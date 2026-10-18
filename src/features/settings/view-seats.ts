@@ -1,4 +1,5 @@
-// PRM-02: view seats are free up to the plan's allowance per paid seat (view_seats_per_paid_seat x active full seats).
+// PRM-02: view seats are free up to the plan's allowance per paid seat (view_seats_per_paid_seat x the full seats bought in
+// the subscription; while none are bought, as on a trial, x the active full seats; owner, 18 October 2026).
 // The database refuses an active view seat over it (app.assert_view_seat_available, hint
 // 'limit:view_seats_per_paid_seat'); the screen counts pending viewer invitations too, so an invitation is not sent
 // that could not be accepted.
