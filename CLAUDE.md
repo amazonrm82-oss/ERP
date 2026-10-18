@@ -203,7 +203,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Purge (migration 0018): activities and tasks reference leads/contacts/companies/deals with
   `on delete set null (x_id)`; the `before delete` trigger `app.purge_links()` first deletes the ones
   that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
-  (`app.purge_trash()`, 02:30 UTC) deletes what has been in the recycle bin for 30 days.
+  (`app.purge_trash()`) deletes what has been in the recycle bin for 30 days; since 020355 (FXD-06, pasted by hand) in batches of
+  1,000 per table, every 15 minutes 01:00-04:45 UTC, beside `crm-purge-notifications` (`app.purge_old_notifications()`: read
+  notifications after 90 days, unread after 180). Until the owner pastes 020355 the old once-a-night job runs.
 - Form inquiry retention (CAP-04, migrations 0091 and 009110): `form_submissions.form_deleted_at` is stamped when the
   form is deleted (`app.keep_form_submissions()`); pg_cron `crm-purge-submissions` (02:45 UTC) calls
   `app.purge_old_form_submissions()` (009110, pasted by hand because it deletes), which removes kept inquiries older than
