@@ -612,7 +612,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020310 (GAP-09), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020320 (QUO-07 follow-up), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -822,7 +822,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   from `app.next_document_number(org, 'quote')` and stamps `sent_at`, `customer_name`, `customer_contact_name` (server only). A purge
   detaches a sent quote (`deals_quotes_detach`, `contacts_quotes_detach`: `former_deal_id` / `former_contact_id`, `customer_deleted_at`
   when nothing is left); drafts go with the cascade; `quotes_has_parent` holds for drafts only; a quote with no parent is read by
-  owners/admins only (`quotes_select`, last altered in 020270). Erasure empties its personal details. `app.quotes_check`,
+  owners/admins and managers by role (`quotes_select`, last altered in 020320, QUO-07 follow-up; erasure also empties its lines' free text). Erasure empties its personal details. `app.quotes_check`,
   `app.quotes_detach_contact` and `app.audit_erase_core` were last redefined in 020270.
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
@@ -833,8 +833,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send`, `public.quote_public`
-  and `app.audit_erase_core` were last redefined in 020310.
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` and `public.quote_public`
+  were last redefined in 020310 (`app.audit_erase_core` in 020320).
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
