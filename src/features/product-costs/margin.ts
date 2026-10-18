@@ -39,7 +39,8 @@ export function costForQuantity(quantity: number, unitCostAgorot: number): numbe
   return Number(divideHalfUp(milli * BigInt(unitCostAgorot), BigInt(1000)));
 }
 
-export type CostedLine = { productId: string | null; quantity: number; netAgorot: number | null };
+// unitCostAgorot: the cost per unit kept on the line (PRD-06 follow-up), null when the line has none
+export type CostedLine = { unitCostAgorot: number | null; quantity: number; netAgorot: number | null };
 
 export type LinesProfit = Profit & {
   // the net amount and the cost of the lines whose product has a cost
@@ -50,17 +51,17 @@ export type LinesProfit = Profit & {
 };
 
 /**
- * The gross profit of a deal's lines: the net amount of each product line whose product has a cost,
+ * The gross profit of a deal's lines: the net amount of each line that has a cost (its own copy, PRD-06 follow-up),
  * less quantity x unit cost. Lines without a cost are counted as left out, never as zero cost.
  * null when no line has a cost.
  */
-export function linesProfit(lines: readonly CostedLine[], costs: ReadonlyMap<string, number>): LinesProfit | null {
+export function linesProfit(lines: readonly CostedLine[]): LinesProfit | null {
   let revenue = 0;
   let cost = 0;
   let counted = 0;
   for (const line of lines) {
-    const unitCost = line.productId === null ? undefined : costs.get(line.productId);
-    if (unitCost === undefined || line.netAgorot === null) continue;
+    const unitCost = line.unitCostAgorot;
+    if (unitCost === null || line.netAgorot === null) continue;
     revenue += line.netAgorot;
     cost += costForQuantity(line.quantity, unitCost);
     counted += 1;

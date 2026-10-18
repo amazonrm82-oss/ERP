@@ -153,6 +153,35 @@ describe("report shaping from the saved samples", () => {
     expect(view.sections[0].note).toContain('שימו לב: בתקופה יש עסקאות שתמחרו כולל מע"מ (2) ועסקאות שתמחרו לפני מע"מ (3)');
   });
 
+  it("DLI-06: revenue by category rolls subcategories up, names free lines, and keeps billing apart", async () => {
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "categories", filters);
+    const [tops, categories] = view.sections;
+    expect(tops.rows.map((r) => [r.category, r.billing, r.amount])).toEqual([["שירותים", "חד-פעמי", 60000]]);
+    expect(categories.rows.map((r) => [r.category, r.billing, r.products, r.amount])).toEqual([
+      ["שירותים / ייעוץ", "חד-פעמי", 1, 60000],
+      ["שורות בלי מוצר", "חודשי", 0, 5000],
+    ]);
+    expect(view.kpis.map((k) => k.label)).toEqual(["מכירות חד-פעמיות", "חיוב חודשי", "קטגוריות שנמכרו", "עסקאות בלי שורות"]);
+    expect(categories.note).toContain("הקטגוריה היא זו שהמוצר נמצא בה היום");
+  });
+
+  it("DLI-06: gross profit per product with margin, one figure per billing, and nothing for someone who may not see costs", async () => {
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "profit", filters);
+    const [section] = view.sections;
+    expect(section.rows.map((r) => [r.product, r.revenue, r.cost, r.profit, r.margin])).toEqual([["ייעוץ", 60000, 24000, 36000, 60]]);
+    expect(section.rows[0]._href).toMatch(/\/products\//);
+    expect(view.kpis[0].label).toBe("רווח גולמי, חד-פעמי");
+    expect(view.kpis[0].value).toContain("60%");
+    expect(view.kpis.at(-1)).toMatchObject({ label: "שורות בלי עלות", value: "1" });
+    results.report_gross_profit = { allowed: false };
+    const hidden = await buildReport("00000000-0000-4000-8000-000000000099", "profit", filters);
+    expect(hidden).toEqual({ kpis: [], sections: [], note: "רק מי שמורשה לראות עלות רואה את הדוח הזה." });
+  });
+
+  it("DLI-06: only the gross profit report is about costs", () => {
+    expect(REPORTS.filter((r) => r.costs).map((r) => r.key)).toEqual(["profit"]);
+  });
+
   it("a sample with a renamed key stops the report instead of showing zeros", async () => {
     results.report_rep_performance = (sample("report_rep_performance") as Record<string, unknown>[]).map(({ won_amount, ...rest }) => ({
       ...rest,

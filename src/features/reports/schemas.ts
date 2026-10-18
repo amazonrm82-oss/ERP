@@ -181,6 +181,57 @@ export const REPORT_SCHEMAS = {
       }),
     ),
   }),
+  // DLI-06: the same won lines by the category their product is in today; free lines and uncategorized products apart
+  report_revenue_by_category: z.object({
+    totals: z.object({
+      deals: count,
+      deals_with_lines: count,
+      categories: count,
+      deals_without_lines: count,
+      amount_without_lines: amount,
+      deals_with_vat: count,
+      deals_without_vat: count,
+    }),
+    by_billing: z.array(z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, amount })),
+    by_category: z.array(
+      z.object({
+        kind: z.enum(["category", "uncategorized", "free"]),
+        category_id: id,
+        name: text,
+        parent_id: id,
+        parent_name: text,
+        billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(),
+        products: count,
+        deals: count,
+        amount,
+      }),
+    ),
+    by_top: z.array(z.object({ category_id: uuid, name: z.string(), billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), products: count, deals: count, amount })),
+  }),
+  // DLI-06: gross profit from the cost kept on each line; {allowed: false} and nothing else for those who may not see costs
+  report_gross_profit: z.union([
+    z.object({
+      allowed: z.literal(true),
+      totals: z.object({ deals: count, deals_with_costs: count, lines: count, costed_lines: count, uncosted_lines: count }),
+      by_billing: z.array(
+        z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, revenue: amount, cost: amount, profit: amount, margin_bp: decimal }),
+      ),
+      by_product: z.array(
+        z.object({
+          product_id: id,
+          name: text,
+          billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(),
+          quantity: z.number(),
+          deals: count,
+          revenue: amount,
+          cost: amount,
+          profit: amount,
+          margin_bp: decimal,
+        }),
+      ),
+    }),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
   report_summary: z.object({
     leads: count,
     leads_prev: count,

@@ -9,6 +9,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { parseMoneyToAgorot } from "@/lib/format";
+import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 // PRD-06: the cost of a product is written with the user's session; RLS lets only someone who both
@@ -79,4 +80,56 @@ export async function setProductCostAction(orgId: string, productId: string, _pr
     return fail(dbErrorMessage(insertError), { values: formValues(formData) });
   }
   return fail("לא הצלחנו לשמור. נסו שוב.", { values: formValues(formData) });
+}
+
+const LINE_NOT_ALLOWED = "אי אפשר לשנות את העלות של השורה: העסקה סגורה, או שאין לך הרשאה.";
+
+/**
+ * PRD-06 follow-up: the cost per unit kept on a deal line (owner, 15 October 2026): those who see costs change it while
+ * the deal is open; an empty field removes it. RLS on deal_line_costs decides (0 rows = closed deal or not allowed).
+ */
+export async function setDealLineCostAction(orgId: string, dealId: string, lineId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, dealId, lineId);
+  if (!context.ok) return context;
+  const parsed = costSchema.safeParse(pick(formData, ["cost"]));
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const cost = parsed.data.cost;
+  const { supabase } = context;
+  const values = formValues(formData);
+  const done = (message: string) => {
+    revalidatePath(paths.deal(orgId, dealId));
+    return { ok: true as const, message };
+  };
+
+  if (cost === null) {
+    const { data, error } = await supabase.from("deal_line_costs").delete().eq("organization_id", orgId).eq("deal_line_id", lineId).select("id");
+    if (error) return fail(dbErrorMessage(error), { values });
+    return done(data.length > 0 ? "העלות של השורה הוסרה." : "לשורה אין עלות שמורה.");
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data, error } = await supabase
+      .from("deal_line_costs")
+      .update({ cost_agorot: cost })
+      .eq("organization_id", orgId)
+      .eq("deal_line_id", lineId)
+      .select("id");
+    if (error) return fail(dbErrorMessage(error), { values });
+    if (data.length > 0) return done("העלות של השורה נשמרה.");
+    const { error: insertError } = await supabase
+      .from("deal_line_costs")
+      .insert({ organization_id: orgId, deal_line_id: lineId, cost_agorot: cost })
+      .select("id")
+      .single();
+    if (!insertError) return done("העלות של השורה נשמרה.");
+    if (insertError.code === "23505") {
+      // the row exists but this user could not update it: a closed deal or no right, not a race
+      if (attempt === 1) return fail(LINE_NOT_ALLOWED, { values });
+      continue;
+    }
+    if (insertError.code === "42501") return fail(LINE_NOT_ALLOWED, { values });
+    if (insertError.code === "23503") return fail("השורה כבר לא קיימת.", { values });
+    return fail(dbErrorMessage(insertError), { values });
+  }
+  return fail(LINE_NOT_ALLOWED, { values });
 }

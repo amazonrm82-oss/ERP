@@ -103,6 +103,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "price_list_lines", file: "price_list_lines.csv" },
   // DLI-01
   { table: "deal_lines", file: "deal_lines.csv" },
+  // PRD-06 follow-up: the cost kept with each deal line (the owner sees costs)
+  { table: "deal_line_costs", file: "deal_line_costs.csv" },
   // QUO-01, QUO-02
   { table: "quotes", file: "quotes.csv" },
   { table: "quote_lines", file: "quote_lines.csv" },
@@ -277,7 +279,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 כל החברות של כל איש קשר נמצאות ב-contact_companies.csv, עם התפקיד שלו באותה חברה (title); is_primary מסמן את החברה הראשית, שהיא גם company_id ב-contacts.csv.
 הקשרים בין אנשי קשר נמצאים ב-contact_relations.csv: contact_id הוא הצד הראשון (או lead_id, כשליד הפנה את איש הקשר), related_contact_id הצד השני, ו-type_id סוג הקשר. סוגי הקשר נמצאים ב-contact_relation_types.csv: name נקרא מהצד הראשון ("הורה של"), ו-reverse_name מהצד השני ("ילד/ה של"; ריק = אותו דבר משני הצדדים).
 אנשי הקשר בכל עסקה נמצאים ב-deal_contacts.csv, עם התפקיד שלהם בעסקה (role_name).
-שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר.
+שורות המוצרים בעסקאות נמצאות ב-deal_lines.csv: deal_id היא העסקה, product_id המוצר (ריק = שורה חופשית), description התיאור, quantity הכמות, unit_price_agorot מחיר היחידה באגורות, ההנחה בשורה ב-discount_bp (1/100 של אחוז) או ב-discount_agorot, ו-total_agorot סכום השורה אחרי ההנחה. price_includes_vat אומר אם המחירים בשורה כוללים מע"מ, ו-price_list_name הוא המחירון שממנו נלקח המחיר. העלות של כל שורה נמצאת ב-deal_line_costs.csv: deal_line_id היא השורה ו-cost_agorot העלות ליחידה באגורות, כפי שנשמרה כשהשורה נוצרה.
 הצעות המחיר נמצאות ב-quotes.csv: title הכותרת, status המצב (draft = טיוטה), deal_id, contact_id ו-company_id הלקוח, quote_date התאריך ו-valid_until התוקף. הסכומים באגורות: subtotal_agorot (השורות), discount_total_agorot (הנחה על ההצעה), net_total_agorot (לפני מע"מ), vat_agorot ו-total_agorot; vat_rate_bp הוא שיעור המע"מ ב-1/100 של אחוז, ו-no_vat_reason סיבה להצעה בלי מע"מ (eilat = אילת, abroad = לקוח בחו"ל, other = אחר, עם no_vat_note). השורות נמצאות ב-quote_lines.csv: quote_id ההצעה, kind הוא item (שורה) או group (כותרת של קבוצה), name ו-description, quantity, unit_price_agorot, ההנחה, total_agorot, ו-is_optional / optional_selected לשורת רשות ואם נבחרה. לוח התשלומים של הצעה נמצא ב-quote_payment_steps.csv: quote_id ההצעה, name שם התשלום, percent_bp האחוז ב-1/100 של אחוז (10000 = 100%), due_date המועד ו-milestone אבן הדרך.
 תבניות ההצעה נמצאות ב-quote_templates.csv (name השם, notes ו-terms, ו-prices_include_vat אם המחירים בתבנית כוללים מע"מ), והשורות שלהן ב-quote_template_lines.csv: template_id התבנית, ושאר העמודות כמו בשורות ההצעה. unit_price_agorot ריק בשורת מוצר פירושו שהמחיר נלקח מהקטלוג כשמשתמשים בתבנית.
 חלוקת הלידים נמצאת ב-lead_distribution.csv: method הוא round_robin (סבב), weighted (לפי משקל) או load (לפי עומס פתוח), ו-weights הם המשקלים של העובדים (מזהה משתמש ומספר מ-1 עד 10; מי שלא מופיע שוקל 1). כללי החלוקה נמצאים ב-lead_routing_rules.csv: ליד מהמקור source_id, עם המוצר product_id, בשפה locale ו/או עם הערך field_value בשדה field_key (כל מה שמולא בכלל צריך להתאים) נשלח לצוות team_id או לאדם user_id, לפי הסדר position, ורק כללים עם is_active.

@@ -34,22 +34,18 @@ describe("profit and margin", () => {
   });
 
   it("adds up the lines that have a cost and counts the rest as left out, never as zero cost", () => {
-    const costs = new Map([
-      ["chair", 6000],
-      ["table", 30000],
+    // each line's own cost (PRD-06 follow-up: kept on the line when it was made)
+    const result = linesProfit([
+      { unitCostAgorot: 6000, quantity: 3, netAgorot: 27000 },
+      { unitCostAgorot: 30000, quantity: 1, netAgorot: 50000 },
+      { unitCostAgorot: null, quantity: 1, netAgorot: 9000 },
+      { unitCostAgorot: null, quantity: 1, netAgorot: 5000 },
     ]);
-    const result = linesProfit(
-      [
-        { productId: "chair", quantity: 3, netAgorot: 27000 },
-        { productId: "table", quantity: 1, netAgorot: 50000 },
-        { productId: "lamp", quantity: 1, netAgorot: 9000 },
-        { productId: null, quantity: 1, netAgorot: 5000 },
-      ],
-      costs,
-    );
     expect(result).toEqual({ revenueAgorot: 77000, costAgorot: 48000, profitAgorot: 29000, marginBp: 3766, uncosted: 2 });
-    expect(linesProfit([{ productId: "lamp", quantity: 1, netAgorot: 9000 }], costs)).toBeNull();
-    expect(linesProfit([{ productId: "chair", quantity: 1, netAgorot: null }], costs)).toBeNull();
+    expect(linesProfit([{ unitCostAgorot: null, quantity: 1, netAgorot: 9000 }])).toBeNull();
+    expect(linesProfit([{ unitCostAgorot: 6000, quantity: 1, netAgorot: null }])).toBeNull();
+    // a cost of 0 is a cost, not a missing one
+    expect(linesProfit([{ unitCostAgorot: 0, quantity: 2, netAgorot: 1000 }])).toMatchObject({ costAgorot: 0, profitAgorot: 1000, uncosted: 0 });
   });
 
   it("shows the margin as a short percent", () => {

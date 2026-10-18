@@ -48,7 +48,7 @@ import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
 import { canEditCatalog, canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
-import { readProductCosts } from "@/features/product-costs/queries";
+import { readDealLineCosts, readProductCosts } from "@/features/product-costs/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
@@ -113,10 +113,30 @@ export default async function DealPage({ params, searchParams }: Props) {
   // DLI-01, PL-03: the day, the VAT and the customer's price list the lines are priced by
   const linesPricing = await getDealPricing(orgId, { contactId: deal.contact_id, companyId: deal.company_id }, lines, context.org.timeZone);
   const granted = await getMyPermissions(orgId);
-  // PRD-06: the products' costs (gross profit on the lines) only for those who see costs; RLS applies the same rule
+  // PRD-06: the cost kept on each line, and its product's cost in the catalog today, only for those who see costs; RLS
+  // applies the same rule. A line's cost can be changed only on an open deal (the database locks a closed one).
+  const seesCosts = canViewCosts(context.role, granted);
   const lineProductIds = lines.flatMap((line) => (line.productId ? [line.productId] : []));
+  const [keptCosts, catalogCosts] =
+    seesCosts && lines.length > 0
+      ? await Promise.all([
+          readDealLineCosts(
+            orgId,
+            lines.map((line) => line.id),
+          ),
+          lineProductIds.length > 0 ? readProductCosts(orgId, lineProductIds) : Promise.resolve(new Map<string, number>()),
+        ])
+      : [null, null];
   const lineCosts =
-    canViewCosts(context.role, granted) && lineProductIds.length > 0 ? Object.fromEntries(await readProductCosts(orgId, lineProductIds)) : null;
+    keptCosts && catalogCosts
+      ? Object.fromEntries(
+          lines.map((line) => [
+            line.id,
+            { cost: keptCosts.get(line.id) ?? null, catalog: line.productId ? (catalogCosts.get(line.productId) ?? null) : null },
+          ]),
+        )
+      : null;
+  const canEditCosts = seesCosts && canEdit && context.canWrite && hasProducts && deal.status === "open";
   // DEAL-11: right after a copy, the custom fields it could not carry
   const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
@@ -191,6 +211,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             features={{ products: hasProducts, discounts: hasDiscounts }}
             canCreateProducts={hasProducts && context.canWrite && canEditCatalog(context.role, granted)}
             costs={lineCosts}
+            canEditCosts={canEditCosts}
           />
           {/* QUO-01: the deal's quotes, and a new one for whoever may edit the deal */}
           <RecordQuotesCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={hasQuotes && canEdit} />

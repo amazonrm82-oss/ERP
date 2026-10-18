@@ -67,6 +67,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   products: "מוצר",
   // PRD-06
   product_costs: "עלות של מוצר",
+  // PRD-06 follow-up
+  deal_line_costs: "עלות של שורה בעסקה",
   // PL-01
   price_lists: "מחירון",
   // PL-02

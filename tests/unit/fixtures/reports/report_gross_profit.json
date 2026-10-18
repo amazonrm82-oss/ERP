@@ -1,0 +1,34 @@
+{
+  "totals": {
+    "deals": 2,
+    "lines": 2,
+    "costed_lines": 1,
+    "uncosted_lines": 1,
+    "deals_with_costs": 1
+  },
+  "allowed": true,
+  "by_billing": [
+    {
+      "cost": 24000,
+      "deals": 1,
+      "lines": 1,
+      "profit": 36000,
+      "billing": "one_time",
+      "revenue": 60000,
+      "margin_bp": 6000
+    }
+  ],
+  "by_product": [
+    {
+      "cost": 24000,
+      "name": "ייעוץ",
+      "deals": 1,
+      "profit": 36000,
+      "billing": "one_time",
+      "revenue": 60000,
+      "quantity": 2,
+      "margin_bp": 6000,
+      "product_id": "00000000-0000-4000-8000-000000000014"
+    }
+  ]
+}

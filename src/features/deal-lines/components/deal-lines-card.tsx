@@ -10,6 +10,7 @@ import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
 import { linesValueNote, monthlyRecurringAgorot } from "@/features/deals/recurring";
+import { LineCost } from "@/features/product-costs/components/line-cost";
 import { linesProfit, marginText } from "@/features/product-costs/margin";
 import { documentVatRateBp } from "@/features/tax/calc";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
@@ -43,8 +44,11 @@ type Props = {
   // DLI-03: what the deal value follows (deals.amount_auto, amount_source, recurring_amount_auto)
   // DLI-04: the deal's recurring amount as shown (null = one-time or empty)
   dealValue: { kind: string | null; auto: boolean; source: string | null; recurringAuto: boolean; recurringAgorot: number | null };
-  // PRD-06: the cost per unit of the lines' products, by product id, for those who see costs; null for anyone else
-  costs: Record<string, number> | null;
+  // PRD-06: per line id, the cost per unit kept on the line (null = none) and its product's cost in the catalog today
+  // (null = none), for those who see costs; null for anyone else
+  costs: Record<string, { cost: number | null; catalog: number | null }> | null;
+  // a hint only (the database decides): the deal is open and the user may edit it and its line costs
+  canEditCosts: boolean;
 };
 
 function discountText(line: DealLine): string | null {
@@ -58,7 +62,7 @@ function discountText(line: DealLine): string | null {
  * discount and amount, and the totals with VAT under them by the one totals rule (TAX-05). DLI-03: the
  * deal's value follows their sum before VAT unless a person typed it; the card says which.
  */
-export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue, costs }: Props) {
+export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features, canCreateProducts, dealValue, costs, canEditCosts }: Props) {
   const [editing, setEditing] = useState<DealLine | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -101,7 +105,7 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
       ? null
       : linesProfit(
           lines.map((line) => ({
-            productId: line.productId,
+            unitCostAgorot: costs[line.id]?.cost ?? null,
             quantity: line.quantity,
             netAgorot: dealLinesNet(
               [{ quantity: line.quantity, unitPriceAgorot: line.unitPriceAgorot, discountBp: line.discountBp, discountAgorot: line.discountAgorot, vatExempt: line.vatExempt }],
@@ -109,7 +113,6 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
               pricing.includesVat,
             ),
           })),
-          new Map(Object.entries(costs)),
         );
 
   return (
@@ -153,6 +156,16 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
                       {lineBillingText(line.billing)}
                     </p>
                     {line.productId ? <p className="text-sm text-ink-soft">{priceSourceText(line.source, line.priceListName)}</p> : null}
+                    {costs ? (
+                      <LineCost
+                        orgId={orgId}
+                        dealId={dealId}
+                        lineId={line.id}
+                        cost={costs[line.id]?.cost ?? null}
+                        catalog={line.productId ? (costs[line.id]?.catalog ?? null) : null}
+                        canEdit={canEditCosts}
+                      />
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="me-1 font-semibold tabular-nums">{formatMoney(line.totalAgorot)}</span>
@@ -227,7 +240,7 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
                 {profit.uncosted === 1 ? "שורה אחת בלי עלות לא נכללה בחישוב." : `${profit.uncosted} שורות בלי עלות לא נכללו בחישוב.`}
               </p>
             ) : null}
-            <p className="text-sm text-ink-soft">לפי העלות שבקטלוג היום. רק מי שמורשה לראות עלות רואה את החלק הזה.</p>
+            <p className="text-sm text-ink-soft">לפי העלות שנשמרה בכל שורה. רק מי שמורשה לראות עלות רואה את החלק הזה.</p>
           </div>
         ) : null}
         {lines.length > 0 && monthly !== null && monthly > 0 ? (

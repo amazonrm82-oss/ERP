@@ -184,11 +184,20 @@ describe("tenant isolation", () => {
         ids.priceListA,
         ids.productA,
       ]);
-      // DLI-01: a product line on the deal
-      await q(
-        "insert into public.deal_lines (organization_id, deal_id, product_id, description, quantity, unit_price_agorot, price_source) values ($1, $2, $3, 'מוצר של א', 2, 10000, 'product')",
-        [orgA, ids.dealA, ids.productA],
-      );
+      // DLI-01: a product line on the deal (PRD-06: it gets a copy of the product's cost, deal_line_costs)
+      ids.dealLineA = (
+        await q<{ id: string }>(
+          "insert into public.deal_lines (organization_id, deal_id, product_id, description, quantity, unit_price_agorot, price_source) values ($1, $2, $3, 'מוצר של א', 2, 10000, 'product') returning id",
+          [orgA, ids.dealA, ids.productA],
+        )
+      ).rows[0].id;
+      // and a free line, which has no cost yet
+      ids.freeLineA = (
+        await q<{ id: string }>("insert into public.deal_lines (organization_id, deal_id, description, unit_price_agorot) values ($1, $2, 'שורה חופשית של א', 500) returning id", [
+          orgA,
+          ids.dealA,
+        ])
+      ).rows[0].id;
       await q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [orgA, ids.leadA]);
       // QUO-01: a draft quote on the deal, with a line
       ids.quoteA = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה של א', $2) returning id", [orgA, ids.dealA])).rows[0].id;
@@ -307,6 +316,8 @@ describe("tenant isolation", () => {
     "price_list_lines",
     // DLI-01
     "deal_lines",
+    // PRD-06 follow-up: a line's cost
+    "deal_line_costs",
     // QUO-01
     "quotes",
     "quote_lines",
@@ -478,6 +489,7 @@ describe("tenant isolation", () => {
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
       deal_lines: "quantity = quantity",
+      deal_line_costs: "cost_agorot = cost_agorot",
       quotes: "title = title",
       quote_lines: "name = name",
       quote_payment_steps: "name = name",
@@ -597,6 +609,7 @@ describe("tenant isolation", () => {
       ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
       ["insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgA, ids.dealA]],
       ["insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgA, ids.dealA, ids.productA]],
+      ["insert into public.deal_line_costs (organization_id, deal_line_id, cost_agorot) values ($1, $2, 1)", [orgA, ids.freeLineA]],
       ["insert into public.quotes (organization_id, title, deal_id) values ($1, 'x', $2)", [orgA, ids.dealA]],
       ["insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgA, ids.quoteA]],
       ["insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.quoteA]],
@@ -697,6 +710,7 @@ describe("tenant isolation", () => {
       ["price_lists", "is_active = false", "not is_active"],
       ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
       ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
+      ["deal_line_costs", "cost_agorot = 777", "cost_agorot = 777"],
       ["quotes", "title = 'HACKED'", "title = 'HACKED'"],
       ["quote_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
@@ -901,6 +915,11 @@ describe("tenant isolation", () => {
       asUser(b.id, (q) => q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 1)", [orgB, ids.productA])),
     );
     expect(viaCostProduct.code).toBe("23503");
+    // PRD-06 follow-up: nor a line cost in B's organization at A's line
+    const viaLineCost = await pgError(
+      asUser(b.id, (q) => q("insert into public.deal_line_costs (organization_id, deal_line_id, cost_agorot) values ($1, $2, 1)", [orgB, ids.dealLineA])),
+    );
+    expect(["42501", "23503"]).toContain(viaLineCost.code);
     const viaLineList = await pgError(
       asUser(b.id, (q) =>
         q("insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source, price_list_id) values ($1, $2, $3, 'x', 'price_list', $4)", [

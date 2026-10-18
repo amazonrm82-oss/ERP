@@ -1,0 +1,59 @@
+{
+  "by_top": [
+    {
+      "name": "שירותים",
+      "deals": 1,
+      "amount": 60000,
+      "billing": "one_time",
+      "products": 1,
+      "category_id": "00000000-0000-4000-8000-000000000015"
+    }
+  ],
+  "totals": {
+    "deals": 2,
+    "categories": 1,
+    "deals_with_vat": 0,
+    "deals_with_lines": 1,
+    "deals_without_vat": 1,
+    "deals_without_lines": 1,
+    "amount_without_lines": 40000
+  },
+  "by_billing": [
+    {
+      "deals": 1,
+      "lines": 1,
+      "amount": 5000,
+      "billing": "monthly"
+    },
+    {
+      "deals": 1,
+      "lines": 1,
+      "amount": 60000,
+      "billing": "one_time"
+    }
+  ],
+  "by_category": [
+    {
+      "kind": "category",
+      "name": "ייעוץ",
+      "deals": 1,
+      "amount": 60000,
+      "billing": "one_time",
+      "products": 1,
+      "parent_id": "00000000-0000-4000-8000-000000000015",
+      "category_id": "00000000-0000-4000-8000-000000000016",
+      "parent_name": "שירותים"
+    },
+    {
+      "kind": "free",
+      "name": null,
+      "deals": 1,
+      "amount": 5000,
+      "billing": "monthly",
+      "products": 0,
+      "parent_id": null,
+      "category_id": null,
+      "parent_name": null
+    }
+  ]
+}

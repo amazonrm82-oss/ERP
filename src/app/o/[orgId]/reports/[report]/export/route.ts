@@ -1,6 +1,7 @@
 import { buildReport } from "@/features/reports/build";
 import { findReport } from "@/features/reports/definitions";
 import { csvCell } from "@/features/reports/format";
+import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
@@ -19,6 +20,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   const context = await getOrgContext(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
+  // DLI-06: a report about costs does not exist for someone who may not see costs (log_export refuses it too)
+  if (definition.costs && !canViewCosts(context.role, granted)) {
+    return new Response("not found", { status: 404 });
+  }
   if (!canExport(context.role, granted)) {
     return new Response("ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }

@@ -1762,6 +1762,18 @@ export type ProductCostRow = {
   updated_at: string;
 };
 
+// PRD-06 follow-up: the cost of a deal line, a copy of its product's cost taken when the line was made; readable only
+// under app.can_view_costs, editable while the deal is open
+export type DealLineCostRow = {
+  id: string;
+  organization_id: string;
+  deal_line_id: string;
+  cost_agorot: number;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type ProductWrite = {
   name: string;
   description?: string | null;
@@ -2317,6 +2329,12 @@ export type Database = {
         { organization_id: string; product_id: string; cost_agorot: number; currency?: string },
         { cost_agorot?: number; currency?: string }
       >;
+      // PRD-06 follow-up: column grants; organization_id and deal_line_id are fixed once inserted
+      deal_line_costs: Table<
+        DealLineCostRow,
+        { organization_id: string; deal_line_id: string; cost_agorot: number; currency?: string },
+        { cost_agorot?: number; currency?: string }
+      >;
       // PL-01: column grants; organization_id is fixed once inserted
       price_lists: Table<
         PriceListRow,
@@ -2511,6 +2529,9 @@ export type Database = {
       report_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // RPT-01: the won deals' lines by product and billing
       report_revenue_by_product: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // DLI-06
+      report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_gross_profit: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // CON-06
       report_referrals: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       report_summary: {

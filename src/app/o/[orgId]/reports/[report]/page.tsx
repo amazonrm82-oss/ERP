@@ -11,6 +11,7 @@ import { ForecastOverdueDeals } from "@/features/reports/components/forecast-ove
 import { getOverdueActionsSetup } from "@/features/reports/forecast-overdue-server";
 import { ReportFilters } from "@/features/reports/components/report-filters";
 import { findReport } from "@/features/reports/definitions";
+import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
@@ -38,6 +39,10 @@ export default async function ReportPage({ params, searchParams }: Props) {
   const context = await getOrgContext(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
+  // DLI-06: a report about costs does not exist for someone who may not see costs
+  if (definition.costs && !canViewCosts(context.role, granted)) {
+    notFound();
+  }
   const filters = reportFilters(definition, await searchParams);
 
   const [view, members, pipelines] = await Promise.all([

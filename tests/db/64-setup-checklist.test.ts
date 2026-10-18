@@ -459,6 +459,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_task_checklists.sql",
       // QUO-07 follow-ups redefine app.audit_erase_core() of _quote_payment_schedule.sql last
       "_quote_kept_followups.sql",
+      // DLI-06 redefines public.log_export() last (the 'categories' and 'profit' report keys)
+      "_report_categories_profit.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

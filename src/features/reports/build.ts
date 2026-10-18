@@ -57,6 +57,18 @@ function billingFigureHint(billing: string | null): string {
   return "שורות שנשמרו לפני שהיה לשורה סוג חיוב; סכומן לפי תקופת העסקה.";
 }
 
+// RPT-01, DLI-06: what the stored line totals of a period are, with VAT or before it (one mode per deal)
+function vatModeNote(totals: Record<string, unknown>): string | null {
+  const withVat = num(totals.deals_with_vat);
+  const withoutVat = num(totals.deals_without_vat);
+  if (withVat > 0 && withoutVat > 0) {
+    return `שימו לב: בתקופה יש עסקאות שתמחרו כולל מע"מ (${formatNumber(withVat)}) ועסקאות שתמחרו לפני מע"מ (${formatNumber(withoutVat)}), והסכומים כאן לא אוחדו לאחד מהם.`;
+  }
+  if (withVat > 0) return 'כל הסכומים כאן כוללים מע"מ, כפי שתומחרו בעסקאות.';
+  if (withoutVat > 0) return 'כל הסכומים כאן לפני מע"מ, כפי שתומחרו בעסקאות.';
+  return null;
+}
+
 function monthLabel(month: unknown): string {
   const value = str(month);
   return value ? monthFormat.format(new Date(`${value.slice(0, 10)}T12:00:00Z`)) : "ללא תאריך צפוי";
@@ -804,7 +816,6 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const oneTime = billings.find((b) => b.billing === "one_time");
       // a recurring line's total is one billing period: never added to one-time sales (each kind its own figure)
       const recurring = billings.filter((b) => b.billing !== "one_time");
-      const mixedVat = num(totals.deals_with_vat) > 0 && num(totals.deals_without_vat) > 0;
       return {
         kpis: [
           {
@@ -848,16 +859,142 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             empty: "לא נמכרו מוצרים בעסקאות שנסגרו בתקופה הזו.",
             note: [
               "נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה, לפי תאריך הסגירה. הסכום הוא סכום השורה כפי שנשמר בעסקה. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, כי הסכום שלה הוא לתקופת חיוב אחת, ולא מתווסף למכירות החד-פעמיות. עסקה בלי שורות לא נספרת כאן; היא מופיעה בדוח \"הכנסות\".",
-              mixedVat
-                ? `שימו לב: בתקופה יש עסקאות שתמחרו כולל מע"מ (${formatNumber(num(totals.deals_with_vat))}) ועסקאות שתמחרו לפני מע"מ (${formatNumber(num(totals.deals_without_vat))}), והסכומים כאן לא אוחדו לאחד מהם.`
-                : num(totals.deals_with_vat) > 0
-                  ? 'כל הסכומים כאן כוללים מע"מ, כפי שתומחרו בעסקאות.'
-                  : num(totals.deals_without_vat) > 0
-                    ? 'כל הסכומים כאן לפני מע"מ, כפי שתומחרו בעסקאות.'
-                    : null,
+              vatModeNote(totals),
             ]
               .filter(Boolean)
               .join(" "),
+          },
+        ],
+      };
+    }
+
+    // DLI-06: the lines of the deals won in the period, by the category their product is in today
+    case "categories": {
+      const data = obj(await rpc("report_revenue_by_category", { ...range, p_pipeline: pipelineId, p_owner: ownerId }));
+      const totals = obj(data.totals as Json);
+      const rows = list(data.by_category as Json);
+      const tops = list(data.by_top as Json);
+      const billings = list(data.by_billing as Json);
+      const withoutLines = num(totals.deals_without_lines);
+      const oneTime = billings.find((b) => b.billing === "one_time");
+      const recurring = billings.filter((b) => b.billing !== "one_time");
+      const categoryName = (r: Record<string, unknown>) =>
+        r.kind === "free" ? "שורות בלי מוצר" : r.kind === "uncategorized" ? "מוצרים בלי קטגוריה" : (str(r.name) ?? "קטגוריה");
+      const amountNote =
+        "נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה, לפי תאריך הסגירה. הסכום הוא סכום השורה כפי שנשמר בעסקה. הקטגוריה היא זו שהמוצר נמצא בה היום. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, כי הסכום שלה הוא לתקופת חיוב אחת.";
+      const columns = [
+        { key: "category", label: "קטגוריה", kind: "text" as const },
+        { key: "billing", label: "חיוב", kind: "text" as const },
+        { key: "products", label: "מוצרים", kind: "number" as const },
+        { key: "deals", label: "עסקאות", kind: "number" as const },
+        { key: "amount", label: "סכום", kind: "money" as const },
+      ];
+      return {
+        kpis: [
+          {
+            label: "מכירות חד-פעמיות",
+            value: formatMoney(num(oneTime?.amount)),
+            hint: `${formatNumber(num(oneTime?.deals))} עסקאות, שורות בחיוב חד-פעמי בלבד`,
+          },
+          ...recurring.map((b) => ({
+            label: billingFigureLabel(str(b.billing)),
+            value: formatMoney(num(b.amount)),
+            hint: `${formatNumber(num(b.deals))} עסקאות. ${billingFigureHint(str(b.billing))}`,
+          })),
+          { label: "קטגוריות שנמכרו", value: formatNumber(num(totals.categories)) },
+          {
+            label: "עסקאות בלי שורות",
+            value: formatNumber(withoutLines),
+            hint: withoutLines ? `בסך ${formatMoney(num(totals.amount_without_lines))}, לא נספרו כאן` : undefined,
+          },
+        ],
+        sections: [
+          {
+            title: "לפי קטגוריה ראשית",
+            columns,
+            rows: tops.map((r) => ({ category: str(r.name) ?? "קטגוריה", billing: billingLabel(str(r.billing)), products: num(r.products), deals: num(r.deals), amount: num(r.amount) })),
+            bar: "amount",
+            empty: "לא נמכרו מוצרים מקטגוריות בעסקאות שנסגרו בתקופה הזו.",
+            note: "תת-קטגוריה נספרת בתוך הקטגוריה הראשית שלה.",
+          },
+          {
+            title: "לפי קטגוריה",
+            columns,
+            rows: rows.map((r) => ({
+              category: r.kind === "category" && str(r.parent_name) ? `${str(r.parent_name)} / ${categoryName(r)}` : categoryName(r),
+              billing: billingLabel(str(r.billing)),
+              products: num(r.products),
+              deals: num(r.deals),
+              amount: num(r.amount),
+            })),
+            bar: "amount",
+            empty: "לא נמכרו מוצרים בעסקאות שנסגרו בתקופה הזו.",
+            note: [amountNote, vatModeNote(totals)].filter(Boolean).join(" "),
+          },
+        ],
+      };
+    }
+
+    // DLI-06: gross profit of the won lines that keep a cost, for those who may see costs (the SQL answers nothing otherwise)
+    case "profit": {
+      const data = obj(await rpc("report_gross_profit", { ...range, p_pipeline: pipelineId, p_owner: ownerId }));
+      if (data.allowed !== true) {
+        return { kpis: [], sections: [], note: "רק מי שמורשה לראות עלות רואה את הדוח הזה." };
+      }
+      const totals = obj(data.totals as Json);
+      const billings = list(data.by_billing as Json);
+      const rows = list(data.by_product as Json);
+      const uncosted = num(totals.uncosted_lines);
+      const margin = (bp: unknown) => (numOrNull(bp) === null ? null : num(bp) / 100);
+      const figure = (b: Record<string, unknown>) =>
+        `${formatMoney(num(b.profit))}${numOrNull(b.margin_bp) === null ? "" : ` (${formatCell("percent", margin(b.margin_bp))})`}`;
+      const oneTime = billings.find((b) => b.billing === "one_time");
+      const recurring = billings.filter((b) => b.billing !== "one_time");
+      return {
+        kpis: [
+          {
+            label: "רווח גולמי, חד-פעמי",
+            value: oneTime ? figure(oneTime) : formatMoney(0),
+            hint: oneTime ? `הכנסה ${formatMoney(num(oneTime.revenue))}, עלות ${formatMoney(num(oneTime.cost))}` : "אין שורות חד-פעמיות עם עלות",
+          },
+          ...recurring.map((b) => ({
+            label: `רווח גולמי, ${billingFigureLabel(str(b.billing))}`,
+            value: figure(b),
+            hint: `הכנסה ${formatMoney(num(b.revenue))}, עלות ${formatMoney(num(b.cost))}. ${billingFigureHint(str(b.billing))}`,
+          })),
+          {
+            label: "שורות בלי עלות",
+            value: formatNumber(uncosted),
+            hint: uncosted ? "לא נכללו בחישוב" : undefined,
+          },
+        ],
+        sections: [
+          {
+            title: "לפי מוצר",
+            columns: [
+              { key: "product", label: "מוצר", kind: "text" },
+              { key: "billing", label: "חיוב", kind: "text" },
+              { key: "quantity", label: "כמות", kind: "number" },
+              { key: "revenue", label: "הכנסה לפני מע\"מ", kind: "money" },
+              { key: "cost", label: "עלות", kind: "money" },
+              { key: "profit", label: "רווח גולמי", kind: "money" },
+              { key: "margin", label: "שיעור רווח", kind: "percent" },
+            ],
+            rows: rows.map(
+              (r): ReportRow => ({
+                _href: str(r.product_id) ? productPath(orgId, str(r.product_id) as string) : null,
+                product: str(r.product_id) ? (str(r.name) ?? "מוצר") : "שורות בלי מוצר",
+                billing: billingLabel(str(r.billing)),
+                quantity: num(r.quantity),
+                revenue: num(r.revenue),
+                cost: num(r.cost),
+                profit: num(r.profit),
+                margin: margin(r.margin_bp),
+              }),
+            ),
+            bar: "profit",
+            empty: "אין בתקופה הזו שורות עם עלות בעסקאות שנסגרו.",
+            note: 'נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה. ההכנסה היא סכום השורה לפני מע"מ, והעלות היא העלות שנשמרה בשורה כפול הכמות. שורה בלי עלות לא נכללת. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, לתקופת חיוב אחת. רק מי שמורשה לראות עלות רואה את הדוח הזה.',
           },
         ],
       };

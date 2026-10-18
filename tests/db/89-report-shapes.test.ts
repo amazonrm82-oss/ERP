@@ -49,6 +49,12 @@ describe("report result shapes (FXC-12)", () => {
       const product = (
         await q<{ id: string }>("insert into public.products (organization_id, name, price_agorot, vat_kind, price_includes_vat) values ($1, 'ייעוץ', 30000, 'taxable', false) returning id", [org])
       ).rows[0].id;
+      // DLI-06: a category with a subcategory for the product, and a cost the line keeps (report_revenue_by_category,
+      // report_gross_profit)
+      const top = (await q<{ id: string }>("insert into public.product_categories (organization_id, name) values ($1, 'שירותים') returning id", [org])).rows[0].id;
+      const sub = (await q<{ id: string }>("insert into public.product_categories (organization_id, name, parent_id) values ($1, 'ייעוץ', $2) returning id", [org, top])).rows[0].id;
+      await q("update public.products set category_id = $2 where id = $1", [product, sub]);
+      await q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 12000)", [org, product]);
       await q(
         "insert into public.deal_lines (organization_id, deal_id, product_id, description, quantity, unit_price_agorot, price_source) values ($1, $2, $3, 'ייעוץ', 2, 30000, 'product')",
         [org, wonDeal, product],
@@ -186,6 +192,8 @@ describe("report result shapes (FXC-12)", () => {
       report_stuck_deals: ["public.report_stuck_deals($1)", [org]],
       report_revenue: ["public.report_revenue($1, $2, $3)", range],
       report_revenue_by_product: ["public.report_revenue_by_product($1, $2, $3)", range],
+      report_revenue_by_category: ["public.report_revenue_by_category($1, $2, $3)", range],
+      report_gross_profit: ["public.report_gross_profit($1, $2, $3)", range],
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],
       report_goal_progress: ["public.report_goal_progress($1)", [org]],
       report_goal_forecast: ["public.report_goal_forecast($1)", [org]],

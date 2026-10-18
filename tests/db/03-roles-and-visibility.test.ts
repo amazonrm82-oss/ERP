@@ -244,6 +244,49 @@ describe("roles and record visibility", () => {
     expect(await asUser(owner.id, async (q) => (await q("update public.product_costs set cost_agorot = 450 where product_id = $1", [product])).rowCount)).toBe(1);
   });
 
+  it("a deal line keeps its product's cost: those who see costs read and edit it while the deal is open; nobody else sees it (PRD-06)", async () => {
+    const product = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.products (organization_id, name, price_agorot) values ($1, 'מוצר לשורה', 1000) returning id", [org])).rows[0].id,
+    );
+    await asUser(owner.id, (q) => q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 300)", [org, product]));
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stages = (await asAdmin((q) => q<{ id: string; kind: string }>("select id, kind from public.stages where pipeline_id = $1 order by position", [pipe]))).rows;
+    const deal = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם עלות', $2, $3) returning id", [
+          org,
+          pipe,
+          stages.find((s) => s.kind === "open")!.id,
+        ])
+      ).rows[0].id,
+    );
+    // a member who may not see costs adds the line: the copy is taken anyway
+    const line = await asUser(m1.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.deal_lines (organization_id, deal_id, product_id, description, unit_price_agorot, price_source) values ($1, $2, $3, 'מוצר', 1000, 'product') returning id",
+          [org, deal, product],
+        )
+      ).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.deal_line_costs where deal_line_id = $1", [line]));
+    for (const u of [owner, admin, manager]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m1, m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    expect(await asAdmin(async (q) => (await q<{ c: string }>("select cost_agorot as c from public.deal_line_costs where deal_line_id = $1", [line])).rows[0].c)).toBe("300");
+    // the member who owns the deal cannot write it; the owner can, while the deal is open
+    expect(await asUser(m1.id, async (q) => (await q("update public.deal_line_costs set cost_agorot = 1 where deal_line_id = $1", [line])).rowCount)).toBe(0);
+    for (const u of [m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("delete from public.deal_line_costs where deal_line_id = $1", [line])).rowCount), u.email).toBe(0);
+      expect((await pgError(asUser(u.id, (q) => q("insert into public.deal_line_costs (organization_id, deal_line_id, cost_agorot) values ($1, $2, 1)", [org, line])))).code, u.email).toBe("42501");
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.deal_line_costs set cost_agorot = 350 where deal_line_id = $1", [line])).rowCount)).toBe(1);
+    // a closed deal is locked, for everyone
+    await asAdmin((q) => q("update public.deals set stage_id = $2 where id = $1", [deal, stages.find((s) => s.kind === "won")!.id]));
+    expect(await asUser(owner.id, async (q) => (await q("update public.deal_line_costs set cost_agorot = 1 where deal_line_id = $1", [line])).rowCount)).toBe(0);
+    expect(await asUser(owner.id, async (q) => (await q("delete from public.deal_line_costs where deal_line_id = $1", [line])).rowCount)).toBe(0);
+    expect(await seen(owner)).toBe(1);
+  });
+
   it("quotes follow their deal: its editors write, readers only read, a viewer never writes (QUO-01)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

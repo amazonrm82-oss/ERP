@@ -129,6 +129,17 @@ describe("currency next to every amount", () => {
         const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם שורה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
         await q("insert into public.deal_lines (organization_id, deal_id, description, price_includes_vat, price_source, quantity, unit_price_agorot) values ($1, $2, 'שורה', false, 'manual', 1, 1000)", [org, deal]);
       },
+      // PRD-06 follow-up
+      deal_line_costs: async (q) => {
+        const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם עלות בשורה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
+        const line = (
+          await q<{ id: string }>(
+            "insert into public.deal_lines (organization_id, deal_id, description, price_includes_vat, price_source, quantity, unit_price_agorot) values ($1, $2, 'שורה', false, 'manual', 1, 1000) returning id",
+            [org, deal],
+          )
+        ).rows[0].id;
+        await q("insert into public.deal_line_costs (organization_id, deal_line_id, cost_agorot) values ($1, $2, 400)", [org, line]);
+      },
       // QUO-01, QUO-02
       quotes: async (q) => {
         const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם הצעה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;

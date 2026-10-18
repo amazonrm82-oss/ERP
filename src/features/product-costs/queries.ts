@@ -35,6 +35,30 @@ export async function readProductCosts(orgId: string, productIds: readonly strin
 }
 
 /**
+ * PRD-06 follow-up: the cost per unit kept on the given deal lines, by line id (public.deal_line_costs, a copy of the
+ * product's cost taken when the line was made). Same rule as readProductCosts: RLS returns rows only to those who see
+ * costs, so call it only for someone canViewCosts() allows.
+ */
+export async function readDealLineCosts(orgId: string, lineIds: readonly string[]): Promise<Map<string, number>> {
+  const ids = [...new Set(lineIds)];
+  if (ids.length === 0) return new Map();
+  const supabase = await createClient();
+  const rows = await readAllPagesByIds(ids, async (slice, from, to) =>
+    must(
+      await supabase
+        .from("deal_line_costs")
+        .select("deal_line_id, cost_agorot")
+        .eq("organization_id", orgId)
+        .in("deal_line_id", slice)
+        .order("deal_line_id")
+        .range(from, to),
+      "deal line costs",
+    ),
+  );
+  return new Map(rows.map((row) => [row.deal_line_id, Number(row.cost_agorot)]));
+}
+
+/**
  * What a product's price is compared with: today's conversion rate (the business's VAT rate, 0
  * when it charges none) and whether it charges VAT (null = not set yet).
  */
