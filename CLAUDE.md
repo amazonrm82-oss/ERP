@@ -835,6 +835,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
   `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` and `public.quote_public`
   were last redefined in 020310 (`app.audit_erase_core` in 020320).
+- Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
+  execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
+  `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
+  only, no amounts (the screen reads the title live). `app.activities_quote_entry_guard` (invoker, before insert/update/delete on
+  activities) refuses a person (`current_user = 'authenticated'`, owners and admins too) any write of a quote_* entry, hint
+  `activity:quote_entry`; server paths (purge, merge, erasure) pass.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
