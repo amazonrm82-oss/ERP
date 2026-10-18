@@ -64,6 +64,13 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(publicQuoteFrom(answer({ customer: { name: null, contact: null } }))!.customer).toBeNull();
   });
 
+  it("QUO-12: a newer version on an old link names the number the link was made for", () => {
+    expect(publicQuoteFrom(answer())!.replaced).toBeNull();
+    expect(publicQuoteFrom(answer({ replaced: null }))!.replaced).toBeNull();
+    expect(publicQuoteFrom(answer({ replaced: { number: "QT-1041" } }))!.replaced).toEqual({ number: "QT-1041" });
+    expect(publicQuoteFrom(answer({ replaced: { number: 7 } }))).toBeNull();
+  });
+
   it("anything else is not a page", () => {
     expect(publicQuoteFrom(null)).toBeNull();
     expect(publicQuoteFrom({ rate_limited: true })).toBeNull();

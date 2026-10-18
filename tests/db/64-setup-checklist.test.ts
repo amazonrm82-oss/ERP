@@ -461,6 +461,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_kept_followups.sql",
       // DLI-06 redefines public.log_export() last (the 'categories' and 'profit' report keys)
       "_report_categories_profit.sql",
+      // QUO-12 redefines public.quote_public() of _quote_payment_schedule.sql last (a newer version on the old link)
+      "_quote_versions.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

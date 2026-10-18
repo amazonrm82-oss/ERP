@@ -157,6 +157,7 @@ export async function getSampleDocumentData(orgId: string, displayName: string):
     customer: { name: "לקוח לדוגמה בע\"מ", attention: "ישראל ישראלי", address: "רחוב הדוגמה 1, תל אביב", email: "client@example.com", taxId: null },
     quote: {
       id: "sample",
+      previousId: null,
       title: "הצעת מחיר לדוגמה",
       status: "sent",
       numberDisplay: "1001",

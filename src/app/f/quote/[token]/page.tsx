@@ -43,6 +43,22 @@ export default async function PublicQuotePage({ params }: Props) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
       {/* data-print-page: print.css leaves only the document on paper */}
+      {/* QUO-12: the link was made for an earlier version; this page now shows the newer one */}
+      {page.replaced ? (
+        <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
+          קיימת גרסה חדשה של ההצעה, והיא מוצגת כאן.
+          {page.replaced.number ? (
+            <>
+              {" "}
+              ההצעה{" "}
+              <span dir="ltr" className="tabular-nums">
+                {page.replaced.number}
+              </span>{" "}
+              הוחלפה בה.
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <div data-print-page="" className="flex justify-end print:hidden">
         <PrintButton label="הדפסה או שמירה כ-PDF" />
       </div>

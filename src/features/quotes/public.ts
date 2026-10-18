@@ -79,6 +79,8 @@ const answerSchema = z.object({
   }),
   brand: z.object({ logo: text, color: text }),
   built_with: z.boolean(),
+  // QUO-12: the number the customer's link was made for, when the page shows a newer version of it (absent before 020345)
+  replaced: z.object({ number: text }).nullish(),
   // GAP-09: the payment schedule, each step's share of the total worked out by the database
   schedule: z.array(
     z.object({
@@ -102,13 +104,15 @@ export type PublicQuote = {
   lines: QuoteLine[];
   schedule: ScheduleRow[];
   builtWith: boolean;
+  // QUO-12: the link was made for an earlier version; this is the newer one (the earlier one's number, if it had one)
+  replaced: { number: string | null } | null;
 };
 
 /** The answer as the page needs it, or null when it does not have the expected shape. */
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with, schedule } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -127,6 +131,7 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     customer: customer.name ? { name: customer.name, attention: customer.contact, address: null, email: null, taxId: null } : null,
     quote: {
       id: "public",
+      previousId: null,
       title: q.title,
       status: isQuoteStatus(q.status) ? q.status : "sent",
       dealId: null,
@@ -187,5 +192,6 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
       amountAgorot: step.amount_agorot,
     })),
     builtWith: built_with,
+    replaced: replaced ? { number: replaced.number } : null,
   };
 }

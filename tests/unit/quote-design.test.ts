@@ -32,6 +32,7 @@ describe("quote design rules (QUO-05)", () => {
 
 const quote = (extra: Partial<Quote> = {}): Quote => ({
   id: "q",
+  previousId: null,
   title: "שיפוץ מטבח",
   status: "draft",
   numberDisplay: null,

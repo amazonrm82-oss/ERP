@@ -1616,6 +1616,8 @@ export type QuoteRow = {
   former_deal_id: string | null;
   former_contact_id: string | null;
   customer_deleted_at: string | null;
+  // QUO-12: the quote this one is a newer version of (server-only, set by public.quote_new_version)
+  previous_id: string | null;
   currency: string;
   created_by: string | null;
   created_at: string;
@@ -2769,6 +2771,8 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-12: a newer version of a sent quote, as a draft copy (its id)
+      quote_new_version: { Args: { p_org: string; p_quote: string }; Returns: string };
       // QUO-08: the customer's link (create returns the token once; status never the hash) and its page (service_role only)
       quote_link_create: { Args: { p_org: string; p_quote: string }; Returns: string };
       quote_link_revoke: { Args: { p_org: string; p_quote: string }; Returns: boolean };

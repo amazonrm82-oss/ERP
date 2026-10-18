@@ -447,6 +447,27 @@ export async function sendQuoteAction(orgId: string, quoteId: string, withLink: 
   return ok(sent);
 }
 
+// QUO-12 ---------------------------------------------------------------------
+
+const VERSION_PRODUCT_GONE =
+  "באחת השורות יש מוצר שכבר לא פעיל או נמצא בארכיון, ולכן אי אפשר להעתיק את ההצעה. החזירו את המוצר לפעיל, או צרו הצעה חדשה.";
+
+/**
+ * Editing a sent quote (owner, 18 October 2026): public.quote_new_version makes a draft copy of it, its lines and its
+ * payment steps, linked as its newer version; the sent quote itself never changes. Opens the new draft.
+ */
+export async function newQuoteVersionAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("quote_new_version", { p_org: orgId, p_quote: quoteId });
+  if (error?.hint === "quote_lines:product") return fail(VERSION_PRODUCT_GONE);
+  if (error) return fail(writeError(error));
+  if (typeof data !== "string") return fail("לא הצלחנו ליצור גרסה חדשה. נסו שוב.");
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  redirect(quotePath(orgId, data));
+}
+
 /**
  * QUO-08: a new link for the customer to a sent quote (public.quote_link_create). The address is returned once: only
  * its hash is kept, and the previous link of the quote stops working.

@@ -199,6 +199,14 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:frozen": "אי אפשר לשנות מחירים, הנחה או מע\"מ בהצעה שכבר אינה טיוטה.",
   // QUO-16: the timeline entries of a sent, accepted or declined quote are history
   "activity:quote_entry": "רישום של הצעת מחיר בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",
+  // QUO-12: versions of a sent quote
+  "quote:no_redraft": "הצעה שנשלחה לא חוזרת לטיוטה. כדי לשנות אותה יוצרים גרסה חדשה.",
+  "quote_version:draft": "זו טיוטה: אפשר לערוך אותה ישירות.",
+  "quote_version:closed": "ההצעה כבר אושרה, נדחתה, בוטלה או פגה, ולכן אי אפשר ליצור לה גרסה חדשה.",
+  "quote_version:exists": "להצעה הזאת כבר יש גרסה חדשה. ממשיכים לעבוד על הגרסה החדשה.",
+  "quote_version:not_sent": "גרסה חדשה נוצרת רק מהצעה שנשלחה.",
+  "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר.",
+  "quote_version:fixed": "אי אפשר לשנות לאיזו הצעה הגרסה שייכת.",
   // GAP-09
   "quote:schedule_total": "לוח התשלומים צריך להגיע בדיוק ל-100% לפני שליחה. תקנו את האחוזים, או מחקו את הלוח.",
   "quote_schedule:over": "סך האחוזים בלוח התשלומים עובר 100%. הקטינו אחוז באחד התשלומים.",

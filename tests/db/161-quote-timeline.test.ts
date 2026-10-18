@@ -95,6 +95,17 @@ describe("a quote's timeline entries (QUO-16)", () => {
     expect(await asUser(viewer.id, (q) => count(q, "select 1 from public.activities where metadata->>'quote_id' = $1", [quote]))).toBe(1);
   });
 
+  it("the sent entry's author is the person who sent it, not the record's or the quote's owner", async () => {
+    // the member owns the deal and made the draft; the admin sends it
+    const quote = await draft({ deal: await deal(await contact("שולח אחר")) });
+    await asUser(admin.id, (q) => q("select public.quote_send($1, $2)", [org, quote]));
+    const [entry, ...rest] = await entries(quote);
+    expect(rest).toEqual([]);
+    expect(entry.kind).toBe("quote_sent");
+    expect(entry.created_by).toBe(admin.id);
+    expect(entry.created_by).not.toBe(member.id);
+  });
+
   it("names the number only: no title and no amount in the stored text", async () => {
     const person = await contact("דנה");
     const quote = await draft({ contact: person }, "הצעה סודית לדנה");

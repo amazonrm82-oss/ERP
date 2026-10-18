@@ -49,6 +49,8 @@ export type Quote = {
   customerName: string | null;
   customerContactName: string | null;
   customerDeletedAt: string | null;
+  // QUO-12: the quote this one is a newer version of
+  previousId: string | null;
 };
 
 export type QuoteLine = {
@@ -74,7 +76,7 @@ export type QuoteLine = {
 };
 
 const QUOTE_COLUMNS =
-  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at";
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id";
 
 type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
 type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
@@ -110,6 +112,7 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
     customerName: row.customer_name,
     customerContactName: row.customer_contact_name,
     customerDeletedAt: row.customer_deleted_at,
+    previousId: row.previous_id,
   };
 }
 
@@ -321,6 +324,25 @@ export async function getQuoteCustomerNow(orgId: string, quote: Quote): Promise<
     company: quote.companyId ? (company ? { name: company.name } : "hidden") : null,
   });
   return { name, email: contact?.email ?? null, phoneE164: contact?.phone_e164 ?? null, contactName: contact?.full_name ?? null };
+}
+
+export type QuoteVersionRef = { id: string; numberDisplay: string | null; status: QuoteStatus };
+
+/**
+ * QUO-12: the versions next to a quote, read with the user's session: the one it replaces and its newer version (at most
+ * one each; a quote on the same deal or contact, so whoever reads this quote reads them too).
+ */
+export async function getQuoteVersions(orgId: string, quote: Quote): Promise<{ previous: QuoteVersionRef | null; newer: QuoteVersionRef | null }> {
+  const supabase = await createClient();
+  const [previous, newer] = await Promise.all([
+    quote.previousId
+      ? supabase.from("quotes").select("id, number_display, status").eq("organization_id", orgId).eq("id", quote.previousId).maybeSingle()
+      : null,
+    supabase.from("quotes").select("id, number_display, status").eq("organization_id", orgId).eq("previous_id", quote.id).maybeSingle(),
+  ]);
+  const ref = (row: { id: string; number_display: string | null; status: string } | null): QuoteVersionRef | null =>
+    row ? { id: row.id, numberDisplay: row.number_display, status: isQuoteStatus(row.status) ? row.status : "draft" } : null;
+  return { previous: previous ? ref(must(previous, "previous version")) : null, newer: ref(must(newer, "newer version")) };
 }
 
 export type QuoteLinkStatus = { active: boolean; createdAt: string | null };
