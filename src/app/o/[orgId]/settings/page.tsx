@@ -32,6 +32,7 @@ export default async function SettingsPage({ params }: Props) {
     priceLists,
     catalog: canEditCatalog(role, granted),
     automations: canManageAutomations(role, granted),
+    keptQuotes: admin || role === "manager",
   });
   // LEAD-06: a picked conversion target was deleted; owners and admins see it until someone chooses again
   const mappingNeedsFix = admin ? await conversionMapNeedsFix(orgId) : false;

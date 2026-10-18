@@ -195,7 +195,7 @@ export type DetachedQuote = QuoteSummary & { customerName: string | null; sentAt
 
 /**
  * QUO-07: kept quotes whose customer was deleted (the deal and contact are both gone), newest deletion first,
- * one page at a time. Read with the user's session: the select policy shows them to owners and admins only.
+ * one page at a time. Read with the user's session: the select policy shows them to owners, admins and managers by role (QUO-07, owner 18 October 2026).
  */
 export async function listDetachedQuotes(orgId: string, page: number): Promise<{ quotes: DetachedQuote[]; hasMore: boolean }> {
   const supabase = await createClient();

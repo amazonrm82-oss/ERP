@@ -61,6 +61,8 @@ export type SettingsAccess = {
   // PRM-01: owners and admins, or a member with the extra permission (edit_catalog / manage_automations)
   catalog?: boolean;
   automations?: boolean;
+  // QUO-07 (owner, 18 October 2026): owners, admins and managers by role read the kept quotes of deleted customers
+  keptQuotes?: boolean;
 };
 
 /**
@@ -87,13 +89,15 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // QUO-05: everyone sees it; owners and admins change it
         { href: quoteDesignPath(orgId), label: "עיצוב הצעת מחיר", description: "לוגו, צבע, כותרת עליונה ותחתונה ופרטי העסק", icon: FormIcon },
         // PL-01: everyone reads the price lists; owners and admins edit them. Hidden without the capability.
+        // QUO-07: kept quotes whose deal and contact were purged; owners, admins and managers by role read them
+        ...(access.keptQuotes ?? access.admin
+          ? [{ href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו", description: "הצעות שנשלחו ונשארו אחרי שהלקוח נמחק לצמיתות", icon: FormIcon }]
+          : []),
         ...(access.priceLists
           ? [{ href: priceListsPath(orgId), label: "מחירונים", description: "מחירים אחרים או הנחות לחלק מהמוצרים, לתקופה מסוימת", icon: TagIcon }]
           : []),
         ...(access.admin
           ? [
-              // QUO-07: kept quotes whose deal and contact were purged; only owners and admins read them
-              { href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו", description: "הצעות שנשלחו ונשארו אחרי שהלקוח נמחק לצמיתות", icon: FormIcon },
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },
               { href: paths.settingsSetupChecklist(orgId), label: "רשימת הקמה", description: "מה כבר מוכן בעסק, ונתוני דוגמה", icon: CheckSquareIcon },
             ]

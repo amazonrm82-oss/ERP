@@ -31,6 +31,7 @@ export default async function SettingsLayout({ children, params }: Props) {
         priceLists,
         catalog: canEditCatalog(role, granted),
         automations: canManageAutomations(role, granted),
+        keptQuotes: admin || role === "manager",
       }}
     >
       {children}

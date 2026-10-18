@@ -21,16 +21,17 @@ type Props = {
 
 /**
  * QUO-07: a sent quote stays when its deal and contact are purged, detached from them and marked "הלקוח נמחק".
- * Such quotes are readable by owners and admins only, and this is where they find them.
+ * Such quotes are readable by owners, admins and managers, and this is where they find them.
  */
 export default async function DeletedCustomerQuotesPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const page = parsePage((await searchParams).page);
   const { role } = await getOrgContext(orgId);
-  if (!isAdminRole(role)) {
+  // owner, 18 October 2026: managers by role read them too (the quotes RLS decides again)
+  if (!isAdminRole(role) && role !== "manager") {
     return (
       <Card>
-        <EmptyState kind="locked" title="פנו לבעלים של העסק" description="הצעות של לקוחות שנמחקו רואים הבעלים ומנהלי המערכת של העסק." />
+        <EmptyState kind="locked" title="פנו לבעלים של העסק" description="הצעות של לקוחות שנמחקו רואים הבעלים, מנהלי המערכת ומנהלי הצוותים של העסק." />
       </Card>
     );
   }

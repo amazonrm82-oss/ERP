@@ -457,6 +457,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_payment_schedule.sql",
       // TASK-06 redefines app.sample_untouched() last (steps keep a sample task)
       "_task_checklists.sql",
+      // QUO-07 follow-ups redefine app.audit_erase_core() of _quote_payment_schedule.sql last
+      "_quote_kept_followups.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
