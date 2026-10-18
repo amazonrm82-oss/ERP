@@ -323,7 +323,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020331, DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
-  `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
+  `max_booking_pages_per_user` x paid seats, `app.paid_seat_count`, 020340): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
   Managed by the rep, owners/admins and a team manager for the `member`-role people of teams they manage
   (`app.booking_manages_rep`). No working hours (`app.booking_rep_has_hours`) = cannot be turned on (hint `booking_page:no_hours`)
   and the public page answers not found. Slots: `app.booking_slots` (one multirange pass, the rule of `app.member_in_hours`;
@@ -899,7 +899,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   redefined in 020020.
 - View seats (PRM-02, migrations 020120, 020325): an active view seat needs room in `view_seats_per_paid_seat` x the full seats bought
   (`subscriptions.seats`; while it is null, a trial, the active full seats; owner 18 October 2026: every `_per_user` key counts
-  purchased seats the same way) (`app.view_seat_cap`, last redefined in 020325, `app.assert_view_seat_available`, under the paid-seat check's subscription lock; hint
+  purchased seats the same way) (`app.view_seat_cap` over `app.paid_seat_count`, both last redefined in 020340, `app.assert_view_seat_available`, under the paid-seat check's subscription lock; hint
   `limit:view_seats_per_paid_seat`); `app.guard_membership` (last redefined in 020120) calls it whenever a view seat becomes active.
   A `view_seats` feature override alone no longer admits viewers: set the quota too. Seats over the allowance stay.
   `public.org_plan_usage` (last redefined in 020120) lists `view_seats` while the plan has the flag.
