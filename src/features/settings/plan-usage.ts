@@ -18,7 +18,7 @@ const LABELS: Record<string, { label: string; unit?: string }> = {
   max_products: { label: "מוצרים בקטלוג (כולל מוצרים בארכיון)" },
   // PL-01: besides the default price list (the products' own prices)
   max_price_lists: { label: "מחירונים (נוסף על מחירי המוצרים)" },
-  // PRM-02: per paid seat x active paid seats
+  // PRM-02: per paid seat x the seats bought (active full seats while none are bought)
   view_seats: { label: "מושבי צפייה (לפי מספר המושבים בתשלום)" },
 };
 

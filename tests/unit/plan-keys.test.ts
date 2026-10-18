@@ -15,6 +15,7 @@ import {
   effectiveFeature,
   effectiveLimits,
   orgAllowance,
+  paidSeatCount,
   PLAN_FEATURE_KEYS,
   PLAN_KEY_FALLBACK,
   PLAN_LIMIT_KEYS,
@@ -107,6 +108,11 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     expect(orgAllowance(personal, "ai_credits_per_month", "ai_credits_per_user_per_month", 2)).toBe(100);
     expect(orgAllowance(pro, "ai_credits_per_month", "ai_credits_per_user_per_month", 4)).toBe(4000);
     expect(orgAllowance(pro, "max_booking_pages", "max_booking_pages_per_user", 3)).toBe(15);
+    // owner, 18 October 2026: the seats bought count; while none are bought (trial), the active full seats
+    expect(paidSeatCount(5, 2)).toBe(5);
+    expect(paidSeatCount(1, 3)).toBe(1);
+    expect(paidSeatCount(null, 3)).toBe(3);
+    expect(orgAllowance(pro, "max_booking_pages", "max_booking_pages_per_user", paidSeatCount(1, 3))).toBe(5);
     expect(orgAllowance({ a: null, b: 1 }, "a", "b", 3)).toBeNull();
   });
 

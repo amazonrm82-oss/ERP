@@ -11,7 +11,9 @@
 // (app.org_has_feature / app.org_limit, hints 'feature:<key>' / 'limit:<key>').
 //
 // Per-user quotas: a limit key that contains "_per_user" is per paid (full) seat; the
-// quota code multiplies it by the paid seats and adds the business-wide key of the
+// quota code multiplies it by the paid seats (paidSeatCount below: the seats bought in the
+// subscription, else the active full seats while none are bought; owner, 18 October 2026,
+// = app.paid_seat_count) and adds the business-wide key of the
 // same quota when there is one (orgAllowance below). Every other key is per business.
 // Example: AI credits = ai_credits_per_month + ai_credits_per_user_per_month x seats.
 
@@ -207,6 +209,14 @@ export function effectiveFeature(key: string, planFeatures: unknown, overrides: 
  */
 export function effectiveLimits(planLimits: unknown, overrides: unknown): JsonObject {
   return { ...PLAN_KEY_FALLBACK.limits, ...asObject(planLimits), ...asObject(overrides) };
+}
+
+/**
+ * The paid seats a per-seat quota counts (= app.paid_seat_count): the full seats bought in the
+ * subscription (subscriptions.seats), else, while none are bought (a trial), the active full seats.
+ */
+export function paidSeatCount(purchasedSeats: number | null, activeFullSeats: number): number {
+  return purchasedSeats ?? activeFullSeats;
 }
 
 /**
