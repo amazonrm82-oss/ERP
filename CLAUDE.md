@@ -320,7 +320,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020275, RPT-01 `products`; `report_meetings` in 020115) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020331, DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x full seats): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -901,8 +901,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   per product, `cost_agorot` per unit as typed: before VAT in a business that charges VAT, else the amount paid; product FK
   cascades). Every policy needs `app.can_view_costs(org)` (owner/admin/manager by role, or the PRM-01 grant `view_costs`); writes
   also `app.can_edit_catalog` of a writable business. `products` holds no cost, so nothing else in the API returns it; the app
-  works out margin and line profit from rows this table returned. Audited, no emit_event. Open: a cost snapshot per deal line in
-  a separate `deal_line_costs` table under the same rule (owner's answer 2, after QUO-01/02).
+  works out margin and line profit from rows this table returned. Audited, no emit_event.
+  Since 020330 (owner's answer 2) `public.deal_line_costs` keeps one cost per deal line, under the same rule (`app.can_view_costs`;
+  writes also `app.deal_line_cost_editable`: live open deal the caller may edit, writable org, `products` flag). The copy is made by
+  `app.deal_line_cost_snapshot()`, the ONE exception to test 120's ban on definers reading costs (owner, 18 October 2026): trigger
+  only, no execute for any role including service_role, returns nothing, and its body is pinned by `REVIEWED_BODY_MD5` in test 120.
+  Changing that function, or that constant, needs a fresh independent review against the four conditions. Reports:
+  `report_revenue_by_category`, `report_gross_profit` (invoker; `{"allowed": false}` without cost rights), keys `categories` and
+  `profit` in `public.log_export` (last redefined in 020331).
 - Plan and usage (FXU-04, migration 0046): `public.org_plan_usage(org)` (security definer, members only, read only)
   returns the plan, trial and usage against each effective limit for `/settings/plan`. Support contact details come
   from `src/lib/support-phone.ts` / `src/lib/support.ts` only; a message that says "contact support" uses them.
