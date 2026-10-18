@@ -8,12 +8,14 @@ import {
   CheckSquareIcon,
   HomeIcon,
   InboxIcon,
+  QuoteIcon,
   SettingsIcon,
   TagIcon,
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarPath } from "@/features/calendar/range";
 import { productsPath } from "@/features/products/paths";
+import { quotesPath } from "@/features/quotes/paths";
 import { paths } from "@/lib/paths";
 
 export type NavItem = {
@@ -35,6 +37,9 @@ export function navItems(orgId: string): NavItem[] {
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
     { key: "deals", label: "עסקאות", href: paths.deals(orgId), icon: BoardIcon, mobile: true },
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },
+    // QUO-16 (owner, 18 October 2026): under "עוד" on a phone. Shown to everyone, like deals and products: the menu does
+    // not know the plan's features
+    { key: "quotes", label: "הצעות מחיר", href: quotesPath(orgId), icon: QuoteIcon, mobile: false },
     // CAL-02: under "עוד" on a phone; the four bottom-bar places stay as they are
     { key: "calendar", label: "יומן", href: calendarPath(orgId), icon: CalendarIcon, mobile: false },
     // PRD-01: under "עוד" on a phone

@@ -295,6 +295,16 @@ export function FormIcon(props: IconProps) {
   );
 }
 
+/** A quote: a page with a folded corner, a few lines and a total under a rule. */
+export function QuoteIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 3.5h8l4 4v11.5a1.5 1.5 0 0 1-1.5 1.5h-10.5a1.5 1.5 0 0 1-1.5-1.5v-14a1.5 1.5 0 0 1 1.5-1.5z" />
+      <path d="M14.5 3.5v4h4M8.5 10h7M8.5 13h7M12 17h3.5" />
+    </Icon>
+  );
+}
+
 /** "עוד": three dots in a row. */
 export function MoreIcon(props: IconProps) {
   return (
