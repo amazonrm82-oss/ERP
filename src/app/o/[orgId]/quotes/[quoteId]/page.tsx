@@ -4,8 +4,6 @@ import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-import { sendQuoteAction } from "@/features/quotes/actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -14,9 +12,11 @@ import { detachedQuotesPath, quoteDocumentPath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteLinkStatus, getQuoteParties, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getQuote, getQuoteCustomerNow, getQuoteLinkStatus, getQuoteParties, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
+import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
+import { currentNameIfChanged } from "@/features/quotes/share";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -50,7 +50,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const quote = await getQuote(orgId, quoteId);
   if (!quote) notFound();
   const supabase = await createClient();
-  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule] = await Promise.all([
+  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule, customerNow] = await Promise.all([
     listQuoteLines(orgId, quote.id),
     getQuotePricing(orgId, quote),
     getQuoteParties(orgId, quote),
@@ -67,6 +67,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
           null,
     // GAP-09
     listQuoteSchedule(orgId, quote.id),
+    // QUO-08: who the link goes to; QUO-07: the customer's name today, beside the printed one
+    getQuoteCustomerNow(orgId, quote),
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -81,6 +83,9 @@ export default async function QuotePage({ params, searchParams }: Props) {
       ? { href: paths.contact(orgId, quote.contactId), label: parties.contact ?? "איש קשר" }
       : // QUO-07: a quote whose customer was deleted belongs to the list of such quotes
         { href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו" };
+  const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
+  // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
+  const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
 
   return (
     <div className="max-w-4xl">
@@ -93,19 +98,9 @@ export default async function QuotePage({ params, searchParams }: Props) {
             <ButtonLink href={quoteDocumentPath(orgId, quote.id)} variant="secondary" size="sm">
               תצוגה והדפסה
             </ButtonLink>
-            {/* QUO-07: the draft gets its number and is locked; sending by link comes with QUO-08 */}
-            {canEdit ? (
-              <ConfirmButton
-                variant="primary"
-                size="sm"
-                title="לסמן את ההצעה כנשלחה?"
-                description="ההצעה תקבל את המספר הרץ הבא, והיא ננעלת לעריכה. אחר כך אפשר ליצור לה קישור ללקוח, או לשלוח אותה מודפסת או כקובץ PDF."
-                confirmLabel="סימון כנשלחה"
-                action={() => sendQuoteAction(orgId, quote.id)}
-              >
-                סימון כנשלחה
-              </ConfirmButton>
-            ) : null}
+            {/* QUO-07: the draft gets its number and is locked; QUO-08: its link and the WhatsApp and email buttons with it.
+                Mounted for every quote so the window survives the refresh that turns the draft into a sent quote. */}
+            <SendQuoteFlow orgId={orgId} quoteId={quote.id} canSend={canEdit} businessName={context.org.name} recipient={recipient} />
           </div>
         }
       />
@@ -120,6 +115,17 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </span>
         ) : null}
         {quote.sentAt ? <span>נשלחה {formatDate(quote.sentAt)}</span> : null}
+        {quote.status !== "draft" && quote.customerName && !quote.customerDeletedAt ? (
+          <span>
+            לקוח במסמך: <bdi className="text-ink">{quote.customerName}</bdi>
+            {renamed ? (
+              <>
+                {" "}
+                (השם הנוכחי: <bdi>{renamed}</bdi>)
+              </>
+            ) : null}
+          </span>
+        ) : null}
         {quote.customerDeletedAt ? (
           <Badge tone="warning">
             הלקוח נמחק{quote.customerName ? `: ${quote.customerName}` : ""}
@@ -158,6 +164,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
           numberDisplay={quote.numberDisplay}
           active={linkStatus.active}
           createdText={linkStatus.createdAt ? formatDate(linkStatus.createdAt) : ""}
+          businessName={context.org.name}
+          recipient={recipient}
         />
       ) : null}
       {started.template === "ok" ? (

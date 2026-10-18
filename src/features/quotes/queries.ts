@@ -14,6 +14,7 @@ import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ScheduleStep } from "./schedule";
+import { quoteCustomerName } from "./share";
 import { isNoVatReason, isQuoteStatus, type NoVatReason, type QuoteStatus } from "./schema";
 
 type Client = SupabaseClient<Database>;
@@ -283,6 +284,43 @@ export async function getQuoteParties(orgId: string, quote: Quote): Promise<{ de
     contact: contact ? (must(contact, "contact")?.full_name ?? null) : null,
     company: company ? (must(company, "company")?.name ?? null) : null,
   };
+}
+
+export type QuoteCustomerNow = {
+  // the customer's name by quote_send's rule as it reads today (null = cannot tell: a part is hidden or missing)
+  name: string | null;
+  // where the WhatsApp and email buttons send to: the quote's contact, when the user reads it
+  email: string | null;
+  phoneE164: string | null;
+  // the person the greeting names
+  contactName: string | null;
+};
+
+/**
+ * QUO-07 point 9 and QUO-08 (owner, 18 October 2026): the customer as they read now, with the user's session. A part the
+ * user may not read counts as hidden, so the name is null rather than built from what they could not see.
+ */
+export async function getQuoteCustomerNow(orgId: string, quote: Quote): Promise<QuoteCustomerNow> {
+  const supabase = await createClient();
+  const [contactRead, companyRead] = await Promise.all([
+    quote.contactId
+      ? supabase.from("contacts").select("full_name, billing_name, company_id, email, phone_e164").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle()
+      : null,
+    quote.companyId ? supabase.from("companies").select("name").eq("organization_id", orgId).eq("id", quote.companyId).maybeSingle() : null,
+  ]);
+  const contact = contactRead ? must(contactRead, "quote contact") : null;
+  const company = companyRead ? must(companyRead, "quote company") : null;
+  const contactCompanyRead = contact?.company_id
+    ? await supabase.from("companies").select("name, billing_name").eq("organization_id", orgId).eq("id", contact.company_id).maybeSingle()
+    : null;
+  const contactCompany = contactCompanyRead ? must(contactCompanyRead, "quote contact company") : null;
+  const name = quoteCustomerName({
+    // a link the quote holds but the user cannot read is hidden; no link is none
+    contact: quote.contactId ? (contact ? { fullName: contact.full_name, billingName: contact.billing_name, companyId: contact.company_id } : "hidden") : null,
+    contactCompany: contact?.company_id ? (contactCompany ? { name: contactCompany.name, billingName: contactCompany.billing_name } : "hidden") : null,
+    company: quote.companyId ? (company ? { name: company.name } : "hidden") : null,
+  });
+  return { name, email: contact?.email ?? null, phoneE164: contact?.phone_e164 ?? null, contactName: contact?.full_name ?? null };
 }
 
 export type QuoteLinkStatus = { active: boolean; createdAt: string | null };

@@ -412,19 +412,39 @@ export async function reorderQuoteLinesAction(orgId: string, quoteId: string, id
 
 // QUO-07 ---------------------------------------------------------------------
 
+export type SentQuote = {
+  // the customer's new link, shown once (null = not asked for, or it could not be made)
+  url: string | null;
+  // the quote was sent but its link could not be made; the link card offers it again
+  linkError: string | null;
+  // the running number the quote got
+  numberDisplay: string | null;
+};
+
 /**
- * Marks a draft as sent (public.quote_send): it gets its running number, the customer names are kept as
- * they are now, and it is locked. Sending it to the customer by link comes with the customer page (QUO-08).
+ * Marks a draft as sent (public.quote_send): it gets its running number, the customer names are kept as they are now,
+ * and it is locked. QUO-08 (owner, 18 October 2026): with `withLink` it also makes the customer's link right away, so the
+ * WhatsApp and email buttons are offered at the moment of sending. The two are separate calls: a failed link never undoes
+ * the sending, and is reported beside it.
  */
-export async function sendQuoteAction(orgId: string, quoteId: string): Promise<ActionResult> {
+export async function sendQuoteAction(orgId: string, quoteId: string, withLink: unknown = false): Promise<ActionResult<SentQuote>> {
+  if (typeof withLink !== "boolean") return fail(INVALID_ARGS);
   const context = await actionContext(orgId, quoteId);
   if (!context.ok) return context;
-  const { error } = await context.supabase.rpc("quote_send", { p_org: orgId, p_quote: quoteId });
+  const { data, error } = await context.supabase.rpc("quote_send", { p_org: orgId, p_quote: quoteId });
   if (error) return fail(writeError(error));
+  const number = (data as { number?: unknown } | null)?.number;
+  const sent: SentQuote = { url: null, linkError: null, numberDisplay: typeof number === "string" ? number : null };
+  if (withLink) {
+    const link = await context.supabase.rpc("quote_link_create", { p_org: orgId, p_quote: quoteId });
+    if (link.error) sent.linkError = writeError(link.error);
+    else if (typeof link.data !== "string" || !QUOTE_LINK_TOKEN.test(link.data)) sent.linkError = "לא הצלחנו ליצור קישור. נסו שוב.";
+    else sent.url = `${await siteOrigin()}${publicQuotePath(link.data)}`;
+  }
   const quote = await readQuote(context.supabase, orgId, quoteId);
   if (quote) revalidateQuote(orgId, quote);
   else revalidatePath(quotePath(orgId, quoteId));
-  return ok();
+  return ok(sent);
 }
 
 /**
