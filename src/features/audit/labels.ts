@@ -41,6 +41,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   qr_codes: "קוד QR",
   // SPD-07
   site_widgets: "כפתור באתר",
+  checklist_templates: "תבנית רשימת תיוג",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
   // GOL-01

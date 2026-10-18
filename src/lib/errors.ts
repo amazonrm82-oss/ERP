@@ -268,6 +268,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CON-05 (trigger contact_companies_check)
   "contact_company:primary": "את החברה הראשית מחליפים או מסירים בפרטי איש הקשר.",
   "contact_company:max": "אפשר לקשר איש קשר לעד 50 חברות.",
+  // TASK-06 (migration task_checklists)
+  "task_checklist:max": "אפשר עד 100 שלבים במשימה אחת.",
+  "checklist_templates:max": "אפשר לשמור עד 50 תבניות של רשימת תיוג. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
   // CON-06 (trigger contact_relations_check, contact_relation_types_cap)
   "contact_relation:exists": "הקשר הזה כבר רשום בין שני אנשי הקשר.",
   "contact_relation:type": "סוג הקשר הזה כבר לא ברשימה. בחרו סוג אחר.",

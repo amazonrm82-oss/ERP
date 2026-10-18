@@ -12,6 +12,8 @@ import type { FormState } from "@/lib/action-result";
 import { cn } from "@/lib/cn";
 
 import { inlineEditAction } from "@/features/inline-edit/actions";
+import { TaskChecklist, type ChecklistTemplateOption } from "@/features/task-checklists/components/task-checklist";
+import type { ChecklistStep } from "@/features/task-checklists/templates";
 import { isRestDay } from "@/features/calendar-days/holidays";
 import { addDays } from "@/lib/calendar-grid";
 
@@ -41,6 +43,8 @@ export type TaskRowView = {
   // TASK-04: how it repeats; null = once
   recurrence: Recurrence | null;
   related: { href: string; label: string } | null;
+  // TASK-06: the steps inside the task, in order
+  checklist?: ChecklistStep[];
 };
 
 type Props = {
@@ -51,9 +55,11 @@ type Props = {
   assignees: AssigneeOption[];
   /** HEB-03: the "in N business days" choice in the edit form */
   businessDays?: BusinessDaysContext;
+  /** TASK-06: the business's checklist templates, for "steps from a template" */
+  templates?: ChecklistTemplateOption[];
 };
 
-export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays }: Props) {
+export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays, templates = [] }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +131,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
             </Link>
           ) : null}
         </p>
+        <TaskChecklist orgId={orgId} taskId={task.id} taskTitle={task.title} steps={task.checklist ?? []} canEdit={canEdit} templates={templates} />
         {task.done && canEdit ? <TaskOutcome orgId={orgId} task={task} /> : task.done && task.outcome ? <p className="mt-1 text-sm">תוצאה: {task.outcome}</p> : null}
         {error ? (
           <p role="alert" className="mt-1 text-sm text-danger">

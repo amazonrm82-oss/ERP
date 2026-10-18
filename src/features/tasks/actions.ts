@@ -17,6 +17,7 @@ import { pick } from "@/lib/validation";
 import { nextWorkingDay } from "@/features/calendar-days/business-days";
 import { movedToWorkingDayNotice } from "@/features/calendar-days/rest-day-note";
 import { calendarSettingsFromRow, type CalendarSettings } from "@/features/calendar-days/holidays";
+import { stepsForNewTask } from "@/features/task-checklists/server";
 
 import { REPEAT_FIELD_NAMES, repeatFormSchema } from "./recurrence";
 import { TASK_FIELD_NAMES, taskSchema } from "./schema";
@@ -88,7 +89,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
   }
 
   // an assignee from another organization fails the composite foreign key
-  const { error } = await context.supabase.from("tasks").insert({
+  const { data: created, error } = await context.supabase.from("tasks").insert({
     organization_id: orgId,
     title: parsed.data.title,
     task_type: parsed.data.task_type,
@@ -96,13 +97,21 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
     recurrence: parsed.data.recurrence,
     ...schedule(parsed.data),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
-  });
+  }).select("id").single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את המשימה. נסו שוב."), { values: formValues(formData) });
   }
 
+  // TASK-06: the steps of a picked template; the task stays even when they fail, and the user is told
+  const templateId = String(formData.get("checklist_template") ?? "");
+  let message: string | undefined;
+  if (templateId) {
+    const steps = await stepsForNewTask(context.supabase, orgId, created.id, templateId);
+    if (!steps.ok) message = `המשימה נוספה, אבל השלבים מהתבנית לא נוספו: ${steps.message}`;
+  }
+
   revalidateTasks(orgId);
-  return ok();
+  return ok(undefined, message);
 }
 
 export async function updateTaskAction(

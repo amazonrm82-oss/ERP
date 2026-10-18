@@ -1382,6 +1382,32 @@ export type LeadInsert = {
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)
 // CON-03 follow-up: the roles a contact may have on a deal, a managed list per organization; key is server-only
 // CON-06: a type of relation between two contacts (managed list); "A <name> B", "B <reverse_name ?? name> A"
+// TASK-06: the steps inside a task (rights follow the task); done_at / done_by are set by trigger
+export type TaskChecklistItemRow = {
+  id: string;
+  organization_id: string;
+  task_id: string;
+  title: string;
+  done: boolean;
+  done_at: string | null;
+  done_by: string | null;
+  position: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// TASK-06: a managed list of named step lists
+export type ChecklistTemplateRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  steps: string[];
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ContactRelationTypeRow = {
   id: string;
   organization_id: string;
@@ -2248,6 +2274,17 @@ export type Database = {
       >;
       deals: Table<DealRow, DealInsert & { import_job_id?: string | null }, Partial<DealInsert>>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
+      // TASK-06: column grants
+      task_checklist_items: Table<
+        TaskChecklistItemRow,
+        { organization_id: string; task_id: string; title: string; position?: number },
+        { title?: string; done?: boolean; position?: number }
+      >;
+      checklist_templates: Table<
+        ChecklistTemplateRow,
+        { organization_id: string; name: string; steps: string[]; position?: number },
+        { name?: string; steps?: string[]; position?: number }
+      >;
       // CON-06: column grants (key is server-only)
       contact_relation_types: Table<
         ContactRelationTypeRow,

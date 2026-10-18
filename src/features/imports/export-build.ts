@@ -71,6 +71,9 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "qr_codes", file: "qr_codes.csv" },
   // SPD-07: the site widgets (token = the widget's public script and form; its view counts are in schema app, not exported)
   { table: "site_widgets", file: "site_widgets.csv" },
+  // TASK-06
+  { table: "task_checklist_items", file: "task_checklist_items.csv" },
+  { table: "checklist_templates", file: "checklist_templates.csv" },
   { table: "pipelines", file: "pipelines.csv" },
   { table: "stages", file: "stages.csv" },
   { table: "lead_statuses", file: "lead_statuses.csv" },

@@ -24,6 +24,7 @@ import { getOrgContext, type OrgContext } from "@/features/shell/queries";
 import { NewTaskPanel } from "@/features/tasks/components/new-task-panel";
 import { TaskForm } from "@/features/tasks/components/task-form";
 import { remindOption } from "@/features/tasks/components/task-fields";
+import { listChecklistSteps, listChecklistTemplates } from "@/features/task-checklists/queries";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
 import { TasksTable } from "@/features/tasks/components/tasks-table";
 import { listCoveringTasks, listTaskGroups, listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
@@ -131,6 +132,20 @@ export default async function TasksPage({ params, searchParams }: Props) {
     // HEB-08: the open tasks of colleagues the user stands in for ("all" already shows them)
     showAll ? Promise.resolve([]) : listCoveringTasks(orgId, user.id, context.org.timeZone),
   ]);
+  // TASK-06: the steps of every task on the page, and the templates for "steps from a template"
+  const shownTaskIds = [
+    ...groups.overdue,
+    ...groups.today,
+    ...groups.upcoming,
+    ...groups.undated,
+    ...groups.done,
+    ...covering.flatMap((group) => group.tasks),
+  ].map((task) => task.id);
+  const [checklists, checklistTemplates] = await Promise.all([
+    listChecklistSteps(orgId, [...new Set(shownTaskIds)]),
+    canWrite ? listChecklistTemplates(orgId) : [],
+  ]);
+  const templates = checklistTemplates.map((t) => ({ id: t.id, name: t.name }));
   // HEB-03: "in N business days" counts from today in the business's zone
   const today = zoneDate(new Date(), context.org.timeZone);
   const businessDays = { calendar, today };
@@ -157,6 +172,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       outcome: task.outcome,
       recurrence: task.recurrence,
       related: task.related ? { href: relatedHref(orgId, task.related), label: RELATED_LABEL[task.related.kind] } : null,
+      checklist: checklists.get(task.id) ?? [],
     };
   };
 
@@ -201,6 +217,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                         showOwner={showAll}
                         assignees={assignees}
                         businessDays={businessDays}
+                        templates={templates}
                       />
                     ))}
                   </ul>
@@ -229,6 +246,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                       // a deputy does not hand the task over (HEB-08)
                       assignees={[]}
                       businessDays={businessDays}
+                      templates={templates}
                     />
                   ))}
                 </ul>
@@ -249,6 +267,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                     showOwner={showAll}
                     assignees={assignees}
                     businessDays={businessDays}
+                    templates={templates}
                   />
                 ))}
               </ul>
@@ -264,7 +283,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
               <Card aria-labelledby="new-task-title">
                 <CardHeader id="new-task-title" title="משימה חדשה" />
                 <CardBody>
-                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} />
+                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} templates={templates} />
                 </CardBody>
               </Card>
             </NewTaskPanel>

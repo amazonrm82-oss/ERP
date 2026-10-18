@@ -36,6 +36,7 @@ import { numberingSettingsPath } from "@/features/numbering/paths";
 import { responseSettingsPath } from "@/features/response-target/paths";
 import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
+import { checklistTemplatesPath } from "@/features/task-checklists/paths";
 import { paths } from "@/lib/paths";
 
 export type SettingsSection = {
@@ -128,6 +129,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: completenessSettingsPath(orgId), label: "שדות חשובים", description: "מה חשוב למלא בכל רשומה, ומה חסר", icon: CheckSquareIcon },
               { href: paths.settingsTags(orgId), label: "תגיות", description: "סימון רשומות וסינון לפיהן", icon: TagIcon },
               { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
+              // TASK-06
+              { href: checklistTemplatesPath(orgId), label: "תבניות רשימת תיוג", description: "רשימות שלבים קבועות שנכנסות למשימה, כמו קליטת לקוח", icon: CheckSquareIcon },
             ]
           : []),
       ],

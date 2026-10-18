@@ -153,6 +153,8 @@ describe("tenant isolation", () => {
         ids.referralTypeA,
       ]);
       await q("insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]);
+      // TASK-06: a step in A's task (the templates are seeded for every new organization)
+      await q("insert into public.task_checklist_items (organization_id, task_id, title) values ($1, $2, 'שלב של א')", [orgA, ids.taskA]);
       // CAL-10: a booking page of a's own (off: a has no working hours, and a page without hours cannot be on)
       await q(
         "insert into public.booking_pages (organization_id, user_id, title, meeting_type_id, is_active) select $1, $2, 'דף של א', t.id, false from public.meeting_types t where t.organization_id = $1 order by t.position limit 1",
@@ -287,6 +289,9 @@ describe("tenant isolation", () => {
     "qr_codes",
     // SPD-07
     "site_widgets",
+    // TASK-06
+    "task_checklist_items",
+    "checklist_templates",
     // GOL-01
     "goals",
     // PRD-04, seeded for every new organization
@@ -446,6 +451,8 @@ describe("tenant isolation", () => {
       contact_channels: "label = label",
       contact_companies: "title = title",
       contact_relation_types: "name = name",
+      task_checklist_items: "title = title",
+      checklist_templates: "name = name",
       // no update grant at all: a permission error is the expected outcome
       contact_relations: "type_id = type_id",
       // no update or delete grant at all: a permission error is the expected outcome
@@ -565,6 +572,8 @@ describe("tenant isolation", () => {
       ["insert into public.contact_channels (organization_id, contact_id, kind, value) values ($1, $2, 'email', 'x@example.test')", [orgA, ids.contactA]],
       ["insert into public.contact_companies (organization_id, contact_id, company_id) values ($1, $2, $3)", [orgA, ids.contactA, ids.companyA]],
       ["insert into public.contact_relation_types (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.task_checklist_items (organization_id, task_id, title) values ($1, $2, 'x')", [orgA, ids.taskA]],
+      ["insert into public.checklist_templates (organization_id, name, steps) values ($1, 'x', '{x}')", [orgA]],
       ["insert into public.contact_relations (organization_id, contact_id, related_contact_id, type_id) values ($1, $3, $2, $4)", [orgA, ids.contactA, ids.contact2A, ids.parentTypeA]],
       ["insert into public.contact_relations (organization_id, lead_id, related_contact_id, type_id) values ($1, $2, $3, $4)", [orgA, ids.leadA, ids.contactA, ids.referralTypeA]],
       ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
@@ -678,6 +687,8 @@ describe("tenant isolation", () => {
       ["business_cards", "job_title = 'HACKED'", "job_title = 'HACKED'"],
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],
+      ["task_checklist_items", "done = true", "done"],
+      ["checklist_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["goals", "target = 777", "target = 777"],
       ["product_categories", "position = 777", "position = 777"],
       ["product_units", "position = 777", "position = 777"],

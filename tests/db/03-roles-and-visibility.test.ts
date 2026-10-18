@@ -1755,3 +1755,44 @@ describe("site widgets by role", () => {
     expect(removed).toBe(1);
   });
 });
+
+// TASK-06: checklist templates are a managed list (owners and admins write, everyone reads); a task's steps follow the
+// task (the rest is in 157-task-checklists).
+describe("checklists by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("chkrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `chkrole-${role}`);
+    }
+  });
+
+  it("templates: owners and admins write; every role reads", async () => {
+    for (const [role, user] of Object.entries(people)) {
+      const insert = asUser(user.id, (q) => q("insert into public.checklist_templates (organization_id, name, steps) values ($1, $2, '{א}')", [org, `של ${role}`]));
+      if (role === "owner" || role === "admin") await insert;
+      else expect((await pgError(insert)).code, role).toBe("42501");
+    }
+    for (const [role, user] of Object.entries(people)) {
+      // two seeded defaults and the two added above
+      expect(await asUser(user.id, (q) => count(q, "select 1 from public.checklist_templates where organization_id = $1", [org])), role).toBe(4);
+    }
+  });
+
+  it("steps: each writer role on its own task; a viewer reads only", async () => {
+    for (const [role, user] of Object.entries(people)) {
+      if (role === "viewer") continue;
+      const task = await asUser(user.id, async (q) => (await q<{ id: string }>("insert into public.tasks (organization_id, title) values ($1, $2) returning id", [org, `של ${role}`])).rows[0].id);
+      await asUser(user.id, (q) => q("insert into public.task_checklist_items (organization_id, task_id, title) values ($1, $2, 'שלב')", [org, task]));
+      expect(await asUser(user.id, async (q) => (await q("update public.task_checklist_items set done = true where task_id = $1", [task])).rowCount), role).toBe(1);
+      const viewerError = await pgError(
+        asUser(people.viewer.id, (q) => q("insert into public.task_checklist_items (organization_id, task_id, title) values ($1, $2, 'x')", [org, task])),
+      );
+      expect(viewerError.code, role).toBe("42501");
+    }
+  });
+});
