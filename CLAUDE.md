@@ -496,7 +496,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `target`). Owners/admins write every goal; a manager (role, not team flag) only goals of teams they manage and of their
   `member`-role people, never owners/admins/managers/themselves/org (owner, 13 October 2026; `app.goals_manager_may_write`).
   Members read org goals, their own and their teams'; managers also their teams' people; a support session reads all.
-  The grid shows "את היעד הזה קובעים בעלים ומנהלי מערכת" on rows a manager cannot set. Report results are parsed through
+  The grid shows "את היעד הזה קובעים בעלים ומנהלי מערכת" on rows a manager cannot set.
+  Since 020440 (RVW-22) definer trigger `goals_per_rep` needs the flag `goals_per_rep` for a new user/team goal or a change of one,
+  for every writer (hint `feature:goals_per_rep`; outsider guard is `app.is_member`, because managers write goals); existing ones
+  stay, are counted and may be deleted; without the flag the grid shows only the business row as editable. Report results are parsed through
   zod schemas before shaping (FXC-12, `src/features/reports/schemas.ts`, fixtures in `tests/unit/fixtures/reports/`; test
   89-report-shapes compares SQL output with them): a new or changed report function updates its schema and fixture.
 - Goal progress and forecast (GOL-03/04, migrations 0139, 0140): `report_goal_progress(org, period, start, user)` and
@@ -698,6 +701,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   used product is archived, not removed). The unit price rule is `unitPriceFor()` in `src/features/price-lists/price.ts` (no SQL
   mirror yet; PL-03 decides). Quota triggers start with `if auth.uid() is not null and not app.is_admin(org) then return new`,
   so an outsider gets RLS's plain 42501 and learns nothing about another org's plan; every new quota trigger does the same.
+  Since 020445 (RVW-23) every quota/cap trigger has it, with the table's own write rule as the predicate (is_admin, can_edit_catalog,
+  member_hours_editable, can_manage_automations, can_write); `app.guard_form` and `app.files_before_insert` were last redefined there.
   Since 0169 `price_lists.prices_include_vat` (owner: one setting per list): defaults from the business setting on insert
   (`price_lists_vat`, invoker), locked once the list has any line (hint `price_lists:vat_locked`, every writer); each line's
   `price_includes_vat` is set from its list by `price_list_lines_vat` (definer, FOR SHARE on the list; clients no longer write it).
@@ -744,7 +749,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   in the bin) and a readable company, and update/delete repeat the company check. At most 50 per contact (hint `contact_company:max`,
   definer count `app.contact_company_count` after the outsider guard). Audited as a `company_link` change of the contact. Merge
   copies links through the `merged` timeline entry (`app.merge_contact_companies`, until `merge_move_links` takes it over).
-  `app.sample_untouched` and `app.import_record_worked` were last redefined in 020150 (SEG-01).
+  `app.sample_untouched` was last redefined in 020150 (SEG-01); `app.import_record_worked` in 020450 (RVW-36: checklist steps keep an imported task).
 - Contact relations (CON-06, migration 020090; owner 15 October 2026: core, every plan): `public.contact_relation_types` (managed
   list, 20 per org, server-only `key` spouse|family|parent|referral on the seeded defaults; a type in use is hidden, not deleted:
   FK with no action) and `public.contact_relations` (first side a contact or a lead, exactly one; a lead only as the referrer of
