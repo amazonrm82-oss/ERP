@@ -163,46 +163,105 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
   });
 
   it("a decision and a send in flight at the same time: whichever commits first wins, the other is turned away", async () => {
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const pause = () => new Promise((resolve) => setTimeout(resolve, 300));
+    // each side is ordered by what the database reports, never by a timer: the first side has run its statement (and holds
+    // its lock) before the second starts, and the second is seen waiting on a lock (pg_stat_activity) before the first commits
+    const deferred = <T = void,>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const backendPid = async (q: Query) => (await one<{ pid: number }>(q, "select pg_backend_pid() as pid")).pid;
+    const waitUntilBlocked = async (pid: Promise<number>) => {
+      const id = await pid;
+      for (let i = 0; i < 400; i += 1) {
+        const row = await asAdmin(async (q) => (await q<{ w: string | null }>("select wait_event_type as w from pg_stat_activity where pid = $1", [id])).rows[0]);
+        if (row?.w === "Lock") return;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      throw new Error(`backend ${id} never waited on a lock`);
+    };
+
+    // `first` runs in its own transaction until it calls hold() (its statement done, its lock held); then `second` starts and
+    // must be seen waiting on a lock; then `first` commits. On any failure the held transaction is rolled back, both sides
+    // are awaited (no transaction left open for closePool), and the error is thrown at once.
+    const ordered = async <A, B>(first: (hold: () => Promise<void>) => Promise<A>, second: (pid: (q: Query) => Promise<void>) => Promise<B>): Promise<[A, B]> => {
+      const held = deferred();
+      const gate = deferred<boolean>();
+      const pid = deferred<number>();
+      const firstRun = first(async () => {
+        held.resolve();
+        if (!(await gate.promise)) throw new Error("rolled back: the other side failed");
+      });
+      let secondRun: Promise<B> | undefined;
+      let ok = false;
+      try {
+        await Promise.race([
+          held.promise,
+          firstRun.then(() => {
+            throw new Error("the first side ended before holding its lock");
+          }),
+        ]);
+        const started = second(async (q) => pid.resolve(await backendPid(q)));
+        secondRun = started;
+        await waitUntilBlocked(
+          Promise.race([
+            pid.promise,
+            started.then(() => {
+              throw new Error("the second side ended without waiting on a lock");
+            }),
+          ]),
+        );
+        ok = true;
+      } finally {
+        gate.resolve(ok);
+        if (!ok) await Promise.allSettled([firstRun, secondRun]);
+      }
+      return [await firstRun, await (secondRun as Promise<B>)];
+    };
 
     // the send commits first: the decision waits on v1, then sees the newer version and answers "changed"
     const a = await sentQuote();
     const ta = await linkOf(a);
     const fa = (await version(ta)).fingerprint;
     const a2 = await newVersion(a);
-    const sending = asUser(member.id, async (q) => {
-      await q("select public.quote_send($1, $2)", [org, a2]);
-      await gate;
-    });
-    await pause();
-    const deciding = asService((q) => decideIn(q, ta, fa));
-    await pause();
-    release();
-    await sending;
-    expect(await deciding).toEqual({ status: "changed" });
+    const [, decision] = await ordered(
+      (hold) =>
+        asUser(member.id, async (q) => {
+          await q("select public.quote_send($1, $2)", [org, a2]);
+          await hold();
+        }),
+      (pid) =>
+        asService(async (q) => {
+          await pid(q);
+          return decideIn(q, ta, fa);
+        }),
+    );
+    expect(decision).toEqual({ status: "changed" });
     expect(["sent", "viewed"]).toContain(await status(a));
     expect(await status(a2)).toBe("sent");
 
     // the decision commits first: the send waits on v1, then sees it decided and is refused
-    let release2!: () => void;
-    const gate2 = new Promise<void>((resolve) => (release2 = resolve));
     const b = await sentQuote();
     const tb = await linkOf(b);
     const fb = (await version(tb)).fingerprint;
     const b2 = await newVersion(b);
-    const deciding2 = asService(async (q) => {
-      const answer = await decideIn(q, tb, fb);
-      await gate2;
-      return answer;
-    });
-    await pause();
-    const sending2 = pgError(send(b2));
-    await pause();
-    release2();
-    expect(await deciding2).toEqual({ status: "accepted" });
-    expect((await sending2).hint).toBe("quote_version:previous_decided");
+    const [answer, refusal] = await ordered(
+      (hold) =>
+        asService(async (q) => {
+          const result = await decideIn(q, tb, fb);
+          await hold();
+          return result;
+        }),
+      (pid) =>
+        pgError(
+          asUser(member.id, async (q) => {
+            await pid(q);
+            await q("select public.quote_send($1, $2)", [org, b2]);
+          }),
+        ),
+    );
+    expect(answer).toEqual({ status: "accepted" });
+    expect(refusal.hint).toBe("quote_version:previous_decided");
     expect([await status(b), await status(b2)]).toEqual(["accepted", "draft"]);
   });
 });
