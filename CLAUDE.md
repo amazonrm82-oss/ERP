@@ -324,7 +324,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020331, DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020425, QUO-17 `quotes`; 020331 DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x paid seats, `app.paid_seat_count`, 020340): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -870,6 +870,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   once on the version the page shows (`app.quote_shown_version`, the rule of `quote_public`'s chain walk: keep the two in step), refuses a
   changed fingerprint, 10 tries per 10 minutes plus the view window, notifies the quote's owner with kind `quote`. Erasure empties the
   personal fields (`app.audit_erase_core`, last redefined in 020370).
+- Quotes report (QUO-17, migration 020425): `public.report_quotes(org, from, to, owner)` (invoker). A chain counts once, through its
+  newest sent version (the rule of `app.quote_shown_version`); acceptance rate null below 5 decided; time to acceptance from
+  `quote_decisions.decided_at` for owners/admins, else from the `quote_accepted` timeline entry; open value = sent/viewed and not past
+  validity in the org zone, the current state. Report key `quotes` (`public.log_export`, last redefined in 020425, refuses it without
+  the `quotes` flag). A report definition may carry `feature`: the index, the page and the export hide it without that flag.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
