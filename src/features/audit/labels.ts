@@ -125,6 +125,8 @@ export const ACTION_LABELS: Record<string, string> = {
   number_jump: "קפיצה קדימה במספור",
   // FLD-09: a deleted pipeline took the conditions based on it (app.pipeline_conditions_cleanup)
   conditions_removed: "הסרת תנאים של שדות",
+  // RVW-25 / HEB-08: an employee picked their own deputy for a leave (app.member_leaves_deputy_notice)
+  deputy_chosen: "בחירת ממלא מקום על ידי העובד",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
