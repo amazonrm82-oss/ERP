@@ -20,7 +20,7 @@ export const NOTIFICATION_KINDS = [
   // QUO-10 (owner, 18 October 2026): the customer opened a quote for the first time
   { key: "quote_viewed", label: "לקוח פתח הצעת מחיר", group: "money", shown: true },
   // QUO-09: the customer accepted or declined a quote (built, so it can be muted too)
-  { key: "quote", label: "הצעת מחיר אושרה או נדחתה", group: "money", shown: true },
+  { key: "quote", label: "הצעת מחיר אושרה, נדחתה או פג תוקפה", group: "money", shown: true },
   { key: "payment", label: "תשלום התקבל", group: "money", shown: false },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },
   { key: "automation_failed", label: "אוטומציה נכשלה (למנהלים)", group: "automations", shown: true },
