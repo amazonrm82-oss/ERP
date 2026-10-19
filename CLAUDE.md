@@ -818,6 +818,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `app.deal_lines_billing`); the rule is `app.deal_value_rule` (13 args; `deal_amount_rule` is a wrapper) over
   `app.deal_lines_sums` (definer, no grants): recurring amount from recurring lines only, value = first year of the recurring
   amount + one-time lines; a monthly deal's value is 12 x the ROUNDED monthly amount (owner, do not "fix"). `app.sample_untouched` and `app.audit_erase_core` were last redefined in 0185.
+- Requested product on conversion (RVW-27, migration 020565): trigger `leads_convert_requested_product` (definer, after converted_at is
+  first set) adds one line of the lead's offerable requested product to the deal the conversion made in this transaction (empty,
+  editable by the converter, `products` flag), priced by PL-03 through the SQL mirrors `app.product_line_price` (= productPriceFor) and
+  `app.price_list_discounted` (= discountedPrice; test 200 compares them); refusals are caught, the conversion never fails.
 - Lead score (LEAD-05, migration 0195; owner 14 October 2026, core, no plan key): `public.lead_score_rules` (field/op/value,
   points -100..100 not 0; members read, owners/admins of a writable org write; 50 per org, hint `lead_score_rules:max`; audited;
   checked by `app.lead_score_rule_check`, hint `lead_score_rule:invalid`; mirrored by `src/features/lead-score/rules.ts`).
