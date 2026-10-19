@@ -482,6 +482,18 @@ export async function cancelQuoteAction(orgId: string, quoteId: string): Promise
   return ok();
 }
 
+/** GAP-10: an empty draft that adds to an accepted quote (public.quote_new_addendum); opens it. */
+export async function newQuoteAddendumAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("quote_new_addendum", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  if (typeof data !== "string") return fail("לא הצלחנו ליצור תוספת. נסו שוב.");
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  redirect(quotePath(orgId, data));
+}
+
 /**
  * QUO-08: a new link for the customer to a sent quote (public.quote_link_create). The address is returned once: only
  * its hash is kept, and the previous link of the quote stops working.

@@ -1620,6 +1620,8 @@ export type QuoteRow = {
   customer_deleted_at: string | null;
   // QUO-12: the quote this one is a newer version of (server-only, set by public.quote_new_version)
   previous_id: string | null;
+  // GAP-10: the accepted quote this one adds to (server-only, set by public.quote_new_addendum and copied by quote_new_version)
+  addendum_of: string | null;
   currency: string;
   created_by: string | null;
   created_at: string;
@@ -2811,6 +2813,8 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // GAP-10: an empty draft that adds to an accepted quote
+      quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // QUO-11: cancels a sent, viewed or expired quote (whoever may edit its deal or contact)
       quote_cancel: { Args: { p_org: string; p_quote: string }; Returns: undefined };
       // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)

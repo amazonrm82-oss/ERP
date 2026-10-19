@@ -9,6 +9,7 @@ import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
+import { formatMoney } from "@/lib/format";
 
 // QUO-14: the page is not for search engines; and its secret address never leaves in a Referer header
 export const metadata: Metadata = { title: "הצעת מחיר", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -64,6 +65,21 @@ export default async function PublicQuotePage({ params }: Props) {
           ) : null}
         </p>
       ) : null}
+      {/* GAP-10: this quote adds work to a quote the customer already accepted */}
+      {page.addendumOf ? (
+        <p className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink">
+          תוספת להצעה
+          {page.addendumOf.number ? (
+            <>
+              {" "}
+              <span dir="ltr" className="tabular-nums">
+                {page.addendumOf.number}
+              </span>
+            </>
+          ) : null}
+          , שכבר אושרה.
+        </p>
+      ) : null}
       <div data-print-page="" className="flex justify-end print:hidden">
         <PrintButton label="הדפסה או שמירה כ-PDF" />
       </div>
@@ -79,6 +95,29 @@ export default async function PublicQuotePage({ params }: Props) {
           schedule: page.schedule,
         }}
       />
+      {/* GAP-10: the addenda the customer accepted on top of this quote */}
+      {page.addenda.length > 0 ? (
+        <section aria-labelledby="quote-addenda" className="rounded-lg border border-line bg-surface p-4 print:hidden sm:p-6">
+          <h2 id="quote-addenda" className="mb-2 text-base font-semibold text-ink">
+            תוספות שאושרו להצעה הזאת
+          </h2>
+          <ul className="divide-y divide-line text-sm">
+            {page.addenda.map((a) => (
+              <li key={a.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+                <span>
+                  {a.number ? (
+                    <span dir="ltr" className="tabular-nums">
+                      {a.number}
+                    </span>
+                  ) : null}{" "}
+                  <bdi>{a.title}</bdi>
+                </span>
+                <span className="tabular-nums text-ink">{formatMoney(a.totalAgorot)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {/* QUO-09: an open quote takes one answer, bound to the version shown (its fingerprint) */}
       {fingerprint ? (
         <QuoteDecisionPanel token={token} fingerprint={fingerprint} />

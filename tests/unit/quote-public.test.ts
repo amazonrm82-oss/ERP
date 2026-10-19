@@ -71,6 +71,16 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(publicQuoteFrom(answer({ replaced: { number: 7 } }))).toBeNull();
   });
 
+  it("GAP-10: names the quote an addendum adds to, and lists the accepted addenda, keyed for the page only", () => {
+    const plain = publicQuoteFrom(answer())!;
+    expect(plain.addendumOf).toBeNull();
+    expect(plain.addenda).toEqual([]);
+    const page = publicQuoteFrom(answer({ addendum: { number: "QT-7" }, addenda: [{ number: "QT-9", title: "מדף נוסף", total_agorot: 23600 }] }))!;
+    expect(page.addendumOf).toEqual({ number: "QT-7" });
+    expect(page.addenda).toEqual([{ key: "addendum-1", number: "QT-9", title: "מדף נוסף", totalAgorot: 23600 }]);
+    expect(publicQuoteFrom(answer({ addenda: [{ number: "QT-9" }] }))).toBeNull();
+  });
+
   it("anything else is not a page", () => {
     expect(publicQuoteFrom(null)).toBeNull();
     expect(publicQuoteFrom({ rate_limited: true })).toBeNull();

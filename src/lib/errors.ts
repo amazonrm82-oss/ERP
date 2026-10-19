@@ -211,6 +211,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_version:not_sent": "גרסה חדשה נוצרת רק מהצעה שנשלחה.",
   "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר.",
   "quote_version:fixed": "אי אפשר לשנות לאיזו הצעה הגרסה שייכת.",
+  // GAP-10: addenda to an accepted quote
+  "quote_addendum:not_accepted": "תוספת נוצרת רק להצעה שהלקוח אישר.",
+  "quote_addendum:of_addendum": "אי אפשר ליצור תוספת לתוספת. יוצרים תוספת נוספת להצעה המקורית.",
+  "quote_addendum:parent": "תוספת שייכת לאותה עסקה ולאותו איש קשר של ההצעה המקורית.",
+  "quote_addendum:version": "גרסה חדשה של תוספת נשארת תוספת לאותה הצעה.",
+  "quote_addendum:fixed": "אי אפשר להעביר תוספת להצעה אחרת.",
   "quote_version:previous_decided": "הלקוח כבר אישר או דחה את ההצעה הקודמת, ולכן אי אפשר לשלוח את הגרסה הזאת. אפשר למחוק את הטיוטה.",
   "quote:superseded": "נשלחה כבר גרסה חדשה של ההצעה, ולכן אי אפשר לאשר או לדחות את הקודמת.",
   // GAP-09

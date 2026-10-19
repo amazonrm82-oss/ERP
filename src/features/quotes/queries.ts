@@ -13,6 +13,7 @@ import { must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
+import { withoutSuperseded } from "./addenda";
 import type { ScheduleStep } from "./schedule";
 import type { QuoteViews } from "./views";
 import { quoteCustomerName } from "./share";
@@ -52,6 +53,8 @@ export type Quote = {
   customerDeletedAt: string | null;
   // QUO-12: the quote this one is a newer version of
   previousId: string | null;
+  // GAP-10: the accepted quote this one adds to
+  addendumOf: string | null;
 };
 
 export type QuoteLine = {
@@ -77,7 +80,7 @@ export type QuoteLine = {
 };
 
 const QUOTE_COLUMNS =
-  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id";
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id, addendum_of";
 
 type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
 type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
@@ -114,6 +117,7 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
     customerContactName: row.customer_contact_name,
     customerDeletedAt: row.customer_deleted_at,
     previousId: row.previous_id,
+    addendumOf: row.addendum_of,
   };
 }
 
@@ -344,6 +348,39 @@ export async function getQuoteVersions(orgId: string, quote: Quote): Promise<{ p
   const ref = (row: { id: string; number_display: string | null; status: string } | null): QuoteVersionRef | null =>
     row ? { id: row.id, numberDisplay: row.number_display, status: isQuoteStatus(row.status) ? row.status : "draft" } : null;
   return { previous: previous ? ref(must(previous, "previous version")) : null, newer: ref(must(newer, "newer version")) };
+}
+
+export type QuoteAddendumRef = { id: string; numberDisplay: string | null; title: string; status: QuoteStatus; totalAgorot: number };
+
+/**
+ * GAP-10: the accepted quote this one adds to, and the addenda of this quote (every status, oldest first), read with the
+ * user's session: they sit on the same deal or contact, so whoever reads this quote reads them too.
+ */
+export async function getQuoteAddenda(orgId: string, quote: Quote): Promise<{ original: QuoteAddendumRef | null; addenda: QuoteAddendumRef[] }> {
+  const supabase = await createClient();
+  const columns = "id, number_display, title, status, total_agorot";
+  const [original, addenda] = await Promise.all([
+    quote.addendumOf ? supabase.from("quotes").select(columns).eq("organization_id", orgId).eq("id", quote.addendumOf).maybeSingle() : null,
+    quote.addendumOf
+      ? null
+      : supabase
+          .from("quotes")
+          .select(`${columns}, previous_id, sent_at`)
+          .eq("organization_id", orgId)
+          .eq("addendum_of", quote.id)
+          .order("created_at")
+          .order("id"),
+  ]);
+  const ref = (row: { id: string; number_display: string | null; title: string; status: string; total_agorot: number }): QuoteAddendumRef => ({
+    id: row.id,
+    numberDisplay: row.number_display,
+    title: row.title,
+    status: isQuoteStatus(row.status) ? row.status : "draft",
+    totalAgorot: row.total_agorot,
+  });
+  const originalRow = original ? must(original, "addendum original") : null;
+  // each addendum chain once: a version superseded by a sent newer version is left out (the QUO-17 rule); drafts stay
+  return { original: originalRow ? ref(originalRow) : null, addenda: withoutSuperseded(addenda ? must(addenda, "addenda") : []).map(ref) };
 }
 
 export type QuoteLinkStatus = { active: boolean; createdAt: string | null };

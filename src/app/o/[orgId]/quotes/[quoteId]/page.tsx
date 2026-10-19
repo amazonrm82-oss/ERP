@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { cancelQuoteAction, newQuoteVersionAction } from "@/features/quotes/actions";
+import { cancelQuoteAction, newQuoteAddendumAction, newQuoteVersionAction } from "@/features/quotes/actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -14,7 +14,7 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getQuote, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
@@ -25,7 +25,7 @@ import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,7 +54,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const quote = await getQuote(orgId, quoteId);
   if (!quote) notFound();
   const supabase = await createClient();
-  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule, customerNow, versions, views] = await Promise.all([
+  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule, customerNow, versions, views, addenda] = await Promise.all([
     listQuoteLines(orgId, quote.id),
     getQuotePricing(orgId, quote),
     getQuoteParties(orgId, quote),
@@ -77,6 +77,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     getQuoteVersions(orgId, quote),
     // QUO-10
     getQuoteViews(orgId, quote.id),
+    // GAP-10
+    getQuoteAddenda(orgId, quote),
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -109,6 +111,14 @@ export default async function QuotePage({ params, searchParams }: Props) {
     parentRow !== null &&
     parentRow.deleted_at === null &&
     canEditRecordHint(context, parentRow.owner_id);
+  // GAP-10: an accepted original (never an addendum) takes addenda, made by whoever may edit its record
+  const canAddendum =
+    hasQuotes &&
+    quote.status === "accepted" &&
+    quote.addendumOf === null &&
+    parentRow !== null &&
+    parentRow.deleted_at === null &&
+    canEditRecordHint(context, parentRow.owner_id);
   const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
@@ -137,6 +147,18 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 action={newQuoteVersionAction.bind(null, orgId, quote.id)}
               >
                 עריכה בגרסה חדשה
+              </ConfirmButton>
+            ) : null}
+            {canAddendum ? (
+              <ConfirmButton
+                variant="secondary"
+                size="sm"
+                title="ליצור תוספת להצעה?"
+                description="תיווצר הצעה חדשה וריקה על אותה עסקה ואותו איש קשר, מקושרת להצעה הזאת. מוסיפים בה את העבודה הנוספת, שולחים אותה והלקוח מאשר וחותם עליה כמו על כל הצעה. ההצעה המאושרת נשארת כפי שהיא."
+                confirmLabel="יצירת תוספת"
+                action={newQuoteAddendumAction.bind(null, orgId, quote.id)}
+              >
+                תוספת להצעה
               </ConfirmButton>
             ) : null}
             {canCancel ? (
@@ -211,6 +233,17 @@ export default async function QuotePage({ params, searchParams }: Props) {
             </Link>
           </span>
         ) : null}
+        {/* GAP-10 */}
+        {addenda.original ? (
+          <span>
+            תוספת להצעה{" "}
+            <Link href={quotePath(orgId, addenda.original.id)} className={linkClass}>
+              <span dir="ltr" className="tabular-nums">
+                {addenda.original.numberDisplay}
+              </span>
+            </Link>
+          </span>
+        ) : null}
         {quote.customerDeletedAt ? (
           <Badge tone="warning">
             הלקוח נמחק{quote.customerName ? `: ${quote.customerName}` : ""}
@@ -243,6 +276,32 @@ export default async function QuotePage({ params, searchParams }: Props) {
         ) : null}
       </div>
       {decision ? <QuoteDecisionCard decision={decision} /> : null}
+      {/* GAP-10: the addenda of this quote */}
+      {addenda.addenda.length > 0 ? (
+        <section aria-labelledby="quote-addenda-title" className="mb-5 rounded-lg border border-line bg-surface p-4 sm:p-5">
+          <h2 id="quote-addenda-title" className="mb-3 text-base font-semibold">
+            תוספות להצעה
+          </h2>
+          <ul className="divide-y divide-line text-sm">
+            {addenda.addenda.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+                <Link href={quotePath(orgId, a.id)} className={linkClass}>
+                  {a.numberDisplay ? (
+                    <span dir="ltr" className="tabular-nums">
+                      {a.numberDisplay}
+                    </span>
+                  ) : null}{" "}
+                  <bdi>{a.title}</bdi>
+                </Link>
+                <span className="flex items-center gap-3">
+                  <Badge>{QUOTE_STATUS_LABELS[a.status]}</Badge>
+                  <span className="tabular-nums text-ink">{formatMoney(a.totalAgorot)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {linkStatus ? (
         <QuoteLinkCard
           orgId={orgId}

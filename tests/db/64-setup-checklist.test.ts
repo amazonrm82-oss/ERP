@@ -471,6 +471,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_superseded.sql",
       // QUO-17 redefines public.log_export() last (the 'quotes' report key)
       "_report_quotes.sql",
+      // GAP-10 redefines public.quote_public() and public.quote_new_version() last (addenda)
+      "_quote_addenda.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -193,7 +193,7 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t2)).toMatchObject({ quote: { number: n2 }, replaced: null });
     // the answer on an old link holds exactly the page's keys, and `replaced` only the earlier number: no ids
     const shown = (await page(t1)) as unknown as Record<string, unknown> & { replaced: Record<string, unknown> };
-    expect(Object.keys(shown).sort()).toEqual(["brand", "built_with", "business", "customer", "design", "lines", "quote", "replaced", "schedule"]);
+    expect(Object.keys(shown).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "lines", "quote", "replaced", "schedule"]);
     expect(Object.keys(shown.replaced)).toEqual(["number"]);
     expect(JSON.stringify(shown)).not.toContain(v1);
     expect(JSON.stringify(shown)).not.toContain(v2);
