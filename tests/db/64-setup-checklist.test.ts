@@ -475,6 +475,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_addenda.sql",
       // RVW-23 redefines app.deal_loss_reasons_cap() of _deal_loss_reasons.sql last (the outsider guard)
       "_quota_outsider_guard.sql",
+      // RVW-36 redefines app.import_record_worked() of _segments.sql last (checklist steps keep an imported task)
+      "_import_task_checklist_worked.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
