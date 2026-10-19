@@ -6,10 +6,11 @@ import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { SelectField, TextField } from "@/components/ui/field";
+import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { pipelineDeleteQuestion } from "@/features/custom-fields/conditions";
 import { DEFAULT_ROT_DAYS, MAX_ROT_DAYS, STAGE_COLORS, stageColor, stageTone } from "@/features/deals/stage-colors";
+import { STAGE_REQUIRED_FIELDS, STAGE_REQUIRED_LABELS, type StageRequiredField } from "@/features/deals/stage-required";
 import type { StageKind } from "@/lib/database.types";
 import type { FormState } from "@/lib/action-result";
 
@@ -25,7 +26,7 @@ import {
 } from "../actions-pipelines";
 import { STAGE_KIND_LABELS } from "../labels";
 import type { PipelineSetting, StageSetting } from "../queries";
-import { STAGE_KINDS } from "../schema";
+import { STAGE_KINDS, STAGE_REQUIRED_SENT } from "../schema";
 
 export function CreatePipelineForm({ orgId }: { orgId: string }) {
   const [state, formAction] = useActionState<FormState, FormData>(createPipelineAction.bind(null, orgId), null);
@@ -154,6 +155,7 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
         <Badge tone={stageTone(stage)}>{stage.name}</Badge>
         <span className="text-sm text-ink-soft">
           {STAGE_KIND_LABELS[stage.kind]}, {stage.probability}%{stage.kind === "open" ? `, ${rotDaysText(stage.rotDays)}` : null}
+          {stage.requiredFields.length > 0 ? `, חובה לכניסה: ${stage.requiredFields.map((field) => STAGE_REQUIRED_LABELS[field]).join(", ")}` : null}
         </span>
       </li>
     );
@@ -203,6 +205,7 @@ function StageRow({ orgId, stage, editable, isFirst, isLast }: StageRowProps) {
             error={errors.probability}
           />
         </div>
+        <StageRequiredFields of={`של השלב ${stage.name}`} picked={stage.requiredFields} />
         <StageLookFields
           stageName={stage.name}
           kind={kind}
@@ -279,6 +282,7 @@ function AddStageForm({ orgId, pipelineId }: { orgId: string; pipelineId: string
           error={errors.probability}
         />
       </div>
+      <StageRequiredFields of="של השלב החדש" picked={[]} />
       <StageLookFields
         stageName="השלב החדש"
         kind={(values?.kind as StageKind | undefined) ?? "open"}
@@ -361,5 +365,26 @@ function StageLookFields({ stageName, kind, color, rotDays, errors, isNew, child
       </p>
       {children}
     </div>
+  );
+}
+
+/**
+ * DEAL-05 (owner, 18 October 2026): the built-in fields a deal must hold to enter the stage. Every move by hand asks
+ * for them; a bulk move skips the deal. Custom fields are made required per stage in the field's own settings (FLD-09).
+ */
+function StageRequiredFields({ of, picked }: { of: string; picked: readonly StageRequiredField[] }) {
+  return (
+    <fieldset className="min-w-0 rounded-md border border-line px-3 py-2">
+      <legend className="px-1 text-sm font-medium text-ink">
+        שדות חובה לכניסה לשלב<span className="sr-only"> {of}</span>
+      </legend>
+      <input type="hidden" name={STAGE_REQUIRED_SENT} value="1" />
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {STAGE_REQUIRED_FIELDS.map((field) => (
+          <Checkbox key={field} name="required_fields" value={field} label={STAGE_REQUIRED_LABELS[field]} defaultChecked={picked.includes(field)} />
+        ))}
+      </div>
+      <p className="mt-1 text-sm text-ink-soft">עסקה בלי השדות האלה לא נכנסת לשלב עד שממלאים אותם. שדות שלכם מסמנים כחובה בהגדרות השדה.</p>
+    </fieldset>
   );
 }

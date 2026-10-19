@@ -4,6 +4,7 @@ import { askedField, type MoveRefusal } from "@/features/custom-fields/required-
 import { missingAfterChange } from "@/features/custom-fields/required-server";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { lossReasonIdByName } from "@/features/deal-loss-reasons/server";
+import { stageRequiredFields } from "@/features/deals/stage-required";
 import { INVALID_ARGS, optionalTextArg, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
@@ -57,11 +58,23 @@ export async function moveRecordAction(
  * FLD-09: the fields a move would leave required and empty, as a window shows them (the won window asks
  * for them up front). Read with the user's session; nothing is saved.
  */
-export async function missingForMoveAction(orgId: string, object: MoveObject, id: string, targetId: string): Promise<ActionResult<{ fields: FieldDefinition[] }>> {
+export async function missingForMoveAction(
+  orgId: string,
+  object: MoveObject,
+  id: string,
+  targetId: string,
+): Promise<ActionResult<{ fields: FieldDefinition[]; amountRequired: boolean }>> {
   if (!validObject(object)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, id, targetId);
   if (!context.ok) return context;
-  const found = await missingAfterChange(orgId, object, [id], { [object === "lead" ? "builtin:status" : "builtin:stage"]: targetId });
+  // only the won window reads this, and it asks the amount itself (DEAL-05): it marks it required when the stage says so
+  const [found, stage] = await Promise.all([
+    missingAfterChange(orgId, object, [id], { [object === "lead" ? "builtin:status" : "builtin:stage"]: targetId }, ["amount"]),
+    object === "deal"
+      ? context.supabase.from("stages").select("required_fields").eq("organization_id", orgId).eq("id", targetId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
   if (!found.ok) return fail(dbErrorMessage(found.error));
-  return ok({ fields: (found.missing.get(id) ?? []).map(askedField) });
+  if (stage.error) return fail(dbErrorMessage(stage.error));
+  return ok({ fields: (found.missing.get(id) ?? []).map(askedField), amountRequired: stageRequiredFields(stage.data?.required_fields).includes("amount") });
 }

@@ -69,7 +69,13 @@ export async function moveRecord(
   // key: 23503. A loss reason on a stage that is not lost is dropped by the database (deals_sync_stage_loss).
   let update = supabase
     .from("deals")
-    .update({ stage_id: spec.stageId, ...(spec.loss ?? {}), ...(required.merge === undefined ? {} : { custom_fields: required.merge }) })
+    .update({
+      stage_id: spec.stageId,
+      ...(spec.loss ?? {}),
+      // DEAL-05: the stage's required built-in fields, asked with the move
+      ...(required.columns ?? {}),
+      ...(required.merge === undefined ? {} : { custom_fields: required.merge }),
+    })
     .eq("organization_id", orgId)
     .eq("id", id)
     .is("deleted_at", null);

@@ -7,10 +7,11 @@ import { ZodError } from "zod";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { isMoveRefusal, type MoveRefusal } from "@/features/custom-fields/required-move";
 import { requiredForMove } from "@/features/custom-fields/required-server";
+import { stageRequiredFields } from "@/features/deals/stage-required";
 import { moveRecord, NO_LONGER_OPEN, STAGE_GONE } from "@/features/record-move/server";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
-import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import { fail, FORM_INVALID, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
@@ -242,7 +243,7 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
 
   const [{ data: org, error: orgError }, { data: stage, error: stageError }] = await Promise.all([
     supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(),
-    supabase.from("stages").select("id, kind").eq("organization_id", orgId).eq("id", stageId).maybeSingle(),
+    supabase.from("stages").select("id, kind, required_fields").eq("organization_id", orgId).eq("id", stageId).maybeSingle(),
   ]);
   if (orgError) return fail(dbErrorMessage(orgError), values);
   if (stageError) return fail(dbErrorMessage(stageError), values);
@@ -255,7 +256,16 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
   const parsed = parseCloseWon(formData, today);
   // FLD-09: the fields the won stage makes required and are empty are asked in the window itself and
   // saved in the same update; still missing: refused with them (missing), and the window shows them
-  const required = await requiredForMove(orgId, "deal", dealId, { "builtin:stage": stageId }, formData);
+  // DEAL-05: the window asks the amount itself; when the won stage requires it, it may not stay empty
+  const required = await requiredForMove(orgId, "deal", dealId, { "builtin:stage": stageId }, formData, ["amount"]);
+  const amountRaw = formData.get("amount");
+  const amountMissing = stageRequiredFields(stage.required_fields).includes("amount") && (typeof amountRaw !== "string" || amountRaw.trim() === "");
+  if (parsed.success && amountMissing) {
+    const amountError = { amount: "יש למלא את השדה." };
+    return isMoveRefusal(required)
+      ? { ...required, message: FORM_INVALID, fieldErrors: { ...required.fieldErrors, ...amountError } }
+      : fail(FORM_INVALID, { fieldErrors: amountError, values: formValues(formData) });
+  }
   if (!parsed.success) {
     const bad = invalid(parsed.error, formData);
     // every problem at once: the window's own fields and the asked ones
@@ -273,6 +283,8 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
       stage_id: stageId,
       amount_agorot: typedDealValue(formData.get("amount"), close.amount),
       closed_at: closedAtFor(close.closedDate, today, now, timeZone),
+      // DEAL-05: the won stage's other required built-in fields (close date, contact), asked in the window
+      ...(required.columns ?? {}),
       ...(required.merge === undefined ? {} : { custom_fields: required.merge }),
     })
     .eq("organization_id", orgId)

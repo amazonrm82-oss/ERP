@@ -2,7 +2,7 @@ import { FORM_INVALID } from "@/lib/action-result";
 import type { Json } from "@/lib/database.types";
 
 import { missingFieldsMessage } from "./conditions";
-import type { FieldDefinition } from "./types";
+import { inputName, type FieldDefinition } from "./types";
 import { parseCustomFields } from "./values";
 
 // FLD-09 (owner, 14 October 2026): one mechanism for every place that moves a lead's status or a deal's
@@ -55,6 +55,9 @@ export function requiredAnswer(
     return { ok: false, message: missingFieldsMessage(fields), missing: fields, ...(values ? { values } : {}) };
   }
   const parsed = parseCustomFields(fields, formData);
+  // DEAL-05: the deal's contact is asked as a choice of contacts, not of the business's users
+  const contactInput = inputName("builtin:contact_id");
+  if (parsed.errors[contactInput]) parsed.errors[contactInput] = parsed.errors[contactInput] === "יש למלא את השדה." ? parsed.errors[contactInput] : "יש לבחור איש קשר מהרשימה.";
   if (Object.keys(parsed.errors).length > 0) {
     return { ok: false, message: FORM_INVALID, missing: fields, fieldErrors: parsed.errors, ...(values ? { values } : {}) };
   }

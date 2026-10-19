@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 import { MAX_ROT_DAYS, STAGE_COLOR_VALUES } from "@/features/deals/stage-colors";
+import { STAGE_REQUIRED_FIELDS } from "@/features/deals/stage-required";
 import { TAG_COLOR_VALUES } from "@/features/tags/types";
 
-import { checkbox, requiredText } from "@/lib/validation";
+import { checkbox, pick, requiredText } from "@/lib/validation";
 
 export const STAGE_KINDS = ["open", "won", "lost"] as const;
 export const STATUS_KINDS = ["open", "converted", "disqualified"] as const;
@@ -49,7 +50,22 @@ export const stageSchema = z.object({
   probability,
   color: stageColorField,
   rot_days: rotDays,
+  // DEAL-05: the built-in fields a deal must hold to enter the stage; absent (a form without the choices) = unchanged
+  required_fields: z
+    .array(z.enum(STAGE_REQUIRED_FIELDS, { error: "יש לבחור שדות מהרשימה." }))
+    .optional()
+    .transform((picked) => (picked === undefined ? undefined : STAGE_REQUIRED_FIELDS.filter((field) => picked.includes(field)))),
 });
+
+/** The stage form's values for stageSchema: the plain fields, and the required fields when the form shows them. */
+export function stageInput(formData: FormData): Record<string, unknown> {
+  const input: Record<string, unknown> = pick(formData, STAGE_FIELDS);
+  if (formData.get(STAGE_REQUIRED_SENT) === "1") input.required_fields = formData.getAll("required_fields").filter((value) => typeof value === "string");
+  return input;
+}
+
+// marks a stage form that shows the required fields (unticked boxes are not sent at all)
+export const STAGE_REQUIRED_SENT = "required_fields_sent";
 
 export const STAGE_FIELDS = ["name", "kind", "probability", "color", "rot_days"] as const;
 

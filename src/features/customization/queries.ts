@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { LeadStatusKind, StageKind } from "@/lib/database.types";
+import { stageRequiredFields, type StageRequiredField } from "@/features/deals/stage-required";
 import { createClient } from "@/lib/supabase/server";
 
 export type StageSetting = {
@@ -13,6 +14,8 @@ export type StageSetting = {
   // DEAL-01: a palette key or null (by kind); days allowed in the stage or null (the default)
   color: string | null;
   rotDays: number | null;
+  // DEAL-05: built-in deal fields required to enter the stage
+  requiredFields: StageRequiredField[];
 };
 export type PipelineSetting = { id: string; name: string; isDefault: boolean; stages: StageSetting[]; liveDealCount: number };
 
@@ -30,7 +33,7 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
       .order("created_at", { ascending: true }),
     supabase
       .from("stages")
-      .select("id, pipeline_id, name, kind, probability, position, color, rot_days")
+      .select("id, pipeline_id, name, kind, probability, position, color, rot_days, required_fields")
       .eq("organization_id", orgId)
       .order("position", { ascending: true }),
   ]);
@@ -76,6 +79,7 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
         position: stage.position,
         color: stage.color,
         rotDays: stage.rot_days,
+        requiredFields: stageRequiredFields(stage.required_fields),
         dealCount: perStage.get(stage.id) ?? 0,
       })),
   }));

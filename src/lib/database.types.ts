@@ -761,6 +761,8 @@ export type StageRow = {
   probability: number;
   color: string | null;
   rot_days: number | null;
+  // DEAL-05: built-in deal fields required to enter the stage (amount | expected_close_date | contact_id)
+  required_fields: string[];
   created_at: string;
   updated_at: string;
 };
@@ -2129,6 +2131,7 @@ export type Database = {
           probability?: number;
           color?: string | null;
           rot_days?: number | null;
+          required_fields?: string[];
         }
       >;
       lead_statuses: Table<

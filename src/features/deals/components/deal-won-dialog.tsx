@@ -101,6 +101,8 @@ function WonForm({
   // FLD-09: the fields the won stage makes required and are empty, asked here and saved with the close
   // (when this read fails, the first save names them and they show then)
   const [required, setRequired] = useState<FieldDefinition[]>([]);
+  // DEAL-05: the won stage requires the amount (the save checks it either way)
+  const [amountRequired, setAmountRequired] = useState(false);
   useEffect(() => {
     let cancelled = false;
     dealOnboardingTaskAction(orgId, target.dealId)
@@ -112,7 +114,10 @@ function WonForm({
       });
     missingForMoveAction(orgId, "deal", target.dealId, target.stageId)
       .then((result) => {
-        if (!cancelled && result.ok && result.data) setRequired(result.data.fields);
+        if (!cancelled && result.ok && result.data) {
+          setRequired(result.data.fields);
+          setAmountRequired(result.data.amountRequired);
+        }
       })
       .catch(() => {
         // the save checks again
@@ -146,6 +151,7 @@ function WonForm({
       <TextField
         label="סכום סופי (₪)"
         name="amount"
+        required={amountRequired}
         dir="ltr"
         inputMode="decimal"
         autoComplete="off"

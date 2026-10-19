@@ -10,7 +10,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { pipelineNameSchema, STAGE_FIELDS, stageSchema } from "./schema";
+import { pipelineNameSchema, stageInput, stageSchema } from "./schema";
 import { saveOrder } from "@/lib/reorder";
 
 function revalidatePipelines(orgId: string) {
@@ -182,7 +182,7 @@ export async function addStageAction(orgId: string, pipelineId: string, _prev: F
   if (!context.ok) {
     return context;
   }
-  const parsed = stageSchema.safeParse(pick(formData, [...STAGE_FIELDS]));
+  const parsed = stageSchema.safeParse(stageInput(formData));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
@@ -221,7 +221,7 @@ export async function updateStageAction(orgId: string, stageId: string, _prev: F
   if (!context.ok) {
     return context;
   }
-  const parsed = stageSchema.safeParse(pick(formData, [...STAGE_FIELDS]));
+  const parsed = stageSchema.safeParse(stageInput(formData));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }

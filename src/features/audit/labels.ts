@@ -240,6 +240,8 @@ export const FIELD_LABELS: Record<string, string> = {
   probability: "סיכוי",
   color: "צבע",
   rot_days: "ימים מרביים בשלב",
+  // DEAL-05
+  required_fields: "שדות חובה לכניסה לשלב",
   snoozed_until: "נדחתה עד",
   closed_at: "נסגרה",
   completed_at: "הושלמה",
