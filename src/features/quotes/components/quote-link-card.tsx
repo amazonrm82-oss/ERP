@@ -93,7 +93,8 @@ export function QuoteLinkCard({ orgId, quoteId, numberDisplay, active, createdTe
               <ConfirmButton
                 size="sm"
                 title="לבטל את הקישור?"
-                description="הלקוח לא יוכל לפתוח את ההצעה מהקישור ששלחתם."
+                // QUO-12 (owner, 19 October 2026): an older version's link still leads to the newest sent version
+                description="הלקוח לא יוכל לפתוח את ההצעה מהקישור הזה. קישורים שנשלחו לגרסאות קודמות של ההצעה עדיין מובילים אליה; כדי לחסום גם אותם, בטלו את הקישור בכל גרסה קודמת."
                 confirmLabel="ביטול הקישור"
                 action={revokeQuoteLinkAction.bind(null, orgId, quoteId)}
                 onDone={() => router.refresh()}
