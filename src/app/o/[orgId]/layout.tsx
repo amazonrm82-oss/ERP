@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/wordmark";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
 import { RememberOrg } from "@/features/shortcuts/components/remember-org";
+import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
 import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
@@ -85,7 +86,7 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd, syncTheme, terms] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, syncTheme, terms, modules] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
@@ -93,6 +94,8 @@ export default async function OrgLayout({ children, params }: Props) {
     profileThemeForNewDevice(user.id),
     // FLD-10: the business's own words in the menu and the "+" menu
     getOrgTerms(org.id),
+    // LEAD-08: a switched-off module leaves the menu and the "+" menu
+    getOrgModules(org.id),
   ]);
   // BIL-08: while the business is in the trial-end transition its line says what comes next
   const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
@@ -117,7 +120,7 @@ export default async function OrgLayout({ children, params }: Props) {
           </Link>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-2">
-          <SidebarNav orgId={org.id} terms={terms} />
+          <SidebarNav orgId={org.id} terms={terms} modules={modules} />
         </div>
       </aside>
 
@@ -130,7 +133,7 @@ export default async function OrgLayout({ children, params }: Props) {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {/* REC-08: create anything from any screen, for who may write */}
-          {context.canWrite ? <CreateMenu orgId={org.id} terms={terms} /> : null}
+          {context.canWrite ? <CreateMenu orgId={org.id} terms={terms} modules={modules} /> : null}
           <GlobalSearch orgId={org.id} />
           <NotificationBell
             // new server data (after marking read, or navigation) starts the bell afresh
@@ -191,6 +194,7 @@ export default async function OrgLayout({ children, params }: Props) {
       <BottomNav
         orgId={org.id}
         terms={terms}
+        modules={modules}
         extra={[
           { href: paths.notifications(org.id), label: "התראות" },
           { href: paths.help, label: "מרכז עזרה" },

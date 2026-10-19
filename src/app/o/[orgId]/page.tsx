@@ -27,7 +27,9 @@ import { getSetupChecklist, getSetupStep } from "@/features/setup/queries";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { readPipelineCleanup } from "@/features/pipeline-cleanup/queries";
 import { cleanupCountText, isCleanupDay } from "@/features/pipeline-cleanup/rules";
+import { cn } from "@/lib/cn";
 import { leadDisplayName } from "@/features/leads/display";
+import { getOrgModules } from "@/features/modules/queries";
 import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
@@ -56,11 +58,13 @@ export default async function HomePage({ params }: Props) {
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
-  const [day, setupStep, goals] = await Promise.all([
+  const [day, setupStep, goals, modules] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
     setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
     // GOL-03: the person's own goals whose period holds today; no goal, no card
     withReportShape(() => getGoalProgress(orgId, { userId: user.id })),
+    // LEAD-08: with leads switched off, the new-leads tile and card are left out
+    getOrgModules(orgId),
   ]);
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
   // MNY-05: once a week, on the business's first working day of the week, the cleanup with a count
@@ -89,7 +93,9 @@ export default async function HomePage({ params }: Props) {
       href: paths.tasks(orgId),
       icon: CheckSquareIcon,
     },
-    { label: "לידים חדשים", value: formatNumber(day.newLeadsCount), note: null, warn: false, href: paths.leads(orgId), icon: InboxIcon },
+    ...(modules.leads
+      ? [{ label: "לידים חדשים", value: formatNumber(day.newLeadsCount), note: null, warn: false, href: paths.leads(orgId), icon: InboxIcon }]
+      : []),
     {
       label: "עסקאות פתוחות",
       value: formatNumber(day.openDealsCount),
@@ -132,7 +138,7 @@ export default async function HomePage({ params }: Props) {
         </Card>
       ) : null}
 
-      <ul aria-label="סיכום" className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
+      <ul aria-label="סיכום" className={cn("mb-5 grid gap-2 sm:gap-3", summary.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
         {summary.map((item) => (
           <li key={item.label}>
             <Link
@@ -291,64 +297,66 @@ export default async function HomePage({ params }: Props) {
           </CardBody>
         </Card>
 
-        <Card aria-labelledby="my-leads-title">
-          <CardHeader
-            id="my-leads-title"
-            title="לידים חדשים שמחכים לי"
-            action={
-              <ButtonLink href={paths.leads(orgId)} variant="ghost" size="sm" className="print:hidden">
-                לכל הלידים
-              </ButtonLink>
-            }
-          />
-          <CardBody>
-            {day.newLeads.length === 0 ? (
-              <EmptyState compact icon={<InboxIcon />} title="אין לידים חדשים שמשויכים אליכם" description="ליד חדש שיוקצה לכם יופיע כאן עד שהסטטוס שלו ישתנה." />
-            ) : (
-              <>
-                <ul className="divide-y divide-line">
-                  {day.newLeads.map((lead) => (
-                    <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                      <span className="min-w-0">
-                        <Link href={paths.lead(orgId, lead.id)} className="block truncate font-medium underline-offset-4 hover:underline">
-                          {leadDisplayName(lead)}
-                        </Link>
-                        <span className="block truncate text-sm text-ink-soft">
-                          {lead.companyName ? `${lead.companyName}, ` : ""}
-                          נוצר ב-<time dateTime={lead.createdAt}>{formatDate(lead.createdAt)}</time>
+        {modules.leads ? (
+          <Card aria-labelledby="my-leads-title">
+            <CardHeader
+              id="my-leads-title"
+              title="לידים חדשים שמחכים לי"
+              action={
+                <ButtonLink href={paths.leads(orgId)} variant="ghost" size="sm" className="print:hidden">
+                  לכל הלידים
+                </ButtonLink>
+              }
+            />
+            <CardBody>
+              {day.newLeads.length === 0 ? (
+                <EmptyState compact icon={<InboxIcon />} title="אין לידים חדשים שמשויכים אליכם" description="ליד חדש שיוקצה לכם יופיע כאן עד שהסטטוס שלו ישתנה." />
+              ) : (
+                <>
+                  <ul className="divide-y divide-line">
+                    {day.newLeads.map((lead) => (
+                      <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                        <span className="min-w-0">
+                          <Link href={paths.lead(orgId, lead.id)} className="block truncate font-medium underline-offset-4 hover:underline">
+                            {leadDisplayName(lead)}
+                          </Link>
+                          <span className="block truncate text-sm text-ink-soft">
+                            {lead.companyName ? `${lead.companyName}, ` : ""}
+                            נוצר ב-<time dateTime={lead.createdAt}>{formatDate(lead.createdAt)}</time>
+                          </span>
                         </span>
-                      </span>
-                      <span className="print:hidden">
-                        <ContactActions
-                          phone={lead.phone}
-                          phoneE164={lead.phoneE164}
-                          email={null}
-                          compact={{ name: leadDisplayName(lead) }}
-                          whatsappLog={listWhatsappLog(whatsappContext, {
-                            subject: { kind: "lead", id: lead.id },
-                            name: leadDisplayName(lead),
-                            phoneE164: lead.phoneE164,
-                            fullName: lead.fullName,
-                          })}
-                        />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {day.newLeadsCount > day.newLeads.length ? (
-                  <p className="mt-3 text-sm text-ink-soft">
-                    ועוד {formatNumber(day.newLeadsCount - day.newLeads.length)} לידים חדשים ברשימת הלידים.
-                  </p>
-                ) : null}
-              </>
-            )}
-            <p className="mt-3 text-sm print:hidden">
-              <Link href={paths.leadsWaiting(orgId)} className="text-accent-strong underline underline-offset-4">
-                לידים שעוד לא קיבלו מענה
-              </Link>
-            </p>
-          </CardBody>
-        </Card>
+                        <span className="print:hidden">
+                          <ContactActions
+                            phone={lead.phone}
+                            phoneE164={lead.phoneE164}
+                            email={null}
+                            compact={{ name: leadDisplayName(lead) }}
+                            whatsappLog={listWhatsappLog(whatsappContext, {
+                              subject: { kind: "lead", id: lead.id },
+                              name: leadDisplayName(lead),
+                              phoneE164: lead.phoneE164,
+                              fullName: lead.fullName,
+                            })}
+                          />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {day.newLeadsCount > day.newLeads.length ? (
+                    <p className="mt-3 text-sm text-ink-soft">
+                      ועוד {formatNumber(day.newLeadsCount - day.newLeads.length)} לידים חדשים ברשימת הלידים.
+                    </p>
+                  ) : null}
+                </>
+              )}
+              <p className="mt-3 text-sm print:hidden">
+                <Link href={paths.leadsWaiting(orgId)} className="text-accent-strong underline underline-offset-4">
+                  לידים שעוד לא קיבלו מענה
+                </Link>
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
 
         <Card aria-labelledby="my-no-next-step-title">
           <CardHeader

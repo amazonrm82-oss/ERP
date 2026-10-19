@@ -663,6 +663,17 @@ export type OrgTermsRow = {
   updated_at: string;
 };
 
+// LEAD-08: which modules a business uses (migration org_modules); no row = both on.
+export type OrgModulesRow = {
+  id: string;
+  organization_id: string;
+  leads_enabled: boolean;
+  companies_enabled: boolean;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MembershipRow = {
   id: string;
   organization_id: string;
@@ -2414,6 +2425,12 @@ export type Database = {
         OrgTermsRow,
         { organization_id: string; contact_term?: string | null; lead_term?: string | null; deal_term?: string | null },
         { contact_term?: string | null; lead_term?: string | null; deal_term?: string | null }
+      >;
+      // LEAD-08: column grants; no delete (a module is switched back on, the row stays)
+      org_modules: Table<
+        OrgModulesRow,
+        { organization_id: string; leads_enabled?: boolean; companies_enabled?: boolean },
+        { leads_enabled?: boolean; companies_enabled?: boolean }
       >;
       quote_designs: Table<QuoteDesignDbRow, QuoteDesignWrite & { organization_id: string }, QuoteDesignWrite>;
       // QUO-04: column grants; the VAT mode is set when the template is made

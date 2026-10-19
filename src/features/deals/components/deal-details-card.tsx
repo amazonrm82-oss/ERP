@@ -75,7 +75,8 @@ type Props = {
   orgId: string;
   deal: DealDetailsView;
   contacts: Option[];
-  companies: Option[];
+  // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
+  companies: Option[] | null;
   lossReasons: LossReasonOption[];
   canEdit: boolean;
   focus?: string | null;
@@ -140,14 +141,16 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
                   </Link>
                 ) : null,
             },
-            company_id: {
-              value:
-                deal.companyId && deal.companyName ? (
-                  <Link href={paths.company(orgId, deal.companyId)} className={linkClass}>
-                    {deal.companyName}
-                  </Link>
-                ) : null,
-            },
+            company_id: companies
+              ? {
+                  value:
+                    deal.companyId && deal.companyName ? (
+                      <Link href={paths.company(orgId, deal.companyId)} className={linkClass}>
+                        {deal.companyName}
+                      </Link>
+                    ) : null,
+                }
+              : null,
             expected_close_date: { value: deal.expectedCloseText },
             recurring_kind: { value: deal.recurring.kindText },
             // the page passes the amount through shownRecurringAmount() (DLI-03: a following 0 is hidden)
@@ -166,7 +169,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   );
 }
 
-type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[]; lossReasons: LossReasonOption[]; onDone: (message?: string) => void };
+type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[] | null; lossReasons: LossReasonOption[]; onDone: (message?: string) => void };
 
 function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
@@ -216,14 +219,19 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
               </option>
             ))}
           </SelectField>
-          <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
-            <option value="">ללא חברה</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </SelectField>
+          {companies ? (
+            <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
+              <option value="">ללא חברה</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </SelectField>
+          ) : (
+            // LEAD-08: companies switched off; the stored company is sent back unchanged
+            <input type="hidden" name="company_id" value={companyValue} />
+          )}
           <TextField
             label="תאריך סגירה צפוי"
             name="expected_close_date"

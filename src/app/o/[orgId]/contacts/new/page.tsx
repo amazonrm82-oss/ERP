@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Card, CardBody } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
+import { getOrgModules } from "@/features/modules/queries";
 import { ContactForm } from "@/features/contacts/components/contact-form";
 import { listPriceLists } from "@/features/price-lists/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
@@ -34,8 +35,9 @@ export default async function NewContactPage({ params }: Props) {
     );
   }
 
+  // LEAD-08: with companies switched off there is no company field (null)
   const [companies, fields, types, priceLists] = await Promise.all([
-    listCompanyOptions(orgId),
+    getOrgModules(orgId).then((modules) => (modules.companies ? listCompanyOptions(orgId) : null)),
     listFieldDefinitions(orgId, "contact"),
     listRecordTypes(orgId, "contact"),
     listPriceLists(orgId),

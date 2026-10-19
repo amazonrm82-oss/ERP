@@ -52,7 +52,8 @@ function initialDrafts(kind: ChannelKind, values: ContactValues): ChannelDraft[]
 type Props = {
   values: ContactValues;
   errors: Record<string, string>;
-  companies: CompanyOption[];
+  // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
+  companies: CompanyOption[] | null;
   // the organization's contact types, and the older free-text type of the contact
   types: RecordType[];
   legacyType?: string | null;
@@ -95,14 +96,19 @@ export function ContactFields({ values, errors, companies, types, legacyType }: 
           error={errors.job_title}
         />
         {/* key: a select only takes defaultValue on mount */}
-        <SelectField key={`company-${companyId}`} label="חברה" name="company_id" defaultValue={companyId} error={errors.company_id}>
-          <option value="">ללא חברה</option>
-          {companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </SelectField>
+        {companies ? (
+          <SelectField key={`company-${companyId}`} label="חברה" name="company_id" defaultValue={companyId} error={errors.company_id}>
+            <option value="">ללא חברה</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : (
+          // LEAD-08: companies switched off; the stored company is sent back unchanged
+          <input type="hidden" name="company_id" value={companyId} />
+        )}
       </div>
       <RecordTypeField types={types} value={values.type_id} legacy={legacyType} label="סוג איש קשר" error={errors.type_id} className="sm:max-w-xs" />
       <TextField label="יום הולדת" name="birth_date" type="date" defaultValue={values.birth_date ?? ""} error={errors.birth_date} className="sm:max-w-56" />

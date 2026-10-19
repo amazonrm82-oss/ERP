@@ -14,6 +14,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 import { calendarPath } from "@/features/calendar/range";
+import { DEFAULT_MODULES, type OrgModules } from "@/features/modules/modules";
 import { productsPath } from "@/features/products/paths";
 import { quotesPath } from "@/features/quotes/paths";
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
@@ -30,12 +31,15 @@ export type NavItem = {
   mobile: boolean;
 };
 
-/** FLD-10: leads, contacts and deals carry the business's own words (today's words by default). */
-export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS): NavItem[] {
-  return [
+/**
+ * FLD-10: leads, contacts and deals carry the business's own words (today's words by default).
+ * LEAD-08: a switched-off module is left out; with leads off, contacts take their place in the phone bottom bar.
+ */
+export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules: OrgModules = DEFAULT_MODULES): NavItem[] {
+  const items: NavItem[] = [
     { key: "home", label: "בית", href: paths.org(orgId), icon: HomeIcon, exact: true, mobile: true },
     { key: "leads", label: terms.lead.plural, href: paths.leads(orgId), icon: InboxIcon, mobile: true },
-    { key: "contacts", label: terms.contact.plural, href: paths.contacts(orgId), icon: UsersIcon, mobile: false },
+    { key: "contacts", label: terms.contact.plural, href: paths.contacts(orgId), icon: UsersIcon, mobile: !modules.leads },
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
     { key: "deals", label: terms.deal.plural, href: paths.deals(orgId), icon: BoardIcon, mobile: true },
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },
@@ -49,6 +53,14 @@ export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS): NavIte
     { key: "reports", label: "דוחות", href: paths.reports(orgId), icon: ChartIcon, mobile: false },
     { key: "settings", label: "הגדרות", href: paths.settings(orgId), icon: SettingsIcon, mobile: false },
   ];
+  return items.filter((item) => moduleOn(item.key, modules));
+}
+
+/** LEAD-08: whether a menu or "+" entry belongs to a module the business switched off. */
+function moduleOn(key: string, modules: OrgModules): boolean {
+  if (key === "leads" || key === "lead") return modules.leads;
+  if (key === "companies" || key === "company") return modules.companies;
+  return true;
 }
 
 export type CreateItem = {
@@ -59,14 +71,15 @@ export type CreateItem = {
 };
 
 /** REC-08: what the "+" button of the top bar can create; each opens that type's own create screen. */
-export function createItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS): CreateItem[] {
-  return [
+export function createItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules: OrgModules = DEFAULT_MODULES): CreateItem[] {
+  const items: CreateItem[] = [
     { key: "lead", label: terms.lead.newOne, href: paths.leadNew(orgId), icon: InboxIcon },
     { key: "contact", label: terms.contact.newOne, href: paths.contactNew(orgId), icon: UsersIcon },
     { key: "company", label: "חברה חדשה", href: paths.companyNew(orgId), icon: BuildingIcon },
     { key: "deal", label: terms.deal.newOne, href: paths.dealNew(orgId), icon: BoardIcon },
     { key: "task", label: "משימה חדשה", href: paths.taskNew(orgId), icon: CheckSquareIcon },
   ];
+  return items.filter((item) => moduleOn(item.key, modules));
 }
 
 export function isActive(pathname: string, item: NavItem): boolean {

@@ -22,7 +22,8 @@ type Props = {
   pipelineId: string;
   stages: StageOption[];
   contacts: Array<{ id: string; name: string }>;
-  companies: Array<{ id: string; name: string }>;
+  // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
+  companies: Array<{ id: string; name: string }> | null;
   // preselected when the form is opened from a contact's or a company's page
   defaultContactId: string;
   defaultCompanyId: string;
@@ -91,14 +92,18 @@ export function DealForm({ orgId, pipelineId, stages, contacts, companies, defau
             </option>
           ))}
         </SelectField>
-        <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
-          <option value="">ללא חברה</option>
-          {companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </SelectField>
+        {companies ? (
+          <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
+            <option value="">ללא חברה</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : (
+          <input type="hidden" name="company_id" value={companyValue} />
+        )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField

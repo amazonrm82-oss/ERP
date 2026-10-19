@@ -46,7 +46,8 @@ export type ContactDetailsView = ContactValues & {
 type Props = {
   orgId: string;
   contact: ContactDetailsView;
-  companies: CompanyOption[];
+  // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
+  companies: CompanyOption[] | null;
   types: RecordType[];
   canEdit: boolean;
   focus?: string | null;
@@ -88,14 +89,16 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
             phone: { value: <ChannelList kind="phone" contact={contact} /> },
             email: { value: <ChannelList kind="email" contact={contact} /> },
             job_title: { value: contact.job_title },
-            company_id: {
-              value:
-                contact.company_id && contact.companyName ? (
-                  <Link href={paths.company(orgId, contact.company_id)} className="text-accent underline underline-offset-4">
-                    {contact.companyName}
-                  </Link>
-                ) : null,
-            },
+            company_id: companies
+              ? {
+                  value:
+                    contact.company_id && contact.companyName ? (
+                      <Link href={paths.company(orgId, contact.company_id)} className="text-accent underline underline-offset-4">
+                        {contact.companyName}
+                      </Link>
+                    ) : null,
+                }
+              : null,
             type: { value: contact.typeName ?? contact.contact_type },
             birth_date: { value: contact.birthDateText },
             preferred_locale: { value: localeLabel(contact.preferred_locale) },
@@ -111,7 +114,7 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
   );
 }
 
-type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[]; types: RecordType[]; onDone: () => void };
+type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[] | null; types: RecordType[]; onDone: () => void };
 
 function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {

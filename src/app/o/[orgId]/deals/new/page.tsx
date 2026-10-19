@@ -5,6 +5,7 @@ import { BoardIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
+import { getOrgModules } from "@/features/modules/queries";
 import { listContactOptions } from "@/features/contacts/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { DealForm } from "@/features/deals/components/deal-form";
@@ -44,14 +45,15 @@ export default async function NewDealPage({ params, searchParams }: Props) {
   const [pipeline, contacts, companies, fields] = await Promise.all([
     getPipeline(orgId, firstParam(query.pipeline)),
     listContactOptions(orgId),
-    listCompanyOptions(orgId),
+    // LEAD-08: with companies switched off there is no company field (null)
+    getOrgModules(orgId).then((modules) => (modules.companies ? listCompanyOptions(orgId) : null)),
     listFieldDefinitions(orgId, "deal"),
   ]);
   const contactParam = firstParam(query.contact);
   const companyParam = firstParam(query.company);
   // only preselect a contact that is actually in the list
   const defaultContactId = isUuid(contactParam) && contacts.some((contact) => contact.id === contactParam) ? contactParam : "";
-  const defaultCompanyId = isUuid(companyParam) && companies.some((company) => company.id === companyParam) ? companyParam : "";
+  const defaultCompanyId = isUuid(companyParam) && companies?.some((company) => company.id === companyParam) ? companyParam : "";
 
   return (
     <div className="max-w-2xl">

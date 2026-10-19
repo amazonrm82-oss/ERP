@@ -12,6 +12,7 @@ import { withReportShape } from "@/features/reports/schemas";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
+import { getOrgModules } from "@/features/modules/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -25,7 +26,11 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   // QUO-17: a report of a plan capability is listed only while the business has it (each capability read once)
   const features = [...new Set(REPORTS.flatMap((report) => (report.feature ? [report.feature] : [])))];
   const hasFeature = new Map(await Promise.all(features.map(async (key) => [key, await orgHasFeature(orgId, key)] as const)));
-  const reports = REPORTS.filter((report) => (!report.costs || seesCosts) && (!report.feature || hasFeature.get(report.feature) === true));
+  // LEAD-08: a leads-only report is left out while the leads module is off (the page itself still opens from a saved link)
+  const modules = await getOrgModules(orgId);
+  const reports = REPORTS.filter(
+    (report) => (!report.costs || seesCosts) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
+  );
   // the dashboard is for people who manage others; reps get the reports list
   const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId, role === "owner" || role === "admin" ? { unteamed: { timeZone: org.timeZone } } : {})) : null;
 

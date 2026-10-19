@@ -22,6 +22,7 @@ import { RecordSummaryCard } from "@/features/record-summary/components/record-s
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
+import { getOrgModules } from "@/features/modules/queries";
 import { ContactCompaniesCard } from "@/features/contact-companies/components/contact-companies-card";
 import { listContactCompanies } from "@/features/contact-companies/queries";
 import { ContactRelationsCard } from "@/features/contact-relations/components/contact-relations-card";
@@ -94,19 +95,22 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
   const canEdit = canEditRecordHint(context, contact.owner_id);
-  const [companies, types, domainLink, companyLinks, relationTypes, people, hasQuotes] = await Promise.all([
-    canEdit ? listCompanyOptions(orgId) : [],
+  // LEAD-08: with companies switched off, the company field, the companies card and the domain note are left out
+  const modules = await getOrgModules(orgId);
+  const [companyOptions, types, domainLink, companyLinks, relationTypes, people, hasQuotes] = await Promise.all([
+    canEdit && modules.companies ? listCompanyOptions(orgId) : [],
     canEdit ? listRecordTypes(orgId, "contact") : [],
     // CON-09: a company linked by the email domain, or the companies to pick from
-    getDomainLinkInfo(orgId, contact),
+    modules.companies ? getDomainLinkInfo(orgId, contact) : null,
     // CON-05: every company of the contact, with the role there
-    listContactCompanies(orgId, contact.id),
+    modules.companies ? listContactCompanies(orgId, contact.id) : [],
     // CON-06: the business's relation types, and the people to relate to
     listRelationTypes(orgId),
     canEdit ? listContactOptions(orgId) : [],
     // QUO-01
     orgHasFeature(orgId, "quotes"),
   ]);
+  const companies = modules.companies ? companyOptions : null;
   const relations = await listContactRelations(orgId, contact.id, relationTypes);
   const name = contactDisplayName({ fullName: contact.full_name, email: contact.email, phone: contact.phone });
 
@@ -197,7 +201,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
             }}
           />
 
-          <ContactCompaniesCard orgId={orgId} contactId={contact.id} canEdit={canEdit} items={companyLinks} options={companies} />
+          {companies ? <ContactCompaniesCard orgId={orgId} contactId={contact.id} canEdit={canEdit} items={companyLinks} options={companies} /> : null}
 
           <ContactRelationsCard
             orgId={orgId}

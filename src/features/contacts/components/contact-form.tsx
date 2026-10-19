@@ -28,7 +28,8 @@ export function ContactForm({
   priceLists,
 }: {
   orgId: string;
-  companies: CompanyOption[];
+  // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
+  companies: CompanyOption[] | null;
   fields: FieldDefinition[];
   types: RecordType[];
   priceLists: BillingPriceList[];

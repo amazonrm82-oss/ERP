@@ -435,6 +435,46 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("the modules a business uses: everyone reads them, only owners and admins of a writable business switch them, nobody deletes them (LEAD-08)", async () => {
+    // no row yet = both on; only owners and admins may create it
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.org_modules (organization_id, leads_enabled) values ($1, false)", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q("insert into public.org_modules (organization_id, leads_enabled) values ($1, false)", [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      const row = await asUser(u.id, async (q) =>
+        (await q<{ leads_enabled: boolean; companies_enabled: boolean }>("select leads_enabled, companies_enabled from public.org_modules where organization_id = $1", [org])).rows,
+      );
+      expect(row, u.email).toEqual([{ leads_enabled: false, companies_enabled: true }]);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.org_modules set leads_enabled = true where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.org_modules set companies_enabled = false where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.org_modules where organization_id = $1", [org])))).code).toBe("42501");
+    // only the two switches are written by a client
+    expect((await pgError(asUser(owner.id, (q) => q("update public.org_modules set updated_by = null where organization_id = $1", [org])))).code).toBe("42501");
+    expect(await asAdmin(async (q) => (await q<{ u: string }>("select updated_by as u from public.org_modules where organization_id = $1", [org])).rows[0].u)).toBe(owner.id);
+    // switching off hides: the business's leads and companies are untouched and still read under RLS
+    expect(await asUser(owner.id, (q) => count(q, "select 1 from public.leads where organization_id = $1", [org]))).toBeGreaterThan(0);
+    // a read-only business keeps its switches readable and frozen, for owners too
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await asUser(m1.id, (q) => count(q, "select 1 from public.org_modules where organization_id = $1", [org]))).toBe(1);
+      for (const u of [owner, admin]) {
+        expect(await asUser(u.id, async (q) => (await q("update public.org_modules set leads_enabled = true where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+      }
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+    // back on, as the rest of this file expects
+    await asUser(owner.id, (q) => q("update public.org_modules set leads_enabled = true, companies_enabled = true where organization_id = $1", [org]));
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

@@ -4,13 +4,15 @@
 
 export type TermValues = { contact_term: string | null; lead_term: string | null; deal_term: string | null };
 
+// LEAD-08 saves its one-row module switches the same way (saveTerms is generic over the row's columns)
+
 type DbError = { code?: string; message: string } | null;
 type Rows = { data: { id: string }[] | null; error: DbError };
 
 /** The two calls the save needs, so the flow can be tested without a database. */
-export type TermsWriter = {
-  update(orgId: string, values: TermValues): PromiseLike<Rows>;
-  insert(orgId: string, values: TermValues): PromiseLike<Rows>;
+export type TermsWriter<V = TermValues> = {
+  update(orgId: string, values: V): PromiseLike<Rows>;
+  insert(orgId: string, values: V): PromiseLike<Rows>;
 };
 
 export type SaveTermsResult = { ok: true } | { ok: false; error: DbError };
@@ -20,7 +22,7 @@ export type SaveTermsResult = { ok: true } | { ok: false; error: DbError };
  * save racing another first save hits the unique key (23505): then the row exists, so update once more.
  * Zero rows at the end means not permitted (RLS), answered as an error with code 42501.
  */
-export async function saveTerms(writer: TermsWriter, orgId: string, values: TermValues): Promise<SaveTermsResult> {
+export async function saveTerms<V = TermValues>(writer: TermsWriter<V>, orgId: string, values: V): Promise<SaveTermsResult> {
   const updated = await writer.update(orgId, values);
   if (updated.error) return { ok: false, error: updated.error };
   if ((updated.data ?? []).length > 0) return { ok: true };

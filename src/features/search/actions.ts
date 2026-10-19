@@ -1,6 +1,7 @@
 "use server";
 
 import { notePlainText } from "@/features/activities/markdown";
+import { getOrgModules } from "@/features/modules/queries";
 import { sessionCheck } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
@@ -22,6 +23,8 @@ export async function searchAction(orgId: string, query: string): Promise<Search
   const { data, error } = await supabase.rpc("search_records", { p_org: orgId, p_query: query.trim(), p_limit: 6 });
   if (error || !data || typeof data !== "object" || Array.isArray(data)) return [];
   const result = data as Record<string, Row[] | undefined>;
+  // LEAD-08: a switched-off module's records are not offered (their pages show the "module is off" screen)
+  const modules = await getOrgModules(orgId);
   const hits: SearchHit[] = [];
   const add = (group: SearchGroup, rows: Row[] | undefined, make: (r: Row) => Omit<SearchHit, "key" | "group"> | null) => {
     for (const r of rows ?? []) {
@@ -29,18 +32,18 @@ export async function searchAction(orgId: string, query: string): Promise<Search
       if (hit) hits.push({ key: `${group}:${String(r.id)}`, group, ...hit });
     }
   };
-  add("leads", result.leads, (r) => ({ title: str(r.title) ?? "ליד ללא שם", subtitle: str(r.subtitle), href: paths.lead(orgId, String(r.id)) }));
+  if (modules.leads) add("leads", result.leads, (r) => ({ title: str(r.title) ?? "ליד ללא שם", subtitle: str(r.subtitle), href: paths.lead(orgId, String(r.id)) }));
   add("contacts", result.contacts, (r) => ({ title: str(r.title) ?? "איש קשר בלי שם", subtitle: str(r.subtitle), href: paths.contact(orgId, String(r.id)) }));
-  add("companies", result.companies, (r) => ({ title: str(r.title) ?? "חברה", subtitle: str(r.subtitle), href: paths.company(orgId, String(r.id)) }));
+  if (modules.companies) add("companies", result.companies, (r) => ({ title: str(r.title) ?? "חברה", subtitle: str(r.subtitle), href: paths.company(orgId, String(r.id)) }));
   add("deals", result.deals, (r) => ({ title: str(r.title) ?? "עסקה", subtitle: formatMoney(Number(r.amount_agorot ?? 0)), href: paths.deal(orgId, String(r.id)) }));
   add("notes", result.notes, (r) => {
-    const href = str(r.lead_id)
+    const href = str(r.lead_id) && modules.leads
       ? paths.lead(orgId, String(r.lead_id))
       : str(r.contact_id)
         ? paths.contact(orgId, String(r.contact_id))
         : str(r.deal_id)
           ? paths.deal(orgId, String(r.deal_id))
-          : str(r.company_id)
+          : str(r.company_id) && modules.companies
             ? paths.company(orgId, String(r.company_id))
             : null;
     // REC-04: a note's formatting marks are not shown in a one-line result

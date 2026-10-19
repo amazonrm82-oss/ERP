@@ -87,6 +87,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   quote_designs: "עיצוב הצעת מחיר",
   // FLD-10
   org_terms: "מונחים",
+  // LEAD-08
+  org_modules: "מודולים",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08
