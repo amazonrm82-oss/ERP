@@ -1011,6 +1011,13 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   list, members read, owners/admins of a writable org write, 50 per org, hint `checklist_templates:max`, audited, two seeded defaults
   mirrored by `DEFAULT_CHECKLIST_TEMPLATES`). A recurring task's next occurrence copies the steps unticked (`tasks_checklist_carry`).
   `app.sample_untouched` was last redefined in 020315 (steps keep a sample task).
+- Team tasks (TASK-07, migration 020490; owner 18 October 2026): an open task with a team and no owner (not a lead's SPD-01
+  call-back task, `app.intake_callback_tasks`) is visible to the team's active members (`tasks_select` adds
+  `app.team_task_visible`, definer). `app.tasks_default_owner()` replaces `app.default_owner()` on tasks only: a person's insert with
+  a team and no owner stays unowned when `app.may_assign_team_task` allows (owner/admin, the team's manager, a non-viewer member of
+  it), else 42501 hint `task:team`. `public.take_task(org, task)` (definer): first taker wins (`owner_id is null`), answers
+  `{ok, reason: taken|closed|lead}`. Trigger `tasks_notify_team` tells the team's full-seat members once (kind `assigned`).
+  The app mirror of the take rule is `teamsForTaskRights()` in `src/features/tasks/team-rights.ts` (test 191 compares them).
 - Recurring tasks (TASK-04, migration 0063): completing a task with `recurrence` makes `app.spawn_recurring_task()`
   (security definer, trigger) create the next one, once (`recurrence_source_id`, unique; clients may not write it).
   Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
