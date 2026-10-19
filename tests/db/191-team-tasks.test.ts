@@ -69,8 +69,10 @@ describe("team tasks: first to take it becomes the owner (TASK-07)", () => {
 
   it("every member of the team sees it until someone takes it; then the owner rules apply again", async () => {
     const t = await teamTask(m1, "לחזור ללקוח");
-    for (const who of [m1, m2, viewer, manager, admin, owner]) expect(await sees(who, t.id), who.email).toBe(true);
+    for (const who of [m1, m2, manager, admin, owner]) expect(await sees(who, t.id), who.email).toBe(true);
     expect(await sees(m3, t.id)).toBe(false);
+    // a viewer in the team neither makes nor takes one, and does not see it either (020500)
+    expect(await sees(viewer, t.id)).toBe(false);
     expect(await sees(outsider, t.id)).toBe(false);
     // a team member cannot change it before taking it
     expect(await asUser(m2.id, async (q) => (await q("update public.tasks set title = 'שונה' where id = $1", [t.id])).rowCount)).toBe(0);
@@ -156,5 +158,29 @@ describe("team tasks: first to take it becomes the owner (TASK-07)", () => {
     // made by a server path (no person), as the intake's call-back tasks: no team notice
     const server = await asAdmin(async (q) => (await q<{ id: string }>("insert into public.tasks (organization_id, title, team_id) values ($1, 'מהשרת', $2) returning id", [org, other])).rows[0].id);
     expect(await noticesOf(server)).toEqual([]);
+  });
+
+  it("no team notice for a team task an automation makes while a person runs it, or for a recurring task's next one (020500)", async () => {
+    // run_automation_now runs its rule with app.automation_running on, in the person's session
+    const byRule = await asUser(owner.id, async (q) => {
+      await q("select set_config('app.automation_running', 'on', true)");
+      return (await q<{ id: string }>("insert into public.tasks (organization_id, title, team_id) values ($1, 'מכלל', $2) returning id", [org, team])).rows[0].id;
+    });
+    expect(await noticesOf(byRule)).toEqual([]);
+    // a recurring team task: the first one tells the team; completing it makes the next one, which tells nobody
+    const first = await asUser(admin.id, async (q) =>
+      (await q<{ id: string }>(
+        `insert into public.tasks (organization_id, title, team_id, due_at, recurrence)
+         values ($1, 'כל יום', $2, now(), '{"kind": "daily"}') returning id`,
+        [org, team],
+      )).rows[0].id,
+    );
+    expect((await noticesOf(first)).length).toBeGreaterThan(0);
+    await asUser(admin.id, (q) => q("update public.tasks set status = 'done' where id = $1", [first]));
+    const next = await asAdmin(async (q) =>
+      (await q<{ id: string; owner_id: string | null; team_id: string }>("select id, owner_id, team_id from public.tasks where recurrence_source_id = $1", [first])).rows[0],
+    );
+    expect(next).toMatchObject({ owner_id: null, team_id: team });
+    expect(await noticesOf(next.id)).toEqual([]);
   });
 });
