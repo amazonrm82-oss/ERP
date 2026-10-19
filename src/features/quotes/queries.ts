@@ -451,3 +451,49 @@ export async function listQuotes(orgId: string, filters: QuoteListFilters): Prom
     })),
   };
 }
+
+// QUO-09: the customer's answer and its evidence. Owners/admins only (RLS of quote_decisions; owner, 18 October 2026).
+export type QuoteDecision = {
+  decision: "accepted" | "rejected";
+  decidedAt: string;
+  signerName: string | null;
+  signerIdNumber: string | null;
+  signatureKind: "drawn" | "typed" | null;
+  signatureImage: string | null;
+  wordingVersion: string | null;
+  contentSha256: string;
+  ip: string | null;
+  userAgent: string | null;
+  declineReason: string | null;
+  erasedAt: string | null;
+};
+
+export async function getQuoteDecision(orgId: string, quoteId: string): Promise<QuoteDecision | null> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase
+      .from("quote_decisions")
+      .select(
+        "decision, decided_at, signer_name, signer_id_number, signature_kind, signature_image, wording_version, content_sha256, ip, user_agent, decline_reason, erased_at",
+      )
+      .eq("organization_id", orgId)
+      .eq("quote_id", quoteId)
+      .maybeSingle(),
+    "quote decision",
+  );
+  if (!row || (row.decision !== "accepted" && row.decision !== "rejected")) return null;
+  return {
+    decision: row.decision,
+    decidedAt: row.decided_at,
+    signerName: row.signer_name,
+    signerIdNumber: row.signer_id_number,
+    signatureKind: row.signature_kind === "drawn" || row.signature_kind === "typed" ? row.signature_kind : null,
+    signatureImage: row.signature_image,
+    wordingVersion: row.wording_version,
+    contentSha256: row.content_sha256,
+    ip: row.ip,
+    userAgent: row.user_agent,
+    declineReason: row.decline_reason,
+    erasedAt: row.erased_at,
+  };
+}

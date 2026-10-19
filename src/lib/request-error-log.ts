@@ -12,6 +12,7 @@ const TOKEN_PREFIXES = [
   "/api/forms/booking/manage/",
   "/api/forms/booking/",
   "/api/forms/card/",
+  "/api/forms/quote/",
   "/api/forms/widget/",
   "/api/calendar-feed/",
   "/api/in/",
@@ -25,7 +26,7 @@ const TOKEN_PREFIXES = [
 ] as const;
 // a form's own link (/f/<token>, /api/forms/<token>): the next segment, unless it is one of the fixed words above
 const FORM_PREFIXES: { prefix: string; fixed: readonly string[] }[] = [
-  { prefix: "/api/forms/", fixed: ["booking", "card", "widget"] },
+  { prefix: "/api/forms/", fixed: ["booking", "card", "quote", "widget"] },
   { prefix: "/f/", fixed: ["book", "card", "quote", "q", "w", "widget", "embed.js"] },
 ];
 

@@ -14,9 +14,10 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteCustomerNow, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getQuote, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
+import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { currentNameIfChanged } from "@/features/quotes/share";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
@@ -95,6 +96,9 @@ export default async function QuotePage({ params, searchParams }: Props) {
     parentRow !== null &&
     parentRow.deleted_at === null &&
     canEditRecordHint(context, parentRow.owner_id);
+  // QUO-09: the customer's answer with its evidence, owners/admins only (RLS decides again)
+  const decision =
+    (quote.status === "accepted" || quote.status === "rejected") && isAdminRole(context.role) ? await getQuoteDecision(orgId, quote.id) : null;
   const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
@@ -209,6 +213,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </span>
         ) : null}
       </div>
+      {decision ? <QuoteDecisionCard decision={decision} /> : null}
       {linkStatus ? (
         <QuoteLinkCard
           orgId={orgId}

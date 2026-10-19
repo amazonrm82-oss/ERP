@@ -58,6 +58,8 @@ describe("notification kinds (USR-06)", () => {
     // TAX-02 follow-up: a bank details change leads to the documents settings
     expect(notificationHref(org, "org_bank_details", id)).toBe(`/o/${org}/settings/documents`);
     expect(notificationHref(org, "lead", id)).toBe(`/o/${org}/leads/${id}`);
+    // QUO-09: an accepted or declined quote leads to the quote
+    expect(notificationHref(org, "quote", id)).toBe(`/o/${org}/quotes/${id}`);
     expect(notificationHref(org, "something", id)).toBeNull();
     expect(notificationHref(org, "meeting", null)).toBeNull();
   });

@@ -1639,6 +1639,27 @@ export type QuotePaymentStepRow = {
   updated_at: string;
 };
 
+// QUO-09: the customer's decision on a quote (migration quote_decisions); written only by public.quote_public_decide, read
+// only by owners and admins. ip and user_agent are kept in full (owner, 18 October 2026); a privacy erasure empties them.
+export type QuoteDecisionRow = {
+  id: string;
+  organization_id: string;
+  quote_id: string;
+  decision: string;
+  decided_at: string;
+  signer_name: string | null;
+  signer_id_number: string | null;
+  signature_kind: string | null;
+  signature_image: string | null;
+  wording_version: string | null;
+  content_sha256: string;
+  ip: string | null;
+  user_agent: string | null;
+  decline_reason: string | null;
+  erased_at: string | null;
+  created_at: string;
+};
+
 // QUO-02: a line of a quote (migration quotes). kind item | group; unit_name, total_agorot and a product line's
 // vat_exempt and billing are set by trigger quote_lines_check.
 export type QuoteLineRow = {
@@ -2381,6 +2402,7 @@ export type Database = {
         QuoteLineWrite
       >;
       // GAP-09: column grants; the quote is fixed once inserted
+      quote_decisions: ReadOnlyTable<QuoteDecisionRow>;
       quote_payment_steps: Table<
         QuotePaymentStepRow,
         { organization_id: string; quote_id: string; position?: number; name: string; percent_bp: number; due_date?: string | null; milestone?: string | null },
@@ -2771,6 +2793,26 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)
+      quote_public_version: { Args: { p_token: string }; Returns: Json };
+      // QUO-09: the customer's page decides (service_role only); every outcome is an answer {status}
+      quote_public_decide: {
+        Args: {
+          p_token: string;
+          p_decision: string;
+          p_fingerprint: string;
+          p_signer_name?: string | null;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_decline_reason?: string | null;
+          p_ip?: string | null;
+          p_user_agent?: string | null;
+        };
+        Returns: Json;
+      };
       // QUO-12: a newer version of a sent quote, as a draft copy (its id)
       quote_new_version: { Args: { p_org: string; p_quote: string }; Returns: string };
       // QUO-08: the customer's link (create returns the token once; status never the hash) and its page (service_role only)
