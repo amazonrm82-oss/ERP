@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { cancelQuoteAction, newQuoteAddendumAction, newQuoteVersionAction } from "@/features/quotes/actions";
+import { cancelQuoteAction, duplicateQuoteAction, newQuoteAddendumAction, newQuoteVersionAction } from "@/features/quotes/actions";
+import { copyNoticeText, readCopyNotice } from "@/features/quotes/duplicate";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -34,7 +35,8 @@ export const metadata: Metadata = { title: "הצעת מחיר" };
 type Props = {
   params: Promise<{ orgId: string; quoteId: string }>;
   // QUO-04: the outcome of starting from a template (createQuoteAction)
-  searchParams: Promise<{ template?: string; added?: string; skipped?: string }>;
+  // QUO-15: the outcome of a copy (duplicateQuoteAction)
+  searchParams: Promise<{ template?: string; added?: string; skipped?: string; copy?: string; copy_left?: string | string[]; copy_more?: string; copy_discount?: string }>;
 };
 
 function count(value: string | undefined): number {
@@ -119,6 +121,10 @@ export default async function QuotePage({ params, searchParams }: Props) {
     parentRow !== null &&
     parentRow.deleted_at === null &&
     canEditRecordHint(context, parentRow.owner_id);
+  // QUO-15: any quote, whatever its status, is copied into a new draft by whoever may edit its record
+  const canDuplicate = hasQuotes && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+  const copied = readCopyNotice(started);
+  const copiedText = copied ? copyNoticeText(copied) : null;
   const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
@@ -159,6 +165,18 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 action={newQuoteAddendumAction.bind(null, orgId, quote.id)}
               >
                 תוספת להצעה
+              </ConfirmButton>
+            ) : null}
+            {canDuplicate ? (
+              <ConfirmButton
+                variant="secondary"
+                size="sm"
+                title="לשכפל את ההצעה?"
+                description="תיווצר טיוטה חדשה על אותה עסקה ואותו איש קשר, עם השורות, לוח התשלומים והתנאים של ההצעה הזאת. ההצעה הזאת לא משתנה. שורה של מוצר שכבר לא מוצע לא תועתק, ונראה לכם אילו שורות נשארו בחוץ."
+                confirmLabel="שכפול"
+                action={duplicateQuoteAction.bind(null, orgId, quote.id)}
+              >
+                שכפול
               </ConfirmButton>
             ) : null}
             {canCancel ? (
@@ -312,6 +330,13 @@ export default async function QuotePage({ params, searchParams }: Props) {
           businessName={context.org.name}
           recipient={recipient}
         />
+      ) : null}
+      {copiedText ? (
+        <div className="mb-5 space-y-2">
+          <FormNotice message={copiedText.done} />
+          {copiedText.left ? <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">{copiedText.left}</p> : null}
+          {copiedText.discount ? <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">{copiedText.discount}</p> : null}
+        </div>
       ) : null}
       {started.template === "ok" ? (
         <FormNotice className="mb-5" message={appliedText(count(started.added), count(started.skipped))} />

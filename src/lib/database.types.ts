@@ -2850,6 +2850,8 @@ export type Database = {
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
+      // QUO-15: a copy of any quote as a new draft; {quote, skipped: [line names], discount_dropped}
+      quote_duplicate: { Args: { p_org: string; p_quote: string }; Returns: Json };
       // QUO-11: cancels a sent, viewed or expired quote (whoever may edit its deal or contact)
       quote_cancel: { Args: { p_org: string; p_quote: string }; Returns: undefined };
       // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)

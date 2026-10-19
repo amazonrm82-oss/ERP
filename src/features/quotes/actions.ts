@@ -18,6 +18,7 @@ import { pick } from "@/lib/validation";
 
 import { siteOrigin } from "@/lib/site-origin";
 
+import { copyNoticeParams, duplicateResultSchema } from "./duplicate";
 import { quotePath } from "./paths";
 import { publicQuotePath, QUOTE_LINK_TOKEN } from "./public";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
@@ -480,6 +481,22 @@ export async function cancelQuoteAction(orgId: string, quoteId: string): Promise
   const quote = await readQuote(context.supabase, orgId, quoteId);
   if (quote) revalidateQuote(orgId, quote);
   return ok();
+}
+
+/**
+ * QUO-15: a copy of any quote as a new draft on the same deal and contact (public.quote_duplicate). Lines the rules no longer
+ * allow are left out by the database and named on the new draft's page.
+ */
+export async function duplicateQuoteAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("quote_duplicate", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  const result = duplicateResultSchema.safeParse(data);
+  if (!result.success) return fail("לא הצלחנו לשכפל את ההצעה. נסו שוב.");
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  redirect(`${quotePath(orgId, result.data.quote)}?${copyNoticeParams(result.data)}`);
 }
 
 /** GAP-10: an empty draft that adds to an accepted quote (public.quote_new_addendum); opens it. */
