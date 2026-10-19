@@ -193,7 +193,7 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     expect(await asAdmin((q) => count(q, "select 1 from app.quote_expiry_retry where quote_id = $1 and done_at is not null", [bad.quote]))).toBe(1);
   });
 
-  it("does not tell an owner who is no longer an active member", async () => {
+  it("does not tell an owner who is no longer an active member; the owners and admins hear instead (RVW-34)", async () => {
     await settle();
     const gone = await addMember(org, owner.id, "member", "qx-gone");
     const x = await sentQuote(org, gone);
@@ -201,7 +201,10 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, gone.id]));
     expect(await expire()).toBe(1);
     expect(await status(x.quote)).toBe("expired");
-    expect(await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1", [x.quote]))).toBe(0);
+    // the suspended owner gets nothing; the deal and contact are theirs too, so the owners and admins are told (020435)
+    expect(await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1 and user_id = $2", [x.quote, gone.id]))).toBe(0);
+    const told = await asAdmin(async (q) => (await q<{ user_id: string }>("select user_id from public.notifications where entity_id = $1 order by user_id", [x.quote])).rows.map((r) => r.user_id));
+    expect(told).toEqual([owner.id, admin.id].sort());
   });
 
   it("cancelling: whoever may edit the record, a sent, viewed or expired quote; a system entry naming who cancelled", async () => {
