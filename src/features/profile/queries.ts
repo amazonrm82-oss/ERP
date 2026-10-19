@@ -3,6 +3,8 @@ import "server-only";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { choiceFromProfile, type ThemeChoice } from "@/features/theme/theme";
+
 import { AVATARS_BUCKET } from "./avatar";
 import { readWorkingHours, type WorkingHours } from "./working-hours";
 
@@ -17,13 +19,15 @@ export type MyProfile = {
   signature: string;
   // a short-lived signed link to the photo, or null
   avatarUrl: string | null;
+  // USR-07: light, dark or by the device
+  theme: ThemeChoice;
 };
 
 /** The signed-in user's own profile, for "החשבון שלי". */
 export async function getMyProfile(userId: string): Promise<MyProfile> {
   const supabase = await createClient();
   const row = must(
-    await supabase.from("profiles").select("full_name, phone, locale, timezone, working_hours, signature, avatar_url").eq("id", userId).maybeSingle(),
+    await supabase.from("profiles").select("full_name, phone, locale, timezone, working_hours, signature, avatar_url, theme").eq("id", userId).maybeSingle(),
     "profiles",
   );
   let avatarUrl: string | null = null;
@@ -40,5 +44,6 @@ export async function getMyProfile(userId: string): Promise<MyProfile> {
     workingHours: readWorkingHours(row?.working_hours ?? null),
     signature: row?.signature ?? "",
     avatarUrl,
+    theme: choiceFromProfile(row?.theme),
   };
 }

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
+import { ThemeSync } from "@/features/theme/components/theme-sync";
+import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
+import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { GlobalSearch } from "@/features/search/components/global-search";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
@@ -79,17 +83,19 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, syncTheme] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
     getTrialEndNotice(org.id),
+    profileThemeForNewDevice(user.id),
   ]);
   // BIL-08: while the business is in the trial-end transition its line says what comes next
   const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
 
   return (
     <div className="min-h-dvh md:ps-60">
+      {syncTheme ? <ThemeSync choice={syncTheme} /> : null}
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow"
@@ -186,4 +192,17 @@ export default async function OrgLayout({ children, params }: Props) {
       />
     </div>
   );
+}
+
+/** USR-07: a device with no theme cookie yet takes the person's choice from the profile (one read, then the cookie). */
+async function profileThemeForNewDevice(userId: string) {
+  if ((await cookies()).has(THEME_COOKIE)) return null;
+  // cosmetic: a failed read falls back to "by the device" quietly and never takes the business shell down
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("profiles").select("theme").eq("id", userId).maybeSingle();
+    return error ? "system" : choiceFromProfile(data?.theme);
+  } catch {
+    return "system";
+  }
 }

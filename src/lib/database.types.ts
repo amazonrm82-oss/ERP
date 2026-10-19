@@ -644,6 +644,8 @@ export type ProfileRow = {
   // USR-01: {"sun": [{"start": "08:00", "end": "12:00"}, ...], ...} (or one object per day, first version); see src/features/profile/working-hours.ts
   working_hours: Json | null;
   signature: string | null;
+  // USR-07: null = by the device, else 'light' | 'dark'
+  theme: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2064,6 +2066,7 @@ export type Database = {
           timezone?: string | null;
           working_hours?: Json | null;
           signature?: string | null;
+          theme?: string | null;
         }
       >;
       memberships: Table<

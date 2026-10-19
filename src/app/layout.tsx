@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies, headers } from "next/headers";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
@@ -8,6 +9,7 @@ import "./globals.css";
 import { ConfigMissing } from "@/components/config-missing";
 import { FocusRescue } from "@/components/focus-rescue";
 import { ServiceWorker } from "@/components/service-worker";
+import { cspNonce, pageThemeChoice, PATH_HEADER, serverThemeAttribute, THEME_COOKIE, THEME_SCRIPT } from "@/features/theme/theme";
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 import { getSupabaseEnv } from "@/lib/env";
 import { configuredSiteUrl } from "@/lib/site-origin";
@@ -47,9 +49,19 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // Without the Supabase settings nothing below can work, so the whole app is
   // replaced by one screen that says what is missing.
   const isConfigured = getSupabaseEnv() !== null;
+  // USR-07: the person's own pick (a cookie per device) is on <html> from the first byte; "by the device" is settled by
+  // the script in <head> before the page paints, so neither shows the wrong theme for a moment
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  // customer-facing pages (the landing page and /f/*) always render light: the choice is about the person's own app
+  const themeChoice = pageThemeChoice(headerStore.get(PATH_HEADER), cookieStore.get(THEME_COOKIE)?.value);
+  const nonce = cspNonce(headerStore.get("content-security-policy"));
 
   return (
-    <html lang="he" dir="rtl">
+    // the script may set data-theme before React hydrates
+    <html lang="he" dir="rtl" data-theme={serverThemeAttribute(themeChoice)} data-theme-choice={themeChoice} suppressHydrationWarning>
+      <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh antialiased">
         {isConfigured ? children : <ConfigMissing />}
         <ServiceWorker />

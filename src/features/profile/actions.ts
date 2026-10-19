@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
@@ -9,6 +10,8 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { optionalPhone, optionalText, requiredText } from "@/lib/validation";
+
+import { isThemeChoice, profileFromChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/features/theme/theme";
 
 import { AVATARS_BUCKET, isOwnAvatarPath } from "./avatar";
 import { isTimeZone } from "./working-hours";
@@ -53,6 +56,22 @@ export async function saveProfileAction(orgId: string, _prev: FormState, formDat
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidatePath(paths.settingsAccount(orgId));
   return { ok: true, message: "הפרטים נשמרו." };
+}
+
+/** USR-07: light, dark or by the device, for this person in every business; kept on this device in a cookie too. */
+export async function saveThemeAction(orgId: string, choice: string): Promise<ActionResult> {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  if (!isThemeChoice(choice)) return fail(INVALID_ARGS);
+  const { data, error } = await context.supabase
+    .from("profiles")
+    .update({ theme: profileFromChoice(choice) })
+    .eq("id", context.user.id)
+    .select("id");
+  if (error) return fail(dbErrorMessage(error, "לא הצלחנו לשמור את המראה. נסו שוב."));
+  if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
+  (await cookies()).set(THEME_COOKIE, choice, { path: "/", maxAge: THEME_COOKIE_MAX_AGE, sameSite: "lax" });
+  return ok();
 }
 
 /** The photo the browser just uploaded becomes the profile photo; the old one is removed. */

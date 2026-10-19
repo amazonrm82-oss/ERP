@@ -17,6 +17,7 @@ import { TestNotificationButton } from "@/features/notifications/components/test
 import { getNotificationSettings } from "@/features/notifications/queries";
 import { AvatarPicker } from "@/features/profile/components/avatar-picker";
 import { ProfileForm } from "@/features/profile/components/profile-form";
+import { ThemePicker } from "@/features/theme/components/theme-picker";
 import { getMyProfile } from "@/features/profile/queries";
 import { timeZones } from "@/features/profile/working-hours";
 import { getOrgContext } from "@/features/shell/queries";
@@ -61,6 +62,8 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
             orgTimeZone={orgContext.timeZone}
             timeZones={[...timeZones()].sort()}
           />
+          {/* USR-07 */}
+          <ThemePicker orgId={orgId} initial={profile.theme} />
         </CardBody>
       </Card>
 

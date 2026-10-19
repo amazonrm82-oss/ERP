@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isTransientAuthError, logSessionCheckThrow } from "@/lib/auth-transient";
+import { PATH_HEADER } from "@/features/theme/theme";
 import { contentSecurityPolicy, makeNonce } from "@/lib/csp";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
@@ -57,6 +58,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const next = () => {
     const headers = new Headers(request.headers);
     headers.set("content-security-policy", csp);
+    // USR-07: the root layout keeps customer-facing pages light; set here, so a visitor's own header never counts
+    headers.set(PATH_HEADER, request.nextUrl.pathname);
     const res = NextResponse.next({ request: { headers } });
     res.headers.set("Content-Security-Policy", csp);
     return res;
