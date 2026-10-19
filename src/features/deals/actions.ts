@@ -20,6 +20,8 @@ import { TIME_ZONE } from "@/lib/app";
 import { zoneDate } from "@/lib/format";
 
 import { LINES_PRICES_KEPT } from "@/features/deal-lines/schema";
+import { linesKeptText, quoteWinResult } from "@/features/quotes/accept-deal";
+import { quotePath } from "@/features/quotes/paths";
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
@@ -233,7 +235,25 @@ export async function closeOpenDealWonAction(orgId: string, dealId: string, stag
   return closeWon(orgId, dealId, stageId, formData, true);
 }
 
-async function closeWon(orgId: string, dealId: string, stageId: string, formData: FormData, expectOpen: boolean): Promise<FormState | MoveRefusal> {
+/**
+ * QUO-13, the close window of an accepted quote's deal: the deal's lines become the quote's and the deal is won in one
+ * transaction (public.quote_win_deal, with the user's session), so cancelling the window changes nothing. A deal lines
+ * refusal keeps the old lines; the deal is still won and the answer's message carries the refusal's hint.
+ */
+export async function closeQuoteDealWonAction(
+  orgId: string,
+  quoteId: string,
+  dealId: string,
+  stageId: string,
+  _prev: FormState | MoveRefusal,
+  formData: FormData,
+): Promise<FormState | MoveRefusal> {
+  const checked = await actionContext(orgId, quoteId);
+  if (!checked.ok) return checked;
+  return closeWon(orgId, dealId, stageId, formData, true, quoteId);
+}
+
+async function closeWon(orgId: string, dealId: string, stageId: string, formData: FormData, expectOpen: boolean, quoteId?: string): Promise<FormState | MoveRefusal> {
   const context = await actionContext(orgId, dealId, stageId);
   if (!context.ok) {
     return context;
@@ -276,24 +296,55 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
   }
   const close = parsed.data;
 
-  let update = supabase
-    .from("deals")
-    // DEAL-07: an emptied value field is sent as null, so a recurring deal gets its first-year value back
-    .update({
-      stage_id: stageId,
-      amount_agorot: typedDealValue(formData.get("amount"), close.amount),
-      closed_at: closedAtFor(close.closedDate, today, now, timeZone),
+  const amount = typedDealValue(formData.get("amount"), close.amount);
+  const closedAt = closedAtFor(close.closedDate, today, now, timeZone);
+  let moved: { id: string; contact_id: string | null; company_id: string | null }[];
+  let linesKept: string | null = null;
+  if (quoteId) {
+    // QUO-13: the quote's lines and the move in one transaction (public.quote_win_deal)
+    const { data: won, error } = await supabase.rpc("quote_win_deal", {
+      p_org: orgId,
+      p_quote: quoteId,
+      p_stage: stageId,
+      p_amount_agorot: amount,
+      p_closed_at: closedAt,
+      p_custom_fields: required.merge === undefined ? null : required.merge,
       // DEAL-05: the won stage's other required built-in fields (close date, contact), asked in the window
-      ...(required.columns ?? {}),
-      ...(required.merge === undefined ? {} : { custom_fields: required.merge }),
-    })
-    .eq("organization_id", orgId)
-    .eq("id", dealId)
-    .is("deleted_at", null);
-  if (expectOpen) update = update.eq("status", "open");
-  const { data: moved, error } = await update.select("id, contact_id, company_id");
-  if (error) {
-    return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו לסגור את העסקה. נסו שוב."), values);
+      p_columns: required.columns ?? null,
+    });
+    if (error) {
+      if (error.hint === "quote_deal:closed") return fail(NO_LONGER_OPEN);
+      return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו לסגור את העסקה. נסו שוב."), values);
+    }
+    // the follow-ups use the deal the database moved, which must be the deal the window was opened for
+    const result = quoteWinResult(won, dealId);
+    if (!result) return fail("ההצעה שייכת לעסקה אחרת מזו שבחלון. רעננו את הדף ובדקו את העסקה.");
+    linesKept = result.linesHint ? linesKeptText(result.linesHint) : null;
+    const read = await supabase.from("deals").select("id, contact_id, company_id").eq("organization_id", orgId).eq("id", result.deal);
+    if (read.error) return fail(dbErrorMessage(read.error), values);
+    moved = read.data;
+    revalidatePath(quotePath(orgId, quoteId));
+  } else {
+    let update = supabase
+      .from("deals")
+      // DEAL-07: an emptied value field is sent as null, so a recurring deal gets its first-year value back
+      .update({
+        stage_id: stageId,
+        amount_agorot: amount,
+        closed_at: closedAt,
+        // DEAL-05: the won stage's other required built-in fields (close date, contact), asked in the window
+        ...(required.columns ?? {}),
+        ...(required.merge === undefined ? {} : { custom_fields: required.merge }),
+      })
+      .eq("organization_id", orgId)
+      .eq("id", dealId)
+      .is("deleted_at", null);
+    if (expectOpen) update = update.eq("status", "open");
+    const { data, error } = await update.select("id, contact_id, company_id");
+    if (error) {
+      return fail(error.code === "23503" ? STAGE_GONE : dbErrorMessage(error, "לא הצלחנו לסגור את העסקה. נסו שוב."), values);
+    }
+    moved = data;
   }
   if (moved.length === 0) {
     return fail(expectOpen ? NO_LONGER_OPEN : NOT_FOUND_OR_FORBIDDEN);
@@ -307,7 +358,7 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
       return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(existing.error)})`, values);
     }
     if (existing.open) {
-      return { ok: true, message: ONBOARDING_EXISTS };
+      return { ok: true, message: linesKept ? `${linesKept} ${ONBOARDING_EXISTS}` : ONBOARDING_EXISTS };
     }
     const deal = moved[0];
     // the window offers the deal's owner first; no choice: the task is the user's (database default)
@@ -322,7 +373,7 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
     }
     revalidatePath(paths.tasks(orgId));
   }
-  return ok();
+  return linesKept ? { ok: true, message: linesKept } : ok();
 }
 
 export async function updateDealAction(

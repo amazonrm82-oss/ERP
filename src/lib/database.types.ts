@@ -166,6 +166,8 @@ export type OrgDocumentSettingsRow = {
   email: string | null;
   // TAX-04 (migration prices_include_vat): prices typed and shown including VAT
   prices_include_vat: boolean;
+  // QUO-13 (migration quote_accept_deal): text with a check: auto | ask | none (what an accepted quote does to its deal)
+  quote_accept_deal: string;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -288,6 +290,7 @@ type OrgDocumentSettingsWrite = {
   vat_status_other?: string | null;
   other_charges_vat?: boolean | null;
   prices_include_vat?: boolean;
+  quote_accept_deal?: "auto" | "ask" | "none";
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -2855,6 +2858,13 @@ export type Database = {
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // QUO-15: a copy of any quote as a new draft; {quote, skipped: [line names], discount_dropped}
       quote_duplicate: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-13: replaces the open deal's lines with an accepted quote's (called by quote_win_deal); {lines}
+      quote_lines_to_deal: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-13: the won window of an accepted quote: the lines and the move in one transaction (invoker); {deal, lines}
+      quote_win_deal: {
+        Args: { p_org: string; p_quote: string; p_stage: string; p_amount_agorot: number | null; p_closed_at: string; p_custom_fields?: Json | null; p_columns?: Json | null };
+        Returns: Json;
+      };
       // QUO-11: cancels a sent, viewed or expired quote (whoever may edit its deal or contact)
       quote_cancel: { Args: { p_org: string; p_quote: string }; Returns: undefined };
       // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)

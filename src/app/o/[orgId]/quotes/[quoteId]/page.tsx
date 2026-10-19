@@ -7,6 +7,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { cancelQuoteAction, duplicateQuoteAction, newQuoteAddendumAction, newQuoteVersionAction } from "@/features/quotes/actions";
 import { copyNoticeText, readCopyNotice } from "@/features/quotes/duplicate";
+import { offersDealMove } from "@/features/quotes/accept-deal";
+import { QuoteDealMoveCard } from "@/features/quotes/components/quote-deal-move-card";
+import { getCalendarSettings } from "@/features/calendar-days/queries";
+import { closeWindowSetup } from "@/features/deals/close-window";
+import { listMembers } from "@/features/settings/queries";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -15,7 +20,7 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
@@ -123,6 +128,27 @@ export default async function QuotePage({ params, searchParams }: Props) {
     canEditRecordHint(context, parentRow.owner_id);
   // QUO-15: any quote, whatever its status, is copied into a new draft by whoever may edit its record
   const canDuplicate = hasQuotes && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+  // QUO-13: the customer accepted and the deal is still open: offer the move (the "ask" setting, or an automatic step that failed)
+  const mayMove = hasQuotes && quote.status === "accepted" && quote.dealId !== null && parentRow !== null && canEditRecordHint(context, parentRow.owner_id);
+  const [dealOpen, acceptMode] = mayMove ? await Promise.all([getDealOpen(orgId, quote.dealId), getQuoteAcceptDeal(orgId)]) : [false, "none" as const];
+  const offerMove = offersDealMove({
+    status: quote.status,
+    hasDeal: quote.dealId !== null,
+    isAddendum: quote.addendumOf !== null,
+    dealOpen,
+    mode: acceptMode,
+    canEdit: mayMove,
+  });
+  const moveSetup = offerMove
+    ? await Promise.all([listMembers(orgId), getCalendarSettings(orgId)]).then(([members, calendar]) =>
+        closeWindowSetup(
+          members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+          context.org.timeZone,
+          calendar,
+          context.user.id,
+        ),
+      )
+    : null;
   const copied = readCopyNotice(started);
   const copiedText = copied ? copyNoticeText(copied) : null;
   const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
@@ -294,6 +320,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
         ) : null}
       </div>
       {decision ? <QuoteDecisionCard decision={decision} /> : null}
+      {mayMove ? <QuoteDealMoveCard orgId={orgId} quoteId={quote.id} offer={offerMove} setup={moveSetup} /> : null}
       {/* GAP-10: the addenda of this quote */}
       {addenda.addenda.length > 0 ? (
         <section aria-labelledby="quote-addenda-title" className="mb-5 rounded-lg border border-line bg-surface p-4 sm:p-5">

@@ -15,7 +15,7 @@ import type { FieldDefinition } from "@/features/custom-fields/types";
 import { missingForMoveAction } from "@/features/record-move/actions";
 import type { FormState } from "@/lib/action-result";
 
-import { closeDealWonAction, closeOpenDealWonAction, dealOnboardingTaskAction } from "../actions";
+import { closeDealWonAction, closeOpenDealWonAction, closeQuoteDealWonAction, dealOnboardingTaskAction } from "../actions";
 import {
   amountInputValue,
   type CloseWindowSetup,
@@ -34,7 +34,17 @@ export type WonTarget = { dealId: string; dealName: string; stageId: string; sta
 export type { CloseWindowSetup };
 
 // expectOpen: only a deal that is still open is closed (GOL-04, the forecast's overdue list)
-type Props = { orgId: string; target: WonTarget | null; setup: CloseWindowSetup; onClose: () => void; onDone?: (target: WonTarget) => void; expectOpen?: boolean };
+// quoteId (QUO-13): the deal of this accepted quote; its lines become the quote's in the same save (an open deal only).
+// onDone gets the save's message, if any (a quote whose lines were kept).
+type Props = {
+  orgId: string;
+  target: WonTarget | null;
+  setup: CloseWindowSetup;
+  onClose: () => void;
+  onDone?: (target: WonTarget, message?: string) => void;
+  expectOpen?: boolean;
+  quoteId?: string;
+};
 
 /**
  * DEAL-04, the close window on the won side: confirm the amount and the close
@@ -42,7 +52,7 @@ type Props = { orgId: string; target: WonTarget | null; setup: CloseWindowSetup;
  * onboarding task). Nothing moves
  * until "סגירה בהצלחה" is pressed; closing the window leaves the deal where it was.
  */
-export function DealWonDialog({ orgId, target, setup, onClose, onDone, expectOpen = false }: Props) {
+export function DealWonDialog({ orgId, target, setup, onClose, onDone, expectOpen = false, quoteId }: Props) {
   return (
     <Dialog open={target !== null} onClose={onClose} title="העסקה נסגרה בהצלחה?" description={target ? `${target.dealName} · שלב ${target.stageName}` : undefined} variant="sheet">
       {target ? (
@@ -52,9 +62,10 @@ export function DealWonDialog({ orgId, target, setup, onClose, onDone, expectOpe
           target={target}
           setup={setup}
           expectOpen={expectOpen}
+          quoteId={quoteId}
           onCancel={onClose}
-          onDone={() => {
-            onDone?.(target);
+          onDone={(message) => {
+            onDone?.(target, message);
             onClose();
           }}
         />
@@ -85,6 +96,7 @@ function WonForm({
   target,
   setup,
   expectOpen,
+  quoteId,
   onCancel,
   onDone,
 }: {
@@ -92,8 +104,9 @@ function WonForm({
   target: WonTarget;
   setup: CloseWindowSetup;
   expectOpen: boolean;
+  quoteId?: string;
   onCancel: () => void;
-  onDone: () => void;
+  onDone: (message?: string) => void;
 }) {
   const choiceKey = onboardingChoiceKey(orgId, setup.userId);
   // an open onboarding task already linked to the deal: none is offered (checked again on save)
@@ -128,10 +141,12 @@ function WonForm({
   }, [orgId, target.dealId, target.stageId]);
 
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
-    const result = await (expectOpen ? closeOpenDealWonAction : closeDealWonAction)(orgId, target.dealId, target.stageId, prev, formData);
+    const result = quoteId
+      ? await closeQuoteDealWonAction(orgId, quoteId, target.dealId, target.stageId, prev, formData)
+      : await (expectOpen ? closeOpenDealWonAction : closeDealWonAction)(orgId, target.dealId, target.stageId, prev, formData);
     if (result?.ok) {
       if (existing !== "open") rememberChoice(choiceKey, formData.get("onboarding") === "on");
-      onDone();
+      onDone(result.message);
     }
     return result;
   }, null);
@@ -148,6 +163,7 @@ function WonForm({
     <form action={formAction} onSubmit={onSubmit} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure?.fieldErrors ? undefined : failure?.message} />
+      {quoteId ? <p className="text-sm text-ink-soft">השורות של העסקה יתעדכנו מההצעה כשתסגרו בהצלחה. ביטול לא משנה דבר.</p> : null}
       <TextField
         label="סכום סופי (₪)"
         name="amount"
@@ -156,7 +172,8 @@ function WonForm({
         inputMode="decimal"
         autoComplete="off"
         autoFocus
-        defaultValue={values?.amount ?? amountInputValue(target.amountAgorot)}
+        defaultValue={values?.amount ?? (quoteId ? "" : amountInputValue(target.amountAgorot))}
+        hint={quoteId ? "ריק: הסכום יחושב מהשורות של ההצעה." : undefined}
         error={errors.amount}
       />
       <DateField

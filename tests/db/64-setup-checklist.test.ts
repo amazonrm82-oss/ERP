@@ -479,6 +479,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_import_task_checklist_worked.sql",
       // RVW-34 redefines public.quote_public_decide(), app.quote_mark_viewed() and app.expire_quotes() last (notice recipients)
       "_quote_notice_recipients.sql",
+      // QUO-13 redefines public.quote_public_decide() last (the deal of an accepted quote)
+      "_quote_accept_deal.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

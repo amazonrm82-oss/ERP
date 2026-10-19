@@ -13,6 +13,7 @@ import { must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
+import { quoteAcceptDealOf, type QuoteAcceptDeal } from "./accept-deal";
 import { withoutSuperseded } from "./addenda";
 import type { ScheduleStep } from "./schedule";
 import type { QuoteViews } from "./views";
@@ -549,4 +550,25 @@ export async function getQuoteViews(orgId: string, quoteId: string): Promise<Quo
     "quote views",
   );
   return row ? { firstViewedAt: row.first_viewed_at, lastViewedAt: row.last_viewed_at, count: row.view_count } : null;
+}
+
+/** QUO-13: what an accepted quote does to its deal; no row = 'ask'. Every member reads the setting. */
+export async function getQuoteAcceptDeal(orgId: string): Promise<QuoteAcceptDeal> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("org_document_settings").select("quote_accept_deal").eq("organization_id", orgId).maybeSingle(),
+    "quote accept deal",
+  );
+  return quoteAcceptDealOf(row?.quote_accept_deal);
+}
+
+/** QUO-13: whether the quote's deal is still open and out of the bin (null deal or unreadable = false). */
+export async function getDealOpen(orgId: string, dealId: string | null): Promise<boolean> {
+  if (!dealId) return false;
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("deals").select("status, deleted_at").eq("organization_id", orgId).eq("id", dealId).maybeSingle(),
+    "quote deal state",
+  );
+  return row !== null && row.status === "open" && row.deleted_at === null;
 }
