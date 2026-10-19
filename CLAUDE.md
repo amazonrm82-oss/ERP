@@ -626,7 +626,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020570 (ORD-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020570 (ORD-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -955,7 +955,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `app.order_number` over `app.next_document_number(org,'order')`. Numbered = customer, prices and lines frozen (`order:frozen`), never
   deleted (`orders_delete_guard`), never back to draft. Rights: `app.order_editable` (deal, else contact, else company, like quotes);
   read follows the parent; detached orders read by owners/admins/managers. Purge detaches numbered orders (`former_*_id`,
-  `customer_deleted_at`); merges move them through the `merged` entry (`app.merge_orders`). Switch `org_modules.orders_enabled`
+  `customer_deleted_at`); merges move them in `app.merge_move_links` since 020590 (`app.merge_orders` is a no-op). Switch `org_modules.orders_enabled`
   (only with the flag) hides screens only. Server writes set `app.order_server`. `app.audit_erase_core`, `app.sample_untouched` and
   `app.import_record_worked` were last redefined in 020570.
   Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
