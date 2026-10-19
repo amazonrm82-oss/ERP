@@ -48,7 +48,7 @@ function blankAction(type: ActionType): Draft {
     case "set_field":
       return { type, field: "", value: "" };
     case "create_deal":
-      return { type, name: "", pipeline_id: "", stage_id: "", amount: "", assign: "owner", user_id: "" };
+      return { type, name: "", pipeline_id: "", stage_id: "", amount: "", assign: "owner", user_id: "", pipeline_source: "", copy_source: "" };
     case "create_note":
       return { type, body: "" };
   }
@@ -456,6 +456,23 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
             <option value="user">משתמש מסוים</option>
           </SelectField>
           {action.assign === "user" ? memberSelect("משתמש") : null}
+          {entity === "deal" ? (
+            <div className="space-y-2 sm:col-span-2">
+              {/* DEAL-08 follow-up: a deal that follows the deal that started the rule */}
+              <Checkbox
+                label="באותו תהליך מכירה של העסקה המקורית"
+                hint="בשלב הפתוח הראשון שלו. אם התהליך נמחק, העסקה נוצרת בתהליך ובשלב שנבחרו למעלה."
+                checked={action.pipeline_source === "1"}
+                onChange={(e) => onChange({ pipeline_source: e.target.checked ? "1" : "" })}
+              />
+              <Checkbox
+                label="להעתיק את ההכנסה החוזרת ואת השורות של העסקה המקורית"
+                hint="סוג החיוב, הסכום החוזר וכל שורות המוצרים. התקופה החדשה מתחילה בתאריך החידוש של העסקה המקורית ונמשכת אותו פרק זמן. השווי מחושב מהשורות, אלא אם הוזן שווי."
+                checked={action.copy_source === "1"}
+                onChange={(e) => onChange({ copy_source: e.target.checked ? "1" : "" })}
+              />
+            </div>
+          ) : null}
           <p className="text-sm text-ink-soft sm:col-span-2">
             העסקה מקושרת ללקוח של הרשומה: איש הקשר והחברה שלו, החברה, או איש הקשר והחברה של העסקה או המשימה.
             {entity === "deal" ? " עסקה שנוצרת מעסקה נרשמת כהמשך שלה." : ""}

@@ -131,6 +131,8 @@ export const STEP_WARNINGS: Record<string, string> = {
   "the owner is away, the lead has no owner": "האחראי נעדר, הליד נכנס בלי אחראי",
   // HEB-08 (owner, 14 October 2026): the lead had an owner and keeps it; {name} = that owner
   "the requested owner is away, the lead stays with its owner": "האחראי המבוקש נעדר, הליד נשאר אצל {name}",
+  // DEAL-08 follow-up: a line of the source deal the rules no longer let in
+  "some lines were not copied": "העסקה נוצרה בלי חלק מהשורות: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
 };
 
 /** The Hebrew text of a step warning; `{name}` is filled from the step's `warning_name`. */

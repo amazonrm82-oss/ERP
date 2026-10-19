@@ -104,6 +104,7 @@ describe("run log warnings", () => {
     const written = [...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]);
     expect([...new Set(written)].sort()).toEqual([
       "no reason is set",
+      "some lines were not copied",
       "the business-day offset is invalid",
       "the owner is away, the lead has no owner",
       "the reason no longer exists",

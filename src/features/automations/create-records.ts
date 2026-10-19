@@ -39,6 +39,9 @@ export type CreateDealInput = {
   amount?: string;
   assign: "owner" | "user";
   user_id?: string;
+  // DEAL-08 follow-up (deal rules only): "1" = in the triggering deal's sales process; "1" = copy its recurring revenue and lines
+  pipeline_source?: string;
+  copy_source?: string;
 };
 
 /** The builder's "create deal" values -> the stored action, or a Hebrew message. */
@@ -55,7 +58,13 @@ export function createDealAction(
   if (input.assign === "user" && !lookups.members.some((m) => m.id === input.user_id)) return "המשתמש שנבחר כבר לא פעיל.";
   const amount = shekelsToAgorot(input.amount ?? "");
   if (amount === null) return "יש להזין סכום תקין לעסקה (עד מיליארד ₪).";
+  const fromSource = input.pipeline_source === "1";
+  const copySource = input.copy_source === "1";
+  if ((fromSource || copySource) && entity !== "deal") return "העתקה מהעסקה המקורית מתאימה רק לאוטומציה על עסקאות.";
   const out: Record<string, Json> = { type: "create_deal", pipeline_id: input.pipeline_id, assign: input.assign };
+  // the engine falls back to pipeline_id when the source deal's process is gone, so it is kept
+  if (fromSource) out.pipeline = "source";
+  if (copySource) out.copy_from_source = true;
   const name = input.name?.trim();
   if (name) out.name = name;
   if (input.stage_id) out.stage_id = input.stage_id;
@@ -76,6 +85,8 @@ export function createDealDraft(action: Record<string, unknown>): Record<string,
     amount: typeof action.amount_agorot === "number" && action.amount_agorot > 0 ? String(action.amount_agorot / 100) : "",
     assign: action.assign === "user" ? "user" : "owner",
     user_id: str(action.user_id),
+    pipeline_source: action.pipeline === "source" ? "1" : "",
+    copy_source: action.copy_from_source === true ? "1" : "",
   };
 }
 
@@ -86,9 +97,16 @@ export function describeCreateDeal(
   action: Record<string, unknown>,
   lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string; name: string }> },
 ): string {
-  const parts = [`"${str(action.name) || DEFAULT_DEAL_NAME}"`, `בתהליך ${nameIn(lookups.pipelines, action.pipeline_id)}`];
+  const parts = [`"${str(action.name) || DEFAULT_DEAL_NAME}"`];
   const stages = lookups.pipelines.find((p) => p.id === action.pipeline_id)?.stages ?? [];
-  parts.push(action.stage_id ? `בשלב ${nameIn(stages, action.stage_id)}` : "בשלב הפתוח הראשון");
+  const fallback = `${nameIn(lookups.pipelines, action.pipeline_id)}${action.stage_id ? `, שלב ${nameIn(stages, action.stage_id)}` : ""}`;
+  if (action.pipeline === "source") {
+    parts.push(`בתהליך המכירה של העסקה המקורית, בשלב הפתוח הראשון (אם אינו קיים: ${fallback})`);
+  } else {
+    parts.push(`בתהליך ${nameIn(lookups.pipelines, action.pipeline_id)}`);
+    parts.push(action.stage_id ? `בשלב ${nameIn(stages, action.stage_id)}` : "בשלב הפתוח הראשון");
+  }
+  if (action.copy_from_source === true) parts.push("עם ההכנסה החוזרת והשורות של העסקה המקורית");
   if (typeof action.amount_agorot === "number" && action.amount_agorot > 0) {
     parts.push(`₪${(action.amount_agorot / 100).toLocaleString("he-IL")}`);
   }

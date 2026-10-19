@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fromDbRule, toDbRule } from "@/features/automations/convert";
 import { createDealDraft, describeCreateDeal, openStagesOf, shekelsToAgorot } from "@/features/automations/create-records";
 import { actionsFor } from "@/features/automations/definitions";
-import { describeRule, STEP_ERRORS } from "@/features/automations/describe";
+import { describeRule, STEP_ERRORS, STEP_WARNINGS } from "@/features/automations/describe";
 import type { Lookups } from "@/features/automations/queries";
 import { ruleSchema } from "@/features/automations/schema";
 
@@ -68,8 +68,8 @@ describe("create deal and create note steps (AUT-02)", () => {
     ]);
     const back = fromDbRule({ name: "כלל", entity: "deal", triggerType: "deal_won", triggerConfig: {}, conditions: [], actions: db.actions });
     expect(back?.actions).toEqual([
-      { type: "create_deal", name: "חידוש: {{name}}", pipeline_id: PIPELINE, stage_id: OPEN2, amount: "2500.5", assign: "user", user_id: MEMBER },
-      { type: "create_deal", name: "", pipeline_id: PIPELINE, stage_id: "", amount: "", assign: "owner", user_id: "" },
+      { type: "create_deal", name: "חידוש: {{name}}", pipeline_id: PIPELINE, stage_id: OPEN2, amount: "2500.5", assign: "user", user_id: MEMBER, pipeline_source: "", copy_source: "" },
+      { type: "create_deal", name: "", pipeline_id: PIPELINE, stage_id: "", amount: "", assign: "owner", user_id: "", pipeline_source: "", copy_source: "" },
     ]);
   });
 
@@ -145,5 +145,49 @@ describe("create deal and create note steps (AUT-02)", () => {
     expect(shekelsToAgorot("1000000000")).toBe(100_000_000_000);
     expect(shekelsToAgorot("abc")).toBeNull();
     expect(createDealDraft({ type: "create_deal", pipeline_id: PIPELINE, amount_agorot: 0 }).amount).toBe("");
+  });
+});
+
+// DEAL-08 follow-up (migration automation_deal_from_source): a new deal in the source deal's process, with its revenue and lines
+const FOLLOW = readFileSync(
+  `supabase/migrations/${readdirSync("supabase/migrations").find((file) => file.endsWith("_automation_deal_from_source.sql"))}`,
+  "utf8",
+);
+
+describe("a create deal step that follows its source deal (DEAL-08 follow-up)", () => {
+  it("stores both settings for a deal rule, keeps the fallback pipeline, and reads them back", () => {
+    const rule = parse("deal:won", [{ type: "create_deal", pipeline_id: PIPELINE, stage_id: OPEN2, pipeline_source: "1", copy_source: "1" }]);
+    const db = toDbRule(rule, lookups);
+    if (typeof db === "string") throw new Error(db);
+    expect(db.actions).toEqual([
+      { type: "create_deal", pipeline_id: PIPELINE, assign: "owner", pipeline: "source", copy_from_source: true, stage_id: OPEN2 },
+    ]);
+    const back = fromDbRule({ name: "כלל", entity: "deal", triggerType: "deal_won", triggerConfig: {}, conditions: [], actions: db.actions });
+    expect(back?.actions[0]).toMatchObject({ pipeline_source: "1", copy_source: "1", pipeline_id: PIPELINE, stage_id: OPEN2 });
+    // unticked: nothing stored
+    const plain = toDbRule(parse("deal:won", [{ type: "create_deal", pipeline_id: PIPELINE, pipeline_source: "", copy_source: "" }]), lookups);
+    if (typeof plain === "string") throw new Error(plain);
+    expect(plain.actions).toEqual([{ type: "create_deal", pipeline_id: PIPELINE, assign: "owner" }]);
+  });
+
+  it("refuses both settings outside deal rules, a gone fallback pipeline, and other values", () => {
+    for (const extra of [{ pipeline_source: "1" }, { copy_source: "1" }] as Array<Record<string, string>>) {
+      expect(toDbRule(parse("contact:created", [{ type: "create_deal", pipeline_id: PIPELINE, ...extra }]), lookups)).toBe(
+        "העתקה מהעסקה המקורית מתאימה רק לאוטומציה על עסקאות.",
+      );
+    }
+    expect(toDbRule(parse("deal:won", [{ type: "create_deal", pipeline_id: MEMBER, pipeline_source: "1" }]), lookups)).toBe("תהליך המכירה שנבחר כבר לא קיים.");
+    expect(ruleSchema.safeParse({ name: "כלל", trigger: "deal:won", conditions: [], actions: [{ type: "create_deal", pipeline_id: PIPELINE, copy_source: "yes" }] }).success).toBe(false);
+  });
+
+  it("says the settings in Hebrew, and the engine's warning has a Hebrew text", () => {
+    const text = describeCreateDeal({ pipeline_id: PIPELINE, stage_id: OPEN2, pipeline: "source", copy_from_source: true, assign: "owner" }, lookups);
+    expect(text).toBe('"עסקה: {{name}}", בתהליך המכירה של העסקה המקורית, בשלב הפתוח הראשון (אם אינו קיים: מכירות, שלב הצעה), עם ההכנסה החוזרת והשורות של העסקה המקורית, לאחראי');
+    expect(STEP_WARNINGS["some lines were not copied"]).toBeTruthy();
+    expect(FOLLOW).toContain("v_warning := 'some lines were not copied'");
+    // the step's own errors are unchanged
+    for (const error of ["the pipeline no longer exists", "the stage is not an open stage of the pipeline", "the pipeline has no open stage"]) {
+      expect(FOLLOW, error).toContain(`raise exception '${error}'`);
+    }
   });
 });

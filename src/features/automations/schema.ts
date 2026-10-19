@@ -51,6 +51,9 @@ const actionSchema = z.discriminatedUnion("type", [
     amount: z.string().max(30, { error: "הסכום ארוך מדי." }).optional(),
     assign: z.enum(["owner", "user"]).default("owner"),
     user_id: id.optional(),
+    // DEAL-08 follow-up: "1" = on (deal rules only)
+    pipeline_source: z.enum(["", "1"]).optional(),
+    copy_source: z.enum(["", "1"]).optional(),
   }),
   // AUT-02: a note on the record's timeline
   z.object({ type: z.literal("create_note"), body: text(NOTE_BODY_MAX, "יש לכתוב את ההערה.") }),
