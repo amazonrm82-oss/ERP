@@ -1264,8 +1264,9 @@ that back.
   `contact_term`, `lead_term`, `deal_term` null = today's word, else a key from the closed lists mirrored by
   `src/features/terminology/terms.ts`, which holds every Hebrew form by hand; members read, owners/admins of a writable org write,
   no delete, audited). Read with `getOrgTerms(orgId)` (separate from org_context; falls back to today's words); `recordTypeNames(type,
-  terms)` in record-types.ts. Used in the nav, the + menu, the three lists, "new" pages and waiting leads; record pages, reports,
-  imports and DB-written notifications still use today's words (part two).
+  terms)` in record-types.ts. Used in the nav, the + menu, the three lists, "new" pages and waiting leads; since part two also on the record pages,
+  report titles/columns (`reportTexts`) and the import wizard (`importEntityLabel`; `withPrefixThe` for ל/ב/כ forms). DB-written
+  notification texts still use today's words (a later migration item).
 - Saving a one-row-per-org settings table whose UPDATE is column-granted: update and select back, insert only when 0 rows, retry
   the update once on 23505. Never PostgREST `.upsert(..., {onConflict})`: its `DO UPDATE SET` names `organization_id`, which has no
   UPDATE grant, so it fails with 42501 (FLD-10 review, QUO-05).
