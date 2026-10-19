@@ -1154,6 +1154,12 @@ that back.
   is added to the gallery `/admin/design` (`src/features/design-gallery/`), which the e2e photographs.
   Icons only from `src/components/ui/icons.tsx`; direction arrows are `BackIcon` / `ForwardIcon` (they flip with
   the reading direction), never a hand-rotated chevron.
+- Theme (USR-07, migration 020410; owner 18 October 2026, answer (ג)): `profiles.theme` (null = by the device, light|dark; own row,
+  column grant). Cookie `mx-theme` holds a per-device copy for the first paint (`src/features/theme/`); the root layout reads it, the
+  business layout syncs it from the profile softly (a failed read never breaks the page). Public customer pages are always light: the
+  proxy (`src/lib/supabase/proxy.ts`) sets request header `x-crm-path`, and the root layout pins light on the public prefixes.
+- App shortcuts (USR-08, no migration): four manifest shortcuts go to `/app/go/[target]` (`src/features/shortcuts/shortcuts.ts`),
+  which opens the target in the business named by cookie `mx-last-org` (set by `RememberOrg` in the business layout), else `/app`.
 - Unsaved changes (REC-11): put `<FormGuard state={state} />` inside a record form (`src/components/ui/unsaved-changes.tsx`,
   logic in `src/lib/form-dirty.ts`). It compares with the starting values, asks via `LeaveDialog` before a link leaves the
   page (then navigates by href), uses beforeunload, and marks the form `data-unsaved` so a `Dialog` asks before closing.
