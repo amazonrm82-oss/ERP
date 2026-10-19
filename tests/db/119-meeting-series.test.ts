@@ -6,8 +6,17 @@ afterAll(closePool);
 
 type U = { id: string };
 
+// The series start on a Sunday at least 30 days ahead, relative to today (it was 6 December 2026, fixed), so the
+// weekly dates stay in the future and keep their weekday
+const DAY_MS = 86_400_000;
+const FIRST_SUNDAY = (() => {
+  const start = new Date(Date.now() + 30 * DAY_MS);
+  const midnight = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  return midnight + ((7 - new Date(midnight).getUTCDay()) % 7) * DAY_MS;
+})();
+
 const week = (n: number, hour = "08:00") => {
-  const day = new Date(Date.UTC(2026, 11, 6 + 7 * n)).toISOString().slice(0, 10);
+  const day = new Date(FIRST_SUNDAY + 7 * n * DAY_MS).toISOString().slice(0, 10);
   return { starts_at: `${day}T${hour}:00Z`, ends_at: `${day}T${hour.replace(/^(\d\d)/, (h) => String(Number(h) + 1).padStart(2, "0"))}:00Z` };
 };
 const weeks = (n: number) => Array.from({ length: n }, (_, i) => week(i));

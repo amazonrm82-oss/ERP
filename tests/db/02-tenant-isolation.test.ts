@@ -211,7 +211,7 @@ describe("tenant isolation", () => {
       // QUO-04: a template with a product line
       ids.templateA = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית של א') returning id", [orgA])).rows[0].id;
       await q("insert into public.quote_template_lines (organization_id, template_id, product_id, name) values ($1, $2, $3, 'מוצר של א')", [orgA, ids.templateA, ids.productA]);
-      await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02')", [orgA, a.id]);
+      await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date + 40, current_date + 41)", [orgA, a.id]);
       await q(`insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'lead', '[{"title": "קשר", "columns": 2, "fields": ["phone", "email"]}]')`, [orgA]);
       // LEAD-05
       await q("insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'email', 'filled', 5)", [orgA]);
@@ -646,7 +646,7 @@ describe("tenant isolation", () => {
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
-      ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-05', '2026-12-06')", [orgA, a.id]],
+      ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date + 44, current_date + 45)", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
       ["insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'deal', '[]')", [orgA]],
       ["insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'phone', 'filled', 1)", [orgA]],

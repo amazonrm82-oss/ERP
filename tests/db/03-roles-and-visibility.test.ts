@@ -983,7 +983,7 @@ describe("roles and record visibility", () => {
   it("leave: everyone reads it; each role writes its own; the owner anyone's, an admin all but the owner's (CAP-09)", async () => {
     const add = (actor: U, user: U) =>
       asUser(actor.id, async (q) =>
-        (await q<{ id: string }>("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2026-12-01', '2026-12-02') returning id", [org, user.id])).rows[0].id,
+        (await q<{ id: string }>("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date + 40, current_date + 41) returning id", [org, user.id])).rows[0].id,
       );
     const ids: Record<string, string> = {};
     for (const u of [owner, admin, manager, m1, viewer]) ids[u.id] = await add(u, u);
@@ -1001,13 +1001,13 @@ describe("roles and record visibility", () => {
     for (const u of [manager, m1, viewer]) {
       await asUser(u.id, async (q) => {
         // only their own row changes
-        expect((await q("update public.member_leaves set ends_on = '2026-12-03' where organization_id = $1", [org])).rowCount, u.email).toBe(1);
+        expect((await q("update public.member_leaves set ends_on = current_date + 42 where organization_id = $1", [org])).rowCount, u.email).toBe(1);
         expect((await q("delete from public.member_leaves where organization_id = $1 and id <> $2", [org, ids[u.id]])).rowCount, u.email).toBe(0);
       });
     }
     // an admin: everyone's but the owner's (and other admins', none here besides themselves)
     await asUser(admin.id, async (q) => {
-      expect((await q("update public.member_leaves set ends_on = '2026-12-04' where organization_id = $1", [org])).rowCount).toBe(6);
+      expect((await q("update public.member_leaves set ends_on = current_date + 43 where organization_id = $1", [org])).rowCount).toBe(6);
       expect((await q("delete from public.member_leaves where organization_id = $1", [org])).rowCount).toBe(6);
     });
     expect((await pgError(add(admin, owner))).code).toBe("42501");
