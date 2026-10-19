@@ -635,6 +635,14 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `readAllPages`, ordered by `created_at` and the table's key (`id`, or the primary key named in `key` for a table without
   `id`; test 74 checks it is unique). A new public table with `organization_id` must be added there or to `LEFT_OUT` in
   `tests/db/74-full-export-tables.test.ts` with a reason.
+- Person erasure (PRV-03, migrations 020530 and 020535 pasted by hand; owner 19 October 2026, privacy, no plan key):
+  `public.privacy_erase_preview` / `public.privacy_erase_person` (definer; `app.person_erase_allowed`: owners/admins of a writable org,
+  aal2, hint `mfa:self_first`; reason 1..500). The set is `app.person_erase_full`: the record and its conversion family
+  (`app.person_erase_set`, bin included) plus ticked offered matches of the same phone/email (`app.person_erase_offered`, first 200,
+  hints `person_erase:extra|extra_max`); locked and re-read (40001 `person_erase:changed`). Kept deals whose name holds the person's
+  name must be renamed (`person_erase:deal_name`); meetings and their notices become "פגישה (לקוח נמחק)"; the only deletes live in
+  `app.person_erase_delete_rows` (no grants, the pasted file); each record then goes through `audit_erase_request`. One audit entry
+  `person_erase` with the reason and counts only. App: `src/features/privacy-erase/`.
 - Person export (PRV-02, migration 020260; privacy, no plan key): `/o/[org]/privacy-export/[lead|contact]/[id]` (owners/admins)
   collects everything about one person with the user's session (`src/features/privacy-export/collect.ts`; conversion relatives; others'
   private notes and their files left out by `withoutOthersPrivate()`, the print rule), calls `public.log_person_export()` (definer,
