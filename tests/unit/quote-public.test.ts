@@ -69,6 +69,10 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(publicQuoteFrom(answer({ replaced: null }))!.replaced).toBeNull();
     expect(publicQuoteFrom(answer({ replaced: { number: "QT-1041" } }))!.replaced).toEqual({ number: "QT-1041" });
     expect(publicQuoteFrom(answer({ replaced: { number: 7 } }))).toBeNull();
+    // QUO-12 (owner, 19 October 2026): a draft version being prepared; absent from older answers
+    expect(publicQuoteFrom(answer({}))!.draftVersion).toBe(false);
+    expect(publicQuoteFrom(answer({ draft_version: true }))!.draftVersion).toBe(true);
+    expect(publicQuoteFrom(answer({ draft_version: "yes" }))).toBeNull();
   });
 
   it("GAP-10: names the quote an addendum adds to, and lists the accepted addenda, keyed for the page only", () => {

@@ -130,7 +130,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     const token = await create(member, org, quote);
     const page = await publicPage(token);
     // QUO-12 adds `replaced`: the earlier version's number when an old link shows a newer version (null here)
-    expect(Object.keys(page).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "lines", "quote", "replaced", "schedule"]);
+    expect(Object.keys(page).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
     expect(page.replaced).toBeNull();
     expect(Object.keys(page.quote).sort()).toEqual(
       [

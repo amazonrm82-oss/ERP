@@ -127,8 +127,8 @@ describe("quote versions (QUO-12)", () => {
     await send(again);
     const third = await newVersion(member, again);
     expect((await row(third)).previous_id).toBe(again);
-    // a decided or closed quote is locked
-    for (const status of ["accepted", "rejected", "expired", "cancelled"]) {
+    // an accepted or cancelled quote is locked (a declined or expired one takes a version since 19 October 2026, test 198)
+    for (const status of ["accepted", "cancelled"]) {
       const closed = await sentQuote();
       await asAdmin((q) => q("update public.quotes set status = $2 where id = $1", [closed, status]));
       expect((await pgError(newVersion(member, closed))).hint, status).toBe("quote_version:closed");
@@ -193,7 +193,7 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t2)).toMatchObject({ quote: { number: n2 }, replaced: null });
     // the answer on an old link holds exactly the page's keys, and `replaced` only the earlier number: no ids
     const shown = (await page(t1)) as unknown as Record<string, unknown> & { replaced: Record<string, unknown> };
-    expect(Object.keys(shown).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "lines", "quote", "replaced", "schedule"]);
+    expect(Object.keys(shown).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
     expect(Object.keys(shown.replaced)).toEqual(["number"]);
     expect(JSON.stringify(shown)).not.toContain(v1);
     expect(JSON.stringify(shown)).not.toContain(v2);
@@ -213,7 +213,7 @@ describe("quote versions (QUO-12)", () => {
     expect((await pgError(page(t3))).code).toBe("P0002");
   });
 
-  it("the copy is all or nothing: a line that can no longer be offered stops the version", async () => {
+  it("a line whose product left the catalog is copied as it is (owner, 19 October 2026)", async () => {
     const product = await asUser(owner.id, async (q) =>
       (await one<{ id: string }>(q, "insert into public.products (organization_id, name, price_agorot) values ($1, 'ארון', 50000) returning id", [org])).id,
     );
@@ -236,8 +236,8 @@ describe("quote versions (QUO-12)", () => {
       return quote;
     });
     await asUser(owner.id, (q) => q("update public.products set is_active = false where id = $1", [product]));
-    expect((await pgError(newVersion(member, original))).hint).toBe("quote_lines:product");
-    expect(await asAdmin((q) => count(q, "select 1 from public.quotes where previous_id = $1", [original]))).toBe(0);
+    const copy = await newVersion(member, original);
+    expect(await asAdmin((q) => count(q, "select 1 from public.quote_lines where quote_id = $1 and product_id = $2 and name = 'ארון' and unit_price_agorot = 50000", [copy, product]))).toBe(1);
   });
 
   it("making a version is no one else's: the function is granted to signed-in users only", async () => {

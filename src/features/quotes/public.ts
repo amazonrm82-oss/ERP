@@ -81,6 +81,8 @@ const answerSchema = z.object({
   built_with: z.boolean(),
   // QUO-12: the number the customer's link was made for, when the page shows a newer version of it (absent before 020345)
   replaced: z.object({ number: text }).nullish(),
+  // QUO-12 (owner, 19 October 2026): a newer version is being prepared (absent before 020540)
+  draft_version: z.boolean().optional(),
   // GAP-10: the quote this one adds to, and this quote's accepted addenda (absent before 020430)
   addendum: z.object({ number: text }).nullish(),
   addenda: z.array(z.object({ number: text, title: z.string(), total_agorot: money })).optional(),
@@ -109,6 +111,8 @@ export type PublicQuote = {
   builtWith: boolean;
   // QUO-12: the link was made for an earlier version; this is the newer one (the earlier one's number, if it had one)
   replaced: { number: string | null } | null;
+  // QUO-12: a draft version follows the quote shown; the page says an updated version is being prepared
+  draftVersion: boolean;
   // GAP-10: this quote adds to an accepted quote (its number); and the accepted addenda of this quote
   addendumOf: { number: string | null } | null;
   addenda: { key: string; number: string | null; title: string; totalAgorot: number }[];
@@ -118,7 +122,7 @@ export type PublicQuote = {
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, addendum, addenda } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, addendum, addenda } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -202,6 +206,7 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     })),
     builtWith: built_with,
     replaced: replaced ? { number: replaced.number } : null,
+    draftVersion: draft_version ?? false,
     addendumOf: addendum ? { number: addendum.number } : null,
     addenda: (addenda ?? []).map((a, index) => ({ key: `addendum-${index + 1}`, number: a.number, title: a.title, totalAgorot: a.total_agorot })),
   };

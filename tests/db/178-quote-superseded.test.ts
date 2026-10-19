@@ -140,8 +140,9 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
     expect(await version(c.t1)).toEqual({ number: await number(c.v2), fingerprint: null });
   });
 
-  it("a decided quote's draft version is never sent (the probe), while deciding with only a draft version stays allowed", async () => {
-    for (const decision of ["accepted", "rejected"]) {
+  it("an accepted quote's draft version is never sent (the probe), while deciding with only a draft version stays allowed", async () => {
+    // a declined quote's draft version may be sent since 19 October 2026 (owner, QUO-12; test 198)
+    for (const decision of ["accepted"]) {
       const v1 = await sentQuote();
       const t1 = await linkOf(v1);
       const v2 = await newVersion(v1);

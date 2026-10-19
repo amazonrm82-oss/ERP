@@ -487,6 +487,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_cancel_accepted.sql",
       // QUO-07 (owner's answer) redefines app.audit_erase_core() of _quote_decisions.sql last (hand-edited line names)
       "_quote_erase_line_names.sql",
+      // QUO-12 follow-ups (owner's answers) redefine app.quote_lines_check() of _quotes.sql, public.quote_public(),
+      // public.quote_new_version() and app.quotes_version_guard() last
+      "_quote_version_followups.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -42,6 +42,8 @@ type Props = {
   orgId: string;
   quote: Quote;
   lines: QuoteLine[];
+  // QUO-12: products on these lines that left the catalog (marked, never dropped)
+  archivedProducts?: string[];
   pricing: EditorPricing;
   // the business charges VAT (the no-VAT choice is offered only then)
   chargesVat: boolean;
@@ -66,7 +68,7 @@ function lineDiscountText(line: QuoteLine): string | null {
  * worked out live by the one totals rule while the discount or the VAT choice is being changed. Every
  * change is saved to the draft; nothing is sent to the customer here.
  */
-export function QuoteEditor({ orgId, quote, lines: savedLines, pricing, chargesVat, canEdit, features }: Props) {
+export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts = [], pricing, chargesVat, canEdit, features }: Props) {
   // the order shown while a move is saved; the server's lines replace it when the page refreshes
   const [lines, setLines] = useState(savedLines);
   const [shown, setShown] = useState(savedLines);
@@ -253,6 +255,11 @@ export function QuoteEditor({ orgId, quote, lines: savedLines, pricing, chargesV
                     <div className="min-w-0 flex-1">
                       <p className="font-medium break-words">
                         <bdi>{line.name}</bdi>
+                        {line.productId !== null && archivedProducts.includes(line.productId) ? (
+                          <Badge className="ms-2" tone="warning">
+                            המוצר בארכיון
+                          </Badge>
+                        ) : null}
                         {line.isOptional ? (
                           <Badge className="ms-2" tone={line.optionalSelected ? "success" : undefined}>
                             {line.optionalSelected ? "רשות, מסומנת" : "רשות"}

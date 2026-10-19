@@ -19,6 +19,9 @@ export const DEFAULT_VALID_DAYS = 30;
 
 // QUO-11 (statuses); only drafts exist until QUO-07
 export const QUOTE_STATUSES = ["draft", "sent", "viewed", "accepted", "rejected", "expired", "cancelled"] as const;
+
+/** QUO-12 (owner, 19 October 2026): a new version is made from a sent, viewed, declined or expired quote (quote_new_version). */
+export const VERSIONABLE_STATUSES: readonly QuoteStatus[] = ["sent", "viewed", "rejected", "expired"];
 export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   draft: "טיוטה",

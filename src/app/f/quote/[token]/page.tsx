@@ -94,6 +94,12 @@ export default async function PublicQuotePage({ params }: Props) {
           ) : null}
         </p>
       ) : null}
+      {/* QUO-12 (owner, 19 October 2026): a newer version is being prepared; this one is still the one on offer */}
+      {page.draftVersion ? (
+        <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
+          גרסה מעודכנת בהכנה.
+        </p>
+      ) : null}
       {/* GAP-10: this quote adds work to a quote the customer already accepted */}
       {page.addendumOf ? (
         <p className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink">

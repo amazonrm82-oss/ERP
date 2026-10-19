@@ -21,14 +21,14 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { currentNameIfChanged } from "@/features/quotes/share";
-import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
+import { QUOTE_STATUS_LABELS, VERSIONABLE_STATUSES } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
@@ -89,6 +89,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     getQuoteAddenda(orgId, quote),
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
+  // QUO-12 (owner, 19 October 2026): lines whose product left the catalog stay as they are, marked on this screen only
+  const archivedProducts = await listArchivedLineProducts(orgId, lines);
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   // QUO-08: the customer's link of a sent quote, for those who may edit its deal or contact (the database decides)
   const linkStatus =
@@ -101,10 +103,11 @@ export default async function QuotePage({ params, searchParams }: Props) {
       ? { href: paths.contact(orgId, quote.contactId), label: parties.contact ?? "איש קשר" }
       : // QUO-07: a quote whose customer was deleted belongs to the list of such quotes
         { href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו" };
-  // QUO-12 (owner, 18 October 2026): a sent, undecided quote is changed by a new version, made by whoever may edit its record
+  // QUO-12 (owner, 18 October 2026): a sent, undecided quote is changed by a new version, made by whoever may edit its record;
+  // (owner, 19 October 2026) also a declined or expired one, never an accepted or cancelled one
   const canVersion =
     hasQuotes &&
-    (quote.status === "sent" || quote.status === "viewed") &&
+    VERSIONABLE_STATUSES.includes(quote.status) &&
     versions.newer === null &&
     parentRow !== null &&
     parentRow.deleted_at === null &&
@@ -177,7 +180,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 variant="secondary"
                 size="sm"
                 title="ליצור גרסה חדשה של ההצעה?"
-                description="תיווצר טיוטה חדשה, עותק של ההצעה עם השורות ולוח התשלומים, ובה עושים את השינויים. ההצעה הזאת נשארת כפי שנשלחה. כשהגרסה החדשה תישלח היא תקבל מספר חדש, והקישור הישן של הלקוח יציג אותה מרגע שיהיה לה קישור משלה. מרגע שהיא נשלחת, הקישור הישן כבר לא מציג את ההצעה הזאת."
+                description="תיווצר טיוטה חדשה, עותק של ההצעה עם השורות ולוח התשלומים, ובה עושים את השינויים. ההצעה הזאת נשארת כפי שנשלחה. עד שהגרסה החדשה תישלח, הלקוח רואה בקישור הישן את ההצעה הזאת עם הודעה שגרסה מעודכנת בהכנה. כשהגרסה החדשה תישלח היא תקבל מספר חדש, והקישור הישן יציג אותה מרגע שיהיה לה קישור משלה."
                 confirmLabel="יצירת גרסה חדשה"
                 action={newQuoteVersionAction.bind(null, orgId, quote.id)}
               >
@@ -394,6 +397,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
         orgId={orgId}
         quote={quote}
         lines={lines}
+        archivedProducts={archivedProducts}
         pricing={pricing}
         chargesVat={pricing.businessRateBp !== null && pricing.businessRateBp > 0}
         canEdit={canEdit}

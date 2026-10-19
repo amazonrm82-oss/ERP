@@ -177,6 +177,21 @@ export async function listQuoteLines(orgId: string, quoteId: string): Promise<Qu
   return readQuoteLines(await createClient(), orgId, quoteId);
 }
 
+/**
+ * QUO-12 (owner, 19 October 2026): the products on these lines that are no longer offered (switched off or archived). A
+ * version keeps such a line as it is; the quote screen marks it "המוצר בארכיון".
+ */
+export async function listArchivedLineProducts(orgId: string, lines: Pick<QuoteLine, "productId">[]): Promise<string[]> {
+  const ids = [...new Set(lines.map((line) => line.productId).filter((id): id is string => id !== null))];
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const rows = must(
+    await supabase.from("products").select("id, is_active, archived_at").eq("organization_id", orgId).in("id", ids),
+    "products of quote lines",
+  );
+  return rows.filter((row) => !row.is_active || row.archived_at !== null).map((row) => row.id);
+}
+
 export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt" | "numberDisplay">;
 
 /** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). QUO-16: and of a company. */
