@@ -596,12 +596,15 @@ describe("booking slots equal the CAP-09 rule (CAL-10)", () => {
   let org: string;
   let owner: U, rep: U, plain: U;
 
-  const sampled = (pageId: string, from: string) =>
-    asAdmin(
-      async (q) =>
-        (
-          await q<{ s: Date }>(
-            `with p as (
+  // The rule written out (sampled) and app.booking_slots (ranged), read in ONE transaction: both cut the past at now(), which
+  // is the transaction's start, so they always cut at the same moment. Read in two transactions, a slot start that passes
+  // between them is kept by the first and dropped by the second, whenever the window holds the present (e.g. from 21:00 UTC,
+  // when the UTC date of tomorrow is already today in Asia/Jerusalem).
+  const sampledAndRanged = (pageId: string, from: string) =>
+    asAdmin(async (q) => {
+      const sampled = (
+        await q<{ s: Date }>(
+          `with p as (
                select b.*, t.duration_minutes as dur, app.intake_zone(o.timezone) as zone
                  from public.booking_pages b
                  join public.meeting_types t on t.organization_id = b.organization_id and t.id = b.meeting_type_id
@@ -617,12 +620,12 @@ describe("booking slots equal the CAP-09 rule (CAL-10)", () => {
                 and not exists (select 1 from generate_series(c.s, c.s + make_interval(mins => c.dur) - interval '1 minute', interval '15 minutes') x
                                  where not app.member_in_hours(c.organization_id, c.user_id, x))
               order by c.s`,
-            [pageId, from],
-          )
-        ).rows.map((r) => r.s.toISOString()),
-    );
-  const ranged = (pageId: string, from: string) =>
-    asAdmin(async (q) => (await q<{ s: Date }>("select s from app.booking_slots($1, $2::date, 7) s", [pageId, from])).rows.map((r) => r.s.toISOString()));
+          [pageId, from],
+        )
+      ).rows.map((r) => r.s.toISOString());
+      const ranged = (await q<{ s: Date }>("select s from app.booking_slots($1, $2::date, 7) s", [pageId, from])).rows.map((r) => r.s.toISOString());
+      return { sampled, ranged };
+    });
 
   beforeAll(async () => {
     owner = await createUser("bks-owner");
@@ -682,9 +685,9 @@ describe("booking slots equal the CAP-09 rule (CAL-10)", () => {
           )
         ).id;
         for (const from of [dayAhead(1), dayAhead(8)]) {
-          const expected = await sampled(page, from);
-          expect(expected.length).toBeGreaterThan(0);
-          expect(await ranged(page, from)).toEqual(expected);
+          const { sampled, ranged } = await sampledAndRanged(page, from);
+          expect(sampled.length).toBeGreaterThan(0);
+          expect(ranged).toEqual(sampled);
         }
       }
     });
