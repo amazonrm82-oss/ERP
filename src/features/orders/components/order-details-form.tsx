@@ -56,7 +56,15 @@ export function OrderDetailsForm({ orgId, orderId, values, contacts, editable }:
           error={failed?.fieldErrors?.shipping_address}
           hint="הועתקה מאיש הקשר או מהחברה כשההזמנה נוצרה. שינוי כאן לא משנה את הכרטיס שלהם."
         />
-        <TextareaField name="notes" label="הערות" rows={3} maxLength={ORDER_NOTES_MAX} defaultValue={v("notes", values.notes)} error={failed?.fieldErrors?.notes} />
+        <TextareaField
+          name="notes"
+          label="הערות"
+          rows={3}
+          maxLength={ORDER_NOTES_MAX}
+          defaultValue={v("notes", values.notes)}
+          error={failed?.fieldErrors?.notes}
+          hint="מופיעות באישור ההזמנה שהלקוח מקבל."
+        />
         {editable ? <SubmitButton>שמירה</SubmitButton> : null}
       </fieldset>
     </form>

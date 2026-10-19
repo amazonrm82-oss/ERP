@@ -11,7 +11,8 @@ import { OrderDetailsForm } from "@/features/orders/components/order-details-for
 import { OrderStatusBadge } from "@/features/orders/components/order-list-items";
 import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
-import { orderPath, ordersPath } from "@/features/orders/paths";
+import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
+import { ButtonLink } from "@/components/ui/button";
 import { getOrder, getOrderParties, getOrderPricing, listOrderLines } from "@/features/orders/queries";
 import { orderEditing, ORDER_SOURCE_LABELS } from "@/features/orders/schema";
 import { quotePath } from "@/features/quotes/paths";
@@ -79,6 +80,10 @@ export default async function OrderPage({ params }: Props) {
         back={back}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {/* ORD-05 part one: the confirmation as the customer sees it, to print or save as PDF */}
+            <ButtonLink href={orderDocumentPath(orgId, order.id)} variant="secondary" size="sm">
+              תצוגה והדפסה
+            </ButtonLink>
             {mayEdit && order.status === "draft" ? (
               <>
                 <ConfirmButton

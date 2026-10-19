@@ -63,7 +63,7 @@ export async function getDocumentBusiness(orgId: string, displayName: string): P
   };
 }
 
-function customerFrom(billing: Billing, names: { company: string | null; contact: string | null }): DocumentCustomer | null {
+export function customerFrom(billing: Billing, names: { company: string | null; contact: string | null }): DocumentCustomer | null {
   const name = billing.name ?? names.company ?? names.contact;
   if (!name) return null;
   return {
@@ -75,7 +75,7 @@ function customerFrom(billing: Billing, names: { company: string | null; contact
   };
 }
 
-function plain(shown: ReturnType<typeof effectiveBilling>): Billing {
+export function plain(shown: ReturnType<typeof effectiveBilling>): Billing {
   return {
     name: shown.name.value,
     taxId: shown.taxId.value,
