@@ -865,6 +865,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   answers not found; never an older version. `app.quotes_version_guard` (last redefined in 020420) refuses deciding a quote with a sent
   newer version (`quote:superseded`) and sending a version whose previous quote is accepted or declined
   (`quote_version:previous_decided`, previous taken FOR SHARE against decide's FOR UPDATE); decide re-reads after its lock ('changed').
+- Duplicating a quote (QUO-15, migration 020470): `public.quote_duplicate(org, quote)` (definer, `app.quote_editable`, flag
+  `quotes`) copies any quote into a new draft on the same deal and contact (lines, payment steps, terms, VAT mode; no `previous_id` or
+  `addendum_of`); each line in its own savepoint catching only P0001, class 23 and 42501, so a line the rules no longer allow is
+  left out and named (`skipped`); a document discount without the `discounts` flag is dropped (`discount_dropped`).
 - Quote notices (RVW-34, migration 020455): every notice about a quote (accepted/declined, viewed, expired) goes to
   `app.quote_notice_recipients(quote)` (definer, no grants): the quote's owner while active, else the deal's owner, else (no deal
   only) the contact's owner, each active and not a viewer, else the active owners and admins. `public.quote_public_decide`,
