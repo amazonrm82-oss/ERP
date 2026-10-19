@@ -497,6 +497,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_orders.sql",
       // ORD-01 follow-up redefines app.order_lines_check() and public.order_from_deal() of _orders.sql last
       "_order_line_products.sql",
+      // the ORD-01 merge follow-up redefines app.merge_move_links() of _quotes.sql and app.merge_orders() of _orders.sql last
+      "_merge_orders_move.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
