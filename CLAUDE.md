@@ -626,7 +626,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020370 (QUO-09), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020520 (QUO-07: hand-edited line names take the catalog name; QUO-11 cancel reason), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -872,6 +872,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   answers not found; never an older version. `app.quotes_version_guard` (last redefined in 020420) refuses deciding a quote with a sent
   newer version (`quote:superseded`) and sending a version whose previous quote is accepted or declined
   (`quote_version:previous_decided`, previous taken FOR SHARE against decide's FOR UPDATE); decide re-reads after its lock ('changed').
+  Since 020515 (owner 19 October 2026) `public.quote_cancel_accepted(org, quote, reason)` (definer, owners/admins of a writable org, flag
+  `quotes`, reason 1..500, hints `quote_cancel:not_accepted|reason`) cancels an ACCEPTED quote: `quotes.cancelled_from = 'accepted'` and
+  `cancel_reason` (server only), audited, the timeline entry carries the reason, `app.quote_notice_recipients` are told (not the actor);
+  the deal is untouched. `quote_public` (last redefined in 020515) answers `{cancelled: {number, title, business, logo, color}}` for it.
+  `app.quote_timeline_entry` was last redefined in 020515.
 - Duplicating a quote (QUO-15, migration 020470): `public.quote_duplicate(org, quote)` (definer, `app.quote_editable`, flag
   `quotes`) copies any quote into a new draft on the same deal and contact (lines, payment steps, terms, VAT mode; no `previous_id` or
   `addendum_of`); each line in its own savepoint catching only P0001, class 23 and 42501, so a line the rules no longer allow is
@@ -907,7 +912,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   deal's lines (`app.quote_deal_lines_replace`, the pasted file, holds the only delete) and moves the open deal to the first won
   stage; ask returns the question for the notice. `public.quote_win_deal(..., p_columns)` (INVOKER) is the won window's save for an
   accepted quote: lines and move in one transaction, `p_columns` limited to expected_close_date (YYYY-MM-DD) and contact_id (hint
-  `quote_win:columns`). Addenda never touch the deal.
+  `quote_win:columns`). Addenda never touch the deal. Since 020510 (owner 19 October 2026) both set the deal's amount to the quote's
+  `net_total_agorot` (before VAT, after the document discount) and `deals.amount_quote_id` ("לפי הצעה מס' X"); trigger
+  `deals_amount_quote` (definer, after `deals_amount_auto` by name) keeps the mark only while that accepted quote of this deal equals the
+  amount, else clears it. `app.quote_accept_deal` and `public.quote_win_deal` were last redefined in 020510.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
@@ -1020,6 +1028,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   it), else 42501 hint `task:team`. `public.take_task(org, task)` (definer): first taker wins (`owner_id is null`), answers
   `{ok, reason: taken|closed|lead}`. Trigger `tasks_notify_team` tells the team's full-seat members once (kind `assigned`).
   The app mirror of the take rule is `teamsForTaskRights()` in `src/features/tasks/team-rights.ts` (test 191 compares them).
+  Since 020505 a viewer does not see team tasks through the team rule, and the team notice skips automation runs and recurring spawns
+  (`app.team_task_visible`, `app.notify_team_task` last redefined there).
 - Recurring tasks (TASK-04, migration 0063): completing a task with `recurrence` makes `app.spawn_recurring_task()`
   (security definer, trigger) create the next one, once (`recurrence_source_id`, unique; clients may not write it).
   Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
