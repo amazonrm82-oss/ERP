@@ -124,7 +124,14 @@ describe("deal and task import (IMP-03)", () => {
         expect((await q<{ origin: string | null }>("select payload ->> 'origin' as origin from public.outbox_events where entity_id = $1", [id])).rows[0].origin).toBeNull();
       }
     });
-    await asAdmin((q) => q("select app.process_outbox(5000)"));
+    // process_outbox is shared by every test file and claims events with SKIP LOCKED: another file's run may hold this test's
+    // events for a moment, so run it until both typed events are processed (the assertions below are unchanged)
+    for (let i = 0; i < 50; i += 1) {
+      await asAdmin((q) => q("select app.process_outbox(5000)"));
+      const left = await asAdmin((q) => count(q, "select 1 from public.outbox_events where entity_id = any($1) and processed_at is null", [[typedDeal, typedTask]]));
+      if (left === 0) break;
+      await asAdmin((q) => q("select pg_sleep(0.1)"));
+    }
     await asAdmin(async (q) => {
       for (const id of [importedDeal, importedTask]) {
         expect(await count(q, "select 1 from public.automation_runs where entity_id = $1", [id])).toBe(0);
