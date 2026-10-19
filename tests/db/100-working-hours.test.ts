@@ -319,35 +319,41 @@ describe("working hours and leave in lead distribution (CAP-09)", () => {
   it("leave: at most 100 current and future per member (past ones do not count), and a read-only organization changes nothing", async () => {
     const insertAs = (start: string, end: string) =>
       asUser(viewer.id, (q) => q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, $3::date, $4::date)", [org, viewer.id, start, end]));
+    // "current or future" is judged from the business's own today, as app.member_leaves_limit does: ends on or after the day
+    // before it. Every date that must count is taken from that day, so the test holds on any date and at any hour.
+    const cutoffSql = "(select (now() at time zone app.intake_zone(o.timezone))::date - 1 from public.organizations o where o.id = $1)";
+    const day = async (offset: number) =>
+      asAdmin(async (q) => (await q<{ d: string }>(`select (${cutoffSql} + 1 + $2::int)::text as d`, [org, offset])).rows[0].d);
+    const [filler, first, firstEnd, over, overEnd, movedFrom, movedTo] = await Promise.all([150, 60, 61, 64, 65, 240, 241].map(day));
     await asAdmin(async (q) => {
       // 150 leaves that ended long ago, and one that ended two days ago: none of them counts
       for (let i = 0; i < 150; i++) {
         await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2025-01-01', '2025-01-01')", [org, viewer.id]);
       }
-      await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date - 5, current_date - 2)", [org, viewer.id]);
-      const have = await count(q, "select 1 from public.member_leaves where organization_id = $1 and user_id = $2 and ends_on >= current_date - 1", [org, viewer.id]);
+      await q(`insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, ${cutoffSql} - 4, ${cutoffSql} - 1)`, [org, viewer.id]);
+      const have = await count(q, `select 1 from public.member_leaves where organization_id = $1 and user_id = $2 and ends_on >= ${cutoffSql}`, [org, viewer.id]);
       for (let i = have; i < 99; i++) {
-        await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2027-03-01', '2027-03-01')", [org, viewer.id]);
+        await q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, $3::date, $3::date)", [org, viewer.id, filler]);
       }
     });
     // the 100th current or future one is still allowed, the 101st is not
-    await insertAs("2027-01-01", "2027-01-02");
-    const err = await pgError(insertAs("2027-01-05", "2027-01-06"));
+    await insertAs(first, firstEnd);
+    const err = await pgError(insertAs(over, overEnd));
     expect(err).toMatchObject({ code: "P0001", hint: "member_leaves:max" });
     // a past one does not count, but the cap is about how many are current or future
     expect((await pgError(insertAs("2025-02-01", "2025-02-02"))).hint).toBe("member_leaves:max");
     // moving an old leave into the future counts too; changing it inside the past does not
     const old = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.member_leaves where organization_id = $1 and user_id = $2 and ends_on = '2025-01-01' limit 1", [org, viewer.id])).rows[0].id);
-    const moved = await pgError(asUser(viewer.id, (q) => q("update public.member_leaves set starts_on = '2027-06-01', ends_on = '2027-06-02' where id = $1", [old])));
+    const moved = await pgError(asUser(viewer.id, (q) => q("update public.member_leaves set starts_on = $2::date, ends_on = $3::date where id = $1", [old, movedFrom, movedTo])));
     expect(moved).toMatchObject({ code: "P0001", hint: "member_leaves:max" });
     expect(await asUser(viewer.id, async (q) => (await q("update public.member_leaves set starts_on = '2024-12-30', ends_on = '2024-12-31' where id = $1", [old])).rowCount)).toBe(1);
     // a current or future one may still change its dates at the cap
-    const future = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.member_leaves where organization_id = $1 and user_id = $2 and ends_on = '2027-03-01' limit 1", [org, viewer.id])).rows[0].id);
-    expect(await asUser(viewer.id, async (q) => (await q("update public.member_leaves set ends_on = '2027-03-02' where id = $1", [future])).rowCount)).toBe(1);
+    const future = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.member_leaves where organization_id = $1 and user_id = $2 and ends_on = $3::date limit 1", [org, viewer.id, filler])).rows[0].id);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.member_leaves set ends_on = ends_on + 1 where id = $1", [future])).rowCount)).toBe(1);
 
     await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
     try {
-      const add = await pgError(asUser(rep1.id, (q) => q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, '2027-01-01', '2027-01-02')", [org, rep1.id])));
+      const add = await pgError(asUser(rep1.id, (q) => q("insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, $3::date, $4::date)", [org, rep1.id, first, firstEnd])));
       expect(add.code).toBe("42501");
       expect(await asUser(owner.id, async (q) => (await q("update public.member_leaves set ends_on = ends_on where organization_id = $1", [org])).rowCount)).toBe(0);
       const hours = await pgError(asUser(owner.id, (q) => q("select public.set_member_working_hours($1, $2, null)", [org, rep1.id])));
@@ -420,7 +426,20 @@ describe("a lead while the rotation is out of hours (CAP-09)", () => {
   const submit = (phone: string) =>
     asService(async (q) => (await q<{ r: { lead_id: string } }>("select public.intake_submit($1, 'webhook', $2) as r", [token, JSON.stringify({ full_name: "פונה בלילה", phone })])).rows[0].r.lead_id);
   const ownerOf = (lead: string) => asAdmin(async (q) => (await q<{ owner_id: string | null }>("select owner_id from public.leads where id = $1", [lead])).rows[0].owner_id);
-  const runWaiting = () => asAdmin(async (q) => (await q<{ n: number }>("select app.assign_waiting_rotation_leads() as n")).rows[0].n);
+  // The job runs over every business. Leads other tests left waiting are given out whenever their own people's hours are open,
+  // which depends on the hour and the weekday the suite runs at; they sit this run out (and get their times back after it),
+  // so the count is this business's alone, at any time.
+  const runWaiting = () =>
+    asAdmin(async (q) => {
+      await q(
+        "create temp table other_waiting on commit drop as select lead_id, next_check_at from app.rotation_waiting_leads where resolved_at is null and organization_id <> $1",
+        [org],
+      );
+      await q("update app.rotation_waiting_leads w set next_check_at = 'infinity' from other_waiting o where w.lead_id = o.lead_id");
+      const n = (await q<{ n: number }>("select app.assign_waiting_rotation_leads() as n")).rows[0].n;
+      await q("update app.rotation_waiting_leads w set next_check_at = o.next_check_at from other_waiting o where w.lead_id = o.lead_id");
+      return n;
+    });
   const pointer = (user: U) =>
     asAdmin(async (q) => (await q<{ t: Date | null }>("select last_lead_assigned_at as t from public.memberships where organization_id = $1 and user_id = $2", [org, user.id])).rows[0].t?.toISOString() ?? null);
   const setAvailable = (user: U, on: boolean) =>

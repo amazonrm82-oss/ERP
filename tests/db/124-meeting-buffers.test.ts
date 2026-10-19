@@ -191,8 +191,10 @@ describe("buffers on the meeting itself (CAL-10)", () => {
   });
 
   it("the series notice skip looks only at a notice of the last 15 minutes (CAL-09 review)", async () => {
+    // a notice is sent only for a meeting still ahead (app.meeting_notice), so the weeks start from the database's own today
+    const base = await asAdmin(async (q) => (await q<{ d: string }>("select (current_date + 30)::text as d")).rows[0].d);
     const times = [0, 1, 2].map((n) => {
-      const day = new Date(Date.UTC(2027, 2, 1 + 7 * n)).toISOString().slice(0, 10);
+      const day = new Date(Date.parse(`${base}T00:00:00Z`) + 7 * n * 86_400_000).toISOString().slice(0, 10);
       return { starts_at: `${day}T08:00:00Z`, ends_at: `${day}T09:00:00Z` };
     });
     const ids = await asUser(member.id, async (q) =>
