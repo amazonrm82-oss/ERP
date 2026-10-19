@@ -184,19 +184,27 @@ describe("automations on a date (AUT-03)", () => {
   });
 
   it("waits for the trigger hour in the business's zone", async () => {
-    const hour = await asAdmin(async (q) => (await q<{ h: number }>("select extract(hour from now() at time zone 'Asia/Jerusalem')::int as h")).rows[0].h);
-    const r = await rule("lead", { field: "created_at", days: 6, direction: "after" });
-    const due = await lead("שעה", 6);
-    if (hour < 23) {
-      await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour + 1)]));
+    // The business's zone is pinned to one where it is about noon now, so both halves always run (in Jerusalem the
+    // "not yet" half was skipped after 23:00), and the "not yet" hour is two ahead, so the clock passing the next full
+    // hour during the test cannot make it due (review of 19 October 2026, RVW-39)
+    const offset = 12 - new Date().getUTCHours();
+    const noon = offset === 0 ? "UTC" : offset > 0 ? `Etc/GMT-${offset}` : `Etc/GMT+${-offset}`;
+    await asAdmin((q) => q("update public.organizations set timezone = $2 where id = $1", [org, noon]));
+    try {
+      const hour = await asAdmin(async (q) => (await q<{ h: number }>("select extract(hour from now() at time zone $1)::int as h", [noon])).rows[0].h);
+      const r = await rule("lead", { field: "created_at", days: 6, direction: "after" });
+      const due = await lead("שעה", 6);
+      await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour + 2)]));
       expect(await runsOf(r)).toEqual([]);
+      await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour)]));
+      expect(await runsOf(r)).toEqual([due]);
+      await off(r);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set timezone = 'Asia/Jerusalem' where id = $1", [org]));
     }
-    await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour)]));
-    expect(await runsOf(r)).toEqual([due]);
     // the default hour is 8, and a bad setting falls back to it
     expect(await asAdmin(async (q) => (await q<{ h: number }>("select app.date_trigger_hour() as h")).rows[0].h)).toBe(8);
     expect(await asAdmin(async (q) => (await q("select set_config('app.date_trigger_hour', '99', true)"), (await q<{ h: number }>("select app.date_trigger_hour() as h")).rows[0].h))).toBe(8);
-    await off(r);
   });
 
   it("goes on from its cursor when the scan limit cuts a run", async () => {

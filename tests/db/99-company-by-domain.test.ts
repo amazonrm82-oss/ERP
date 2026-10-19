@@ -509,15 +509,23 @@ describe("company by email domain (CON-09)", () => {
       ).rows.length,
     );
     expect(indexes).toBe(3);
-    const started = Date.now();
-    const rows = await asUser(bigOwner.id, async (q) =>
-      (await q<{ id: string; kind: string }>("select id, kind from public.company_domain_matches($1, 'dana@sales.big12345.co.il')", [big])).rows,
-    );
-    const elapsed = Date.now() - started;
+    // What the lookup does to the 20,000 rows, counted inside its own transaction (pg_stat_xact_user_tables), not timed: a wall
+    // clock against a fixed limit failed by chance under the full suite's load (review of 19 October 2026). A scan with
+    // app.can_read_record() per row (3.5 s here once) reads every company; the indexed lookup reads a handful.
+    const { rows, reads } = await asUser(bigOwner.id, async (q) => {
+      const found = (await q<{ id: string; kind: string }>("select id, kind from public.company_domain_matches($1, 'dana@sales.big12345.co.il')", [big])).rows;
+      const counted = (
+        await q<{ seq_scan: string; seq_tup_read: string; idx_scan: string; idx_tup_fetch: string }>(
+          "select seq_scan, seq_tup_read, idx_scan, idx_tup_fetch from pg_stat_xact_user_tables where relid = 'public.companies'::regclass",
+        )
+      ).rows[0];
+      return { rows: found, reads: counted };
+    });
     expect(rows).toHaveLength(1);
     expect(rows[0].kind).toBe("parent");
-    // a scan with app.can_read_record() per row took 3.5 s here; the indexed lookup takes milliseconds
-    expect(elapsed).toBeLessThan(1000);
+    // a scan reads all 20,000 companies; the indexed lookup reads a handful (2 here)
+    expect(Number(reads.seq_tup_read)).toBeLessThan(1000);
+    expect(Number(reads.idx_tup_fetch)).toBeLessThan(1000);
   });
 
   it("anon may not call the lookup", async () => {
