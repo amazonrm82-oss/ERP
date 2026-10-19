@@ -473,6 +473,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_report_quotes.sql",
       // GAP-10 redefines public.quote_public() and public.quote_new_version() last (addenda)
       "_quote_addenda.sql",
+      // RVW-23 redefines app.deal_loss_reasons_cap() of _deal_loss_reasons.sql last (the outsider guard)
+      "_quota_outsider_guard.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
