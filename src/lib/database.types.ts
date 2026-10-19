@@ -2861,6 +2861,12 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // PRV-03: what removing a person takes (owners/admins, second step) and the removal itself (pasted by hand, 020520)
+      privacy_erase_preview: { Args: { p_org: string; p_type: string; p_id: string; p_extra?: Json }; Returns: Json };
+      privacy_erase_person: {
+        Args: { p_org: string; p_type: string; p_id: string; p_extra: Json; p_reason: string; p_deal_names?: Json; p_person_request?: boolean };
+        Returns: Json;
+      };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // QUO-15: a copy of any quote as a new draft; {quote, skipped: [line names], discount_dropped}

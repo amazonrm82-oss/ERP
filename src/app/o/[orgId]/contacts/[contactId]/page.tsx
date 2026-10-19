@@ -14,6 +14,7 @@ import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrintButton } from "@/features/print/components/print-button";
 import { PersonExportLink } from "@/features/privacy-export/components/person-export-link";
+import { PersonEraseButton } from "@/features/privacy-erase/components/person-erase-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
@@ -245,7 +246,13 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
         ) : null}
         {/* PRV-02 */}
-        {isAdminRole(context.role) ? <PersonExportLink orgId={orgId} kind="contact" id={contact.id} /> : null}
+        {isAdminRole(context.role) ? (
+          <>
+            <PersonExportLink orgId={orgId} kind="contact" id={contact.id} />
+            {/* PRV-03 */}
+            {context.canWrite ? <PersonEraseButton orgId={orgId} kind="contact" id={contact.id} listHref={paths.contacts(orgId)} /> : null}
+          </>
+        ) : null}
       </div>
     </>
   );

@@ -17,6 +17,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrintButton } from "@/features/print/components/print-button";
 import { PersonExportLink } from "@/features/privacy-export/components/person-export-link";
+import { PersonEraseButton } from "@/features/privacy-erase/components/person-erase-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
@@ -287,7 +288,13 @@ export default async function LeadPage({ params, searchParams }: Props) {
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5 empty:hidden print:hidden">
         {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
         {/* PRV-02 */}
-        {isAdminRole(context.role) ? <PersonExportLink orgId={orgId} kind="lead" id={lead.id} /> : null}
+        {isAdminRole(context.role) ? (
+          <>
+            <PersonExportLink orgId={orgId} kind="lead" id={lead.id} />
+            {/* PRV-03 */}
+            {context.canWrite ? <PersonEraseButton orgId={orgId} kind="lead" id={lead.id} listHref={paths.leads(orgId)} /> : null}
+          </>
+        ) : null}
       </div>
     </>
   );
