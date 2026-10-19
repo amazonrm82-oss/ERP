@@ -26,6 +26,7 @@ import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-
 import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
+import { fromDealText } from "@/features/quotes/from-deal";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
@@ -50,6 +51,8 @@ type Props = {
   // QUO-15: the outcome of a copy (duplicateQuoteAction)
   searchParams: Promise<{
     template?: string;
+    // DLI-05: the outcome of starting from the deal's lines
+    from_deal?: string;
     added?: string;
     skipped?: string;
     copy?: string;
@@ -451,6 +454,10 @@ export default async function QuotePage({ params, searchParams }: Props) {
       ) : null}
       {started.template === "ok" ? (
         <FormNotice className="mb-5" message={appliedText(count(started.added), count(started.skipped))} />
+      ) : started.from_deal === "ok" ? (
+        <FormNotice className="mb-5" message={fromDealText(count(started.added), count(started.skipped))} />
+      ) : started.from_deal === "failed" ? (
+        <FormError className="mb-5" message="ההצעה נוצרה, אבל שורות העסקה לא הועתקו. אפשר להוסיף שורות בעורך." />
       ) : started.template === "failed" ? (
         <FormError className="mb-5" message="ההצעה נוצרה, אבל השורות מהתבנית לא נוספו. אפשר לנסות שוב בכפתור &quot;מתבנית&quot;." />
       ) : null}

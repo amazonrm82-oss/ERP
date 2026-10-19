@@ -5,7 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, formatMoney } from "@/lib/format";
 
 import { quotePath } from "../paths";
-import { listRecordQuotes } from "../queries";
+import { countDealLines, listRecordQuotes } from "../queries";
 import { listQuoteTemplates } from "../template-server";
 import { QUOTE_STATUS_LABELS } from "../schema";
 import { NewQuoteButton } from "./new-quote-button";
@@ -22,13 +22,18 @@ type Props = {
 export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
   const source = subject.kind === "company" ? null : { kind: subject.kind, id: subject.id };
   const creates = canCreate && source !== null;
-  const [quotes, templates] = await Promise.all([listRecordQuotes(orgId, subject), creates ? listQuoteTemplates(orgId) : []]);
+  const [quotes, templates, dealLines] = await Promise.all([
+    listRecordQuotes(orgId, subject),
+    creates ? listQuoteTemplates(orgId) : [],
+    // DLI-05: a deal's quote may start from its lines
+    creates && subject.kind === "deal" ? countDealLines(orgId, subject.id) : 0,
+  ]);
   if (quotes.length === 0 && !creates) return null;
   return (
     <Card aria-labelledby={`quotes-${subject.id}`} className="print:hidden">
       <CardHeader id={`quotes-${subject.id}`} title="הצעות מחיר" action={
           creates && source ? (
-            <NewQuoteButton orgId={orgId} source={source} templates={templates.map((t) => ({ id: t.id, name: t.name }))} />
+            <NewQuoteButton orgId={orgId} source={source} templates={templates.map((t) => ({ id: t.id, name: t.name }))} dealLines={dealLines} />
           ) : null
         } />
       <CardBody>

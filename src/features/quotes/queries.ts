@@ -9,7 +9,7 @@ import type { Billing } from "@/features/products/schema";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
 import type { Database } from "@/lib/database.types";
-import { must } from "@/lib/db-read";
+import { DbReadError, must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
@@ -616,4 +616,12 @@ export async function getQuoteNumberDisplay(orgId: string, quoteId: string): Pro
   const supabase = await createClient();
   const row = must(await supabase.from("quotes").select("number_display").eq("organization_id", orgId).eq("id", quoteId).maybeSingle(), "quote number");
   return row ? row.number_display : undefined;
+}
+
+/** DLI-05: how many product lines a deal has (read with the user's session; a deal they cannot read has none). */
+export async function countDealLines(orgId: string, dealId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase.from("deal_lines").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("deal_id", dealId);
+  if (error) throw new DbReadError("deal_lines", error);
+  return count ?? 0;
 }

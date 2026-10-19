@@ -8,7 +8,7 @@ import { priceListTiers, readPricedProduct } from "@/features/deal-lines/queries
 import { lineTotal, priceOnEdit, pulledPrice } from "@/features/deal-lines/pricing";
 import { totalsErrorMessage } from "@/features/tax/calc";
 import { actionContext } from "@/lib/action-context";
-import { INVALID_ARGS, validArg } from "@/lib/action-args";
+import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { addDays } from "@/lib/calendar-grid";
@@ -22,6 +22,7 @@ import { copyNoticeParams, duplicateResultSchema } from "./duplicate";
 import { quotePath } from "./paths";
 import { publicQuotePath, QUOTE_LINK_TOKEN } from "./public";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
+import { applyDealLinesToQuote } from "./from-deal-server";
 import { applyTemplateToQuote } from "./template-server";
 import {
   DEFAULT_VALID_DAYS,
@@ -67,10 +68,12 @@ const sourceArg = z.object({ kind: z.enum(["deal", "contact"]), id: z.guid() });
  * QUO-01: a new draft from a deal (its contact and company come with it) or from a contact (its company
  * comes with it), titled after the deal or the contact and valid for 30 days; then the editor opens.
  */
-export async function createQuoteAction(orgId: string, source: unknown, templateId: unknown = null): Promise<ActionResult> {
+export async function createQuoteAction(orgId: string, source: unknown, templateId: unknown = null, fromDeal: unknown = false): Promise<ActionResult> {
   if (!validArg(sourceArg, source)) return fail(INVALID_ARGS);
   // QUO-04: a template to start from (its lines, notes and terms)
   if (templateId !== null && !validArg(z.guid(), templateId)) return fail(INVALID_ARGS);
+  // DLI-05: start from the deal's own lines (a deal only; never together with a template)
+  if (!validArg(booleanArg, fromDeal) || (fromDeal && (source.kind !== "deal" || templateId !== null))) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, source.id);
   if (!context.ok) return context;
   const { supabase } = context;
@@ -96,6 +99,16 @@ export async function createQuoteAction(orgId: string, source: unknown, template
     .single();
   if (error) return fail(error.code === "42501" ? CANNOT_CREATE : dbErrorMessage(error));
   revalidateQuote(orgId, { id: data.id, dealId: data.deal_id, contactId: data.contact_id });
+  if (fromDeal) {
+    const quote = await readQuote(supabase, orgId, data.id);
+    const copied = quote ? await applyDealLinesToQuote(supabase, orgId, quote) : null;
+    // the quote exists either way; the editor says what came from the deal
+    redirect(
+      `${quotePath(orgId, data.id)}?${
+        copied?.ok ? new URLSearchParams({ from_deal: "ok", added: String(copied.added), skipped: String(copied.skipped) }) : "from_deal=failed"
+      }`,
+    );
+  }
   if (templateId === null) redirect(quotePath(orgId, data.id));
   const quote = await readQuote(supabase, orgId, data.id);
   const applied = quote ? await applyTemplateToQuote(supabase, orgId, quote, templateId) : null;
