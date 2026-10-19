@@ -9,6 +9,7 @@ import { ContactFields } from "@/features/contacts/components/contact-fields";
 import { DEFAULT_MODULES, modulesFromRow } from "@/features/modules/modules";
 import { REPORTS } from "@/features/reports/definitions";
 import { createItems, navItems } from "@/features/shell/nav";
+import { dbErrorMessage } from "@/lib/errors";
 
 // LEAD-08 part (a): switching a module off hides it in the app; nothing is removed.
 describe("module switches (LEAD-08)", () => {
@@ -55,5 +56,9 @@ describe("module switches (LEAD-08)", () => {
 
   it("the leads-only reports are marked, so the index can leave them out", () => {
     expect(REPORTS.filter((r) => r.module === "leads").map((r) => r.key)).toEqual(["sources", "response"]);
+  });
+
+  it("a leads import refused while leads are off is explained in Hebrew (part b)", () => {
+    expect(dbErrorMessage({ code: "P0001", message: "the leads module is switched off", hint: "module:leads_off" })).toContain("מודול הלידים כבוי");
   });
 });
