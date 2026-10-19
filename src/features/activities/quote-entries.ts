@@ -1,5 +1,5 @@
 // QUO-16, the timeline part (owner, 18 October 2026): the entries the database writes when a quote is sent, accepted or
-// declined (app.quote_timeline_entry, migration 020335), and since QUO-11 (020400) when it expires or is cancelled. The
+// declined (app.quote_timeline_entry, migration 020335), and since QUO-11 (020415) when it expires or is cancelled. The
 // stored body names the number only (a cancellation also who cancelled it); the screen adds the title as the quote reads
 // now, so an erased title leaves nothing behind. No amounts.
 

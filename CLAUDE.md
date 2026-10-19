@@ -837,7 +837,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020390, `app.audit_erase_core` in 020370).
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020420, `app.audit_erase_core` in 020370).
 - Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
   execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
   `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
@@ -850,6 +850,16 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quotes_version_guard`: the chain is set on insert only, same deal and contact, from a sent quote (`quote_version:not_sent|parent|fixed`),
   and a quote that left draft never returns to it, for every writer (`quote:no_redraft`). `public.quote_public` (last redefined in
   020345) walks the chain to the newest open version with a live link of its own and adds `replaced {number}`.
+- Quote expiry and cancel (QUO-11, migrations 020415, 020420; owner 18 October 2026): pg_cron `crm-quote-expiry` (every 15 minutes)
+  runs `app.expire_quotes()`: a sent or viewed quote whose `valid_until` is before the business's today becomes `expired` (200 per org,
+  2,000 per run, per-quote exception block; a failure waits an hour in `app.quote_expiry_retry`), and its active owner gets kind `quote`.
+  `public.quote_cancel(org, quote)` (definer, `app.quote_editable`, flag `quotes`): sent, viewed or expired only (hints
+  `quote_cancel:draft|accepted|closed`). `app.quote_timeline_entry` (last redefined in 020415) writes both as `system` entries with no
+  author (trigger `activities_zz_quote_system_author`). A link shows the newest version that was ever SENT (`app.quote_shown_version`
+  + `app.quote_link_shows`, used by `quote_public`, `quote_public_version` and `quote_public_decide`, all last redefined in 020420), or
+  answers not found; never an older version. `app.quotes_version_guard` (last redefined in 020420) refuses deciding a quote with a sent
+  newer version (`quote:superseded`) and sending a version whose previous quote is accepted or declined
+  (`quote_version:previous_decided`, previous taken FOR SHARE against decide's FOR UPDATE); decide re-reads after its lock ('changed').
 - Quote views (QUO-10, migration 020390; owner 18 October 2026): `public.quote_views` (one row per quote: first, last, count; server
   writes only; select follows the quote). `app.quote_mark_viewed` (definer, no grants), called by `public.quote_public` (last redefined
   in 020390) after the rate limit and the chain walk, counts the view, moves sent → viewed once and sends kind `quote_viewed` (in both
