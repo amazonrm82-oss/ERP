@@ -519,6 +519,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   days the caller sees, null below 5). Unhandled = the waiting-leads rule (`src/features/leads/waiting.ts`): no non-private
   contact entry by a person, and a lead someone else took is hidden as in `takenLeadsFilter`; keep SQL and TS in step. New
   groups go into `MONEY_GROUPS` (`src/features/money-waiting/groups.ts`) plus a report key.
+- Stage-required built-in fields (DEAL-05, migration 020475): `stages.required_fields` (subset of amount | expected_close_date |
+  contact_id, constraint `stages_required_fields_known`, mirrored by `STAGE_REQUIRED_FIELDS` in `src/features/deals/stage-required.ts`).
+  App-only like FLD-09's "require": `requiredForMove` / `missingAfterChange` add pseudo fields `builtin:*` ahead of the custom ones,
+  `splitMovePatch` writes them to the deal's columns in the same update; the contact is checked on the server as readable in the org
+  and not in the bin (`withSentContact`), not against the 200-item list. Automations, imports and server writes are never refused.
 - Deal loss reasons (DEAL-03, migration 0121): `public.deal_loss_reasons` is a managed list like `disqualify_reasons` (members
   read, owners/admins write, 50 per org, hint `reasons:max`; seeded by trigger `organizations_seed_deal_loss_reasons`).
   `deals.lost_reason_id` (composite FK, set null on delete) and `deals.competitor` (≤120). Trigger `deals_sync_stage_loss`
