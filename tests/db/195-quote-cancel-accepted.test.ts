@@ -138,14 +138,15 @@ describe("cancelling an accepted quote (QUO-11)", () => {
     const a = await accepted();
     await cancel(owner, a.quote, "הלקוח ביקש לבטל");
     const shown = await page(a.token);
-    expect(Object.keys(shown)).toEqual(["cancelled"]);
-    const cancelled = shown.cancelled as Record<string, unknown>;
-    expect(cancelled).toMatchObject({ title: "שיפוץ מטבח", business: "עסק הביטולים" });
+    expect(Object.keys(shown)).toEqual(["status_page"]);
+    const cancelled = shown.status_page as Record<string, unknown>;
+    expect(Object.keys(cancelled).sort()).toEqual(["business", "color", "draft_version", "logo", "number", "phone", "replaced", "state", "title", "valid_until"]);
+    expect(cancelled).toMatchObject({ state: "cancelled", title: "שיפוץ מטבח", business: "עסק הביטולים" });
     expect(cancelled.number).toMatch(/\d/);
     expect(JSON.stringify(shown)).not.toMatch(/50000|59000|total|lines|הלקוח ביקש|נועה/);
     // no decision on it
-    expect((await pgError(asService((q) => q("select public.quote_public_version($1)", [a.token]))))).toMatchObject({ code: "P0002" });
-    // a quote cancelled before acceptance still answers not found
+    expect(await asService(async (q) => (await one<{ v: unknown }>(q, "select public.quote_public_version($1) as v", [a.token])).v)).toMatchObject({ fingerprint: null });
+    // a quote cancelled before acceptance shows the same status page (owner, 19 October 2026)
     const sent = await asUser(member.id, async (q) => {
       const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id) values ($1, 'נשלחה', $2) returning id", [org, a.deal])).id;
       await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'עבודה', 100)", [org, id]);
@@ -154,7 +155,7 @@ describe("cancelling an accepted quote (QUO-11)", () => {
       await q("select public.quote_cancel($1, $2)", [org, id]);
       return token;
     });
-    expect((await pgError(page(sent))).code).toBe("P0002");
+    expect(await page(sent)).toMatchObject({ status_page: { state: "cancelled" } });
     // a purged customer's quote: not found, as on the normal path
     await asAdmin((q) => q("update public.quotes set customer_deleted_at = now() where id = $1", [a.quote]));
     try {

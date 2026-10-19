@@ -5,7 +5,11 @@ import { addMember, asAdmin, asService, asUser, closePool, createOrg, createUser
 afterAll(closePool);
 
 type U = { id: string; email: string };
-type Page = { quote: { number: string; status: string }; replaced: { number: string } | null };
+type Page = {
+  quote: { number: string; status: string };
+  replaced: { number: string } | null;
+  status_page?: { state: string; number: string; replaced: { number: string } | null };
+};
 type Version = { number: string | null; fingerprint: string | null };
 
 /**
@@ -73,11 +77,20 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
     expect(await page(t1)).toMatchObject({ quote: { number: await number(v2) }, replaced: { number: await number(v1) } });
     return { v1, t1, v2, fingerprint1 };
   };
-  // every way of reaching or deciding v1 through its own link is closed, and no other path decides it
-  const v1Closed = async (c: { v1: string; t1: string; fingerprint1: string | null }) => {
-    expect((await pgError(page(c.t1))).code).toBe("P0002");
-    expect((await pgError(version(c.t1))).code).toBe("P0002");
-    expect((await pgError(decide(c.t1, c.fingerprint1))).code).toBe("P0002");
+  // v1's own link leads only to the newest sent version (owner, 19 October 2026: never "not found", never v1 again): with
+  // that version closed it shows its status page, nothing is decided through it, and no other path decides v1
+  const v1Superseded = async (c: { v1: string; t1: string; fingerprint1: string | null; v2: string }, state: string | null) => {
+    const shown = await page(c.t1);
+    if (state) {
+      expect(Object.keys(shown)).toEqual(["status_page"]);
+      expect(shown.status_page).toMatchObject({ state, number: await number(c.v2), replaced: { number: await number(c.v1) } });
+    } else {
+      expect(shown).toMatchObject({ quote: { number: await number(c.v2) }, replaced: { number: await number(c.v1) } });
+    }
+    expect((await version(c.t1)).number).toBe(await number(c.v2));
+    if (state) expect((await version(c.t1)).fingerprint).toBeNull();
+    // v1's fingerprint never decides anything: the newest version is closed, or a different version
+    expect((await decide(c.t1, c.fingerprint1)).status).toMatch(state ? /^closed$/ : /^changed$/);
     expect((await pgError(asUser(member.id, (q) => q("select public.quote_new_version($1, $2)", [org, c.v1])))).hint).toBe("quote_version:exists");
     for (const to of ["accepted", "rejected"]) {
       expect((await pgError(asAdmin((q) => q("update public.quotes set status = $2 where id = $1", [c.v1, to])))).hint, to).toBe("quote:superseded");
@@ -98,13 +111,13 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
     );
   });
 
-  it("a cancelled newer version closes the old link; the superseded quote is not shown or accepted", async () => {
+  it("a cancelled newer version shows as cancelled on the old link; the superseded quote is not shown or accepted", async () => {
     const c = await chain();
     await asUser(member.id, (q) => q("select public.quote_cancel($1, $2)", [org, c.v2]));
-    await v1Closed(c);
+    await v1Superseded(c, "cancelled");
   });
 
-  it("an expired newer version closes the old link the same way", async () => {
+  it("an expired newer version shows as expired on the old link the same way", async () => {
     const c = await chain();
     await asAdmin(async (q) => {
       await q("set local session_replication_role = replica");
@@ -112,10 +125,10 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
     });
     await asAdmin((q) => q("select app.expire_quotes()"));
     expect(await status(c.v2)).toBe("expired");
-    await v1Closed(c);
+    await v1Superseded(c, "expired");
   });
 
-  it("a newer version sent without a link yet, or whose link was turned off, never brings the old one back", async () => {
+  it("a newer version sent without a link yet, or whose link was turned off, is what the old link shows, never the old one", async () => {
     const v1 = await sentQuote();
     const t1 = await linkOf(v1);
     const fingerprint1 = (await version(t1)).fingerprint;
@@ -123,10 +136,10 @@ describe("a superseded quote stays superseded (QUO-11 review)", () => {
     // a draft version changes nothing: the original is still shown and may be decided
     expect(await page(t1)).toMatchObject({ quote: { number: await number(v1) }, replaced: null });
     await send(v2);
-    await v1Closed({ v1, t1, fingerprint1 });
+    await v1Superseded({ v1, t1, fingerprint1, v2 }, null);
     await linkOf(v2);
     await asUser(member.id, (q) => q("select public.quote_link_revoke($1, $2)", [org, v2]));
-    await v1Closed({ v1, t1, fingerprint1 });
+    await v1Superseded({ v1, t1, fingerprint1, v2 }, null);
   });
 
   it("a decided newer version is shown as decided on the old link, and the old quote stays undecided", async () => {

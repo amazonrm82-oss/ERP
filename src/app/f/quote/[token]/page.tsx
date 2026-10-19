@@ -9,8 +9,9 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
+import { STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 // QUO-14: the page is not for search engines; and its secret address never leaves in a Referer header
 export const metadata: Metadata = { title: "הצעת מחיר", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -43,28 +44,60 @@ export default async function PublicQuotePage({ params }: Props) {
     );
   }
 
-  // QUO-11: an accepted quote the business cancelled: only that, no prices and no signing
-  if ("cancelled" in page) {
+  // owner, 19 October 2026: the newest sent version is not open (accepted, declined, cancelled, expired): its state only, no
+  // prices, lines or signing
+  if ("statusPage" in page) {
     const logoUrl = logoPublicUrl(page.logoPath);
     return (
       <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
-        {logoUrl ? (
-          <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="h-12 max-w-40" />
-        ) : null}
+        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="h-12 max-w-40" /> : null}
         <h1 className="text-lg font-semibold">
           <bdi>{page.title}</bdi>
         </h1>
+        {page.replaced ? (
+          <p className="text-sm text-ink-soft">
+            זו הגרסה החדשה של ההצעה
+            {page.replaced.number ? (
+              <>
+                {" "}
+                <span dir="ltr" className="tabular-nums">
+                  {page.replaced.number}
+                </span>
+              </>
+            ) : null}
+            .
+          </p>
+        ) : null}
         <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          ההצעה
           {page.number ? (
             <>
-              {" "}
+              הצעה{" "}
               <span dir="ltr" className="tabular-nums">
                 {page.number}
               </span>
+              :{" "}
             </>
-          ) : null}{" "}
-          בוטלה על ידי <bdi>{page.business}</bdi>. לפרטים פנו לעסק.
+          ) : null}
+          {STATUS_PAGE_TEXT[page.state]}
+          {page.state === "expired" && page.validUntil ? <> היא הייתה בתוקף עד {formatDate(page.validUntil)}.</> : null}
+        </p>
+        {page.draftVersion ? (
+          <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong">
+            גרסה מעודכנת בהכנה.
+          </p>
+        ) : null}
+        <p className="text-sm text-ink">
+          לפרטים פנו אל <bdi>{page.business}</bdi>
+          {page.phone ? (
+            <>
+              {" "}
+              בטלפון{" "}
+              <a href={`tel:${page.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="font-medium text-accent-strong underline-offset-4 hover:underline">
+                {page.phone}
+              </a>
+            </>
+          ) : null}
+          .
         </p>
         <AccessibilityLink />
       </main>
@@ -98,6 +131,12 @@ export default async function PublicQuotePage({ params }: Props) {
       {page.draftVersion ? (
         <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
           גרסה מעודכנת בהכנה.
+        </p>
+      ) : null}
+      {/* owner, 19 October 2026: an accepted quote is shown in full, with the day it was accepted and no way to decide */}
+      {page.quote.status === "accepted" ? (
+        <p role="status" className="rounded-md bg-success-soft px-3 py-2.5 text-sm text-success">
+          {page.acceptedOn ? <>אושרה ב-{formatDate(page.acceptedOn)}.</> : "ההצעה אושרה."}
         </p>
       ) : null}
       {/* GAP-10: this quote adds work to a quote the customer already accepted */}
@@ -156,10 +195,6 @@ export default async function PublicQuotePage({ params }: Props) {
       {/* QUO-09: an open quote takes one answer, bound to the version shown (its fingerprint) */}
       {fingerprint ? (
         <QuoteDecisionPanel token={token} fingerprint={fingerprint} />
-      ) : page.quote.status === "accepted" ? (
-        <p role="status" className="rounded-md bg-success-soft px-3 py-2.5 text-sm text-success print:hidden">
-          ההצעה אושרה ונחתמה. תודה!
-        </p>
       ) : page.quote.status === "rejected" ? (
         <p role="status" className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink-soft print:hidden">
           ההצעה נדחתה. אם משהו השתנה, אפשר לפנות לעסק ששלח אותה.

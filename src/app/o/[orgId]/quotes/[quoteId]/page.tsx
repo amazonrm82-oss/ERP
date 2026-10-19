@@ -10,6 +10,7 @@ import { copyNoticeText, readCopyNotice } from "@/features/quotes/duplicate";
 import { offersDealMove } from "@/features/quotes/accept-deal";
 import { QuoteDealMoveCard } from "@/features/quotes/components/quote-deal-move-card";
 import { CancelAcceptedQuote } from "@/features/quotes/components/cancel-accepted-quote";
+import { CopySkippedLines } from "@/features/quotes/components/copy-skipped-lines";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { listMembers } from "@/features/settings/queries";
@@ -21,7 +22,7 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
@@ -42,7 +43,17 @@ type Props = {
   params: Promise<{ orgId: string; quoteId: string }>;
   // QUO-04: the outcome of starting from a template (createQuoteAction)
   // QUO-15: the outcome of a copy (duplicateQuoteAction)
-  searchParams: Promise<{ template?: string; added?: string; skipped?: string; copy?: string; copy_left?: string | string[]; copy_more?: string; copy_discount?: string }>;
+  searchParams: Promise<{
+    template?: string;
+    added?: string;
+    skipped?: string;
+    copy?: string;
+    copy_left?: string | string[];
+    copy_more?: string;
+    copy_discount?: string;
+    copy_from?: string;
+    copy_line?: string | string[];
+  }>;
 };
 
 function count(value: string | undefined): number {
@@ -157,6 +168,19 @@ export default async function QuotePage({ params, searchParams }: Props) {
     : null;
   const copied = readCopyNotice(started);
   const copiedText = copied ? copyNoticeText(copied) : null;
+  // QUO-15 (owner, 19 October 2026): the left-out lines, offered as free lines while this draft may be edited
+  const skippedLines =
+    copied?.from && canEdit
+      ? (await listCopySkippedLines(orgId, copied.from, copied.lineIds)).map((line) => ({
+          id: line.id,
+          name: line.name,
+          quantity: line.quantity,
+          unitPriceAgorot: line.unitPriceAgorot,
+          added: lines.some(
+            (own) => own.kind === "item" && own.productId === null && own.name === line.name && own.quantity === line.quantity && own.unitPriceAgorot === line.unitPriceAgorot,
+          ),
+        }))
+      : [];
   const recipient = {
     name: customerNow.contactName,
     email: customerNow.email,
@@ -378,6 +402,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
           <FormNotice message={copiedText.done} />
           {copiedText.left ? <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">{copiedText.left}</p> : null}
           {copiedText.discount ? <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">{copiedText.discount}</p> : null}
+          {skippedLines.length > 0 && copied?.from ? <CopySkippedLines orgId={orgId} draftId={quote.id} sourceId={copied.from} items={skippedLines} /> : null}
         </div>
       ) : null}
       {started.template === "ok" ? (

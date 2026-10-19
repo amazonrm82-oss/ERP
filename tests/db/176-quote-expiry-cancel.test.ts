@@ -231,8 +231,10 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     const [entry] = await entries(sent.quote);
     expect(entry).toMatchObject({ type: "system", created_by: null, kind: "quote_cancelled", deal_id: sent.deal, contact_id: sent.contact });
     expect(entry.body).toMatch(/בוטלה על ידי דנה כהן$/);
-    // the customer's page closes
-    expect((await pgError(asService((q) => q("select public.quote_public($1)", [token])))).code).toBe("P0002");
+    // the customer's page shows only that it was cancelled (owner, 19 October 2026: no prices, no signing)
+    expect(
+      await asService(async (q) => (await q<{ p: { status_page?: { state: string } } }>("select public.quote_public($1) as p", [token])).rows[0].p.status_page?.state),
+    ).toBe("cancelled");
     // once cancelled, it stays so
     expect((await pgError(asUser(member.id, (q) => q("select public.quote_cancel($1, $2)", [org, sent.quote])))).hint).toBe("quote_cancel:closed");
 

@@ -33,13 +33,15 @@ export const decisionBodySchema = z.discriminatedUnion("decision", [
 ]);
 export type DecisionBody = z.infer<typeof decisionBodySchema>;
 
-export type DecisionStatus = "accepted" | "rejected" | "already_decided" | "changed" | "invalid" | "rate_limited";
+export type DecisionStatus = "accepted" | "rejected" | "already_decided" | "closed" | "changed" | "invalid" | "rate_limited";
 
 /** The Hebrew answer the page shows for each outcome. */
 export const DECISION_MESSAGES: Record<DecisionStatus, string> = {
   accepted: "תודה! ההצעה אושרה ונחתמה.",
   rejected: "התשובה נשמרה. תודה שעדכנת.",
   already_decided: "כבר התקבלה תשובה על ההצעה הזאת.",
+  // owner, 19 October 2026: only an open quote is decided; a cancelled or expired one shows its status page
+  closed: "ההצעה כבר לא פתוחה לתשובה. רעננו את הדף.",
   changed: "ההצעה התעדכנה בזמן שהיא הייתה פתוחה. בדקו את הגרסה העדכנית ונסו שוב.",
   invalid: "חלק מהפרטים לא תקינים. בדקו את השם, תעודת הזהות והחתימה.",
   rate_limited: "היו יותר מדי ניסיונות בזמן קצר. נסו שוב בעוד כמה דקות.",

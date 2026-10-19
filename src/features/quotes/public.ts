@@ -83,6 +83,8 @@ const answerSchema = z.object({
   replaced: z.object({ number: text }).nullish(),
   // QUO-12 (owner, 19 October 2026): a newer version is being prepared (absent before 020540)
   draft_version: z.boolean().optional(),
+  // owner, 19 October 2026: the day an accepted quote was accepted, in the business's zone (absent before 020550)
+  accepted_on: text.optional(),
   // GAP-10: the quote this one adds to, and this quote's accepted addenda (absent before 020430)
   addendum: z.object({ number: text }).nullish(),
   addenda: z.array(z.object({ number: text, title: z.string(), total_agorot: money })).optional(),
@@ -113,6 +115,8 @@ export type PublicQuote = {
   replaced: { number: string | null } | null;
   // QUO-12: a draft version follows the quote shown; the page says an updated version is being prepared
   draftVersion: boolean;
+  // the day it was accepted (YYYY-MM-DD, business zone), for an accepted quote
+  acceptedOn: string | null;
   // GAP-10: this quote adds to an accepted quote (its number); and the accepted addenda of this quote
   addendumOf: { number: string | null } | null;
   addenda: { key: string; number: string | null; title: string; totalAgorot: number }[];
@@ -122,7 +126,7 @@ export type PublicQuote = {
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, addendum, addenda } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, accepted_on, addendum, addenda } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -207,22 +211,70 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     builtWith: built_with,
     replaced: replaced ? { number: replaced.number } : null,
     draftVersion: draft_version ?? false,
+    acceptedOn: accepted_on ?? null,
     addendumOf: addendum ? { number: addendum.number } : null,
     addenda: (addenda ?? []).map((a, index) => ({ key: `addendum-${index + 1}`, number: a.number, title: a.title, totalAgorot: a.total_agorot })),
   };
 }
 
-// QUO-11 (owner, 19 October 2026): an accepted quote that was cancelled; the link shows only that, no prices or signing
-export type CancelledPublicQuote = { cancelled: true; number: string | null; title: string; business: string; logoPath: string | null };
+// Owner, 19 October 2026: the link of a sent quote always leads to its newest sent version; when that one is not open
+// (declined, cancelled, expired) the page shows only its state, with no prices, lines or signing. An accepted one is shown
+// in full with the day it was accepted (owner's correction of the same day).
+export const STATUS_PAGE_STATES = ["rejected", "cancelled", "expired"] as const;
+export type StatusPageState = (typeof STATUS_PAGE_STATES)[number];
 
-const cancelledSchema = z.object({
-  cancelled: z.object({ number: z.string().nullable(), title: z.string(), business: z.string(), logo: z.string().nullable(), color: z.string().nullable() }),
+export type StatusPublicQuote = {
+  statusPage: true;
+  state: StatusPageState;
+  number: string | null;
+  title: string;
+  validUntil: string | null;
+  business: string;
+  logoPath: string | null;
+  phone: string | null;
+  // the number the link was made for, when this is a newer version of it
+  replaced: { number: string | null } | null;
+  // a newer version is being prepared
+  draftVersion: boolean;
+};
+
+const statusSchema = z.object({
+  status_page: z.object({
+    state: z.enum(STATUS_PAGE_STATES),
+    number: z.string().nullable(),
+    title: z.string(),
+    valid_until: z.string().nullable(),
+    business: z.string(),
+    logo: z.string().nullable(),
+    color: z.string().nullable(),
+    phone: z.string().nullable(),
+    replaced: z.object({ number: z.string().nullable() }).nullable(),
+    draft_version: z.boolean(),
+  }),
 });
 
-/** The "cancelled" answer of public.quote_public, or null for any other shape. */
-export function cancelledQuoteFrom(raw: unknown): CancelledPublicQuote | null {
-  const parsed = cancelledSchema.safeParse(raw);
+/** The status answer of public.quote_public, or null for any other shape. */
+export function statusQuoteFrom(raw: unknown): StatusPublicQuote | null {
+  const parsed = statusSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const c = parsed.data.cancelled;
-  return { cancelled: true, number: c.number, title: c.title, business: c.business, logoPath: c.logo };
+  const p = parsed.data.status_page;
+  return {
+    statusPage: true,
+    state: p.state,
+    number: p.number,
+    title: p.title,
+    validUntil: p.valid_until,
+    business: p.business,
+    logoPath: p.logo,
+    phone: p.phone,
+    replaced: p.replaced ? { number: p.replaced.number } : null,
+    draftVersion: p.draft_version,
+  };
 }
+
+/** The sentence the status page shows for each state. */
+export const STATUS_PAGE_TEXT: Record<StatusPageState, string> = {
+  rejected: "התשובה על ההצעה כבר נשמרה: ההצעה לא אושרה.",
+  cancelled: "ההצעה בוטלה על ידי העסק.",
+  expired: "פג תוקף ההצעה.",
+};

@@ -493,7 +493,43 @@ export async function duplicateQuoteAction(orgId: string, quoteId: string): Prom
   if (!result.success) return fail("לא הצלחנו לשכפל את ההצעה. נסו שוב.");
   const quote = await readQuote(context.supabase, orgId, quoteId);
   if (quote) revalidateQuote(orgId, quote);
-  redirect(`${quotePath(orgId, result.data.quote)}?${copyNoticeParams(result.data)}`);
+  redirect(`${quotePath(orgId, result.data.quote)}?${copyNoticeParams(result.data, quoteId)}`);
+}
+
+/**
+ * QUO-15 (owner, 19 October 2026): a line the copy left out (its product left the catalog, or the plan no longer allows it)
+ * is added to the new draft as a free line with its name, quantity and price, at the person's request. The source line is
+ * read again with the user's session (it must be an item line of the quote copied from), and the insert is the person's own
+ * under the normal rules (an editable draft, 200 lines). The VAT choice and billing of the line come with it, so the price
+ * means the same.
+ */
+export async function addSkippedLineAction(orgId: string, draftId: string, sourceId: string, lineId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, draftId, sourceId, lineId);
+  if (!context.ok) return context;
+  const quote = await readQuote(context.supabase, orgId, draftId);
+  if (!quote || quote.status !== "draft") return fail(NOT_FOUND_OR_FORBIDDEN);
+  const source = (await readQuoteLines(context.supabase, orgId, sourceId)).find((line) => line.id === lineId && line.kind === "item");
+  if (!source) return fail(NOT_FOUND_OR_FORBIDDEN);
+  const lines = await readQuoteLines(context.supabase, orgId, draftId);
+  if (lines.length >= QUOTE_LINES_MAX) return fail(TOO_MANY);
+  const position = lines.reduce((max, line) => Math.max(max, line.position), 0) + 1;
+  const { error } = await context.supabase.from("quote_lines").insert({
+    organization_id: orgId,
+    quote_id: draftId,
+    position: Math.min(position, 100000),
+    kind: "item",
+    product_id: null,
+    name: source.name,
+    quantity: source.quantity,
+    unit_price_agorot: source.unitPriceAgorot,
+    vat_exempt: source.vatExempt,
+    billing: source.billing,
+    price_source: "manual",
+    price_list_id: null,
+  });
+  if (error) return fail(writeError(error));
+  revalidateQuote(orgId, quote);
+  return ok();
 }
 
 const cancelAcceptedSchema = z.object({

@@ -10,6 +10,7 @@ type Page = {
   replaced: { number: string } | null;
   draft_version: boolean;
   lines: Array<{ name: string; unit_price_agorot: number }>;
+  status_page?: { state: string; number: string; draft_version: boolean };
 };
 
 /**
@@ -147,17 +148,17 @@ describe("quote versions, the owner's answers of 19 October (QUO-12)", () => {
   });
 
   it("(6) a version is made from a declined or expired quote and sent; never from an accepted or cancelled one", async () => {
-    // declined: the version is sent, and the customer's old link shows it once it has a link of its own
+    // declined: the old link shows the declined state (owner, 19 October 2026: a status page), then the sent version
     const declined = await sentQuote();
     const td = await linkOf(declined);
     await setStatus(declined, "rejected");
-    expect((await page(td)).quote).toMatchObject({ number: await number(declined), status: "rejected" });
+    expect((await page(td)).status_page).toMatchObject({ state: "rejected", number: await number(declined), draft_version: false });
     const dv = await newVersion(declined);
-    expect((await page(td)).draft_version).toBe(true);
+    expect((await page(td)).status_page).toMatchObject({ draft_version: true });
     await send(dv);
     expect(await status(dv)).toBe("sent");
-    // sent but no link of its own yet: the old link closes, never showing the declined quote as the offer
-    expect((await pgError(page(td))).code).toBe("P0002");
+    // sent: the old link shows it at once, with or without a link of its own
+    expect(await page(td)).toMatchObject({ quote: { number: await number(dv) }, replaced: { number: await number(declined) } });
     await linkOf(dv);
     expect(await page(td)).toMatchObject({ quote: { number: await number(dv), status: "viewed" }, replaced: { number: await number(declined) }, draft_version: false });
     // the declined quote stays declined; it is superseded now

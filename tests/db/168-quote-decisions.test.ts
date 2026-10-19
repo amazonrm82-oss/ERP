@@ -243,7 +243,7 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     expect(await status(quote)).toBe("viewed");
   });
 
-  it("a wrong, revoked or closed link finds nothing, and only the server may call it", async () => {
+  it("a wrong or revoked link finds nothing, a cancelled quote is not decided, and only the server may call it", async () => {
     expect((await pgError(decide("x".repeat(64), { fingerprint: "0".repeat(64) }))).code).toBe("P0002");
     expect((await pgError(decide("short", { fingerprint: "0".repeat(64) }))).code).toBe("P0002");
     const { quote } = await sentQuote();
@@ -255,7 +255,10 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     const tc = await linkOf(cancelled.quote);
     const fc = (await page(tc)).fingerprint;
     await asAdmin((q) => q("update public.quotes set status = 'cancelled' where id = $1", [cancelled.quote]));
-    expect((await pgError(decide(tc, { fingerprint: fc }))).code).toBe("P0002");
+    // owner, 19 October 2026: the link still leads to the quote, which shows its status; it is never decided
+    expect(await decide(tc, { fingerprint: fc })).toEqual({ status: "closed" });
+    expect(await version(tc)).toEqual({ number: expect.any(String), fingerprint: null });
+    expect(await status(cancelled.quote)).toBe("cancelled");
     for (const [role, expected] of [
       ["anon", false],
       ["authenticated", false],

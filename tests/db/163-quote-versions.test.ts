@@ -174,7 +174,7 @@ describe("quote versions (QUO-12)", () => {
     expect((await pgError(asUser(member.id, (q) => q("update public.quotes set status = 'draft' where id = $1", [original])))).code).toBe("42501");
   });
 
-  it("the old customer link shows the newest version once it is sent and has a link, and names the number it was made for", async () => {
+  it("the old customer link shows the newest version once it is sent, and names the number it was made for", async () => {
     // QUO-11 review: once a newer version is sent, the old link never shows the superseded quote again
     const v1 = await sentQuote();
     const n1 = (await row(v1)).number_display!;
@@ -186,14 +186,15 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t1)).toMatchObject({ quote: { number: n1 }, replaced: null });
     await send(v2);
     const n2 = (await row(v2)).number_display!;
-    // sent but without a link of its own yet: the superseded original is no longer shown, and nothing else is either
-    expect((await pgError(page(t1))).code).toBe("P0002");
+    // sent: the old link shows it at once, with or without a link of its own (owner, 19 October 2026: a sent quote's link
+    // always leads to the newest sent version); the superseded original is never shown again
+    expect(await page(t1)).toMatchObject({ quote: { number: n2 }, replaced: { number: n1 } });
     const t2 = await linkOf(v2);
     expect(await page(t1)).toMatchObject({ quote: { number: n2 }, replaced: { number: n1 } });
     expect(await page(t2)).toMatchObject({ quote: { number: n2 }, replaced: null });
     // the answer on an old link holds exactly the page's keys, and `replaced` only the earlier number: no ids
     const shown = (await page(t1)) as unknown as Record<string, unknown> & { replaced: Record<string, unknown> };
-    expect(Object.keys(shown).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
+    expect(Object.keys(shown).sort()).toEqual(["accepted_on", "addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
     expect(Object.keys(shown.replaced)).toEqual(["number"]);
     expect(JSON.stringify(shown)).not.toContain(v1);
     expect(JSON.stringify(shown)).not.toContain(v2);
@@ -206,11 +207,12 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t1)).toMatchObject({ quote: { number: n3 }, replaced: { number: n1 } });
     expect(await page(t2)).toMatchObject({ quote: { number: n3 }, replaced: { number: n2 } });
 
-    // the newest version's link turned off: the old links close too, never falling back to a superseded version
+    // the newest version's own link turned off: only that token answers not found (owner, 19 October 2026: not found only for
+    // a token revoked by hand); the old links still lead to the newest version, never to a superseded one
     await asUser(member.id, (q) => q("select public.quote_link_revoke($1, $2)", [org, v3]));
-    expect((await pgError(page(t1))).code).toBe("P0002");
-    expect((await pgError(page(t2))).code).toBe("P0002");
     expect((await pgError(page(t3))).code).toBe("P0002");
+    expect(await page(t1)).toMatchObject({ quote: { number: n3 }, replaced: { number: n1 } });
+    expect(await page(t2)).toMatchObject({ quote: { number: n3 }, replaced: { number: n2 } });
   });
 
   it("a line whose product left the catalog is copied as it is (owner, 19 October 2026)", async () => {

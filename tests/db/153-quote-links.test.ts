@@ -130,7 +130,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     const token = await create(member, org, quote);
     const page = await publicPage(token);
     // QUO-12 adds `replaced`: the earlier version's number when an old link shows a newer version (null here)
-    expect(Object.keys(page).sort()).toEqual(["addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
+    expect(Object.keys(page).sort()).toEqual(["accepted_on", "addenda", "addendum", "brand", "built_with", "business", "customer", "design", "draft_version", "lines", "quote", "replaced", "schedule"]);
     expect(page.replaced).toBeNull();
     expect(Object.keys(page.quote).sort()).toEqual(
       [
@@ -247,13 +247,16 @@ describe("the customer's link to a quote (QUO-08)", () => {
     expect(audit.rows.map((r) => r.changes.link)).toEqual(["created", "created", "revoked"]);
   });
 
-  it("not found for a cancelled or expired quote, a deleted customer, a business without quotes or with its pages closed", async () => {
+  it("a cancelled or expired quote shows its status page; not found for a deleted customer, a business without quotes or with its pages closed", async () => {
     const { quote, contact, deal } = await newSentQuote(member, org, { pipelineId, stageId });
     await send(member, org, quote);
     const token = await create(member, org, quote);
+    const answer = () => asService(async (q) => (await q<{ p: Record<string, unknown> & { status_page?: { state: string } } }>("select public.quote_public($1) as p", [token])).rows[0].p);
 
+    // owner, 19 October 2026: the link of a sent quote never answers not found; a cancelled one shows its state only
     await asAdmin((q) => q("update public.quotes set status = 'cancelled' where id = $1", [quote]));
-    await notFound(token);
+    expect(Object.keys(await answer())).toEqual(["status_page"]);
+    expect((await answer()).status_page!.state).toBe("cancelled");
     expect(await status(member, org, quote)).toMatchObject({ active: false });
     expect((await pgError(create(member, org, quote))).hint).toBe("quote:closed");
     await asAdmin((q) => q("update public.quotes set status = 'sent' where id = $1", [quote]));
@@ -265,7 +268,8 @@ describe("the customer's link to a quote (QUO-08)", () => {
       await q("set local session_replication_role = replica");
       await q("update public.quotes set quote_date = current_date - 30, valid_until = current_date - 1 where id = $1", [quote]);
     });
-    await notFound(token);
+    // since 19 October 2026 (owner, QUO-12) a quote past its date answers the status page (no prices, lines or signing)
+    expect((await answer()).status_page!.state).toBe("expired");
     await asAdmin((q) => q("update public.quotes set valid_until = current_date + 30 where id = $1", [quote]));
     expect((await publicPage(token)).quote.status).toBe("viewed");
 

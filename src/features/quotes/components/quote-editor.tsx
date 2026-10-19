@@ -260,6 +260,12 @@ export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts 
                             המוצר בארכיון
                           </Badge>
                         ) : null}
+                        {line.source === "price_list" && line.priceListId === null ? (
+                          // QUO-12 (owner, 19 October 2026): the price came from a list that was deleted; kept as it was
+                          <Badge className="ms-2" tone="warning">
+                            המחירון נמחק{line.priceListName ? <>: <bdi>{line.priceListName}</bdi></> : null}
+                          </Badge>
+                        ) : null}
                         {line.isOptional ? (
                           <Badge className="ms-2" tone={line.optionalSelected ? "success" : undefined}>
                             {line.optionalSelected ? "רשות, מסומנת" : "רשות"}

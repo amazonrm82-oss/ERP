@@ -11,14 +11,20 @@ import {
   type DecisionBody,
   type DecisionStatus,
 } from "./decision";
-import { cancelledQuoteFrom, publicQuoteFrom, QUOTE_LINK_TOKEN, type CancelledPublicQuote, type PublicQuote } from "./public";
+import {
+  publicQuoteFrom,
+  QUOTE_LINK_TOKEN,
+  statusQuoteFrom,
+  type PublicQuote,
+  type StatusPublicQuote,
+} from "./public";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
 // which checks the token and answers only what the page shows. No table is reached directly. No IP is used for viewing: the
 // views are limited per link in the database. A decision (QUO-09, below) goes through public.quote_public_version() and public.quote_public_decide().
 
-export type PublicQuoteState = PublicQuote | CancelledPublicQuote | "not-found" | "rate-limited" | "not-configured";
+export type PublicQuoteState = PublicQuote | StatusPublicQuote | "not-found" | "rate-limited" | "not-configured";
 
 /** The quote behind a customer's link. */
 export async function getPublicQuote(token: string): Promise<PublicQuoteState> {
@@ -33,7 +39,7 @@ export async function getPublicQuote(token: string): Promise<PublicQuoteState> {
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";
   }
-  return cancelledQuoteFrom(data) ?? publicQuoteFrom(data) ?? "not-found";
+  return statusQuoteFrom(data) ?? publicQuoteFrom(data) ?? "not-found";
 }
 
 // QUO-09 ---------------------------------------------------------------------

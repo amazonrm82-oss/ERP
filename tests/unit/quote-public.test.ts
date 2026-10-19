@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { quoteLinkMessage } from "@/features/quotes/share";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
-import { publicQuoteFrom, publicQuotePath, QUOTE_LINK_TOKEN } from "@/features/quotes/public";
+import { publicQuoteFrom, publicQuotePath, QUOTE_LINK_TOKEN, statusQuoteFrom } from "@/features/quotes/public";
 
 // QUO-08: the answer of public.quote_public() as the customer's page reads it.
 
@@ -72,6 +72,9 @@ describe("the customer's quote page (QUO-08)", () => {
     // QUO-12 (owner, 19 October 2026): a draft version being prepared; absent from older answers
     expect(publicQuoteFrom(answer({}))!.draftVersion).toBe(false);
     expect(publicQuoteFrom(answer({ draft_version: true }))!.draftVersion).toBe(true);
+    // owner, 19 October 2026: an accepted quote is shown in full with the day it was accepted
+    expect(publicQuoteFrom(answer({}))!.acceptedOn).toBeNull();
+    expect(publicQuoteFrom(answer({ accepted_on: "2026-10-19" }))!.acceptedOn).toBe("2026-10-19");
     expect(publicQuoteFrom(answer({ draft_version: "yes" }))).toBeNull();
   });
 
@@ -135,5 +138,24 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(publicQuotePath(token)).toBe(`/f/quote/${token}`);
     expect(quoteLinkMessage("https://x/f/quote/t", "QT-7")).toBe("שלום, הצעת מחיר QT-7 מחכה לך בקישור הזה: https://x/f/quote/t");
     expect(quoteLinkMessage("https://x/f/quote/t", null)).toBe("שלום, הצעת מחיר מחכה לך בקישור הזה: https://x/f/quote/t");
+  });
+
+  it("QUO-12 (owner, 19 October 2026): an expired quote's status page carries its date and the draft notice", () => {
+    const raw = {
+      status_page: {
+        state: "expired",
+        number: "QT-7",
+        title: "שיפוץ",
+        valid_until: "2026-10-01",
+        business: "העסק",
+        logo: null,
+        color: null,
+        phone: null,
+        replaced: null,
+        draft_version: true,
+      },
+    };
+    expect(statusQuoteFrom(raw)).toMatchObject({ state: "expired", validUntil: "2026-10-01", draftVersion: true });
+    expect(statusQuoteFrom({ expired: { number: "QT-7" } })).toBeNull();
   });
 });

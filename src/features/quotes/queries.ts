@@ -192,6 +192,16 @@ export async function listArchivedLineProducts(orgId: string, lines: Pick<QuoteL
   return rows.filter((row) => !row.is_active || row.archived_at !== null).map((row) => row.id);
 }
 
+/**
+ * QUO-15 (owner, 19 October 2026): the item lines a copy left out, read again from the quote copied from with the user's
+ * session, in that quote's order; ids that are not its item lines are ignored.
+ */
+export async function listCopySkippedLines(orgId: string, sourceId: string, ids: string[]): Promise<QuoteLine[]> {
+  if (ids.length === 0) return [];
+  const lines = await readQuoteLines(await createClient(), orgId, sourceId);
+  return lines.filter((line) => line.kind === "item" && ids.includes(line.id));
+}
+
 export type QuoteSummary = Pick<Quote, "id" | "title" | "status" | "quoteDate" | "validUntil" | "totalAgorot" | "createdAt" | "numberDisplay">;
 
 /** QUO-01: the quotes of a deal or a contact, newest first (the card on the record). QUO-16: and of a company. */
