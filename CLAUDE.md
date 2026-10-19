@@ -626,7 +626,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020520 (QUO-07: hand-edited line names take the catalog name; QUO-11 cancel reason), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020570 (ORD-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -948,6 +948,16 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   a writable org write, no delete): header/footer text, show logo, show business details, accent colour (null = business colour). The
   document page `/o/[org]/quotes/[id]/document` reads with the user's session, shows stored totals only, BrandScope on the document only;
   it imports print.css directly (no "הודפס ב-" line on a customer document).
+- Orders (ORD-01/03 and ORD-02 status, migration 020570; owner 19 October 2026; plan flag `orders`): `public.orders` (draft | new |
+  in_progress | partly_delivered | delivered | cancelled; source manual|quote|deal; a draft has no number) and `public.order_lines`.
+  A person makes only a manual draft; `public.order_confirm` numbers it; `order_from_quote` (accepted quote, one order per quote, an
+  addendum links to the original's order) and `order_from_deal` (won deal without an accepted quote) create it numbered, via
+  `app.order_number` over `app.next_document_number(org,'order')`. Numbered = customer, prices and lines frozen (`order:frozen`), never
+  deleted (`orders_delete_guard`), never back to draft. Rights: `app.order_editable` (deal, else contact, else company, like quotes);
+  read follows the parent; detached orders read by owners/admins/managers. Purge detaches numbered orders (`former_*_id`,
+  `customer_deleted_at`); merges move them through the `merged` entry (`app.merge_orders`). Switch `org_modules.orders_enabled`
+  (only with the flag) hides screens only. Server writes set `app.order_server`. `app.audit_erase_core`, `app.sample_untouched` and
+  `app.import_record_worked` were last redefined in 020570.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
