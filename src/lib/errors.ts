@@ -459,6 +459,11 @@ function looksLikeNetworkFailure(error: ErrorLike): boolean {
 }
 
 /** Hebrew message for an error returned by a table query or an RPC call. */
+/** The Hebrew message of a plan hint (`feature:<key>` or `limit:<key>`), for screens that explain a lock up front. */
+export function planHintMessage(hint: string): string | undefined {
+  return LIMIT_MESSAGES[hint];
+}
+
 export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR): string {
   const e = asErrorLike(error);
   if (!e) {

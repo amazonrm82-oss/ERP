@@ -20,6 +20,8 @@ type Props = {
   values: GoalValue[];
   // keys of the rows the person may change (the database decides either way)
   editable: string[];
+  // whether the plan holds goals per rep and per team (RVW-22); without it those rows are read only
+  perRep: boolean;
   // the column the copy fills unless another is picked
   copyTarget: string;
   // the label of the period before each column ("ספטמבר", "רבעון 2", "2025")
@@ -44,7 +46,7 @@ function without<T>(map: Record<string, T>, key: string): Record<string, T> {
  * (or quarter, or year). Owners and admins (and managers, in their teams' rows) type a target into a cell; it is saved when the
  * cell loses focus or on Enter (which moves down a row). An empty cell is no goal.
  */
-export function GoalsGrid({ orgId, metric, period, columns, rows, values, editable, copyTarget, previousLabels, onMessage: setMessage }: Props) {
+export function GoalsGrid({ orgId, metric, period, columns, rows, values, editable, perRep, copyTarget, previousLabels, onMessage: setMessage }: Props) {
   const definition = goalMetric(metric);
   const canEdit = new Set(editable);
   const anyEditable = canEdit.size > 0;
@@ -192,7 +194,9 @@ export function GoalsGrid({ orgId, metric, period, columns, rows, values, editab
                 <th scope="row" className="sticky start-0 z-10 max-w-40 bg-surface px-3 py-1.5 text-start font-medium">
                   <span className="block truncate">{row.label}</span>
                   {row.hint ? <span className="block text-sm font-normal text-ink-soft">{row.hint}</span> : null}
-                  {anyEditable && !canEdit.has(row.key) ? (
+                  {!perRep && row.scope !== "org" ? (
+                    <span className="block text-sm font-normal text-ink-soft">לא כלול בחבילה הנוכחית</span>
+                  ) : anyEditable && !canEdit.has(row.key) ? (
                     <span className="block text-sm font-normal text-ink-soft">את היעד הזה קובעים בעלים ומנהלי מערכת</span>
                   ) : null}
                 </th>

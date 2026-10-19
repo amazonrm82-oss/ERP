@@ -1,6 +1,6 @@
 import "server-only";
 
-import { listMembers, listTeams } from "@/features/settings/queries";
+import { listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import type { OrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
@@ -44,7 +44,10 @@ export type GoalsGrid = {
   // the rows the caller may change (keys): every row for owners and admins, the teams a
   // manager manages and their people (not themselves); none while the business is read only.
   // The database decides either way (goals policies, app.goals_manager_may_write).
+  // Without the plan key goals_per_rep only the business row is editable (RVW-22).
   editable: string[];
+  // whether the plan holds goals per rep and per team (goals_per_rep; the trigger goals_per_rep decides)
+  perRep: boolean;
 };
 
 async function managerScope(orgId: string, userId: string): Promise<{ teams: Set<string>; people: Set<string> }> {
@@ -69,11 +72,12 @@ export async function getGoalsGrid(context: OrgContext, view: GoalView): Promise
   const orgId = context.org.id;
   const columns = goalColumns(view.period, view.year);
   const isAdmin = context.role === "owner" || context.role === "admin";
-  const [members, teams, values, scope] = await Promise.all([
+  const [members, teams, values, scope, perRep] = await Promise.all([
     listMembers(orgId),
     listTeams(orgId),
     readGoals(orgId, view, columns[0].start, columns[columns.length - 1].start),
     context.role === "manager" ? managerScope(orgId, context.user.id) : Promise.resolve(null),
+    orgHasFeature(orgId, "goals_per_rep"),
   ]);
 
   const people = members
@@ -94,9 +98,10 @@ export async function getGoalsGrid(context: OrgContext, view: GoalView): Promise
   // (never an owner, an admin or another manager), the rule of app.goals_manager_may_write
   const roleOf = new Map(members.map((m) => [m.userId, m.role]));
   const mayWrite = (row: GoalGridRow) =>
-    isAdmin ||
+    (perRep || row.scope === "org") &&
+    (isAdmin ||
     (scope !== null &&
-      ((row.scope === "team" && scope.teams.has(row.subjectId ?? "")) || (row.scope === "user" && scope.people.has(row.subjectId ?? "") && roleOf.get(row.subjectId ?? "") === "member")));
+      ((row.scope === "team" && scope.teams.has(row.subjectId ?? "")) || (row.scope === "user" && scope.people.has(row.subjectId ?? "") && roleOf.get(row.subjectId ?? "") === "member"))));
   const withGoals = new Set(values.map(rowKey));
   const rows = isAdmin
     ? all
@@ -104,5 +109,5 @@ export async function getGoalsGrid(context: OrgContext, view: GoalView): Promise
         (row) => row.scope === "org" || (row.scope === "user" && row.subjectId === context.user.id) || withGoals.has(row.key) || mayWrite(row),
       );
 
-  return { columns, rows, values, editable: context.canWrite ? rows.filter(mayWrite).map((r) => r.key) : [] };
+  return { columns, rows, values, editable: context.canWrite ? rows.filter(mayWrite).map((r) => r.key) : [], perRep };
 }

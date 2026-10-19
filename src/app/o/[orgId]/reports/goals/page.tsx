@@ -7,6 +7,7 @@ import { defaultCopyTarget, goalColumns, goalView, previousStart, type GoalValue
 import { goalMetric, GOAL_PERIOD_LABELS } from "@/features/goals/metrics";
 import { getGoalsGrid } from "@/features/goals/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { planHintMessage } from "@/lib/errors";
 import { zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
@@ -14,10 +15,12 @@ import { firstParam } from "@/lib/search";
 export const metadata: Metadata = { title: "יעדים" };
 
 /** What the person can do here, in one line. */
-function accessNote(role: string, canWrite: boolean, anyEditable: boolean): string {
+function accessNote(role: string, canWrite: boolean, anyEditable: boolean, perRep: boolean): string {
   if (!canWrite && (role === "owner" || role === "admin" || role === "manager")) return "העסק במצב קריאה בלבד, ולכן אי אפשר לשנות יעדים.";
   if (role === "owner" || role === "admin") return "הקלידו יעד בתא. תא ריק הוא בלי יעד.";
   if (role === "manager") {
+    // without goals_per_rep a manager has no row to set: the plan, not the team, is the reason (RVW-22)
+    if (!perRep) return "היעד של כל העסק נקבע על ידי בעלי העסק ומנהלי המערכת.";
     return anyEditable
       ? "אפשר לקבוע יעדים לצוותים שאתם מנהלים ולנציגים בהם. את שאר היעדים, כולל של מנהלים, קובעים בעלי העסק ומנהלי המערכת."
       : "אתם לא מנהלים צוות כרגע, ולכן היעדים כאן לצפייה. בעלי העסק ומנהלי המערכת קובעים אותם.";
@@ -69,7 +72,8 @@ export default async function GoalsPage({ params, searchParams }: Props) {
         back={{ href: paths.reports(orgId), label: "דוחות" }}
       />
       <GoalsFilters metric={view.metric} period={view.period} year={view.year} years={years} />
-      <p className="mb-4 text-md text-ink-soft">{accessNote(context.role, context.canWrite, grid.editable.length > 0)}</p>
+      <p className="mb-4 text-md text-ink-soft">{accessNote(context.role, context.canWrite, grid.editable.length > 0, grid.perRep)}</p>
+      {grid.perRep ? null : <p className="mb-4 rounded-md border border-line bg-canvas px-3 py-2.5 text-md text-ink-soft">{planHintMessage("feature:goals_per_rep")}</p>}
       <GoalsPanel
         gridKey={gridKey(view, grid.values)}
         orgId={orgId}
@@ -79,6 +83,7 @@ export default async function GoalsPage({ params, searchParams }: Props) {
         rows={grid.rows}
         values={grid.values}
         editable={grid.editable}
+        perRep={grid.perRep}
         copyTarget={defaultCopyTarget(grid.columns, view.period, today)}
         previousLabels={previousLabels}
       />
