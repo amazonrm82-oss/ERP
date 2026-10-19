@@ -837,7 +837,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020345, `app.audit_erase_core` in 020370).
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020390, `app.audit_erase_core` in 020370).
 - Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
   execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
   `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
@@ -850,6 +850,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quotes_version_guard`: the chain is set on insert only, same deal and contact, from a sent quote (`quote_version:not_sent|parent|fixed`),
   and a quote that left draft never returns to it, for every writer (`quote:no_redraft`). `public.quote_public` (last redefined in
   020345) walks the chain to the newest open version with a live link of its own and adds `replaced {number}`.
+- Quote views (QUO-10, migration 020390; owner 18 October 2026): `public.quote_views` (one row per quote: first, last, count; server
+  writes only; select follows the quote). `app.quote_mark_viewed` (definer, no grants), called by `public.quote_public` (last redefined
+  in 020390) after the rate limit and the chain walk, counts the view, moves sent → viewed once and sends kind `quote_viewed` (in both
+  kind constraints) to the quote's active owner, number and title only.
 - Quote decisions (QUO-09, migration 020370; owner 18 October 2026): `public.quote_decisions` (one per quote, owners/admins read, no client
   writes, not audited) keeps the signer's name, optional ID, drawn PNG or typed signature, wording version (DRAFT), the SHA-256 of the
   version shown (`app.quote_fingerprint`), full IP and user agent, or a decline reason. `public.quote_public_decide` (service_role) decides
