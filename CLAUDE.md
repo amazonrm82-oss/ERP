@@ -877,7 +877,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Quote notices (RVW-34, migration 020455): every notice about a quote (accepted/declined, viewed, expired) goes to
   `app.quote_notice_recipients(quote)` (definer, no grants): the quote's owner while active, else the deal's owner, else (no deal
   only) the contact's owner, each active and not a viewer, else the active owners and admins. `public.quote_public_decide`,
-  `app.quote_mark_viewed` and `app.expire_quotes` were last redefined in 020455.
+  `app.quote_mark_viewed` and `app.expire_quotes` were last redefined in 020455 (`quote_public_decide` again in 020485).
 - Quote views (QUO-10, migration 020390; owner 18 October 2026): `public.quote_views` (one row per quote: first, last, count; server
   writes only; select follows the quote). `app.quote_mark_viewed` (definer, no grants), called by `public.quote_public` (last redefined
   in 020390) after the rate limit and the chain walk, counts the view, moves sent → viewed once and sends kind `quote_viewed` (in both
@@ -899,6 +899,13 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   accepted, not itself an addendum, same deal and contact, a version carries its previous quote's `addendum_of`, never moved (hints
   `quote_addendum:*`). `public.quote_new_version` and `public.quote_public` were last redefined in 020430 (`addendum`, `addenda`:
   accepted addenda only, number/title/total).
+- Accepted quote and its deal (QUO-13 part one, migrations 020480 pasted by hand, 020485): `org_document_settings.quote_accept_deal`
+  auto | ask | none (default ask, column grants). `app.quote_accept_deal(quote)` (definer, no grants), called by
+  `public.quote_public_decide` (last redefined in 020485) in an exception block, so the decision never fails: auto replaces the
+  deal's lines (`app.quote_deal_lines_replace`, the pasted file, holds the only delete) and moves the open deal to the first won
+  stage; ask returns the question for the notice. `public.quote_win_deal(..., p_columns)` (INVOKER) is the won window's save for an
+  accepted quote: lines and move in one transaction, `p_columns` limited to expected_close_date (YYYY-MM-DD) and contact_id (hint
+  `quote_win:columns`). Addenda never touch the deal.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
