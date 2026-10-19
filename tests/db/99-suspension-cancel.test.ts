@@ -50,14 +50,15 @@ const notices = (org: string, userId: string) =>
     async (q) =>
       (
         await q<{ title: string }>(
-          "select title from public.notifications where organization_id = $1 and user_id = $2 and type = 'system' and title like 'בעוד % ימים החשבון של %' order by created_at, id",
+          "select title from public.notifications where organization_id = $1 and user_id = $2 and type = 'system' and title like 'הגישה לעסק סגורה. בעוד % ימים המנוי יבוטל.%' order by created_at, id",
           [org, userId],
         )
       ).rows.map((r) => r.title),
   );
 
-const notice = (days: number, name: string) =>
-  `בעוד ${days} ימים החשבון של ${name} ייסגר, המידע יימחק והטפסים באתר יפסיקו לקלוט פניות. כדי להמשיך, חדשו את המנוי.`;
+// the owner's wording (19 October 2026, RVW-24): no business name, nothing about deleting
+const notice = (days: number) =>
+  `הגישה לעסק סגורה. בעוד ${days} ימים המנוי יבוטל. לחידוש: בחירת חבילה ותשלום. אפשר להוריד את הנתונים שלכם בכל עת.`;
 
 const iso = (d: Date) => d.toISOString();
 const plusDays = (d: Date, days: number) => new Date(d.getTime() + days * 86_400_000);
@@ -118,12 +119,12 @@ describe("cancelled 90 days after suspension (OFF by default)", () => {
     // 14 days before, then again the next day: one notice
     await run(org, iso(plusDays(cancelAt, -13.9)));
     await run(org, iso(plusDays(cancelAt, -12.9)));
-    expect(await notices(org, owner.id)).toEqual([notice(14, "עסק on")]);
+    expect(await notices(org, owner.id)).toEqual([notice(14)]);
     // 3 days before, twice
     await run(org, iso(plusDays(cancelAt, -2.9)));
     await run(org, iso(plusDays(cancelAt, -2.5)));
     const sent = await notices(org, owner.id);
-    expect(sent).toEqual([notice(14, "עסק on"), notice(3, "עסק on")]);
+    expect(sent).toEqual([notice(14), notice(3)]);
     expect((await suspension(org)).cancel_at).toEqual(cancelAt);
     // the notice leads to the plan page and carries nothing else
     const row = await asAdmin(
@@ -154,7 +155,7 @@ describe("cancelled 90 days after suspension (OFF by default)", () => {
     expect(cancelAt.getTime()).toBeGreaterThanOrEqual(plusDays(now, 14).getTime());
     // the job missed days: 3 days before only the most urgent notice goes out, and the day holds
     await run(org, iso(plusDays(cancelAt, -2.9)));
-    expect(await notices(org, owner.id)).toEqual([notice(3, "עסק old")]);
+    expect(await notices(org, owner.id)).toEqual([notice(3)]);
     expect((await suspension(org)).cancel_at).toEqual(cancelAt);
     await run(org, iso(plusDays(cancelAt, 0.01)));
     expect(await statusOf(org)).toBe("cancelled");
@@ -169,7 +170,7 @@ describe("cancelled 90 days after suspension (OFF by default)", () => {
     expect(await statusOf(org)).toBe("suspended");
     const moved = (await suspension(org)).cancel_at as Date;
     expect(moved.getTime()).toBeGreaterThan(plusDays(cancelAt, 2.5).getTime());
-    expect(await notices(org, owner.id)).toEqual([notice(3, "עסק late")]);
+    expect(await notices(org, owner.id)).toEqual([notice(3)]);
     await run(org, iso(plusDays(moved, -0.5)));
     expect(await statusOf(org)).toBe("suspended");
     await run(org, iso(plusDays(moved, 0.01)));
