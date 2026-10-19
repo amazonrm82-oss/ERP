@@ -69,3 +69,13 @@ export function quoteWinResult(answer: unknown, dealId: string): { deal: string;
   if (typeof deal !== "string" || deal !== dealId || typeof lines !== "string") return null;
   return { deal, linesHint: lines === "updated" ? null : lines };
 }
+
+/** QUO-13: the mark beside a deal amount that is an accepted quote's total. */
+export function quoteAmountMark(numberDisplay: string | null): string {
+  return numberDisplay ? `(לפי הצעה מס' ${numberDisplay})` : "(לפי הצעה)";
+}
+
+/** QUO-13: the won window's hint under an amount prefilled with the quote's total. */
+export function quoteAmountHint(numberDisplay: string | null): string {
+  return `סה"כ ההצעה לפני מע"מ ${quoteAmountMark(numberDisplay)}. סכום אחר יישמר בלי הסימון.`;
+}

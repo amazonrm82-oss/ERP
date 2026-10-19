@@ -361,7 +361,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto, amount_quote_id",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)

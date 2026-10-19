@@ -55,6 +55,8 @@ import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
+import { quoteAmountMark } from "@/features/quotes/accept-deal";
+import { getQuoteNumberDisplay } from "@/features/quotes/queries";
 import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 
@@ -152,6 +154,8 @@ export default async function DealPage({ params, searchParams }: Props) {
   const lossReason = lossReasons.find((reason) => reason.id === deal.lost_reason_id) ?? null;
   const lossOptions = activeLossReasons(lossReasons);
 
+  // QUO-13: the amount is an accepted quote's total (deals.amount_quote_id): its number, as the caller reads it
+  const amountQuote = deal.amount_quote_id ? await getQuoteNumberDisplay(orgId, deal.amount_quote_id) : undefined;
   return (
     <>
       {/* GAP-11: the card on paper (business name, printed at; the screen tools are left out) */}
@@ -296,6 +300,7 @@ export default async function DealPage({ params, searchParams }: Props) {
               amountInput: amount === 0 && !deal.billing_kind ? "" : agorotInput(amount),
               amountAuto: deal.amount_auto === true,
               amountSource: deal.amount_source,
+              amountQuoteMark: amountQuote === undefined ? null : quoteAmountMark(amountQuote),
               expectedCloseDate: deal.expected_close_date,
               expectedCloseText: deal.expected_close_date ? formatDate(deal.expected_close_date) : null,
               recurring: {

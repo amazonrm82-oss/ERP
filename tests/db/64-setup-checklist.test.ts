@@ -481,6 +481,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_notice_recipients.sql",
       // QUO-13 redefines public.quote_public_decide() last (the deal of an accepted quote)
       "_quote_accept_deal.sql",
+      // QUO-13 (owner's answers) redefines app.quote_accept_deal() and public.quote_win_deal() last (the quote's amount)
+      "_quote_deal_amount.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

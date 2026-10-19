@@ -572,3 +572,10 @@ export async function getDealOpen(orgId: string, dealId: string | null): Promise
   );
   return row !== null && row.status === "open" && row.deleted_at === null;
 }
+
+/** QUO-13: a quote's number for the deal's amount mark; undefined when the caller may not read the quote. */
+export async function getQuoteNumberDisplay(orgId: string, quoteId: string): Promise<string | null | undefined> {
+  const supabase = await createClient();
+  const row = must(await supabase.from("quotes").select("number_display").eq("organization_id", orgId).eq("id", quoteId).maybeSingle(), "quote number");
+  return row ? row.number_display : undefined;
+}

@@ -47,6 +47,8 @@ export type DealDetailsView = {
   // DEAL-07: the value is computed (deals.amount_auto); DLI-03: from the lines or the first year
   amountAuto: boolean;
   amountSource: string | null;
+  // QUO-13: the amount is an accepted quote's total: "(לפי הצעה מס' X)" (deals.amount_quote_id), else null
+  amountQuoteMark?: string | null;
   expectedCloseDate: string | null;
   expectedCloseText: string | null;
   // DEAL-07: recurring revenue (kind null = one-time); texts formatted on the server
@@ -92,7 +94,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
   const [notice, setNotice] = useState<string | null>(null);
   useEditFocus("deal-details-title", focus, editing);
-  const note = dealValueNote(deal.amountAuto, deal.amountSource);
+  const note = deal.amountQuoteMark ?? dealValueNote(deal.amountAuto, deal.amountSource);
 
   if (editing) {
     return (

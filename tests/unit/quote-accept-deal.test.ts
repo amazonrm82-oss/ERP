@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { linesKeptText, offersDealMove, quoteWinResult, QUOTE_ACCEPT_DEAL_DEFAULT, QUOTE_ACCEPT_DEAL_MODES, QUOTE_ACCEPT_DEAL_OPTIONS, quoteAcceptDealOf } from "@/features/quotes/accept-deal";
+import { linesKeptText, offersDealMove, quoteAmountHint, quoteAmountMark, quoteWinResult, QUOTE_ACCEPT_DEAL_DEFAULT, QUOTE_ACCEPT_DEAL_MODES, QUOTE_ACCEPT_DEAL_OPTIONS, quoteAcceptDealOf } from "@/features/quotes/accept-deal";
 
 describe("QUO-13: what an accepted quote does to its deal", () => {
   it("the modes and the default match the migration's check and default", () => {
@@ -48,5 +48,12 @@ describe("QUO-13: what an accepted quote does to its deal", () => {
     expect(quoteWinResult({ lines: "updated" }, deal)).toBeNull();
     expect(quoteWinResult(null, deal)).toBeNull();
     expect(quoteWinResult([deal], deal)).toBeNull();
+  });
+
+  it("the deal amount's mark names the quote (owner, 19 October 2026)", () => {
+    expect(quoteAmountMark("Q-1001")).toBe("(לפי הצעה מס' Q-1001)");
+    expect(quoteAmountMark(null)).toBe("(לפי הצעה)");
+    expect(quoteAmountHint("Q-1001")).toContain("לפני מע\"מ");
+    expect(quoteAmountHint("Q-1001")).toContain("(לפי הצעה מס' Q-1001)");
   });
 });

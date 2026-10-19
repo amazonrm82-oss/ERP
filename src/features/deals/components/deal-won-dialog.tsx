@@ -29,7 +29,8 @@ import {
 import { OldCloseDateQuestion, useOldCloseDate } from "./old-close-date";
 
 // the deal that is about to be won, and the won stage it goes to
-export type WonTarget = { dealId: string; dealName: string; stageId: string; stageName: string; amountAgorot: number; ownerId: string | null };
+// amountHint (QUO-13): what the prefilled amount is, e.g. an accepted quote's total
+export type WonTarget = { dealId: string; dealName: string; stageId: string; stageName: string; amountAgorot: number; ownerId: string | null; amountHint?: string };
 
 export type { CloseWindowSetup };
 
@@ -172,8 +173,8 @@ function WonForm({
         inputMode="decimal"
         autoComplete="off"
         autoFocus
-        defaultValue={values?.amount ?? (quoteId ? "" : amountInputValue(target.amountAgorot))}
-        hint={quoteId ? "ריק: הסכום יחושב מהשורות של ההצעה." : undefined}
+        defaultValue={values?.amount ?? amountInputValue(target.amountAgorot)}
+        hint={target.amountHint}
         error={errors.amount}
       />
       <DateField

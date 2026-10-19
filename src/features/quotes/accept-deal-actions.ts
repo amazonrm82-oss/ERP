@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { QUOTE_ACCEPT_DEAL_FIELD_NAMES, quoteAcceptDealSchema } from "./accept-deal";
+import { QUOTE_ACCEPT_DEAL_FIELD_NAMES, quoteAcceptDealSchema, quoteAmountHint } from "./accept-deal";
 import { quoteDesignPath } from "./paths";
 
 const NOT_ADMIN = "רק בעלים ומנהלי מערכת יכולים לשנות את ההגדרה.";
@@ -48,7 +48,12 @@ export async function quoteDealMoveTargetAction(orgId: string, quoteId: string):
   const context = await actionContext(orgId, quoteId);
   if (!context.ok) return context;
   const { supabase } = context;
-  const quote = await supabase.from("quotes").select("deal_id, status").eq("organization_id", orgId).eq("id", quoteId).maybeSingle();
+  const quote = await supabase
+    .from("quotes")
+    .select("deal_id, status, net_total_agorot, number_display")
+    .eq("organization_id", orgId)
+    .eq("id", quoteId)
+    .maybeSingle();
   if (quote.error) return fail(dbErrorMessage(quote.error));
   const dealId = quote.data?.deal_id;
   if (!dealId || quote.data?.status !== "accepted") return fail("להצעה הזו אין עסקה פתוחה לעדכן.");
@@ -79,7 +84,9 @@ export async function quoteDealMoveTargetAction(orgId: string, quoteId: string):
     dealName: deal.data.name,
     stageId: stage.data.id,
     stageName: stage.data.name,
-    amountAgorot: deal.data.amount_agorot ?? 0,
+    // QUO-13 (owner, 19 October 2026): the deal's amount is the quote's total before VAT, after its document discount
+    amountAgorot: quote.data.net_total_agorot,
+    amountHint: quoteAmountHint(quote.data.number_display),
     ownerId: deal.data.owner_id,
   });
 }

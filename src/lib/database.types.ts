@@ -1917,6 +1917,8 @@ export type DealRow = {
   amount_source: string | null;
   // DLI-03: true while the recurring amount follows the product lines; set by trigger only
   recurring_amount_auto: boolean | null;
+  // QUO-13: the accepted quote whose total the amount is; kept by trigger deals_amount_quote only while true
+  amount_quote_id: string | null;
   // IMP-03: the import that created the deal; set on insert only (deals_import_tag)
   import_job_id: string | null;
   created_by: string | null;
