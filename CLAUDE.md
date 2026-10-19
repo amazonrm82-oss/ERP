@@ -1156,6 +1156,15 @@ that back.
   One exception (owner, 14 October 2026, LEAD-05): lead score rules. New organizations are seeded; an existing organization with no
   rules gets an "add the suggested rules" button with a warning, because adding rules rescores all its leads (a bulk change
   that must not happen behind its back in a migration).
+- Business terms (FLD-10 part one, migration 020435; owner 18 October 2026, answer (א)): `public.org_terms` (one row per org;
+  `contact_term`, `lead_term`, `deal_term` null = today's word, else a key from the closed lists mirrored by
+  `src/features/terminology/terms.ts`, which holds every Hebrew form by hand; members read, owners/admins of a writable org write,
+  no delete, audited). Read with `getOrgTerms(orgId)` (separate from org_context; falls back to today's words); `recordTypeNames(type,
+  terms)` in record-types.ts. Used in the nav, the + menu, the three lists, "new" pages and waiting leads; record pages, reports,
+  imports and DB-written notifications still use today's words (part two).
+- Saving a one-row-per-org settings table whose UPDATE is column-granted: update and select back, insert only when 0 rows, retry
+  the update once on 23505. Never PostgREST `.upsert(..., {onConflict})`: its `DO UPDATE SET` names `organization_id`, which has no
+  UPDATE grant, so it fails with 42501 (FLD-10 review, QUO-05).
 - Record types (FXC-06): `src/lib/record-types.ts` (`RECORD_TYPES`, `isRecordType`, `recordPage`) says each
   type's table, pages, Hebrew names and features. Use it instead of a local map; a new type is added there.
 - Server Action arguments that are not FormData and not ids (actionContext checks ids) are checked with
