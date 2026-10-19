@@ -1,11 +1,10 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
-
 import { brandPalette, DEFAULT_PICKER_COLOR } from "@/features/branding/color";
 import { parseAttribution } from "@/features/intake/attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD } from "@/features/intake/fields";
 import type { Json } from "@/lib/database.types";
+import { clientIp, keyedIpHash as keyedHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { isWidgetToken, widgetFormPath } from "./paths";
@@ -26,26 +25,9 @@ const SCRIPT_CACHE = "public, max-age=300, s-maxage=300";
 
 export type PublicWidgetState = PublicWidget | "not-found" | "rate-limited" | "not-configured";
 
-/** The sender's address from the proxy's headers (Vercel sets x-forwarded-for). */
-export function clientIp(headers: Headers): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || headers.get("x-real-ip") || null;
-}
-
-/**
- * FXS-11: the sender's IP only as a keyed hash with INTAKE_IP_HASH_SECRET, for the rate limits; without the secret no
- * hash is kept and the error is logged (no fallback to a plain hash). The database scopes it to the widget
- * (app.site_widget_sender), so one visitor is a different sender on every widget.
- */
-function keyedIpHash(ip: string | null): string | null {
-  if (!ip) return null;
-  const secret = process.env.INTAKE_IP_HASH_SECRET;
-  if (!secret) {
-    console.error("[SPD-07 widget] INTAKE_IP_HASH_SECRET is not set: no IP hash kept, only the per-form limit applies");
-    return null;
-  }
-  return createHmac("sha256", secret).update(`widget:${ip}`).digest("hex");
-}
+// FXS-11: the sender's IP as a keyed hash (src/lib/keyed-ip-hash.ts, scope "widget", the value this page always used);
+// the database scopes it further per widget (app.site_widget_sender), so one visitor is a different sender on every widget
+const keyedIpHash = (ip: string | null) => keyedHash(ip, "widget");
 
 /** The widget behind a token; with an address the view counts (60 per sender in 10 minutes). */
 export async function getPublicWidget(token: string, ip: string | null): Promise<PublicWidgetState> {

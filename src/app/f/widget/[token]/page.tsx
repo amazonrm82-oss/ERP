@@ -5,7 +5,8 @@ import { AccessibilityLink } from "@/components/accessibility-link";
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PublicWidgetForm } from "@/features/site-widgets/components/public-widget-form";
-import { clientIp, getPublicWidget } from "@/features/site-widgets/public-server";
+import { getPublicWidget } from "@/features/site-widgets/public-server";
+import { clientIp } from "@/lib/keyed-ip-hash";
 
 export const metadata: Metadata = { title: "השאירו פרטים", robots: { index: false, follow: false } };
 
