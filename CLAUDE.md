@@ -738,7 +738,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   effective value as a snapshot). Terms and `paymentDueDate()` in `src/features/billing/terms.ts`. `leads.requested_product_id`
   (composite FK set null, column grants): trigger `leads_requested_product_check` (invoker, person writes; non-members go to RLS)
   needs an offerable product and the `products` flag; sort field `sort_requested_product`. Owner: billing is core (no plan key,
-  `PLAN_CAPABILITIES` `core`); neither is in merge picks yet (shared-ground follow-up).
+  `PLAN_CAPABILITIES` `core`); both are merge picks since 020560 (RVW-26).
   Since 0179 the due date is `app.payment_due_date(date, terms, days)` (immutable, Gregorian, no rest-day skip; 22023 hint
   `payment_terms:invalid`), mirrored by `paymentDueDate()` (test 105 compares them day by day); shortcuts and wording per owner.
 - Recurring revenue (DEAL-07, migration 0181; owner: core, no plan key): nullable `deals.billing_kind` (null = one-time, monthly|
@@ -1076,6 +1076,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
 - Merge (migration 0020): `public.merge_records(org, type, keep, merge, picks)`; pickable columns are
   listed in `app.merge_columns()` and mirrored in `src/features/merge/fields.ts`. A new table that
   references leads, contacts or companies must be added to `app.merge_move_links()`.
+  Since 020560 (RVW-26) picks are written in one update and judged first by `app.merge_pick_check` (a person's rules for type_id,
+  requested_product_id, company tax_id/country; channel source only with its channel); the duplicate's delete lives in
+  `app.merge_delete_duplicate` (020555, pasted by hand, no grants). `public.merge_records` and `app.merge_columns` were last redefined in 020560.
 - Schema app (RVW-15, migration 0089): every table in schema `app` has RLS enabled, with no policies and not forced;
   clients have no grants, and the security definer functions owned by the table owner bypass it. A new app table enables
   RLS too, and no security invoker function may read an app table (`tests/db/01-schema-guards.test.ts` enforces both).
