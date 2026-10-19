@@ -837,7 +837,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020420, `app.audit_erase_core` in 020370).
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020430, `app.audit_erase_core` in 020370).
 - Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
   execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
   `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
@@ -875,6 +875,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quote_decisions.decided_at` for owners/admins, else from the `quote_accepted` timeline entry; open value = sent/viewed and not past
   validity in the org zone, the current state. Report key `quotes` (`public.log_export`, last redefined in 020425, refuses it without
   the `quotes` flag). A report definition may carry `feature`: the index, the page and the export hide it without that flag.
+- Quote addenda (GAP-10, migration 020430): `quotes.addendum_of` (composite FK set null, server-only) points at an accepted quote;
+  `public.quote_new_addendum(org, quote)` (definer, `app.quote_editable`, flag `quotes`) makes an empty draft on the same deal and
+  contact. Definer trigger `quotes_zz_addendum_guard` (named to fire after `quotes_check`) is the only place the rules live: original
+  accepted, not itself an addendum, same deal and contact, a version carries its previous quote's `addendum_of`, never moved (hints
+  `quote_addendum:*`). `public.quote_new_version` and `public.quote_public` were last redefined in 020430 (`addendum`, `addenda`:
+  accepted addenda only, number/title/total).
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
