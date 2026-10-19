@@ -92,6 +92,8 @@ and build this CRM here instead. The old code is preserved on the branch
    `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
    In use (QUO-08 part one, owner 8 October 2026, migration 020290): the customer's quote page (`src/features/quotes/public-server.ts`,
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
+   In use (QUO-09, owner 18 October 2026, migration 020370): the customer's accept/decline (`src/features/quotes/public-server.ts`, route
+   `POST /api/forms/quote/<token>/decide`), which calls only `public.quote_public_decide()` and `public.quote_public_version()`.
    In use (BIZ-03 part one, owner 13 October 2026, migration 020295): the QR scan route (`src/features/qr-codes/scan-server.ts`, route
    `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>` or `/f/book/<token>`; in the eslint allow-list.
    In use (SPD-07, owner 13 October 2026, migration 020305): the site widget (`src/features/site-widgets/public-server.ts`; script
@@ -614,7 +616,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020320 (QUO-07 follow-up), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020105 (QUO-01), `app.audit_erase_core` in 020370 (QUO-09), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -835,7 +837,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
   `quote_send`'s FOR UPDATE). `quote_send` refuses a schedule that is not exactly 100% (`quote:schedule_total`); `quote_public` adds
-  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020345, `app.audit_erase_core` in 020320).
+  `schedule` via `app.quote_schedule` (cumulative half-up shares, = `scheduleAmounts()`). `public.quote_send` was last redefined in 020310 (`public.quote_public` in 020345, `app.audit_erase_core` in 020370).
 - Quote timeline (QUO-16, migration 020335; owner 18 October 2026): trigger `quotes_timeline` (`app.quote_timeline_entry`, definer, no
   execute for any role) writes one activity per status change to sent/accepted/rejected on the quote's deal and contact: "sent" is a
   `note` by the sender (counts as contact through the existing rule), accepted/rejected are `system`; `metadata.kind` = quote_*, number
@@ -848,6 +850,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quotes_version_guard`: the chain is set on insert only, same deal and contact, from a sent quote (`quote_version:not_sent|parent|fixed`),
   and a quote that left draft never returns to it, for every writer (`quote:no_redraft`). `public.quote_public` (last redefined in
   020345) walks the chain to the newest open version with a live link of its own and adds `replaced {number}`.
+- Quote decisions (QUO-09, migration 020370; owner 18 October 2026): `public.quote_decisions` (one per quote, owners/admins read, no client
+  writes, not audited) keeps the signer's name, optional ID, drawn PNG or typed signature, wording version (DRAFT), the SHA-256 of the
+  version shown (`app.quote_fingerprint`), full IP and user agent, or a decline reason. `public.quote_public_decide` (service_role) decides
+  once on the version the page shows (`app.quote_shown_version`, the rule of `quote_public`'s chain walk: keep the two in step), refuses a
+  changed fingerprint, 10 tries per 10 minutes plus the view window, notifies the quote's owner with kind `quote`. Erasure empties the
+  personal fields (`app.audit_erase_core`, last redefined in 020370).
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
