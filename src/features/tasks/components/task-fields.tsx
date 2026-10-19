@@ -19,8 +19,8 @@ export type TaskValues = {
   priority?: string | null;
 } & RepeatValues;
 
-// the four codes a task stores (task_type), under their built-in names; the table, filters, export and calendar still
-// show these (TASK-08 part one names tasks by the business's types in the task list and its forms)
+// the four codes a task stores (task_type), under their built-in names: the filter on the code, and the fallback of
+// taskTypeName() (TASK-08: the table, its export and the calendar show the business's own type, hidden ones too)
 export const TASK_TYPE_OPTIONS = [
   { value: "todo", label: "משימה" },
   { value: "call", label: "שיחה" },

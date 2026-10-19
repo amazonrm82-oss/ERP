@@ -1,12 +1,14 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { isActivityBase, isActivityTypeIcon, type ActivityTypeOption } from "./types";
 
-/** TASK-08: the business's activity and task types, in the list's order, hidden ones included (members read). */
-export async function listActivityTypes(orgId: string): Promise<ActivityTypeOption[]> {
+/** TASK-08: the business's activity and task types, in the list's order, hidden ones included (members read). Read once per request. */
+export const listActivityTypes = cache(async (orgId: string): Promise<ActivityTypeOption[]> => {
   const supabase = await createClient();
   const rows =
     must(
@@ -23,4 +25,4 @@ export async function listActivityTypes(orgId: string): Promise<ActivityTypeOpti
       ? [{ id: row.id, baseType: row.base_type, name: row.name, icon: isActivityTypeIcon(row.icon) ? row.icon : null, key: row.key, isActive: row.is_active }]
       : [],
   );
-}
+});

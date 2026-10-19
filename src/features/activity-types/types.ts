@@ -220,3 +220,30 @@ export function taskKindLabel(task: TaskKind, types: ReadonlyArray<ActivityTypeO
   if (task.taskType === "call" || task.taskType === "meeting") return types.find((type) => type.key === task.taskType)?.name ?? TASK_CODE_LABELS[task.taskType];
   return TASK_CODE_LABELS[task.taskType] ?? null;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// TASK-08 follow-ups: the tasks table, its export and the calendar; the one-step call and WhatsApp logs
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * A task's type as the tasks table, its export and the calendar name it: the business's own type while it is in the list,
+ * hidden ones too (owner's decision, like hidden contact types); else (no type, or a deleted one) today's built-in name of
+ * the code the task stores.
+ */
+export function taskTypeName(task: TaskKind, types: ReadonlyArray<ActivityTypeOption>): string {
+  if (task.activityTypeId) {
+    const own = types.find((type) => type.id === task.activityTypeId);
+    if (own) return own.name;
+  }
+  return TASK_CODE_LABELS[task.taskType] ?? task.taskType;
+}
+
+/**
+ * The type a one-step log (the call button, the WhatsApp button) records: the business's active seeded default of that
+ * kind (key = the kind), else its first active type of that kind in the list's order, else none (the entry is logged
+ * with its kind alone). `types` in the list's order.
+ */
+export function quickLogTypeId(base: ActivityBase, types: ReadonlyArray<Pick<ActivityTypeOption, "id" | "baseType" | "key" | "isActive">>): string | null {
+  const active = types.filter((type) => type.isActive && type.baseType === base);
+  return (active.find((type) => type.key === base) ?? active[0])?.id ?? null;
+}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { quickLogType, typeRefused } from "@/features/activity-types/quick-log";
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, invalid, formValues, ok, type ActionResult, type FormState } from "@/lib/action-result";
@@ -130,9 +131,15 @@ export async function logCallAction(orgId: string, subject: TimelineSubject, rec
   }
   const column = SUBJECT_COLUMN[parsedSubject.data.kind];
 
-  const activity: ActivityInsert = { organization_id: orgId, type: "call", body: parsed.data.body, metadata: { outcome: parsed.data.outcome } };
+  // TASK-08: the business's call type (its seeded default, else its first active one), when it has one
+  const typeId = await quickLogType(context.supabase, orgId, "call");
+  const activity: ActivityInsert = { organization_id: orgId, type: "call", body: parsed.data.body, metadata: { outcome: parsed.data.outcome }, activity_type_id: typeId };
   activity[column] = parsedSubject.data.id;
-  const { error } = await context.supabase.from("activities").insert(activity);
+  let { error } = await context.supabase.from("activities").insert(activity);
+  if (error && typeId && typeRefused(error)) {
+    // the type was hidden or removed meanwhile: log the call with its kind alone
+    ({ error } = await context.supabase.from("activities").insert({ ...activity, activity_type_id: null }));
+  }
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את השיחה. נסו שוב."), { values: formValues(formData) });
   }

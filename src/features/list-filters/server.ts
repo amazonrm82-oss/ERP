@@ -51,6 +51,8 @@ type Lookups = {
   stages?: Option[];
   // contacts and companies: the organization's types (CON-02)
   types?: Option[];
+  // tasks: the business's activity and task types (TASK-08), hidden ones too
+  activityTypes?: Option[];
   // contacts: the live companies, for the primary company (CON-05)
   companies?: Option[];
   // products (LST-09): the catalog's categories (with their parent) and units of measure
@@ -152,6 +154,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
     task: [
       text("title", "כותרת", "title"),
       { key: "type", label: "סוג", kind: "select", column: "task_type", plain: true, options: TASK_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })) },
+      // TASK-08: the business's own type of the task (activity_type_id); the code above stays for every task
+      { key: "activity_type", label: "סוג מהרשימה", kind: "select", column: "activity_type_id", options: lookups.activityTypes ?? [] },
       {
         key: "status",
         label: "מצב",

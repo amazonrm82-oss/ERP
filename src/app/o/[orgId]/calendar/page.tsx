@@ -29,6 +29,8 @@ import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { parsePeople, pickPeople, PEOPLE_MAX, teammatesOf, teamPeople, visibleTeams } from "@/features/calendar/team";
 import { holidaysByDay } from "@/features/calendar-days/holidays";
 import { listMeetingTypeChoices } from "@/features/meeting-types/queries";
+import { listActivityTypes } from "@/features/activity-types/queries";
+import { taskTypeName, type ActivityTypeOption } from "@/features/activity-types/types";
 import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 import { MEETING_STATUS_LABEL, MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { PrintAgenda } from "@/features/print/components/print-agenda";
@@ -36,7 +38,6 @@ import { PrintButton } from "@/features/print/components/print-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
-import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { formatNumber, zoneDate } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
 import { firstParam } from "@/lib/search";
@@ -48,11 +49,10 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const TASK_TYPE_LABEL: Record<string, string> = Object.fromEntries(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 const TASK_STATUS_LABEL: Record<string, string> = { open: "פתוחה", done: "בוצעה" };
 const RELATED_LABEL = { lead: "פתיחת הליד", contact: "פתיחת איש הקשר", company: "פתיחת החברה", deal: "פתיחת העסקה" } as const;
 
-function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<string, MeetingTypeChoice>): CalendarEntry {
+function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<string, MeetingTypeChoice>, activityTypes: ReadonlyArray<ActivityTypeOption>): CalendarEntry {
   const meeting = item.kind === "meeting";
   // CAL-08: a deleted type is gone (the link was cleared); a hidden one still shows
   const meetingType = meeting && item.meetingTypeId ? (meetingTypes.get(item.meetingTypeId) ?? null) : null;
@@ -84,7 +84,8 @@ function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<stri
     endsAt: item.endsAt,
     title: item.title,
     kindLabel: meeting ? "פגישה" : "משימה",
-    typeLabel: (meeting ? MEETING_TYPE_LABEL[item.type] : TASK_TYPE_LABEL[item.type]) ?? item.type,
+    // TASK-08: a task shows the business's type (hidden ones too), else its code's built-in name
+    typeLabel: meeting ? (MEETING_TYPE_LABEL[item.type] ?? item.type) : taskTypeName({ taskType: item.type, activityTypeId: item.activityTypeId }, activityTypes),
     statusLabel: (meeting ? MEETING_STATUS_LABEL[item.status] : TASK_STATUS_LABEL[item.status]) ?? item.status,
     meetingTypeName: meetingType?.name ?? null,
     tone: meetingType?.color ?? null,
@@ -122,7 +123,12 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   // `done` rides along on every link of the screen
   const done = showDone || undefined;
 
-  const [allMembers, teamData, meetingTypes] = await Promise.all([listMembers(orgId), listCalendarTeams(orgId), listMeetingTypeChoices(orgId)]);
+  const [allMembers, teamData, meetingTypes, activityTypes] = await Promise.all([
+    listMembers(orgId),
+    listCalendarTeams(orgId),
+    listMeetingTypeChoices(orgId),
+    listActivityTypes(orgId),
+  ]);
   const typeById = new Map(meetingTypes.map((type) => [type.id, type]));
   const members = allMembers.filter((member) => member.status === "active").map((member) => ({ id: member.userId, name: member.name }));
   const teams = visibleTeams(teamData.teams, teamData.memberships, me, {
@@ -146,7 +152,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   const days = viewDays(view, day);
   const { items, truncated } = await listCalendarItems(orgId, rangeBounds(days, timeZone), people, showDone);
-  const entries = items.map((item) => entry(orgId, item, typeById));
+  const entries = items.map((item) => entry(orgId, item, typeById, activityTypes));
   const holidays = Object.fromEntries(holidaysByDay(days[0], days[days.length - 1]));
 
   const href = (target: { view?: typeof view; date?: string }) =>

@@ -18,7 +18,6 @@ import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext } from "@/features/shell/queries";
-import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskSortKey } from "@/features/tasks/queries";
 import { viewChips } from "@/features/views/server";
 import { csvText } from "@/lib/csv";
@@ -42,7 +41,6 @@ const MAX_PICKED = 100;
 
 const TASK_STATUS_LABELS = { open: "פתוחה", done: "הושלמה", cancelled: "בוטלה" } as const;
 const PRIORITY_LABELS: Record<number, string> = { 1: "גבוהה", 2: "רגילה", 3: "נמוכה" };
-const TASK_TYPE_LABELS = new Map<string, string>(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
 const text = (message: string, status: number) => new Response(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
@@ -177,7 +175,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
           customFields: {},
           cells: {
             due: task.dueAt ? formatDateTime(task.dueAt) : null,
-            type: TASK_TYPE_LABELS.get(task.taskType) ?? task.taskType,
+            type: task.typeName,
             status: TASK_STATUS_LABELS[task.status],
             priority: PRIORITY_LABELS[task.priority] ?? null,
             related: task.related?.name ?? null,

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { listActivityTypes } from "@/features/activity-types/queries";
+import { taskTypeName } from "@/features/activity-types/types";
 import { getUserNames } from "@/features/shell/queries";
 import type { LeaveKind } from "@/features/work-hours/leave";
 import { getCurrentAbsences } from "@/features/work-hours/queries";
@@ -242,6 +244,9 @@ export type TaskListItem = {
   id: string;
   title: string;
   taskType: string;
+  // TASK-08: the business's type, and the name the table, its filter and the export show (taskTypeName)
+  activityTypeId: string | null;
+  typeName: string;
   status: TaskStatus;
   priority: number;
   dueAt: string | null;
@@ -287,7 +292,7 @@ export async function listTasks(
 
   let query = supabase
     .from("tasks")
-    .select("id, title, task_type, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, created_at")
+    .select("id, title, task_type, activity_type_id, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, created_at")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   if (options.ownerId) {
@@ -313,7 +318,11 @@ export async function listTasks(
   }
   const rows = data.slice(0, size);
 
-  const [owners, related] = await Promise.all([getUserNames(rows.map((row) => row.owner_id)), relatedRecords(orgId, rows)]);
+  const [owners, related, types] = await Promise.all([
+    getUserNames(rows.map((row) => row.owner_id)),
+    relatedRecords(orgId, rows),
+    listActivityTypes(orgId),
+  ]);
 
   return {
     hasMore: data.length > size,
@@ -322,6 +331,8 @@ export async function listTasks(
         id: row.id,
         title: row.title,
         taskType: row.task_type,
+        activityTypeId: row.activity_type_id,
+        typeName: taskTypeName({ taskType: row.task_type, activityTypeId: row.activity_type_id }, types),
         status: row.status,
         priority: row.priority,
         dueAt: row.due_at,

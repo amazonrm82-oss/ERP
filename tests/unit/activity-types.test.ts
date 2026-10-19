@@ -16,6 +16,8 @@ import {
   taskChoiceValue,
   taskCodeFor,
   taskKindLabel,
+  taskTypeName,
+  quickLogTypeId,
   type ActivityTypeOption,
 } from "@/features/activity-types/types";
 import { taskSchema } from "@/features/tasks/schema";
@@ -121,5 +123,39 @@ describe("the task form (TASK-08)", () => {
     const renamed = types.map((t) => (t.key === "meeting" ? { ...t, name: "פגישת לקוח" } : t));
     expect(taskKindLabel({ taskType: "meeting", activityTypeId: null }, renamed)).toBe("פגישת לקוח");
     expect(taskKindLabel({ taskType: "call", activityTypeId: null }, [])).toBe("שיחה");
+  });
+});
+
+describe("TASK-08 follow-ups: names in the tasks table, export and calendar; the type of a one-step log", () => {
+  const call = type(1, "call", "שיחת מכירה", { key: "call" });
+  const callOther = type(2, "call", "שיחת שירות");
+  const hidden = type(3, "call", "שיחה ישנה", { isActive: false });
+  const meeting = type(4, "meeting", "פגישה בשטח", { key: "meeting" });
+  const list = [call, callOther, hidden, meeting];
+
+  it("a task shows its own type, hidden ones too, else the built-in name of its code", () => {
+    expect(taskTypeName({ taskType: "call", activityTypeId: callOther.id }, list)).toBe("שיחת שירות");
+    // a hidden type keeps its own name (owner, like hidden contact types)
+    expect(taskTypeName({ taskType: "call", activityTypeId: hidden.id }, list)).toBe("שיחה ישנה");
+    // a deleted type, or none: today's built-in name of the stored code
+    expect(taskTypeName({ taskType: "meeting", activityTypeId: ID(9) }, list)).toBe("פגישה");
+    expect(taskTypeName({ taskType: "call", activityTypeId: null }, list)).toBe("שיחה");
+    // the two fixed choices keep their names (owner)
+    expect(taskTypeName({ taskType: "todo", activityTypeId: null }, list)).toBe("משימה");
+    expect(taskTypeName({ taskType: "follow_up", activityTypeId: null }, list)).toBe("מעקב");
+    // an unknown code is shown as stored
+    expect(taskTypeName({ taskType: "other", activityTypeId: null }, [])).toBe("other");
+  });
+
+  it("a one-step log takes the seeded default of its kind, else the first active one, else none", () => {
+    expect(quickLogTypeId("call", list)).toBe(call.id);
+    // the default hidden: the next active one of the kind, in the list's order
+    expect(quickLogTypeId("call", [{ ...call, isActive: false }, hidden, callOther])).toBe(callOther.id);
+    // a renamed default keeps its key and is still preferred, wherever it stands in the list
+    expect(quickLogTypeId("call", [callOther, { ...call, name: "טלפון" }])).toBe(call.id);
+    // no active type of the kind: none (the entry is logged with its kind alone)
+    expect(quickLogTypeId("call", [hidden, meeting])).toBeNull();
+    expect(quickLogTypeId("whatsapp", list)).toBeNull();
+    expect(quickLogTypeId("whatsapp", [type(5, "whatsapp", "וואטסאפ", { key: "whatsapp" })])).toBe(ID(5));
   });
 });

@@ -12,7 +12,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import type { TaskListItem } from "../queries";
-import { PRIORITY_LABEL, TASK_TYPE_OPTIONS } from "./task-fields";
+import { PRIORITY_LABEL } from "./task-fields";
 
 type Props = {
   orgId: string;
@@ -31,7 +31,6 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; tone: BadgeTone }>
   done: { label: "הושלמה", tone: "success" },
   cancelled: { label: "בוטלה", tone: "neutral" },
 };
-const TYPE_LABEL = new Map<string, string>(TASK_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
 const relatedHref = (orgId: string, related: NonNullable<TaskListItem["related"]>) =>
   related.kind === "lead"
@@ -99,7 +98,8 @@ export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, edi
               );
             }
             case "type":
-              return TYPE_LABEL.get(task.taskType) ?? task.taskType;
+              // TASK-08: the business's type name (listTasks resolves it)
+              return task.typeName;
             case "status":
               return <Badge tone={TASK_STATUS[task.status].tone}>{TASK_STATUS[task.status].label}</Badge>;
             case "priority":

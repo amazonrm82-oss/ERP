@@ -17,6 +17,8 @@ export type CalendarItem = TimedItem & {
   type: string;
   // CAL-08: the business's meeting type of a meeting; null for none and for tasks
   meetingTypeId: string | null;
+  // TASK-08: the business's activity/task type of a task; null for none and for meetings
+  activityTypeId: string | null;
   location: string | null;
   ownerName: string | null;
   // the record it is about, for a link
@@ -63,7 +65,7 @@ export async function listCalendarItems(
 
   let taskQuery = supabase
     .from("tasks")
-    .select("id, title, task_type, due_at, status, owner_id, lead_id, contact_id, company_id, deal_id")
+    .select("id, title, task_type, activity_type_id, due_at, status, owner_id, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .neq("status", "cancelled")
@@ -124,6 +126,7 @@ export async function listCalendarItems(
       status: m.status,
       type: m.meeting_type,
       meetingTypeId: m.meeting_type_id,
+      activityTypeId: null,
       location: m.location,
       ownerName: m.owner_id ? (names.get(m.owner_id) ?? null) : null,
       related: relatedOf(m),
@@ -141,6 +144,7 @@ export async function listCalendarItems(
         status: t.status,
         type: t.task_type,
         meetingTypeId: null,
+        activityTypeId: t.activity_type_id,
         location: null,
         ownerName: t.owner_id ? (names.get(t.owner_id) ?? null) : null,
         related: relatedOf(t),

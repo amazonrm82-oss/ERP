@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { quickLogType, typeRefused } from "@/features/activity-types/quick-log";
 import { sanitizeNote } from "@/features/activities/markdown";
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
 import { actionContext } from "@/lib/action-context";
@@ -86,14 +87,21 @@ export async function logWhatsappMessageAction(orgId: string, subject: TimelineS
 
   // what goes to the customer is plain text: a mention token in it must not notify a colleague
   const body = plainMentions(sanitizeNote(parsed.data.text));
+  // TASK-08: the business's WhatsApp type (its seeded default, else its first active one), when it has one
+  const typeId = await quickLogType(context.supabase, orgId, "whatsapp");
   const activity: ActivityInsert = {
     organization_id: orgId,
     type: "whatsapp",
     body: body === "" ? null : body,
     metadata: { via: "link", ...(templateName ? { template_id: parsed.data.templateId, template_name: templateName } : {}) },
+    activity_type_id: typeId,
   };
   activity[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
-  const { error } = await context.supabase.from("activities").insert(activity);
+  let { error } = await context.supabase.from("activities").insert(activity);
+  if (error && typeId && typeRefused(error)) {
+    // the type was hidden or removed meanwhile: log the message with its kind alone
+    ({ error } = await context.supabase.from("activities").insert({ ...activity, activity_type_id: null }));
+  }
   if (error) {
     return fail(dbErrorMessage(error, "ההודעה נפתחה ב-WhatsApp, אבל לא הצלחנו לרשום אותה בציר הזמן."));
   }
