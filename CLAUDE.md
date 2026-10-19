@@ -68,6 +68,8 @@ and build this CRM here instead. The old code is preserved on the branch
    photos of deleted accounts and replaced photos; owner's decision USR-01, 12 October 2026) and `org-logos` (business
    logos that were replaced or cleared, and the logo folder of a deleted business; never a logo still in use; owner's
    decision FLD-04, 14 October 2026).
+   Every public page hashes a sender's IP only through `src/lib/keyed-ip-hash.ts` (HMAC with `INTAKE_IP_HASH_SECRET`, a scope per
+   page; no secret = no hash, never a plain one; FXS-11, migration 020495); form hashes are cleared after 15 minutes (`crm-form-ip-hashes`).
    Approved pattern for public secret-link pages (owner, 8 October 2026: booking `CAL-07`, quotes
    `QUO-08`, `CAL-10`, `BAL-04`; owner, 13 October 2026: digital business card `BIZ-02`, QR scan counter `BIZ-03`,
    site widget `SPD-07`): a server route calls one `security definer` function granted to `service_role` only, which
