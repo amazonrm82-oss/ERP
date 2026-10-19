@@ -257,12 +257,14 @@ export async function getOrderParties(
 /** What a product line of a draft is priced with (PL-03, the quotes' rule): the order's day, VAT mode and customer's list. */
 export type OrderPricing = {
   day: string;
+  // the business charges VAT on this order (a free line may then be marked exempt)
+  vatCharged: boolean;
   rateBp: number;
   includesVat: boolean;
   list: Omit<NamedPriceList, "lines"> | null;
 };
 
-export async function readOrderPricing(supabase: Client, orgId: string, order: Pick<Order, "orderDate" | "contactId" | "companyId" | "pricesIncludeVat">): Promise<OrderPricing> {
+export async function readOrderPricing(supabase: Client, orgId: string, order: Pick<Order, "orderDate" | "contactId" | "companyId" | "pricesIncludeVat" | "noVatReason">): Promise<OrderPricing> {
   const day = order.orderDate;
   const [settings, rateRows, list] = await Promise.all([
     supabase.from("org_document_settings").select("vat_status, other_charges_vat").eq("organization_id", orgId).maybeSingle(),
@@ -273,7 +275,7 @@ export async function readOrderPricing(supabase: Client, orgId: string, order: P
   const rates: VatRate[] = must(rateRows, "vat rates").map((r) => ({ effectiveFrom: r.effective_from, rateBp: r.rate_bp }));
   const status = isVatStatus(row?.vat_status) ? row.vat_status : null;
   const vat = documentVat(chargesVat(status, row?.other_charges_vat ?? null), rates, day);
-  return { day, rateBp: conversionRateBp(vat, rates, day), includesVat: order.pricesIncludeVat, list };
+  return { day, vatCharged: vat.kind !== "none" && order.noVatReason === null, rateBp: conversionRateBp(vat, rates, day), includesVat: order.pricesIncludeVat, list };
 }
 
 export async function getOrderPricing(orgId: string, order: Order): Promise<OrderPricing> {

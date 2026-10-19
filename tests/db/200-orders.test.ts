@@ -426,6 +426,22 @@ describe("orders (ORD-01, ORD-03)", () => {
       // a free line is always priced by hand
       expect((await insertLine({ name: "חופשי", unit_price_agorot: 1, price_source: "product" })).price_source).toBe("manual");
 
+      // a line priced from a live list stays editable: quantity, name and position
+      await run(member, (q) => q("update public.order_lines set quantity = 3, name = 'מדף גדול', position = 7 where id = $1", [fromList.id]));
+      expect(await asAdmin((q) => one(q, "select quantity::int as quantity, name, position, price_source, price_list_id, price_list_name from public.order_lines where id = $1", [fromList.id]))).toEqual({
+        quantity: 3,
+        name: "מדף גדול",
+        position: 7,
+        price_source: "price_list",
+        price_list_id: list,
+        price_list_name: "מחירון סיטונאי",
+      });
+      // an update must name the list too (as an insert must)
+      const typedLine = await insertLine({ name: "מדף", product_id: product, unit_price_agorot: 9000, price_source: "manual" });
+      expect((await pgError(run(member, (q) => q("update public.order_lines set price_source = 'price_list' where id = $1", [typedLine.id])))).hint).toBe(
+        "order_lines:price_list",
+      );
+      expect((await pgError(run(member, (q) => q("update public.order_lines set price_list_id = null where id = $1", [fromList.id])))).hint).toBe("order_lines:price_list");
       // on a draft the price may be typed over the list's: the line no longer names it
       await run(member, (q) => q("update public.order_lines set unit_price_agorot = 7000, price_source = 'manual', price_list_id = null where id = $1", [fromList.id]));
       expect(await asAdmin((q) => one(q, "select price_source, price_list_name from public.order_lines where id = $1", [fromList.id]))).toEqual({ price_source: "manual", price_list_name: null });
@@ -444,6 +460,27 @@ describe("orders (ORD-01, ORD-03)", () => {
         price_list_id: null,
         price_list_name: "מחירון סיטונאי",
         price: 7000,
+      });
+      // a draft line whose list was deleted keeps the list's name and stays editable
+      const other = await draft(member, { contact_id: contact });
+      const list2 = await run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.price_lists (organization_id, name) values ($1, 'מחירון זמני') returning id", [org])).id,
+      );
+      const kept = await run(member, async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            "insert into public.order_lines (organization_id, order_id, name, product_id, unit_price_agorot, price_source, price_list_id) values ($1, $2, 'מדף', $3, 8000, 'price_list', $4) returning id",
+            [org, other, product, list2],
+          )
+        ).id,
+      );
+      await run(owner, (q) => q("delete from public.price_lists where id = $1", [list2]));
+      await run(member, (q) => q("update public.order_lines set quantity = 2 where id = $1", [kept]));
+      expect(await asAdmin((q) => one(q, "select price_source, price_list_name, quantity::int as quantity from public.order_lines where id = $1", [kept]))).toEqual({
+        price_source: "price_list",
+        price_list_name: "מחירון זמני",
+        quantity: 2,
       });
     } finally {
       await setFeatures({ orders: true });

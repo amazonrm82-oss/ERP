@@ -3,12 +3,13 @@
 import { useActionState, useState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { TextareaField, TextField } from "@/components/ui/field";
+import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { ProductHit } from "@/features/deal-lines/actions";
 import { DealProductPicker } from "@/features/deal-lines/components/deal-product-picker";
 import { lineTotal, pulledPrice } from "@/features/deal-lines/pricing";
-import { priceSourceText } from "@/features/deal-lines/schema";
+import { DISCOUNT_KIND_LABELS, DISCOUNT_KINDS, LINE_BILLING_LABEL, priceSourceText, VAT_EXEMPT_LABEL, type DiscountKind } from "@/features/deal-lines/schema";
+import { BILLING_LABELS, BILLINGS } from "@/features/products/schema";
 import { agorotInput } from "@/features/deals/recurring";
 import type { FormState } from "@/lib/action-result";
 import { formatMoney, parseMoneyToAgorot } from "@/lib/format";
@@ -23,6 +24,8 @@ type Props = {
   pricing: OrderPricing;
   // the plan holds products: the line may be picked from the catalog
   products: boolean;
+  // the plan holds discounts: a line discount may be given
+  discounts: boolean;
 };
 
 function quantityOf(text: string): number | null {
@@ -36,12 +39,14 @@ function quantityOf(text: string): number | null {
  * with an empty price, takes the automatic price: the customer's price list with its tiers, else the product's own price
  * (PL-03, as on deal lines and quotes). A free line needs a price. The amount is worked out while typing.
  */
-export function OrderLineForm({ orgId, orderId, pricing, products }: Props) {
+export function OrderLineForm({ orgId, orderId, pricing, products, discounts }: Props) {
   const [product, setProduct] = useState<ProductHit | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
+  const [discountKind, setDiscountKind] = useState<DiscountKind | "">("");
+  const [discount, setDiscount] = useState("");
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await addOrderLineAction(orgId, orderId, prev, formData);
     // a saved line empties the form for the next one
@@ -51,6 +56,8 @@ export function OrderLineForm({ orgId, orderId, pricing, products }: Props) {
       setDescription("");
       setQuantity("1");
       setPrice("");
+      setDiscountKind("");
+      setDiscount("");
     }
     return result;
   }, null);
@@ -63,7 +70,20 @@ export function OrderLineForm({ orgId, orderId, pricing, products }: Props) {
   const automatic = product && qty !== null ? pulledPrice(product, list, qty, pricing.day, pricing.includesVat, pricing.rateBp) : null;
   const typed = price.trim() === "" ? null : parseMoneyToAgorot(price);
   const unit = typed ?? automatic?.priceAgorot ?? null;
-  const preview = qty !== null && unit !== null ? lineTotal({ quantity: qty, unitPriceAgorot: unit, discountBp: null, discountAgorot: null }, pricing.includesVat) : null;
+  const discountBp = discountKind === "percent" ? Math.round(Number(discount.replace(/%/g, "")) * 100) : null;
+  const discountAgorot = discountKind === "amount" ? parseMoneyToAgorot(discount) : null;
+  const preview =
+    qty !== null && unit !== null
+      ? lineTotal(
+          {
+            quantity: qty,
+            unitPriceAgorot: unit,
+            discountBp: discountBp !== null && Number.isFinite(discountBp) && discountBp > 0 ? discountBp : null,
+            discountAgorot: discountAgorot !== null && discountAgorot > 0 ? discountAgorot : null,
+          },
+          pricing.includesVat,
+        )
+      : null;
   const vatWord = pricing.includesVat ? 'כולל מע"מ' : 'לפני מע"מ';
 
   return (
@@ -124,6 +144,51 @@ export function OrderLineForm({ orgId, orderId, pricing, products }: Props) {
           error={errors.unit_price}
         />
       </div>
+      {discounts ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField label="הנחה בשורה" name="discount_kind" value={discountKind} onChange={(event) => setDiscountKind(event.target.value as DiscountKind | "")}>
+            <option value="">{DISCOUNT_KIND_LABELS[""]}</option>
+            {DISCOUNT_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {DISCOUNT_KIND_LABELS[kind]}
+              </option>
+            ))}
+          </SelectField>
+          {discountKind !== "" ? (
+            <TextField
+              label={discountKind === "percent" ? "אחוז הנחה" : `סכום הנחה (₪, ${vatWord})`}
+              name="discount"
+              required
+              dir="ltr"
+              inputMode="decimal"
+              autoComplete="off"
+              value={discount}
+              onChange={(event) => setDiscount(event.target.value)}
+              error={errors.discount}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <input type="hidden" name="discount_kind" value="" />
+      )}
+      {product === null ? (
+        // a free line's billing and VAT exemption; a product line takes its product's
+        <>
+          <SelectField label={LINE_BILLING_LABEL} name="billing" defaultValue="one_time" error={errors.billing}>
+            {BILLINGS.map((billing) => (
+              <option key={billing} value={billing}>
+                {BILLING_LABELS[billing]}
+              </option>
+            ))}
+          </SelectField>
+          {pricing.vatCharged ? (
+            <>
+              <input type="hidden" name="vat_exempt_shown" value="1" />
+              <Checkbox name="vat_exempt" label={VAT_EXEMPT_LABEL} />
+            </>
+          ) : null}
+        </>
+      ) : null}
       <p aria-live="polite" className="text-md">
         <span className="text-ink-soft">סכום השורה: </span>
         <span className="font-semibold">{preview && preview.ok ? formatMoney(preview.totals.lines[0].totalAgorot) : "—"}</span>

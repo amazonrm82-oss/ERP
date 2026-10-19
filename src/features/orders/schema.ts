@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { quantityField } from "@/features/deal-lines/schema";
-import { moneyField, optionalDate, optionalId, optionalText, requiredText } from "@/lib/validation";
+import { optionalDate, optionalId, optionalText } from "@/lib/validation";
 
 // ORD-01 / ORD-02 / ORD-03: an order and its lines. Mirrors the checks of public.orders and public.order_lines
 // (migration orders).
@@ -64,23 +63,9 @@ export const orderDetailsSchema = z.object({
 });
 export const ORDER_DETAILS_FIELD_NAMES = ["delivery_date", "shipping_address", "notes", "delivery_contact_id"] as const;
 
-// empty = the automatic price on a product line (PL-03); a free line needs one (checked by the action)
-const priceField = z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()).transform((value, ctx) => {
-  if (value === "") return null;
-  const parsed = moneyField.safeParse(value);
-  if (!parsed.success || parsed.data > 1_000_000_000_000) {
-    ctx.addIssue({ code: "custom", message: "יש להזין מחיר בשקלים, למשל 120 או 99.90." });
-    return z.NEVER;
-  }
-  return parsed.data;
-});
-
-/** A line of a draft: a product (priced by PL-03 when the price is left empty) or a free line with its own price. */
-export const orderLineSchema = z.object({
-  product_id: optionalId,
-  name: requiredText(ORDER_LINE_NAME_MAX, "יש לכתוב שם לשורה.", `השם ארוך מדי (עד ${ORDER_LINE_NAME_MAX} תווים).`),
-  description: optionalText(ORDER_LINE_DESCRIPTION_MAX, `התיאור ארוך מדי (עד ${ORDER_LINE_DESCRIPTION_MAX} תווים).`),
-  quantity: quantityField,
-  unit_price: priceField,
-});
-export const ORDER_LINE_FIELD_NAMES = ["product_id", "name", "description", "quantity", "unit_price"] as const;
+/**
+ * A line of a draft: a product (priced by PL-03 when the price is left empty) or a free line with its own price, a line
+ * discount, and for a free line its billing and VAT exemption. The same fields and rules as a quote line (QUO-02);
+ * the optional-line fields are not sent by the order form and are ignored.
+ */
+export { quoteLineSchema as orderLineSchema, QUOTE_LINE_FIELD_NAMES as ORDER_LINE_FIELD_NAMES } from "@/features/quotes/schema";

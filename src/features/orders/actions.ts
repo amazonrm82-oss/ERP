@@ -7,7 +7,8 @@ import { z } from "zod";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { priceListTiers, readPricedProduct } from "@/features/deal-lines/queries";
-import { pulledPrice } from "@/features/deal-lines/pricing";
+import { lineTotal, pulledPrice } from "@/features/deal-lines/pricing";
+import { totalsErrorMessage } from "@/features/tax/calc";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
@@ -141,21 +142,31 @@ async function addLine(orgId: string, orderId: string, formData: FormData): Prom
 
   let price: { agorot: number; source: "product" | "price_list" | "manual"; listId: string | null };
   let description = input.description;
-  if (input.product_id) {
-    const product = await readPricedProduct(supabase, orgId, input.product_id);
+  if (input.productId) {
+    const product = await readPricedProduct(supabase, orgId, input.productId);
     if (!product || !product.offerable) return fail(PRODUCT_GONE, { fieldErrors: { product_id: PRODUCT_GONE }, values });
     if (!description && product.description) description = product.description.slice(0, ORDER_LINE_DESCRIPTION_MAX);
-    if (input.unit_price === null) {
+    if (input.unitPriceAgorot === null) {
       const pricing = await readOrderPricing(supabase, orgId, order);
       const tiers = pricing.list ? await priceListTiers(supabase, orgId, pricing.list.id, [product.id]) : [];
       const pulled = pulledPrice(product, pricing.list ? { ...pricing.list, lines: tiers } : null, input.quantity, pricing.day, pricing.includesVat, pricing.rateBp);
       price = { agorot: pulled.priceAgorot, source: pulled.source, listId: pulled.priceListId };
     } else {
-      price = { agorot: input.unit_price, source: "manual", listId: null };
+      price = { agorot: input.unitPriceAgorot, source: "manual", listId: null };
     }
   } else {
-    if (input.unit_price === null) return fail(PRICE_MISSING, { fieldErrors: { unit_price: PRICE_MISSING }, values });
-    price = { agorot: input.unit_price, source: "manual", listId: null };
+    if (input.unitPriceAgorot === null) return fail(PRICE_MISSING, { fieldErrors: { unit_price: PRICE_MISSING }, values });
+    price = { agorot: input.unitPriceAgorot, source: "manual", listId: null };
+  }
+  // the line's amount must be sound before the database works it out again (discount above the line, too large a total)
+  const checked = lineTotal(
+    { quantity: input.quantity, unitPriceAgorot: price.agorot, discountBp: input.discountBp, discountAgorot: input.discountAgorot, vatExempt: false },
+    order.pricesIncludeVat,
+  );
+  if (!checked.ok) {
+    const field = checked.error === "quantity" ? "quantity" : checked.error === "price" || checked.error === "amount" ? "unit_price" : "discount";
+    const message = totalsErrorMessage(checked.error);
+    return fail(message, { fieldErrors: { [field]: message }, values });
   }
 
   const { data: last, error: lastError } = await supabase
@@ -170,11 +181,15 @@ async function addLine(orgId: string, orderId: string, formData: FormData): Prom
     organization_id: orgId,
     order_id: orderId,
     position: Math.min((last[0]?.position ?? -1) + 1, 100000),
-    product_id: input.product_id,
+    product_id: input.productId,
     name: input.name,
     description,
     quantity: input.quantity,
     unit_price_agorot: price.agorot,
+    discount_bp: input.discountBp,
+    discount_agorot: input.discountAgorot,
+    // a free line's own choices; a product line's come from the product (the trigger sets them)
+    ...(input.productId === null ? { vat_exempt: input.vatExempt ?? false, billing: input.billing ?? "one_time" } : {}),
     price_source: price.source,
     price_list_id: price.listId,
   });

@@ -55,7 +55,10 @@ export default async function OrderPage({ params }: Props) {
   const editing = orderEditing(order.status);
   const contacts = mayEdit && editing.details ? await listContactOptions(orgId) : [];
   // a draft's new lines are priced like deal lines (PL-03): the order's day, VAT mode and the customer's price list
-  const [pricing, hasProducts] = mayEdit && editing.lines ? await Promise.all([getOrderPricing(orgId, order), orgHasFeature(orgId, "products")]) : [null, false];
+  const [pricing, hasProducts, hasDiscounts] =
+    mayEdit && editing.lines
+      ? await Promise.all([getOrderPricing(orgId, order), orgHasFeature(orgId, "products"), orgHasFeature(orgId, "discounts")])
+      : [null, false, false];
   const contactOptions = contacts.map((c) => ({ value: c.id, label: c.name }));
   if (order.deliveryContactId && !contactOptions.some((c) => c.value === order.deliveryContactId)) {
     contactOptions.unshift({ value: order.deliveryContactId, label: parties.deliveryContact ?? "איש קשר" });
@@ -203,6 +206,7 @@ export default async function OrderPage({ params }: Props) {
                           <span className="tabular-nums">{line.quantity}</span>
                           {line.unitName ? ` ${line.unitName}` : ""} × <span className="tabular-nums">{formatMoney(line.unitPriceAgorot)}</span>
                           {BILLING_LABELS[line.billing] ? ` · ${BILLING_LABELS[line.billing]}` : ""}
+                          {line.discountBp ? ` · הנחה ${line.discountBp / 100}%` : line.discountAgorot ? ` · הנחה ${formatMoney(line.discountAgorot)}` : ""}
                           {line.vatExempt ? ' · פטור ממע"מ' : ""}
                           {line.productId ? ` · ${priceSourceText(line.priceSource, line.priceListName)}` : ""}
                         </p>
@@ -243,7 +247,7 @@ export default async function OrderPage({ params }: Props) {
             {pricing ? (
               <div className="border-t border-line pt-4">
                 <h3 className="mb-3 text-md font-semibold">שורה חדשה</h3>
-                <OrderLineForm orgId={orgId} orderId={order.id} pricing={pricing} products={hasProducts} />
+                <OrderLineForm orgId={orgId} orderId={order.id} pricing={pricing} products={hasProducts} discounts={hasDiscounts} />
               </div>
             ) : null}
           </CardBody>
