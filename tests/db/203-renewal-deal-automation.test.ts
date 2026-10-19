@@ -97,6 +97,22 @@ describe("renewal deal automation (DEAL-08)", () => {
     // once per deal and renewal date
     await runDates();
     expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from public.deals where organization_id = $1 and previous_deal_id = $2", [org, ids.due])).rows[0].n)).toBe(1);
+    // the renewal follows its deal: same process, the recurring revenue and lines for the next period, so the date rule
+    // never fires again on the renewal itself (it renews a year later)
+    expect(
+      await asAdmin(async (q) =>
+        (
+          await q(
+            `select r.billing_kind, r.recurring_amount_agorot::text as amount, r.recurring_start_date = d.renewal_date as starts_at_renewal,
+                    r.renewal_date = (d.renewal_date + interval '1 year')::date as renews_a_year_later
+               from public.deals r join public.deals d on d.id = r.previous_deal_id where r.previous_deal_id = $1`,
+            [ids.due],
+          )
+        ).rows,
+      ),
+    ).toEqual([{ billing_kind: "yearly", amount: "120000", starts_at_renewal: true, renews_a_year_later: true }]);
+    await runDates();
+    expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from public.deals where organization_id = $1", [org])).rows[0].n)).toBe(3);
     expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from public.deals where organization_id = $1 and previous_deal_id = $2", [org, ids.later])).rows[0].n)).toBe(0);
   });
 });

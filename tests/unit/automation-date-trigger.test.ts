@@ -125,7 +125,15 @@ describe("date triggers (AUT-03)", () => {
     if (typeof db === "string") throw new Error(db);
     expect(db).toMatchObject({ entity_type: "deal", trigger_type: "date_reached", trigger_config: { field: "renewal_date", days: 30, direction: "before" } });
     expect(db.actions).toEqual([
-      expect.objectContaining({ type: "create_deal", pipeline_id: "22222222-2222-4222-8222-222222222222", name: "חידוש: {{name}}", assign: "owner" }),
+      expect.objectContaining({
+        type: "create_deal",
+        pipeline_id: "22222222-2222-4222-8222-222222222222",
+        name: "חידוש: {{name}}",
+        assign: "owner",
+        // the deal's own sales process and its recurring revenue and lines (the pipeline above is the fallback)
+        pipeline: "source",
+        copy_from_source: true,
+      }),
       expect.objectContaining({ type: "create_task", task_type: "follow_up" }),
     ]);
   });
