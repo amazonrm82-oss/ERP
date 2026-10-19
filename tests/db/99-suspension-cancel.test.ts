@@ -194,6 +194,50 @@ describe("cancelled 90 days after suspension (OFF by default)", () => {
     expect(again.cancel_at).toBeNull();
   });
 
+  // RVW-24: like the trial end (0156), a suspension platform staff set or touched by hand stays until staff change it
+  it("on: a business staff suspended by hand gets no cancel day, no notice and is never cancelled", async () => {
+    const owner = await createUser("by-hand-owner");
+    const org = await createOrg(owner.id, "עסק בירור");
+    await asMfaUser(pOwner.id, (q) => q("select public.platform_set_org_status($1, 'suspended', 'בירור')", [org]));
+    // long ago: both the suspension and the hand assignment
+    await asAdmin(async (q) => {
+      await q("update app.org_suspensions set suspended_at = now() - interval '200 days' where organization_id = $1 and ended_at is null", [org]);
+      await q("update app.platform_assignments set assigned_at = now() - interval '200 days' where organization_id = $1", [org]);
+    });
+    expect(await run(org, iso(new Date()))).toMatchObject({ enabled: true, planned: 0, notices: 0, cancelled: 0 });
+    expect(await run(org, iso(plusDays(new Date(), 400)))).toMatchObject({ planned: 0, notices: 0, cancelled: 0 });
+    expect(await statusOf(org)).toBe("suspended");
+    expect((await suspension(org)).cancel_at).toBeNull();
+    expect(await notices(org, owner.id)).toEqual([]);
+  });
+
+  it("on: staff touching an automatic suspension during it clears its planned day; an earlier hand assignment does not count", async () => {
+    const { org, owner } = await suspendedOrg("touched", 0);
+    await run(org, iso(new Date()));
+    const cancelAt = (await suspension(org)).cancel_at as Date;
+    expect(cancelAt).not.toBeNull();
+    await run(org, iso(plusDays(cancelAt, -13.9)));
+    expect(await notices(org, owner.id)).toHaveLength(1);
+    // staff change the plan while it is suspended
+    await asAdmin((q) => q("select app.mark_platform_assignment($1, 'subscription')", [org]));
+    expect(await run(org, iso(plusDays(cancelAt, -12.9)))).toMatchObject({ cleared_by_staff: 1, planned: 0, notices: 0 });
+    expect((await suspension(org)).cancel_at).toBeNull();
+    expect(await run(org, iso(plusDays(cancelAt, 5)))).toMatchObject({ cleared_by_staff: 0, cancelled: 0 });
+    expect(await statusOf(org)).toBe("suspended");
+    expect(await notices(org, owner.id)).toHaveLength(1);
+
+    // a hand assignment from before the suspension began: counted as usual
+    const other = await createUser("before-owner");
+    const org2 = await createOrg(other.id, "עסק שיוך ישן");
+    await asAdmin(async (q) => {
+      await q("select app.mark_platform_assignment($1, 'subscription')", [org2]);
+      await q("update app.platform_assignments set assigned_at = now() - interval '10 days' where organization_id = $1", [org2]);
+      await q("update public.organizations set status = 'suspended' where id = $1", [org2]);
+    });
+    expect(await run(org2, iso(new Date()))).toMatchObject({ planned: 1 });
+    expect((await suspension(org2)).cancel_at).not.toBeNull();
+  });
+
   it("switching off clears the planned days; nothing happens until it is on again", async () => {
     const { org, owner } = await suspendedOrg("switch", 0);
     await run(org, iso(new Date()));
