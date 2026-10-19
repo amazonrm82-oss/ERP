@@ -4,15 +4,16 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { Select } from "@/components/ui/field";
+import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { OrderListItems } from "@/features/orders/components/order-list-items";
+import { isFiltered, orderListFilters, orderListHref } from "@/features/orders/list";
 import { ordersPath } from "@/features/orders/paths";
-import { listOrders, type OrderListFilters } from "@/features/orders/queries";
-import { isOrderStatus, ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/features/orders/schema";
+import { listOrders } from "@/features/orders/queries";
+import { ORDER_SOURCE_LABELS, ORDER_SOURCES, ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/features/orders/schema";
+import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
-import { parsePage } from "@/lib/search";
 
 export const metadata: Metadata = { title: "הזמנות" };
 
@@ -21,24 +22,16 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
-function listHref(orgId: string, filters: OrderListFilters, page: number): string {
-  const query = new URLSearchParams();
-  if (filters.status) query.set("status", filters.status);
-  if (page > 1) query.set("page", String(page));
-  const text = query.toString();
-  return text ? `${ordersPath(orgId)}?${text}` : ordersPath(orgId);
-}
-
-/** ORD-01: every order the user reads, newest first, by status. Orders are made from a quote, a deal, a contact or a company. */
+/**
+ * ORD-01, ORD-06 part one: every order the user reads, newest first, filtered by status, source, the person responsible and
+ * order date. Orders are made from a quote, a deal, a contact or a company. Documents and payments join with DOC/PAY.
+ */
 export default async function OrdersPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const query = await searchParams;
-  const status = one(query.status);
-  const filters: OrderListFilters = { status: isOrderStatus(status) ? status : null, page: parsePage(query.page) };
+  const filters = orderListFilters(await searchParams);
   await getOrgContext(orgId);
-  const { orders, hasMore } = await listOrders(orgId, filters);
+  const [{ orders, hasMore }, members] = await Promise.all([listOrders(orgId, filters), listMembers(orgId)]);
+  const filtered = isFiltered(filters);
 
   return (
     <>
@@ -58,10 +51,42 @@ export default async function OrdersPage({ params, searchParams }: Props) {
             ))}
           </Select>
         </label>
+        <label>
+          <span className="mb-1.5 block text-sm font-medium">מקור</span>
+          <Select name="source" defaultValue={filters.source ?? ""} className="w-40">
+            <option value="">הכול</option>
+            {ORDER_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {ORDER_SOURCE_LABELS[s]}
+              </option>
+            ))}
+          </Select>
+        </label>
+        <label>
+          <span className="mb-1.5 block text-sm font-medium">אחראי</span>
+          <Select name="owner" defaultValue={filters.ownerId ?? ""} className="w-44">
+            <option value="">כולם</option>
+            {members
+              .filter((member) => member.status === "active" || member.userId === filters.ownerId)
+              .map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.name}
+                </option>
+              ))}
+          </Select>
+        </label>
+        <label>
+          <span className="mb-1.5 block text-sm font-medium">מתאריך</span>
+          <Input type="date" name="from" defaultValue={filters.from ?? ""} className="w-40" />
+        </label>
+        <label>
+          <span className="mb-1.5 block text-sm font-medium">עד תאריך</span>
+          <Input type="date" name="to" defaultValue={filters.to ?? ""} className="w-40" />
+        </label>
         <button type="submit" className={buttonClasses("secondary", "md")}>
           הצגה
         </button>
-        {filters.status ? (
+        {filtered ? (
           <Link href={ordersPath(orgId)} className={buttonClasses("ghost", "md")}>
             ניקוי הסינון
           </Link>
@@ -70,8 +95,8 @@ export default async function OrdersPage({ params, searchParams }: Props) {
       {orders.length === 0 ? (
         <Card>
           <EmptyState
-            title={filters.status ? "אין הזמנות לפי הסינון" : "עוד אין הזמנות"}
-            description={filters.status ? "נסו סינון אחר, או נקו אותו." : 'הזמנה יוצרים מהצעת מחיר שאושרה, מעסקה שנסגרה, או בכרטיס "הזמנות" של איש קשר, חברה או עסקה.'}
+            title={filtered ? "אין הזמנות לפי הסינון" : "עוד אין הזמנות"}
+            description={filtered ? "נסו סינון אחר, או נקו אותו." : 'הזמנה יוצרים מהצעת מחיר שאושרה, מעסקה שנסגרה, או בכרטיס "הזמנות" של איש קשר, חברה או עסקה.'}
           />
         </Card>
       ) : (
@@ -79,7 +104,7 @@ export default async function OrdersPage({ params, searchParams }: Props) {
           <OrderListItems orgId={orgId} orders={orders} />
         </ul>
       )}
-      <Pagination page={filters.page} hasMore={hasMore} hrefFor={(target) => listHref(orgId, filters, target)} className="mt-4" />
+      <Pagination page={filters.page} hasMore={hasMore} hrefFor={(target) => orderListHref(orgId, filters, target)} className="mt-4" />
     </>
   );
 }

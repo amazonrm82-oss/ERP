@@ -143,6 +143,7 @@ export async function listOrderLines(orgId: string, orderId: string): Promise<Or
 
 export type OrderSummary = {
   id: string;
+  ownerId: string | null;
   status: OrderStatus;
   source: OrderSource;
   numberDisplay: string | null;
@@ -154,9 +155,9 @@ export type OrderSummary = {
   companyId: string | null;
 };
 
-const SUMMARY_COLUMNS = "id, status, source, number_display, order_date, delivery_date, total_agorot, customer_name, contact_id, company_id";
+const SUMMARY_COLUMNS = "id, owner_id, status, source, number_display, order_date, delivery_date, total_agorot, customer_name, contact_id, company_id";
 
-type SummaryRow = Pick<OrderRow, "id" | "status" | "source" | "number_display" | "order_date" | "delivery_date" | "total_agorot" | "customer_name" | "contact_id" | "company_id">;
+type SummaryRow = Pick<OrderRow, "id" | "owner_id" | "status" | "source" | "number_display" | "order_date" | "delivery_date" | "total_agorot" | "customer_name" | "contact_id" | "company_id">;
 
 async function withCustomers(supabase: Client, orgId: string, rows: SummaryRow[]): Promise<OrderSummary[]> {
   // a draft has no stored customer name yet: the contact's name, else the company's (read with the user's session)
@@ -171,6 +172,7 @@ async function withCustomers(supabase: Client, orgId: string, rows: SummaryRow[]
   for (const c of companies ? must(companies, "companies") : []) names.set(c.id, c.name);
   return rows.map((row) => ({
     id: row.id,
+    ownerId: row.owner_id,
     status: isOrderStatus(row.status) ? row.status : "draft",
     source: isOrderSource(row.source) ? row.source : "manual",
     numberDisplay: row.number_display,
@@ -183,7 +185,15 @@ async function withCustomers(supabase: Client, orgId: string, rows: SummaryRow[]
   }));
 }
 
-export type OrderListFilters = { status: OrderStatus | null; page: number };
+// ORD-06 part one: status, source, the person responsible and a range of order dates (inclusive)
+export type OrderListFilters = {
+  status: OrderStatus | null;
+  source: OrderSource | null;
+  ownerId: string | null;
+  from: string | null;
+  to: string | null;
+  page: number;
+};
 
 /** ORD-01: the orders list, newest first, one page at a time. */
 export async function listOrders(orgId: string, filters: OrderListFilters): Promise<{ orders: OrderSummary[]; hasMore: boolean }> {
@@ -191,6 +201,10 @@ export async function listOrders(orgId: string, filters: OrderListFilters): Prom
   const from = (filters.page - 1) * PAGE_SIZE;
   let query = supabase.from("orders").select(SUMMARY_COLUMNS).eq("organization_id", orgId);
   if (filters.status) query = query.eq("status", filters.status);
+  if (filters.source) query = query.eq("source", filters.source);
+  if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
+  if (filters.from) query = query.gte("order_date", filters.from);
+  if (filters.to) query = query.lte("order_date", filters.to);
   const rows = must(await query.order("created_at", { ascending: false }).order("id").range(from, from + PAGE_SIZE), "orders");
   const page = await withCustomers(supabase, orgId, rows.slice(0, PAGE_SIZE));
   return { orders: page, hasMore: rows.length > PAGE_SIZE };
