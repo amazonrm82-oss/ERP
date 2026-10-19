@@ -1092,6 +1092,80 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       };
     }
 
+    case "quotes": {
+      // QUO-17: quotes sent in the period, each version chain once (its newest sent version); open value is the current state
+      const data = parseReportData("report_quotes", await rpc("report_quotes", { ...range, p_owner: ownerId }));
+      const t = data.totals;
+      const name = await ownerNames(data.by_owner.map((r) => r.owner_id));
+      const decided = t.accepted + t.rejected;
+      const minutes = (hours: number | null) => (hours === null ? null : Math.round(hours * 60));
+      return {
+        kpis: [
+          { label: "הצעות שנשלחו", value: formatNumber(t.sent), hint: `${formatNumber(t.waiting + t.viewed)} עוד מחכות לתשובה` },
+          {
+            label: "אחוז אישור",
+            value: formatCell("percent", t.acceptance_rate),
+            hint: `${formatNumber(t.accepted)} אושרו מתוך ${formatNumber(decided)} שקיבלו תשובה`,
+          },
+          {
+            label: "זמן ממוצע עד אישור",
+            value: formatCell("minutes", minutes(t.avg_hours_to_accept)),
+            hint: t.accepted_measured > 0 ? `לפי ${formatNumber(t.accepted_measured)} הצעות שאושרו` : undefined,
+          },
+          { label: "שווי הצעות פתוחות", value: formatMoney(t.open_amount), hint: `${formatNumber(t.open_count)} הצעות פתוחות היום` },
+        ],
+        sections: [
+          {
+            title: "לפי סטטוס",
+            columns: [
+              { key: "status", label: "סטטוס", kind: "text" },
+              { key: "quotes", label: "הצעות", kind: "number" },
+            ],
+            rows: [
+              { status: "נשלחה ועוד לא נצפתה", quotes: t.waiting },
+              { status: "נצפתה", quotes: t.viewed },
+              { status: "אושרה", quotes: t.accepted },
+              { status: "נדחתה", quotes: t.rejected },
+              { status: "פג תוקפה", quotes: t.expired },
+              { status: "בוטלה", quotes: t.cancelled },
+            ],
+            bar: "quotes",
+            empty: "לא נשלחו הצעות מחיר בתקופה הזו.",
+          },
+          {
+            title: "לפי אחראי",
+            columns: [
+              { key: "owner", label: "אחראי", kind: "text" },
+              { key: "sent", label: "נשלחו", kind: "number" },
+              { key: "accepted", label: "אושרו", kind: "number" },
+              { key: "rejected", label: "נדחו", kind: "number" },
+              { key: "acceptance_rate", label: "אחוז אישור", kind: "percent" },
+              { key: "accepted_amount", label: "שווי שאושר", kind: "money" },
+              { key: "avg_to_accept", label: "זמן ממוצע עד אישור", kind: "minutes" },
+              { key: "open_count", label: "פתוחות היום", kind: "number" },
+              { key: "open_amount", label: "שווי פתוחות", kind: "money" },
+            ],
+            rows: data.by_owner.map(
+              (r): ReportRow => ({
+                owner: name(r.owner_id),
+                sent: r.sent,
+                accepted: r.accepted,
+                rejected: r.rejected,
+                acceptance_rate: r.acceptance_rate,
+                accepted_amount: r.accepted_amount,
+                avg_to_accept: minutes(r.avg_hours_to_accept),
+                open_count: r.open_count,
+                open_amount: r.open_amount,
+              }),
+            ),
+            bar: "sent",
+            empty: "אין הצעות מחיר להצגה.",
+            note: `נספרות הצעות שנשלחו בתקופה, לפי מועד השליחה. הצעה שיש לה גרסה חדשה שנשלחה נספרת פעם אחת, לפי הגרסה האחרונה שנשלחה. אחוז אישור: מתוך ההצעות שאושרו או נדחו; כשיש פחות מ-${formatNumber(data.rate_min)} כאלה, האחוז לא מוצג. זמן עד אישור: ממועד השליחה עד שהלקוח אישר. הצעות פתוחות: הצעות שנשלחו או נצפו ועוד לא פג תוקפן, נכון להיום, בלי קשר לתקופה. סכומים כפי שנשמרו בהצעה.`,
+          },
+        ],
+      };
+    }
+
     case "referrals": {
       // CON-06: the relations of the referral type made in the period (RLS: both sides readable); a referrer is a contact or a lead
       const data = obj(await rpc("report_referrals", range));

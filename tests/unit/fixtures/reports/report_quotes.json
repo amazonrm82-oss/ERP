@@ -1,0 +1,31 @@
+{
+  "totals": {
+    "sent": 2,
+    "viewed": 0,
+    "waiting": 1,
+    "expired": 0,
+    "accepted": 1,
+    "rejected": 0,
+    "cancelled": 0,
+    "open_count": 1,
+    "open_amount": 59000,
+    "acceptance_rate": null,
+    "accepted_amount": 59000,
+    "accepted_measured": 1,
+    "avg_hours_to_accept": 0.0
+  },
+  "by_owner": [
+    {
+      "sent": 2,
+      "accepted": 1,
+      "owner_id": "00000000-0000-4000-8000-000000000001",
+      "rejected": 0,
+      "open_count": 1,
+      "open_amount": 59000,
+      "acceptance_rate": null,
+      "accepted_amount": 59000,
+      "avg_hours_to_accept": 0.0
+    }
+  ],
+  "rate_min": 5
+}

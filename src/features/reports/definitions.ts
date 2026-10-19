@@ -1,4 +1,4 @@
-// The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -11,6 +11,8 @@ export type ReportDefinition = {
   ownerLabel?: string;
   // DLI-06: shown, opened and exported only by those who may see costs (canViewCosts); the SQL answers nothing to others
   costs?: true;
+  // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it
+  feature?: "quotes";
 };
 
 export const REPORTS: ReportDefinition[] = [
@@ -38,6 +40,15 @@ export const REPORTS: ReportDefinition[] = [
   { key: "meetings", title: "פגישות", description: "פגישות לפי מארגן, אחוז אי-הגעה, ופגישות שהובילו לעסקה שנסגרה.", filters: ["period", "owner"], ownerLabel: "מארגן" },
   // CON-06
   { key: "referrals", title: "הפניות", description: "מי הפנה אליכם אנשי קשר, כמה מהם הפכו ללקוחות ומה ההכנסה מהם.", filters: ["period"] },
+  // QUO-17
+  {
+    key: "quotes",
+    title: "הצעות מחיר",
+    description:
+      "כמה הצעות נשלחו, אחוז האישור, הזמן עד אישור ושווי ההצעות הפתוחות. הצעה שנשלחה לה גרסה חדשה נספרת פעם אחת, בחודש שבו נשלחה הגרסה האחרונה, ולכן נתוני חודש קודם יכולים להשתנות.",
+    filters: ["period", "owner"],
+    feature: "quotes",
+  },
 ];
 
 export function findReport(key: string): ReportDefinition | undefined {

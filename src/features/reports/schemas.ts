@@ -320,6 +320,39 @@ export const REPORT_SCHEMAS = {
       z.object({ referrer_id: uuid, referrer_kind: z.enum(["contact", "lead"]), name: text, referred: count, customers: count, won_amount: amount }),
     ),
   }),
+  // QUO-17: quotes sent in the period (each version chain once, by its newest sent version), the acceptance rate (null
+  // below rate_min decided), hours from sending to acceptance, and the quotes open now
+  report_quotes: z.object({
+    rate_min: count,
+    totals: z.object({
+      sent: count,
+      viewed: count,
+      waiting: count,
+      accepted: count,
+      rejected: count,
+      expired: count,
+      cancelled: count,
+      acceptance_rate: decimal,
+      accepted_amount: amount,
+      avg_hours_to_accept: decimal,
+      accepted_measured: count,
+      open_count: count,
+      open_amount: amount,
+    }),
+    by_owner: z.array(
+      z.object({
+        owner_id: id,
+        sent: count,
+        accepted: count,
+        rejected: count,
+        acceptance_rate: decimal,
+        accepted_amount: amount,
+        avg_hours_to_accept: decimal,
+        open_count: count,
+        open_amount: amount,
+      }),
+    ),
+  }),
 } as const;
 
 export type ReportFunction = keyof typeof REPORT_SCHEMAS;

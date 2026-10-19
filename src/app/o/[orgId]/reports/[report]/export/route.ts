@@ -3,6 +3,7 @@ import { findReport } from "@/features/reports/definitions";
 import { csvCell } from "@/features/reports/format";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
+import { orgHasFeature } from "@/features/settings/queries";
 import { canExport, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
 import { reportXlsxRows } from "@/features/reports/xlsx";
@@ -22,6 +23,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   const granted = await getMyPermissions(orgId);
   // DLI-06: a report about costs does not exist for someone who may not see costs (log_export refuses it too)
   if (definition.costs && !canViewCosts(context.role, granted)) {
+    return new Response("not found", { status: 404 });
+  }
+  // QUO-17: a report of a plan capability (log_export refuses it too)
+  if (definition.feature && !(await orgHasFeature(orgId, definition.feature))) {
     return new Response("not found", { status: 404 });
   }
   if (!canExport(context.role, granted)) {

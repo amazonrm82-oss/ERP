@@ -15,7 +15,7 @@ import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
-import { listMembers } from "@/features/settings/queries";
+import { listMembers, orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, zonedIso } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -41,6 +41,10 @@ export default async function ReportPage({ params, searchParams }: Props) {
   const granted = await getMyPermissions(orgId);
   // DLI-06: a report about costs does not exist for someone who may not see costs
   if (definition.costs && !canViewCosts(context.role, granted)) {
+    notFound();
+  }
+  // QUO-17: a report of a plan capability does not exist while the business does not have it
+  if (definition.feature && !(await orgHasFeature(orgId, definition.feature))) {
     notFound();
   }
   const filters = reportFilters(definition, await searchParams);

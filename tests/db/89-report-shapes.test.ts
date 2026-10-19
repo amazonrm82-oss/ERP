@@ -177,6 +177,29 @@ describe("report result shapes (FXC-12)", () => {
       );
     });
 
+    // QUO-17: two sent quotes on a deal, one of them accepted (report_quotes)
+    await asUser(owner.id, (q) =>
+      q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed') on conflict (organization_id) do update set vat_status = 'licensed'", [org]),
+    );
+    await asUser(member.id, async (q) => {
+      const deal = (
+        await q<{ id: string }>(
+          `insert into public.deals (organization_id, name, pipeline_id, stage_id, owner_id)
+           select $1, 'עסקה להצעה', p.id, s.id, $2
+             from public.pipelines p join public.stages s on s.pipeline_id = p.id and s.kind = 'open'
+            where p.organization_id = $1 and p.is_default order by s.position limit 1
+           returning id`,
+          [org, member.id],
+        )
+      ).rows[0].id;
+      for (const title of ["הצעה שאושרה", "הצעה פתוחה"]) {
+        const quote = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, $2, $3) returning id", [org, title, deal])).rows[0].id;
+        await q("insert into public.quote_lines (organization_id, quote_id, name, unit_price_agorot) values ($1, $2, 'עבודה', 50000)", [org, quote]);
+        await q("select public.quote_send($1, $2)", [org, quote]);
+      }
+    });
+    await asAdmin((q) => q("update public.quotes set status = 'accepted' where organization_id = $1 and title = 'הצעה שאושרה'", [org]));
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -200,6 +223,7 @@ describe("report result shapes (FXC-12)", () => {
       report_pipeline_cleanup: ["public.report_pipeline_cleanup($1)", [org]],
       report_money_waiting: ["public.report_money_waiting($1)", [org]],
       report_referrals: ["public.report_referrals($1, $2, $3)", range],
+      report_quotes: ["public.report_quotes($1, $2, $3)", range],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

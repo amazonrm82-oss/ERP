@@ -2574,6 +2574,8 @@ export type Database = {
       report_gross_profit: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // CON-06
       report_referrals: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
+      // QUO-17
+      report_quotes: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       report_summary: {
         Args: { p_org: string; p_from: string; p_to: string; p_prev_from: string; p_prev_to: string; p_owner?: string | null };
         Returns: Json;
