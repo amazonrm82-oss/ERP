@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/wordmark";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
 import { RememberOrg } from "@/features/shortcuts/components/remember-org";
+import { withOrdersPlan } from "@/features/modules/modules";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
@@ -23,6 +24,7 @@ import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
 import { getOrgContextAllowClosed } from "@/features/shell/queries";
 import { trialEndBannerText } from "@/features/trial-end/notice";
@@ -86,7 +88,7 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd, syncTheme, terms, modules] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
@@ -97,6 +99,10 @@ export default async function OrgLayout({ children, params }: Props) {
     // LEAD-08: a switched-off module leaves the menu and the "+" menu
     getOrgModules(org.id),
   ]);
+  // ORD-01: orders show only while the plan holds them too; asked only when the business switched them on, and a failed
+  // read hides them (the menu never breaks the page)
+  const ordersInPlan = storedModules.orders ? await orgHasFeature(org.id, "orders").catch(() => false) : false;
+  const modules = withOrdersPlan(storedModules, ordersInPlan);
   // BIL-08: while the business is in the trial-end transition its line says what comes next
   const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
 

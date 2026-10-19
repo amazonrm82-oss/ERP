@@ -29,3 +29,11 @@ export function modulesFromRow(row: ModulesRow | null): OrgModules {
     ordersOfferClosed: Boolean(row?.orders_offer_closed_at),
   };
 }
+
+/**
+ * ORD-01: the orders entries (menu) show only while the plan holds `orders` AND the business switched the module on. A
+ * plan that lost the key leaves orders_enabled stored on, so the stored switch alone is not enough.
+ */
+export function withOrdersPlan(modules: OrgModules, ordersInPlan: boolean): OrgModules {
+  return { ...modules, orders: modules.orders && ordersInPlan };
+}

@@ -305,6 +305,16 @@ export function QuoteIcon(props: IconProps) {
   );
 }
 
+/** An order: a closed box with its tape line. */
+export function OrderIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z" />
+      <path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9M7.75 5.5l8.5 4" />
+    </Icon>
+  );
+}
+
 /** "עוד": three dots in a row. */
 export function MoreIcon(props: IconProps) {
   return (

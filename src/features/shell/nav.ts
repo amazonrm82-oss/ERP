@@ -8,6 +8,7 @@ import {
   CheckSquareIcon,
   HomeIcon,
   InboxIcon,
+  OrderIcon,
   QuoteIcon,
   SettingsIcon,
   TagIcon,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/icons";
 import { calendarPath } from "@/features/calendar/range";
 import { DEFAULT_MODULES, type OrgModules } from "@/features/modules/modules";
+import { ordersPath } from "@/features/orders/paths";
 import { productsPath } from "@/features/products/paths";
 import { quotesPath } from "@/features/quotes/paths";
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
@@ -46,6 +48,8 @@ export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules
     // QUO-16 (owner, 18 October 2026): under "עוד" on a phone. Shown to everyone, like deals and products: the menu does
     // not know the plan's features
     { key: "quotes", label: "הצעות מחיר", href: quotesPath(orgId), icon: QuoteIcon, mobile: false },
+    // ORD-01: under "עוד" on a phone; only while the plan holds orders and the business switched them on (withOrdersPlan)
+    { key: "orders", label: "הזמנות", href: ordersPath(orgId), icon: OrderIcon, mobile: false },
     // CAL-02: under "עוד" on a phone; the four bottom-bar places stay as they are
     { key: "calendar", label: "יומן", href: calendarPath(orgId), icon: CalendarIcon, mobile: false },
     // PRD-01: under "עוד" on a phone
@@ -56,10 +60,11 @@ export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules
   return items.filter((item) => moduleOn(item.key, modules));
 }
 
-/** LEAD-08: whether a menu or "+" entry belongs to a module the business switched off. */
+/** LEAD-08: whether a menu or "+" entry belongs to a module the business switched off (ORD-01: orders also need the plan). */
 function moduleOn(key: string, modules: OrgModules): boolean {
   if (key === "leads" || key === "lead") return modules.leads;
   if (key === "companies" || key === "company") return modules.companies;
+  if (key === "orders" || key === "order") return modules.orders;
   return true;
 }
 
