@@ -2,6 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
+import { TypeIcon } from "@/features/activity-types/components/type-icon";
+import { listActivityTypes } from "@/features/activity-types/queries";
+import { logChoices } from "@/features/activity-types/types";
 import { listNoteFiles } from "@/features/files/queries";
 import { formatBytes, opensInBrowser } from "@/features/files/types";
 import { getMentionCandidates } from "@/features/mentions/queries";
@@ -35,7 +38,13 @@ type Props = {
 export async function Timeline({ orgId, subject, canWrite, filter: filterParam }: Props) {
   const filter = parseTimelineFilter(filterParam);
   // getOrgContext is memoized per request: the page already loaded it
-  const [items, context] = await Promise.all([getTimeline(orgId, subject, filter), getOrgContext(orgId)]);
+  // TASK-08: the business's activity types name the entries and fill the log form's choices
+  const typesRead = listActivityTypes(orgId);
+  const [items, context, types] = await Promise.all([
+    typesRead.then((list) => getTimeline(orgId, subject, filter, list)),
+    getOrgContext(orgId),
+    typesRead,
+  ]);
   const writable = canWrite && context.canWrite;
   // REC-02: who may be mentioned here, and the current names of those mentioned in the entries shown
   const [mentions, mentionedNames, noteFiles] = await Promise.all([
@@ -59,7 +68,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
       <CardBody>
         {canWrite ? (
           <div className="mb-6 print:hidden">
-            <NoteForm orgId={orgId} subject={subject} mentions={mentions} />
+            <NoteForm orgId={orgId} subject={subject} mentions={mentions} choices={logChoices(types)} />
           </div>
         ) : null}
 
@@ -106,6 +115,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                         <span className="sr-only">: גלויה רק למי שכתב אותה ולמנהלי המערכת</span>
                       </Badge>
                     ) : null}
+                    {item.icon ? <TypeIcon icon={item.icon} className="me-1 inline size-4 align-text-bottom text-ink-soft" /> : null}
                     <span className="font-medium text-ink">{item.label}</span>
                     {item.authorName ? <>, {item.authorName}</> : null}
                     <span className="mx-1.5" aria-hidden="true">

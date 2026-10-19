@@ -17,7 +17,8 @@ export type ReorderTable =
   | "product_units"
   | "deal_contact_roles"
   | "lead_routing_rules"
-  | "contact_relation_types";
+  | "contact_relation_types"
+  | "activity_types";
 
 /**
  * Saves a list's order (positions 0..n-1) in one call: all of it or none of it, with the user's rights. Answers an

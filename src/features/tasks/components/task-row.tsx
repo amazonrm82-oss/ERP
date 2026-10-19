@@ -15,12 +15,13 @@ import { inlineEditAction } from "@/features/inline-edit/actions";
 import { TaskChecklist, type ChecklistTemplateOption } from "@/features/task-checklists/components/task-checklist";
 import type { ChecklistStep } from "@/features/task-checklists/templates";
 import { isRestDay } from "@/features/calendar-days/holidays";
+import type { ActivityTypeOption } from "@/features/activity-types/types";
 import { addDays } from "@/lib/calendar-grid";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
 import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, takeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import type { BusinessDaysContext } from "./business-days-picker";
-import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
+import { REMIND_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
 export type TaskRowView = {
   id: string;
@@ -37,6 +38,9 @@ export type TaskRowView = {
   ownerId: string | null;
   ownerName: string | null;
   taskType: string;
+  // TASK-08: the name the row shows for the task's kind (null for a plain "משימה"), and the edit form's choice
+  kindLabel: string | null;
+  kindChoice: string;
   // 1 high, 2 normal, 3 low (TASK-01)
   priority: number;
   outcome: string | null;
@@ -60,9 +64,11 @@ type Props = {
   businessDays?: BusinessDaysContext;
   /** TASK-06: the business's checklist templates, for "steps from a template" */
   templates?: ChecklistTemplateOption[];
+  /** TASK-08: the business's activity and task types, for the edit form */
+  kinds?: ActivityTypeOption[];
 };
 
-export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays, templates = [] }: Props) {
+export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays, templates = [], kinds = [] }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +109,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
   if (editing) {
     return (
       <li className="px-4 py-3.5 sm:px-5">
-        <TaskEditForm orgId={orgId} task={task} assignees={assignees} businessDays={businessDays} onDone={() => setEditing(false)} />
+        <TaskEditForm orgId={orgId} task={task} assignees={assignees} businessDays={businessDays} kinds={kinds} onDone={() => setEditing(false)} />
       </li>
     );
   }
@@ -129,7 +135,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
           {!task.done && task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
           {!task.done && task.recurrence ? <span>{describeRecurrence(task.recurrence)}</span> : null}
           {!task.done && task.remind !== "" ? <span>תזכורת {REMIND_OPTIONS.find((o) => o.value === task.remind)?.label}</span> : null}
-          {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
+          {task.kindLabel ? <span>{task.kindLabel}</span> : null}
           {!task.done && task.priority === 3 ? <span>עדיפות נמוכה</span> : null}
           {showOwner && task.ownerName ? <span>באחריות {task.ownerName}</span> : null}
           {task.related ? (
@@ -229,7 +235,7 @@ function TeamTaskRow({ orgId, task, teamName, canTake }: { orgId: string; task: 
         </p>
         <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
           {task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
-          {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
+          {task.kindLabel ? <span>{task.kindLabel}</span> : null}
           <span>עדיין אין אחראי. מי שלוקח ראשון הופך לאחראי.</span>
           {task.related ? (
             <Link href={task.related.href} className="underline underline-offset-4 hover:text-ink">
@@ -256,9 +262,16 @@ function TeamTaskRow({ orgId, task, teamName, canTake }: { orgId: string; task: 
   );
 }
 
-type EditProps = { orgId: string; task: TaskRowView; assignees: AssigneeOption[]; businessDays?: BusinessDaysContext; onDone: () => void };
+type EditProps = {
+  orgId: string;
+  task: TaskRowView;
+  assignees: AssigneeOption[];
+  businessDays?: BusinessDaysContext;
+  kinds: ActivityTypeOption[];
+  onDone: () => void;
+};
 
-function TaskEditForm({ orgId, task, assignees, businessDays, onDone }: EditProps) {
+function TaskEditForm({ orgId, task, assignees, businessDays, kinds, onDone }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateTaskAction(orgId, task.id, prev, formData);
     if (result?.ok) {
@@ -283,7 +296,7 @@ function TaskEditForm({ orgId, task, assignees, businessDays, onDone }: EditProp
             due_date: task.dueDate,
             due_time: task.dueTime,
             owner_id: task.ownerId,
-            task_type: task.taskType,
+            task_type: task.kindChoice,
             remind: task.remind,
             priority: String(task.priority),
             ...repeatValues(task.recurrence),
@@ -293,6 +306,7 @@ function TaskEditForm({ orgId, task, assignees, businessDays, onDone }: EditProp
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}
         businessDays={businessDays}
+        kinds={kinds}
       />
       <div className="flex flex-wrap gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>

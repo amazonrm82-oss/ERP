@@ -1,5 +1,6 @@
 import "server-only";
 
+import { entryLabel, isActivityBase, type ActivityTypeIcon, type ActivityTypeOption } from "@/features/activity-types/types";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
@@ -12,8 +13,10 @@ import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilt
 export type TimelineItem = {
   id: string;
   type: string;
-  // short Hebrew label of the activity type
+  // short Hebrew label of the activity type (TASK-08: the business's name for a logged kind)
   label: string;
+  // TASK-08: the icon of a logged entry's type; null for system events
+  icon: ActivityTypeIcon | null;
   // user-written text (notes) or a generated sentence (system events)
   text: string;
   isUserContent: boolean;
@@ -61,12 +64,17 @@ const TIMELINE_LIMIT = 100;
  * Timeline of a record: pinned entries first, then newest first (100 entries at most).
  * REC-06: with a filter, only activities of those types (pinned ones still on top).
  */
-export async function getTimeline(orgId: string, subject: TimelineSubject, filter?: TimelineFilter): Promise<TimelineItem[]> {
+export async function getTimeline(
+  orgId: string,
+  subject: TimelineSubject,
+  filter?: TimelineFilter,
+  types: ReadonlyArray<ActivityTypeOption> = [],
+): Promise<TimelineItem[]> {
   const supabase = await createClient();
 
   let query = supabase
     .from("activities")
-    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned, is_private")
+    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned, is_private, activity_type_id")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id);
   // the type lists are constants (TIMELINE_FILTERS), never text from the URL
@@ -164,6 +172,8 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
       isUserContent = false;
     }
 
+    // TASK-08: a logged entry is named by the business's type (its own, else the default of its kind)
+    const logged = !quoteKind && isActivityBase(activity.type) ? entryLabel(activity.activity_type_id, activity.type, types) : null;
     return {
       id: activity.id,
       // a quote entry is an event on screen: no edit, delete or pin buttons
@@ -173,7 +183,11 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
         ? "הצעת מחיר"
         : activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
           ? "נשלחה הודעת WhatsApp"
-          : (TYPE_LABELS[activity.type] ?? "פעילות"),
+          : logged
+            ? logged.name
+            : (TYPE_LABELS[activity.type] ?? "פעילות"),
+      // TASK-08: the icon of the business's type (logged kinds only)
+      icon: logged?.icon ?? null,
       text,
       isUserContent,
       body: activity.body ?? "",

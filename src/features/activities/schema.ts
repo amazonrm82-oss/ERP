@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { checkbox, optionalText, requiredText } from "@/lib/validation";
 
+import { ACTIVITY_BASES, BASE_LABELS } from "@/features/activity-types/types";
 import { MENTION_MAX, mentionIds } from "@/features/mentions/token";
 
 import { sanitizeNote } from "./markdown";
@@ -34,15 +35,9 @@ export const subjectSchema = z.object({
   id: z.guid(),
 });
 
-// what a person can log on a record; the reports count these as contact with the customer
-export const LOGGED_TYPES = [
-  { value: "note", label: "הערה" },
-  { value: "call", label: "שיחה" },
-  { value: "meeting", label: "פגישה" },
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "email", label: "אימייל" },
-  { value: "sms", label: "SMS" },
-] as const;
+// what a person can log on a record; the reports count these as contact with the customer. TASK-08: the business names
+// them through its list of types (src/features/activity-types/types.ts, which holds the built-in names)
+export const LOGGED_TYPES = ACTIVITY_BASES.map((value) => ({ value, label: BASE_LABELS[value] }));
 
 const LOGGED_TYPE_VALUES = ["note", "call", "meeting", "whatsapp", "email", "sms"] as const;
 

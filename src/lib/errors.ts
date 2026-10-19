@@ -268,6 +268,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "form:card": "הטופס של כרטיס ביקור משתנה רק דרך הכרטיס עצמו.",
   "booking_page:no_hours": "אי אפשר להפעיל את הדף: לא הוגדרו שעות עבודה לנציג או לעסק, ובלי שעות אין זמנים פנויים. הגדירו שעות עבודה, או שמרו את הדף כשהוא כבוי.",
   // CON-03 follow-up: the roles of a contact on a deal
+  // TASK-08
+  "activity_types:max": "אפשר לשמור עד 50 סוגים. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
+  "activity_type:invalid": "הסוג שנבחר כבר לא ברשימה, או שאינו מתאים. רעננו את הדף ובחרו סוג אחר.",
   "deal_contact_roles:max": "אפשר לשמור עד 20 תפקידים. מחקו תפקיד שלא בשימוש כדי להוסיף חדש.",
   "deal_contact_role:invalid": "התפקיד שנבחר כבר לא ברשימה. רעננו את הדף ובחרו שוב.",
   // CAL-09 (migration meeting_series)

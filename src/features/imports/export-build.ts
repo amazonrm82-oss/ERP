@@ -56,6 +56,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "deal_contact_roles", file: "deal_contact_roles.csv" },
   { table: "tasks", file: "tasks.csv" },
   { table: "activities", file: "activities.csv" },
+  // TASK-08: the business's names of activity and task types (activity_type_id on activities and tasks)
+  { table: "activity_types", file: "activity_types.csv" },
   { table: "meetings", file: "meetings.csv" },
   { table: "meeting_participants", file: "meeting_participants.csv" },
   // CAL-08
@@ -183,6 +185,8 @@ export const LOOKUPS: Record<string, string> = {
   role_id: "role_label",
   // CON-06: the other contact of a relation
   related_contact_id: "related_contact",
+  // TASK-08: the business's type of an activity or a task
+  activity_type_id: "activity_type",
 };
 
 export type ExportRow = Record<string, unknown>;
@@ -215,7 +219,7 @@ const READABLE: Record<string, { header: string; get: (value: unknown, row: Expo
 // tables whose rows are named by their name column
 const NAMED_BY_NAME = new Set<string>([
   "lead_statuses", "lead_sources", "stages", "pipelines", "companies", "teams", "record_type_options", "product_categories", "product_units",
-  "price_lists", "products", "deal_contact_roles", "contact_relation_types",
+  "price_lists", "products", "deal_contact_roles", "contact_relation_types", "activity_types",
 ]);
 
 /**

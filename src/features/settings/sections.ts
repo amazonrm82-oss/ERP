@@ -37,6 +37,7 @@ import { responseSettingsPath } from "@/features/response-target/paths";
 import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { checklistTemplatesPath } from "@/features/task-checklists/paths";
+import { activityTypesPath } from "@/features/activity-types/paths";
 import { modulesSettingsPath } from "@/features/modules/paths";
 import { termsSettingsPath } from "@/features/terminology/paths";
 import { paths } from "@/lib/paths";
@@ -141,6 +142,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
               // TASK-06
               { href: checklistTemplatesPath(orgId), label: "תבניות רשימת תיוג", description: "רשימות שלבים קבועות שנכנסות למשימה, כמו קליטת לקוח", icon: CheckSquareIcon },
+              // TASK-08
+              { href: activityTypesPath(orgId), label: "סוגי פעילות ומשימה", description: "ביקור, הדגמה: השמות שבוחרים מהם בתיעוד ובמשימות", icon: CheckSquareIcon },
             ]
           : []),
       ],

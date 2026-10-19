@@ -17,6 +17,8 @@ import { ExportMenu, exportHref } from "@/features/list-export/components/export
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
+import { listActivityTypes } from "@/features/activity-types/queries";
+import { taskChoiceValue, taskKindLabel } from "@/features/activity-types/types";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
@@ -146,9 +148,11 @@ export default async function TasksPage({ params, searchParams }: Props) {
     ...covering.flatMap((group) => group.tasks),
     ...teamTasks,
   ].map((task) => task.id);
-  const [checklists, checklistTemplates] = await Promise.all([
+  const [checklists, checklistTemplates, kinds] = await Promise.all([
     listChecklistSteps(orgId, [...new Set(shownTaskIds)]),
     canWrite ? listChecklistTemplates(orgId) : [],
+    // TASK-08: the business's activity and task types
+    listActivityTypes(orgId),
   ]);
   const templates = checklistTemplates.map((t) => ({ id: t.id, name: t.name }));
   // HEB-03: "in N business days" counts from today in the business's zone
@@ -173,6 +177,8 @@ export default async function TasksPage({ params, searchParams }: Props) {
       ownerId: task.ownerId,
       ownerName: task.ownerName,
       taskType: task.taskType,
+      kindLabel: taskKindLabel(task, kinds),
+      kindChoice: taskChoiceValue(task, kinds),
       priority: task.priority,
       outcome: task.outcome,
       recurrence: task.recurrence,
@@ -227,6 +233,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                         assignees={assignees}
                         businessDays={businessDays}
                         templates={templates}
+                        kinds={kinds}
                       />
                     ))}
                   </ul>
@@ -277,6 +284,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                       assignees={[]}
                       businessDays={businessDays}
                       templates={templates}
+                      kinds={kinds}
                     />
                   ))}
                 </ul>
@@ -298,6 +306,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                     assignees={assignees}
                     businessDays={businessDays}
                     templates={templates}
+                    kinds={kinds}
                   />
                 ))}
               </ul>
@@ -313,7 +322,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
               <Card aria-labelledby="new-task-title">
                 <CardHeader id="new-task-title" title="משימה חדשה" />
                 <CardBody>
-                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} templates={templates} teams={teams.assignable} />
+                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} templates={templates} teams={teams.assignable} kinds={kinds} />
                 </CardBody>
               </Card>
             </NewTaskPanel>

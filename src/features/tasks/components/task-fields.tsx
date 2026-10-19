@@ -1,4 +1,5 @@
 import { SelectField, TextField } from "@/components/ui/field";
+import { taskChoices, type ActivityTypeOption } from "@/features/activity-types/types";
 import { restDays } from "@/features/calendar-days/holidays";
 
 import type { RepeatValues } from "../recurrence";
@@ -18,6 +19,8 @@ export type TaskValues = {
   priority?: string | null;
 } & RepeatValues;
 
+// the four codes a task stores (task_type), under their built-in names; the table, filters, export and calendar still
+// show these (TASK-08 part one names tasks by the business's types in the task list and its forms)
 export const TASK_TYPE_OPTIONS = [
   { value: "todo", label: "משימה" },
   { value: "call", label: "שיחה" },
@@ -59,10 +62,12 @@ type Props = {
   businessDays?: BusinessDaysContext;
   /** TASK-07: teams the task may go to with no owner (new tasks only); the first in the team to take it owns it */
   teams?: Array<{ id: string; name: string }>;
+  /** TASK-08: the business's activity and task types, offered beside the fixed "משימה" and "מעקב" */
+  kinds?: ActivityTypeOption[];
 };
 
 /** Title, due date and time, reminder, repeat, assignee. Shared by the new-task form and the edit form. */
-export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays, teams = [] }: Props) {
+export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays, teams = [], kinds = [] }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
     <>
@@ -102,7 +107,7 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId, business
       </SelectField>
       {/* key: a select only takes defaultValue on mount */}
       <SelectField key={`type-${values.task_type ?? "todo"}`} label="סוג" name="task_type" defaultValue={values.task_type ?? "todo"} error={errors.task_type}>
-        {TASK_TYPE_OPTIONS.map((option) => (
+        {taskChoices(kinds, values.task_type).map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

@@ -488,6 +488,8 @@ describe("roles and record visibility", () => {
       "insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')",
       "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
       "insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')",
+      // TASK-08
+      "insert into public.activity_types (organization_id, base_type, name) values ($1, 'meeting', 'x')",
       // LEAD-05
       "insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'email', 'filled', 5)",
       "insert into public.meeting_types (organization_id, name) values ($1, 'x')",
@@ -558,6 +560,7 @@ describe("roles and record visibility", () => {
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
+      activity_types: "name = name",
       lead_score_rules: "points = points",
       meeting_types: "name = name",
       // PRD-04, seeded for every organization

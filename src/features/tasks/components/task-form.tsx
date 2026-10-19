@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
+import type { ActivityTypeOption } from "@/features/activity-types/types";
 import { SelectField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
@@ -21,10 +22,12 @@ type Props = {
   templates?: Array<{ id: string; name: string }>;
   // TASK-07: teams the user may give a task to with no owner
   teams?: Array<{ id: string; name: string }>;
+  // TASK-08: the business's activity and task types
+  kinds?: ActivityTypeOption[];
 };
 
 /** New task, for oneself or for a colleague. The form clears itself after a successful save. */
-export function TaskForm({ orgId, assignees, myUserId, today, calendar, templates = [], teams = [] }: Props) {
+export function TaskForm({ orgId, assignees, myUserId, today, calendar, templates = [], teams = [], kinds = [] }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createTaskAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   return (
@@ -37,6 +40,7 @@ export function TaskForm({ orgId, assignees, myUserId, today, calendar, template
         defaultOwnerId={myUserId}
         businessDays={calendar ? { calendar, today } : undefined}
         teams={teams}
+        kinds={kinds}
       />
       {templates.length > 0 ? (
         <SelectField label="רשימת תיוג" name="checklist_template" defaultValue={failure?.values?.checklist_template ?? ""}>

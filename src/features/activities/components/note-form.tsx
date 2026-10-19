@@ -12,10 +12,23 @@ import { uploadFiles } from "@/features/files/upload-client";
 import type { FormState } from "@/lib/action-result";
 
 import { addNoteAction } from "../actions";
-import { LOGGED_TYPES, PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
+import { defaultLogChoice, logChoices, type LogChoice } from "@/features/activity-types/types";
+
+import { PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
 import { NoteEditor } from "./note-editor";
 
-export function NoteForm({ orgId, subject, mentions }: { orgId: string; subject: TimelineSubject; mentions?: MentionCandidate[] }) {
+type Props = {
+  orgId: string;
+  subject: TimelineSubject;
+  mentions?: MentionCandidate[];
+  // TASK-08: the business's types (logChoices); without them, the six base kinds
+  choices?: LogChoice[];
+};
+
+const BASE_CHOICES = logChoices([]);
+
+export function NoteForm({ orgId, subject, mentions, choices = BASE_CHOICES }: Props) {
+  const startOn = defaultLogChoice(choices);
   const router = useRouter();
   const fileInputId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -38,8 +51,15 @@ export function NoteForm({ orgId, subject, mentions }: { orgId: string; subject:
   return (
     // After a successful save React resets the form, which clears the textarea.
     <form action={formAction} className="space-y-3">
-      <SelectField key={`type-${failure?.values?.type ?? "note"}`} label="סוג הפעילות" name="type" defaultValue={failure?.values?.type ?? "note"} className="max-w-48">
-        {LOGGED_TYPES.map((option) => (
+      <SelectField
+        key={`type-${failure?.values?.type ?? startOn}`}
+        label="סוג הפעילות"
+        name="type"
+        defaultValue={failure?.values?.type ?? startOn}
+        error={failure?.fieldErrors?.type}
+        className="max-w-48"
+      >
+        {choices.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

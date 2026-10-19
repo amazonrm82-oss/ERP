@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { parseTaskChoice } from "@/features/activity-types/types";
 import { optionalDate, optionalId, optionalText, requiredText } from "@/lib/validation";
 
 export const TASK_FIELD_NAMES = ["title", "due_date", "due_time", "owner_id", "task_type", "remind", "priority"] as const;
@@ -20,8 +21,16 @@ export const taskSchema = z
     due_time: optionalTime,
     // empty: the task is the creator's (set by the database)
     owner_id: optionalId,
-    // the quick-add on the home page does not send it
-    task_type: z.preprocess((value) => (value === null || value === "" ? "todo" : value), z.enum(TASK_TYPE_VALUES, { error: "יש לבחור סוג." })),
+    // the quick-add on the home page does not send it ("משימה"). TASK-08: a fixed code, or a type of the business's list
+    // ("t:<id>"), read into the columns to write (parseTaskChoice)
+    task_type: z.unknown().transform((value, ctx) => {
+      const kind = parseTaskChoice(value);
+      if (!kind) {
+        ctx.addIssue({ code: "custom", message: "יש לבחור סוג." });
+        return z.NEVER;
+      }
+      return kind;
+    }),
     // the quick-add does not send it either
     remind: z.preprocess((value) => value ?? "", z.enum(REMIND_VALUES, { error: "יש לבחור תזכורת." })),
     // 1 high, 2 normal, 3 low (TASK-01); forms without the field keep "normal"

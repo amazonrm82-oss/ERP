@@ -299,6 +299,8 @@ describe("tenant isolation", () => {
     "deal_loss_reasons",
     // CON-03 follow-up, also seeded
     "deal_contact_roles",
+    // TASK-08, also seeded
+    "activity_types",
     // CAL-08, also seeded
     "meeting_types",
     // CAL-10
@@ -495,6 +497,7 @@ describe("tenant isolation", () => {
       whatsapp_templates: "name = name",
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
+      activity_types: "name = name",
       meeting_types: "name = name",
       booking_pages: "title = title",
       segments: "name = name",
@@ -621,6 +624,7 @@ describe("tenant isolation", () => {
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.activity_types (organization_id, base_type, name) values ($1, 'meeting', 'x')", [orgA]],
       ["insert into public.meeting_types (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.booking_pages (organization_id, user_id, title) values ($1, $2, 'x')", [orgA, a.id]],
       ["insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'x')", [orgA]],
@@ -725,6 +729,7 @@ describe("tenant isolation", () => {
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["deal_contact_roles", "is_active = false", "not is_active"],
+      ["activity_types", "is_active = false", "not is_active"],
       ["meeting_types", "is_active = false", "not is_active"],
       ["booking_pages", "title = 'HACKED'", "title = 'HACKED'"],
       ["segments", "name = 'HACKED'", "name = 'HACKED'"],

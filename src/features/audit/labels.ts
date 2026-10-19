@@ -29,6 +29,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   deal_loss_reasons: "סיבת הפסד",
   // CON-03 follow-up
   deal_contact_roles: "תפקיד בעסקה",
+  activity_types: "סוג פעילות ומשימה",
   // CON-06
   contact_relation_types: "סוג קשר בין אנשי קשר",
   // CAL-08

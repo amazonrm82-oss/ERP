@@ -23,6 +23,8 @@ export type TaskItem = {
   // TASK-07: the task's team; with no owner and still open it is a team task anyone in the team may take
   teamId: string | null;
   taskType: string;
+  // TASK-08: a type of the business's list (its base kind set taskType)
+  activityTypeId: string | null;
   priority: number;
   completedAt: string | null;
   // what came of it, once done (TASK-03)
@@ -45,12 +47,13 @@ export type TaskGroups = {
 
 const OPEN_LIMIT = 300;
 const DONE_SHOWN = 20;
-const TASK_ITEM_COLUMNS = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id";
+const TASK_ITEM_COLUMNS = "id, title, task_type, activity_type_id, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id";
 
 type TaskItemRow = {
   id: string;
   title: string;
   task_type: string;
+  activity_type_id: string | null;
   priority: number;
   outcome: string | null;
   recurrence: unknown;
@@ -75,6 +78,7 @@ function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
     ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
     teamId: row.team_id,
     taskType: row.task_type,
+    activityTypeId: row.activity_type_id,
     priority: row.priority,
     completedAt: row.completed_at,
     outcome: row.outcome,

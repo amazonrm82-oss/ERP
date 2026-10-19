@@ -1465,6 +1465,20 @@ export type ContactRelationRow = {
   updated_at: string;
 };
 
+// TASK-08: the business's activity and task types (one list); base_type is fixed once inserted
+export type ActivityTypeRow = {
+  id: string;
+  organization_id: string;
+  base_type: string;
+  name: string;
+  icon: string | null;
+  key: string | null;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealContactRoleRow = {
   id: string;
   organization_id: string;
@@ -1978,6 +1992,8 @@ export type ActivityRow = {
   contact_id: string | null;
   company_id: string | null;
   deal_id: string | null;
+  // TASK-08: the business's name for the kind (activity_types; its base_type equals type)
+  activity_type_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1996,6 +2012,7 @@ export type ActivityInsert = {
   contact_id?: string | null;
   company_id?: string | null;
   deal_id?: string | null;
+  activity_type_id?: string | null;
 };
 
 // Column grant: only these columns may be updated by a client.
@@ -2033,6 +2050,8 @@ export type TaskRow = {
   recurrence_source_id: string | null;
   // IMP-03: the import that created the task; set on insert only (tasks_import_tag, insert grant only)
   import_job_id: string | null;
+  // TASK-08: a type of the business's list; sets task_type from its base (trigger tasks_activity_type_check)
+  activity_type_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -2057,6 +2076,7 @@ export type TaskInsert = {
   company_id?: string | null;
   deal_id?: string | null;
   recurrence?: Json | null;
+  activity_type_id?: string | null;
   deleted_at?: string | null;
 };
 
@@ -2383,6 +2403,12 @@ export type Database = {
         ContactRelationRow,
         { organization_id: string; contact_id?: string | null; lead_id?: string | null; related_contact_id: string; type_id: string },
         Record<string, never>
+      >;
+      // TASK-08: column grants (key is server-only; base_type and organization_id fixed once inserted)
+      activity_types: Table<
+        ActivityTypeRow,
+        { organization_id: string; base_type: string; name: string; icon?: string | null; position?: number; is_active?: boolean },
+        { name?: string; icon?: string | null; position?: number; is_active?: boolean }
       >;
       // CON-03 follow-up: column grants (key is server-only; organization_id fixed once inserted)
       deal_contact_roles: Table<

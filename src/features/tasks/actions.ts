@@ -107,7 +107,7 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
   const { data: created, error } = await context.supabase.from("tasks").insert({
     organization_id: orgId,
     title: parsed.data.title,
-    task_type: parsed.data.task_type,
+    ...parsed.data.task_type,
     priority: parsed.data.priority,
     recurrence: parsed.data.recurrence,
     ...schedule(parsed.data),
@@ -151,7 +151,7 @@ export async function updateTaskAction(
     .from("tasks")
     .update({
       title: parsed.data.title,
-      task_type: parsed.data.task_type,
+      ...parsed.data.task_type,
       priority: parsed.data.priority,
       recurrence: parsed.data.recurrence,
       ...schedule(parsed.data),

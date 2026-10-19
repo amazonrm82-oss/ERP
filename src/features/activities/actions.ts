@@ -13,6 +13,9 @@ import { pick } from "@/lib/validation";
 import { addDays } from "@/lib/calendar-grid";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { recordPage } from "@/lib/record-types";
+import { isActivityBase, parseChoice } from "@/features/activity-types/types";
+
+const TYPE_GONE = "הסוג שנבחר כבר לא ברשימה. רעננו את הדף ובחרו סוג אחר.";
 import type { TaskInsert } from "@/lib/database.types";
 
 import {
@@ -55,14 +58,43 @@ export async function addNoteAction(
     return context;
   }
 
-  const parsed = noteSchema.safeParse(pick(formData, ["type", "body", "private"]));
+  // TASK-08: the form sends a base kind, or a type of the business's list ("t:<id>"), whose kind is read from the list
+  const rawType = formData.get("type");
+  const choice = parseChoice(rawType === null || rawType === "" ? "note" : rawType);
+  if (!choice) {
+    return fail("יש לבחור סוג.", { values: formValues(formData), fieldErrors: { type: "יש לבחור סוג." } });
+  }
+  let base = "base" in choice ? choice.base : null;
+  if ("typeId" in choice) {
+    const { data: type, error: typeError } = await context.supabase
+      .from("activity_types")
+      .select("base_type")
+      .eq("organization_id", orgId)
+      .eq("id", choice.typeId)
+      .maybeSingle();
+    if (typeError) {
+      return fail(dbErrorMessage(typeError), { values: formValues(formData) });
+    }
+    if (!type || !isActivityBase(type.base_type)) {
+      return fail(TYPE_GONE, { values: formValues(formData), fieldErrors: { type: TYPE_GONE } });
+    }
+    base = type.base_type;
+  }
+  const parsed = noteSchema.safeParse({ ...pick(formData, ["body", "private"]), type: base });
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
 
   // RLS: allowed when the user can write in the organization and can see the record.
   // GAP-05: a private note is seen by its author and the owners/admins only (activities_select).
-  const row: ActivityInsert = { organization_id: orgId, type: parsed.data.type, body: parsed.data.body, is_private: parsed.data.private };
+  const row: ActivityInsert = {
+    organization_id: orgId,
+    type: parsed.data.type,
+    body: parsed.data.body,
+    is_private: parsed.data.private,
+    // TASK-08: the database checks the type is active and of this kind (activities_activity_type)
+    activity_type_id: "typeId" in choice ? choice.typeId : null,
+  };
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
   const { data, error } = await context.supabase.from("activities").insert(row).select("id").single();
   if (error) {
