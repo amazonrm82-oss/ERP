@@ -958,6 +958,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `customer_deleted_at`); merges move them through the `merged` entry (`app.merge_orders`). Switch `org_modules.orders_enabled`
   (only with the flag) hides screens only. Server writes set `app.order_server`. `app.audit_erase_core`, `app.sample_untouched` and
   `app.import_record_worked` were last redefined in 020570.
+  Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
+  (composite FK set null, only with `price_source = 'price_list'`, flag `price_lists`, name copied from the list).
+  `app.order_lines_check` and `public.order_from_deal` were last redefined in 020585.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
