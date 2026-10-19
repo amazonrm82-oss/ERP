@@ -2,7 +2,7 @@
 -- Replacing a deal's lines with an accepted quote's (QUO-13 part one)
 -- =============================================================================
 -- Runs by hand in the SQL Editor (the connector stops on a migration that holds a delete statement). Belongs to
--- 20261006020475_quote_accept_deal.sql; it only creates a function, so it may run before or after that one. Until this one
+-- 20261006020485_quote_accept_deal.sql; it only creates a function, so it may run before or after that one. Until this one
 -- runs, the automatic step of an accepted quote
 -- still moves the deal to won and its notice says the lines were not updated (the call fails into its own savepoint), and
 -- public.quote_lines_to_deal and public.quote_win_deal answer an error (42883).
