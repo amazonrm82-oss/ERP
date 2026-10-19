@@ -1044,6 +1044,13 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   The app mirror of the take rule is `teamsForTaskRights()` in `src/features/tasks/team-rights.ts` (test 191 compares them).
   Since 020505 a viewer does not see team tasks through the team rule, and the team notice skips automation runs and recurring spawns
   (`app.team_task_visible`, `app.notify_team_task` last redefined there).
+- Activity and task types (TASK-08, migration 020545; owner 19 October 2026: every plan, no key): `public.activity_types` (managed
+  list, 50 per org, hint `activity_types:max`; `base_type` one of the six activity kinds, insert-only; server-only `key` on the six
+  seeded defaults, mirrored by `DEFAULT_ACTIVITY_TYPES`; members read, owners/admins of a writable org write; audited).
+  `activities.activity_type_id` must match the activity's kind (trigger `activities_activity_type`, hint `activity_type:invalid`);
+  `tasks.activity_type_id` sets `task_type` from its base (call/meeting/else todo) and is cleared when `task_type` alone changes; the
+  six kinds and the four task codes stay the truth for reports, "last contact", automations and filters. "משימה"/"מעקב" are fixed
+  choices, not list entries. `public.reorder_positions` was last redefined in 020545.
 - Recurring tasks (TASK-04, migration 0063): completing a task with `recurrence` makes `app.spawn_recurring_task()`
   (security definer, trigger) create the next one, once (`recurrence_source_id`, unique; clients may not write it).
   Since then `tasks` has column-level INSERT/UPDATE grants: a new `tasks` column must also get
