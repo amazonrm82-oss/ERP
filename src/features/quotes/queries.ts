@@ -323,6 +323,8 @@ export type QuoteCustomerNow = {
   phoneE164: string | null;
   // the person the greeting names
   contactName: string | null;
+  // CON-10: the contact's preferred channel (phone|whatsapp|email|sms), which orders the send buttons
+  preferredChannel: string | null;
 };
 
 /**
@@ -333,7 +335,7 @@ export async function getQuoteCustomerNow(orgId: string, quote: Quote): Promise<
   const supabase = await createClient();
   const [contactRead, companyRead] = await Promise.all([
     quote.contactId
-      ? supabase.from("contacts").select("full_name, billing_name, company_id, email, phone_e164").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle()
+      ? supabase.from("contacts").select("full_name, billing_name, company_id, email, phone_e164, preferred_channel").eq("organization_id", orgId).eq("id", quote.contactId).maybeSingle()
       : null,
     quote.companyId ? supabase.from("companies").select("name").eq("organization_id", orgId).eq("id", quote.companyId).maybeSingle() : null,
   ]);
@@ -349,7 +351,13 @@ export async function getQuoteCustomerNow(orgId: string, quote: Quote): Promise<
     contactCompany: contact?.company_id ? (contactCompany ? { name: contactCompany.name, billingName: contactCompany.billing_name } : "hidden") : null,
     company: quote.companyId ? (company ? { name: company.name } : "hidden") : null,
   });
-  return { name, email: contact?.email ?? null, phoneE164: contact?.phone_e164 ?? null, contactName: contact?.full_name ?? null };
+  return {
+    name,
+    email: contact?.email ?? null,
+    phoneE164: contact?.phone_e164 ?? null,
+    contactName: contact?.full_name ?? null,
+    preferredChannel: contact?.preferred_channel ?? null,
+  };
 }
 
 export type QuoteVersionRef = { id: string; numberDisplay: string | null; status: QuoteStatus };

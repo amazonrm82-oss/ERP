@@ -157,7 +157,14 @@ export default async function QuotePage({ params, searchParams }: Props) {
     : null;
   const copied = readCopyNotice(started);
   const copiedText = copied ? copyNoticeText(copied) : null;
-  const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
+  const recipient = {
+    name: customerNow.contactName,
+    email: customerNow.email,
+    phoneE164: customerNow.phoneE164,
+    // CON-10: the contact's preferred channel comes first; WA-01's {שם הנציג} is the person sending
+    preferredChannel: customerNow.preferredChannel,
+    senderName: context.user.displayName,
+  };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
 

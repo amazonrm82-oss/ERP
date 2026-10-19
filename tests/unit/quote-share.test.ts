@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { currentNameIfChanged, NEW_LINK_WARNING, quoteCustomerName, quoteEmailText, quoteMailtoHref, quoteWhatsappHref } from "@/features/quotes/share";
+import { currentNameIfChanged, NEW_LINK_WARNING, quoteCustomerName, quoteEmailText, quoteLinkMessage, quoteMailtoHref, quoteWhatsappHref, shareOrder } from "@/features/quotes/share";
 
 // QUO-08 (owner, 18 October 2026): the link goes out by WhatsApp or email when the quote is sent; QUO-07 point 9: today's
 // customer name beside the printed one.
@@ -13,8 +13,10 @@ describe("sending the customer's link", () => {
   });
 
   it("opens WhatsApp with the customer's number when it is E.164, else lets the person pick the chat", () => {
-    expect(quoteWhatsappHref(url, "QT-7", "+972501234567")).toBe(`https://wa.me/972501234567?text=${encodeURIComponent(`הצעת מחיר QT-7: ${url}`)}`);
-    expect(quoteWhatsappHref(url, null, null)).toBe(`https://wa.me/?text=${encodeURIComponent(`הצעת מחיר: ${url}`)}`);
+    expect(quoteWhatsappHref(url, "QT-7", "+972501234567")).toBe(
+      `https://wa.me/972501234567?text=${encodeURIComponent(`שלום, הצעת מחיר QT-7 מחכה לך בקישור הזה: ${url}`)}`,
+    );
+    expect(quoteWhatsappHref(url, null, null)).toBe(`https://wa.me/?text=${encodeURIComponent(`שלום, הצעת מחיר מחכה לך בקישור הזה: ${url}`)}`);
     expect(quoteWhatsappHref(url, null, "050-1234567")).toMatch(/^https:\/\/wa\.me\/\?text=/);
   });
 
@@ -63,5 +65,20 @@ describe("the customer's name now (quote_send's order; test 158 compares with th
     expect(currentNameIfChanged("ירח", " ירח ")).toBeNull();
     expect(currentNameIfChanged(null, "ירח")).toBeNull();
     expect(currentNameIfChanged("ירח", null)).toBeNull();
+  });
+
+  it("fills the WhatsApp message like a WA-01 template, leaving out a part that is missing", () => {
+    expect(quoteLinkMessage(url, "QT-7", { customerName: "דנה כהן", senderName: "יוסי", businessName: "ירח הפקות" })).toBe(
+      `שלום דנה, כאן יוסי מירח הפקות. הצעת מחיר QT-7 מחכה לך בקישור הזה: ${url}`,
+    );
+    expect(quoteLinkMessage(url, null, { businessName: "ירח הפקות" })).toBe(`שלום, כאן ירח הפקות. הצעת מחיר מחכה לך בקישור הזה: ${url}`);
+    expect(quoteLinkMessage(url, "QT-7", { customerName: "  ", senderName: "יוסי" })).toBe(`שלום, כאן יוסי. הצעת מחיר QT-7 מחכה לך בקישור הזה: ${url}`);
+    expect(quoteLinkMessage(url, "QT-7", { customerName: "דנה" })).not.toMatch(/[{}]/);
+    expect(quoteWhatsappHref(url, "QT-7", null, { customerName: "דנה" })).toContain(encodeURIComponent("שלום דנה,"));
+  });
+
+  it("puts the contact's preferred channel first (CON-10)", () => {
+    expect(shareOrder("email")).toEqual(["email", "whatsapp"]);
+    for (const other of ["whatsapp", "phone", "sms", null, undefined, "x"]) expect(shareOrder(other)).toEqual(["whatsapp", "email"]);
   });
 });

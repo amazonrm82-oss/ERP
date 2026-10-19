@@ -1,21 +1,40 @@
 // QUO-08 (owner, 18 October 2026): the customer's link goes out by WhatsApp or email right when the quote is sent, and
 // from the link card later. Pure helpers, shared by both places and the unit tests.
 
+import { firstNameOf } from "@/features/whatsapp/templates";
+
 /** Asked before a new link replaces a working one (owner, 18 October 2026: "הקישור הקודם יפסיק לעבוד"). */
 export const NEW_LINK_WARNING = "הקישור הקודם יפסיק לעבוד מיד: מי שיפתח אותו לא יראה את ההצעה. אחר כך שלחו ללקוח את הקישור החדש.";
 
-/** The line that goes with the link in WhatsApp. */
-export function quoteLinkMessage(url: string, numberDisplay: string | null): string {
-  return `${numberDisplay ? `הצעת מחיר ${numberDisplay}` : "הצעת מחיר"}: ${url}`;
+/** Who the WhatsApp message is from and to; every part may be missing. */
+export type QuoteMessageParties = { customerName?: string | null; senderName?: string | null; businessName?: string | null };
+
+/**
+ * The WhatsApp message with the link, filled like a WA-01 template ("שלום {שם פרטי}, כאן {שם הנציג} מ{שם העסק}."): a part
+ * that is missing is left out of the sentence rather than shown as a placeholder, because the message goes to the customer.
+ */
+export function quoteLinkMessage(url: string, numberDisplay: string | null, parties: QuoteMessageParties = {}): string {
+  const quote = numberDisplay ? `הצעת מחיר ${numberDisplay}` : "הצעת מחיר";
+  const first = firstNameOf(parties.customerName);
+  const sender = parties.senderName?.trim() || null;
+  const business = parties.businessName?.trim() || null;
+  const greeting = first ? `שלום ${first},` : "שלום,";
+  const from = sender && business ? ` כאן ${sender} מ${business}.` : sender ? ` כאן ${sender}.` : business ? ` כאן ${business}.` : "";
+  return `${greeting}${from} ${quote} מחכה לך בקישור הזה: ${url}`;
+}
+
+/** The order of the WhatsApp and email buttons: the contact's preferred channel first (CON-10); email only when preferred. */
+export function shareOrder(preferredChannel: string | null | undefined): Array<"whatsapp" | "email"> {
+  return preferredChannel === "email" ? ["email", "whatsapp"] : ["whatsapp", "email"];
 }
 
 /**
  * wa.me with the message. With the customer's number (E.164) the chat opens with them; without one the person picks the
  * chat. A number that is not E.164 is left out rather than guessed.
  */
-export function quoteWhatsappHref(url: string, numberDisplay: string | null, phoneE164: string | null): string {
+export function quoteWhatsappHref(url: string, numberDisplay: string | null, phoneE164: string | null, parties: QuoteMessageParties = {}): string {
   const digits = phoneE164 && /^\+[1-9]\d{6,14}$/.test(phoneE164) ? phoneE164.slice(1) : "";
-  return `https://wa.me/${digits}?text=${encodeURIComponent(quoteLinkMessage(url, numberDisplay))}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(quoteLinkMessage(url, numberDisplay, parties))}`;
 }
 
 // a plain address only: anything that could add headers or more recipients to the mailto link is left out

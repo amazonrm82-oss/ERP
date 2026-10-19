@@ -133,7 +133,7 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(QUOTE_LINK_TOKEN.test(token.slice(1))).toBe(false);
     expect(QUOTE_LINK_TOKEN.test(`${token.slice(1)}/`)).toBe(false);
     expect(publicQuotePath(token)).toBe(`/f/quote/${token}`);
-    expect(quoteLinkMessage("https://x/f/quote/t", "QT-7")).toBe("הצעת מחיר QT-7: https://x/f/quote/t");
-    expect(quoteLinkMessage("https://x/f/quote/t", null)).toBe("הצעת מחיר: https://x/f/quote/t");
+    expect(quoteLinkMessage("https://x/f/quote/t", "QT-7")).toBe("שלום, הצעת מחיר QT-7 מחכה לך בקישור הזה: https://x/f/quote/t");
+    expect(quoteLinkMessage("https://x/f/quote/t", null)).toBe("שלום, הצעת מחיר מחכה לך בקישור הזה: https://x/f/quote/t");
   });
 });
