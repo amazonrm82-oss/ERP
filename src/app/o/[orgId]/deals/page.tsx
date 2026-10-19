@@ -29,6 +29,8 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender, type TermForms } from "@/features/terminology/terms";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -39,7 +41,10 @@ import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
 import { nextSort, parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 
-export const metadata: Metadata = { title: "עסקאות" };
+export async function generateMetadata({ params }: { params: Promise<{ orgId: string }> }): Promise<Metadata> {
+  // FLD-10: the business's own word
+  return { title: (await getOrgTerms((await params).orgId)).deal.plural };
+}
 
 type Query = Record<string, string | string[] | undefined>;
 type Props = {
@@ -47,11 +52,11 @@ type Props = {
   searchParams: Promise<Query>;
 };
 
-const NO_PIPELINE = (
+const noPipeline = (deal: TermForms) => (
   <>
-    <PageHeader title="עסקאות" />
+    <PageHeader title={deal.plural} />
     <div className="rounded-lg border border-line bg-surface">
-      <EmptyState icon={<BoardIcon />} title="אין תהליך מכירה" description="כדי לנהל עסקאות צריך תהליך מכירה עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות." />
+      <EmptyState icon={<BoardIcon />} title="אין תהליך מכירה" description={`כדי לנהל ${deal.plural} צריך תהליך מכירה עם שלבים. מנהל המערכת יכול להוסיף אחד בהגדרות.`} />
     </div>
   </>
 );
@@ -115,6 +120,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
   const query = await searchParams;
+  // FLD-10: the business's own words
+  const { deal, lead } = await getOrgTerms(orgId);
   if (firstParam(query.view) === "table") {
     return <DealsTableView orgId={orgId} context={context} query={query} />;
   }
@@ -150,7 +157,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
   ]);
 
   if (!board) {
-    return NO_PIPELINE;
+    return noPipeline(deal);
   }
 
   const stuck = await getStuckDeals(orgId, board.pipeline.id);
@@ -190,7 +197,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
       {canWrite ? (
         <ButtonLink href={`${paths.dealNew(orgId)}?pipeline=${board.pipeline.id}`}>
           <PlusIcon className="size-4.5" />
-          עסקה חדשה
+          {deal.newOne}
         </ButtonLink>
       ) : null}
     </span>
@@ -199,9 +206,11 @@ export default async function DealsPage({ params, searchParams }: Props) {
   return (
     <>
       <PageHeader
-        title="עסקאות"
+        title={deal.plural}
         description={
-          anyDeals ? `תהליך המכירה "${board.pipeline.name}": ${formatNumber(openCount)} עסקאות פתוחות בשווי ${formatMoney(openTotal)}.` : `תהליך המכירה "${board.pipeline.name}"`
+          anyDeals
+            ? `תהליך המכירה "${board.pipeline.name}": ${formatNumber(openCount)} ${deal.plural} ${byGender(deal, "פתוחים", "פתוחות")} בשווי ${formatMoney(openTotal)}.`
+            : `תהליך המכירה "${board.pipeline.name}"`
         }
         actions={newDealButton}
       />
@@ -211,7 +220,9 @@ export default async function DealsPage({ params, searchParams }: Props) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
           <Link href={boardHref({ closed: showClosed ? null : "1" })} className="text-accent-strong underline underline-offset-4">
-            {showClosed ? "הסתרת עסקאות שנסגרו" : "הצגת עסקאות שנסגרו (בהצלחה ואבודות)"}
+            {showClosed
+              ? `הסתרת ${deal.plural} שנסגרו`
+              : `הצגת ${deal.plural} שנסגרו (${byGender(deal, "בהצלחה ואבודים", "בהצלחה ואבודות")})`}
           </Link>
         </p>
         <ColumnsPanel
@@ -224,8 +235,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
           max={MAX_BOARD_FIELDS}
           texts={{
             button: "שדות בכרטיס",
-            group: "בחירת השדות בכרטיס עסקה",
-            hint: "שם העסקה תמיד מוצג. מסמנים מה להציג על כל כרטיס, ומסדרים בחצים.",
+            group: `בחירת השדות בכרטיס ${deal.singular}`,
+            hint: `שם ${deal.theSingular} תמיד מוצג. מסמנים מה להציג על כל כרטיס, ומסדרים בחצים.`,
             save: "שמירת השדות",
           }}
         />
@@ -244,13 +255,13 @@ export default async function DealsPage({ params, searchParams }: Props) {
 
       {!anyDeals && isBoardFiltered(filter) ? (
         <div className="mb-5 rounded-lg border border-line bg-surface">
-          <EmptyState kind="search" title="אין עסקאות שמתאימות לסינון" description="נסו לשנות את הסינון או לנקות אותו." />
+          <EmptyState kind="search" title={`אין ${deal.plural} ${byGender(deal, "שמתאימים", "שמתאימות")} לסינון`} description="נסו לשנות את הסינון או לנקות אותו." />
         </div>
       ) : !anyDeals ? (
         <div className="mb-5 rounded-lg border border-line bg-surface">
           <EmptyState icon={<BoardIcon />}
-            title="עוד אין עסקאות"
-            description="עסקה נוצרת כשממירים ליד, או ידנית מכאן. בלוח רואים בכל רגע כמה כסף נמצא בכל שלב."
+            title={`עוד אין ${deal.plural}`}
+            description={`${deal.singular} ${byGender(deal, "נוצר", "נוצרת")} כשממירים ${lead.singular}, או ידנית מכאן. בלוח רואים בכל רגע כמה כסף נמצא בכל שלב.`}
             action={newDealButton}
           />
         </div>
@@ -258,7 +269,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
 
       {board.totalsPartial ? (
         <p className="mb-3 text-sm text-ink-soft" role="status">
-          {`יותר מ-${formatNumber(FILTERED_TOTALS_LIMIT)} עסקאות מתאימות לסינון. הסכומים מחושבים מ-${formatNumber(FILTERED_TOTALS_LIMIT)} הראשונות בלבד. צמצמו את הסינון כדי לקבל סכום מדויק.`}
+          {`יותר מ-${formatNumber(FILTERED_TOTALS_LIMIT)} ${deal.plural} ${byGender(deal, "מתאימים", "מתאימות")} לסינון. הסכומים מחושבים מ-${formatNumber(FILTERED_TOTALS_LIMIT)} ${byGender(deal, "הראשונים", "הראשונות")} בלבד. צמצמו את הסינון כדי לקבל סכום מדויק.`}
         </p>
       ) : null}
 
@@ -299,6 +310,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
  * the cell, bulk actions and export, as in the other lists.
  */
 async function DealsTableView({ orgId, context, query }: { orgId: string; context: OrgContext; query: Query }) {
+  // FLD-10: the business's own words
+  const { deal, lead } = await getOrgTerms(orgId);
   const requested = firstParam(query.pipeline);
   // FXC-09: the pipeline, the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
   const [pipeline, pipelines, listColumns] = await Promise.all([
@@ -308,7 +321,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
     startListFilterLookups(orgId, "deal"),
   ]);
   if (!pipeline) {
-    return NO_PIPELINE;
+    return noPipeline(deal);
   }
   const search = firstParam(query.q).trim();
   const tagParam = firstParam(query.tag);
@@ -351,7 +364,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
   const newDealButton = context.canWrite ? (
     <ButtonLink href={`${paths.dealNew(orgId)}?pipeline=${pipeline.id}`}>
       <PlusIcon className="size-4.5" />
-      עסקה חדשה
+      {deal.newOne}
     </ButtonLink>
   ) : null;
   // QUO-16: every quote of the business, next to the new deal button
@@ -366,7 +379,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
 
   return (
     <>
-      <PageHeader title="עסקאות" description={`תהליך המכירה "${pipeline.name}"`} actions={headerActions} />
+      <PageHeader title={deal.plural} description={`תהליך המכירה "${pipeline.name}"`} actions={headerActions} />
       <ViewNav orgId={orgId} pipelineId={pipeline.id} pipelines={pipelines} table />
       <SavedViewsBar
         orgId={orgId}
@@ -400,7 +413,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
       <Form action={paths.deals(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <input type="hidden" name="view" value="table" />
         {pipelineParam ? <input type="hidden" name="pipeline" value={pipelineParam} /> : null}
-        <TextField label="חיפוש עסקאות" hideLabel name="q" type="search" placeholder="חיפוש לפי שם העסקה" defaultValue={search} className="min-w-0 flex-[1_1_14rem]" />
+        <TextField label={`חיפוש ${deal.plural}`} hideLabel name="q" type="search" placeholder={`חיפוש לפי שם ${deal.theSingular}`} defaultValue={search} className="min-w-0 flex-[1_1_14rem]" />
         <button type="submit" className={buttonClasses("secondary")}>
           <SearchIcon className="size-4.5" />
           חיפוש
@@ -426,8 +439,8 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (
             <EmptyState kind="search"
-              title="לא נמצאו עסקאות"
-              description="אין עסקאות שמתאימות לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
+              title={`לא נמצאו ${deal.plural}`}
+              description={`אין ${deal.plural} ${byGender(deal, "שמתאימים", "שמתאימות")} לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון.`}
               action={
                 <ButtonLink href={`${paths.deals(orgId)}?view=table${pipelineParam ? `&pipeline=${pipelineParam}` : ""}`} variant="secondary">
                   ניקוי הסינון
@@ -435,7 +448,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
               }
             />
           ) : (
-            <EmptyState icon={<BoardIcon />} title="עוד אין עסקאות בתהליך המכירה הזה" description="עסקה נוצרת כשממירים ליד, או ידנית מכאן." action={newDealButton} />
+            <EmptyState icon={<BoardIcon />} title={`עוד אין ${deal.plural} בתהליך המכירה הזה`} description={`${deal.singular} ${byGender(deal, "נוצר", "נוצרת")} כשממירים ${lead.singular}, או ידנית מכאן.`} action={newDealButton} />
           )}
         </div>
       )}

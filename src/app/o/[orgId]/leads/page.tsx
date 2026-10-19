@@ -28,6 +28,8 @@ import { canWriteSegments } from "@/features/segments/model";
 import { segmentsPath } from "@/features/segments/paths";
 import { staticSegmentOptions } from "@/features/segments/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender, waitingPlural } from "@/features/terminology/terms";
 import { whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -37,7 +39,10 @@ import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
 import { nextSort, parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 
-export const metadata: Metadata = { title: "לידים" };
+export async function generateMetadata({ params }: { params: Promise<{ orgId: string }> }): Promise<Metadata> {
+  // FLD-10: the business's own word
+  return { title: (await getOrgTerms((await params).orgId)).lead.plural };
+}
 
 type Props = {
   params: Promise<{ orgId: string }>;
@@ -48,6 +53,9 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
   const context = await getOrgContext(orgId);
+  // FLD-10: the business's own words
+  const terms = await getOrgTerms(orgId);
+  const { lead, contact, deal } = terms;
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
   const { canWrite } = context;
@@ -125,19 +133,19 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>
       <PlusIcon className="size-4.5" />
-      ליד חדש
+      {lead.newOne}
     </ButtonLink>
   ) : null;
 
   return (
     <>
       <PageHeader
-        title="לידים"
-        description="פניות שעוד לא סוננו. ליד מתאים ממירים לאיש קשר ועסקה."
+        title={lead.plural}
+        description={`${lead.plural} שעוד לא סוננו. כשמתאים, ממירים ל${contact.singular} ול${deal.singular}.`}
         actions={
           <>
             <ButtonLink href={paths.leadsWaiting(orgId)} variant="secondary">
-              לידים שמחכים
+              {waitingPlural(lead)}
             </ButtonLink>
             <ButtonLink href={segmentsPath(orgId)} variant="secondary">
               סגמנטים
@@ -234,8 +242,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         <div className="rounded-lg border border-line bg-surface">
           {isFiltered || page > 1 ? (
             <EmptyState kind="search"
-              title="לא נמצאו לידים"
-              description="אין לידים שמתאימים לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
+              title={`לא נמצאו ${lead.plural}`}
+              description={`אין ${lead.plural} ${byGender(lead, "שמתאימים", "שמתאימות")} לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון.`}
               action={
                 <ButtonLink href={paths.leads(orgId)} variant="secondary">
                   ניקוי הסינון
@@ -244,8 +252,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
             />
           ) : (
             <EmptyState icon={<InboxIcon />}
-              title="עוד אין לידים"
-              description="כאן יופיעו כל הפניות החדשות, עם מקור, סטטוס ואחראי. אפשר להתחיל בהוספת הליד הראשון."
+              title={`עוד אין ${lead.plural}`}
+              description={`כאן יופיעו כל ${lead.thePlural} ${byGender(lead, "החדשים", "החדשות")}, עם מקור, סטטוס ואחראי. אפשר להתחיל בהוספת ${lead.theSingular} ${byGender(lead, "הראשון", "הראשונה")}.`}
               action={newLeadButton}
             />
           )}

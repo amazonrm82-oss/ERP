@@ -16,6 +16,7 @@ import {
 import { calendarPath } from "@/features/calendar/range";
 import { productsPath } from "@/features/products/paths";
 import { quotesPath } from "@/features/quotes/paths";
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
 
 export type NavItem = {
@@ -29,13 +30,14 @@ export type NavItem = {
   mobile: boolean;
 };
 
-export function navItems(orgId: string): NavItem[] {
+/** FLD-10: leads, contacts and deals carry the business's own words (today's words by default). */
+export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS): NavItem[] {
   return [
     { key: "home", label: "בית", href: paths.org(orgId), icon: HomeIcon, exact: true, mobile: true },
-    { key: "leads", label: "לידים", href: paths.leads(orgId), icon: InboxIcon, mobile: true },
-    { key: "contacts", label: "אנשי קשר", href: paths.contacts(orgId), icon: UsersIcon, mobile: false },
+    { key: "leads", label: terms.lead.plural, href: paths.leads(orgId), icon: InboxIcon, mobile: true },
+    { key: "contacts", label: terms.contact.plural, href: paths.contacts(orgId), icon: UsersIcon, mobile: false },
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
-    { key: "deals", label: "עסקאות", href: paths.deals(orgId), icon: BoardIcon, mobile: true },
+    { key: "deals", label: terms.deal.plural, href: paths.deals(orgId), icon: BoardIcon, mobile: true },
     { key: "tasks", label: "משימות", href: paths.tasks(orgId), icon: CheckSquareIcon, mobile: true },
     // QUO-16 (owner, 18 October 2026): under "עוד" on a phone. Shown to everyone, like deals and products: the menu does
     // not know the plan's features
@@ -57,12 +59,12 @@ export type CreateItem = {
 };
 
 /** REC-08: what the "+" button of the top bar can create; each opens that type's own create screen. */
-export function createItems(orgId: string): CreateItem[] {
+export function createItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS): CreateItem[] {
   return [
-    { key: "lead", label: "ליד חדש", href: paths.leadNew(orgId), icon: InboxIcon },
-    { key: "contact", label: "איש קשר חדש", href: paths.contactNew(orgId), icon: UsersIcon },
+    { key: "lead", label: terms.lead.newOne, href: paths.leadNew(orgId), icon: InboxIcon },
+    { key: "contact", label: terms.contact.newOne, href: paths.contactNew(orgId), icon: UsersIcon },
     { key: "company", label: "חברה חדשה", href: paths.companyNew(orgId), icon: BuildingIcon },
-    { key: "deal", label: "עסקה חדשה", href: paths.dealNew(orgId), icon: BoardIcon },
+    { key: "deal", label: terms.deal.newOne, href: paths.dealNew(orgId), icon: BoardIcon },
     { key: "task", label: "משימה חדשה", href: paths.taskNew(orgId), icon: CheckSquareIcon },
   ];
 }

@@ -399,6 +399,42 @@ describe("roles and record visibility", () => {
     expect(await asUser(owner.id, async (q) => (await q("update public.quote_designs set footer_text = 'שלום' where organization_id = $1", [org])).rowCount)).toBe(1);
   });
 
+  it("the business's words: everyone reads them, only owners and admins write them, nobody deletes them (FLD-10)", async () => {
+    // the business has no row yet: only owners and admins may create it
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.org_terms (organization_id, lead_term) values ($1, 'inquiry')", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) =>
+      q("insert into public.org_terms (organization_id, contact_term) values ($1, 'student') on conflict (organization_id) do update set contact_term = 'student'", [org]),
+    );
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.org_terms where organization_id = $1", [org])), u.email).toBe(1);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.org_terms set contact_term = 'member' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.org_terms set deal_term = 'case' where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.org_terms where organization_id = $1", [org])))).code).toBe("42501");
+    // a word outside the ready list is refused
+    expect((await pgError(asUser(owner.id, (q) => q("update public.org_terms set lead_term = 'חברים' where organization_id = $1", [org])))).code).toBe("23514");
+    // the last writer is recorded by touch_row
+    expect(await asAdmin(async (q) => (await q<{ u: string }>("select updated_by as u from public.org_terms where organization_id = $1", [org])).rows[0].u)).toBe(owner.id);
+    // a read-only business keeps its words readable and frozen, for owners too
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await asUser(m1.id, (q) => count(q, "select 1 from public.org_terms where organization_id = $1", [org]))).toBe(1);
+      for (const u of [owner, admin]) {
+        expect(await asUser(u.id, async (q) => (await q("update public.org_terms set deal_term = 'deal' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+      }
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

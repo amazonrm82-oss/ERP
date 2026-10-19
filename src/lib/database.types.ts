@@ -650,6 +650,19 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+// FLD-10: a business's own words for contacts, leads and deals (migration org_terms); null = today's word.
+// Keys mirror src/features/terminology/terms.ts.
+export type OrgTermsRow = {
+  id: string;
+  organization_id: string;
+  contact_term: string | null;
+  lead_term: string | null;
+  deal_term: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MembershipRow = {
   id: string;
   organization_id: string;
@@ -2397,6 +2410,11 @@ export type Database = {
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
       // QUO-05: column grants; no delete (a row is changed, never removed)
+      org_terms: Table<
+        OrgTermsRow,
+        { organization_id: string; contact_term?: string | null; lead_term?: string | null; deal_term?: string | null },
+        { contact_term?: string | null; lead_term?: string | null; deal_term?: string | null }
+      >;
       quote_designs: Table<QuoteDesignDbRow, QuoteDesignWrite & { organization_id: string }, QuoteDesignWrite>;
       // QUO-04: column grants; the VAT mode is set when the template is made
       quote_templates: Table<

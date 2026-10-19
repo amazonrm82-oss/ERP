@@ -85,6 +85,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   quote_template_lines: "שורה בתבנית הצעת מחיר",
   // QUO-05
   quote_designs: "עיצוב הצעת מחיר",
+  // FLD-10
+  org_terms: "מונחים",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08

@@ -9,15 +9,17 @@ import { MoreIcon } from "@/components/ui/icons";
 
 import { cn } from "@/lib/cn";
 
+import type { OrgTerms } from "@/features/terminology/terms";
+
 import { isActive, navItems } from "../nav";
 
 /** Fixed sidebar navigation (start side: right in RTL). Desktop and tablet. */
-export function SidebarNav({ orgId }: { orgId: string }) {
+export function SidebarNav({ orgId, terms }: { orgId: string; terms?: OrgTerms }) {
   const pathname = usePathname();
   return (
     <nav aria-label="ניווט ראשי">
       <ul className="space-y-0.5">
-        {navItems(orgId).map((item) => {
+        {navItems(orgId, terms).map((item) => {
           const active = isActive(pathname, item);
           return (
             <li key={item.key}>
@@ -47,10 +49,10 @@ type ExtraLink = { href: string; label: string };
  * opens a sheet with everything else, so no screen is reachable only through
  * the user menu.
  */
-export function BottomNav({ orgId, extra }: { orgId: string; extra: ExtraLink[] }) {
+export function BottomNav({ orgId, extra, terms }: { orgId: string; extra: ExtraLink[]; terms?: OrgTerms }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const all = navItems(orgId);
+  const all = navItems(orgId, terms);
   const items = all.filter((item) => item.mobile);
   const rest = all.filter((item) => !item.mobile);
   const moreActive = rest.some((item) => isActive(pathname, item));

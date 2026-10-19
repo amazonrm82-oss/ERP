@@ -37,6 +37,7 @@ import { responseSettingsPath } from "@/features/response-target/paths";
 import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { checklistTemplatesPath } from "@/features/task-checklists/paths";
+import { termsSettingsPath } from "@/features/terminology/paths";
 import { paths } from "@/lib/paths";
 
 export type SettingsSection = {
@@ -109,6 +110,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
       sections: [
         ...(access.admin
           ? [
+              // FLD-10
+              { href: termsSettingsPath(orgId), label: "מונחים", description: "איך העסק קורא לאנשי קשר, ללידים ולעסקאות", icon: PencilIcon },
               { href: paths.settingsPipelines(orgId), label: "תהליכי מכירה", description: "שלבי המכירה של העסקאות", icon: BoardIcon },
               { href: paths.settingsDealLossReasons(orgId), label: "סיבות הפסד", description: "הרשימה שבוחרים ממנה כשעסקה אבודה", icon: BoardIcon },
               // CON-03 follow-up

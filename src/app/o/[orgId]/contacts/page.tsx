@@ -26,6 +26,8 @@ import { SaveAsSegment } from "@/features/segments/components/segment-forms";
 import { canWriteSegments } from "@/features/segments/model";
 import { segmentsPath } from "@/features/segments/paths";
 import { staticSegmentOptions } from "@/features/segments/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender } from "@/features/terminology/terms";
 import { getOrgContext } from "@/features/shell/queries";
 import { listWhatsappLog, whatsappListContext } from "@/features/whatsapp/templates";
 import { listTags } from "@/features/tags/queries";
@@ -35,7 +37,10 @@ import { isUuid, paths } from "@/lib/paths";
 import { firstParam, parsePage } from "@/lib/search";
 import { nextSort, parseSort, sortValue, type CustomSortKey, type Sort } from "@/lib/sort";
 
-export const metadata: Metadata = { title: "אנשי קשר" };
+export async function generateMetadata({ params }: { params: Promise<{ orgId: string }> }): Promise<Metadata> {
+  // FLD-10: the business's own word
+  return { title: (await getOrgTerms((await params).orgId)).contact.plural };
+}
 
 type Props = {
   params: Promise<{ orgId: string }>;
@@ -46,6 +51,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
   const context = await getOrgContext(orgId);
+  // FLD-10: the business's own words
+  const { contact: term, lead: leadTerm } = await getOrgTerms(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
   const { canWrite } = context;
@@ -99,15 +106,15 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const newContactButton = canWrite ? (
     <ButtonLink href={paths.contactNew(orgId)}>
       <PlusIcon className="size-4.5" />
-      איש קשר חדש
+      {term.newOne}
     </ButtonLink>
   ) : null;
 
   return (
     <>
       <PageHeader
-        title="אנשי קשר"
-        description="הלקוחות והאנשים שהעסק עובד איתם."
+        title={term.plural}
+        description={`${term.thePlural} שהעסק עובד איתם.`}
         actions={
           <>
             <ButtonLink href={segmentsPath(orgId)} variant="secondary">
@@ -152,7 +159,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
       </ListTools>
       <Form action={paths.contacts(orgId)} role="search" className="mb-4 flex flex-wrap items-end gap-2">
         <TextField
-          label="חיפוש אנשי קשר"
+          label={`חיפוש ${term.plural}`}
           hideLabel
           name="q"
           type="search"
@@ -179,7 +186,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
       {contacts.length > 0 ? (
         <>
           <RecordCards
-            label="אנשי קשר"
+            label={term.plural}
             className="md:hidden"
             cards={contacts.map((contact) => ({
               id: contact.id,
@@ -218,8 +225,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         <div className="rounded-lg border border-line bg-surface">
           {search !== "" || tagId !== null || filter.tree !== null || page > 1 ? (
             <EmptyState kind="search"
-              title="לא נמצאו אנשי קשר"
-              description="אין אנשי קשר שמתאימים לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון."
+              title={`לא נמצאו ${term.plural}`}
+              description={`אין ${term.plural} ${byGender(term, "שמתאימים", "שמתאימות")} לחיפוש או לסינון. נסו מילה אחרת או נקו את הסינון.`}
               action={
                 <ButtonLink href={paths.contacts(orgId)} variant="secondary">
                   ניקוי הסינון
@@ -228,8 +235,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
             />
           ) : (
             <EmptyState icon={<UsersIcon />}
-              title="עוד אין אנשי קשר"
-              description="אנשי קשר נוצרים כשממירים ליד, או ידנית מכאן. לכל אחד יש ציר זמן עם כל ההערות והפעילות."
+              title={`עוד אין ${term.plural}`}
+              description={`${term.plural} ${byGender(term, "נוצרים", "נוצרות")} כשממירים ${leadTerm.singular}, או ידנית מכאן. ${byGender(term, "לכל אחד", "לכל אחת")} יש ציר זמן עם כל ההערות והפעילות.`}
               action={newContactButton}
             />
           )}

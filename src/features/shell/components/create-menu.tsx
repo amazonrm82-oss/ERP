@@ -5,6 +5,8 @@ import Link from "next/link";
 import { PlusIcon } from "@/components/ui/icons";
 import { Popover } from "@/components/ui/popover";
 
+import type { OrgTerms } from "@/features/terminology/terms";
+
 import { createItems } from "../nav";
 
 /**
@@ -12,7 +14,7 @@ import { createItems } from "../nav";
  * from any screen by opening that type's own create screen. The layout shows it
  * only to users who may write (not a viewer, not a read-only organization).
  */
-export function CreateMenu({ orgId }: { orgId: string }) {
+export function CreateMenu({ orgId, terms }: { orgId: string; terms?: OrgTerms }) {
   return (
     <Popover
       label="יצירה"
@@ -23,7 +25,7 @@ export function CreateMenu({ orgId }: { orgId: string }) {
     >
       {(close) => (
         <ul className="py-1.5">
-          {createItems(orgId).map((item) => (
+          {createItems(orgId, terms).map((item) => (
             <li key={item.key}>
               <Link href={item.href} onClick={close} className="flex min-h-11 items-center gap-3 px-4 text-md hover:bg-canvas">
                 <item.icon className="size-5 shrink-0 text-ink-soft" />

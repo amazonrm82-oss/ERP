@@ -12,13 +12,18 @@ import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { WaitingClock } from "@/features/leads/components/waiting-clock";
 import { takenLabel } from "@/features/leads/take";
 import { getWaitingLeads } from "@/features/leads/waiting";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender, waitingPlural } from "@/features/terminology/terms";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 import { waitingText } from "@/lib/waiting-time";
 
-export const metadata: Metadata = { title: "לידים שמחכים" };
+export async function generateMetadata({ params }: { params: Promise<{ orgId: string }> }): Promise<Metadata> {
+  // FLD-10: the business's own word
+  return { title: waitingPlural((await getOrgTerms((await params).orgId)).lead) };
+}
 
 type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<{ who?: string | string[] }> };
 
@@ -29,6 +34,8 @@ type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<{ who?:
 export default async function WaitingLeadsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
+  // FLD-10: the business's own word
+  const term = (await getOrgTerms(orgId)).lead;
   const showAll = (await searchParams).who === "all";
   const { leads, truncated } = showAll
     ? await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role })
@@ -46,12 +53,16 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   return (
     <>
       <PageHeader
-        title="לידים שמחכים"
-        description={leads.length > 0 ? `${formatNumber(leads.length)}${truncated ? "+" : ""} לידים עוד לא קיבלו מענה. הוותיק ביותר למעלה.` : undefined}
-        back={{ href: paths.leads(orgId), label: "לידים" }}
+        title={waitingPlural(term)}
+        description={
+          leads.length > 0
+            ? `${formatNumber(leads.length)}${truncated ? "+" : ""} ${term.plural} עוד לא קיבלו מענה. ${byGender(term, "הוותיק ביותר", "הוותיקה ביותר")} למעלה.`
+            : undefined
+        }
+        back={{ href: paths.leads(orgId), label: term.plural }}
       />
       <Tabs
-        label="של מי הלידים"
+        label={`של מי ${term.thePlural}`}
         className="mb-5"
         items={[
           { href: base, label: "שלי", current: !showAll },
@@ -62,8 +73,8 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
         <div className="rounded-lg border border-line bg-surface">
           <EmptyState
             icon={<InboxIcon />}
-            title="אין לידים שמחכים"
-            description="כל ליד שנכנס ועוד לא קיבל מענה (שיחה, הודעה, פגישה או הערה בציר הזמן) מופיע כאן, עם הזמן שעבר מאז שנכנס."
+            title={`אין ${waitingPlural(term)}`}
+            description={`כל ${term.singular} ${byGender(term, "שנכנס ועוד לא קיבל", "שנכנסה ועוד לא קיבלה")} מענה (שיחה, הודעה, פגישה או הערה בציר הזמן) ${byGender(term, "מופיע", "מופיעה")} כאן, עם הזמן שעבר מאז ${byGender(term, "שנכנס", "שנכנסה")}.`}
           />
         </div>
       ) : (

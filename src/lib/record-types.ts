@@ -1,3 +1,4 @@
+import type { OrgTerms } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
 
 // FXC-06: the one place that says what each kind of record is: its table, its
@@ -102,4 +103,13 @@ export function recordTable<T extends RecordType>(type: T): (typeof RECORD_TYPES
 export function recordPage(type: RecordType, orgId: string, id: string): string {
   const info = RECORD_TYPES[type];
   return info.page ? info.page(orgId, id) : info.list(orgId);
+}
+
+/**
+ * FLD-10: a record type's names in the business's own words (contacts, leads and deals; companies and tasks keep theirs).
+ * `plural` and `singular` above are today's words, for code that has no business at hand.
+ */
+export function recordTypeNames(type: RecordType, terms: OrgTerms): { singular: string; plural: string } {
+  const term = type === "lead" ? terms.lead : type === "contact" ? terms.contact : type === "deal" ? terms.deal : null;
+  return term ? { singular: term.singular, plural: term.plural } : { singular: RECORD_TYPES[type].singular, plural: RECORD_TYPES[type].plural };
 }

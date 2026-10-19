@@ -111,6 +111,8 @@ describe("tenant isolation", () => {
       await q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed')", [orgA]);
       // QUO-05
       await q("insert into public.quote_designs (organization_id, header_text) values ($1, 'כותרת של א')", [orgA]);
+      // FLD-10
+      await q("insert into public.org_terms (organization_id, contact_term) values ($1, 'patient')", [orgA]);
       await q("insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)", [orgA]);
       await q("insert into public.number_sequences (organization_id, kind, prefix) values ($1, 'quote', 'Q-')", [orgA]);
       await q("insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק', '800', '1234567')", [orgA]);
@@ -271,6 +273,8 @@ describe("tenant isolation", () => {
     "org_document_settings",
     // QUO-05
     "quote_designs",
+    // FLD-10
+    "org_terms",
     "org_bank_details",
     // CAP-10
     "lead_response_settings",
@@ -464,6 +468,8 @@ describe("tenant isolation", () => {
       org_calendar_settings: "holidays_rest = holidays_rest",
       org_document_settings: "vat_status = vat_status",
       quote_designs: "show_logo = show_logo",
+      // no delete grant at all: a permission error is the expected outcome for the delete
+      org_terms: "contact_term = contact_term",
       lead_response_settings: "target_minutes = target_minutes",
       // no delete grant at all: a permission error is the expected outcome for the delete
       number_sequences: "prefix = prefix",
@@ -591,6 +597,7 @@ describe("tenant isolation", () => {
       ["insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{0}')", [orgA]],
       ["insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')", [orgA]],
       ["insert into public.quote_designs (organization_id, header_text) values ($1, 'x')", [orgA]],
+      ["insert into public.org_terms (organization_id, deal_term) values ($1, 'case')", [orgA]],
       ["insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 90)", [orgA]],
       ["insert into public.number_sequences (organization_id, kind) values ($1, 'order')", [orgA]],
       ["insert into public.org_bank_details (organization_id, bank_name) values ($1, 'x')", [orgA]],
@@ -696,6 +703,7 @@ describe("tenant isolation", () => {
       ["org_calendar_settings", "holiday_eves_rest = true", "holiday_eves_rest"],
       ["org_document_settings", "vat_status = 'exempt'", "vat_status = 'exempt'"],
       ["quote_designs", "header_text = 'HACKED'", "header_text = 'HACKED'"],
+      ["org_terms", "lead_term = 'prospect'", "lead_term = 'prospect'"],
       ["lead_response_settings", "target_minutes = 777", "target_minutes = 777"],
       ["number_sequences", "prefix = 'HACKED'", "prefix = 'HACKED'"],
       ["org_bank_details", "bank_name = 'HACKED'", "bank_name = 'HACKED'"],

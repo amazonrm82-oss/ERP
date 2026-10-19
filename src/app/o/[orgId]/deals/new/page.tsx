@@ -10,11 +10,15 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { DealForm } from "@/features/deals/components/deal-form";
 import { getPipeline } from "@/features/deals/queries";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { isUuid, paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
 
-export const metadata: Metadata = { title: "עסקה חדשה" };
+export async function generateMetadata({ params }: { params: Promise<{ orgId: string }> }): Promise<Metadata> {
+  // FLD-10: the business's own word
+  return { title: (await getOrgTerms((await params).orgId)).deal.newOne };
+}
 
 type Props = {
   params: Promise<{ orgId: string }>;
@@ -24,12 +28,13 @@ type Props = {
 export default async function NewDealPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const { canWrite } = await getOrgContext(orgId);
-  const back = { href: paths.deals(orgId), label: "עסקאות" };
+  const term = (await getOrgTerms(orgId)).deal;
+  const back = { href: paths.deals(orgId), label: term.plural };
 
   if (!canWrite) {
     return (
       <>
-        <PageHeader title="עסקה חדשה" back={back} />
+        <PageHeader title={term.newOne} back={back} />
         <ReadOnlyNotice />
       </>
     );
@@ -50,7 +55,7 @@ export default async function NewDealPage({ params, searchParams }: Props) {
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="עסקה חדשה" back={back} description={pipeline ? `תהליך המכירה "${pipeline.name}"` : undefined} />
+      <PageHeader title={term.newOne} back={back} description={pipeline ? `תהליך המכירה "${pipeline.name}"` : undefined} />
       <Card>
         {pipeline && pipeline.stages.length > 0 ? (
           <CardBody>
