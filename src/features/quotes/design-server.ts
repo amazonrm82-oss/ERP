@@ -158,6 +158,8 @@ export async function getSampleDocumentData(orgId: string, displayName: string):
     quote: {
       id: "sample",
       previousId: null,
+      cancelledFrom: null,
+      cancelReason: null,
       addendumOf: null,
       title: "הצעת מחיר לדוגמה",
       status: "sent",

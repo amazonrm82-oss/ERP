@@ -139,6 +139,8 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
       id: "public",
       previousId: null,
       addendumOf: null,
+      cancelledFrom: null,
+      cancelReason: null,
       title: q.title,
       status: isQuoteStatus(q.status) ? q.status : "sent",
       dealId: null,
@@ -203,4 +205,19 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     addendumOf: addendum ? { number: addendum.number } : null,
     addenda: (addenda ?? []).map((a, index) => ({ key: `addendum-${index + 1}`, number: a.number, title: a.title, totalAgorot: a.total_agorot })),
   };
+}
+
+// QUO-11 (owner, 19 October 2026): an accepted quote that was cancelled; the link shows only that, no prices or signing
+export type CancelledPublicQuote = { cancelled: true; number: string | null; title: string; business: string; logoPath: string | null };
+
+const cancelledSchema = z.object({
+  cancelled: z.object({ number: z.string().nullable(), title: z.string(), business: z.string(), logo: z.string().nullable(), color: z.string().nullable() }),
+});
+
+/** The "cancelled" answer of public.quote_public, or null for any other shape. */
+export function cancelledQuoteFrom(raw: unknown): CancelledPublicQuote | null {
+  const parsed = cancelledSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const c = parsed.data.cancelled;
+  return { cancelled: true, number: c.number, title: c.title, business: c.business, logoPath: c.logo };
 }

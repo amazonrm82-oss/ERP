@@ -1651,6 +1651,9 @@ export type QuoteRow = {
   previous_id: string | null;
   // GAP-10: the accepted quote this one adds to (server-only, set by public.quote_new_addendum and copied by quote_new_version)
   addendum_of: string | null;
+  // QUO-11 (owner, 19 October 2026): an accepted quote cancelled by an owner or admin, with the reason (server-only)
+  cancelled_from: string | null;
+  cancel_reason: string | null;
   currency: string;
   created_by: string | null;
   created_at: string;
@@ -2871,6 +2874,8 @@ export type Database = {
       };
       // QUO-11: cancels a sent, viewed or expired quote (whoever may edit its deal or contact)
       quote_cancel: { Args: { p_org: string; p_quote: string }; Returns: undefined };
+      // QUO-11: owners and admins cancel an accepted quote, with a reason
+      quote_cancel_accepted: { Args: { p_org: string; p_quote: string; p_reason: string }; Returns: undefined };
       // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)
       quote_public_version: { Args: { p_token: string }; Returns: Json };
       // QUO-09: the customer's page decides (service_role only); every outcome is an answer {status}

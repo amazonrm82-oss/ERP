@@ -34,6 +34,8 @@ const quote = (extra: Partial<Quote> = {}): Quote => ({
   id: "q",
   previousId: null,
   addendumOf: null,
+  cancelledFrom: null,
+  cancelReason: null,
   title: "שיפוץ מטבח",
   status: "draft",
   numberDisplay: null,

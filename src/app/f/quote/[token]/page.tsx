@@ -3,6 +3,7 @@ import "@/features/print/print.css";
 import type { Metadata } from "next";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
+import { OrgLogo } from "@/features/branding/components/org-logo";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PrintButton } from "@/features/print/components/print-button";
@@ -36,6 +37,34 @@ export default async function PublicQuotePage({ params }: Props) {
       <main className="mx-auto min-h-dvh w-full max-w-md px-5 py-10 sm:py-16">
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[page]}
+        </p>
+        <AccessibilityLink />
+      </main>
+    );
+  }
+
+  // QUO-11: an accepted quote the business cancelled: only that, no prices and no signing
+  if ("cancelled" in page) {
+    const logoUrl = logoPublicUrl(page.logoPath);
+    return (
+      <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
+        {logoUrl ? (
+          <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="h-12 max-w-40" />
+        ) : null}
+        <h1 className="text-lg font-semibold">
+          <bdi>{page.title}</bdi>
+        </h1>
+        <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          ההצעה
+          {page.number ? (
+            <>
+              {" "}
+              <span dir="ltr" className="tabular-nums">
+                {page.number}
+              </span>
+            </>
+          ) : null}{" "}
+          בוטלה על ידי <bdi>{page.business}</bdi>. לפרטים פנו לעסק.
         </p>
         <AccessibilityLink />
       </main>

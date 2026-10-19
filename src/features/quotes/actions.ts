@@ -499,6 +499,30 @@ export async function duplicateQuoteAction(orgId: string, quoteId: string): Prom
   redirect(`${quotePath(orgId, result.data.quote)}?${copyNoticeParams(result.data)}`);
 }
 
+const cancelAcceptedSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, "יש לכתוב סיבה לביטול.")
+    .max(500, "הסיבה ארוכה מדי (עד 500 תווים)."),
+});
+
+/**
+ * QUO-11 (owner, 19 October 2026): an owner or admin cancels a quote the customer already accepted, with a reason
+ * (public.quote_cancel_accepted). The customer's link then says "cancelled"; the deal is not touched.
+ */
+export async function cancelAcceptedQuoteAction(orgId: string, quoteId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const parsed = cancelAcceptedSchema.safeParse({ reason: formData.get("reason") ?? "" });
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const { error } = await context.supabase.rpc("quote_cancel_accepted", { p_org: orgId, p_quote: quoteId, p_reason: parsed.data.reason });
+  if (error) return fail(error.code === "42501" ? "רק בעלים ומנהלי מערכת מבטלים הצעה שאושרה." : dbErrorMessage(error), { values: formValues(formData) });
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  return { ok: true, message: "ההצעה בוטלה." };
+}
+
 /** GAP-10: an empty draft that adds to an accepted quote (public.quote_new_addendum); opens it. */
 export async function newQuoteAddendumAction(orgId: string, quoteId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, quoteId);

@@ -211,6 +211,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_cancel:draft": "טיוטה לא מבטלים אלא מוחקים.",
   "quote_cancel:accepted": "אי אפשר לבטל הצעה שהלקוח כבר אישר.",
   "quote_cancel:closed": "ההצעה כבר נדחתה או בוטלה.",
+  // QUO-11: cancelling an accepted quote (public.quote_cancel_accepted, owners and admins)
+  "quote_cancel:not_accepted": "רק הצעה שהלקוח אישר מבטלים כאן.",
+  "quote_cancel:reason": "יש לכתוב סיבה לביטול (עד 500 תווים).",
   "quote_version:exists": "להצעה הזאת כבר יש גרסה חדשה. ממשיכים לעבוד על הגרסה החדשה.",
   "quote_version:not_sent": "גרסה חדשה נוצרת רק מהצעה שנשלחה.",
   "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר.",

@@ -9,6 +9,7 @@ import { cancelQuoteAction, duplicateQuoteAction, newQuoteAddendumAction, newQuo
 import { copyNoticeText, readCopyNotice } from "@/features/quotes/duplicate";
 import { offersDealMove } from "@/features/quotes/accept-deal";
 import { QuoteDealMoveCard } from "@/features/quotes/components/quote-deal-move-card";
+import { CancelAcceptedQuote } from "@/features/quotes/components/cancel-accepted-quote";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { listMembers } from "@/features/settings/queries";
@@ -118,6 +119,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     parentRow !== null &&
     parentRow.deleted_at === null &&
     canEditRecordHint(context, parentRow.owner_id);
+  // QUO-11 (owner, 19 October 2026): owners and admins cancel an accepted quote, with a reason
+  const canCancelAccepted = hasQuotes && quote.status === "accepted" && isAdminRole(context.role) && context.canWrite;
   // GAP-10: an accepted original (never an addendum) takes addenda, made by whoever may edit its record
   const canAddendum =
     hasQuotes &&
@@ -205,6 +208,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 שכפול
               </ConfirmButton>
             ) : null}
+            {canCancelAccepted ? <CancelAcceptedQuote orgId={orgId} quoteId={quote.id} /> : null}
             {canCancel ? (
               <ConfirmButton
                 variant="danger-ghost"
@@ -222,6 +226,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
       />
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <Badge>{QUOTE_STATUS_LABELS[quote.status]}</Badge>
+        {quote.cancelledFrom === "accepted" ? <span>בוטלה אחרי שהלקוח אישר{quote.cancelReason ? <> · סיבה: <bdi>{quote.cancelReason}</bdi></> : null}</span> : null}
         {quote.numberDisplay ? (
           <span>
             מספר{" "}

@@ -56,6 +56,9 @@ export type Quote = {
   previousId: string | null;
   // GAP-10: the accepted quote this one adds to
   addendumOf: string | null;
+  // QUO-11: cancelled after the customer accepted, and why
+  cancelledFrom: string | null;
+  cancelReason: string | null;
 };
 
 export type QuoteLine = {
@@ -81,7 +84,7 @@ export type QuoteLine = {
 };
 
 const QUOTE_COLUMNS =
-  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id, addendum_of";
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id, addendum_of, cancelled_from, cancel_reason";
 
 type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
 type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
@@ -119,6 +122,8 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
     customerDeletedAt: row.customer_deleted_at,
     previousId: row.previous_id,
     addendumOf: row.addendum_of,
+    cancelledFrom: row.cancelled_from,
+    cancelReason: row.cancel_reason,
   };
 }
 
