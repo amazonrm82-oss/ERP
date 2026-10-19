@@ -98,3 +98,12 @@ export function waitingPlural(term: TermForms): string {
 export function noneYet(term: TermForms): string {
   return `אין עדיין ${term.plural}`;
 }
+
+/**
+ * FLD-10 part two: the definite form after ל, ב or כ, which swallow the article ("לאיש הקשר", "ללקוח", "לעסקה", "בתיק").
+ * The article is the leading ה of `theSingular`; a construct form ("איש הקשר") has none and takes the letter as it is.
+ */
+export function withPrefixThe(prefix: "ל" | "ב" | "כ", term: TermForms): string {
+  const bare = term.theSingular.startsWith("ה") && term.theSingular.slice(1) === term.singular ? term.singular : term.theSingular;
+  return `${prefix}${bare}`;
+}

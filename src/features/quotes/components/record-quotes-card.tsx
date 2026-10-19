@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { getOrgTerms } from "@/features/terminology/queries";
+import { withPrefixThe } from "@/features/terminology/terms";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -22,11 +24,13 @@ type Props = {
 export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
   const source = subject.kind === "company" ? null : { kind: subject.kind, id: subject.id };
   const creates = canCreate && source !== null;
-  const [quotes, templates, dealLines] = await Promise.all([
+  const [quotes, templates, dealLines, terms] = await Promise.all([
     listRecordQuotes(orgId, subject),
     creates ? listQuoteTemplates(orgId) : [],
     // DLI-05: a deal's quote may start from its lines
     creates && subject.kind === "deal" ? countDealLines(orgId, subject.id) : 0,
+    // FLD-10: the business's words
+    getOrgTerms(orgId),
   ]);
   if (quotes.length === 0 && !creates) return null;
   return (
@@ -38,7 +42,7 @@ export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
         } />
       <CardBody>
         {quotes.length === 0 ? (
-          <p className="text-sm text-ink-soft">{subject.kind === "deal" ? "עוד אין הצעות מחיר לעסקה." : subject.kind === "contact" ? "עוד אין הצעות מחיר לאיש הקשר." : "עוד אין הצעות מחיר לחברה."}</p>
+          <p className="text-sm text-ink-soft">{`עוד אין הצעות מחיר ${subject.kind === "deal" ? withPrefixThe("ל", terms.deal) : subject.kind === "contact" ? withPrefixThe("ל", terms.contact) : "לחברה"}.`}</p>
         ) : (
           <ul className="divide-y divide-line">
             {quotes.map((quote) => (

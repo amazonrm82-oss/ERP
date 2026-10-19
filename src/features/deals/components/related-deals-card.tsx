@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatMoney } from "@/lib/format";
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
 
 import { DEAL_STATUS } from "../display";
@@ -15,19 +16,21 @@ type Props = {
   // "?contact=<id>" or "?company=<id>": preselects the record in the new-deal form
   newDealQuery: string | null;
   emptyText: string;
+  // FLD-10: the business's word for deals
+  terms?: OrgTerms;
 };
 
 /** Deals of a contact or a company, on its card. */
-export function RelatedDealsCard({ orgId, deals, newDealQuery, emptyText }: Props) {
+export function RelatedDealsCard({ orgId, deals, newDealQuery, emptyText, terms = DEFAULT_TERMS }: Props) {
   return (
     <Card aria-labelledby="related-deals-title">
       <CardHeader
         id="related-deals-title"
-        title="עסקאות"
+        title={terms.deal.plural}
         action={
           newDealQuery ? (
             <ButtonLink href={`${paths.dealNew(orgId)}${newDealQuery}`} variant="ghost" size="sm">
-              עסקה חדשה
+              {terms.deal.newOne}
             </ButtonLink>
           ) : null
         }

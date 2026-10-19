@@ -1,5 +1,6 @@
 import { buildReport } from "@/features/reports/build";
-import { findReport } from "@/features/reports/definitions";
+import { findReport, reportTexts } from "@/features/reports/definitions";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { csvCell } from "@/features/reports/format";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -34,6 +35,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   }
   const searchParams = Object.fromEntries(new URL(request.url).searchParams);
   const xlsx = searchParams.format === "xlsx";
+  // FLD-10: the title in the business's words
+  const title = reportTexts(definition, await getOrgTerms(orgId)).title;
   const filters = reportFilters(definition, searchParams);
   const built = await withReportShape(() => buildReport(orgId, definition.key, filters));
   if (!built.ok) {
@@ -51,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
 
   if (xlsx) {
     const period = definition.filters.includes("period") ? filters.period : null;
-    const file = xlsxSheet(sheetName(definition.title, "דוח"), reportXlsxRows(definition.title, period, view));
+    const file = xlsxSheet(sheetName(title, "דוח"), reportXlsxRows(title, period, view));
     return new Response(file as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -61,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     });
   }
 
-  const lines: string[] = [csvCell("text", definition.title)];
+  const lines: string[] = [csvCell("text", title)];
   if (definition.filters.includes("period")) {
     lines.push(`${csvCell("text", "תקופה")},${filters.period.fromDate},${filters.period.toDate}`);
   }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
 import { Button } from "@/components/ui/button";
@@ -83,12 +84,14 @@ type Props = {
   canEdit: boolean;
   focus?: string | null;
   layout?: CardLayoutGroup[] | null;
+  // FLD-10: the business's words
+  terms?: OrgTerms;
 };
 
 const linkClass = "text-accent underline underline-offset-4";
 
 /** Deal details that switch in place between reading and editing. */
-export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus, layout = null }: Props) {
+export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus, layout = null, terms = DEFAULT_TERMS }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
@@ -104,6 +107,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
         contacts={contacts}
         companies={companies}
         lossReasons={lossReasons}
+        terms={terms}
         onDone={(message) => {
           setNotice(message ?? null);
           setEditing(false);
@@ -116,7 +120,7 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
     <Card aria-labelledby="deal-details-title">
       <CardHeader
         id="deal-details-title"
-        title="פרטי העסקה"
+        title={`פרטי ${terms.deal.theSingular}`}
         action={
           canEdit ? (
             <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
@@ -171,9 +175,9 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   );
 }
 
-type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[] | null; lossReasons: LossReasonOption[]; onDone: (message?: string) => void };
+type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[] | null; lossReasons: LossReasonOption[]; onDone: (message?: string) => void; terms: OrgTerms };
 
-function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }: EditProps) {
+function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone, terms }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateDealAction(orgId, deal.id, prev, formData);
     if (result?.ok) {
@@ -189,13 +193,13 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
 
   return (
     <Card aria-labelledby="deal-details-title">
-      <CardHeader id="deal-details-title" title="עריכת העסקה" />
+      <CardHeader id="deal-details-title" title={`עריכת ${terms.deal.theSingular}`} />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
           <FormGuard state={state} />
           <FormError message={failure?.message} />
           <TextField
-            label="שם העסקה"
+            label={`שם ${terms.deal.theSingular}`}
             name="name"
             required
             maxLength={200}
@@ -213,8 +217,8 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone }:
             error={errors.amount}
             hint={dealValueHint(deal.amountAuto, deal.amountSource)}
           />
-          <SelectField key={`contact-${contactValue}`} label="איש קשר" name="contact_id" defaultValue={contactValue} error={errors.contact_id}>
-            <option value="">ללא איש קשר</option>
+          <SelectField key={`contact-${contactValue}`} label={terms.contact.singular} name="contact_id" defaultValue={contactValue} error={errors.contact_id}>
+            <option value="">ללא {terms.contact.singular}</option>
             {contacts.map((contact) => (
               <option key={contact.id} value={contact.id}>
                 {contact.name}

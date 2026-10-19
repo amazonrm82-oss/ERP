@@ -17,6 +17,8 @@ import { getUserNames } from "@/features/shell/queries";
 import type { Database, Json } from "@/lib/database.types";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender } from "@/features/terminology/terms";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ReportRow, ReportSection, ReportView } from "./definitions";
@@ -157,6 +159,13 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
 }
 
 export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean } = {}): Promise<ReportView> {
+  // FLD-10 part two: titles and column headers name leads and deals in the business's own words (notes and empty texts
+  // keep today's words)
+  const terms = await getOrgTerms(orgId);
+  const L = terms.lead;
+  const D = terms.deal;
+  const newLeads = `${L.plural} ${byGender(L, "חדשים", "חדשות")}`;
+  const averageDeal = `${D.singular} ${byGender(D, "ממוצע", "ממוצעת")}`;
   const { period, ownerId, pipelineId } = filters;
   const range = { p_org: orgId, p_from: period.from, p_to: period.to };
 
@@ -178,17 +187,17 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       }
       const totals = [...bySource.values()].reduce((t, s) => ({ leads: t.leads + s.leads, converted: t.converted + s.converted, revenue: t.revenue + s.revenue }), { leads: 0, converted: 0, revenue: 0 });
       const columns = [
-        { key: "leads", label: "לידים", kind: "number" as const },
+        { key: "leads", label: L.plural, kind: "number" as const },
         { key: "converted", label: "הומרו", kind: "number" as const },
         { key: "rate", label: "אחוז המרה", kind: "percent" as const },
-        { key: "won", label: "עסקאות שנסגרו", kind: "number" as const },
+        { key: "won", label: `${D.plural} שנסגרו`, kind: "number" as const },
         { key: "revenue", label: "הכנסה", kind: "money" as const },
       ];
       return {
         kpis: [
-          { label: "לידים", value: formatNumber(totals.leads) },
+          { label: L.plural, value: formatNumber(totals.leads) },
           { label: "אחוז המרה", value: totals.leads ? `${pct(totals.converted, totals.leads)}%` : "—" },
-          { label: "הכנסה מלידים", value: formatMoney(totals.revenue) },
+          { label: `הכנסה מ${L.plural}`, value: formatMoney(totals.revenue) },
         ],
         sections: [
           {
@@ -225,27 +234,27 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const leads = obj(data.leads as Json);
       const created = num(leads.created);
       const steps = [
-        { step: "לידים חדשים", count: created },
+        { step: newLeads, count: created },
         { step: "נוצר מגע", count: num(leads.contacted) },
         { step: "הומרו ללקוח", count: num(leads.converted) },
-        { step: "עסקה נסגרה בהצלחה", count: num(leads.won) },
+        { step: `${D.singular} ${byGender(D, "נסגר", "נסגרה")} בהצלחה`, count: num(leads.won) },
       ];
       const stages = list(data.stages as Json);
       const deals = obj(data.deals as Json);
       const firstStage = stages.length ? num(stages[0].reached) : 0;
       return {
         kpis: [
-          { label: "לידים חדשים", value: formatNumber(created) },
-          { label: "מליד לעסקה שנסגרה", value: created ? `${pct(num(leads.won), created)}%` : "—" },
-          { label: "עסקאות שנפתחו", value: formatNumber(num(deals.deals)), hint: `נסגרו ${formatNumber(num(deals.won))}, אבדו ${formatNumber(num(deals.lost))}` },
+          { label: newLeads, value: formatNumber(created) },
+          { label: `מ${L.singular} ל${D.singular} ${byGender(D, "שנסגר", "שנסגרה")}`, value: created ? `${pct(num(leads.won), created)}%` : "—" },
+          { label: `${D.plural} שנפתחו`, value: formatNumber(num(deals.deals)), hint: `נסגרו ${formatNumber(num(deals.won))}, אבדו ${formatNumber(num(deals.lost))}` },
         ],
         sections: [
           {
-            title: "מליד ללקוח",
+            title: `מ${L.singular} ללקוח`,
             columns: [
               { key: "step", label: "שלב", kind: "text" },
               { key: "count", label: "כמות", kind: "number" },
-              { key: "of_first", label: "מתוך הלידים", kind: "percent" },
+              { key: "of_first", label: `מתוך ${L.thePlural}`, kind: "percent" },
               { key: "of_prev", label: "מהשלב הקודם", kind: "percent" },
             ],
             rows: steps.map((s, i) => ({ step: s.step, count: s.count, of_first: pct(s.count, created), of_prev: i === 0 ? null : pct(s.count, steps[i - 1].count) })),
@@ -254,7 +263,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             note: "\"נוצר מגע\": נרשמה לליד שיחה, פגישה, הודעה או הערה, או שהליד הומר.",
           },
           {
-            title: "שלבי תהליך המכירה (עסקאות שנפתחו בתקופה)",
+            title: `שלבי תהליך המכירה (${D.plural} שנפתחו בתקופה)`,
             columns: [
               { key: "name", label: "שלב", kind: "text" },
               { key: "reached", label: "הגיעו לשלב", kind: "number" },
@@ -297,7 +306,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         median: numOrNull(r.median_minutes),
       });
       const measureColumns = [
-        { key: "leads", label: "לידים", kind: "number" as const },
+        { key: "leads", label: L.plural, kind: "number" as const },
         { key: "contacted", label: "נוצר מגע", kind: "number" as const },
         { key: "within_target", label: labels.column, kind: "percent" as const },
         { key: "avg", label: "ממוצע", kind: "minutes" as const },
@@ -307,7 +316,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         kpis: [
           { label: "זמן ממוצע עד מגע ראשון", value: contacted ? formatCell("minutes", weighted / contacted) : "—" },
           { label: labels.kpi, value: leads ? `${pct(withinTarget, leads)}%` : "—", hint: labels.clock },
-          { label: "לידים בלי מגע", value: formatNumber(leads - contacted) },
+          { label: `${L.plural} בלי מגע`, value: formatNumber(leads - contacted) },
         ],
         sections: [
           {
@@ -327,7 +336,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           },
           {
             title: "לפי שעת ההגעה",
-            columns: [{ key: "hour", label: "הליד הגיע", kind: "text" }, ...measureColumns],
+            columns: [{ key: "hour", label: `${L.theSingular} ${byGender(L, "הגיע", "הגיעה")}`, kind: "text" }, ...measureColumns],
             rows: list(breakdown.by_hour as Json).map((r) => ({ hour: hourLabel(num(r.hour)), ...measures(r) })),
             bar: "leads",
             empty: "אין לידים בתקופה הזו.",
@@ -348,7 +357,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const amount = rows.reduce((s, r) => s + num(r.won_amount), 0);
       return {
         kpis: [
-          { label: "עסקאות שנסגרו", value: formatNumber(won) },
+          { label: `${D.plural} שנסגרו`, value: formatNumber(won) },
           { label: "סכום שנסגר", value: formatMoney(amount) },
           { label: "אחוז סגירה בהצלחה", value: won + lost ? `${pct(won, won + lost)}%` : "—" },
         ],
@@ -361,7 +370,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
               { key: "won_amount", label: "סכום", kind: "money" },
               { key: "lost", label: "אבדו", kind: "number" },
               { key: "win_rate", label: "אחוז סגירה בהצלחה", kind: "percent" },
-              { key: "avg_deal", label: "עסקה ממוצעת", kind: "money" },
+              { key: "avg_deal", label: averageDeal, kind: "money" },
               { key: "open_count", label: "פתוחות עכשיו", kind: "number" },
               { key: "open_amount", label: "שווי פתוחות", kind: "money" },
             ],
@@ -451,7 +460,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const pipelines = new Set(data.by_stage.map((r) => r.pipeline_id));
       const split = (kind: "owner" | "stage") => [
         { key: kind, label: kind === "owner" ? "חבר צוות" : "שלב", kind: "text" as const },
-        { key: "deals", label: "עסקאות", kind: "number" as const },
+        { key: "deals", label: D.plural, kind: "number" as const },
         { key: "amount", label: "שווי", kind: "money" as const },
         { key: "weighted", label: "משוקלל", kind: "money" as const },
         { key: "month_weighted", label: "משוקלל לחודש הזה", kind: "money" as const },
@@ -504,7 +513,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: withGoal ? "לפי חודש סגירה צפוי, מול היעד" : "לפי חודש סגירה צפוי",
             columns: [
               { key: "month", label: "חודש", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "שווי", kind: "money" },
               { key: "weighted", label: "משוקלל", kind: "money" },
               { key: "won_amount", label: "כבר נסגר", kind: "money" },
@@ -564,10 +573,10 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             empty: "אין עסקאות פתוחות.",
           },
           {
-            title: "עסקאות שתאריך הסגירה שלהן עבר",
+            title: `${D.plural} שתאריך הסגירה ${byGender(D, "שלהם", "שלהן")} עבר`,
             anchor: "overdue-deals",
             columns: [
-              { key: "deal", label: "עסקה", kind: "text" },
+              { key: "deal", label: D.singular, kind: "text" },
               { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "stage", label: "שלב", kind: "text" },
               { key: "expected", label: "תאריך סגירה צפוי", kind: "text" },
@@ -616,7 +625,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const total = byReason.reduce((s, r) => s + num(r.deals), 0);
       return {
         kpis: [
-          { label: "עסקאות שאבדו", value: formatNumber(total) },
+          { label: `${D.plural} שאבדו`, value: formatNumber(total) },
           { label: "שווי שאבד", value: formatMoney(byReason.reduce((s, r) => s + num(r.amount), 0)) },
         ],
         sections: [
@@ -624,7 +633,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי סיבה",
             columns: [
               { key: "reason", label: "סיבה", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "share", label: "מתוך כולן", kind: "percent" },
               { key: "amount", label: "שווי", kind: "money" },
             ],
@@ -636,7 +645,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "באיזה שלב אבדו",
             columns: [
               { key: "stage", label: "השלב לפני ההפסד", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
             ],
             // stages in pipeline order; deals with no recorded stage move last
             rows: [...byStage]
@@ -653,7 +662,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי חבר צוות",
             columns: [
               { key: "owner", label: "חבר צוות", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "שווי", kind: "money" },
             ],
             rows: byOwner.map((r) => ({ owner: name(r.owner_id), deals: num(r.deals), amount: num(r.amount) })),
@@ -663,7 +672,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי מתחרה",
             columns: [
               { key: "competitor", label: "מתחרה", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "שווי", kind: "money" },
             ],
             rows: byCompetitor.map((r) => ({ competitor: str(r.competitor) ?? "", deals: num(r.deals), amount: num(r.amount) })),
@@ -679,9 +688,9 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const stages = list(data.stages as Json);
       return {
         kpis: [
-          { label: "ממוצע מפתיחת עסקה לסגירה", value: formatCell("days", numOrNull(data.avg_days)), hint: `חציון: ${formatCell("days", numOrNull(data.median_days))}` },
-          { label: "ממוצע מליד לסגירה", value: formatCell("days", numOrNull(data.avg_days_from_lead)), hint: `${formatNumber(num(data.from_lead))} עסקאות שהתחילו כליד` },
-          { label: "עסקאות שנסגרו", value: formatNumber(num(data.won)) },
+          { label: `ממוצע מפתיחת ${D.singular} לסגירה`, value: formatCell("days", numOrNull(data.avg_days)), hint: `חציון: ${formatCell("days", numOrNull(data.median_days))}` },
+          { label: `ממוצע מ${L.singular} לסגירה`, value: formatCell("days", numOrNull(data.avg_days_from_lead)), hint: `${formatNumber(num(data.from_lead))} עסקאות שהתחילו כליד` },
+          { label: `${D.plural} שנסגרו`, value: formatNumber(num(data.won)) },
         ],
         sections: [
           {
@@ -705,15 +714,15 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       const name = await ownerNames(rows.map((r) => r.owner_id));
       return {
         kpis: [
-          { label: "עסקאות תקועות", value: formatNumber(rows.filter((r) => r.stuck === true).length) },
+          { label: `${D.plural} ${byGender(D, "תקועים", "תקועות")}`, value: formatNumber(rows.filter((r) => r.stuck === true).length) },
           { label: "שווי התקועות", value: formatMoney(rows.filter((r) => r.stuck === true).reduce((s, r) => s + num(r.amount_agorot), 0)) },
           { label: "בלי צעד הבא", value: formatNumber(rows.filter((r) => r.no_next_step === true).length) },
         ],
         sections: [
           {
-            title: "עסקאות לטיפול",
+            title: `${D.plural} לטיפול`,
             columns: [
-              { key: "name", label: "עסקה", kind: "text" },
+              { key: "name", label: D.singular, kind: "text" },
               { key: "stage", label: "שלב", kind: "text" },
               { key: "owner", label: "חבר צוות", kind: "text" },
               { key: "amount", label: "סכום", kind: "money" },
@@ -758,15 +767,15 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       return {
         kpis: [
           { label: "הכנסה שנסגרה", value: formatMoney(amount) },
-          { label: "עסקאות", value: formatNumber(deals) },
-          { label: "עסקה ממוצעת", value: deals ? formatMoney(Math.round(amount / deals)) : "—" },
+          { label: D.plural, value: formatNumber(deals) },
+          { label: averageDeal, value: deals ? formatMoney(Math.round(amount / deals)) : "—" },
         ],
         sections: [
           {
             title: "לפי חודש",
             columns: [
               { key: "month", label: "חודש", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "הכנסה", kind: "money" },
             ],
             rows: byMonth.map((r) => ({ month: monthLabel(r.month), deals: num(r.deals), amount: num(r.amount) })),
@@ -777,7 +786,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "לפי חבר צוות",
             columns: [
               { key: "owner", label: "חבר צוות", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "הכנסה", kind: "money" },
             ],
             rows: byOwner.map((r) => ({ owner: name(r.owner_id), deals: num(r.deals), amount: num(r.amount) })),
@@ -788,7 +797,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             title: "10 הלקוחות המובילים",
             columns: [
               { key: "customer", label: "לקוח", kind: "text" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "הכנסה", kind: "money" },
             ],
             rows: byCustomer.map(
@@ -830,7 +839,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           })),
           { label: "מוצרים שנמכרו", value: formatNumber(num(totals.products)) },
           {
-            label: "עסקאות בלי שורות",
+            label: `${D.plural} בלי שורות`,
             value: formatNumber(withoutLines),
             hint: withoutLines ? `בסך ${formatMoney(num(totals.amount_without_lines))}, לא נספרו כאן` : undefined,
           },
@@ -842,7 +851,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
               { key: "product", label: "מוצר", kind: "text" },
               { key: "billing", label: "חיוב", kind: "text" },
               { key: "quantity", label: "כמות", kind: "number" },
-              { key: "deals", label: "עסקאות", kind: "number" },
+              { key: "deals", label: D.plural, kind: "number" },
               { key: "amount", label: "סכום", kind: "money" },
             ],
             rows: rows.map(
@@ -886,7 +895,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
         { key: "category", label: "קטגוריה", kind: "text" as const },
         { key: "billing", label: "חיוב", kind: "text" as const },
         { key: "products", label: "מוצרים", kind: "number" as const },
-        { key: "deals", label: "עסקאות", kind: "number" as const },
+        { key: "deals", label: D.plural, kind: "number" as const },
         { key: "amount", label: "סכום", kind: "money" as const },
       ];
       return {
@@ -903,7 +912,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           })),
           { label: "קטגוריות שנמכרו", value: formatNumber(num(totals.categories)) },
           {
-            label: "עסקאות בלי שורות",
+            label: `${D.plural} בלי שורות`,
             value: formatNumber(withoutLines),
             hint: withoutLines ? `בסך ${formatMoney(num(totals.amount_without_lines))}, לא נספרו כאן` : undefined,
           },
@@ -1025,7 +1034,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             hint: `${formatNumber(noShow)} מתוך ${formatNumber(held + noShow)} פגישות שהתקיימו או שהלקוח לא הגיע`,
           },
           {
-            label: "פגישות שהובילו לעסקה",
+            label: `פגישות שהובילו ל${D.singular}`,
             value: formatNumber(num(totals.led_meetings)),
             hint: `${formatNumber(num(totals.won_deals))} עסקאות, ${formatMoney(num(totals.won_amount))}`,
           },
@@ -1042,8 +1051,8 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
               { key: "cancelled", label: "בוטלו", kind: "number" },
               { key: "not_updated", label: "עברו ולא עודכנו", kind: "number" },
               { key: "upcoming", label: "עוד לא התקיימו", kind: "number" },
-              { key: "led_meetings", label: "הובילו לעסקה", kind: "number" },
-              { key: "won_deals", label: "עסקאות שנסגרו", kind: "number" },
+              { key: "led_meetings", label: `הובילו ל${D.singular}`, kind: "number" },
+              { key: "won_deals", label: `${D.plural} שנסגרו`, kind: "number" },
               { key: "won_amount", label: "שווי", kind: "money" },
             ],
             rows: byOwner.map((r) => ({
@@ -1066,11 +1075,11 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           {
             // the cap is said in the title, so the CSV and Excel files say it too
             title: dealsCapped
-              ? `עסקאות שנסגרו אחרי פגישה (מוצגות ${formatNumber(deals.length)} האחרונות מתוך ${formatNumber(dealsTotal)})`
-              : "עסקאות שנסגרו אחרי פגישה",
+              ? `${D.plural} שנסגרו אחרי פגישה (מוצגות ${formatNumber(deals.length)} האחרונות מתוך ${formatNumber(dealsTotal)})`
+              : `${D.plural} שנסגרו אחרי פגישה`,
             columns: [
-              { key: "name", label: "עסקה", kind: "text" },
-              { key: "owner", label: "אחראי לעסקה", kind: "text" },
+              { key: "name", label: D.singular, kind: "text" },
+              { key: "owner", label: `אחראי ל${D.singular}`, kind: "text" },
               { key: "meetings", label: "פגישות בתקופה", kind: "number" },
               { key: "closed", label: "נסגרה", kind: "text" },
               { key: "amount", label: "שווי", kind: "money" },

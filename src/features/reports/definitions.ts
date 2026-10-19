@@ -1,3 +1,5 @@
+import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
+
 // The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
@@ -52,6 +54,50 @@ export const REPORTS: ReportDefinition[] = [
     feature: "quotes",
   },
 ];
+
+/**
+ * FLD-10 part two: a report's title and description in the business's own words. Only the reports that name leads, deals
+ * or contacts differ; with today's words every text equals the definition's (unit test).
+ */
+export function reportTexts(report: ReportDefinition, terms: OrgTerms = DEFAULT_TERMS): { title: string; description: string } {
+  const { lead, deal, contact } = terms;
+  const closed = `${deal.plural} שנסגרו`;
+  const open = `${deal.plural} ${byGender(deal, "פתוחים", "פתוחות")}`;
+  switch (report.key) {
+    case "sources":
+      return { title: `${lead.plural} לפי מקור`, description: report.description };
+    case "response":
+      return {
+        title: `זמן תגובה ל${lead.singular}`,
+        description: `זמן עד מגע ראשון ואחוז ${lead.thePlural} שנענו בתוך היעד, לפי אחראי, מקור ושעה.`,
+      };
+    case "reps":
+      return { title: report.title, description: `${closed}, סכום ואחוז סגירה בהצלחה לכל חבר צוות.` };
+    case "forecast":
+      return { title: report.title, description: `שווי משוקלל של ${open} לפי חודש סגירה צפוי, מול יעד ההכנסה, לפי חבר צוות ושלב.` };
+    case "lost":
+      return { title: report.title, description: `למה ${deal.plural} ${byGender(deal, "אובדים", "אובדות")}, באיזה שלב ואצל מי.` };
+    case "cycle":
+      return { title: report.title, description: `ימים מ${lead.singular} לסגירה, וימים בכל שלב.` };
+    case "stuck":
+      return {
+        title: `${deal.plural} ${byGender(deal, "תקועים", "תקועות")}`,
+        description: `${open} ${byGender(deal, "שנמצאים", "שנמצאות")} בשלב יותר מדי זמן, או בלי משימה או פגישה הבאה.`,
+      };
+    case "products":
+      return { title: report.title, description: `מה נמכר ב${closed}: כמות, מספר ${deal.plural} וסכום לכל מוצר.` };
+    case "categories":
+      return { title: report.title, description: `מה נמכר ב${closed} לפי קטגוריית המוצר: מספר ${deal.plural} וסכום.` };
+    case "profit":
+      return { title: report.title, description: `הכנסה, עלות ורווח גולמי לכל מוצר ב${closed}, לפי העלות שנשמרה בכל שורה.` };
+    case "meetings":
+      return { title: report.title, description: `פגישות לפי מארגן, אחוז אי-הגעה, ופגישות שהובילו ל${deal.singular} ${byGender(deal, "שנסגר", "שנסגרה")}.` };
+    case "referrals":
+      return { title: report.title, description: `מי הפנה אליכם ${contact.plural}, כמה מהם הפכו ללקוחות ומה ההכנסה מהם.` };
+    default:
+      return { title: report.title, description: report.description };
+  }
+}
 
 export function findReport(key: string): ReportDefinition | undefined {
   return REPORTS.find((report) => report.key === key);

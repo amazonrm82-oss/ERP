@@ -52,8 +52,14 @@ import { LeadReferralsCard } from "@/features/contact-relations/components/lead-
 import { listLeadReferrals, listRelationTypes } from "@/features/contact-relations/queries";
 import { REFERRAL_TYPE_KEY } from "@/features/contact-relations/types";
 import { listContactOptions } from "@/features/contacts/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender, withPrefixThe } from "@/features/terminology/terms";
 
-export const metadata: Metadata = { title: "ליד" };
+// FLD-10: the tab title in the business's word
+export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
+  const { orgId } = await params;
+  return { title: (await getOrgTerms(orgId)).lead.singular };
+}
 
 type Props = {
   params: Promise<{ orgId: string; leadId: string }>;
@@ -72,7 +78,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [lead, lookups, fields, reasons, follow, cardLayout] = await Promise.all([
+  const [lead, lookups, fields, reasons, follow, cardLayout, terms] = await Promise.all([
     getLead(orgId, leadId),
     getLeadLookups(orgId),
     listFieldDefinitions(orgId, "lead"),
@@ -80,6 +86,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
     getFollowState(orgId, { kind: "lead", id: leadId }, context.user.id),
     // FLD-08: the business's card layout (null = the default)
     getCardLayout(orgId, "lead"),
+    // FLD-10: the business's words for leads, contacts and deals
+    getOrgTerms(orgId),
   ]);
   if (!lead) {
     notFound();
@@ -109,7 +117,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
       <PrintHeader orgName={context.org.name} timeZone={context.org.timeZone} />
       <PageHeader
         title={name}
-        back={{ href: paths.leads(orgId), label: "לידים" }}
+        back={{ href: paths.leads(orgId), label: terms.lead.plural }}
         actions={
           <>
             <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
@@ -160,18 +168,20 @@ export default async function LeadPage({ params, searchParams }: Props) {
           <RecordMeetings orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} timeZone={context.org.timeZone} userId={context.user.id} />
           {isConverted ? (
             <Card aria-labelledby="converted-title">
-              <CardHeader id="converted-title" title="הליד הומר" />
+              <CardHeader id="converted-title" title={`${terms.lead.theSingular} ${byGender(terms.lead, "הומר", "הומרה")}`} />
               <CardBody>
-                <p className="text-md text-ink-soft">הומר בתאריך {formatDate(lead.converted_at)}.</p>
+                <p className="text-md text-ink-soft">
+                  {byGender(terms.lead, "הומר", "הומרה")} בתאריך {formatDate(lead.converted_at)}.
+                </p>
                 <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-md">
                   {lead.converted_contact_id ? (
                     <Link href={paths.contact(orgId, lead.converted_contact_id)} className={linkClass}>
-                      לאיש הקשר
+                      {withPrefixThe("ל", terms.contact)}
                     </Link>
                   ) : null}
                   {lead.converted_deal_id ? (
                     <Link href={paths.deal(orgId, lead.converted_deal_id)} className={linkClass}>
-                      לעסקה
+                      {withPrefixThe("ל", terms.deal)}
                     </Link>
                   ) : null}
                 </p>
@@ -193,7 +203,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
                   {/* QUO-01: a quote is made from a contact or a deal; a lead is converted first */}
                   {hasQuotes ? (
                     <p className="mb-3 text-sm text-ink-soft">
-                      רוצים לשלוח הצעת מחיר? קודם ממירים את הליד לאיש קשר ועסקה, ואז יוצרים את ההצעה מהעסקה.
+                      רוצים לשלוח הצעת מחיר? קודם ממירים את {terms.lead.theSingular} ל{terms.contact.singular} ו{terms.deal.singular}, ואז יוצרים את ההצעה
+                      מ{terms.deal.theSingular}.
                     </p>
                   ) : null}
                   <ConvertLeadPanel
@@ -201,6 +212,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
                     leadId={lead.id}
                     defaultDealName={lead.full_name ?? lead.company_name ?? ""}
                     hasCompany={Boolean(lead.company_name)}
+                    terms={terms}
                   />
                 </div>
               </CardBody>
@@ -249,6 +261,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               preferredChannelSource: lead.preferred_channel_source,
               preferredLocale: lead.preferred_locale,
             }}
+            terms={terms}
           />
 
           {!isConverted || referrals.length > 0 ? (
@@ -286,7 +299,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5 empty:hidden print:hidden">
-        {canDelete ? <TrashRecordButton noun="הליד" action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
+        {canDelete ? <TrashRecordButton noun={terms.lead.theSingular} action={trashLeadAction.bind(null, orgId, lead.id)} /> : null}
         {/* PRV-02 */}
         {isAdminRole(context.role) ? (
           <>

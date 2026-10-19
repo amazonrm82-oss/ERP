@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { toCompletePath } from "@/features/data-quality/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
-import { REPORTS } from "@/features/reports/definitions";
+import { REPORTS, reportTexts } from "@/features/reports/definitions";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { withReportShape } from "@/features/reports/schemas";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -28,6 +29,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   const hasFeature = new Map(await Promise.all(features.map(async (key) => [key, await orgHasFeature(orgId, key)] as const)));
   // LEAD-08: a leads-only report is left out while the leads module is off (the page itself still opens from a saved link)
   const modules = await getOrgModules(orgId);
+  // FLD-10: report titles in the business's words
+  const terms = await getOrgTerms(orgId);
   const reports = REPORTS.filter(
     (report) => (!report.costs || seesCosts) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
   );
@@ -65,8 +68,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
               href={paths.report(orgId, report.key)}
               className="block h-full rounded-lg border border-line bg-surface p-4 hover:border-accent hover:bg-accent-soft/40"
             >
-              <span className="block font-semibold">{report.title}</span>
-              <span className="mt-1 block text-md text-ink-soft">{report.description}</span>
+              <span className="block font-semibold">{reportTexts(report, terms).title}</span>
+              <span className="mt-1 block text-md text-ink-soft">{reportTexts(report, terms).description}</span>
             </Link>
           </li>
         ))}

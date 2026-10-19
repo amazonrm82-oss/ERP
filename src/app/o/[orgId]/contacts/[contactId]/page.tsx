@@ -1,3 +1,5 @@
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender } from "@/features/terminology/terms";
 import { RecordConsents } from "@/features/consents/components/record-consents";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
@@ -59,7 +61,11 @@ import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-car
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
-export const metadata: Metadata = { title: "איש קשר" };
+// FLD-10: the tab title in the business's word
+export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
+  const { orgId } = await params;
+  return { title: (await getOrgTerms(orgId)).contact.singular };
+}
 
 type Props = {
   params: Promise<{ orgId: string; contactId: string }>;
@@ -77,7 +83,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, mainDeals, dealRoles, fields, follow, billing, cardLayout] = await Promise.all([
+  const [contact, mainDeals, dealRoles, fields, follow, billing, cardLayout, terms] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
     listContactDealRoles(orgId, contactId),
@@ -87,6 +93,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
     getRecordBilling(orgId, "contact", contactId),
     // FLD-08: the business's card layout (null = the default)
     getCardLayout(orgId, "contact"),
+    // FLD-10: the business's words for contacts and deals
+    getOrgTerms(orgId),
   ]);
   const [tags, takingPart] = await Promise.all([
     listTags(orgId),
@@ -123,7 +131,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
       <PageHeader
         title={name}
         description={[contact.job_title, contact.companyName].filter(Boolean).join(", ") || undefined}
-        back={{ href: paths.contacts(orgId), label: "אנשי קשר" }}
+        back={{ href: paths.contacts(orgId), label: terms.contact.plural }}
         actions={
           <>
             <PrintButton />
@@ -132,7 +140,10 @@ export default async function ContactPage({ params, searchParams }: Props) {
         }
       />
       {channels === "failed" ? (
-        <FormError className="mb-4" message="איש הקשר נוצר, אבל לא כל הטלפונים והאימיילים הנוספים נשמרו. אפשר להוסיף אותם בעריכה." />
+        <FormError
+          className="mb-4"
+          message={`${terms.contact.theSingular} ${byGender(terms.contact, "נוצר", "נוצרה")}, אבל לא כל הטלפונים והאימיילים הנוספים נשמרו. אפשר להוסיף אותם בעריכה.`}
+        />
       ) : null}
       {domainLink ? (
         <div className="mb-4 print:hidden">
@@ -201,6 +212,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
               birthDateText: contact.birth_date ? formatDate(contact.birth_date) : null,
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields), builtins: { "builtin:type": contact.type_id } },
             }}
+            terms={terms}
           />
 
           {companies ? <ContactCompaniesCard orgId={orgId} contactId={contact.id} canEdit={canEdit} items={companyLinks} options={companies} /> : null}
@@ -238,7 +250,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
             orgId={orgId}
             deals={deals}
             newDealQuery={context.canWrite ? `?contact=${contact.id}` : null}
-            emptyText="עוד אין עסקאות עם איש הקשר הזה."
+            emptyText={`עוד אין ${terms.deal.plural} עם ${terms.contact.theSingular} ${byGender(terms.contact, "הזה", "הזאת")}.`}
+            terms={terms}
           />
 
         </div>
@@ -246,7 +259,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
       {/* FXU-03: out of the way of the daily work, at the very end */}
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5 empty:hidden print:hidden">
         {context.canDelete ? (
-          <TrashRecordButton noun="איש הקשר" action={trashContactAction.bind(null, orgId, contact.id)} />
+          <TrashRecordButton noun={terms.contact.theSingular} action={trashContactAction.bind(null, orgId, contact.id)} />
         ) : null}
         {/* PRV-02 */}
         {isAdminRole(context.role) ? (

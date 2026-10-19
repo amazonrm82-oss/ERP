@@ -1,3 +1,5 @@
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender } from "@/features/terminology/terms";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -61,7 +63,11 @@ import { getQuoteNumberDisplay } from "@/features/quotes/queries";
 import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 
-export const metadata: Metadata = { title: "עסקה" };
+// FLD-10: the tab title in the business's word
+export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
+  const { orgId } = await params;
+  return { title: (await getOrgTerms(orgId)).deal.singular };
+}
 
 type Props = {
   params: Promise<{ orgId: string; dealId: string }>;
@@ -80,7 +86,7 @@ export default async function DealPage({ params, searchParams }: Props) {
   }
   // CON-03 follow-up: the business's list of roles names each linked contact's role
   const contactRoles = await listDealContactRoles(orgId);
-  const [deal, fields, tags, follow, dealContacts, lossReasons, cardLayout] = await Promise.all([
+  const [deal, fields, tags, follow, dealContacts, lossReasons, cardLayout, terms] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
@@ -89,6 +95,8 @@ export default async function DealPage({ params, searchParams }: Props) {
     listLossReasons(orgId),
     // FLD-08: the business's card layout (null = the default)
     getCardLayout(orgId, "deal"),
+    // FLD-10: the business's words for deals and contacts
+    getOrgTerms(orgId),
   ]);
   if (!deal) {
     notFound();
@@ -164,7 +172,7 @@ export default async function DealPage({ params, searchParams }: Props) {
       <PageHeader
         title={deal.name}
         description={deal.pipelineName ? `תהליך המכירה "${deal.pipelineName}"` : undefined}
-        back={{ href: paths.deals(orgId), label: "עסקאות" }}
+        back={{ href: paths.deals(orgId), label: terms.deal.plural }}
         actions={
           <>
             <Badge tone={status.tone}>{status.label}</Badge>
@@ -181,15 +189,17 @@ export default async function DealPage({ params, searchParams }: Props) {
       ) : null}
       {attention && (attention.stuck || attention.noNextStep) ? (
         <p role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          <span className="font-semibold">{attention.stuck ? "העסקה תקועה:" : "אין צעד הבא:"}</span>
+          <span className="font-semibold">{attention.stuck ? `${terms.deal.theSingular} ${byGender(terms.deal, "תקוע", "תקועה")}:` : "אין צעד הבא:"}</span>
           <span>{attention.text}.</span>
-          <span>{attention.stuck ? "כדאי לקדם אותה, לדחות אותה לתאריך או לסגור." : "כדאי לקבוע משימה הבאה או לתעד מה קרה."}</span>
+          <span>{attention.stuck
+              ? `כדאי לקדם ${byGender(terms.deal, "אותו", "אותה")}, לדחות ${byGender(terms.deal, "אותו", "אותה")} לתאריך או לסגור.`
+              : "כדאי לקבוע משימה הבאה או לתעד מה קרה."}</span>
         </p>
       ) : null}
       <div className="mb-5 print:hidden">
         <ShareSummary
           text={recordSummary(deal.name, [
-            ["איש קשר", deal.contactName],
+            [terms.contact.singular, deal.contactName],
             ["טלפון", deal.contactPhone],
             ["חברה", deal.companyName],
             ["שלב", stage?.name],
@@ -323,6 +333,7 @@ export default async function DealPage({ params, searchParams }: Props) {
               createdAtText: formatDateTime(deal.created_at),
               custom: { definitions: fields, values: asCustomValues(deal.custom_fields), builtins: { "builtin:stage": deal.stage_id, "builtin:pipeline": deal.pipeline_id } },
             }}
+            terms={terms}
           />
 
           <DealContactsCard
@@ -336,6 +347,7 @@ export default async function DealPage({ params, searchParams }: Props) {
               dealContacts.map((item) => item.contactId),
               deal.contact_id,
             )}
+            terms={terms}
           />
 
           <DealContinuationCard
@@ -351,7 +363,7 @@ export default async function DealPage({ params, searchParams }: Props) {
       </div>
       {/* FXU-03: out of the way of the daily work, at the very end */}
       <div className="mt-8 border-t border-line pt-5 empty:hidden print:hidden">
-        {context.canDelete ? <TrashRecordButton noun="העסקה" action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
+        {context.canDelete ? <TrashRecordButton noun={terms.deal.theSingular} action={trashDealAction.bind(null, orgId, deal.id)} /> : null}
       </div>
     </>
   );

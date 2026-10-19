@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
+import { DEFAULT_TERMS, withPrefixThe, type OrgTerms } from "@/features/terminology/terms";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ type Props = {
   roles: DealContactRoleOption[];
   // contacts the user may pick (already without the linked ones)
   options: ContactOption[];
+  // FLD-10: the business's words
+  terms?: OrgTerms;
 };
 
 const HIDDEN_NAME = "איש קשר שאין לכם גישה אליו";
@@ -115,16 +118,18 @@ function DealContactRow({ orgId, dealId, canEdit, item, roles }: { orgId: string
  * CON-03: the contacts on a deal, each with a role in the purchase from the business's list (by default מקבל
  * החלטה, משפיע, משתמש, איש כספים). Whoever may edit the deal adds, changes and removes them.
  */
-export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options }: Props) {
+export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options, terms = DEFAULT_TERMS }: Props) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(addDealContactAction.bind(null, orgId, dealId), null);
   const failure = state && !state.ok ? state : null;
 
   return (
     <Card aria-labelledby="deal-contacts-title">
-      <CardHeader id="deal-contacts-title" title="אנשי קשר בעסקה" />
+      <CardHeader id="deal-contacts-title" title={`${terms.contact.plural} ${withPrefixThe("ב", terms.deal)}`} />
       <CardBody className="space-y-4">
         {items.length === 0 ? (
-          <p className="text-md text-ink-soft">עוד לא נוספו אנשי קשר לעסקה.</p>
+          <p className="text-md text-ink-soft">
+            עוד לא נוספו {terms.contact.plural} {withPrefixThe("ל", terms.deal)}.
+          </p>
         ) : (
           <ul className="divide-y divide-line">
             {items.map((item) => (
@@ -135,19 +140,19 @@ export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options
 
         {canEdit ? (
           options.length === 0 ? (
-            <p className="text-sm text-ink-soft">אין עוד אנשי קשר להוספה.</p>
+            <p className="text-sm text-ink-soft">אין עוד {terms.contact.plural} להוספה.</p>
           ) : (
             // a new key after a failed submit puts back what was chosen (React resets the form)
             <form key={failure ? JSON.stringify(failure.values ?? {}) : "add"} action={dispatch} className="space-y-3 border-t border-line pt-4">
               <SelectField
-                label="איש קשר"
+                label={terms.contact.singular}
                 name="contact_id"
                 required
                 defaultValue={failure?.values?.contact_id ?? ""}
                 error={failure?.fieldErrors?.contact_id}
               >
                 <option value="" disabled>
-                  בחירת איש קשר
+                  בחירת {terms.contact.singular}
                 </option>
                 {options.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -159,7 +164,7 @@ export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options
                 <RoleOptions roles={roles} currentId={null} />
               </SelectField>
               <SubmitButton size="sm" pending={pending} pendingText="מוסיפים…">
-                הוספה לעסקה
+                הוספה {withPrefixThe("ל", terms.deal)}
               </SubmitButton>
               <FormError message={failure && !failure.fieldErrors?.contact_id ? failure.message : null} />
             </form>

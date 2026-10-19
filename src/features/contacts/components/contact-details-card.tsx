@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
 import { Button } from "@/components/ui/button";
@@ -52,24 +53,26 @@ type Props = {
   canEdit: boolean;
   focus?: string | null;
   layout?: CardLayoutGroup[] | null;
+  // FLD-10: the business's words
+  terms?: OrgTerms;
 };
 
 /** Contact details that switch in place between reading and editing. */
-export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, focus, layout = null }: Props) {
+export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, focus, layout = null, terms = DEFAULT_TERMS }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   useEditFocus("contact-details-title", focus, editing);
 
   if (editing) {
     // mounted only while editing, so every edit starts with a clean form state
-    return <ContactEditForm orgId={orgId} contact={contact} companies={companies} types={types} onDone={() => setEditing(false)} />;
+    return <ContactEditForm orgId={orgId} contact={contact} companies={companies} types={types} onDone={() => setEditing(false)} terms={terms} />;
   }
 
   return (
     <Card aria-labelledby="contact-details-title">
       <CardHeader
         id="contact-details-title"
-        title="פרטי איש הקשר"
+        title={`פרטי ${terms.contact.theSingular}`}
         action={
           canEdit ? (
             <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
@@ -114,9 +117,9 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
   );
 }
 
-type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[] | null; types: RecordType[]; onDone: () => void };
+type EditProps = { orgId: string; contact: ContactDetailsView; companies: CompanyOption[] | null; types: RecordType[]; onDone: () => void; terms: OrgTerms };
 
-function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps) {
+function ContactEditForm({ orgId, contact, companies, types, onDone, terms }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateContactAction(orgId, contact.id, prev, formData);
     if (result?.ok) {
@@ -128,7 +131,7 @@ function ContactEditForm({ orgId, contact, companies, types, onDone }: EditProps
 
   return (
     <Card aria-labelledby="contact-details-title">
-      <CardHeader id="contact-details-title" title="עריכת איש הקשר" />
+      <CardHeader id="contact-details-title" title={`עריכת ${terms.contact.theSingular}`} />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
           <FormGuard state={state} />

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
+import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/field";
@@ -22,6 +23,7 @@ import {
   DUPLICATE_MODES,
   duplicateModesFor,
   IMPORT_ENTITIES,
+  importEntityLabel,
   IMPORT_TARGETS,
   MAX_IMPORT_ROWS,
   PRODUCT_DUPLICATE_HINT,
@@ -39,7 +41,15 @@ import { NewFieldForm } from "./new-field-form";
 type CustomField = { key: string; label: string };
 // canCreateFields: owners and admins may add a custom field while mapping (IMP-01)
 // canImportProducts: owners and admins write the product catalog (PRD-05)
-type Props = { orgId: string; customFields: Record<ImportEntityKey, CustomField[]>; canCreateFields: boolean; canImportProducts: boolean; initialEntity?: ImportEntityKey };
+// FLD-10: terms = the business's words for leads, contacts and deals
+type Props = {
+  orgId: string;
+  customFields: Record<ImportEntityKey, CustomField[]>;
+  canCreateFields: boolean;
+  canImportProducts: boolean;
+  initialEntity?: ImportEntityKey;
+  terms?: OrgTerms;
+};
 
 type Sheet = { fileName: string; headers: string[]; rows: string[][] };
 type Step = "file" | "map" | "preview" | "running" | "done";
@@ -104,7 +114,7 @@ const OUTCOME_LABEL: Record<RowOutcome["status"], string> = {
   failed: "שגיאה",
 };
 
-export function ImportWizard({ orgId, customFields: initialFields, canCreateFields, canImportProducts, initialEntity = "lead" }: Props) {
+export function ImportWizard({ orgId, customFields: initialFields, canCreateFields, canImportProducts, initialEntity = "lead", terms = DEFAULT_TERMS }: Props) {
   const [customFields, setCustomFields] = useState(initialFields);
   // the column whose "new field" form is open
   const [newFieldFor, setNewFieldFor] = useState<number | null>(null);
@@ -235,7 +245,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   }
 
   const mappedCount = mapping.filter(Boolean).length;
-  const entityLabel = IMPORT_ENTITIES.find((e) => e.value === entity)?.label ?? "";
+  const entityLabel = importEntityLabel(entity, terms);
   const entities = IMPORT_ENTITIES.filter((e) => e.value !== "product" || canImportProducts);
   const isProduct = entity === "product";
   // products and tasks: no custom fields (PRD-05, IMP-03)
@@ -272,7 +282,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               {entities.map((option) => (
                 <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-2">
                   <input type="radio" name="entity" value={option.value} checked={entity === option.value} onChange={() => chooseEntity(option.value)} className="size-4 accent-accent" />
-                  {option.label}
+                  {importEntityLabel(option.value, terms)}
                 </label>
               ))}
             </div>
@@ -363,13 +373,23 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               ) : null}
               {entity === "deal" ? (
                 <>
-                  <p className="mt-1 text-ink-soft">תהליך המכירה והשלב נמצאים לפי השם. שם שלא קיים הוא שגיאה בשורה, ושלב חדש לא נוצר. בלי עמודת שלב העסקה נכנסת לשלב הפתוח הראשון.</p>
-                  <p className="mt-1 text-ink-soft">עסקה בשלב זכייה או הפסד נסגרת בתאריך הסגירה בפועל. בלעדיו, בתאריך הסגירה הצפוי אם כבר עבר, ואם אין, בתאריך הייבוא.</p>
-                  <p className="mt-1 text-ink-soft">איש קשר נמצא לפי אימייל או טלפון, וחברה לפי שם או דומיין. כשלא נמצאה רשומה אחת בדיוק, השורה לא מיובאת.</p>
+                  <p className="mt-1 text-ink-soft">
+                    תהליך המכירה והשלב נמצאים לפי השם. שם שלא קיים הוא שגיאה בשורה, ושלב חדש לא נוצר. בלי עמודת שלב {terms.deal.theSingular}{" "}
+                    {byGender(terms.deal, "נכנס", "נכנסת")} לשלב הפתוח הראשון.
+                  </p>
+                  <p className="mt-1 text-ink-soft">
+                    {terms.deal.singular} בשלב זכייה או הפסד {byGender(terms.deal, "נסגר", "נסגרת")} בתאריך הסגירה בפועל. בלעדיו, בתאריך הסגירה הצפוי אם כבר עבר, ואם אין, בתאריך הייבוא.
+                  </p>
+                  <p className="mt-1 text-ink-soft">
+                    {terms.contact.singular} {byGender(terms.contact, "נמצא", "נמצאת")} לפי אימייל או טלפון, וחברה לפי שם או דומיין. כשלא נמצאה רשומה אחת בדיוק, השורה לא מיובאת.
+                  </p>
                 </>
               ) : null}
               {entity === "task" ? (
-                <p className="mt-1 text-ink-soft">ליד ואיש קשר נמצאים לפי טלפון או אימייל, חברה לפי שם או דומיין, ועסקה לפי השם המדויק. כשלא נמצאה רשומה אחת בדיוק, השורה לא מיובאת. שעות היעד הן לפי שעון העסק.</p>
+                <p className="mt-1 text-ink-soft">
+                  {terms.lead.singular} ו{terms.contact.singular} נמצאים לפי טלפון או אימייל, חברה לפי שם או דומיין, ו{terms.deal.singular} לפי השם המדויק. כשלא נמצאה
+                  רשומה אחת בדיוק, השורה לא מיובאת. שעות היעד הן לפי שעון העסק.
+                </p>
               ) : null}
             </div>
           ) : (

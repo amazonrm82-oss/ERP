@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { CheckedTextField } from "@/features/data-quality/components/checked-field";
 import { useEditFocus } from "@/features/data-quality/use-edit-focus";
 
@@ -65,10 +66,19 @@ export type LeadDetailsView = {
 };
 
 // layout: the business's card layout (FLD-08); null or missing = the default layout
-type Props = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; canWrite: boolean; focus?: string | null; layout?: CardLayoutGroup[] | null };
+// FLD-10: terms = the business's words
+type Props = {
+  orgId: string;
+  lead: LeadDetailsView;
+  sources: LeadSourceOption[];
+  canWrite: boolean;
+  focus?: string | null;
+  layout?: CardLayoutGroup[] | null;
+  terms?: OrgTerms;
+};
 
 /** Lead details that switch in place between reading and editing. */
-export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout = null }: Props) {
+export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout = null, terms = DEFAULT_TERMS }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canWrite);
   useEditFocus("lead-details-title", focus, editing);
@@ -76,14 +86,14 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout 
 
   if (editing) {
     // mounted only while editing, so every edit starts with a clean form state
-    return <LeadEditForm orgId={orgId} lead={lead} sources={sources} onDone={() => setEditing(false)} />;
+    return <LeadEditForm orgId={orgId} lead={lead} sources={sources} onDone={() => setEditing(false)} terms={terms} />;
   }
 
   return (
     <Card aria-labelledby="lead-details-title">
       <CardHeader
         id="lead-details-title"
-        title="פרטי הליד"
+        title={`פרטי ${terms.lead.theSingular}`}
         action={
           canWrite ? (
             <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
@@ -127,7 +137,7 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout 
         {lead.attribution && lead.attribution.length > 0 ? (
           <section aria-labelledby="lead-attribution-title" className="mt-4 border-t border-line pt-4">
             <h3 id="lead-attribution-title" className="mb-3 text-sm text-ink-soft">
-              מאיפה הגיע הליד
+              מאיפה {byGender(terms.lead, "הגיע", "הגיעה")} {terms.lead.theSingular}
             </h3>
             <DetailList>
               {lead.attribution.map((row) => (
@@ -152,9 +162,9 @@ function RequestedProductValue({ orgId, product }: { orgId: string; product: Req
   );
 }
 
-type EditProps = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; onDone: () => void };
+type EditProps = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; onDone: () => void; terms: OrgTerms };
 
-function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
+function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateLeadAction(orgId, lead.id, prev, formData);
     if (result?.ok) {
@@ -169,7 +179,7 @@ function LeadEditForm({ orgId, lead, sources, onDone }: EditProps) {
 
   return (
     <Card aria-labelledby="lead-details-title">
-      <CardHeader id="lead-details-title" title="עריכת פרטי הליד" />
+      <CardHeader id="lead-details-title" title={`עריכת פרטי ${terms.lead.theSingular}`} />
       <CardBody>
         <form action={formAction} className="space-y-4" noValidate>
           <FormGuard state={state} />

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getOrgTerms } from "@/features/terminology/queries";
+import { byGender } from "@/features/terminology/terms";
 import type { GoalPeriod } from "@/features/goals/metrics";
 import { countsDeals } from "@/features/goals/progress";
 import { getGoalProgress, getUnteamedWon, type NamedGoalProgress } from "@/features/goals/progress-queries";
@@ -68,20 +70,22 @@ export async function getDashboard(orgId: string, options: { unteamed?: { timeZo
     throw new Error(`report_summary failed: ${error.message}`);
   }
   const s = parseReportData("report_summary", data) as Obj;
+  // FLD-10: the tiles name leads and deals in the business's words
+  const { lead: L, deal: D } = await getOrgTerms(orgId);
   const winRate = (won: number, lost: number) => (won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0);
   const percentText = (n: number) => `${formatNumber(n)}%`;
 
   const tiles: DashboardTile[] = [
-    { label: "לידים חדשים החודש", value: formatNumber(num(s.leads)), ...compare(num(s.leads), num(s.leads_prev), formatNumber) },
+    { label: `${L.plural} ${byGender(L, "חדשים", "חדשות")} החודש`, value: formatNumber(num(s.leads)), ...compare(num(s.leads), num(s.leads_prev), formatNumber) },
     { label: "הכנסה שנסגרה החודש", value: formatMoney(num(s.won_amount)), ...compare(num(s.won_amount), num(s.won_amount_prev), formatMoney) },
     {
       label: "אחוז סגירה בהצלחה החודש",
       value: num(s.won) + num(s.lost) > 0 ? percentText(winRate(num(s.won), num(s.lost))) : "—",
       ...(num(s.won) + num(s.lost) + num(s.won_prev) + num(s.lost_prev) > 0
         ? compare(winRate(num(s.won), num(s.lost)), winRate(num(s.won_prev), num(s.lost_prev)), percentText)
-        : { change: "עוד לא נסגרו או אבדו עסקאות", trend: null }),
+        : { change: `עוד לא נסגרו או אבדו ${D.plural}`, trend: null }),
     },
-    { label: "עסקאות פתוחות", value: formatNumber(num(s.open)), change: `שווי ${formatMoney(num(s.open_amount))}`, trend: null },
+    { label: `${D.plural} ${byGender(D, "פתוחים", "פתוחות")}`, value: formatNumber(num(s.open)), change: `שווי ${formatMoney(num(s.open_amount))}`, trend: null },
     { label: "שווי משוקלל בתהליך המכירה", value: formatMoney(num(s.weighted_amount)), change: "סכום כפול סיכויי הסגירה", trend: null },
     { label: "משימות באיחור", value: formatNumber(num(s.overdue_tasks)), change: null, trend: null },
   ];
@@ -92,7 +96,7 @@ export async function getDashboard(orgId: string, options: { unteamed?: { timeZo
     buildReport(orgId, "stuck", filters),
     getGoalProgress(orgId),
   ]);
-  const stuckSection = stuck.sections[0] ? { ...stuck.sections[0], title: "עסקאות שדורשות טיפול", rows: stuck.sections[0].rows.slice(0, 5) } : null;
+  const stuckSection = stuck.sections[0] ? { ...stuck.sections[0], title: `${D.plural} ${byGender(D, "שדורשים", "שדורשות")} טיפול`, rows: stuck.sections[0].rows.slice(0, 5) } : null;
   const shown = goals.filter((g) => g.scope !== "user");
   const periods = options.unteamed
     ? [...new Map(shown.filter((g) => g.scope === "team" && countsDeals(g.metric)).map((g) => [`${g.period}:${g.periodStart}`, g])).values()]

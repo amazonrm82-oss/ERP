@@ -10,7 +10,8 @@ import { ReportBody } from "@/features/reports/components/report-body";
 import { ForecastOverdueDeals } from "@/features/reports/components/forecast-overdue";
 import { getOverdueActionsSetup } from "@/features/reports/forecast-overdue-server";
 import { ReportFilters } from "@/features/reports/components/report-filters";
-import { findReport } from "@/features/reports/definitions";
+import { findReport, reportTexts } from "@/features/reports/definitions";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
@@ -26,8 +27,10 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { report } = await params;
-  return { title: findReport(report)?.title ?? "דוח" };
+  const { orgId, report } = await params;
+  const definition = findReport(report);
+  // FLD-10: in the business's words
+  return { title: definition ? reportTexts(definition, await getOrgTerms(orgId)).title : "דוח" };
 }
 
 export default async function ReportPage({ params, searchParams }: Props) {
@@ -62,6 +65,8 @@ export default async function ReportPage({ params, searchParams }: Props) {
     .filter((m) => m.status === "active" && m.role !== "viewer")
     .map((m) => ({ value: m.userId, label: m.userId === context.user.id ? `${m.name} (אני)` : m.name }));
   const { period } = filters;
+  // FLD-10: the title and description in the business's words
+  const texts = reportTexts(definition, await getOrgTerms(orgId));
   const periodText = definition.filters.includes("period")
     ? `${formatDate(zonedIso(period.fromDate, "12:00:00"))} עד ${formatDate(zonedIso(period.toDate, "12:00:00"))}`
     : "מצב נוכחי";
@@ -69,8 +74,8 @@ export default async function ReportPage({ params, searchParams }: Props) {
   return (
     <>
       <PageHeader
-        title={definition.title}
-        description={`${definition.description} ${periodText}.`}
+        title={texts.title}
+        description={`${texts.description} ${periodText}.`}
         back={{ href: paths.reports(orgId), label: "כל הדוחות" }}
         actions={
           canExport(context.role, granted) ? (

@@ -5,7 +5,8 @@ import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { UploadIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
-import { IMPORT_ENTITIES } from "@/features/imports/fields";
+import { importEntityLabel } from "@/features/imports/fields";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { UndoImportButton } from "@/features/imports/components/undo-import-button";
 import { listImportJobs } from "@/features/imports/queries";
 import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
@@ -42,7 +43,12 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
   if (!canImport && role !== "owner") {
     notFound();
   }
-  const jobs = canImport ? await listImportJobs(orgId) : [];
+  const [jobs, terms] = await Promise.all([
+    canImport ? listImportJobs(orgId) : Promise.resolve([]),
+    // FLD-10: the business's words for leads, contacts and deals
+    getOrgTerms(orgId),
+  ]);
+  const objects = `${terms.lead.plural}, ${terms.contact.plural}, חברות, ${terms.deal.plural}`;
 
   return (
     <div className="space-y-5">
@@ -50,7 +56,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
         <Card aria-labelledby="import-title">
           <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
           {jobs.length === 0 ? (
-            <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description="לידים, אנשי קשר, חברות, עסקאות, משימות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים." />
+            <EmptyState icon={<UploadIcon />} title="עוד לא ייבאתם קבצים" description={`${objects}, משימות או מוצרים מקובץ Excel או CSV. אפשר לבטל ייבוא בשבעת הימים הראשונים.`} />
           ) : (
             <ul className="divide-y divide-line">
               {jobs.map((job) => {
@@ -59,7 +65,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
                   <li key={job.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
                     <div className="min-w-0">
                       <p className="font-medium break-words">
-                        {job.file_name} <span className="font-normal text-ink-soft">· {IMPORT_ENTITIES.find((e) => e.value === job.entity_type)?.label}</span>
+                        {job.file_name} <span className="font-normal text-ink-soft">· {importEntityLabel(job.entity_type, terms)}</span>
                       </p>
                       <p className="mt-0.5 text-sm text-ink-soft">
                         {formatDateTime(job.created_at)}
@@ -97,7 +103,7 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
         <CardHeader id="export-title" title="ייצוא מלא" />
         <CardBody className="space-y-3">
           <p className="text-md">
-            קובץ ZIP עם כל הנתונים של העסק: לידים, אנשי קשר, חברות, עסקאות, משימות, ציר הזמן, תהליכי מכירה, תגיות ושדות מותאמים. כל טבלה בקובץ CSV שנפתח ב-Excel.
+            קובץ ZIP עם כל הנתונים של העסק: {objects}, משימות, ציר הזמן, תהליכי מכירה, תגיות ושדות מותאמים. כל טבלה בקובץ CSV שנפתח ב-Excel.
           </p>
           {role === "owner" ? (
             <a href={paths.fullExport(orgId)} className={buttonClasses("secondary", "md")} download>

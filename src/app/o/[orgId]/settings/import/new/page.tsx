@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { ImportWizard } from "@/features/imports/components/import-wizard";
 import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
@@ -26,11 +27,13 @@ export default async function NewImportPage({ params, searchParams }: Props) {
     notFound();
   }
   const catalog = canEditCatalog(role, granted);
-  const [lead, contact, company, deal] = await Promise.all([
+  const [lead, contact, company, deal, terms] = await Promise.all([
     listFieldDefinitions(orgId, "lead"),
     listFieldDefinitions(orgId, "contact"),
     listFieldDefinitions(orgId, "company"),
     listFieldDefinitions(orgId, "deal"),
+    // FLD-10: the business's words for leads, contacts and deals
+    getOrgTerms(orgId),
   ]);
   const short = (defs: typeof lead) => defs.map((d) => ({ key: d.key, label: d.label }));
 
@@ -43,6 +46,7 @@ export default async function NewImportPage({ params, searchParams }: Props) {
         canCreateFields={isAdminRole(role)}
         canImportProducts={catalog}
         initialEntity={initialEntity === "product" && !catalog ? "lead" : initialEntity}
+        terms={terms}
       />
     </>
   );

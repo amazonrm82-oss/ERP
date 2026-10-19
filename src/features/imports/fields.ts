@@ -1,6 +1,8 @@
 // What a column of an imported file can be mapped to, per object.
 // Shared by the wizard (browser) and the import action (server).
 
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
+
 export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
   { value: "contact", label: "אנשי קשר" },
@@ -13,6 +15,14 @@ export const IMPORT_ENTITIES = [
 ] as const;
 
 export type ImportEntityKey = (typeof IMPORT_ENTITIES)[number]["value"];
+
+/** FLD-10 part two: an object's name in the wizard and the import history, in the business's own words. */
+export function importEntityLabel(entity: string, terms: OrgTerms = DEFAULT_TERMS): string {
+  if (entity === "lead") return terms.lead.plural;
+  if (entity === "contact") return terms.contact.plural;
+  if (entity === "deal") return terms.deal.plural;
+  return IMPORT_ENTITIES.find((e) => e.value === entity)?.label ?? "";
+}
 /**
  * The objects imported with duplicate detection (leads, contacts, companies). Products (PRD-05),
  * deals and tasks (IMP-03) have their own paths.
