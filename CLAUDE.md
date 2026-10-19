@@ -748,7 +748,8 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   (`company_contact_domain()`, only without an own domain and while `companies.contact_domain_off` is null). Public domains and
   site hosts (`app.public_email_domain`, closed list) never match. Candidates come from `app.company_domain_candidates()` (definer,
   ids only, no cap, members only) and are re-read under RLS. `contacts.company_matched_domain` / `company_match_kind` (server only)
-  drive the card marks. Mirrors in `src/features/company-domain/domains.ts` (unit test).
+  drive the card marks. Mirrors in `src/features/company-domain/domains.ts` (unit test) `public.company_domain_matches` was last redefined in 020525
+  (the companies join carries `c.id = any(<candidates>)`, so only the candidates are read whatever the plan; test 99).
 - Contact at several companies (CON-05, migration 020070; owner 15 October 2026: core, free-text role up to 80): `public.contact_companies`
   (contact, company, `title`, server-derived `is_primary`). The primary company stays `contacts.company_id`, the one source of
   truth: trigger `contacts_company_links` (definer) keeps a primary row for it; a person cannot remove the primary link (hint
