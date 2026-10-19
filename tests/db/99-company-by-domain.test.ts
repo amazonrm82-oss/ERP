@@ -526,6 +526,44 @@ describe("company by email domain (CON-09)", () => {
     // a scan reads all 20,000 companies; the indexed lookup reads a handful (2 here)
     expect(Number(reads.seq_tup_read)).toBeLessThan(1000);
     expect(Number(reads.idx_tup_fetch)).toBeLessThan(1000);
+
+    // The same among many small businesses, as in production and in the full suite: a business then looks like a few dozen
+    // companies, and the plan once hashed the whole business (20,001 rows read, ~8 s) instead of probing the candidates
+    // (020525). Seeded, analyzed and measured in one transaction that is rolled back, so nothing is left behind.
+    class Measured extends Error {
+      constructor(readonly value: { rows: number; seq: number; idx: number }) {
+        super("rolled back on purpose");
+      }
+    }
+    const crowded = await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      await q(
+        `insert into public.companies (organization_id, name, website, email)
+         select md5('small-business-' || (g % 400))::uuid, 'קטנה ' || g, 'https://www.small' || g || '.co.il', 'a@small' || g || '.com'
+           from generate_series(1, 4000) g`,
+      );
+      await q("set local session_replication_role = origin");
+      await q("analyze public.companies");
+      await q("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: bigOwner.id, role: "authenticated" })]);
+      await q("set local role authenticated");
+      const stat = async () =>
+        (await q<{ seq: string; idx: string }>(
+          "select seq_tup_read as seq, idx_tup_fetch as idx from pg_stat_xact_user_tables where relid = 'public.companies'::regclass",
+        )).rows[0];
+      const before = await stat();
+      const found = (await q("select id from public.company_domain_matches($1, 'dana@sales.big12345.co.il')", [big])).rows.length;
+      const after = await stat();
+      throw new Measured({ rows: found, seq: Number(after.seq) - Number(before.seq), idx: Number(after.idx) - Number(before.idx) });
+    }).then(
+      () => null,
+      (e: unknown) => {
+        if (e instanceof Measured) return e.value;
+        throw e;
+      },
+    );
+    expect(crowded).toMatchObject({ rows: 1 });
+    expect(crowded!.seq).toBeLessThan(1000);
+    expect(crowded!.idx).toBeLessThan(1000);
   });
 
   it("anon may not call the lookup", async () => {
