@@ -865,6 +865,10 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   answers not found; never an older version. `app.quotes_version_guard` (last redefined in 020420) refuses deciding a quote with a sent
   newer version (`quote:superseded`) and sending a version whose previous quote is accepted or declined
   (`quote_version:previous_decided`, previous taken FOR SHARE against decide's FOR UPDATE); decide re-reads after its lock ('changed').
+- Quote notices (RVW-34, migration 020455): every notice about a quote (accepted/declined, viewed, expired) goes to
+  `app.quote_notice_recipients(quote)` (definer, no grants): the quote's owner while active, else the deal's owner, else (no deal
+  only) the contact's owner, each active and not a viewer, else the active owners and admins. `public.quote_public_decide`,
+  `app.quote_mark_viewed` and `app.expire_quotes` were last redefined in 020455.
 - Quote views (QUO-10, migration 020390; owner 18 October 2026): `public.quote_views` (one row per quote: first, last, count; server
   writes only; select follows the quote). `app.quote_mark_viewed` (definer, no grants), called by `public.quote_public` (last redefined
   in 020390) after the rate limit and the chain walk, counts the view, moves sent → viewed once and sends kind `quote_viewed` (in both
