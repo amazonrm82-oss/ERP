@@ -681,7 +681,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  019640/019620 (`app.run_automation_actions` in 020215); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020465/019620 (`app.run_automation_actions` in 020215); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
@@ -1165,6 +1165,15 @@ that back.
   One exception (owner, 14 October 2026, LEAD-05): lead score rules. New organizations are seeded; an existing organization with no
   rules gets an "add the suggested rules" button with a warning, because adding rules rescores all its leads (a bulk change
   that must not happen behind its back in a migration).
+- Modules on/off (LEAD-08, migrations 020460, 020465; owner 18 October 2026, answer (א)): `public.org_modules` (one row per org;
+  `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
+  no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
+  company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
+  `public.intake_submit` and `public.booking_submit` (both last redefined in 020465) match or create a contact instead of a lead
+  (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
+  what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
+  companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
+  function keeps the `v_leads_on` lines.
 - Business terms (FLD-10 part one, migration 020435; owner 18 October 2026, answer (א)): `public.org_terms` (one row per org;
   `contact_term`, `lead_term`, `deal_term` null = today's word, else a key from the closed lists mirrored by
   `src/features/terminology/terms.ts`, which holds every Hebrew form by hand; members read, owners/admins of a writable org write,
