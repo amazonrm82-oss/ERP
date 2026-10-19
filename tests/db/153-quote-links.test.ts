@@ -179,7 +179,8 @@ describe("the customer's link to a quote (QUO-08)", () => {
     expect(Object.keys(page.customer).sort()).toEqual(["contact", "name"]);
     // nothing anywhere in the answer is an id: of the quote, its lines, the deal, the contact, a product or the business
     expect(JSON.stringify(page)).not.toMatch(UUID);
-    expect(page.quote).toMatchObject({ title: "הצעה ללקוח", status: "sent", notes: "הערה ללקוח", terms: "תשלום שוטף", net_total_agorot: 20000, vat_agorot: 3600, total_agorot: 23600 });
+    // QUO-10: the customer opening the page marks a sent quote viewed (test 175)
+    expect(page.quote).toMatchObject({ title: "הצעה ללקוח", status: "viewed", notes: "הערה ללקוח", terms: "תשלום שוטף", net_total_agorot: 20000, vat_agorot: 3600, total_agorot: 23600 });
     expect(page.quote.number).toEqual(expect.any(String));
     expect(page.customer).toEqual({ name: "דנה הלקוחה", contact: null });
     expect(page.lines.map((l) => [l.kind, l.name])).toEqual([
@@ -256,7 +257,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     expect(await status(member, org, quote)).toMatchObject({ active: false });
     expect((await pgError(create(member, org, quote))).hint).toBe("quote:closed");
     await asAdmin((q) => q("update public.quotes set status = 'sent' where id = $1", [quote]));
-    expect((await publicPage(token)).quote.status).toBe("sent");
+    expect((await publicPage(token)).quote.status).toBe("viewed");
 
     // valid until yesterday in the business's time zone
     // the dates of a sent quote are frozen for every writer; the test moves them past the triggers
@@ -266,7 +267,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     });
     await notFound(token);
     await asAdmin((q) => q("update public.quotes set valid_until = current_date + 30 where id = $1", [quote]));
-    expect((await publicPage(token)).quote.status).toBe("sent");
+    expect((await publicPage(token)).quote.status).toBe("viewed");
 
     await setFeatures(org, { quotes: false });
     await notFound(token);
@@ -274,15 +275,15 @@ describe("the customer's link to a quote (QUO-08)", () => {
     expect((await pgError(create(member, org, quote))).hint).toBe("feature:quotes");
     expect((await pgError(status(member, org, quote))).hint).toBe("feature:quotes");
     await setFeatures(org, {});
-    expect((await publicPage(token)).quote.status).toBe("sent");
+    expect((await publicPage(token)).quote.status).toBe("viewed");
 
     // a suspended business still shows its pages (app.org_public_pages_open); a cancelled one does not
     await asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [org]));
-    expect((await publicPage(token)).quote.status).toBe("sent");
+    expect((await publicPage(token)).quote.status).toBe("viewed");
     await asAdmin((q) => q("update public.organizations set status = 'cancelled' where id = $1", [org]));
     await notFound(token);
     await asAdmin((q) => q("update public.organizations set status = 'trial' where id = $1", [org]));
-    expect((await publicPage(token)).quote.status).toBe("sent");
+    expect((await publicPage(token)).quote.status).toBe("viewed");
 
     // the customer purged for good: the kept quote has no page any more
     for (const [table, id] of [
@@ -321,7 +322,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     const token = await create(member, org, quote);
     await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
     try {
-      expect((await publicPage(token)).quote.status).toBe("sent");
+      expect((await publicPage(token)).quote.status).toBe("viewed");
       expect((await pgError(create(member, org, quote))).code).toBe("42501");
     } finally {
       await asAdmin((q) => q("update public.organizations set status = 'trial' where id = $1", [org]));

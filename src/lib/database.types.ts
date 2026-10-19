@@ -1660,6 +1660,18 @@ export type QuoteDecisionRow = {
   created_at: string;
 };
 
+// QUO-10: a customer's views of a quote (migration quote_views). Written by public.quote_public only; read by whoever
+// reads the quote.
+export type QuoteViewRow = {
+  id: string;
+  organization_id: string;
+  quote_id: string;
+  first_viewed_at: string;
+  last_viewed_at: string;
+  view_count: number;
+  created_at: string;
+};
+
 // QUO-02: a line of a quote (migration quotes). kind item | group; unit_name, total_agorot and a product line's
 // vat_exempt and billing are set by trigger quote_lines_check.
 export type QuoteLineRow = {
@@ -2403,6 +2415,7 @@ export type Database = {
       >;
       // GAP-09: column grants; the quote is fixed once inserted
       quote_decisions: ReadOnlyTable<QuoteDecisionRow>;
+      quote_views: ReadOnlyTable<QuoteViewRow>;
       quote_payment_steps: Table<
         QuotePaymentStepRow,
         { organization_id: string; quote_id: string; position?: number; name: string; percent_bp: number; due_date?: string | null; milestone?: string | null },

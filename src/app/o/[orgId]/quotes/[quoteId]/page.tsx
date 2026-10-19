@@ -14,7 +14,8 @@ import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quo
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getQuote, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getQuote, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { quoteViewsCount } from "@/features/quotes/views";
 import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
@@ -24,7 +25,7 @@ import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -53,7 +54,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const quote = await getQuote(orgId, quoteId);
   if (!quote) notFound();
   const supabase = await createClient();
-  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule, customerNow, versions] = await Promise.all([
+  const [lines, pricing, parties, hasProducts, hasDiscounts, hasQuotes, templates, parent, schedule, customerNow, versions, views] = await Promise.all([
     listQuoteLines(orgId, quote.id),
     getQuotePricing(orgId, quote),
     getQuoteParties(orgId, quote),
@@ -74,6 +75,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     getQuoteCustomerNow(orgId, quote),
     // QUO-12
     getQuoteVersions(orgId, quote),
+    // QUO-10
+    getQuoteViews(orgId, quote.id),
   ]);
   const parentRow = parent ? must(parent, "quote parent") : null;
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -143,6 +146,13 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </span>
         ) : null}
         {quote.sentAt ? <span>נשלחה {formatDate(quote.sentAt)}</span> : null}
+        {views ? (
+          // QUO-10: the customer's views (first, count, last)
+          <span>
+            נפתחה לראשונה {formatDateTime(views.firstViewedAt)} · {quoteViewsCount(views)}
+            {views.count > 1 ? <> · אחרונה {formatDateTime(views.lastViewedAt)}</> : null}
+          </span>
+        ) : null}
         {quote.status !== "draft" && quote.customerName && !quote.customerDeletedAt ? (
           <span>
             לקוח במסמך: <bdi className="text-ink">{quote.customerName}</bdi>

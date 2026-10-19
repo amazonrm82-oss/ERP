@@ -228,6 +228,8 @@ describe("tenant isolation", () => {
     await asAdmin((q) =>
       q("insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256, ip) values ($1, $2, 'rejected', repeat('0', 64), '203.0.113.7')", [orgA, ids.quoteA]),
     );
+    // QUO-10: the customer opened A's quote (written by the server only)
+    await asAdmin((q) => q("insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]));
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
     );
@@ -328,6 +330,8 @@ describe("tenant isolation", () => {
     "quote_payment_steps",
     // QUO-09
     "quote_decisions",
+    // QUO-10
+    "quote_views",
     // QUO-04
     "quote_templates",
     "quote_template_lines",
@@ -501,6 +505,8 @@ describe("tenant isolation", () => {
       quote_payment_steps: "name = name",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
       quote_decisions: "ip = ip",
+      // no client write grant at all: a permission error is the expected outcome
+      quote_views: "view_count = view_count",
       quote_templates: "name = name",
       quote_template_lines: "name = name",
       completeness_settings: "fields = fields",
@@ -622,6 +628,7 @@ describe("tenant isolation", () => {
       ["insert into public.quote_lines (organization_id, quote_id, name) values ($1, $2, 'x')", [orgA, ids.quoteA]],
       ["insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.quoteA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
+      ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
@@ -724,6 +731,7 @@ describe("tenant isolation", () => {
       ["quote_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
+      ["quote_views", "view_count = 777", "view_count = 777"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],

@@ -14,6 +14,7 @@ import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ScheduleStep } from "./schedule";
+import type { QuoteViews } from "./views";
 import { quoteCustomerName } from "./share";
 import { isNoVatReason, isQuoteStatus, type NoVatReason, type QuoteStatus } from "./schema";
 
@@ -496,4 +497,19 @@ export async function getQuoteDecision(orgId: string, quoteId: string): Promise<
     declineReason: row.decline_reason,
     erasedAt: row.erased_at,
   };
+}
+
+/** QUO-10: when the customer opened the quote (null when never, or when the caller may not read the quote). */
+export async function getQuoteViews(orgId: string, quoteId: string): Promise<QuoteViews | null> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase
+      .from("quote_views")
+      .select("first_viewed_at, last_viewed_at, view_count")
+      .eq("organization_id", orgId)
+      .eq("quote_id", quoteId)
+      .maybeSingle(),
+    "quote views",
+  );
+  return row ? { firstViewedAt: row.first_viewed_at, lastViewedAt: row.last_viewed_at, count: row.view_count } : null;
 }

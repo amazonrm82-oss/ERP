@@ -172,7 +172,8 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     await decide(token, { fingerprint: (await page(token)).fingerprint });
     const notes = await asAdmin(async (q) =>
       (await q<{ user_id: string; type: string; title: string; body: string | null; entity_type: string }>(
-        "select user_id, type, title, body, entity_type from public.notifications where entity_id = $1",
+        // QUO-10: opening the page also sent a quote_viewed notice (test 175); this one is about the decision
+        "select user_id, type, title, body, entity_type from public.notifications where entity_id = $1 and type <> 'quote_viewed'",
         [quote],
       )).rows,
     );
@@ -197,7 +198,8 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     ]) {
       expect(await decide(ta, { fingerprint: fa, ...bad }), JSON.stringify(bad)).toEqual({ status: "invalid" });
     }
-    expect([await status(a.quote), await decisions(a.quote)]).toEqual(["sent", 0]);
+    // QUO-10: opening the page marked the quote viewed; the invalid answers changed nothing else
+    expect([await status(a.quote), await decisions(a.quote)]).toEqual(["viewed", 0]);
     expect(await decide(ta, { fingerprint: fa, kind: "typed", image: null })).toEqual({ status: "accepted" });
 
     const b = await sentQuote();
@@ -224,10 +226,11 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     expect(shown.replaced).not.toBeNull();
     expect(shown.fingerprint).not.toBe(f1);
     expect(await decide(t1, { fingerprint: f1 })).toEqual({ status: "changed" });
-    expect([await status(v1.quote), await status(v2), await decisions(v1.quote), await decisions(v2)]).toEqual(["sent", "sent", 0, 0]);
+    // QUO-10: each was viewed when the old link showed it (version 1 first, then version 2)
+    expect([await status(v1.quote), await status(v2), await decisions(v1.quote), await decisions(v2)]).toEqual(["viewed", "viewed", 0, 0]);
     // with what the page shows now, version 2 is accepted and the original stays as it was
     expect(await decide(t1, { fingerprint: shown.fingerprint })).toEqual({ status: "accepted" });
-    expect([await status(v1.quote), await status(v2)]).toEqual(["sent", "accepted"]);
+    expect([await status(v1.quote), await status(v2)]).toEqual(["viewed", "accepted"]);
   });
 
   it("tries are limited per link, and the limit holds because every outcome is an answer", async () => {
@@ -236,7 +239,8 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     const fingerprint = (await page(token)).fingerprint;
     for (let i = 0; i < 10; i += 1) expect(await decide(token, { fingerprint, agreed: false })).toEqual({ status: "invalid" });
     expect(await decide(token, { fingerprint })).toEqual({ status: "rate_limited" });
-    expect(await status(quote)).toBe("sent");
+    // QUO-10: viewed by opening the page, never decided
+    expect(await status(quote)).toBe("viewed");
   });
 
   it("a wrong, revoked or closed link finds nothing, and only the server may call it", async () => {

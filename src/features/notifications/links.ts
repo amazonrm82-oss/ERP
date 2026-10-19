@@ -31,7 +31,7 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // a new lead while the business is suspended (0163): choose a plan to see it; the id is the business
     case "subscription":
       return paths.settingsPlan(orgId);
-    // QUO-09: the customer accepted or declined a quote
+    // QUO-09 / QUO-10: the customer opened, accepted or declined a quote
     case "quote":
       return quotePath(orgId, entityId);
     default:
