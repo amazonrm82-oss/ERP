@@ -58,6 +58,7 @@ import { CompletenessCard } from "@/features/data-quality/components/completenes
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
+import { getOrdersAccess } from "@/features/orders/access";
 import { quoteAmountMark } from "@/features/quotes/accept-deal";
 import { getQuoteNumberDisplay } from "@/features/quotes/queries";
 import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
@@ -109,12 +110,16 @@ export default async function DealPage({ params, searchParams }: Props) {
     : [[], [], [], DEFAULT_CALENDAR_SETTINGS];
   const companies = modules.companies ? companyOptions : null;
   // DEAL-04: the close window of a move into a won stage; the onboarding task goes to an active member who writes
-  const closeWindow = closeWindowSetup(
-    members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
-    context.org.timeZone,
-    calendar,
-    context.user.id,
-  );
+  const closeWindow = {
+    ...closeWindowSetup(
+      members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+      context.org.timeZone,
+      calendar,
+      context.user.id,
+    ),
+    // DEAL-04 wave 2: the close window also offers the deal's order while the orders module is on
+    orders: (await getOrdersAccess(orgId)).on,
+  };
   // DEAL-11: the deal this one continues and its follow-ups; the pipelines for a new deal (writers only)
   const [links, pipelines, lines, hasProducts, hasDiscounts, hasQuotes] = await Promise.all([
     getDealLinks(orgId, deal.id, deal.previous_deal_id),

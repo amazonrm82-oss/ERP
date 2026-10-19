@@ -191,6 +191,8 @@ export type CloseWindowSetup = {
   nextWorkingDay: string;
   timeZone: string;
   userId: string;
+  // DEAL-04 wave 2: the orders module is on (ORD-01), so "what next" also offers an order
+  orders?: boolean;
 };
 
 /** Built on the server for a page that may close deals: owners are the active members who write. */

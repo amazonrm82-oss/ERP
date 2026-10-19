@@ -23,6 +23,9 @@ import { LINES_PRICES_KEPT } from "@/features/deal-lines/schema";
 import { linesKeptText, quoteWinResult } from "@/features/quotes/accept-deal";
 import { quotePath } from "@/features/quotes/paths";
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
+import { createOrderForWonDeal, dealHasOrder } from "@/features/orders/won-order";
+import { wonOrderText } from "@/features/orders/won";
+import { ordersPath } from "@/features/orders/paths";
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
 import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
@@ -351,6 +354,7 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
   }
   revalidateDeal(orgId, dealId);
 
+  const notes: string[] = linesKept ? [linesKept] : [];
   if (close.task) {
     // one open onboarding task per deal: another window may have created one meanwhile
     const existing = await openOnboardingTask(supabase, orgId, dealId);
@@ -358,22 +362,42 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
       return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(existing.error)})`, values);
     }
     if (existing.open) {
-      return { ok: true, message: linesKept ? `${linesKept} ${ONBOARDING_EXISTS}` : ONBOARDING_EXISTS };
+      notes.push(ONBOARDING_EXISTS);
+    } else {
+      const deal = moved[0];
+      // the window offers the deal's owner first; no choice: the task is the user's (database default)
+      const taskError = await insertOnboardingTask(
+        supabase,
+        orgId,
+        { dealId, contactId: deal.contact_id, companyId: deal.company_id, title: close.task.title, dueDate: close.task.dueDate, ownerId: close.task.ownerId },
+        timeZone,
+      );
+      if (taskError) {
+        return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(taskError)})`, values);
+      }
+      revalidatePath(paths.tasks(orgId));
     }
-    const deal = moved[0];
-    // the window offers the deal's owner first; no choice: the task is the user's (database default)
-    const taskError = await insertOnboardingTask(
-      supabase,
-      orgId,
-      { dealId, contactId: deal.contact_id, companyId: deal.company_id, title: close.task.title, dueDate: close.task.dueDate, ownerId: close.task.ownerId },
-      timeZone,
-    );
-    if (taskError) {
-      return fail(`${CLOSE_TASK_FAILED} (${dbErrorMessage(taskError)})`, values);
-    }
-    revalidatePath(paths.tasks(orgId));
   }
-  return linesKept ? { ok: true, message: linesKept } : ok();
+  // DEAL-04 wave 2: "what next" may also make the deal's order (ORD-01); the deal is won either way
+  if (formData.get("create_order") === "on") {
+    const order = await createOrderForWonDeal(supabase, orgId, dealId, quoteId);
+    notes.push(wonOrderText(order));
+    if (order.ok) revalidatePath(ordersPath(orgId));
+  }
+  return notes.length > 0 ? { ok: true, message: notes.join(" ") } : ok();
+}
+
+/** DEAL-04 wave 2: whether the deal already has an order that is not cancelled (the close window then offers none). */
+export async function dealOrderStateAction(orgId: string, dealId: string): Promise<ActionResult<{ has: boolean }>> {
+  const context = await actionContext(orgId, dealId);
+  if (!context.ok) {
+    return context;
+  }
+  const found = await dealHasOrder(context.supabase, orgId, dealId);
+  if ("error" in found) {
+    return fail(dbErrorMessage(found.error));
+  }
+  return ok({ has: found.has });
 }
 
 export async function updateDealAction(

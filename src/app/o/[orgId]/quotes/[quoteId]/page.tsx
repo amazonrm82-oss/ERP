@@ -164,14 +164,19 @@ export default async function QuotePage({ params, searchParams }: Props) {
     mode: acceptMode,
     canEdit: mayMove,
   });
+  const ordersOn = offerMove ? (await getOrdersAccess(orgId)).on : false;
   const moveSetup = offerMove
     ? await Promise.all([listMembers(orgId), getCalendarSettings(orgId)]).then(([members, calendar]) =>
-        closeWindowSetup(
-          members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
-          context.org.timeZone,
-          calendar,
-          context.user.id,
-        ),
+        ({
+          ...closeWindowSetup(
+            members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+            context.org.timeZone,
+            calendar,
+            context.user.id,
+          ),
+          // DEAL-04 wave 2: the close window also offers the quote's order while the orders module is on
+          orders: ordersOn,
+        }),
       )
     : null;
   // ORD-01 (owner, 19 October 2026): an accepted quote makes one order, numbered at once; while the module is off, owners and

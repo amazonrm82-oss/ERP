@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getOrdersAccess } from "@/features/orders/access";
 import Form from "next/form";
 import Link from "next/link";
 
@@ -127,6 +128,8 @@ export default async function DealsPage({ params, searchParams }: Props) {
   }
 
   const { canWrite } = context;
+  // DEAL-04 wave 2: the close window also offers the deal's order while the orders module is on
+  const ordersOn = canWrite && (await getOrdersAccess(orgId)).on;
   const requested = firstParam(query.pipeline);
   const showClosed = firstParam(query.closed) === "1";
   const fullStage = firstParam(query.stage);
@@ -287,12 +290,16 @@ export default async function DealsPage({ params, searchParams }: Props) {
         }}
         closeWindow={
           canWrite && calendar
-            ? closeWindowSetup(
-                members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
-                context.org.timeZone,
-                calendar,
-                context.user.id,
-              )
+            ? {
+                ...closeWindowSetup(
+                  members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ value: m.userId, label: m.name })),
+                  context.org.timeZone,
+                  calendar,
+                  context.user.id,
+                ),
+                // DEAL-04 wave 2: the close window also offers the deal's order while the orders module is on
+                orders: ordersOn,
+              }
             : null
         }
         hrefs={{
@@ -310,6 +317,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
  * the cell, bulk actions and export, as in the other lists.
  */
 async function DealsTableView({ orgId, context, query }: { orgId: string; context: OrgContext; query: Query }) {
+  const ordersOn = context.canWrite && (await getOrdersAccess(orgId)).on;
   // FLD-10: the business's own words
   const { deal, lead } = await getOrgTerms(orgId);
   const requested = firstParam(query.pipeline);
@@ -433,7 +441,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           editing={editing}
           tags={tags}
           lossReasons={activeLossReasons(lossReasons).map((reason) => reason.name)}
-          closeWindow={context.canWrite && calendar ? closeWindowSetup(editing.owners, context.org.timeZone, calendar, context.user.id) : null}
+          closeWindow={context.canWrite && calendar ? { ...closeWindowSetup(editing.owners, context.org.timeZone, calendar, context.user.id), orders: ordersOn } : null}
         />
       ) : (
         <div className="rounded-lg border border-line bg-surface">

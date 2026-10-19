@@ -15,7 +15,7 @@ import type { FieldDefinition } from "@/features/custom-fields/types";
 import { missingForMoveAction } from "@/features/record-move/actions";
 import type { FormState } from "@/lib/action-result";
 
-import { closeDealWonAction, closeOpenDealWonAction, closeQuoteDealWonAction, dealOnboardingTaskAction } from "../actions";
+import { closeDealWonAction, closeOpenDealWonAction, closeQuoteDealWonAction, dealOnboardingTaskAction, dealOrderStateAction } from "../actions";
 import {
   amountInputValue,
   type CloseWindowSetup,
@@ -117,8 +117,19 @@ function WonForm({
   const [required, setRequired] = useState<FieldDefinition[]>([]);
   // DEAL-05: the won stage requires the amount (the save checks it either way)
   const [amountRequired, setAmountRequired] = useState(false);
+  // DEAL-04 wave 2: an order is offered while the orders module is on and the deal has none yet (the database checks again)
+  const [orderState, setOrderState] = useState<"checking" | "has" | "none">(setup.orders ? "checking" : "has");
   useEffect(() => {
     let cancelled = false;
+    if (setup.orders) {
+      dealOrderStateAction(orgId, target.dealId)
+        .then((result) => {
+          if (!cancelled) setOrderState(result.ok && result.data?.has ? "has" : "none");
+        })
+        .catch(() => {
+          if (!cancelled) setOrderState("none");
+        });
+    }
     dealOnboardingTaskAction(orgId, target.dealId)
       .then((result) => {
         if (!cancelled) setExisting(result.ok && result.data?.open ? "open" : "none");
@@ -139,7 +150,7 @@ function WonForm({
     return () => {
       cancelled = true;
     };
-  }, [orgId, target.dealId, target.stageId]);
+  }, [orgId, target.dealId, target.stageId, setup.orders]);
 
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = quoteId
@@ -232,6 +243,20 @@ function WonForm({
             ) : null}
           </>
         )}
+        {setup.orders && orderState === "none" ? (
+          <Checkbox
+            label="ליצור הזמנה"
+            hint={
+              quoteId
+                ? "הזמנה ממוספרת עם השורות והמחירים שהלקוח אישר בהצעה."
+                : "הזמנה ממוספרת מההצעה שהלקוח אישר, ואם אין כזו, משורות העסקה."
+            }
+            name="create_order"
+            defaultChecked={values?.create_order === "on"}
+          />
+        ) : setup.orders && orderState === "has" ? (
+          <p className="text-sm text-ink-soft">לעסקה כבר יש הזמנה.</p>
+        ) : null}
       </fieldset>
       <OldCloseDateQuestion day={asking} onConfirm={confirm} onCancel={cancel} />
       <div className="flex flex-wrap gap-2 pt-1">
