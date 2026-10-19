@@ -876,6 +876,12 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   it in only while the transaction setting `app.quote_version_copy` names the new draft and the previous quote has that product);
   `quote_public` adds `draft_version`. `app.quote_lines_check`, `public.quote_new_version`, `app.quotes_version_guard` and
   `public.quote_public` were last redefined in 020540.
+  Since 020550 (owner 19 October 2026, the one rule for a sent quote's link) `quote_public` leads to the newest sent version: open =
+  full page, accepted = full page with `accepted_on` and no decision, declined/cancelled/expired = `{status_page: {...}}` without prices;
+  not found only per `app.quote_link_usable` (unknown/revoked token, draft, erased customer, closed public pages, no flag). Only an open
+  newest version is decided (`app.quote_offer_open`; decide answers `closed` otherwise). A version keeps a line of a deleted price list
+  (`price_list_name`); `quote_duplicate` answers `skipped_lines`. `quote_public`, `quote_public_version`, `quote_public_decide`,
+  `app.quote_lines_check`, `quote_new_version` and `quote_duplicate` were last redefined in 020550.
 - Quote expiry and cancel (QUO-11, migrations 020415, 020420; owner 18 October 2026): pg_cron `crm-quote-expiry` (every 15 minutes)
   runs `app.expire_quotes()`: a sent or viewed quote whose `valid_until` is before the business's today becomes `expired` (200 per org,
   2,000 per run, per-quote exception block; a failure waits an hour in `app.quote_expiry_retry`), and its active owner gets kind `quote`.
