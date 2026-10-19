@@ -119,11 +119,20 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     .filter(Boolean)
     .join(",");
   const quotes = await readLinked(supabase, orgId, "quotes", "*", quoteFilter || null);
-  const quoteLines = await readByIds(supabase, orgId, "quote_lines", "*", "quote_id", uniqueIds(quotes.map((q) => q.id)));
+  const quoteIds = uniqueIds(quotes.map((q) => q.id));
+  // RVW-33: the customer's decision (signer, ID, signature, IP and browser, or the decline reason; owners and admins
+  // read it, RLS), the views and the payment schedule of the person's quotes, and the static segments they are in
+  const [quoteLines, quoteDecisions, quoteViews, quotePaymentSteps, segmentMembers] = await Promise.all([
+    readByIds(supabase, orgId, "quote_lines", "*", "quote_id", quoteIds),
+    readByIds(supabase, orgId, "quote_decisions", "*", "quote_id", quoteIds),
+    readByIds(supabase, orgId, "quote_views", "*", "quote_id", quoteIds),
+    readByIds(supabase, orgId, "quote_payment_steps", "*", "quote_id", quoteIds),
+    readLinked(supabase, orgId, "segment_members", "*", personOnly),
+  ]);
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
-  const [companies, statuses, sources, stages, pipelines, fields, relationTypes] = await Promise.all([
+  const [companies, statuses, sources, stages, pipelines, fields, relationTypes, segments] = await Promise.all([
     readByIds(supabase, orgId, "companies", "id, name", "id", companyIds),
     readLinked(supabase, orgId, "lead_statuses", "id, name", "id.not.is.null"),
     readLinked(supabase, orgId, "lead_sources", "id, name", "id.not.is.null"),
@@ -131,10 +140,11 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readLinked(supabase, orgId, "pipelines", "id, name", "id.not.is.null"),
     readLinked(supabase, orgId, "field_definitions", "id, object_type, key, label", "id.not.is.null"),
     relations.length ? readLinked(supabase, orgId, "contact_relation_types", "id, name, reverse_name", "id.not.is.null") : Promise.resolve([]),
+    readByIds(supabase, orgId, "segments", "id, name", "id", uniqueIds(segmentMembers.map((m) => m.segment_id))),
   ]);
   const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
   const userNames = await getUserNames(
-    uniqueIds([...userIds, ...files.map((f) => f.uploaded_by), ...consents.map((c) => c.recorded_by)]).filter((u): u is string => typeof u === "string"),
+    uniqueIds([...userIds, ...files.map((f) => f.uploaded_by), ...consents.map((c) => c.recorded_by), ...segmentMembers.map((m) => m.added_by)]).filter((u): u is string => typeof u === "string"),
   );
 
   const sections = {
@@ -155,6 +165,10 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     }),
     quotes,
     quote_lines: quoteLines,
+    quote_decisions: quoteDecisions,
+    quote_views: quoteViews,
+    quote_payment_steps: quotePaymentSteps,
+    segment_members: segmentMembers,
     consents,
     form_submissions: submissions,
     lookups: {
@@ -164,6 +178,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
       lead_sources: Object.fromEntries(sources.map((s) => [s.id, s.name])),
       pipelines: Object.fromEntries(pipelines.map((p) => [p.id, p.name])),
       stages: Object.fromEntries(stages.map((s) => [s.id, s.name])),
+      segments: Object.fromEntries(segments.map((g) => [g.id, g.name])),
       relation_types: Object.fromEntries(relationTypes.map((t) => [t.id, { name: t.name, reverse_name: t.reverse_name }])),
       custom_fields: fields.map((f) => ({ object_type: f.object_type, key: f.key, label: f.label })),
     },
