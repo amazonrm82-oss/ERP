@@ -10,10 +10,13 @@ import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
 import type { Database } from "@/lib/database.types";
 import { DbReadError, must } from "@/lib/db-read";
+import { readAllPagesByIds } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
+import type { Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
 import { quoteAcceptDealOf, type QuoteAcceptDeal } from "./accept-deal";
+import { QUOTE_DEFAULT_SORT, QUOTE_SORT_COLUMNS, type QuoteSortKey } from "./list";
 import { withoutSuperseded } from "./addenda";
 import type { ScheduleStep } from "./schedule";
 import type { QuoteViews } from "./views";
@@ -465,6 +468,14 @@ export type QuoteListFilters = {
   from: string | null;
   to: string | null;
   page: number;
+  // LST-09: the table's sort (default: quote date, newest first)
+  sort?: Sort<QuoteSortKey>;
+  // LST-05: the advanced filter as one PostgREST logic tree (prepareListFilter), or null
+  filter?: string | null;
+  // LST-08: only these quotes (the rows picked in the list); the other filters are then ignored
+  ids?: string[];
+  // LST-08: an export reads the list in larger chunks instead of a page
+  chunk?: { from: number; size: number };
 };
 
 export type QuoteListItem = QuoteSummary & {
@@ -477,40 +488,52 @@ export type QuoteListItem = QuoteSummary & {
 };
 
 /**
- * QUO-16: the business's quotes, newest first, filtered by status, owner and quote date; one page at a time. Read with
- * the user's session: the quotes RLS shows only the quotes of deals and contacts they read.
+ * QUO-16: the business's quotes, filtered by status, owner and quote date; one page at a time (LST-09: sorted by any
+ * column, the advanced filter, picked rows, export chunks). Read with the user's session: the quotes RLS shows only the
+ * quotes of deals and contacts they read.
  */
 export async function listQuotes(orgId: string, filters: QuoteListFilters): Promise<{ quotes: QuoteListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
+  const size = filters.chunk?.size ?? PAGE_SIZE;
+  const offset = filters.chunk?.from ?? (filters.page - 1) * PAGE_SIZE;
   let query = supabase
     .from("quotes")
     .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display, owner_id, sent_at, customer_name, deal_id, contact_id")
     .eq("organization_id", orgId);
-  if (filters.status) query = query.eq("status", filters.status);
-  if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
-  if (filters.from) query = query.gte("quote_date", filters.from);
-  if (filters.to) query = query.lte("quote_date", filters.to);
-  const offset = (filters.page - 1) * PAGE_SIZE;
+  if (filters.ids) {
+    query = query.in("id", filters.ids);
+  } else {
+    if (filters.status) query = query.eq("status", filters.status);
+    if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
+    if (filters.from) query = query.gte("quote_date", filters.from);
+    if (filters.to) query = query.lte("quote_date", filters.to);
+    if (filters.filter) query = query.or(filters.filter);
+  }
+  const sort = filters.sort ?? QUOTE_DEFAULT_SORT;
   const rows = must(
     await query
-      .order("quote_date", { ascending: false })
+      .order(QUOTE_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
       .order("created_at", { ascending: false })
       .order("id")
-      .range(offset, offset + PAGE_SIZE),
+      .range(offset, offset + size),
     "quotes list",
   );
-  const page = rows.slice(0, PAGE_SIZE);
+  const page = rows.slice(0, size);
   // the names of the deals and contacts on this page, read separately (RLS: only those the user reads)
   const contactIds = [...new Set(page.flatMap((row) => (row.contact_id && !row.customer_name ? [row.contact_id] : [])))];
-  const dealIds = [...new Set(page.flatMap((row) => (row.deal_id && !row.customer_name && !row.contact_id ? [row.deal_id] : [])))];
+  const dealIds = [...new Set(page.flatMap((row) => (row.deal_id && !row.customer_name ? [row.deal_id] : [])))];
   const [contacts, deals] = await Promise.all([
-    contactIds.length > 0 ? supabase.from("contacts").select("id, full_name").eq("organization_id", orgId).in("id", contactIds) : null,
-    dealIds.length > 0 ? supabase.from("deals").select("id, name").eq("organization_id", orgId).in("id", dealIds) : null,
+    contactIds.length > 0 ? readAllPagesByIds(contactIds, async (slice, from, to) =>
+          must(await supabase.from("contacts").select("id, full_name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "quote contacts"),
+        ) : [],
+    dealIds.length > 0 ? readAllPagesByIds(dealIds, async (slice, from, to) =>
+          must(await supabase.from("deals").select("id, name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "quote deals"),
+        ) : [],
   ]);
-  const contactNames = new Map((contacts ? must(contacts, "quote contacts") : []).map((row) => [row.id, row.full_name]));
-  const dealNames = new Map((deals ? must(deals, "quote deals") : []).map((row) => [row.id, row.name]));
+  const contactNames = new Map(contacts.map((row) => [row.id, row.full_name]));
+  const dealNames = new Map(deals.map((row) => [row.id, row.name]));
   return {
-    hasMore: rows.length > PAGE_SIZE,
+    hasMore: rows.length > size,
     quotes: page.map((row) => ({
       id: row.id,
       title: row.title,
@@ -524,7 +547,8 @@ export async function listQuotes(orgId: string, filters: QuoteListFilters): Prom
       sentAt: row.sent_at,
       dealId: row.deal_id,
       contactId: row.contact_id,
-      customer: row.customer_name ?? (row.contact_id ? contactNames.get(row.contact_id) : null) ?? (row.deal_id ? dealNames.get(row.deal_id) : null) ?? null,
+      // the rule of public.sort_customer(quotes): the kept name, else the contact's, else the deal's
+      customer: row.customer_name ?? (row.contact_id ? contactNames.get(row.contact_id) : undefined) ?? (row.deal_id ? dealNames.get(row.deal_id) : undefined) ?? null,
     })),
   };
 }

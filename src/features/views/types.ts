@@ -2,12 +2,12 @@ import type { ColumnChoice } from "@/features/list-columns/columns";
 
 // Lists that support saved views, and what a view stores: the URL filters, the
 // sort and the columns (LST-04).
-export const VIEW_OBJECTS = ["lead", "contact", "company", "deal", "task", "product"] as const;
+export const VIEW_OBJECTS = ["lead", "contact", "company", "deal", "task", "product", "quote"] as const;
 export type ViewObject = (typeof VIEW_OBJECTS)[number];
 
 // "f": the advanced filter (LST-05), as JSON; "pipeline" and "view": the deals table (LST-09); "who": the tasks list;
-// "category" and "kind": the product catalog's own selects (LST-09)
-export const VIEW_FILTER_KEYS = ["q", "status", "tag", "f", "pipeline", "view", "who", "category", "kind"] as const;
+// "category" and "kind": the product catalog's own selects (LST-09); "owner", "from" and "to": the quotes list's (LST-09)
+export const VIEW_FILTER_KEYS = ["q", "status", "tag", "f", "pipeline", "view", "who", "category", "kind", "owner", "from", "to"] as const;
 export type ViewFilters = Partial<Record<(typeof VIEW_FILTER_KEYS)[number], string>>;
 
 /** Only the known filter keys, as non-empty strings. */

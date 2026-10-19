@@ -177,9 +177,10 @@ export function BulkSelection({
 
   // what the button says: the action, how many, and to what (FXU-06)
   // the product catalog is not a record type (LST-09)
-  const names = object === "product" ? { singular: "מוצר", plural: "מוצרים" } : RECORD_TYPES[object];
+  const names =
+    object === "product" ? { singular: "מוצר", plural: "מוצרים" } : object === "quote" ? { singular: "הצעה", plural: "הצעות" } : RECORD_TYPES[object];
   const plural = names.plural;
-  const feminine = object === "company" || object === "deal" || object === "task";
+  const feminine = object === "company" || object === "deal" || object === "task" || object === "quote";
   const many = count === 1 ? `${names.singular} ${feminine ? "אחת" : "אחד"}` : `${count} ${plural}`;
   const chosen =
     kind === "owner" && value === NO_OWNER

@@ -5,6 +5,7 @@ import type { ListObject } from "@/features/list-columns/columns";
 import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "@/features/contacts/preferences";
 import { INDUSTRIES } from "@/features/onboarding/options";
 import { BILLING_LABELS, BILLINGS, PRODUCT_KIND_LABELS, PRODUCT_KINDS, VAT_KIND_LABELS, VAT_KINDS } from "@/features/products/schema";
+import { QUOTE_STATUS_LABELS, QUOTE_STATUSES } from "@/features/quotes/schema";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
@@ -198,6 +199,19 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       // the price as typed (before or with VAT, as the product says)
       { key: "price", label: "מחיר (₪)", kind: "number", column: "price_agorot", scale: 100 },
       { key: "active", label: "פעיל", kind: "checkbox", column: "is_active" },
+      created,
+    ],
+    // LST-09: the quotes list (no tags or custom fields); the customer's name is not filtered (it is read from the deal or contact)
+    quote: [
+      text("title", "כותרת", "title"),
+      text("number", "מספר", "number_display"),
+      { key: "status", label: "מצב", kind: "select", column: "status", plain: true, options: QUOTE_STATUSES.map((s) => ({ value: s, label: QUOTE_STATUS_LABELS[s] })) },
+      owner,
+      { key: "quote_date", label: "תאריך ההצעה", kind: "day", column: "quote_date" },
+      { key: "valid_until", label: "בתוקף עד", kind: "day", column: "valid_until" },
+      { key: "sent", label: "תאריך שליחה", kind: "date", column: "sent_at" },
+      // the total with VAT, as the quote shows it
+      { key: "total", label: "סכום (₪)", kind: "number", column: "total_agorot", scale: 100 },
       created,
     ],
   };

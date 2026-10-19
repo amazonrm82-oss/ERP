@@ -24,7 +24,8 @@ import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 // its own, with the user's session, so the usual rules hold row by row: a row
 // the user may not change is skipped and counted, and the rest still go through.
 // "product": the product catalog (LST-09); its changes live in src/features/products/bulk-server.ts
-export type BulkObject = "lead" | "contact" | "company" | "deal" | "task" | "product";
+// "quote": the quotes list (LST-09), whose only bulk action is "export the picked rows" (no changes here)
+export type BulkObject = "lead" | "contact" | "company" | "deal" | "task" | "product" | "quote";
 export type BulkChange =
   | { kind: "owner"; ownerId: string | null }
   // a lead's status (lead_statuses id), a task's status (open | done | cancelled), or a product's (active | inactive | archived)
@@ -84,7 +85,7 @@ async function eachLimited<T>(items: T[], run: (item: T) => Promise<boolean>): P
 }
 
 // the columns a change may need to put back
-const BEFORE_COLUMNS: Record<Exclude<BulkObject, "product">, string> = {
+const BEFORE_COLUMNS: Record<Exclude<BulkObject, "product" | "quote">, string> = {
   lead: "id, tag_ids, owner_id, status_id, disqualify_reason",
   contact: "id, tag_ids, owner_id",
   company: "id, tag_ids, owner_id",
@@ -128,6 +129,8 @@ export async function bulkAction(orgId: string, object: BulkObject, ids: string[
   if (!validArg(changeSchema, change) || !validArg(z.array(z.string()), ids)) {
     return fail(INVALID_ARGS);
   }
+  // quotes change only through their own screen (sending, versions, cancelling)
+  if (object === "quote") return fail("פעולה לא מוכרת.");
   if ((object !== "product" && !isRecordType(object)) || !Array.isArray(ids) || ids.length === 0) {
     return fail("לא נבחרו רשומות.");
   }
@@ -378,7 +381,7 @@ const undoSchema = z.object({
  * session: the same rules as any change, so nothing the user may not do.
  */
 export async function undoBulkAction(orgId: string, object: BulkObject, undo: BulkUndo): Promise<ActionResult<{ done: number }>> {
-  if ((object !== "product" && !isRecordType(object)) || !validArg(undoSchema, undo)) {
+  if (object === "quote" || (object !== "product" && !isRecordType(object)) || !validArg(undoSchema, undo)) {
     return fail(INVALID_ARGS);
   }
   if (undo.rows.length === 0) return ok({ done: 0 });

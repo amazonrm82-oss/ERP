@@ -47,8 +47,8 @@ const text = (message: string, status: number) => new Response(message, { status
 // a row as the export needs it: its id, its name, the built-in cells, and its custom fields
 type ExportRow = { name: string; cells: Record<string, string | null>; customFields: Json };
 
-// the product catalog has its own export (src/features/products/export-server.ts)
-export async function exportList(request: Request, orgId: string, object: Exclude<ListObject, "product">): Promise<Response> {
+// the product catalog and the quotes list have their own exports (src/features/products/export-server.ts, src/features/quotes/export-server.ts)
+export async function exportList(request: Request, orgId: string, object: Exclude<ListObject, "product" | "quote">): Promise<Response> {
   const context = await getOrgContext(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);

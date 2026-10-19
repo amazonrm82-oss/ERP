@@ -3,7 +3,7 @@ import { z } from "zod";
 // Which columns a list shows, in what order and how wide (LST-03). Shared by the
 // server (resolving a saved choice) and the "columns" panel in the browser.
 
-export type ListObject = "lead" | "contact" | "company" | "deal" | "task" | "product";
+export type ListObject = "lead" | "contact" | "company" | "deal" | "task" | "product" | "quote";
 // a saved choice in list_preferences: a list's columns, or the fields of a deal card on the board (DEAL-09)
 export type PreferenceKey = ListObject | "deal_board";
 export type ColumnWidth = "narrow" | "normal" | "wide";
@@ -107,6 +107,20 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "created", label: "נוצר" },
     ],
     defaults: ["sku", "category", "kind", "price", "unit", "vat", "status"],
+  },
+  // LST-09: the quotes list (QUO-16); the name column is the quote's number and title; no custom fields
+  quote: {
+    columns: [
+      { key: "status", label: "מצב" },
+      { key: "customer", label: "לקוח" },
+      { key: "owner", label: "אחראי" },
+      { key: "quote_date", label: "תאריך ההצעה" },
+      { key: "valid_until", label: "בתוקף עד" },
+      { key: "sent", label: "נשלחה" },
+      { key: "total", label: "סכום" },
+      { key: "created", label: "נוצרה" },
+    ],
+    defaults: ["status", "customer", "owner", "quote_date", "valid_until", "total"],
   },
 };
 
