@@ -1,5 +1,9 @@
 import "server-only";
 
+import { paymentTermsOf, paymentTermsText } from "@/features/billing/terms";
+import { countryName, ISRAEL } from "@/features/companies/countries";
+import { channelTypeLabel } from "@/features/contacts/channels";
+import { channelDetail, localeLabel } from "@/features/contacts/preferences";
 import { getUserNames } from "@/features/shell/queries";
 import { formatDate, formatMoney } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -66,6 +70,25 @@ export async function findDuplicateCandidates(orgId: string, type: MergeType, id
   }));
 }
 
+/**
+ * A field as the merge screen shows it, together with the columns that are taken with it (MERGE_COMPANIONS), so a
+ * difference in a companion alone (the phone's type, the payment days) shows as a difference to pick.
+ */
+function companionText(type: MergeType, key: string, value: string, r: Row): string {
+  if (type === "contact" && key === "phone") return withNote(value, channelTypeLabel("phone", str(r.phone_type)));
+  if (type === "contact" && key === "email") return withNote(value, channelTypeLabel("email", str(r.email_type)));
+  if (key === "preferred_locale") return localeLabel(value) ?? value;
+  if (key === "preferred_channel") return channelDetail(value, str(r.preferred_channel_source)) ?? value;
+  if (key === "payment_terms") return paymentTermsText(paymentTermsOf(value, typeof r.payment_days === "number" ? r.payment_days : null)) ?? value;
+  if (type === "company" && key === "tax_id") {
+    const country = str(r.country) ?? ISRAEL;
+    return country === ISRAEL ? value : withNote(value, countryName(country));
+  }
+  return value;
+}
+
+const withNote = (value: string, note: string | null) => (note ? `${value} (${note})` : value);
+
 export type MergeSide = { id: string; title: string; values: Record<string, string | null>; raw: Record<string, unknown>; converted: boolean };
 
 /** Both records, with each mergeable field as the text the user sees. Null when one is missing or hidden. */
@@ -79,11 +102,15 @@ export async function loadMergePair(orgId: string, type: MergeType, keepId: stri
   if (!keep || !dup) return null;
 
   const ids = (key: string) => [keep[key], dup[key]].filter((v): v is string => typeof v === "string");
-  const [statuses, sources, companies, owners] = await Promise.all([
+  const none = Promise.resolve({ data: [] as Array<{ id: string; name: string }>, error: null });
+  const [statuses, sources, companies, owners, recordTypes, priceLists, products] = await Promise.all([
     type === "lead" ? supabase.from("lead_statuses").select("id, name, kind").in("id", ids("status_id")) : Promise.resolve({ data: [] }),
     supabase.from("lead_sources").select("id, name").in("id", ids("source_id")),
     type === "contact" ? supabase.from("companies").select("id, name").in("id", ids("company_id")) : Promise.resolve({ data: [] }),
     getUserNames(ids("owner_id")),
+    type === "lead" ? none : supabase.from("record_type_options").select("id, name").eq("organization_id", orgId).in("id", ids("type_id")),
+    type === "lead" ? none : supabase.from("price_lists").select("id, name").eq("organization_id", orgId).in("id", ids("price_list_id")),
+    type === "lead" ? supabase.from("products").select("id, name").eq("organization_id", orgId).in("id", ids("requested_product_id")) : none,
   ]);
   const nameOf = (list: Array<{ id: string; name: string }> | null) => new Map((list ?? []).map((x) => [x.id, x.name]));
   const lookups: Record<string, Map<string, string>> = {
@@ -91,6 +118,9 @@ export async function loadMergePair(orgId: string, type: MergeType, keepId: stri
     source_id: nameOf(sources.data),
     company_id: nameOf(companies.data),
     owner_id: owners,
+    type_id: nameOf(must(recordTypes, "record types")),
+    price_list_id: nameOf(must(priceLists, "price lists")),
+    requested_product_id: nameOf(must(products, "products")),
   };
 
   // a "not relevant" status is shown with its reason, which is merged with it (RVW-9)
@@ -106,7 +136,7 @@ export async function loadMergePair(orgId: string, type: MergeType, keepId: stri
       else if (lookups[key]) values[key] = lookups[key].get(String(v)) ?? "—";
       else if (key === "budget_agorot") values[key] = formatMoney(Number(v));
       else if (key === "birth_date") values[key] = formatDate(String(v));
-      else values[key] = String(v);
+      else values[key] = companionText(type, key, String(v), r);
     }
     return { id: String(r.id), title: recordTitle(type, r), values, raw: r, converted: Boolean(r.converted_at) };
   };

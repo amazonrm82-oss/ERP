@@ -23,6 +23,9 @@ export async function mergeRecordsAction(orgId: string, type: string, keepId: st
     // CON-07: moving the duplicate's child companies under the kept one would break the company tree
     if (error.hint === "company:parent_cycle") return fail("אי אפשר למזג: החברה שנשארת נמצאת מתחת לחברה הכפולה במבנה החברות. שנו קודם למי היא שייכת, ואז מזגו.");
     if (error.hint === "company:parent_depth") return fail("אי אפשר למזג: אחרי המיזוג מבנה החברות יהיה עמוק מ-10 רמות. קצרו את המבנה קודם, ואז מזגו.");
+    // RVW-26: a value taken from the duplicate is judged like a person's choice
+    if (error.hint === "record_type:invalid") return fail("הסוג של הרשומה הכפולה כבר לא פעיל. השאירו את הסוג של הרשומה שנשארת, או הפעילו אותו שוב בהגדרות.");
+    if (error.hint === "lead:requested_product") return fail("המוצר המבוקש של הליד הכפול כבר לא זמין. השאירו את המוצר של הליד שנשאר.");
     if (error.code === "42501") return fail("אין לכם הרשאה למזג את הרשומות האלה. מיזוג מותר למנהלי צוות ולמנהלי מערכת.");
     return fail(dbErrorMessage(error, "המיזוג נכשל. נסו שוב."));
   }
