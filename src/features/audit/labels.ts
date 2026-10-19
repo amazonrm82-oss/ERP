@@ -81,6 +81,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   quote_lines: "שורה בהצעת מחיר",
   // GAP-09
   quote_payment_steps: "תשלום בלוח התשלומים של הצעה",
+  // ORD-01
+  orders: "הזמנה",
+  order_lines: "שורה בהזמנה",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",
   quote_template_lines: "שורה בתבנית הצעת מחיר",
@@ -147,6 +150,11 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
 export const FIELD_LABELS: Record<string, string> = {
   // PRV-02 (person_export)
   file_count: "קבצים",
+  // ORD-01
+  delivery_date: "מועד אספקה",
+  delivery_contact_id: "איש קשר לאספקה",
+  order_date: "תאריך ההזמנה",
+  original_order_id: "הזמנה מקורית",
   // QUO-03 jump forward
   next_number: "המספר הבא",
   // FLD-09: a custom field's show / require condition, and the mark a deleted pipeline leaves

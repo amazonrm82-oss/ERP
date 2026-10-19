@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ModulesForm } from "@/features/modules/components/modules-form";
 import { getOrgModules } from "@/features/modules/queries";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 
@@ -15,7 +16,7 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function ModulesPage({ params }: Props) {
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
-  const [modules, terms] = await Promise.all([getOrgModules(orgId), getOrgTerms(orgId)]);
+  const [modules, terms, ordersInPlan] = await Promise.all([getOrgModules(orgId), getOrgTerms(orgId), orgHasFeature(orgId, "orders")]);
   const editable = isAdminRole(context.role) && context.canWrite;
   return (
     <div className="space-y-5">
@@ -26,7 +27,7 @@ export default async function ModulesPage({ params }: Props) {
         <Card aria-labelledby="modules-title">
           <CardHeader id="modules-title" title="המודולים של העסק" />
           <CardBody>
-            <ModulesForm orgId={orgId} modules={modules} leadsLabel={terms.lead.plural} />
+            <ModulesForm orgId={orgId} modules={modules} leadsLabel={terms.lead.plural} ordersInPlan={ordersInPlan} />
           </CardBody>
         </Card>
       ) : (

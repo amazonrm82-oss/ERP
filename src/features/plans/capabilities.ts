@@ -42,7 +42,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },
   // CAP-08
   { feature: "lead_distribution", label: "חלוקת לידים לפי משקל, עומס וכללים", built: true },
-  { feature: "orders", label: "מודול הזמנות", built: false },
+  { feature: "orders", label: "מודול הזמנות", built: true },
   { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },
   { feature: "dashboards", label: "דשבורדים", built: false },

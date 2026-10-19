@@ -493,6 +493,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the owner's answers to QUO-12b redefine public.quote_public(), quote_public_version(), quote_public_decide(),
       // app.quote_lines_check() and public.quote_new_version() last
       "_quote_link_expired_lists.sql",
+      // ORD-01 redefines app.sample_untouched(), app.import_record_worked() and app.audit_erase_core() last (orders)
+      "_orders.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

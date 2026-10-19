@@ -672,6 +672,10 @@ export type OrgModulesRow = {
   organization_id: string;
   leads_enabled: boolean;
   companies_enabled: boolean;
+  // ORD-01: off by default; turned on only while the plan has the `orders` key
+  orders_enabled: boolean;
+  // ORD-01: when an owner or admin closed the one-time offer to switch orders on
+  orders_offer_closed_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1674,6 +1678,98 @@ export type QuoteRow = {
   updated_at: string;
 };
 
+// ORD-01 / ORD-03 / ORD-02's status (migration orders). A draft has no number; numbered orders keep their lines and amounts.
+export type OrderStatus = "draft" | "new" | "in_progress" | "partly_delivered" | "delivered" | "cancelled";
+export type OrderRow = {
+  id: string;
+  organization_id: string;
+  status: string;
+  source: string;
+  number: number | null;
+  number_display: string | null;
+  quote_id: string | null;
+  original_order_id: string | null;
+  deal_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  delivery_contact_id: string | null;
+  owner_id: string | null;
+  order_date: string;
+  delivery_date: string | null;
+  shipping_address: string | null;
+  notes: string | null;
+  prices_include_vat: boolean;
+  no_vat_reason: string | null;
+  no_vat_note: string | null;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  vat_rate_bp: number | null;
+  subtotal_agorot: number;
+  discount_total_agorot: number;
+  net_total_agorot: number;
+  vat_agorot: number;
+  total_agorot: number;
+  currency: string;
+  customer_name: string | null;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  former_deal_id: string | null;
+  former_contact_id: string | null;
+  former_company_id: string | null;
+  customer_deleted_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type OrderWrite = {
+  contact_id?: string | null;
+  company_id?: string | null;
+  delivery_contact_id?: string | null;
+  delivery_date?: string | null;
+  shipping_address?: string | null;
+  notes?: string | null;
+  prices_include_vat?: boolean;
+  no_vat_reason?: string | null;
+  no_vat_note?: string | null;
+  discount_bp?: number | null;
+  discount_agorot?: number | null;
+};
+
+export type OrderLineRow = {
+  id: string;
+  organization_id: string;
+  order_id: string;
+  position: number;
+  kind: string;
+  product_id: string | null;
+  name: string;
+  description: string | null;
+  unit_name: string | null;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  vat_exempt: boolean;
+  billing: string;
+  price_source: string;
+  price_list_name: string | null;
+  total_agorot: number;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+type OrderLineWrite = {
+  position?: number;
+  name?: string;
+  description?: string | null;
+  quantity?: number;
+  unit_price_agorot?: number;
+  discount_bp?: number | null;
+  discount_agorot?: number | null;
+  vat_exempt?: boolean;
+  billing?: string;
+};
+
 // GAP-09: a step of a quote's payment schedule (migration quote_payment_schedule). A date or a milestone at least;
 // percent_bp 1..10000, the steps of a quote never pass 100% and add up to exactly 100% when it is sent.
 export type QuotePaymentStepRow = {
@@ -2466,8 +2562,16 @@ export type Database = {
       // LEAD-08: column grants; no delete (a module is switched back on, the row stays)
       org_modules: Table<
         OrgModulesRow,
-        { organization_id: string; leads_enabled?: boolean; companies_enabled?: boolean },
-        { leads_enabled?: boolean; companies_enabled?: boolean }
+        { organization_id: string; leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null },
+        { leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null }
+      >;
+      // ORD-01: column grants; a person inserts a manual draft; status is the only state column a person writes
+      orders: Table<OrderRow, OrderWrite & { organization_id: string; deal_id?: string | null; currency?: string }, OrderWrite & { status?: OrderStatus }>;
+      // ORD-01: column grants; the order, the kind and the product are fixed once inserted; a draft's lines only
+      order_lines: Table<
+        OrderLineRow,
+        OrderLineWrite & { organization_id: string; order_id: string; name: string; kind?: "item" | "group"; product_id?: string | null; currency?: string },
+        OrderLineWrite
       >;
       quote_designs: Table<QuoteDesignDbRow, QuoteDesignWrite & { organization_id: string }, QuoteDesignWrite>;
       // QUO-04: column grants; the VAT mode is set when the template is made
@@ -2895,6 +2999,10 @@ export type Database = {
       };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
+      // ORD-01 / ORD-03: confirm a manual draft ({number}); make a numbered order from an accepted quote or a won deal (its id)
+      order_confirm: { Args: { p_org: string; p_order: string }; Returns: Json };
+      order_from_quote: { Args: { p_org: string; p_quote: string }; Returns: string };
+      order_from_deal: { Args: { p_org: string; p_deal: string }; Returns: string };
       // QUO-15: a copy of any quote as a new draft; {quote, skipped: [line names], discount_dropped}
       quote_duplicate: { Args: { p_org: string; p_quote: string }; Returns: Json };
       // QUO-13: replaces the open deal's lines with an accepted quote's (called by quote_win_deal); {lines}

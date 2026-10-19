@@ -346,6 +346,54 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("an order and its lines follow the deal: its editors write, readers only read, a viewer seat never writes (ORD-01)", async () => {
+    await setVisibility("own");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה להזמנה', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח להזמנה') returning id", [org])).rows[0].id,
+    );
+    const order = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.orders (organization_id, deal_id, contact_id) values ($1, $2, $3) returning id", [org, deal, contact])).rows[0].id,
+    );
+    const line = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot) values ($1, $2, 'שורה', 100) returning id", [org, order])).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.orders where id = $1", [order]));
+    const seenLine = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.order_lines where id = $1", [line]));
+    const edits = (u: U) => asUser(u.id, async (q) => (await q("update public.orders set notes = 'x' where id = $1", [order])).rowCount);
+    const editsLine = (u: U) => asUser(u.id, async (q) => (await q("update public.order_lines set name = 'שורה' where id = $1", [line])).rowCount);
+    for (const u of [owner, admin, m1]) {
+      expect(await seen(u), u.email).toBe(1);
+      expect(await seenLine(u), u.email).toBe(1);
+      expect(await edits(u), u.email).toBe(1);
+      expect(await editsLine(u), u.email).toBe(1);
+    }
+    for (const u of [m2, viewer]) {
+      expect(await seen(u), u.email).toBe(0);
+      expect(await seenLine(u), u.email).toBe(0);
+    }
+    await setVisibility("org");
+    try {
+      for (const u of [m2, viewer]) {
+        expect(await seen(u), u.email).toBe(1);
+        expect(await seenLine(u), u.email).toBe(1);
+        expect(await edits(u), u.email).toBe(0);
+        expect(await editsLine(u), u.email).toBe(0);
+        expect(await asUser(u.id, async (q) => (await q("delete from public.order_lines where id = $1", [line])).rowCount), u.email).toBe(0);
+        expect(await asUser(u.id, async (q) => (await q("delete from public.orders where id = $1", [order])).rowCount), u.email).toBe(0);
+        expect((await pgError(asUser(u.id, (q) => q("insert into public.orders (organization_id, deal_id, contact_id) values ($1, $2, $3)", [org, deal, contact])))).code, u.email).toBe("42501");
+        expect((await pgError(asUser(u.id, (q) => q("select public.order_confirm($1, $2)", [org, order])))).code, u.email).toBe("42501");
+      }
+    } finally {
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = feature_overrides - 'orders' where organization_id = $1", [org]));
+    }
+  });
+
   it("a quote's views follow the quote: whoever reads it reads them, nobody writes them (QUO-10)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

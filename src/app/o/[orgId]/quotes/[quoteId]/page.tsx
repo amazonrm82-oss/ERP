@@ -9,6 +9,11 @@ import { cancelQuoteAction, duplicateQuoteAction, newQuoteAddendumAction, newQuo
 import { copyNoticeText, readCopyNotice } from "@/features/quotes/duplicate";
 import { offersDealMove } from "@/features/quotes/accept-deal";
 import { QuoteDealMoveCard } from "@/features/quotes/components/quote-deal-move-card";
+import { orderFromQuoteAction } from "@/features/orders/actions";
+import { getOrdersAccess } from "@/features/orders/access";
+import { OrdersOffer } from "@/features/orders/components/orders-offer";
+import { orderPath } from "@/features/orders/paths";
+import { getQuoteOrder } from "@/features/orders/queries";
 import { CancelAcceptedQuote } from "@/features/quotes/components/cancel-accepted-quote";
 import { CopySkippedLines } from "@/features/quotes/components/copy-skipped-lines";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
@@ -166,6 +171,14 @@ export default async function QuotePage({ params, searchParams }: Props) {
         ),
       )
     : null;
+  // ORD-01 (owner, 19 October 2026): an accepted quote makes one order, numbered at once; while the module is off, owners and
+  // admins are offered once to switch it on
+  const ordersAccess = quote.status === "accepted" ? await getOrdersAccess(orgId) : null;
+  const quoteOrder = ordersAccess?.on ? await getQuoteOrder(orgId, quote.id) : null;
+  const canOrder =
+    ordersAccess?.on === true && quoteOrder === null && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+  const offerOrders =
+    ordersAccess !== null && ordersAccess.inPlan && !ordersAccess.on && !ordersAccess.offerClosed && isAdminRole(context.role) && context.canWrite;
   const copied = readCopyNotice(started);
   const copiedText = copied ? copyNoticeText(copied) : null;
   // QUO-15 (owner, 19 October 2026): the left-out lines, offered as free lines while this draft may be edited
@@ -240,6 +253,32 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 action={duplicateQuoteAction.bind(null, orgId, quote.id)}
               >
                 שכפול
+              </ConfirmButton>
+            ) : null}
+            {quoteOrder ? (
+              <ButtonLink href={orderPath(orgId, quoteOrder.id)} variant="secondary" size="sm">
+                {quoteOrder.numberDisplay ? (
+                  <>
+                    הזמנה{" "}
+                    <span dir="ltr" className="tabular-nums">
+                      {quoteOrder.numberDisplay}
+                    </span>
+                  </>
+                ) : (
+                  "ההזמנה"
+                )}
+              </ButtonLink>
+            ) : null}
+            {canOrder ? (
+              <ConfirmButton
+                variant="primary"
+                size="sm"
+                title="ליצור הזמנה מההצעה?"
+                description="תיווצר הזמנה ממוספרת עם השורות והמחירים שהלקוח אישר. בהזמנה אפשר לשנות מועד אספקה, כתובת משלוח, הערות ואיש קשר לאספקה; שינוי מחיר עובר דרך תוספת להצעה."
+                confirmLabel="יצירת הזמנה"
+                action={orderFromQuoteAction.bind(null, orgId, quote.id)}
+              >
+                יצירת הזמנה
               </ConfirmButton>
             ) : null}
             {canCancelAccepted ? <CancelAcceptedQuote orgId={orgId} quoteId={quote.id} /> : null}
@@ -360,6 +399,11 @@ export default async function QuotePage({ params, searchParams }: Props) {
       </div>
       {decision ? <QuoteDecisionCard decision={decision} /> : null}
       {mayMove ? <QuoteDealMoveCard orgId={orgId} quoteId={quote.id} offer={offerMove} setup={moveSetup} /> : null}
+      {offerOrders ? (
+        <div className="mb-5">
+          <OrdersOffer orgId={orgId} />
+        </div>
+      ) : null}
       {/* GAP-10: the addenda of this quote */}
       {addenda.addenda.length > 0 ? (
         <section aria-labelledby="quote-addenda-title" className="mb-5 rounded-lg border border-line bg-surface p-4 sm:p-5">

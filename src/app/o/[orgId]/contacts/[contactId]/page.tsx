@@ -56,6 +56,7 @@ import { CompletenessCard } from "@/features/data-quality/components/completenes
 import { BillingCard } from "@/features/billing/components/billing-card";
 import { getRecordBilling } from "@/features/billing/queries";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
+import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
 export const metadata: Metadata = { title: "איש קשר" };
@@ -230,6 +231,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
 
           {/* QUO-01: the contact's quotes, and a new one for whoever may edit the contact */}
           <RecordQuotesCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} canCreate={hasQuotes && canEdit} />
+          {/* ORD-01: the contact's orders while the orders module is on */}
+          <RecordOrdersCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} canCreate={canEdit} />
 
           <RelatedDealsCard
             orgId={orgId}

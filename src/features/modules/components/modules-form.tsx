@@ -10,10 +10,11 @@ import type { FormState } from "@/lib/action-result";
 import { saveModulesAction } from "../actions";
 import type { OrgModules } from "../modules";
 
-type Props = { orgId: string; modules: OrgModules; leadsLabel: string };
+// ORD-01: the orders switch shows only while the plan has the `orders` key
+type Props = { orgId: string; modules: OrgModules; leadsLabel: string; ordersInPlan: boolean };
 
-/** LEAD-08: two switches, saved together. */
-export function ModulesForm({ orgId, modules, leadsLabel }: Props) {
+/** LEAD-08: the module switches, saved together. */
+export function ModulesForm({ orgId, modules, leadsLabel, ordersInPlan }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(saveModulesAction.bind(null, orgId), null);
   const failed = state && !state.ok ? state : null;
   return (
@@ -32,6 +33,17 @@ export function ModulesForm({ orgId, modules, leadsLabel }: Props) {
         label="מודול החברות"
         hint="לעסק שמוכר לאנשים פרטיים אפשר לכבות. כשהוא כבוי, החברות יורדות מהתפריט, מהמסכים ומהטפסים."
       />
+      {ordersInPlan ? (
+        <>
+          <input type="hidden" name="orders_shown" value="1" />
+          <Checkbox
+            name="orders_enabled"
+            defaultChecked={modules.orders}
+            label="מודול ההזמנות"
+            hint="הזמנה נוצרת מהצעת מחיר שאושרה, מעסקה שנסגרה בהצלחה, או ידנית, ומקבלת מספר רץ. כבוי כברירת מחדל; כיבוי מסתיר את ההזמנות ולא מוחק אותן."
+          />
+        </>
+      ) : null}
       <SubmitButton>שמירה</SubmitButton>
     </form>
   );

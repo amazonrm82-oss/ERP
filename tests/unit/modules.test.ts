@@ -15,9 +15,18 @@ import { dbErrorMessage } from "@/lib/errors";
 describe("module switches (LEAD-08)", () => {
   it("no row, or a missing value, is on; the stored row is read as it is", () => {
     expect(modulesFromRow(null)).toEqual(DEFAULT_MODULES);
-    expect(modulesFromRow({})).toEqual({ leads: true, companies: true });
-    expect(modulesFromRow({ leads_enabled: false, companies_enabled: true })).toEqual({ leads: false, companies: true });
-    expect(modulesFromRow({ leads_enabled: true, companies_enabled: false })).toEqual({ leads: true, companies: false });
+    expect(modulesFromRow({})).toEqual({ leads: true, companies: true, orders: false, ordersOfferClosed: false });
+    expect(modulesFromRow({ leads_enabled: false, companies_enabled: true })).toMatchObject({ leads: false, companies: true });
+    expect(modulesFromRow({ leads_enabled: true, companies_enabled: false })).toMatchObject({ leads: true, companies: false });
+  });
+
+  it("ORD-01: orders are off unless stored on; the offer is closed once a time is stored", () => {
+    expect(DEFAULT_MODULES.orders).toBe(false);
+    expect(modulesFromRow({ orders_enabled: null }).orders).toBe(false);
+    expect(modulesFromRow({ orders_enabled: true }).orders).toBe(true);
+    expect(modulesFromRow({ orders_offer_closed_at: "2026-10-19T10:00:00Z" }).ordersOfferClosed).toBe(true);
+    const sql = readFileSync(path.resolve(__dirname, "../../supabase/migrations/20261006020570_orders.sql"), "utf8");
+    expect(sql).toMatch(/orders_enabled boolean not null default false/);
   });
 
   it("the migration's defaults are on, like the app's", () => {
@@ -30,17 +39,17 @@ describe("module switches (LEAD-08)", () => {
     const keys = (modules = DEFAULT_MODULES) => navItems("org", undefined, modules).map((i) => i.key);
     expect(keys()).toContain("leads");
     expect(keys()).toContain("companies");
-    expect(keys({ leads: false, companies: true })).not.toContain("leads");
-    expect(keys({ leads: true, companies: false })).not.toContain("companies");
+    expect(keys({ ...DEFAULT_MODULES, leads: false })).not.toContain("leads");
+    expect(keys({ ...DEFAULT_MODULES, companies: false })).not.toContain("companies");
     // the phone bottom bar keeps four places either way
     const mobile = (modules = DEFAULT_MODULES) => navItems("org", undefined, modules).filter((i) => i.mobile).map((i) => i.key);
     expect(mobile()).toEqual(["home", "leads", "deals", "tasks"]);
-    expect(mobile({ leads: false, companies: true })).toEqual(["home", "contacts", "deals", "tasks"]);
+    expect(mobile({ ...DEFAULT_MODULES, leads: false })).toEqual(["home", "contacts", "deals", "tasks"]);
   });
 
   it("the + menu leaves out a switched-off module", () => {
     expect(createItems("org").map((i) => i.key)).toEqual(["lead", "contact", "company", "deal", "task"]);
-    expect(createItems("org", undefined, { leads: false, companies: false }).map((i) => i.key)).toEqual(["contact", "deal", "task"]);
+    expect(createItems("org", undefined, { ...DEFAULT_MODULES, leads: false, companies: false }).map((i) => i.key)).toEqual(["contact", "deal", "task"]);
   });
 
   it("with companies off the contact form has no company picker but sends the stored company back", () => {

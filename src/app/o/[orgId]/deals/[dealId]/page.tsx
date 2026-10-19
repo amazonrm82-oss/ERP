@@ -55,6 +55,7 @@ import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
+import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { quoteAmountMark } from "@/features/quotes/accept-deal";
 import { getQuoteNumberDisplay } from "@/features/quotes/queries";
 import { getDealPricing, listDealLines } from "@/features/deal-lines/queries";
@@ -223,6 +224,8 @@ export default async function DealPage({ params, searchParams }: Props) {
           />
           {/* QUO-01: the deal's quotes, and a new one for whoever may edit the deal */}
           <RecordQuotesCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={hasQuotes && canEdit} />
+          {/* ORD-01: the deal's orders while the orders module is on */}
+          <RecordOrdersCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={canEdit} dealWon={deal.status === "won"} />
           <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />

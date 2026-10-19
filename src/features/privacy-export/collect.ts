@@ -129,6 +129,16 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readByIds(supabase, orgId, "quote_payment_steps", "*", "quote_id", quoteIds),
     readLinked(supabase, orgId, "segment_members", "*", personOnly),
   ]);
+  // ORD-01: the person's orders (as the customer or the delivery contact, or on their deals) and their lines
+  const orderFilter = [
+    contactIds.length ? `contact_id.in.(${contactIds.join(",")})` : null,
+    contactIds.length ? `delivery_contact_id.in.(${contactIds.join(",")})` : null,
+    ids.deal.length ? `deal_id.in.(${ids.deal.join(",")})` : null,
+  ]
+    .filter(Boolean)
+    .join(",");
+  const orders = await readLinked(supabase, orgId, "orders", "*", orderFilter || null);
+  const orderLines = await readByIds(supabase, orgId, "order_lines", "*", "order_id", uniqueIds(orders.map((o) => o.id)));
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
@@ -142,7 +152,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     relations.length ? readLinked(supabase, orgId, "contact_relation_types", "id, name, reverse_name", "id.not.is.null") : Promise.resolve([]),
     readByIds(supabase, orgId, "segments", "id, name", "id", uniqueIds(segmentMembers.map((m) => m.segment_id))),
   ]);
-  const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
+  const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes, ...orders].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
   const userNames = await getUserNames(
     uniqueIds([...userIds, ...files.map((f) => f.uploaded_by), ...consents.map((c) => c.recorded_by), ...segmentMembers.map((m) => m.added_by)]).filter((u): u is string => typeof u === "string"),
   );
@@ -168,6 +178,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     quote_decisions: quoteDecisions,
     quote_views: quoteViews,
     quote_payment_steps: quotePaymentSteps,
+    orders,
+    order_lines: orderLines,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,
