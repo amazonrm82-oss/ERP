@@ -2809,6 +2809,8 @@ export type Database = {
       quote_template_save: { Args: { p_org: string; p_quote: string; p_name: string }; Returns: string };
       // QUO-07: marks a draft as sent (definer): its number, the customer names, status 'sent'
       quote_send: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-11: cancels a sent, viewed or expired quote (whoever may edit its deal or contact)
+      quote_cancel: { Args: { p_org: string; p_quote: string }; Returns: undefined };
       // QUO-09: the number and fingerprint of the version the customer's page shows (service_role only, counts no view)
       quote_public_version: { Args: { p_token: string }; Returns: Json };
       // QUO-09: the customer's page decides (service_role only); every outcome is an answer {status}

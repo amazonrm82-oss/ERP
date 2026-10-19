@@ -469,6 +469,20 @@ export async function newQuoteVersionAction(orgId: string, quoteId: string): Pro
 }
 
 /**
+ * QUO-11: cancels a sent, viewed or expired quote (public.quote_cancel; whoever may edit its deal or contact). The customer's
+ * page closes with it, and the timeline of the deal and the contact says who cancelled.
+ */
+export async function cancelQuoteAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const { error } = await context.supabase.rpc("quote_cancel", { p_org: orgId, p_quote: quoteId });
+  if (error) return fail(writeError(error));
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (quote) revalidateQuote(orgId, quote);
+  return ok();
+}
+
+/**
  * QUO-08: a new link for the customer to a sent quote (public.quote_link_create). The address is returned once: only
  * its hash is kept, and the previous link of the quote stops working.
  */

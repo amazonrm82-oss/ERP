@@ -203,10 +203,16 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:no_redraft": "הצעה שנשלחה לא חוזרת לטיוטה. כדי לשנות אותה יוצרים גרסה חדשה.",
   "quote_version:draft": "זו טיוטה: אפשר לערוך אותה ישירות.",
   "quote_version:closed": "ההצעה כבר אושרה, נדחתה, בוטלה או פגה, ולכן אי אפשר ליצור לה גרסה חדשה.",
+  // QUO-11: cancelling a sent quote (public.quote_cancel)
+  "quote_cancel:draft": "טיוטה לא מבטלים אלא מוחקים.",
+  "quote_cancel:accepted": "אי אפשר לבטל הצעה שהלקוח כבר אישר.",
+  "quote_cancel:closed": "ההצעה כבר נדחתה או בוטלה.",
   "quote_version:exists": "להצעה הזאת כבר יש גרסה חדשה. ממשיכים לעבוד על הגרסה החדשה.",
   "quote_version:not_sent": "גרסה חדשה נוצרת רק מהצעה שנשלחה.",
   "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר.",
   "quote_version:fixed": "אי אפשר לשנות לאיזו הצעה הגרסה שייכת.",
+  "quote_version:previous_decided": "הלקוח כבר אישר או דחה את ההצעה הקודמת, ולכן אי אפשר לשלוח את הגרסה הזאת. אפשר למחוק את הטיוטה.",
+  "quote:superseded": "נשלחה כבר גרסה חדשה של ההצעה, ולכן אי אפשר לאשר או לדחות את הקודמת.",
   // GAP-09
   "quote:schedule_total": "לוח התשלומים צריך להגיע בדיוק ל-100% לפני שליחה. תקנו את האחוזים, או מחקו את הלוח.",
   "quote_schedule:over": "סך האחוזים בלוח התשלומים עובר 100%. הקטינו אחוז באחד התשלומים.",

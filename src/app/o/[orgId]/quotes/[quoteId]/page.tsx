@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { newQuoteVersionAction } from "@/features/quotes/actions";
+import { cancelQuoteAction, newQuoteVersionAction } from "@/features/quotes/actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
@@ -102,6 +102,13 @@ export default async function QuotePage({ params, searchParams }: Props) {
   // QUO-09: the customer's answer with its evidence, owners/admins only (RLS decides again)
   const decision =
     (quote.status === "accepted" || quote.status === "rejected") && isAdminRole(context.role) ? await getQuoteDecision(orgId, quote.id) : null;
+  // QUO-11: a sent, viewed or expired quote may be cancelled by whoever may edit its record; never an accepted one (open question)
+  const canCancel =
+    hasQuotes &&
+    (quote.status === "sent" || quote.status === "viewed" || quote.status === "expired") &&
+    parentRow !== null &&
+    parentRow.deleted_at === null &&
+    canEditRecordHint(context, parentRow.owner_id);
   const recipient = { name: customerNow.contactName, email: customerNow.email, phoneE164: customerNow.phoneE164 };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
@@ -125,11 +132,23 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 variant="secondary"
                 size="sm"
                 title="ליצור גרסה חדשה של ההצעה?"
-                description="תיווצר טיוטה חדשה, עותק של ההצעה עם השורות ולוח התשלומים, ובה עושים את השינויים. ההצעה הזאת נשארת כפי שנשלחה. כשהגרסה החדשה תישלח היא תקבל מספר חדש, והקישור הישן של הלקוח יציג אותה מרגע שיהיה לה קישור משלה."
+                description="תיווצר טיוטה חדשה, עותק של ההצעה עם השורות ולוח התשלומים, ובה עושים את השינויים. ההצעה הזאת נשארת כפי שנשלחה. כשהגרסה החדשה תישלח היא תקבל מספר חדש, והקישור הישן של הלקוח יציג אותה מרגע שיהיה לה קישור משלה. מרגע שהיא נשלחת, הקישור הישן כבר לא מציג את ההצעה הזאת."
                 confirmLabel="יצירת גרסה חדשה"
                 action={newQuoteVersionAction.bind(null, orgId, quote.id)}
               >
                 עריכה בגרסה חדשה
+              </ConfirmButton>
+            ) : null}
+            {canCancel ? (
+              <ConfirmButton
+                variant="danger-ghost"
+                size="sm"
+                title="לבטל את ההצעה?"
+                description="ההצעה תסומן כמבוטלת, הקישור של הלקוח יפסיק לעבוד, וברשומה יירשם מי ביטל. אי אפשר להחזיר הצעה מבוטלת."
+                confirmLabel="ביטול ההצעה"
+                action={cancelQuoteAction.bind(null, orgId, quote.id)}
+              >
+                ביטול ההצעה
               </ConfirmButton>
             ) : null}
           </div>

@@ -467,6 +467,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_decisions.sql",
       // QUO-10 redefines public.quote_public() of _quote_versions.sql last (a customer's view is counted)
       "_quote_views.sql",
+      // QUO-11 review redefines public.quote_public(), the decision functions and app.quotes_version_guard() last
+      "_quote_superseded.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -175,6 +175,7 @@ describe("quote versions (QUO-12)", () => {
   });
 
   it("the old customer link shows the newest version once it is sent and has a link, and names the number it was made for", async () => {
+    // QUO-11 review: once a newer version is sent, the old link never shows the superseded quote again
     const v1 = await sentQuote();
     const n1 = (await row(v1)).number_display!;
     const t1 = await linkOf(v1);
@@ -185,8 +186,8 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t1)).toMatchObject({ quote: { number: n1 }, replaced: null });
     await send(v2);
     const n2 = (await row(v2)).number_display!;
-    // sent but without a link of its own: still the original
-    expect(await page(t1)).toMatchObject({ quote: { number: n1 }, replaced: null });
+    // sent but without a link of its own yet: the superseded original is no longer shown, and nothing else is either
+    expect((await pgError(page(t1))).code).toBe("P0002");
     const t2 = await linkOf(v2);
     expect(await page(t1)).toMatchObject({ quote: { number: n2 }, replaced: { number: n1 } });
     expect(await page(t2)).toMatchObject({ quote: { number: n2 }, replaced: null });
@@ -205,13 +206,11 @@ describe("quote versions (QUO-12)", () => {
     expect(await page(t1)).toMatchObject({ quote: { number: n3 }, replaced: { number: n1 } });
     expect(await page(t2)).toMatchObject({ quote: { number: n3 }, replaced: { number: n2 } });
 
-    // the newest version's link turned off, or the newest version cancelled: the old links fall back along the chain
+    // the newest version's link turned off: the old links close too, never falling back to a superseded version
     await asUser(member.id, (q) => q("select public.quote_link_revoke($1, $2)", [org, v3]));
-    expect(await page(t1)).toMatchObject({ quote: { number: n2 }, replaced: { number: n1 } });
-    await asAdmin((q) => q("update public.quotes set status = 'cancelled' where id = $1", [v2]));
-    expect(await page(t1)).toMatchObject({ quote: { number: n1 }, replaced: null });
+    expect((await pgError(page(t1))).code).toBe("P0002");
     expect((await pgError(page(t2))).code).toBe("P0002");
-    void t3;
+    expect((await pgError(page(t3))).code).toBe("P0002");
   });
 
   it("the copy is all or nothing: a line that can no longer be offered stops the version", async () => {

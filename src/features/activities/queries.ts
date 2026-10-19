@@ -6,7 +6,7 @@ import { must } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
-import { quoteEntryKind, quoteEntryText } from "./quote-entries";
+import { quoteEntryBy, quoteEntryKind, quoteEntryText } from "./quote-entries";
 import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
@@ -120,9 +120,14 @@ export async function getTimeline(orgId: string, subject: TimelineSubject, filte
     const quoteKind = quoteEntryKind(activity.type, metaString(activity.metadata, "kind"));
 
     if (quoteKind) {
-      // QUO-16: written by the database when the quote was sent, accepted or declined; shown as an event, never as a note
-      // to edit, even though "sent" is stored as the sender's note so it counts as contact with the customer
-      text = quoteEntryText(quoteKind, metaString(activity.metadata, "number"), quoteTitles.get(metaString(activity.metadata, "quote_id") ?? "") ?? null);
+      // QUO-16: written by the database when the quote was sent, accepted, declined, expired or cancelled (QUO-11); shown as an
+      // event, never as a note to edit, even though "sent" is stored as the sender's note so it counts as contact with the customer
+      text = quoteEntryText(
+        quoteKind,
+        metaString(activity.metadata, "number"),
+        quoteTitles.get(metaString(activity.metadata, "quote_id") ?? "") ?? null,
+        quoteEntryBy(quoteKind, body),
+      );
       isUserContent = false;
     } else if (activity.type === "status_change") {
       const from = statusNames.get(metaString(activity.metadata, "from_status_id") ?? "");
