@@ -6,14 +6,16 @@ import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
-import { fail, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
+import { priceListTiers, readPricedProduct } from "@/features/deal-lines/queries";
+import { pulledPrice } from "@/features/deal-lines/pricing";
+import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { orderPath, ordersPath } from "./paths";
-import { readOrder, type Order } from "./queries";
-import { MOVABLE_STATUSES, ORDER_DETAILS_FIELD_NAMES, ORDER_LINE_FIELD_NAMES, orderDetailsSchema, orderLineSchema } from "./schema";
+import { readOrder, readOrderPricing, type Order } from "./queries";
+import { MOVABLE_STATUSES, ORDER_DETAILS_FIELD_NAMES, ORDER_LINE_DESCRIPTION_MAX, ORDER_LINE_FIELD_NAMES, orderDetailsSchema, orderLineSchema } from "./schema";
 
 // ORD-01 / ORD-02 / ORD-03. Every write goes with the user's session; rights follow the order's deal, else its contact,
 // else its company (RLS on orders and order_lines), so a person who may not edit them gets 42501 or 0 rows. Numbers come
@@ -119,33 +121,74 @@ export async function deleteOrderAction(orgId: string, orderId: string): Promise
   );
 }
 
-/** A free line on a draft. */
-export async function addOrderLineAction(orgId: string, orderId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+const PRODUCT_GONE = "המוצר שנבחר לא פעיל או בארכיון. בחרו מוצר פעיל מהקטלוג.";
+const PRICE_MISSING = "בשורה בלי מוצר יש להזין מחיר.";
+
+/**
+ * A line on a draft: a product (its price, when left empty, is the automatic one: the customer's price list with its
+ * tiers, else the product's own price, PL-03 as on deal lines and quotes) or a free line with a typed price.
+ */
+async function addLine(orgId: string, orderId: string, formData: FormData): Promise<FormState> {
   const parsed = orderLineSchema.safeParse(pick(formData, ORDER_LINE_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
+  const input = parsed.data;
+  const values = formValues(formData);
   const context = await actionContext(orgId, orderId);
   if (!context.ok) return context;
-  const { data: last, error: lastError } = await context.supabase
+  const { supabase } = context;
+  const order = await readOrder(supabase, orgId, orderId);
+  if (!order) return fail(NOT_FOUND_OR_FORBIDDEN, { values });
+
+  let price: { agorot: number; source: "product" | "price_list" | "manual"; listId: string | null };
+  let description = input.description;
+  if (input.product_id) {
+    const product = await readPricedProduct(supabase, orgId, input.product_id);
+    if (!product || !product.offerable) return fail(PRODUCT_GONE, { fieldErrors: { product_id: PRODUCT_GONE }, values });
+    if (!description && product.description) description = product.description.slice(0, ORDER_LINE_DESCRIPTION_MAX);
+    if (input.unit_price === null) {
+      const pricing = await readOrderPricing(supabase, orgId, order);
+      const tiers = pricing.list ? await priceListTiers(supabase, orgId, pricing.list.id, [product.id]) : [];
+      const pulled = pulledPrice(product, pricing.list ? { ...pricing.list, lines: tiers } : null, input.quantity, pricing.day, pricing.includesVat, pricing.rateBp);
+      price = { agorot: pulled.priceAgorot, source: pulled.source, listId: pulled.priceListId };
+    } else {
+      price = { agorot: input.unit_price, source: "manual", listId: null };
+    }
+  } else {
+    if (input.unit_price === null) return fail(PRICE_MISSING, { fieldErrors: { unit_price: PRICE_MISSING }, values });
+    price = { agorot: input.unit_price, source: "manual", listId: null };
+  }
+
+  const { data: last, error: lastError } = await supabase
     .from("order_lines")
     .select("position")
     .eq("organization_id", orgId)
     .eq("order_id", orderId)
     .order("position", { ascending: false })
     .limit(1);
-  if (lastError) return fail(dbErrorMessage(lastError));
-  const { error } = await context.supabase.from("order_lines").insert({
+  if (lastError) return fail(dbErrorMessage(lastError), { values });
+  const { error } = await supabase.from("order_lines").insert({
     organization_id: orgId,
     order_id: orderId,
-    position: (last[0]?.position ?? -1) + 1,
-    name: parsed.data.name,
-    description: parsed.data.description,
-    quantity: parsed.data.quantity,
-    unit_price_agorot: parsed.data.unit_price,
+    position: Math.min((last[0]?.position ?? -1) + 1, 100000),
+    product_id: input.product_id,
+    name: input.name,
+    description,
+    quantity: input.quantity,
+    unit_price_agorot: price.agorot,
+    price_source: price.source,
+    price_list_id: price.listId,
   });
-  if (error) return fail(writeError(error));
-  const order = await readOrder(context.supabase, orgId, orderId);
-  if (order) revalidateOrder(orgId, order);
+  if (error) return fail(writeError(error), { values });
+  revalidateOrder(orgId, order);
   return { ok: true, message: "השורה נוספה." };
+}
+
+export async function addOrderLineAction(orgId: string, orderId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  try {
+    return await addLine(orgId, orderId, formData);
+  } catch {
+    return fail(dbErrorMessage(null), { values: formValues(formData) });
+  }
 }
 
 /** Removes a line of a draft. */

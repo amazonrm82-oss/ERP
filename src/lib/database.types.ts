@@ -1752,6 +1752,8 @@ export type OrderLineRow = {
   vat_exempt: boolean;
   billing: string;
   price_source: string;
+  // the customer's price list that set the price (PL-03); its name stays when the list is deleted
+  price_list_id: string | null;
   price_list_name: string | null;
   total_agorot: number;
   currency: string;
@@ -1768,6 +1770,8 @@ type OrderLineWrite = {
   discount_agorot?: number | null;
   vat_exempt?: boolean;
   billing?: string;
+  price_source?: string;
+  price_list_id?: string | null;
 };
 
 // GAP-09: a step of a quote's payment schedule (migration quote_payment_schedule). A date or a milestone at least;

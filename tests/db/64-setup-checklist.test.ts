@@ -495,6 +495,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_link_expired_lists.sql",
       // ORD-01 redefines app.sample_untouched(), app.import_record_worked() and app.audit_erase_core() last (orders)
       "_orders.sql",
+      // ORD-01 follow-up redefines app.order_lines_check() and public.order_from_deal() of _orders.sql last
+      "_order_line_products.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -12,9 +12,11 @@ import { OrderStatusBadge } from "@/features/orders/components/order-list-items"
 import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
 import { orderPath, ordersPath } from "@/features/orders/paths";
-import { getOrder, getOrderParties, listOrderLines } from "@/features/orders/queries";
+import { getOrder, getOrderParties, getOrderPricing, listOrderLines } from "@/features/orders/queries";
 import { orderEditing, ORDER_SOURCE_LABELS } from "@/features/orders/schema";
 import { quotePath } from "@/features/quotes/paths";
+import { priceSourceText } from "@/features/deal-lines/schema";
+import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -52,6 +54,8 @@ export default async function OrderPage({ params }: Props) {
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const editing = orderEditing(order.status);
   const contacts = mayEdit && editing.details ? await listContactOptions(orgId) : [];
+  // a draft's new lines are priced like deal lines (PL-03): the order's day, VAT mode and the customer's price list
+  const [pricing, hasProducts] = mayEdit && editing.lines ? await Promise.all([getOrderPricing(orgId, order), orgHasFeature(orgId, "products")]) : [null, false];
   const contactOptions = contacts.map((c) => ({ value: c.id, label: c.name }));
   if (order.deliveryContactId && !contactOptions.some((c) => c.value === order.deliveryContactId)) {
     contactOptions.unshift({ value: order.deliveryContactId, label: parties.deliveryContact ?? "איש קשר" });
@@ -200,6 +204,7 @@ export default async function OrderPage({ params }: Props) {
                           {line.unitName ? ` ${line.unitName}` : ""} × <span className="tabular-nums">{formatMoney(line.unitPriceAgorot)}</span>
                           {BILLING_LABELS[line.billing] ? ` · ${BILLING_LABELS[line.billing]}` : ""}
                           {line.vatExempt ? ' · פטור ממע"מ' : ""}
+                          {line.productId ? ` · ${priceSourceText(line.priceSource, line.priceListName)}` : ""}
                         </p>
                       </div>
                       <span className="flex items-center gap-2">
@@ -235,10 +240,10 @@ export default async function OrderPage({ params }: Props) {
                 <dd className="tabular-nums">{formatMoney(order.totalAgorot)}</dd>
               </div>
             </dl>
-            {mayEdit && editing.lines ? (
+            {pricing ? (
               <div className="border-t border-line pt-4">
                 <h3 className="mb-3 text-md font-semibold">שורה חדשה</h3>
-                <OrderLineForm orgId={orgId} orderId={order.id} pricesIncludeVat={order.pricesIncludeVat} />
+                <OrderLineForm orgId={orgId} orderId={order.id} pricing={pricing} products={hasProducts} />
               </div>
             ) : null}
           </CardBody>

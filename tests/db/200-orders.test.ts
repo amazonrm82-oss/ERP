@@ -390,6 +390,83 @@ describe("orders (ORD-01, ORD-03)", () => {
     expect(await asAdmin(async (q) => (await one<{ d: string }>(q, "select delivery_contact_id as d from public.orders where id = $1", [id])).d)).toBe(keep);
   });
 
+  it("a manual draft takes product lines priced by the customer's price list; the list's name comes from the list (PL-03)", async () => {
+    await setFeatures({ orders: true, products: true, price_lists: true });
+    try {
+      const product = await run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.products (organization_id, name, price_agorot) values ($1, 'מדף', 10000) returning id", [org])).id,
+      );
+      const list = await run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.price_lists (organization_id, name) values ($1, 'מחירון סיטונאי') returning id", [org])).id,
+      );
+      const contact = await newContact(member, "לקוח סיטונאי");
+      const id = await draft(member, { contact_id: contact });
+      const insertLine = (fields: Record<string, unknown>) =>
+        run(member, async (q) => {
+          const keys = Object.keys(fields);
+          return (
+            await one<{ id: string; price_source: string; price_list_id: string | null; price_list_name: string | null; unit_name: string | null }>(
+              q,
+              `insert into public.order_lines (organization_id, order_id, ${keys.join(", ")}) values ($1, $2, ${keys.map((_, i) => `$${i + 3}`).join(", ")})
+               returning id, price_source, price_list_id, price_list_name, unit_name`,
+              [org, id, ...Object.values(fields)],
+            )
+          );
+        });
+      // a price from the list names it; the name is the list's own, whatever was sent
+      const fromList = await insertLine({ name: "מדף", product_id: product, unit_price_agorot: 8000, price_source: "price_list", price_list_id: list });
+      expect(fromList).toMatchObject({ price_source: "price_list", price_list_id: list, price_list_name: "מחירון סיטונאי" });
+      // the product's own price, or typed
+      expect((await insertLine({ name: "מדף", product_id: product, unit_price_agorot: 10000, price_source: "product" })).price_source).toBe("product");
+      expect((await insertLine({ name: "מדף", product_id: product, unit_price_agorot: 9500, price_source: "manual" })).price_source).toBe("manual");
+      // a list price without the list, a list on a price that is not the list's, and a free line claiming a list
+      expect((await pgError(insertLine({ name: "מדף", product_id: product, unit_price_agorot: 1, price_source: "price_list" }))).hint).toBe("order_lines:price_list");
+      expect((await pgError(insertLine({ name: "מדף", product_id: product, unit_price_agorot: 1, price_source: "manual", price_list_id: list }))).hint).toBe("order_lines:price_list");
+      expect((await pgError(insertLine({ name: "חופשי", unit_price_agorot: 1, price_source: "price_list", price_list_id: list }))).hint).toBe("order_lines:price_list");
+      // a free line is always priced by hand
+      expect((await insertLine({ name: "חופשי", unit_price_agorot: 1, price_source: "product" })).price_source).toBe("manual");
+
+      // on a draft the price may be typed over the list's: the line no longer names it
+      await run(member, (q) => q("update public.order_lines set unit_price_agorot = 7000, price_source = 'manual', price_list_id = null where id = $1", [fromList.id]));
+      expect(await asAdmin((q) => one(q, "select price_source, price_list_name from public.order_lines where id = $1", [fromList.id]))).toEqual({ price_source: "manual", price_list_name: null });
+      await run(member, (q) => q("update public.order_lines set price_source = 'price_list', price_list_id = $2 where id = $1", [fromList.id, list]));
+
+      // without the plan's price lists a person cannot name one
+      await setFeatures({ orders: true, products: true, price_lists: false });
+      expect((await pgError(insertLine({ name: "מדף", product_id: product, unit_price_agorot: 1, price_source: "price_list", price_list_id: list }))).hint).toBe("feature:price_lists");
+      await setFeatures({ orders: true, products: true, price_lists: true });
+
+      // once numbered, deleting the list leaves the line's price and the list's name as they were
+      await confirm(member, id);
+      await run(owner, (q) => q("delete from public.price_lists where id = $1", [list]));
+      expect(await asAdmin((q) => one(q, "select price_source, price_list_id, price_list_name, unit_price_agorot::int as price from public.order_lines where id = $1", [fromList.id]))).toEqual({
+        price_source: "price_list",
+        price_list_id: null,
+        price_list_name: "מחירון סיטונאי",
+        price: 7000,
+      });
+    } finally {
+      await setFeatures({ orders: true });
+    }
+  });
+
+  it("an order from a won deal names a line by its trimmed description (a long blank start no longer fails)", async () => {
+    const contact = await newContact(member, "רווחים");
+    const deal = await newDeal(member, contact);
+    await run(member, (q) =>
+      q("insert into public.deal_lines (organization_id, deal_id, description, unit_price_agorot) values ($1, $2, $3, 1000), ($1, $2, $4, 2000)", [
+        org,
+        deal,
+        `${" ".repeat(300)}שירות`,
+        "א".repeat(400),
+      ]),
+    );
+    await run(member, (q) => q("update public.deals set stage_id = $2 where id = $1", [deal, wonStage]));
+    const id = await fromDeal(member, deal);
+    const names = await asAdmin(async (q) => (await q<{ name: string }>("select name from public.order_lines where order_id = $1 order by unit_price_agorot", [id])).rows.map((r) => r.name));
+    expect(names).toEqual(["שירות", "א".repeat(300)]);
+  });
+
   it("the module switch needs the plan's orders key; a member cannot turn it on", async () => {
     await setFeatures({ orders: false });
     expect((await pgError(run(owner, (q) => q("insert into public.org_modules (organization_id, orders_enabled) values ($1, true)", [org])))).hint).toBe("feature:orders");

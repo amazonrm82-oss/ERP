@@ -3,6 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
+import { customerPriceList } from "@/features/deal-lines/queries";
+import { conversionRateBp, type NamedPriceList } from "@/features/deal-lines/pricing";
+import { chargesVat, isVatStatus } from "@/features/tax/status";
+import { documentVat, type VatRate } from "@/features/tax/rates";
+
 import type { Database, OrderLineRow, OrderRow } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
@@ -60,6 +65,8 @@ export type OrderLine = {
   discountAgorot: number | null;
   vatExempt: boolean;
   billing: string;
+  priceSource: string;
+  priceListName: string | null;
   totalAgorot: number;
 };
 
@@ -111,6 +118,8 @@ function toLine(row: OrderLineRow): OrderLine {
     discountAgorot: row.discount_agorot === null ? null : Number(row.discount_agorot),
     vatExempt: row.vat_exempt,
     billing: row.billing,
+    priceSource: row.price_source,
+    priceListName: row.price_list_name,
     totalAgorot: Number(row.total_agorot),
   };
 }
@@ -243,4 +252,30 @@ export async function getOrderParties(
     quote: quoteRow ? (quoteRow.number_display ?? quoteRow.title) : null,
     original: original ? (must(original, "orders")?.number_display ?? null) : null,
   };
+}
+
+/** What a product line of a draft is priced with (PL-03, the quotes' rule): the order's day, VAT mode and customer's list. */
+export type OrderPricing = {
+  day: string;
+  rateBp: number;
+  includesVat: boolean;
+  list: Omit<NamedPriceList, "lines"> | null;
+};
+
+export async function readOrderPricing(supabase: Client, orgId: string, order: Pick<Order, "orderDate" | "contactId" | "companyId" | "pricesIncludeVat">): Promise<OrderPricing> {
+  const day = order.orderDate;
+  const [settings, rateRows, list] = await Promise.all([
+    supabase.from("org_document_settings").select("vat_status, other_charges_vat").eq("organization_id", orgId).maybeSingle(),
+    supabase.from("vat_rates").select("effective_from, rate_bp").is("cancelled_at", null).order("effective_from"),
+    customerPriceList(supabase, orgId, { contactId: order.contactId, companyId: order.companyId }, day),
+  ]);
+  const row = must(settings, "org document settings");
+  const rates: VatRate[] = must(rateRows, "vat rates").map((r) => ({ effectiveFrom: r.effective_from, rateBp: r.rate_bp }));
+  const status = isVatStatus(row?.vat_status) ? row.vat_status : null;
+  const vat = documentVat(chargesVat(status, row?.other_charges_vat ?? null), rates, day);
+  return { day, rateBp: conversionRateBp(vat, rates, day), includesVat: order.pricesIncludeVat, list };
+}
+
+export async function getOrderPricing(orgId: string, order: Order): Promise<OrderPricing> {
+  return readOrderPricing(await createClient(), orgId, order);
 }
