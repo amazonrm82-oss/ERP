@@ -1093,6 +1093,7 @@ that back.
   function of 0001–0033 exists there and report gaps (0010 once ran half way; see `supabase/repair/`).
   The hosted database is Postgres 17; CI runs the database tests on Postgres 17 (FXD-05), the local
   `test:db` on whatever PostgreSQL the machine has (16 here), and the local Supabase stack is 17.
+  Before a hosted apply the lead also applies the migration to the local Supabase stack (17) and runs the e2e there (RVW-31).
 - The connector stops on destructive SQL (seen 12 October 2026, since 0048): a migration whose text holds
   a `drop …` statement or a `delete from`, even inside a function body, makes `apply_migration` hang for
   60 seconds and apply nothing (it waits for a confirmation nobody sees). So: no statement starts with
