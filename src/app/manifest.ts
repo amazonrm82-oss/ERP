@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { SHORTCUTS, shortcutUrl } from "@/features/shortcuts/shortcuts";
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 
 /** Web app manifest: lets the app be installed to the home screen and open in its own window. */
@@ -21,6 +22,13 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#f4f6f8",
     theme_color: THEME_COLOR,
     categories: ["business", "productivity"],
+    // USR-08 (owner, 18 October 2026): a long press on the app icon; each opens in the last business worked in
+    shortcuts: SHORTCUTS.map((shortcut) => ({
+      name: shortcut.name,
+      short_name: shortcut.name,
+      url: shortcutUrl(shortcut.target),
+      icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    })),
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

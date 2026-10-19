@@ -7,6 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
+import { RememberOrg } from "@/features/shortcuts/components/remember-org";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
 import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
 import { createClient } from "@/lib/supabase/server";
@@ -96,6 +97,8 @@ export default async function OrgLayout({ children, params }: Props) {
   return (
     <div className="min-h-dvh md:ps-60">
       {syncTheme ? <ThemeSync choice={syncTheme} /> : null}
+      {/* USR-08: the app's shortcuts open in this business next time */}
+      <RememberOrg orgId={org.id} />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow"
