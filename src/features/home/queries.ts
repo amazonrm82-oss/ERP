@@ -8,7 +8,7 @@ import { relatedRecords, type RelatedRecord } from "@/features/tasks/queries";
 import { listCalendarItems } from "@/features/calendar/queries";
 import { rangeBounds } from "@/features/calendar/range";
 
-import { dealsWithoutNextStep, myMeetings, type DealsWithoutNextStep, type MyMeeting } from "./my-day";
+import { dealsWithoutNextStep, myMeetings, withoutSupersededQuotes, type DealsWithoutNextStep, type MyMeeting, type WaitingQuoteRow } from "./my-day";
 import { parseReportData } from "@/features/reports/schemas";
 
 // related: the record the task belongs to, when it has one (FXU-01)
@@ -36,12 +36,18 @@ export type MyDay = {
   meetingsTruncated: boolean;
   // TASK-09: the user's open deals with no open task and no planned meeting ahead
   dealsWithoutNextStep: DealsWithoutNextStep;
+  // TASK-09: the user's sent or viewed quotes still within their validity, oldest sent first
+  waitingQuotes: WaitingQuoteRow[];
+  waitingQuotesCount: number;
 };
 
 const TASK_LIMIT = 50;
 const NEW_LEADS_SHOWN = 8;
 const DEALS_SUM_LIMIT = 1000;
 const NO_NEXT_STEP_SHOWN = 8;
+const WAITING_QUOTES_SHOWN = 8;
+// read a few more than shown, so a quote replaced by a newer sent version can be left out
+const WAITING_QUOTES_READ = 50;
 
 /**
  * "My day": the signed-in user's due tasks, new leads, open deals, today's meetings and the
@@ -61,7 +67,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     .eq("is_default", true)
     .maybeSingle(), "lead_statuses");
 
-  const [tasks, leads, deals, calendar, stuck] = await Promise.all([
+  const [tasks, leads, deals, calendar, stuck, quotes] = await Promise.all([
     supabase
       .from("tasks")
       .select("id, title, due_at, lead_id, contact_id, company_id, deal_id")
@@ -95,6 +101,17 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     listCalendarItems(orgId, rangeBounds([today], timeZone ?? TIME_ZONE), [userId]),
     // "no next action" as the board and the stuck-deals report decide it (security invoker)
     supabase.rpc("report_stuck_deals", { p_org: orgId, p_owner: userId }),
+    // quotes the user owns that wait for the customer: sent or viewed, validity not passed in the business's day
+    supabase
+      .from("quotes")
+      .select("id, title, number_display, status, sent_at, valid_until, customer_name, total_agorot", { count: "exact" })
+      .eq("organization_id", orgId)
+      .eq("owner_id", userId)
+      .in("status", ["sent", "viewed"])
+      .or(`valid_until.is.null,valid_until.gte.${today}`)
+      .order("sent_at", { ascending: true })
+      .order("id")
+      .limit(WAITING_QUOTES_READ),
   ]);
 
   if (tasks.error) {
@@ -109,6 +126,34 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
 
   // FXC-12: checked before it is read; a mismatch throws (the page's error screen)
   const stuckRows = parseReportData("report_stuck_deals", must(stuck, "stuck deals"));
+
+  const quoteRows = must(quotes, "waiting quotes");
+  // a quote whose newer version was sent waits no more (the customer's link shows the newer one)
+  const newer = quoteRows.length
+    ? must(
+        await supabase
+          .from("quotes")
+          .select("previous_id")
+          .eq("organization_id", orgId)
+          .in("previous_id", quoteRows.map((q) => q.id))
+          .neq("status", "draft"),
+        "newer quote versions",
+      )
+    : [];
+  const superseded = new Set(newer.map((row) => row.previous_id).filter((id): id is string => id !== null));
+  const waiting = withoutSupersededQuotes(
+    quoteRows.map((q) => ({
+      id: q.id,
+      title: q.title,
+      numberDisplay: q.number_display,
+      status: q.status === "viewed" ? ("viewed" as const) : ("sent" as const),
+      sentAt: q.sent_at,
+      validUntil: q.valid_until,
+      customerName: q.customer_name,
+      totalAgorot: Number(q.total_agorot),
+    })),
+    superseded,
+  );
 
   const related = await relatedRecords(orgId, tasks.data);
   return {
@@ -137,5 +182,8 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     meetings: myMeetings(calendar.items, now),
     meetingsTruncated: calendar.truncated,
     dealsWithoutNextStep: dealsWithoutNextStep(stuckRows, NO_NEXT_STEP_SHOWN),
+    waitingQuotes: waiting.slice(0, WAITING_QUOTES_SHOWN),
+    // the count is exact while the read held them all; beyond that it is the database's count less what was seen replaced
+    waitingQuotesCount: Math.max(waiting.length, (quotes.count ?? quoteRows.length) - superseded.size),
   };
 }

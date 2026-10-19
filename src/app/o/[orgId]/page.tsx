@@ -10,7 +10,8 @@ import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/component
 import { PageHeader } from "@/components/ui/page-header";
 import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
-import { idleText, meetingSpanText } from "@/features/home/my-day";
+import { idleText, meetingSpanText, quoteEndsSoonText, quoteWaitText } from "@/features/home/my-day";
+import { quotePath, quotesPath } from "@/features/quotes/paths";
 import { getMyDay } from "@/features/home/queries";
 import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
 import { getGoalProgress, getMyMonthClosings } from "@/features/goals/progress-queries";
@@ -354,6 +355,56 @@ export default async function HomePage({ params }: Props) {
                   לידים שעוד לא קיבלו מענה
                 </Link>
               </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {day.waitingQuotes.length > 0 ? (
+          // TASK-09: the person's quotes that wait for the customer's answer (none: no card)
+          <Card aria-labelledby="my-waiting-quotes-title">
+            <CardHeader
+              id="my-waiting-quotes-title"
+              title="הצעות שמחכות לתשובה"
+              action={
+                <ButtonLink href={`${quotesPath(orgId)}?${new URLSearchParams({ owner: user.id })}`} variant="ghost" size="sm" className="print:hidden">
+                  לכל ההצעות
+                </ButtonLink>
+              }
+            />
+            <CardBody>
+              <ul className="divide-y divide-line">
+                {day.waitingQuotes.map((quote) => {
+                  const endsSoon = quoteEndsSoonText(quote.validUntil, day.today);
+                  return (
+                    <li key={quote.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2.5 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <Link href={quotePath(orgId, quote.id)} className="block break-words font-medium underline-offset-4 hover:underline">
+                          {quote.numberDisplay ? (
+                            <span dir="ltr" className="me-1 tabular-nums">
+                              {quote.numberDisplay}
+                            </span>
+                          ) : null}
+                          <bdi>{quote.title}</bdi>
+                        </Link>
+                        <span className="block text-sm text-ink-soft">
+                          {quote.customerName ? (
+                            <>
+                              <bdi>{quote.customerName}</bdi>
+                              {" · "}
+                            </>
+                          ) : null}
+                          {quoteWaitText(quote, day.today, org.timeZone)}
+                          {endsSoon ? <span className="text-warning"> · {endsSoon}</span> : null}
+                        </span>
+                      </div>
+                      <span className="font-medium whitespace-nowrap tabular-nums">{formatMoney(quote.totalAgorot)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {day.waitingQuotesCount > day.waitingQuotes.length ? (
+                <p className="mt-3 text-sm text-ink-soft">ועוד {formatNumber(day.waitingQuotesCount - day.waitingQuotes.length)} הצעות שמחכות לתשובה.</p>
+              ) : null}
             </CardBody>
           </Card>
         ) : null}

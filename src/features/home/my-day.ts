@@ -102,3 +102,47 @@ export function meetingSpanText(startsAt: string, endsAt: string, today: string,
   };
   return `${side(startsAt)}–${side(endsAt)}`;
 }
+
+// TASK-09 (owner, 13 October 2026: "quotes that wait for an answer" join My day once quotes exist): the person's sent or
+// viewed quotes whose validity has not passed, oldest sent first, so the longest wait is on top.
+
+export type WaitingQuoteRow = {
+  id: string;
+  title: string;
+  numberDisplay: string | null;
+  status: "sent" | "viewed";
+  sentAt: string | null;
+  validUntil: string | null;
+  customerName: string | null;
+  totalAgorot: number;
+};
+
+/** Whole days between two calendar dates (YYYY-MM-DD), later minus earlier; never below 0. */
+function daysFrom(earlier: string, later: string): number {
+  const ms = Date.parse(`${later}T00:00:00Z`) - Date.parse(`${earlier}T00:00:00Z`);
+  return Number.isFinite(ms) ? Math.max(0, Math.round(ms / 86_400_000)) : 0;
+}
+
+/** "נשלחה היום" / "נשלחה אתמול" / "נשלחה לפני 5 ימים", counted in the business's days; ", נצפתה" once the customer opened it. */
+export function quoteWaitText(quote: Pick<WaitingQuoteRow, "status" | "sentAt">, today: string, timeZone: string): string {
+  const viewed = quote.status === "viewed" ? ", נצפתה" : "";
+  if (!quote.sentAt) return `נשלחה${viewed}`;
+  const days = daysFrom(zoneDate(new Date(quote.sentAt), timeZone), today);
+  const sent = days === 0 ? "נשלחה היום" : days === 1 ? "נשלחה אתמול" : `נשלחה לפני ${formatNumber(days)} ימים`;
+  return `${sent}${viewed}`;
+}
+
+/** "בתוקף עד היום" / "בתוקף עד מחר" / null when there is no end date or it is further away. */
+export function quoteEndsSoonText(validUntil: string | null, today: string): string | null {
+  if (!validUntil) return null;
+  const days = daysFrom(today, validUntil);
+  if (validUntil < today) return null;
+  if (days === 0) return "בתוקף עד היום";
+  if (days === 1) return "בתוקף עד מחר";
+  return null;
+}
+
+/** Leaves out a quote whose newer version was already sent (its link shows the newer one, QUO-11). */
+export function withoutSupersededQuotes<T extends { id: string }>(quotes: T[], supersededIds: ReadonlySet<string>): T[] {
+  return quotes.filter((quote) => !supersededIds.has(quote.id));
+}
