@@ -871,6 +871,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `quotes_version_guard`: the chain is set on insert only, same deal and contact, from a sent quote (`quote_version:not_sent|parent|fixed`),
   and a quote that left draft never returns to it, for every writer (`quote:no_redraft`). `public.quote_public` (last redefined in
   020345) walks the chain to the newest open version with a live link of its own and adds `replaced {number}`.
+  Since 020540 (owner 19 October 2026) a version may be made from a declined or expired quote too (never accepted/cancelled); sending
+  is refused only while the previous is accepted; the copy keeps a line whose product left the catalog (`app.quote_lines_check` lets
+  it in only while the transaction setting `app.quote_version_copy` names the new draft and the previous quote has that product);
+  `quote_public` adds `draft_version`. `app.quote_lines_check`, `public.quote_new_version`, `app.quotes_version_guard` and
+  `public.quote_public` were last redefined in 020540.
 - Quote expiry and cancel (QUO-11, migrations 020415, 020420; owner 18 October 2026): pg_cron `crm-quote-expiry` (every 15 minutes)
   runs `app.expire_quotes()`: a sent or viewed quote whose `valid_until` is before the business's today becomes `expired` (200 per org,
   2,000 per run, per-quote exception block; a failure waits an hour in `app.quote_expiry_retry`), and its active owner gets kind `quote`.
