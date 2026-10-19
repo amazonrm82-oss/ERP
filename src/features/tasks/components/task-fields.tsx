@@ -57,10 +57,12 @@ type Props = {
   defaultOwnerId: string;
   /** HEB-03: the quick "in N business days" choice next to the date; left out where the settings are not at hand */
   businessDays?: BusinessDaysContext;
+  /** TASK-07: teams the task may go to with no owner (new tasks only); the first in the team to take it owns it */
+  teams?: Array<{ id: string; name: string }>;
 };
 
 /** Title, due date and time, reminder, repeat, assignee. Shared by the new-task form and the edit form. */
-export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays }: Props) {
+export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays, teams = [] }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
     <>
@@ -114,12 +116,38 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId, business
         ))}
       </SelectField>
       <RecurrenceFields values={values} errors={errors} restWeekdays={businessDays ? restDays(businessDays.calendar) : undefined} />
-      <SelectField key={`owner-${owner}`} label="באחריות" name="owner_id" defaultValue={owner} error={errors.owner_id}>
-        {assignees.map((assignee) => (
-          <option key={assignee.userId} value={assignee.userId}>
-            {assignee.name}
-          </option>
-        ))}
+      <SelectField
+        key={`owner-${owner}`}
+        label="באחריות"
+        name="owner_id"
+        defaultValue={owner}
+        error={errors.owner_id}
+        hint={teams.length > 0 ? "משימה לצוות: כל הצוות רואה אותה, ומי שלוקח ראשון הופך לאחראי." : undefined}
+      >
+        {teams.length > 0 ? (
+          <>
+            <optgroup label="אנשים">
+              {assignees.map((assignee) => (
+                <option key={assignee.userId} value={assignee.userId}>
+                  {assignee.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="לצוות: מי שלוקח ראשון">
+              {teams.map((team) => (
+                <option key={team.id} value={`team:${team.id}`}>
+                  צוות {team.name}
+                </option>
+              ))}
+            </optgroup>
+          </>
+        ) : (
+          assignees.map((assignee) => (
+            <option key={assignee.userId} value={assignee.userId}>
+              {assignee.name}
+            </option>
+          ))
+        )}
       </SelectField>
     </>
   );

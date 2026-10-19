@@ -27,7 +27,7 @@ import { remindOption } from "@/features/tasks/components/task-fields";
 import { listChecklistSteps, listChecklistTemplates } from "@/features/task-checklists/queries";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
 import { TasksTable } from "@/features/tasks/components/tasks-table";
-import { listCoveringTasks, listTaskGroups, listTasks, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
+import { listCoveringTasks, listOpenTeamTasks, listTaskGroups, listTasks, listTaskTeams, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { absenceLabel } from "@/features/work-hours/leave";
@@ -124,14 +124,18 @@ export default async function TasksPage({ params, searchParams }: Props) {
     return <TasksTableView orgId={orgId} context={context} query={query} showAll={showAll} />;
   }
 
-  const [groups, members, calendar, covering] = await Promise.all([
+  const [groups, members, calendar, covering, teams] = await Promise.all([
     listTaskGroups(orgId, showAll ? null : user.id),
     listMembers(orgId),
     // HEB-02: always read, so every row's snooze label knows the rest days
     getCalendarSettings(orgId),
     // HEB-08: the open tasks of colleagues the user stands in for ("all" already shows them)
     showAll ? Promise.resolve([]) : listCoveringTasks(orgId, user.id, context.org.timeZone),
+    // TASK-07: teams for "team, no owner" on the form, and the user's own teams
+    listTaskTeams(orgId, user.id, context.role),
   ]);
+  // TASK-07: "mine" also shows the open tasks of the user's teams that nobody took yet ("all" has them in its groups)
+  const teamTasks = showAll ? [] : await listOpenTeamTasks(orgId, teams.mine);
   // TASK-06: the steps of every task on the page, and the templates for "steps from a template"
   const shownTaskIds = [
     ...groups.overdue,
@@ -140,6 +144,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
     ...groups.undated,
     ...groups.done,
     ...covering.flatMap((group) => group.tasks),
+    ...teamTasks,
   ].map((task) => task.id);
   const [checklists, checklistTemplates] = await Promise.all([
     listChecklistSteps(orgId, [...new Set(shownTaskIds)]),
@@ -173,6 +178,10 @@ export default async function TasksPage({ params, searchParams }: Props) {
       recurrence: task.recurrence,
       related: task.related ? { href: relatedHref(orgId, task.related), label: RELATED_LABEL[task.related.kind] } : null,
       checklist: checklists.get(task.id) ?? [],
+      teamTask:
+        task.ownerId === null && task.teamId !== null && task.completedAt === null
+          ? { teamName: teams.names.get(task.teamId) ?? "", canTake: teams.rights.has(task.teamId) }
+          : null,
     };
   };
 
@@ -224,6 +233,27 @@ export default async function TasksPage({ params, searchParams }: Props) {
                 </Card>
               ))
           )}
+
+          {teamTasks.length > 0 ? (
+            <Card aria-labelledby="tasks-team">
+              <CardHeader id="tasks-team" title={`משימות הצוות שלי (${formatNumber(teamTasks.length)})`} />
+              <p className="border-b border-line px-4 py-2.5 text-sm text-ink-soft sm:px-5">
+                משימות שניתנו לצוות שלכם ועוד אין להן אחראי. מי שלוחץ ראשון על &quot;לקחתי&quot; הופך לאחראי.
+              </p>
+              <ul className="divide-y divide-line">
+                {teamTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    orgId={orgId}
+                    task={view(task, task.dueAt !== null && zoneDate(new Date(task.dueAt), context.org.timeZone) < today)}
+                    canEdit={canWrite}
+                    showOwner={false}
+                    assignees={[]}
+                  />
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
           {covering.map((group) => (
             <Card key={group.userId} aria-labelledby={`tasks-for-${group.userId}`}>
@@ -283,7 +313,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
               <Card aria-labelledby="new-task-title">
                 <CardHeader id="new-task-title" title="משימה חדשה" />
                 <CardBody>
-                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} templates={templates} />
+                  <TaskForm orgId={orgId} assignees={assignees} myUserId={user.id} today={today} calendar={calendar ?? undefined} templates={templates} teams={teams.assignable} />
                 </CardBody>
               </Card>
             </NewTaskPanel>

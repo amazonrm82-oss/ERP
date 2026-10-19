@@ -151,6 +151,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "member_leaves:deputy_inactive": "ממלא המקום צריך להיות עובד פעיל בעסק שאינו צופה בלבד. בחרו עובד אחר.",
   "member_leaves:deputy_absent": "ממלא המקום נעדר בחלק מהימים האלה. בחרו עובד אחר או שנו את התאריכים.",
   "task:deputy_owner": "ממלא מקום לא מעביר משימה לאחראי אחר. אפשר לסיים, לדחות ולערוך אותה.",
+  // TASK-07: a team task, for a team the user may not give tasks to
+  "task:team": "אפשר לתת משימה לצוות רק אם אתם חברים בו או מנהלים אותו.",
   // LEAD-06 (migration lead_convert_map)
   "convert_map:invalid": "אפשר לבחור רק שדה מאותו סוג. רעננו את הדף ונסו שוב.",
   // DEAL-03 (migration deal_loss_reasons)

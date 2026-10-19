@@ -11,6 +11,7 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { parseRecurrence, type Recurrence } from "./recurrence";
+import { teamsForTaskRights } from "./team-rights";
 
 export type TaskItem = {
   id: string;
@@ -19,6 +20,8 @@ export type TaskItem = {
   remindAt: string | null;
   ownerId: string | null;
   ownerName: string | null;
+  // TASK-07: the task's team; with no owner and still open it is a team task anyone in the team may take
+  teamId: string | null;
   taskType: string;
   priority: number;
   completedAt: string | null;
@@ -42,7 +45,7 @@ export type TaskGroups = {
 
 const OPEN_LIMIT = 300;
 const DONE_SHOWN = 20;
-const TASK_ITEM_COLUMNS = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, completed_at, lead_id, contact_id, company_id, deal_id";
+const TASK_ITEM_COLUMNS = "id, title, task_type, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id";
 
 type TaskItemRow = {
   id: string;
@@ -54,6 +57,7 @@ type TaskItemRow = {
   due_at: string | null;
   remind_at: string | null;
   owner_id: string | null;
+  team_id: string | null;
   completed_at: string | null;
   lead_id: string | null;
   contact_id: string | null;
@@ -69,6 +73,7 @@ function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
     remindAt: row.remind_at,
     ownerId: row.owner_id,
     ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+    teamId: row.team_id,
     taskType: row.task_type,
     priority: row.priority,
     completedAt: row.completed_at,
@@ -134,6 +139,61 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
   // TASK-01: within a group, high priority first; the due order stays among equals (a stable sort)
   for (const key of ["overdue", "today", "upcoming", "undated"] as const) groups[key].sort((a, b) => a.priority - b.priority);
   return groups;
+}
+
+export type TaskTeam = { id: string; name: string };
+
+/**
+ * TASK-07: the teams the user may give a task to with no owner and take such a task from (`teamsForTaskRights`, the rule
+ * of app.may_assign_team_task), every team's name, and the user's own teams.
+ */
+export async function listTaskTeams(
+  orgId: string,
+  userId: string,
+  role: string | null,
+): Promise<{ assignable: TaskTeam[]; names: Map<string, string>; mine: string[]; rights: Set<string> }> {
+  const supabase = await createClient();
+  const [teams, membership] = await Promise.all([
+    supabase.from("teams").select("id, name, parent_team_id").eq("organization_id", orgId).order("name"),
+    supabase.from("team_members").select("team_id, is_manager").eq("organization_id", orgId).eq("user_id", userId),
+  ]);
+  const all = must(teams, "teams");
+  const rows = must(membership, "team members");
+  const rights = teamsForTaskRights(
+    role,
+    all.map((team) => ({ id: team.id, parentId: team.parent_team_id })),
+    rows.map((row) => ({ teamId: row.team_id, isManager: row.is_manager })),
+  );
+  return {
+    assignable: all.filter((team) => rights.has(team.id)).map((team) => ({ id: team.id, name: team.name })),
+    names: new Map(all.map((team) => [team.id, team.name])),
+    mine: rows.map((row) => row.team_id),
+    rights,
+  };
+}
+
+/**
+ * TASK-07: open team tasks nobody took yet, of the user's teams, due first. RLS shows them to the team's members
+ * until someone takes them.
+ */
+export async function listOpenTeamTasks(orgId: string, teamIds: string[]): Promise<TaskItem[]> {
+  if (teamIds.length === 0) return [];
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("tasks")
+      .select(TASK_ITEM_COLUMNS)
+      .eq("organization_id", orgId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .is("owner_id", null)
+      .in("team_id", teamIds)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .limit(OPEN_LIMIT),
+    "team tasks",
+  );
+  return rows.map((row) => toTaskItem(row, new Map()));
 }
 
 export type CoveringGroup = { userId: string; name: string; kind: LeaveKind | null; endsOn: string; tasks: TaskItem[]; truncated: boolean };

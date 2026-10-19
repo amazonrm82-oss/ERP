@@ -2781,6 +2781,8 @@ export type Database = {
       send_test_notification: { Args: { p_org: string }; Returns: Json };
       // SPD-01: "I took it": { ok: true, result: 'taken' | 'acknowledged' } | { ok: false, reason: 'taken', owner_name } | { ok: false, reason: 'closed' }
       take_lead: { Args: { p_org: string; p_lead: string }; Returns: Json };
+      // TASK-07: the first team member to take a team task becomes its owner; {ok, owner_id} or {ok:false, reason: taken|closed|lead}
+      take_task: { Args: { p_org: string; p_task: string }; Returns: Json };
       // FLD-05: adds an industry template's missing lists; { added: {...counts}, limits: ["limit:<key>"] }
       apply_industry_template: { Args: { p_org: string; p_industry: string }; Returns: Json };
       // REC-02: who a note on this record may mention (active members who may see it, not the caller)

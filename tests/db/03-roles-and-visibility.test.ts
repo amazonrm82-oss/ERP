@@ -1044,6 +1044,38 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("delete from public.member_leaves where id = $1", [leave]));
   });
 
+  it("a team task: its team sees it until someone takes it, even under 'own'; only who may give the team tasks makes one (TASK-07)", async () => {
+    await setVisibility("own");
+    const make = (u: U) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string; owner_id: string | null }>("insert into public.tasks (organization_id, title, team_id) values ($1, 'לצוות', $2) returning id, owner_id", [org, team])).rows[0],
+      );
+    const seesTask = (u: U, id: string) => asUser(u.id, async (q) => (await count(q, "select 1 from public.tasks where id = $1", [id])) === 1);
+    // a member outside the team and a viewer may not give the team a task
+    expect(await pgError(make(m2))).toMatchObject({ code: "42501", hint: "task:team" });
+    expect((await pgError(make(viewer))).code).toBe("42501");
+    const task = await make(manager);
+    expect(task.owner_id).toBeNull();
+    for (const u of [owner, admin, manager, m1]) expect(await seesTask(u, task.id), u.email).toBe(true);
+    for (const u of [m2, viewer]) expect(await seesTask(u, task.id), u.email).toBe(false);
+    // seeing is not editing, and nobody but the team takes it
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.tasks set title = 'x' where id = $1", [task.id])).rowCount).toBe(0);
+      expect((await q("delete from public.tasks where id = $1", [task.id])).rowCount).toBe(0);
+    });
+    for (const u of [m2, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("select public.take_task($1, $2)", [org, task.id])))).code, u.email).toBe("42501");
+    }
+    const taken = await asUser(m1.id, async (q) => (await q<{ r: unknown }>("select public.take_task($1, $2) as r", [org, task.id])).rows[0].r);
+    expect(taken).toEqual({ ok: true, owner_id: m1.id });
+    // now the usual rules: the taker edits it, the team's manager still reads it
+    await asUser(m1.id, async (q) => {
+      expect((await q("update public.tasks set title = 'שלי' where id = $1", [task.id])).rowCount).toBe(1);
+    });
+    expect(await seesTask(manager, task.id)).toBe(true);
+    expect(await seesTask(m2, task.id)).toBe(false);
+  });
+
   it("everyone reads the VAT status; only owners and admins set it (TAX-01)", async () => {
     const insert = "insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt')";
     for (const u of [manager, m1, viewer]) {

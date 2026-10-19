@@ -1017,6 +1017,36 @@ describe("tenant isolation", () => {
     expect(err.code).toBe("42501");
   });
 
+  it("a team task stays inside its organization: unseen, not taken, not pointed at (TASK-07)", async () => {
+    const [teamA, taskTeamA] = await asUser(a.id, async (q) => {
+      const t = (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'שירות א') returning id", [orgA])).rows[0].id;
+      await q("insert into public.team_members (organization_id, team_id, user_id) values ($1, $2, $3)", [orgA, t, a.id]);
+      const task = (await q<{ id: string; owner_id: string | null }>(
+        "insert into public.tasks (organization_id, title, team_id) values ($1, 'משימת צוות של א', $2) returning id, owner_id",
+        [orgA, t],
+      )).rows[0];
+      expect(task.owner_id).toBeNull();
+      return [t, task.id];
+    });
+    await asUser(b.id, async (q) => {
+      expect(await count(q, "select 1 from public.tasks where id = $1", [taskTeamA])).toBe(0);
+      expect((await q("update public.tasks set owner_id = $2 where id = $1", [taskTeamA, b.id])).rowCount).toBe(0);
+    });
+    for (const org of [orgA, orgB]) {
+      expect((await pgError(asUser(b.id, (q) => q("select public.take_task($1, $2)", [org, taskTeamA])))).code, org).toBe("42501");
+    }
+    // a task of org B given to org A's team, and org B's member put in org A's team
+    const viaTeam = await pgError(
+      asUser(b.id, (q) => q("insert into public.tasks (organization_id, title, team_id) values ($1, 'x', $2)", [orgB, teamA])),
+    );
+    expect(["42501", "23503"]).toContain(viaTeam.code);
+    const intoTeam = await pgError(
+      asUser(b.id, (q) => q("insert into public.team_members (organization_id, team_id, user_id) values ($1, $2, $3)", [orgB, teamA, b.id])),
+    );
+    expect(["42501", "23503"]).toContain(intoTeam.code);
+    expect(await asAdmin(async (q) => (await q<{ owner_id: string | null }>("select owner_id from public.tasks where id = $1", [taskTeamA])).rows[0].owner_id)).toBeNull();
+  });
+
   it("cannot reach another organization through the RPC functions", async () => {
     const convert = await pgError(asUser(b.id, (q) => q("select public.convert_lead($1)", [ids.leadA])));
     expect(convert.code).toBe("P0002");

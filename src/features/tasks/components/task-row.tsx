@@ -18,7 +18,7 @@ import { isRestDay } from "@/features/calendar-days/holidays";
 import { addDays } from "@/lib/calendar-grid";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
-import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
+import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, takeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import type { BusinessDaysContext } from "./business-days-picker";
 import { REMIND_OPTIONS, TASK_TYPE_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
 
@@ -45,6 +45,9 @@ export type TaskRowView = {
   related: { href: string; label: string } | null;
   // TASK-06: the steps inside the task, in order
   checklist?: ChecklistStep[];
+  // TASK-07: an open task of a team that nobody took yet; the first to press "לקחתי" owns it
+  // canTake: the user may take it (the rule of public.take_task); others see it without the button
+  teamTask?: { teamName: string; canTake: boolean } | null;
 };
 
 type Props = {
@@ -91,6 +94,10 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
         setError(result.message);
       }
     });
+  }
+
+  if (task.teamTask && !task.done) {
+    return <TeamTaskRow orgId={orgId} task={task} teamName={task.teamTask.teamName} canTake={canEdit && task.teamTask.canTake} />;
   }
 
   if (editing) {
@@ -185,6 +192,65 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
             </Select>
           ) : null}
         </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** TASK-07: a team task nobody took yet. Seen by the whole team; "לקחתי" makes the user its owner, first one wins. */
+function TeamTaskRow({ orgId, task, teamName, canTake }: { orgId: string; task: TaskRowView; teamName: string; canTake: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  function take() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const result = await takeTaskAction(orgId, task.id);
+      if (result.ok) setNotice(result.message ?? null);
+      else setError(result.message);
+    });
+  }
+
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <p className="break-words font-medium">
+          <Badge tone="accent" className="me-1.5 align-middle">
+            לצוות {teamName}
+          </Badge>
+          {!task.done && task.priority === 1 ? (
+            <Badge tone="danger" className="me-1.5 align-middle">
+              עדיפות גבוהה
+            </Badge>
+          ) : null}
+          {task.title}
+        </p>
+        <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
+          {task.dueText ? <span className={task.overdue ? "font-medium text-danger" : undefined}>{task.dueText}</span> : null}
+          {task.taskType !== "todo" ? <span>{TASK_TYPE_OPTIONS.find((o) => o.value === task.taskType)?.label}</span> : null}
+          <span>עדיין אין אחראי. מי שלוקח ראשון הופך לאחראי.</span>
+          {task.related ? (
+            <Link href={task.related.href} className="underline underline-offset-4 hover:text-ink">
+              {task.related.label}
+            </Link>
+          ) : null}
+        </p>
+        {error ? (
+          <p role="alert" className="mt-1 text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+        <p role="status" className="mt-1 text-sm text-ink-soft empty:hidden">
+          {notice}
+        </p>
+      </div>
+      {canTake ? (
+        <Button variant="secondary" size="sm" onClick={take} disabled={pending} aria-busy={pending || undefined}>
+          {pending ? "לוקחים…" : "לקחתי"}
+          <span className="sr-only">: {task.title}</span>
+        </Button>
       ) : null}
     </li>
   );

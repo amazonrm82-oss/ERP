@@ -66,13 +66,28 @@ async function readCalendar(
   return { calendar: calendarSettingsFromRow(settings.data), timeZone: org.data?.timezone || undefined };
 }
 
+const TEAM_CHOICE = "team:";
+
+/** The team of a "team:<id>" choice; undefined when the choice is not a team, null when its id is not valid. */
+function teamChoice(value: unknown): string | null | undefined {
+  if (typeof value !== "string" || !value.startsWith(TEAM_CHOICE)) return undefined;
+  const id = z.uuid().safeParse(value.slice(TEAM_CHOICE.length));
+  return id.success ? id.data : null;
+}
+
 /** The task form: its fields and its repeat rule (TASK-04), with the errors of both. */
 function parseTaskForm(formData: FormData) {
   const input = pick(formData, [...TASK_FIELD_NAMES, ...REPEAT_FIELD_NAMES]);
+  // TASK-07: "team:<id>" in the assignee list = for that team, no owner (the database checks the team is the user's to give)
+  const team = teamChoice(input.owner_id);
+  if (team !== undefined) input.owner_id = null;
   const task = taskSchema.safeParse(input);
   const repeat = repeatFormSchema.safeParse(input);
+  if (team === null) {
+    return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["owner_id"], message: "יש לבחור אחראי או צוות מהרשימה.", input: undefined }]) };
+  }
   if (task.success && repeat.success) {
-    return { success: true as const, data: { ...task.data, recurrence: repeat.data } };
+    return { success: true as const, data: { ...task.data, recurrence: repeat.data, team_id: team ?? null } };
   }
   return { success: false as const, error: new z.ZodError([...(task.error?.issues ?? []), ...(repeat.error?.issues ?? [])]) };
 }
@@ -97,6 +112,8 @@ export async function createTaskAction(orgId: string, _prev: FormState, formData
     recurrence: parsed.data.recurrence,
     ...schedule(parsed.data),
     ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
+    // TASK-07: a team and no owner; the first in the team to take it becomes its owner
+    ...(parsed.data.team_id ? { team_id: parsed.data.team_id } : {}),
   }).select("id").single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את המשימה. נסו שוב."), { values: formValues(formData) });
@@ -333,4 +350,28 @@ export async function setTaskOutcomeAction(orgId: string, taskId: string, outcom
   }
   revalidateTasks(orgId);
   return ok();
+}
+
+const TAKE_REFUSED: Record<string, string> = {
+  taken: "מישהו אחר מהצוות כבר לקח את המשימה.",
+  closed: "המשימה כבר נסגרה.",
+  lead: "זו משימת חזרה לליד: לוקחים את הליד עצמו, והמשימה עוברת איתו.",
+};
+
+/** TASK-07: "לקחתי" on a team task. The first in the team wins; the database decides (public.take_task). */
+export async function takeTaskAction(orgId: string, taskId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, taskId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase.rpc("take_task", { p_org: orgId, p_task: taskId });
+  if (error) {
+    return fail(error.code === "42501" ? NOT_FOUND_OR_FORBIDDEN : dbErrorMessage(error, "לא הצלחנו לקחת את המשימה. נסו שוב."));
+  }
+  const answer = (data ?? {}) as { ok?: boolean; reason?: string };
+  revalidateTasks(orgId);
+  if (answer.ok !== true) {
+    return fail(TAKE_REFUSED[answer.reason ?? ""] ?? "לא הצלחנו לקחת את המשימה. נסו שוב.");
+  }
+  return { ok: true, message: "המשימה עכשיו באחריותך." };
 }

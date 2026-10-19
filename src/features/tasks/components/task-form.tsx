@@ -19,10 +19,12 @@ type Props = {
   calendar?: BusinessDaysContext["calendar"];
   // TASK-06: a checklist template whose steps go into the new task
   templates?: Array<{ id: string; name: string }>;
+  // TASK-07: teams the user may give a task to with no owner
+  teams?: Array<{ id: string; name: string }>;
 };
 
 /** New task, for oneself or for a colleague. The form clears itself after a successful save. */
-export function TaskForm({ orgId, assignees, myUserId, today, calendar, templates = [] }: Props) {
+export function TaskForm({ orgId, assignees, myUserId, today, calendar, templates = [], teams = [] }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createTaskAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   return (
@@ -34,6 +36,7 @@ export function TaskForm({ orgId, assignees, myUserId, today, calendar, template
         assignees={assignees}
         defaultOwnerId={myUserId}
         businessDays={calendar ? { calendar, today } : undefined}
+        teams={teams}
       />
       {templates.length > 0 ? (
         <SelectField label="רשימת תיוג" name="checklist_template" defaultValue={failure?.values?.checklist_template ?? ""}>
