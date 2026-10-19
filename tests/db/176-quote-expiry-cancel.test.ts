@@ -125,6 +125,8 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     expect(await entries(past.quote)).toHaveLength(1);
     // the customer's page was already closed for it
     expect(await asAdmin(async (q) => (await one<{ c: number }>(q, "select count(*)::int as c from public.quotes where id = $1 and status = 'expired'", [past.quote])).c)).toBe(1);
+    // the quote valid until today would expire at Jerusalem's midnight, inside a later test's count: close it here
+    await asAdmin((q) => q("update public.quotes set status = 'cancelled' where id = $1", [today.quote]));
   });
 
   it("leaves drafts and answered quotes alone, and judges 'today' in each business's own time zone", async () => {
@@ -132,19 +134,27 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     const accepted = await sentQuote(org, member);
     await validFor(accepted.quote, -5);
     await asAdmin((q) => q("update public.quotes set status = 'accepted' where id = $1", [accepted.quote]));
-    // far east and far west: the date that is already past in Kiritimati is still today in Pago Pago
-    await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Kiritimati' where id = $1", [org]));
-    await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Pago_Pago' where id = $1", [otherOrg]));
+    // far east and far west, each a business of its own: moving a business that already holds quotes (the earlier tests'
+    // quotes valid until Jerusalem's today) to Kiritimati would expire them too for half of every day.
+    // Kiritimati (UTC+14) is always 25 hours ahead of Pago Pago (UTC-11), so the date that is already past in
+    // Kiritimati is still today in Pago Pago at any hour.
+    const eastOwner = await createUser("qx-east");
+    const westOwner = await createUser("qx-west");
+    const eastOrg = await setupOrg(eastOwner, "עסק במזרח");
+    const westOrg = await setupOrg(westOwner, "עסק במערב");
+    await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Kiritimati' where id = $1", [eastOrg]));
+    await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Pago_Pago' where id = $1", [westOrg]));
+    const east = await sentQuote(eastOrg, eastOwner);
+    const west = await sentQuote(westOrg, westOwner);
     try {
-      const east = await sentQuote(org, member);
-      const west = await sentQuote(otherOrg, outsider);
       for (const quote of [east.quote, west.quote]) {
         await setDates(quote, "(now() at time zone 'Pacific/Pago_Pago')::date");
       }
       expect(await expire()).toBe(1);
       expect([await status(east.quote), await status(west.quote), await status(accepted.quote)]).toEqual(["expired", "sent", "accepted"]);
     } finally {
-      await asAdmin((q) => q("update public.organizations set timezone = 'Asia/Jerusalem' where id = any($1)", [[org, otherOrg]]));
+      // the west quote expires on Pago Pago's next day: close it, so no later count in this file can take it
+      await asAdmin((q) => q("update public.quotes set status = 'cancelled' where id = $1 and status = 'sent'", [west.quote]));
     }
   });
 
