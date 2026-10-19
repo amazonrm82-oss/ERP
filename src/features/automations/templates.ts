@@ -7,6 +7,8 @@ export type Template = {
   description: string;
   // why it cannot be added yet (missing integration or field), when that is the case
   unavailable?: string;
+  // what the business lacks when build answers null (default: a lead status the template names)
+  missing?: string;
   build?: (lookups: Lookups) => Rule | null;
 };
 
@@ -109,5 +111,30 @@ export const TEMPLATES: Template[] = [
       conditions: [],
       actions: [{ type: "create_task", title: "לדבר עם הלקוח על חידוש {{name}}", due_amount: 0, due_unit: "none", assign: "owner", task_type: "follow_up" }],
     }),
+  },
+  {
+    key: "renewal_deal_30d",
+    title: "עסקת חידוש 30 יום לפני",
+    description:
+      "30 יום לפני תאריך החידוש של עסקה נוצרת עסקת חידוש לאותו לקוח, בתהליך המכירה הראשון, באחריות האחראי על העסקה, ומקושרת לעסקה המקורית. האחראי מקבל משימה לטפל בה. את הסכום ממלאים בעסקה החדשה.",
+    missing: "התבנית צריכה תהליך מכירה עם שלב פתוח. הוסיפו שלב פתוח בהגדרות תהליכי המכירה ונסו שוב.",
+    // DEAL-08: AUT-03's date trigger on the deal's renewal date (DEAL-07) and AUT-02's "create deal" step, which names the
+    // deal it was made from as the previous deal (DEAL-11). Once per deal and renewal date (the engine's run key).
+    build: (lookups) => {
+      const pipeline = lookups.pipelines.find((p) => p.stages.some((s) => s.kind === "open"));
+      if (!pipeline) return null;
+      return {
+        name: "עסקת חידוש 30 יום לפני",
+        trigger: "deal:date",
+        trigger_field: "renewal_date",
+        trigger_direction: "before",
+        trigger_days: 30,
+        conditions: [],
+        actions: [
+          { type: "create_deal", name: "חידוש: {{name}}", pipeline_id: pipeline.id, assign: "owner" },
+          { type: "create_task", title: "לטפל בחידוש {{name}}", due_amount: 0, due_unit: "none", assign: "owner", task_type: "follow_up" },
+        ],
+      };
+    },
   },
 ];

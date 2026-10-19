@@ -125,7 +125,7 @@ export async function createFromTemplateAction(orgId: string, templateKey: strin
   }
   const rule = template.build(lookups.data);
   if (!rule) {
-    return fail("התבנית צריכה סטטוס שלא קיים אצלכם (למשל \"לא ענה\"). אפשר לבנות אוטומציה דומה בעצמכם.");
+    return fail(template.missing ?? "התבנית צריכה סטטוס שלא קיים אצלכם (למשל \"לא ענה\"). אפשר לבנות אוטומציה דומה בעצמכם.");
   }
   const result = await insertRule(orgId, rule, template.key);
   if (!result.ok) {

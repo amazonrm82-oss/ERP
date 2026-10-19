@@ -107,4 +107,26 @@ describe("date triggers (AUT-03)", () => {
     if (typeof db === "string") throw new Error(db);
     expect(db).toMatchObject({ entity_type: "deal", trigger_type: "date_reached", trigger_config: { field: "renewal_date", days: 30, direction: "before" } });
   });
+
+  it("DEAL-08: the renewal deal template makes a renewal deal 30 days before the renewal date, in the first pipeline with an open stage", () => {
+    const template = TEMPLATES.find((t) => t.key === "renewal_deal_30d")!;
+    // no pipeline with an open stage: nothing to build, and the business is told what is missing
+    expect(template.build!(lookups)).toBeNull();
+    expect(template.missing).toContain("שלב פתוח");
+    const withPipelines: Lookups = {
+      ...lookups,
+      pipelines: [
+        { id: "11111111-1111-4111-8111-111111111111", name: "סגור בלבד", stages: [{ id: "s0", name: "זכייה", kind: "won" }] },
+        { id: "22222222-2222-4222-8222-222222222222", name: "מכירות", stages: [{ id: "s1", name: "חדש", kind: "open" }] },
+      ],
+    };
+    const rule = template.build!(withPipelines)!;
+    const db = toDbRule(ruleSchema.parse(rule), withPipelines);
+    if (typeof db === "string") throw new Error(db);
+    expect(db).toMatchObject({ entity_type: "deal", trigger_type: "date_reached", trigger_config: { field: "renewal_date", days: 30, direction: "before" } });
+    expect(db.actions).toEqual([
+      expect.objectContaining({ type: "create_deal", pipeline_id: "22222222-2222-4222-8222-222222222222", name: "חידוש: {{name}}", assign: "owner" }),
+      expect.objectContaining({ type: "create_task", task_type: "follow_up" }),
+    ]);
+  });
 });
