@@ -960,7 +960,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `app.import_record_worked` were last redefined in 020570.
   Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
   (composite FK set null, only with `price_source = 'price_list'`, flag `price_lists`, name copied from the list).
-  `app.order_lines_check` and `public.order_from_deal` were last redefined in 020585.
+  `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
+  update too; only the FK's own set-null, `pg_trigger_depth() > 1`, clears a line's list alone). Order document:
+  `/o/[org]/orders/[id]/document` (quote design, stored totals, "אינו חשבונית מס"; billing details read live, only the name is a snapshot).
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
