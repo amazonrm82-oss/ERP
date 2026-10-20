@@ -9,7 +9,7 @@ vi.mock("@/features/setup/actions", () => ({ saveSetupIndustryAction: async () =
 const { IndustryStepForm } = await import("@/features/setup/components/industry-step-form");
 
 const previews = Object.fromEntries(
-  INDUSTRY_TEMPLATES.map((t) => [t.industry, previewTemplate(t, { pipelines: [], statuses: [], sources: [], fields: [], automations: [] })]),
+  INDUSTRY_TEMPLATES.map((t) => [t.industry, previewTemplate(t, { pipelines: [], statuses: [], sources: [], fields: [], automations: [], products: null })]),
 );
 
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]);

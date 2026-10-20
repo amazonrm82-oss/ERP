@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { INDUSTRY_TEMPLATES, previewTemplate } from "@/features/industry-templates/templates";
+import { INDUSTRY_TEMPLATES, previewTemplate, TEMPLATE_PRODUCTS, templateProducts } from "@/features/industry-templates/templates";
 import { INDUSTRIES } from "@/features/onboarding/options";
 
 import { addMember, asAdmin, asAnon, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
@@ -8,7 +8,7 @@ import { addMember, asAdmin, asAnon, asUser, closePool, createOrg, createUser, p
 afterAll(closePool);
 
 type U = { id: string; email: string };
-type Result = { added: Record<"pipelines" | "stages" | "statuses" | "sources" | "fields" | "automations", number>; limits: string[] };
+type Result = { added: Record<"pipelines" | "stages" | "statuses" | "sources" | "fields" | "automations" | "products", number>; limits: string[] };
 
 // FLD-05: industry templates add a pipeline, stages, statuses, sources, custom
 // fields and (switched off) automations; nothing is deleted or renamed.
@@ -57,6 +57,21 @@ const snapshot = (org: string): Promise<Snapshot> =>
     return { pipelines: pipelines.map((p) => p.name), stages, statuses, sources, fields, automations };
   });
 
+// whether the organization's plan holds the product catalog (sample products are added only then)
+const hasProducts = (org: string) =>
+  asAdmin(async (q) => (await q<{ f: boolean }>("select app.org_has_feature($1, 'products') as f", [org])).rows[0].f);
+
+const productRows = (org: string) =>
+  asAdmin(
+    async (q) =>
+      (
+        await q<{ name: string; kind: string; price_agorot: string; price_includes_vat: boolean; vat_kind: string; billing: string; is_active: boolean }>(
+          `select name, kind, price_agorot, price_includes_vat, vat_kind, billing, is_active from public.products where organization_id = $1 order by name collate "C"`,
+          [org],
+        )
+      ).rows,
+  );
+
 const applied = (org: string) =>
   asAdmin(async (q) => (await q<{ t: string[] }>("select industry_templates as t from public.organizations where id = $1", [org])).rows[0].t);
 
@@ -67,6 +82,17 @@ describe("industry templates: data (FLD-05)", () => {
       expect(db, template.industry).toEqual(JSON.parse(JSON.stringify(template)));
     }
     expect(await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template('nope') as t")).rows[0].t)).toBeNull();
+  });
+
+  it("the database's sample products equal TEMPLATE_PRODUCTS (FLD-05, wave 2)", async () => {
+    for (const template of INDUSTRY_TEMPLATES) {
+      const db = await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template_products($1) as t", [template.industry])).rows[0].t);
+      expect(db, template.industry).toEqual(JSON.parse(JSON.stringify(templateProducts(template.industry))));
+    }
+    expect(Object.keys(TEMPLATE_PRODUCTS).sort()).toEqual(INDUSTRY_TEMPLATES.map((t) => t.industry).sort());
+    expect(await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template_products('nope') as t")).rows[0].t)).toBeNull();
+    const owner = await createUser("tpl-products-data");
+    expect((await pgError(asUser(owner.id, (q) => q("select app.industry_template_products('services')")))).code).toBe("42501");
   });
 
   it("every industry of the sign-up form has a template", () => {
@@ -125,6 +151,7 @@ describe("apply_industry_template (FLD-05)", () => {
       sources: template.sources.length,
       fields: template.fields.length,
       automations: template.automations.length,
+      products: (await hasProducts(org)) ? templateProducts("real_estate").length : 0,
     });
 
     const after = await snapshot(org);
@@ -151,7 +178,7 @@ describe("apply_industry_template (FLD-05)", () => {
   it("applying again adds nothing", async () => {
     const before = await snapshot(org);
     const result = await apply(admin.id, org, "real_estate");
-    expect(result).toEqual({ added: { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0 }, limits: [] });
+    expect(result).toEqual({ added: { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0 }, limits: [] });
     expect(await snapshot(org)).toEqual(before);
     expect(await applied(org)).toEqual(["real_estate"]);
   });
@@ -203,6 +230,9 @@ describe("apply_industry_template (FLD-05)", () => {
       sources: (await q<{ name: string }>("select name from public.lead_sources where organization_id = $1", [o])).rows.map((r) => r.name),
       fields: (await q<{ object_type: string; key: string; label: string }>("select object_type, key, label from public.field_definitions where organization_id = $1", [o])).rows,
       automations: (await q<{ name: string; template_key: string | null }>("select name, template_key from public.automations where organization_id = $1", [o])).rows,
+      products: (await q<{ f: boolean }>("select app.org_has_feature($1, 'products') as f", [o])).rows[0].f
+        ? (await q<{ name: string }>("select name from public.products where organization_id = $1", [o])).rows.map((r) => r.name)
+        : null,
     }));
     expect(existing.statuses).toContain("\tנקבע סיור");
     const preview = previewTemplate(template, existing);
@@ -214,6 +244,7 @@ describe("apply_industry_template (FLD-05)", () => {
       sources: preview.sources.length,
       fields: preview.fields.length,
       automations: preview.automations.length,
+      products: preview.products.length,
     });
     expect(preview.sources).toEqual(["שלט על הנכס"]);
     expect(preview.statuses).toEqual(template.statuses);
@@ -313,5 +344,71 @@ describe("apply_industry_template and plan limits (FLD-05)", () => {
     expect(second.added).toMatchObject({ pipelines: 1, stages: template.pipeline!.stages.length, statuses: 0, sources: 0, automations: 0 });
     expect(second.added.fields).toBe(template.fields.length - 2);
     expect(await applied(org)).toEqual(["real_estate"]);
+  });
+});
+
+describe("apply_industry_template and sample products (FLD-05, wave 2)", () => {
+  const setProducts = (org: string, on: boolean, limits: Record<string, number> = {}) =>
+    asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = feature_overrides || $2, limit_overrides = $3 where organization_id = $1", [
+        org,
+        JSON.stringify({ products: on }),
+        JSON.stringify(limits),
+      ]),
+    );
+  const sample = templateProducts("health");
+
+  it("without the product catalog in the plan adds no products and reports nothing", async () => {
+    const owner = await createUser("tpl-prod-off");
+    const org = await createOrg(owner.id);
+    await setProducts(org, false);
+    const result = await apply(owner.id, org, "health");
+    expect(result.added.products).toBe(0);
+    expect(result.limits).toEqual([]);
+    expect(await productRows(org)).toEqual([]);
+    expect(await applied(org)).toEqual(["health"]);
+  });
+
+  it("with the catalog adds each missing sample product, taxable, price before VAT; a name in the catalog (archived too) is skipped", async () => {
+    const owner = await createUser("tpl-prod-on");
+    const org = await createOrg(owner.id);
+    await setProducts(org, true);
+    // the business already has one of the names, archived
+    await asUser(owner.id, (q) => q("insert into public.products (organization_id, name, price_agorot) values ($1, $2, 1)", [org, sample[1].name]));
+    await asAdmin((q) => q("update public.products set archived_at = now() where organization_id = $1", [org]));
+
+    const result = await apply(owner.id, org, "health");
+    expect(result.limits).toEqual([]);
+    expect(result.added.products).toBe(sample.length - 1);
+    const rows = await productRows(org);
+    for (const p of sample.filter((_, i) => i !== 1)) {
+      expect(rows.find((r) => r.name === p.name)).toEqual({
+        name: p.name,
+        kind: p.kind,
+        price_agorot: String(p.price_agorot),
+        price_includes_vat: false,
+        vat_kind: "taxable",
+        billing: p.billing,
+        is_active: true,
+      });
+    }
+    // the archived one is untouched, not added again
+    expect(rows.filter((r) => r.name === sample[1].name)).toEqual([expect.objectContaining({ price_agorot: "1" })]);
+    expect(await applied(org)).toEqual(["health"]);
+
+    // again: nothing more
+    expect((await apply(owner.id, org, "health")).added.products).toBe(0);
+    expect(await productRows(org)).toHaveLength(sample.length);
+  });
+
+  it("the product quota of the plan is reported like any limit, and the template stays offered", async () => {
+    const owner = await createUser("tpl-prod-quota");
+    const org = await createOrg(owner.id);
+    await setProducts(org, true, { max_products: 1 });
+    const result = await apply(owner.id, org, "health");
+    expect(result.added.products).toBe(1);
+    expect(result.limits).toEqual(["limit:max_products"]);
+    expect(await productRows(org)).toHaveLength(1);
+    expect(await applied(org)).toEqual([]);
   });
 });

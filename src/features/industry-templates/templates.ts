@@ -296,6 +296,50 @@ export const INDUSTRY_TEMPLATES: readonly IndustryTemplate[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Sample products (FLD-05, wave 2): a few products and services per industry, added to the catalog when the
+// business has the product catalog in its plan (flag 'products'). Prices are before VAT (price_includes_vat false,
+// taxable) and are only a starting point: the business edits or archives them like any product.
+// The database copy is app.industry_template_products(key) (migration industry_template_products); the two must
+// stay equal (tests/db/65-industry-templates.test.ts). Kept apart from IndustryTemplate so app.industry_template()
+// stays as it is.
+// ---------------------------------------------------------------------------
+
+export type TemplateProduct = {
+  name: string;
+  kind: "product" | "service";
+  price_agorot: number;
+  billing: "one_time" | "monthly";
+};
+
+const service = (name: string, shekels: number, billing: TemplateProduct["billing"] = "one_time"): TemplateProduct => ({
+  name,
+  kind: "service",
+  price_agorot: shekels * 100,
+  billing,
+});
+const product = (name: string, shekels: number): TemplateProduct => ({ name, kind: "product", price_agorot: shekels * 100, billing: "one_time" });
+
+export const TEMPLATE_PRODUCTS: Readonly<Record<string, readonly TemplateProduct[]>> = {
+  services: [service("פגישת ייעוץ", 450), service("ליווי חודשי", 2500, "monthly"), service("סדנה", 3500)],
+  real_estate: [service("דמי תיווך בשכירות", 5000), service("צילום ושיווק נכס", 1500), service("ייעוץ השקעות נדל\"ן", 800)],
+  insurance_finance: [service("בדיקת תיק ביטוחי", 400), service("ייעוץ פנסיוני", 600), service("ליווי פיננסי חודשי", 500, "monthly")],
+  construction: [service("ביקור ומדידה", 300), service("שעת עבודה", 180), service("שיפוץ חדר רחצה", 25000)],
+  retail: [product("מוצר לדוגמה", 100), product("כרטיס מתנה", 200), service("משלוח עד הבית", 30)],
+  health: [service("פגישת היכרות", 150), service("טיפול", 300), service("סדרת 10 טיפולים", 2700)],
+  education: [service("שיעור פרטי", 180), service("קורס", 1200), service("מנוי חודשי לחוגים", 450, "monthly")],
+  marketing: [service("ניהול רשתות חברתיות", 3500, "monthly"), service("ניהול קמפיין ממומן", 2500, "monthly"), service("בניית דף נחיתה", 4000)],
+  technology: [service("שעת פיתוח", 350), service("הטמעה והדרכה", 3000), service("מנוי תוכנה", 200, "monthly")],
+  tourism_events: [service("הפקת אירוע", 15000), service("חבילת צילום", 4500), service("יום טיול מאורגן", 250)],
+  nonprofit: [service("תרומה חודשית", 100, "monthly"), service("חסות לאירוע", 5000), service("סדנה לקהילה", 50)],
+  other: [],
+};
+
+/** The sample products of an industry template (none for an unknown key). */
+export function templateProducts(industry: string): readonly TemplateProduct[] {
+  return TEMPLATE_PRODUCTS[industry] ?? [];
+}
+
 export function industryTemplate(industry: string | null | undefined): IndustryTemplate | null {
   return INDUSTRY_TEMPLATES.find((t) => t.industry === industry) ?? null;
 }
@@ -314,6 +358,8 @@ export type ExistingLists = {
   sources: string[];
   fields: Array<{ object_type: string; key: string; label: string }>;
   automations: Array<{ name: string; template_key: string | null }>;
+  // the names of every product (archived ones too); null when the plan has no product catalog (no sample products then)
+  products: string[] | null;
 };
 
 export type TemplatePreview = {
@@ -324,6 +370,8 @@ export type TemplatePreview = {
   sources: string[];
   fields: TemplateField[];
   automations: string[];
+  // sample products that would be added (FLD-05, wave 2)
+  products: TemplateProduct[];
 };
 
 // btrim(name): strips plain spaces (U+0020) at both ends, nothing else; no case folding
@@ -384,6 +432,7 @@ export function previewTemplate(template: IndustryTemplate, existing: ExistingLi
     sources: missing(template.sources, existing.sources),
     fields,
     automations,
+    products: existing.products === null ? [] : templateProducts(template.industry).filter((p) => !existing.products!.some((name) => normName(name) === normName(p.name))),
   };
 }
 
@@ -393,6 +442,7 @@ export function previewIsEmpty(preview: TemplatePreview): boolean {
     preview.statuses.length === 0 &&
     preview.sources.length === 0 &&
     preview.fields.length === 0 &&
-    preview.automations.length === 0
+    preview.automations.length === 0 &&
+    preview.products.length === 0
   );
 }

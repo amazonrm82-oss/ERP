@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/lib/format";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { previewIsEmpty, type TemplatePreview } from "../templates";
@@ -19,6 +20,11 @@ export function TemplatePreviewList({ preview, headingId }: Props) {
     { title: "מקורות לידים", names: preview.sources },
     { title: "שדות", names: preview.fields.map((f) => `${f.label} (${RECORD_TYPES[f.object_type].singular})`) },
     { title: "אוטומציות (נוספות כבויות)", names: preview.automations },
+    // FLD-05: sample products, with the price before VAT (the business changes them in the catalog)
+    {
+      title: 'מוצרים לדוגמה (מחיר לפני מע"מ)',
+      names: preview.products.map((p) => `${p.name}: ${formatMoney(p.price_agorot)}${p.billing === "monthly" ? " לחודש" : ""}`),
+    },
   ].filter((g) => g.title && g.names.length > 0);
 
   return (

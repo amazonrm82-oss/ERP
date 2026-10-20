@@ -8,6 +8,7 @@ import {
   normName,
   previewIsEmpty,
   previewTemplate,
+  templateProducts,
   type ExistingLists,
 } from "@/features/industry-templates/templates";
 import { INDUSTRIES } from "@/features/onboarding/options";
@@ -108,7 +109,7 @@ describe("industry template data (FLD-05)", () => {
   }
 });
 
-const EMPTY: ExistingLists = { pipelines: [], statuses: [], sources: [], fields: [], automations: [] };
+const EMPTY: ExistingLists = { pipelines: [], statuses: [], sources: [], fields: [], automations: [], products: null };
 
 describe("previewTemplate (FLD-05)", () => {
   const t = industryTemplate("real_estate")!;
@@ -121,7 +122,42 @@ describe("previewTemplate (FLD-05)", () => {
     expect(p.sources).toEqual(t.sources);
     expect(p.fields).toEqual(t.fields);
     expect(p.automations).toEqual(t.automations.map((a) => a.name));
+    // no product catalog in the plan: no sample products
+    expect(p.products).toEqual([]);
     expect(previewIsEmpty(p)).toBe(false);
+  });
+
+  it("offers the sample products the catalog lacks, only with the product catalog (FLD-05, wave 2)", () => {
+    expect(previewTemplate(t, { ...EMPTY, products: [] }).products).toEqual(templateProducts("real_estate"));
+    const p = previewTemplate(t, { ...EMPTY, products: [" צילום ושיווק נכס ", "שירות אחר"] });
+    expect(p.products.map((x) => x.name)).toEqual(["דמי תיווך בשכירות", 'ייעוץ השקעות נדל"ן']);
+    // a template with nothing else left still offers its products
+    const g = industryTemplate("services")!;
+    const full = {
+      pipelines: [{ name: g.pipeline!.name, stages: g.pipeline!.stages.map((s) => ({ name: s.name, kind: s.kind })) }],
+      statuses: g.statuses,
+      sources: g.sources,
+      fields: g.fields,
+      automations: g.automations.map((a) => ({ name: a.name, template_key: null })),
+    };
+    expect(previewIsEmpty(previewTemplate(g, { ...full, products: [] }))).toBe(false);
+    expect(previewIsEmpty(previewTemplate(g, { ...full, products: templateProducts("services").map((x) => x.name) }))).toBe(true);
+    expect(previewIsEmpty(previewTemplate(g, { ...full, products: null }))).toBe(true);
+  });
+
+  it("every industry has its sample products (none for 'other'): valid names, prices and billing", () => {
+    for (const template of INDUSTRY_TEMPLATES) {
+      const products = templateProducts(template.industry);
+      expect(products.length, template.industry).toBe(template.industry === "other" ? 0 : 3);
+      for (const x of products) {
+        expect(x.name).toBe(x.name.trim());
+        expect(x.name.length).toBeGreaterThan(0);
+        expect(Number.isInteger(x.price_agorot) && x.price_agorot > 0).toBe(true);
+        expect(["one_time", "monthly"]).toContain(x.billing);
+      }
+      expect(new Set(products.map((x) => x.name)).size).toBe(products.length);
+    }
+    expect(templateProducts("spaceships")).toEqual([]);
   });
 
   it("skips names that exist, ignoring outer spaces only (like btrim)", () => {
@@ -137,6 +173,7 @@ describe("previewTemplate (FLD-05)", () => {
         { object_type: "deal", key: "deal_type", label: "סוג" },
       ],
       automations: [{ name: "x", template_key: "industry:real_estate:new_lead_call" }],
+      products: null,
     });
     expect(p.pipeline).toEqual({ name: ` ${t.pipeline!.name} `, isNew: false });
     // the pipeline has a won stage already: the template's is not added
@@ -164,11 +201,14 @@ describe("previewTemplate (FLD-05)", () => {
 });
 
 describe("describeApplyResult (FLD-05)", () => {
-  const zero = { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0 };
+  const zero = { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0 };
 
   it("says what was added, in Hebrew", () => {
-    expect(describeApplyResult({ added: { pipelines: 1, stages: 6, statuses: 1, sources: 2, fields: 1, automations: 2 }, limits: [] })).toBe(
+    expect(describeApplyResult({ added: { pipelines: 1, stages: 6, statuses: 1, sources: 2, fields: 1, automations: 2, products: 0 }, limits: [] })).toBe(
       "נוספו: תהליך מכירה, 6 שלבים, סטטוס אחד, 2 מקורות, שדה אחד, 2 אוטומציות (כבויות, מפעילים אותן בהגדרות).",
+    );
+    expect(describeApplyResult({ added: { ...zero, products: 3 }, limits: ["limit:max_products"] })).toBe(
+      "נוספו: 3 מוצרים לדוגמה (משנים מחיר או מעבירים לארכיון בקטלוג). חלק מהתבנית לא נוסף בגלל מגבלת החבילה: חלק מהמוצרים לדוגמה.",
     );
   });
 
