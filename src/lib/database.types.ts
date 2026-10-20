@@ -1824,6 +1824,27 @@ export type QuoteDecisionRow = {
   created_at: string;
 };
 
+// ORD-05: the customer's answer on an order through its link (migration order_links); the shape of QuoteDecisionRow.
+// Written only by public.order_public_decide, read only by owners and admins.
+export type OrderDecisionRow = {
+  id: string;
+  organization_id: string;
+  order_id: string;
+  decision: string;
+  decided_at: string;
+  signer_name: string | null;
+  signer_id_number: string | null;
+  signature_kind: string | null;
+  signature_image: string | null;
+  wording_version: string | null;
+  content_sha256: string;
+  ip: string | null;
+  user_agent: string | null;
+  decline_reason: string | null;
+  erased_at: string | null;
+  created_at: string;
+};
+
 // QUO-10: a customer's views of a quote (migration quote_views). Written by public.quote_public only; read by whoever
 // reads the quote.
 export type QuoteViewRow = {
@@ -2620,6 +2641,8 @@ export type Database = {
       >;
       // GAP-09: column grants; the quote is fixed once inserted
       quote_decisions: ReadOnlyTable<QuoteDecisionRow>;
+      // ORD-05: no client writes
+      order_decisions: ReadOnlyTable<OrderDecisionRow>;
       quote_views: ReadOnlyTable<QuoteViewRow>;
       quote_payment_steps: Table<
         QuotePaymentStepRow,
@@ -3046,6 +3069,29 @@ export type Database = {
       quote_public_version: { Args: { p_token: string }; Returns: Json };
       // QUO-09: the customer's page decides (service_role only); every outcome is an answer {status}
       quote_public_decide: {
+        Args: {
+          p_token: string;
+          p_decision: string;
+          p_fingerprint: string;
+          p_signer_name?: string | null;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_decline_reason?: string | null;
+          p_ip?: string | null;
+          p_user_agent?: string | null;
+        };
+        Returns: Json;
+      };
+      // ORD-05: the customer's link to a numbered order (create returns the token once; status never the hash), its page and
+      // its answer (service_role only)
+      order_link_create: { Args: { p_org: string; p_order: string }; Returns: string };
+      order_link_revoke: { Args: { p_org: string; p_order: string }; Returns: boolean };
+      order_link_status: { Args: { p_org: string; p_order: string }; Returns: Json };
+      order_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      order_public_decide: {
         Args: {
           p_token: string;
           p_decision: string;

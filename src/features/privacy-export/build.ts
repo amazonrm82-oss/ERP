@@ -81,6 +81,7 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 - quote_payment_steps: לוח התשלומים של הצעות המחיר
 - orders, order_lines: ההזמנות (כלקוח, כאיש הקשר למשלוח או בעסקאות) והשורות שלהן
 - order_payment_steps: לוח התשלומים של ההזמנות
+- order_decisions: אישור או דחייה של הזמנה בקישור: שם החותם, מספר זהות, החתימה, כתובת IP, הדפדפן וסיבת הדחייה
 - segment_members: הסגמנטים (רשימות ידניות) שהאדם הוכנס אליהם
 - consents: הסכמות לדיוור והסרות
 - form_submissions: פניות מטפסים

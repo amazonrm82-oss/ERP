@@ -7,10 +7,19 @@ import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, TextareaField, TextField } from "@/components/ui/field";
 
+import { ORDER_ACCEPT_WORDING } from "@/features/orders/public";
+
 import { ACCEPT_WORDING, REASON_MAX, type DecisionBody } from "../decision";
 import { SignaturePad } from "./signature-pad";
 
-type Props = { token: string; fingerprint: string };
+// ORD-05: the same panel answers a quote (QUO-09) or an order (its own route and DRAFT wording)
+type Subject = "quote" | "order";
+type Props = { token: string; fingerprint: string; subject?: Subject };
+
+const SUBJECT: Record<Subject, { route: string; wording: string; title: string; decline: string }> = {
+  quote: { route: "quote", wording: ACCEPT_WORDING, title: "התשובה שלך להצעה", decline: "דחיית ההצעה" },
+  order: { route: "order", wording: ORDER_ACCEPT_WORDING, title: "התשובה שלך להזמנה", decline: "דחיית ההזמנה" },
+};
 type Mode = "choose" | "accept" | "decline";
 
 /**
@@ -18,7 +27,8 @@ type Mode = "choose" | "accept" | "decline";
  * typed signature, the checkbox) or decline with an optional reason. The answer names the fingerprint of the version shown,
  * so it applies to exactly what the customer read.
  */
-export function QuoteDecisionPanel({ token, fingerprint }: Props) {
+export function QuoteDecisionPanel({ token, fingerprint, subject = "quote" }: Props) {
+  const texts = SUBJECT[subject];
   const router = useRouter();
   const ids = useId();
   const [mode, setMode] = useState<Mode>("choose");
@@ -38,7 +48,7 @@ export function QuoteDecisionPanel({ token, fingerprint }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/forms/quote/${encodeURIComponent(token)}/decide`, {
+        const response = await fetch(`/api/forms/${texts.route}/${encodeURIComponent(token)}/decide`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -63,13 +73,13 @@ export function QuoteDecisionPanel({ token, fingerprint }: Props) {
   return (
     <section aria-labelledby={`${ids}-title`} className="space-y-4 rounded-lg border border-line bg-surface p-4 print:hidden sm:p-6">
       <h2 id={`${ids}-title`} className="text-lg font-semibold text-ink">
-        התשובה שלך להצעה
+        {texts.title}
       </h2>
       {mode === "choose" ? (
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setMode("accept")}>אישור וחתימה</Button>
           <Button variant="secondary" onClick={() => setMode("decline")}>
-            דחיית ההצעה
+            {texts.decline}
           </Button>
         </div>
       ) : mode === "accept" ? (
@@ -120,8 +130,8 @@ export function QuoteDecisionPanel({ token, fingerprint }: Props) {
               </p>
             )}
           </fieldset>
-          {/* DRAFT wording until the lawyer edits it (ACCEPT_WORDING) */}
-          <Checkbox label={ACCEPT_WORDING} checked={agreed} onChange={(event) => setAgreed(event.currentTarget.checked)} />
+          {/* DRAFT wording until the lawyer edits it (ACCEPT_WORDING, ORDER_ACCEPT_WORDING) */}
+          <Checkbox label={texts.wording} checked={agreed} onChange={(event) => setAgreed(event.currentTarget.checked)} />
           <p className="text-sm text-ink-soft">עם החתימה נשמרים השם, החתימה, השעה, כתובת ה-IP והדפדפן, כראיה לאישור.</p>
           <FormError message={error} />
           <div className="flex flex-wrap gap-2">
@@ -151,7 +161,7 @@ export function QuoteDecisionPanel({ token, fingerprint }: Props) {
           <FormError message={error} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="danger" loading={pending}>
-              דחיית ההצעה
+              {texts.decline}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setMode("choose")} disabled={pending}>
               חזרה

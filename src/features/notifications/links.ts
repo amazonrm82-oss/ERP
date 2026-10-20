@@ -1,4 +1,5 @@
 import { calendarPath } from "@/features/calendar/range";
+import { orderPath } from "@/features/orders/paths";
 import { quotePath } from "@/features/quotes/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { paths } from "@/lib/paths";
@@ -34,6 +35,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // QUO-09 / QUO-10: the customer opened, accepted or declined a quote
     case "quote":
       return quotePath(orgId, entityId);
+    // ORD-05: the customer approved or declined an order through its link
+    case "order":
+      return orderPath(orgId, entityId);
     default:
       return null;
   }

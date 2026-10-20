@@ -62,6 +62,8 @@ const eslintConfig = defineConfig([
       "src/features/qr-codes/scan-server.ts",
       // SPD-07: the site widget's script and short form, approved public secret-link pattern (owner, 13 October 2026)
       "src/features/site-widgets/public-server.ts",
+      // ORD-05: the customer's order confirmation page, approved public secret-link pattern (owner, 20 October 2026)
+      "src/features/orders/public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

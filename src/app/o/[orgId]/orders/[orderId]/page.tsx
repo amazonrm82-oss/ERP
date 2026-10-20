@@ -12,7 +12,9 @@ import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
 import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
 import { ButtonLink } from "@/components/ui/button";
-import { getOrder, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
+import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
+import { OrderLinkCard } from "@/features/orders/components/order-link-card";
+import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { orderEditing, ORDER_SOURCE_LABELS } from "@/features/orders/schema";
 import { quotePath } from "@/features/quotes/paths";
@@ -50,11 +52,14 @@ export default async function OrderPage({ params }: Props) {
       : order.companyId
         ? supabase.from("companies").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", order.companyId).maybeSingle()
         : null;
-  const [lines, parties, parent, schedule] = await Promise.all([
+  const [lines, parties, parent, schedule, linkStatus, decision] = await Promise.all([
     listOrderLines(orgId, order.id),
     getOrderParties(orgId, order),
     parentQuery,
     listOrderSchedule(orgId, order.id),
+    // ORD-05: the customer's link (for who may manage it) and their answer (owners and admins, RLS)
+    order.status === "draft" ? Promise.resolve(null) : getOrderLinkStatus(orgId, order.id),
+    order.status === "draft" ? Promise.resolve(null) : getOrderDecision(orgId, order.id),
   ]);
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -178,6 +183,18 @@ export default async function OrderPage({ params }: Props) {
             {!order.contactId && !order.companyId && !order.dealId ? <p className="text-ink-soft">הלקוח של ההזמנה נמחק.</p> : null}
           </CardBody>
         </Card>
+
+        {/* ORD-05: the customer's answer through the link, with its evidence (owners and admins only) */}
+        {decision ? <QuoteDecisionCard decision={decision} /> : null}
+        {/* ORD-05: the customer's link, for a numbered order that is not cancelled and whose customer was not deleted */}
+        {linkStatus && mayEdit && (linkStatus.active || (order.status !== "cancelled" && !order.customerDeletedAt)) ? (
+          <OrderLinkCard
+            orgId={orgId}
+            orderId={order.id}
+            active={linkStatus.active}
+            createdText={linkStatus.createdAt ? formatDate(linkStatus.createdAt) : ""}
+          />
+        ) : null}
 
         {mayEdit && editing.status ? (
           <Card aria-labelledby="order-status">

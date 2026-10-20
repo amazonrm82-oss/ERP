@@ -44,6 +44,9 @@ describe("server log line of a request error", () => {
       [`/api/forms/card/${t}/vcard`, "/api/forms/card/[token]/vcard"],
       // QUO-09: the decision route
       [`/api/forms/quote/${t}/decide`, "/api/forms/quote/[token]/decide"],
+      // ORD-05: the customer's order page and its decision route
+      [`/f/order/${t}`, "/f/order/[token]"],
+      [`/api/forms/order/${t}/decide`, "/api/forms/order/[token]/decide"],
       [`/api/in/${t}`, "/api/in/[token]"],
       [`/api/calendar-feed/${t}.ics`, "/api/calendar-feed/[token]"],
       // SPD-07: the site widget's script, form page and form route

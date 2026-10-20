@@ -503,6 +503,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_line_price_claim.sql",
       // ORD-04 redefines public.order_confirm(), public.order_from_quote() and app.audit_erase_core() of _orders.sql last
       "_order_payment_steps.sql",
+      // ORD-05 redefines app.audit_erase_core() of _order_payment_steps.sql last (the answers on erased orders)
+      "_order_links.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

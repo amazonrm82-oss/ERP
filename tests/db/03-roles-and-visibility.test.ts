@@ -410,6 +410,32 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
+    await setVisibility("org");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));
+    try {
+      const contact = await asUser(m1.id, async (q) =>
+        (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לתשובה') returning id", [org])).rows[0].id,
+      );
+      const order = await asUser(m1.id, async (q) =>
+        (await q<{ id: string }>("insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).rows[0].id,
+      );
+      const answer = await asAdmin(async (q) =>
+        (await q<{ id: string }>("insert into public.order_decisions (organization_id, order_id, decision, content_sha256, ip) values ($1, $2, 'rejected', repeat('0', 64), '203.0.113.9') returning id", [org, order])).rows[0].id,
+      );
+      const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.order_decisions where id = $1", [answer]));
+      for (const u of [owner, admin]) expect(await seen(u), u.email).toBe(1);
+      // the order's own writer, a manager and a viewer seat read the order, not the answer (IP, signature)
+      for (const u of [manager, m1, m2, viewer]) expect(await seen(u), u.email).toBe(0);
+      for (const u of [owner, m1]) {
+        expect((await pgError(asUser(u.id, (q) => q("update public.order_decisions set ip = null where id = $1", [answer])))).code, u.email).toBe("42501");
+        expect((await pgError(asUser(u.id, (q) => q("delete from public.order_decisions where id = $1", [answer])))).code, u.email).toBe("42501");
+      }
+    } finally {
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = feature_overrides - 'orders' where organization_id = $1", [org]));
+    }
+  });
+
   it("a quote's views follow the quote: whoever reads it reads them, nobody writes them (QUO-10)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

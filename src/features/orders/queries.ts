@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { customerPriceList } from "@/features/deal-lines/queries";
+import type { QuoteDecision } from "@/features/quotes/queries";
 import type { ScheduleStep } from "@/features/quotes/schedule";
 import { conversionRateBp, type NamedPriceList } from "@/features/deal-lines/pricing";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
@@ -156,6 +157,48 @@ export async function listOrderSchedule(orgId: string, orderId: string): Promise
     "order payment schedule",
   );
   return rows.map((row) => ({ id: row.id, position: row.position, name: row.name, percentBp: row.percent_bp, dueDate: row.due_date, milestone: row.milestone }));
+}
+
+/** ORD-05: whether the order has a working customer link, and since when; null for someone who may not manage it. */
+export async function getOrderLinkStatus(orgId: string, orderId: string): Promise<{ active: boolean; createdAt: string | null } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("order_link_status", { p_org: orgId, p_order: orderId });
+  if (error) {
+    // not someone who manages the order, or the plan has no orders: no link card
+    if (error.code === "42501" || error.code === "P0001") return null;
+    throw new Error(`order_link_status failed: ${error.code} ${error.message}`);
+  }
+  const value = data as { active?: unknown; created_at?: unknown } | null;
+  return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };
+}
+
+/** ORD-05: the customer's answer through the link and its evidence; owners and admins only (RLS), else null. */
+export async function getOrderDecision(orgId: string, orderId: string): Promise<QuoteDecision | null> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase
+      .from("order_decisions")
+      .select("decision, decided_at, signer_name, signer_id_number, signature_kind, signature_image, wording_version, content_sha256, ip, user_agent, decline_reason, erased_at")
+      .eq("organization_id", orgId)
+      .eq("order_id", orderId)
+      .maybeSingle(),
+    "order decision",
+  );
+  if (!row || (row.decision !== "accepted" && row.decision !== "rejected")) return null;
+  return {
+    decision: row.decision,
+    decidedAt: row.decided_at,
+    signerName: row.signer_name,
+    signerIdNumber: row.signer_id_number,
+    signatureKind: row.signature_kind === "drawn" || row.signature_kind === "typed" ? row.signature_kind : null,
+    signatureImage: row.signature_image,
+    wordingVersion: row.wording_version,
+    contentSha256: row.content_sha256,
+    ip: row.ip,
+    userAgent: row.user_agent,
+    declineReason: row.decline_reason,
+    erasedAt: row.erased_at,
+  };
 }
 
 export type OrderSummary = {

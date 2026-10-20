@@ -248,6 +248,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:schedule_total": "לוח התשלומים צריך להגיע בדיוק ל-100% לפני שליחה. תקנו את האחוזים, או מחקו את הלוח.",
   "quote_schedule:over": "סך האחוזים בלוח התשלומים עובר 100%. הקטינו אחוז באחד התשלומים.",
   "quote_schedule:max": "אפשר עד 20 תשלומים בלוח אחד.",
+  // ORD-05: the customer's link to an order
+  "order_link:draft": "קישור ללקוח נוצר רק להזמנה שאושרה וקיבלה מספר.",
+  "order_link:cancelled": "להזמנה שבוטלה לא יוצרים קישור חדש.",
+  "order_link:customer_deleted": "הלקוח של ההזמנה נמחק, ולכן אין לה קישור.",
   // ORD-04: an order's payment schedule
   "order:schedule_total": "לוח התשלומים צריך להגיע בדיוק ל-100% לפני אישור ההזמנה. תקנו את האחוזים, או מחקו את הלוח.",
   "order_schedule:over": "סך האחוזים בלוח התשלומים עובר 100%. הקטינו אחוז באחד התשלומים.",
