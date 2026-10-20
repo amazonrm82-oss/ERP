@@ -516,6 +516,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the PAY-01 files follow-up redefines app.files_before_insert() of _document_files.sql and app.audit_erase_core() of
       // _payments.sql last (a payment's file; erasure reaches the files of documents and payments)
       "_payment_files.sql",
+      // ORD-05b redefines app.audit_erase_core() of _payment_files.sql last (the customer's decline reason on the timeline and notices)
+      "_order_answer_timeline.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

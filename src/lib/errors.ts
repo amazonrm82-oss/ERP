@@ -218,6 +218,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:frozen": "אי אפשר לשנות מחירים, הנחה או מע\"מ בהצעה שכבר אינה טיוטה.",
   // QUO-16: the timeline entries of a sent, accepted or declined quote are history
   "activity:quote_entry": "רישום של הצעת מחיר בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",
+  // ORD-05b
+  "activity:order_entry": "תשובת הלקוח להזמנה בציר הזמן נכתבת על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותה.",
   // QUO-12: versions of a sent quote
   "quote:no_redraft": "הצעה שנשלחה לא חוזרת לטיוטה. כדי לשנות אותה יוצרים גרסה חדשה.",
   "quote_version:draft": "זו טיוטה: אפשר לערוך אותה ישירות.",
