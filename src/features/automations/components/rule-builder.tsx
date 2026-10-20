@@ -14,7 +14,7 @@ import { paths } from "@/lib/paths";
 
 import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
-import { DEAL_NAME_MAX, DEFAULT_DEAL_NAME, NOTE_BODY_MAX, openStagesOf } from "../create-records";
+import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
 import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
@@ -429,8 +429,8 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
             value={action.name}
             onChange={(e) => onChange({ name: e.target.value })}
             maxLength={DEAL_NAME_MAX}
-            placeholder={DEFAULT_DEAL_NAME}
-            hint={`ריק: "${DEFAULT_DEAL_NAME}"`}
+            placeholder={defaultDealName(lookups.dealWord)}
+            hint={`ריק: "${defaultDealName(lookups.dealWord)}"`}
             className="sm:col-span-2"
             controlSize="sm"
           />

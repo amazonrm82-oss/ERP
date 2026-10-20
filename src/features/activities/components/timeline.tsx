@@ -11,6 +11,7 @@ import { getMentionCandidates } from "@/features/mentions/queries";
 import { mentionIds } from "@/features/mentions/token";
 import { printsTimelineEntry } from "@/features/print/print";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -40,8 +41,10 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
   // getOrgContext is memoized per request: the page already loaded it
   // TASK-08: the business's activity types name the entries and fill the log form's choices
   const typesRead = listActivityTypes(orgId);
+  // FLD-10 part three: the entries the app draws (a conversion, a stage move, a lead passed on) in the business's words
+  const termsRead = getOrgTerms(orgId);
   const [items, context, types] = await Promise.all([
-    typesRead.then((list) => getTimeline(orgId, subject, filter, list)),
+    Promise.all([typesRead, termsRead]).then(([list, terms]) => getTimeline(orgId, subject, filter, list, terms)),
     getOrgContext(orgId),
     typesRead,
   ]);

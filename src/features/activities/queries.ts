@@ -2,12 +2,14 @@ import "server-only";
 
 import { entryLabel, isActivityBase, type ActivityTypeIcon, type ActivityTypeOption } from "@/features/activity-types/types";
 import { getUserNames } from "@/features/shell/queries";
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import type { Json } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
 import { quoteEntryBy, quoteEntryKind, quoteEntryText } from "./quote-entries";
+import { conversionText, responsePassText, stageChangeText } from "./system-entries";
 import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
@@ -58,6 +60,17 @@ function metaString(metadata: Json, key: string): string | null {
   return null;
 }
 
+function metaNumber(metadata: Json, key: string): number | null {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const value = metadata[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+  return null;
+}
+
+const isResponsePass = (activity: { type: string; metadata: Json }) =>
+  activity.type === "system" && metaString(activity.metadata, "kind") === "response_pass";
+
 const TIMELINE_LIMIT = 100;
 
 /**
@@ -69,6 +82,8 @@ export async function getTimeline(
   subject: TimelineSubject,
   filter?: TimelineFilter,
   types: ReadonlyArray<ActivityTypeOption> = [],
+  // FLD-10 part three: the business's words in the entries the app draws
+  terms: OrgTerms = DEFAULT_TERMS,
 ): Promise<TimelineItem[]> {
   const supabase = await createClient();
 
@@ -112,7 +127,11 @@ export async function getTimeline(
     needsStages
       ? supabase.from("stages").select("id, name").eq("organization_id", orgId)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
-    getUserNames(activities.map((a) => a.created_by)),
+    // SPD-03: the reps a lead was passed between are named from the entry's metadata
+    getUserNames([
+      ...activities.map((a) => a.created_by),
+      ...activities.filter(isResponsePass).flatMap((a) => [metaString(a.metadata, "from_user_id"), metaString(a.metadata, "to_user_id")]),
+    ]),
     quoteIds.length > 0
       ? supabase.from("quotes").select("id, title").eq("organization_id", orgId).in("id", quoteIds)
       : Promise.resolve({ data: [] as Array<{ id: string; title: string }>, error: null }),
@@ -145,7 +164,7 @@ export async function getTimeline(
     } else if (activity.type === "stage_change") {
       const from = stageNames.get(metaString(activity.metadata, "from_stage_id") ?? "");
       const to = stageNames.get(metaString(activity.metadata, "to_stage_id") ?? "");
-      text = from && to ? `העסקה עברה מהשלב "${from}" לשלב "${to}".` : "העסקה עברה שלב.";
+      text = stageChangeText(from, to, terms);
       isUserContent = false;
     } else if (activity.type === "inquiry") {
       // a repeat submission from a form or webhook: who wrote, through which channel, and what
@@ -164,11 +183,22 @@ export async function getTimeline(
     } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "snooze_cleared") {
       // written by the database when a move to another stage cancels a postponement
       isUserContent = false;
-    } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "response_pass") {
-      // SPD-03: written by the database when a lead nobody answered in time went to the next rep
+    } else if (isResponsePass(activity)) {
+      // SPD-03: written by the database when a lead nobody answered in time went to the next rep; drawn from its metadata
+      // in the business's words (the stored text stays when the metadata is not complete)
+      text =
+        responsePassText(
+          {
+            fromUserId: metaString(activity.metadata, "from_user_id"),
+            toUserId: metaString(activity.metadata, "to_user_id"),
+            targetMinutes: metaNumber(activity.metadata, "target_minutes"),
+          },
+          authors,
+          terms,
+        ) ?? text;
       isUserContent = false;
     } else if (activity.type === "conversion") {
-      text = "הליד הומר לאיש קשר.";
+      text = conversionText(terms);
       isUserContent = false;
     }
 

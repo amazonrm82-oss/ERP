@@ -13,7 +13,15 @@ export const CREATE_DEAL_ENTITIES: readonly Entity[] = ["contact", "company", "d
 export const DEAL_AMOUNT_MAX_AGOROT = 100_000_000_000;
 export const DEAL_NAME_MAX = 200;
 export const NOTE_BODY_MAX = 2000;
-export const DEFAULT_DEAL_NAME = "עסקה: {{name}}";
+/** Today's word for a deal: an empty name made by the database is "עסקה: <name>" (app.run_automation_actions). */
+export const DEFAULT_DEAL_WORD = "עסקה";
+
+/** FLD-10 part three: the default name of a deal a rule makes, in the business's word. */
+export function defaultDealName(dealWord: string = DEFAULT_DEAL_WORD): string {
+  return `${dealWord}: {{name}}`;
+}
+
+export const DEFAULT_DEAL_NAME = defaultDealName();
 
 type PipelineLookup = { id: string; name: string; stages: Array<{ id: string; name: string; kind?: string }> };
 
@@ -48,7 +56,7 @@ export type CreateDealInput = {
 export function createDealAction(
   entity: Entity,
   input: CreateDealInput,
-  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string }> },
+  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string }>; dealWord?: string },
 ): Record<string, Json> | string {
   if (!CREATE_DEAL_ENTITIES.includes(entity)) return "ליד הופך לעסקה בהמרה. יצירת עסקה מתאימה לאנשי קשר, חברות, עסקאות ומשימות.";
   if (!lookups.pipelines.some((p) => p.id === input.pipeline_id)) return "תהליך המכירה שנבחר כבר לא קיים.";
@@ -67,6 +75,8 @@ export function createDealAction(
   if (copySource) out.copy_from_source = true;
   const name = input.name?.trim();
   if (name) out.name = name;
+  // an empty name: the database's default is today's word, so a business with its own word stores its default here
+  else if (lookups.dealWord && lookups.dealWord !== DEFAULT_DEAL_WORD) out.name = defaultDealName(lookups.dealWord);
   if (input.stage_id) out.stage_id = input.stage_id;
   if (amount > 0) out.amount_agorot = amount;
   if (input.assign === "user" && input.user_id) out.user_id = input.user_id;
@@ -95,8 +105,9 @@ const nameIn = (list: Array<{ id: string; name: string }>, id: unknown) => list.
 /** `"<name>" בתהליך X, בשלב Y, ₪ Z, לאחראי` for a rule's description. */
 export function describeCreateDeal(
   action: Record<string, unknown>,
-  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string; name: string }> },
+  lookups: { pipelines: PipelineLookup[]; members: Array<{ id: string; name: string }>; dealWord?: string },
 ): string {
+  // a stored rule without a name makes the database's "עסקה: <name>"
   const parts = [`"${str(action.name) || DEFAULT_DEAL_NAME}"`];
   const stages = lookups.pipelines.find((p) => p.id === action.pipeline_id)?.stages ?? [];
   const fallback = `${nameIn(lookups.pipelines, action.pipeline_id)}${action.stage_id ? `, שלב ${nameIn(stages, action.stage_id)}` : ""}`;

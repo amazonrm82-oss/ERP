@@ -49,7 +49,7 @@ export default async function OrgLayout({ children, params }: Props) {
   // closed screen (getOrgContext), except the owner's plan and full export
   if (context.closed) {
     // the owner still gets 'system' notices here (new leads waiting, the cancel date); nobody else gets any
-    const ownerBell = context.role === "owner" ? await Promise.all([listNotifications(org.id, user.id, 8), countUnread(org.id, user.id)]) : null;
+    const ownerBell = context.role === "owner" ? await Promise.all([listNotifications(org.id, user.id, 8), countUnread(org.id, user.id), getOrgTerms(org.id)]) : null;
     return (
       <div className="min-h-dvh">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6">
@@ -67,6 +67,7 @@ export default async function OrgLayout({ children, params }: Props) {
                 userId={user.id}
                 initial={ownerBell[0]}
                 unread={ownerBell[1]}
+                terms={ownerBell[2]}
               />
             ) : null}
             <UserMenu
@@ -148,6 +149,7 @@ export default async function OrgLayout({ children, params }: Props) {
             userId={user.id}
             initial={notifications}
             unread={unread}
+            terms={terms}
           />
           <UserMenu
             name={user.displayName}

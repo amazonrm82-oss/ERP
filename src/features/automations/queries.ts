@@ -1,4 +1,5 @@
 import "server-only";
+import { getOrgTerms } from "@/features/terminology/queries";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
@@ -20,6 +21,8 @@ export type Lookups = {
   reasons: Array<{ id: string; name: string }>;
   // AUT-01: the active custom fields a "set_field" step may write, per record type (tasks have none)
   fields: Partial<Record<"lead" | "contact" | "company" | "deal", FieldDefinition[]>>;
+  // FLD-10 part three: the business's word for a deal, for the default name of a deal a rule makes (absent = "עסקה")
+  dealWord?: string;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -40,7 +43,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
-  const [statuses, sources, pipelines, stages, tags, members, teams, reasons] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -55,6 +58,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       .eq("is_active", true)
       .order("position", { ascending: true })
       .order("created_at", { ascending: true }),
+    getOrgTerms(orgId),
   ]);
   if (reasons.error) {
     return { data: null, error: reasons.error };
@@ -73,6 +77,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       teams: teams.map((t) => ({ id: t.id, name: t.name })),
       reasons: reasons.data ?? [],
       fields,
+      dealWord: terms.deal.singular,
     },
     error: null,
   };

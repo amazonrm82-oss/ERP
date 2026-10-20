@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { BellIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import type { OrgTerms } from "@/features/terminology/terms";
 import type { NotificationRow } from "@/lib/database.types";
 import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -12,9 +13,11 @@ import { createClient } from "@/lib/supabase/client";
 
 import { markNotificationsReadAction } from "../actions";
 import { notificationHref } from "../links";
+import { notificationText } from "../notification-text";
 import type { NotificationView } from "../queries";
 
-type Props = { orgId: string; userId: string; initial: NotificationView[]; unread: number };
+// terms: the business's words, to redraw a notification that arrives live (FLD-10 part three)
+type Props = { orgId: string; userId: string; initial: NotificationView[]; unread: number; terms: OrgTerms };
 
 const SHOWN = 8;
 
@@ -22,7 +25,7 @@ const SHOWN = 8;
  * Bell in the top bar: unread count, the latest notifications, and new ones
  * arriving live (Supabase Realtime; RLS sends each user only their own rows).
  */
-export function NotificationBell({ orgId, userId, initial, unread: initialUnread }: Props) {
+export function NotificationBell({ orgId, userId, initial, unread: initialUnread, terms }: Props) {
   const [items, setItems] = useState(initial);
   const [unread, setUnread] = useState(initialUnread);
   const [announcement, setAnnouncement] = useState("");
@@ -31,6 +34,11 @@ export function NotificationBell({ orgId, userId, initial, unread: initialUnread
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+  // read by the live handler without resubscribing when the server props refresh
+  const termsRef = useRef(terms);
+  useEffect(() => {
+    termsRef.current = terms;
+  }, [terms]);
 
   useEffect(() => {
     let supabase: ReturnType<typeof createClient>;
@@ -49,10 +57,11 @@ export function NotificationBell({ orgId, userId, initial, unread: initialUnread
         if (row.organization_id !== orgId) {
           return;
         }
+        const text = notificationText(row, termsRef.current);
         const view: NotificationView = {
           id: row.id,
-          title: row.title,
-          body: row.body,
+          title: text.title,
+          body: text.body,
           href: notificationHref(orgId, row.entity_type, row.entity_id),
           read: row.read_at !== null,
           when: formatDateTime(row.created_at),

@@ -1,6 +1,8 @@
+import { resolveTerms, termKeys } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
 
 import { notificationHref } from "./links";
+import { notificationText } from "./notification-text";
 
 /** One row of public.claim_push_notifications(). `type` and `lead_actions` arrive since SPD-01. */
 export type ClaimedNotification = {
@@ -14,6 +16,8 @@ export type ClaimedNotification = {
   organization_name: string;
   type?: string | null;
   lead_actions?: boolean | null;
+  // FLD-10 part three: the business's term keys (public.org_terms), null = today's words
+  terms?: { contact_term?: string | null; lead_term?: string | null; deal_term?: string | null } | null;
 };
 
 export type PushAction = "take" | "call" | "whatsapp";
@@ -46,11 +50,16 @@ export type PushPayload = {
 
 export function pushPayload(notification: ClaimedNotification): PushPayload {
   const org = notification.organization_id;
-  const body = notification.body ? `${notification.organization_name}: ${notification.body}` : notification.organization_name;
+  // FLD-10 part three: the title and body in the business's words, like the bell
+  const text = notificationText(
+    { type: notification.type ?? "", title: notification.title, body: notification.body },
+    resolveTerms(termKeys(notification.terms ?? null)),
+  );
+  const body = text.body ? `${notification.organization_name}: ${text.body}` : notification.organization_name;
   if (notification.lead_actions === true && notification.entity_type === "lead" && notification.entity_id) {
     const lead = notification.entity_id;
     return {
-      title: notification.title,
+      title: text.title,
       body,
       url: paths.leadRespond(org, lead),
       tag: notification.id,
@@ -63,7 +72,7 @@ export function pushPayload(notification: ClaimedNotification): PushPayload {
     };
   }
   return {
-    title: notification.title,
+    title: text.title,
     body,
     url: notificationHref(org, notification.entity_type, notification.entity_id) ?? paths.notifications(org),
     tag: notification.id,

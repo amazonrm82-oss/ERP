@@ -1,9 +1,12 @@
 import "server-only";
 
+import { getOrgTerms } from "@/features/terminology/queries";
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { formatDateTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { notificationHref } from "./links";
+import { notificationText } from "./notification-text";
 import { NOTIFICATION_KINDS, type NotificationSettings } from "./settings";
 import { must } from "@/lib/db-read";
 
@@ -18,15 +21,17 @@ export type NotificationView = {
   createdAt: string;
 };
 
-const COLUMNS = "id, title, body, entity_type, entity_id, read_at, created_at";
+const COLUMNS = "id, type, title, body, entity_type, entity_id, read_at, created_at";
 
-type Row = { id: string; title: string; body: string | null; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
+type Row = { id: string; type: string; title: string; body: string | null; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
 
-export function toNotificationView(orgId: string, row: Row): NotificationView {
+/** FLD-10 part three: the title and body are redrawn in the business's words (notification-text.ts). */
+export function toNotificationView(orgId: string, row: Row, terms: OrgTerms = DEFAULT_TERMS): NotificationView {
+  const text = notificationText(row, terms);
   return {
     id: row.id,
-    title: row.title,
-    body: row.body,
+    title: text.title,
+    body: text.body,
     href: notificationHref(orgId, row.entity_type, row.entity_id),
     read: row.read_at !== null,
     when: formatDateTime(row.created_at),
@@ -37,17 +42,20 @@ export function toNotificationView(orgId: string, row: Row): NotificationView {
 /** The user's latest notifications in this organization (RLS: only their own). */
 export async function listNotifications(orgId: string, userId: string, limit: number): Promise<NotificationView[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const [terms, { data, error }] = await Promise.all([
+    getOrgTerms(orgId),
+    supabase
     .from("notifications")
     .select(COLUMNS)
     .eq("organization_id", orgId)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(limit),
+  ]);
   if (error) {
     throw new Error(`notifications query failed: ${error.message}`);
   }
-  return data.map((row) => toNotificationView(orgId, row));
+  return data.map((row) => toNotificationView(orgId, row, terms));
 }
 
 export async function countUnread(orgId: string, userId: string): Promise<number> {
