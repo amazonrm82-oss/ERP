@@ -1,6 +1,8 @@
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { agorotInput } from "@/features/deals/recurring";
+import { HolderFiles } from "@/features/files/components/holder-files";
+import { listHolderFiles } from "@/features/files/holder-queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -25,12 +27,21 @@ const STATUS_TONES: Record<PaymentStatus, BadgeTone> = {
  * PAY-01: the payments received and recorded on this deal or contact (amount, date, method, instalments, reference,
  * note, status). Owners, admins and managers record them and move their status, and whoever holds the personal key
  * `record_payments`; owners and admins also correct and cancel them (PAY-06; never deleted). Shown while the plan has `payments`.
+ * Each payment may carry its file (a PDF or an image of the receipt or confirmation): the same people attach it, a new file
+ * becomes the current one and the earlier ones stay as versions.
  */
 export async function RecordPaymentsCard({ orgId, subject }: Props) {
   const access = await getPaymentsAccess(orgId);
   if (!access.inPlan) return null;
   const [{ payments, names }, context] = await Promise.all([listRecordPayments(orgId, subject), getOrgContext(orgId)]);
   if (payments.length === 0 && !access.canRecord) return null;
+  // PAY-01 follow-up: each payment's file (a receipt, a confirmation), with its versions
+  const { files, names: uploaders } = await listHolderFiles(
+    orgId,
+    "payment",
+    payments.map((p) => p.id),
+  );
+  const isAdmin = context.role === "owner" || context.role === "admin";
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -84,6 +95,17 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                           ) : null}
                         </p>
                       ) : null}
+                      <HolderFiles
+                        orgId={orgId}
+                        page={subject}
+                        holder={{ kind: "payment", id: payment.id }}
+                        files={files.get(payment.id)}
+                        names={uploaders}
+                        canRecord={access.canRecord}
+                        userId={context.user.id}
+                        isAdmin={isAdmin}
+                        label={label}
+                      />
                     </div>
                     {access.canRecord && !cancelled ? (
                       <span className="flex shrink-0 flex-wrap items-start gap-1">

@@ -513,6 +513,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payments.sql",
       // the DOC-01 files follow-up redefines app.files_before_insert() of _quota_outsider_guard.sql last (a document's file)
       "_document_files.sql",
+      // the PAY-01 files follow-up redefines app.files_before_insert() of _document_files.sql and app.audit_erase_core() of
+      // _payments.sql last (a payment's file; erasure reaches the files of documents and payments)
+      "_payment_files.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

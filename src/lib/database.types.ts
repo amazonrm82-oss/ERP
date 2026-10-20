@@ -1041,6 +1041,8 @@ export type FileRow = {
   // DOC-01 follow-up (migration document_files): the recorded document it belongs to instead of a record (PDF or image; the
   // server links it to the document's latest file)
   accounting_document_id: string | null;
+  // PAY-01 follow-up (migration payment_files): the recorded payment it belongs to instead (PDF or image; linked the same way)
+  payment_id: string | null;
   // FXS-07: set (server only) while a person's upload waits for confirm_file_upload(); null = confirmed or made by the server
   unconfirmed_since: string | null;
   upload_checked_at: string | null;
@@ -2497,6 +2499,7 @@ export type Database = {
           activity_id?: string | null;
           previous_id?: string | null;
           accounting_document_id?: string | null;
+          payment_id?: string | null;
         },
         Record<string, never>
       >;

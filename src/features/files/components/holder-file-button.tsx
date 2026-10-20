@@ -3,27 +3,28 @@
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 
-import { DOCUMENT_ACCEPT, FILES_BUCKET } from "@/features/files/types";
 import { createClient } from "@/lib/supabase/client";
 
-import { finishDocumentFileAction, prepareDocumentFileAction } from "../file-actions";
+import type { FileHolder, HolderPage } from "../holder";
+import { finishHolderFileAction, prepareHolderFileAction } from "../holder-actions";
+import { DOCUMENT_ACCEPT, FILES_BUCKET } from "../types";
 
 type Props = {
   orgId: string;
-  subject: { kind: "deal" | "contact"; id: string };
-  documentId: string;
-  // the newest file of the document (a new one replaces it), null when it has none
+  page: HolderPage;
+  holder: FileHolder;
+  // the newest file of the document or payment (a new one replaces it), null when it has none
   latestId: string | null;
-  // what the document is called, for screen readers
+  // what the document or payment is called, for screen readers
   label: string;
 };
 
 /**
- * DOC-01 follow-up: attaches the document's file (a PDF or an image), or a new version of it; the earlier one stays in its
- * history. A row on the server first (rights, type, storage, link to the latest file), then the object straight to Storage
- * with the user's session, then the server checks what arrived.
+ * DOC-01 / PAY-01 follow-ups: attaches the file of a document or a payment (a PDF or an image), or a new version of it; the
+ * earlier one stays in its history. A row on the server first (rights, type, storage, link to the latest file), then the
+ * object straight to Storage with the user's session, then the server checks what arrived.
  */
-export function DocumentFileButton({ orgId, subject, documentId, latestId, label }: Props) {
+export function HolderFileButton({ orgId, page, holder, latestId, label }: Props) {
   const router = useRouter();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,12 +35,12 @@ export function DocumentFileButton({ orgId, subject, documentId, latestId, label
     if (!file) return;
     setBusy(true);
     setError(null);
-    const prepared = await prepareDocumentFileAction(orgId, subject, documentId, { name: file.name, size: file.size, type: file.type || "application/octet-stream" }, latestId);
+    const prepared = await prepareHolderFileAction(orgId, page, holder, { name: file.name, size: file.size, type: file.type || "application/octet-stream" }, latestId);
     if (!prepared.ok) {
       setError(prepared.message);
     } else {
       const { error: uploadError } = await createClient().storage.from(FILES_BUCKET).upload(prepared.path, file, { contentType: file.type, upsert: false });
-      const finished = await finishDocumentFileAction(orgId, subject, prepared.id, !uploadError);
+      const finished = await finishHolderFileAction(orgId, page, prepared.id, !uploadError);
       if (uploadError) setError(`ההעלאה של ${file.name} נכשלה. נסו שוב.`);
       else if (!finished.ok) setError(finished.message);
     }

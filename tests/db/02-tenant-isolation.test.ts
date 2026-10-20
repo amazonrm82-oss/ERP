@@ -256,7 +256,14 @@ describe("tenant isolation", () => {
         ids.documentA,
       ]);
       // PAY-01
-      await q("insert into public.payments (organization_id, deal_id, amount_agorot, method, reference) values ($1, $2, 1000, 'cash', 'A-1')", [orgA, ids.dealA]);
+      ids.paymentA = (
+        await q<{ id: string }>("insert into public.payments (organization_id, deal_id, amount_agorot, method, reference) values ($1, $2, 1000, 'cash', 'A-1') returning id", [
+          orgA,
+          ids.dealA,
+        ])
+      ).rows[0].id;
+      // PAY-01 follow-up: the payment's file (its one subject is the payment)
+      await q("insert into public.files (organization_id, payment_id, name, mime_type, size_bytes) values ($1, $2, 'אישור.pdf', 'application/pdf', 1000)", [orgA, ids.paymentA]);
     });
     // ORD-05: a customer's answer on an order is written only by public.order_public_decide (no client grant)
     await asAdmin((q) =>
@@ -646,6 +653,7 @@ describe("tenant isolation", () => {
       ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
       ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
       ["insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.documentA]],
+      ["insert into public.files (organization_id, payment_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.paymentA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
       ["insert into public.record_followers (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       // no organizer: the policy, not the organizer trigger, has to refuse it
@@ -952,6 +960,17 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaDocumentFile.code);
+
+    // PAY-01 follow-up: a file in org B hung on org A's payment (B has the payments key too)
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"payments\": true}'::jsonb where organization_id = $1", [orgB]),
+    );
+    const viaPaymentFile = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.files (organization_id, payment_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgB, ids.paymentA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaPaymentFile.code);
 
     // a consent in org B recorded on org A's lead (CNS-01)
     const viaConsent = await pgError(

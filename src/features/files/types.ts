@@ -24,10 +24,10 @@ export const ALLOWED_TYPES: Record<string, string> = {
 };
 export const ACCEPT = Object.keys(ALLOWED_TYPES).join(",");
 
-// DOC-01 follow-up: a recorded accounting document takes a PDF or an image only (app.document_file_types)
+// DOC-01 / PAY-01 follow-ups: a recorded accounting document or payment takes a PDF or an image only (app.document_file_types)
 export const DOCUMENT_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"] as const;
 export const DOCUMENT_ACCEPT = DOCUMENT_FILE_TYPES.join(",");
-export const DOCUMENT_TYPE_PROBLEM = "למסמך חשבונאי אפשר לצרף רק PDF או תמונה.";
+export const ATTACHMENT_TYPE_PROBLEM = "למסמך או לתשלום אפשר לצרף רק PDF או תמונה.";
 export function isDocumentFileType(type: string): boolean {
   return (DOCUMENT_FILE_TYPES as readonly string[]).includes(type);
 }
