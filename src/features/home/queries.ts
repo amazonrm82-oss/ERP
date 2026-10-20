@@ -8,7 +8,15 @@ import { relatedRecords, type RelatedRecord } from "@/features/tasks/queries";
 import { listCalendarItems } from "@/features/calendar/queries";
 import { rangeBounds } from "@/features/calendar/range";
 
-import { dealsWithoutNextStep, myMeetings, withoutSupersededQuotes, type DealsWithoutNextStep, type MyMeeting, type WaitingQuoteRow } from "./my-day";
+import {
+  dealsWithoutNextStep,
+  myMeetings,
+  TEAM_TASKS_SHOWN,
+  withoutSupersededQuotes,
+  type DealsWithoutNextStep,
+  type MyMeeting,
+  type WaitingQuoteRow,
+} from "./my-day";
 import { parseReportData } from "@/features/reports/schemas";
 
 // related: the record the task belongs to, when it has one (FXU-01)
@@ -185,5 +193,50 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     waitingQuotes: waiting.slice(0, WAITING_QUOTES_SHOWN),
     // the count is exact while the read held them all; beyond that it is the database's count less what was seen replaced
     waitingQuotesCount: Math.max(waiting.length, (quotes.count ?? quoteRows.length) - superseded.size),
+  };
+}
+
+export type MyTeamTask = { id: string; title: string; dueAt: string | null; teamName: string; related: RelatedRecord | null };
+
+/**
+ * TASK-07 follow-up: open team tasks nobody took yet, of the user's own teams (the team rule, app.team_task_visible), due
+ * first and undated last, at most TEAM_TASKS_SHOWN, with the count of them all. A viewer gets none; so does a person in no
+ * team. Read with the user's session, so RLS decides what shows.
+ */
+export async function getMyTeamTasks(orgId: string, userId: string, role: string | null): Promise<{ tasks: MyTeamTask[]; count: number }> {
+  if (role !== "owner" && role !== "admin" && role !== "manager" && role !== "member") return { tasks: [], count: 0 };
+  const supabase = await createClient();
+  const teamIds = must(
+    await supabase.from("team_members").select("team_id").eq("organization_id", orgId).eq("user_id", userId),
+    "team members",
+  ).map((row) => row.team_id);
+  if (teamIds.length === 0) return { tasks: [], count: 0 };
+  const [tasks, teams] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, title, due_at, team_id, lead_id, contact_id, company_id, deal_id", { count: "exact" })
+      .eq("organization_id", orgId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .is("owner_id", null)
+      .in("team_id", teamIds)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .order("id")
+      .limit(TEAM_TASKS_SHOWN),
+    supabase.from("teams").select("id, name").eq("organization_id", orgId).in("id", teamIds),
+  ]);
+  const rows = must(tasks, "team tasks");
+  const names = new Map(must(teams, "teams").map((team) => [team.id, team.name]));
+  const related = await relatedRecords(orgId, rows);
+  return {
+    tasks: rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      dueAt: row.due_at,
+      teamName: (row.team_id && names.get(row.team_id)) || "הצוות",
+      related: related(row),
+    })),
+    count: tasks.count ?? rows.length,
   };
 }

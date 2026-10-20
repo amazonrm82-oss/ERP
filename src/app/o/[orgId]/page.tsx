@@ -10,9 +10,10 @@ import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/component
 import { PageHeader } from "@/components/ui/page-header";
 import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
-import { idleText, meetingSpanText, quoteEndsSoonText, quoteWaitText } from "@/features/home/my-day";
+import { idleText, meetingSpanText, quoteEndsSoonText, quoteWaitText, teamTaskDue, teamTasksMoreText } from "@/features/home/my-day";
+import { TeamTasksList } from "@/features/home/components/team-tasks-list";
 import { quotePath, quotesPath } from "@/features/quotes/paths";
-import { getMyDay } from "@/features/home/queries";
+import { getMyDay, getMyTeamTasks } from "@/features/home/queries";
 import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
 import { getGoalProgress, getMyMonthClosings } from "@/features/goals/progress-queries";
 import { DeviceWarning } from "@/features/notifications/components/device-warning";
@@ -59,13 +60,15 @@ export default async function HomePage({ params }: Props) {
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
-  const [day, setupStep, goals, modules] = await Promise.all([
+  const [day, setupStep, goals, modules, teamTasks] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
     setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
     // GOL-03: the person's own goals whose period holds today; no goal, no card
     withReportShape(() => getGoalProgress(orgId, { userId: user.id })),
     // LEAD-08: with leads switched off, the new-leads tile and card are left out
     getOrgModules(orgId),
+    // TASK-07 follow-up: open team tasks nobody took yet, of the person's own teams (a viewer gets none)
+    getMyTeamTasks(orgId, user.id, role),
   ]);
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
   // MNY-05: once a week, on the business's first working day of the week, the cleanup with a count
@@ -80,6 +83,20 @@ export default async function HomePage({ params }: Props) {
   const closings = goals.ok && goals.value.length === 0 ? await withReportShape(() => getMyMonthClosings(orgId, user.id, org.timeZone)) : null;
 
   const overdueCount = day.tasks.filter((task) => task.isOverdue).length;
+  const teamTaskViews = teamTasks.tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    due: teamTaskDue(task.dueAt, day.today, org.timeZone),
+    teamName: task.teamName,
+    related: task.related
+      ? {
+          href: recordPage(task.related.kind, orgId, task.related.id),
+          kind: RECORD_TYPES[task.related.kind].singular,
+          name: task.related.name ?? "ללא שם",
+        }
+      : null,
+  }));
+  const teamTasksMore = teamTasksMoreText(teamTasks.count, teamTasks.tasks.length);
   const firstName = user.displayName.split(" ")[0];
   const noNextStep = day.dealsWithoutNextStep;
   const stuckReportHref = `${paths.report(orgId, "stuck")}?${new URLSearchParams({ owner: user.id })}`;
@@ -297,6 +314,26 @@ export default async function HomePage({ params }: Props) {
             )}
           </CardBody>
         </Card>
+
+        {teamTasks.count > 0 ? (
+          // TASK-07 follow-up: the team's open tasks nobody took yet; the first to take one owns it (none waiting: no card)
+          <Card aria-labelledby="my-team-tasks-title">
+            <CardHeader
+              id="my-team-tasks-title"
+              title="משימות של הצוות"
+              action={
+                <ButtonLink href={paths.tasks(orgId)} variant="ghost" size="sm" className="print:hidden">
+                  לכל המשימות
+                </ButtonLink>
+              }
+            />
+            <CardBody>
+              <p className="mb-3 text-sm text-ink-soft">עדיין אין להן אחראי. מי שלוקח ראשון הופך לאחראי.</p>
+              <TeamTasksList orgId={orgId} tasks={teamTaskViews} canTake={canWrite} />
+              {teamTasksMore ? <p className="mt-3 text-sm text-ink-soft">{teamTasksMore} ברשימת המשימות.</p> : null}
+            </CardBody>
+          </Card>
+        ) : null}
 
         {modules.leads ? (
           <Card aria-labelledby="my-leads-title">

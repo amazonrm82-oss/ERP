@@ -5,7 +5,7 @@
 // meeting of the deal that has not ended. The database decides it in public.report_stuck_deals()
 // (`no_next_step`, security invoker, so RLS decides what counts); this file only reads its rows.
 
-import { formatNumber, zoneDate, zoneTime } from "@/lib/format";
+import { formatDate, formatNumber, zoneDate, zoneTime } from "@/lib/format";
 
 import type { CalendarItem } from "@/features/calendar/queries";
 
@@ -145,4 +145,30 @@ export function quoteEndsSoonText(validUntil: string | null, today: string): str
 /** Leaves out a quote whose newer version was already sent (its link shows the newer one, QUO-11). */
 export function withoutSupersededQuotes<T extends { id: string }>(quotes: T[], supersededIds: ReadonlySet<string>): T[] {
   return quotes.filter((quote) => !supersededIds.has(quote.id));
+}
+
+// TASK-07 follow-up: open team tasks nobody took yet, of the person's own teams (the team rule, app.team_task_visible;
+// a viewer sees none). The database orders them by due date, oldest first and undated last, so what is overdue or
+// due today comes first; the card shows a few and counts the rest.
+
+export const TEAM_TASKS_SHOWN = 8;
+
+export type TeamTaskDue = { kind: "overdue" | "today" | "later" | "none"; text: string | null };
+
+/** Where a team task's due date stands in the business's day: "באיחור" with its date, "היום, 14:00", a later date, or none. */
+export function teamTaskDue(dueAt: string | null, today: string, timeZone: string): TeamTaskDue {
+  if (!dueAt) return { kind: "none", text: null };
+  const at = new Date(dueAt);
+  if (Number.isNaN(at.getTime())) return { kind: "none", text: null };
+  const day = zoneDate(at, timeZone);
+  if (day < today) return { kind: "overdue", text: formatDate(dueAt) };
+  if (day === today) return { kind: "today", text: `היום, ${zoneTime(at, timeZone)}` };
+  return { kind: "later", text: formatDate(dueAt) };
+}
+
+/** "ועוד משימה אחת של הצוות" / "ועוד 5 משימות של הצוות", or null when every task is shown. */
+export function teamTasksMoreText(count: number, shown: number): string | null {
+  const more = Math.max(0, count - shown);
+  if (more === 0) return null;
+  return more === 1 ? "ועוד משימה אחת של הצוות" : `ועוד ${formatNumber(more)} משימות של הצוות`;
 }
