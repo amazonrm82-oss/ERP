@@ -27,7 +27,6 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
     "document",
     documents.map((d) => d.id),
   );
-  const isAdmin = context.role === "owner" || context.role === "admin";
   const titleId = `documents-${subject.id}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
@@ -80,8 +79,6 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                       files={files.get(doc.id)}
                       names={uploaders}
                       canRecord={access.canRecord}
-                      userId={context.user.id}
-                      isAdmin={isAdmin}
                       label={label}
                     />
                   </div>

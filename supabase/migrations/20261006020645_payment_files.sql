@@ -6,14 +6,17 @@
 --   composite foreign key on delete cascade (a payment is never deleted; only its business's deletion takes the files).
 -- * Who: reading follows the payment (payments_select: its deal, else its contact, else owners, admins and managers);
 --   adding needs the payment rules (app.can_record_payments in a writable business with the `payments` flag) besides
---   app.can_write; removing also needs the uploader or an admin. A cancelled or refunded payment takes files too (the
---   paper that was received still exists; the payment's facts stay frozen).
+--   app.can_write. A cancelled or refunded payment takes files too (the paper that was received still exists; the
+--   payment's facts stay frozen).
+-- * Never removed (owner, 20 October 2026, the rule of 020640): nobody deletes a payment's file; a new version replaces it
+--   and the earlier ones stay. The delete policy, the Storage delete policy and trigger files_keep_attached hold it, with
+--   the same two exceptions (the business's own deletion; the uploader's upload that never arrived).
 -- * PDF and images only (app.document_file_types), as declared and as stored; one current file per payment, linked by the
 --   server to the payment's latest file under a lock (as for documents).
 -- * Privacy erasure (app.audit_erase_core, the body of 020635): the entries of the files of every document and payment the
 --   erasure reaches are erased too (a file's name may carry the customer's name). The files themselves stay with the
 --   document or payment, as those do.
--- * Storage needs no change: its policies read public.files with the caller's rights.
+-- * Storage reads public.files with the caller's rights as before; its delete policy also keeps a payment's file.
 -- Every statement is safe to run twice. No drops, no row removal.
 
 alter table public.files add column if not exists payment_id uuid;
@@ -76,19 +79,38 @@ alter policy files_insert on public.files
 alter policy files_delete on public.files
   using (app.can_write(organization_id)
          and (uploaded_by = (select auth.uid()) or app.is_admin(organization_id))
-         and case when accounting_document_id is not null
-                  then app.can_record_documents(organization_id) and app.org_writable(organization_id)
-                       and exists (select 1 from public.accounting_documents d
-                                    where d.organization_id = files.organization_id and d.id = files.accounting_document_id)
-                  when payment_id is not null
-                  then app.can_record_payments(organization_id) and app.org_writable(organization_id)
-                       and exists (select 1 from public.payments pm
-                                    where pm.organization_id = files.organization_id and pm.id = files.payment_id)
+         and case when accounting_document_id is not null or payment_id is not null
+                  -- never removed (owner); only the uploader's own upload that never arrived goes
+                  then unconfirmed_since is not null and uploaded_by = (select auth.uid())
                   else app.can_read_activity_subject(lead_id, contact_id, company_id, deal_id)
                        and (activity_id is null
                             or exists (select 1 from public.activities a
                                         where a.organization_id = files.organization_id and a.id = files.activity_id))
              end);
+
+-- Storage keeps the object of a document's or a payment's file: only an upload that never arrived goes
+alter policy record_files_delete on storage.objects
+  using (bucket_id = 'record-files'
+         and exists (select 1 from public.files f
+                      where f.storage_path = objects.name and app.can_write(f.organization_id)
+                        and (f.uploaded_by = (select auth.uid()) or app.is_admin(f.organization_id))
+                        and ((f.accounting_document_id is null and f.payment_id is null)
+                             or (f.unconfirmed_since is not null and f.uploaded_by = (select auth.uid())))));
+
+-- For every writer, definer paths included (020640, plus payments)
+create or replace function app.files_keep_attached() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  if (old.accounting_document_id is not null or old.payment_id is not null)
+     and old.unconfirmed_since is null and app.org_exists(old.organization_id) then
+    raise exception 'a document''s or a payment''s file is kept; add a new version instead' using errcode = 'P0001', hint = 'file:kept';
+  end if;
+  return old;
+end;
+$$;
+revoke all on function app.files_keep_attached() from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- The path, the uploader, the waiting state and the quota (020640), plus a payment's flag and types

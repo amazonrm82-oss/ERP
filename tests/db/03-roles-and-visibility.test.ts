@@ -495,7 +495,7 @@ describe("roles and record visibility", () => {
     expect(await asUser(manager.id, async (q) => (await q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [docId])).rowCount)).toBe(1);
   });
 
-  it("a document's file follows the document: recorders attach, readers read, the uploader or an admin removes (DOC-01 follow-up)", async () => {
+  it("a document's file follows the document: recorders attach, readers read, nobody removes (DOC-01 follow-up)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
     const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
@@ -523,13 +523,15 @@ describe("roles and record visibility", () => {
     expect(await seen(viewer, byOwner)).toBe(1);
     expect((await pgError(attach(viewer))).code).toBe("42501");
     expect(await removed(viewer, byOwner)).toBe(0);
-    // a manager removes their own file, not the owner's; an admin removes anyone's
-    expect(await removed(manager, byOwner)).toBe(0);
-    expect(await removed(manager, byManager)).toBe(1);
-    expect(await removed(admin, byOwner)).toBe(1);
+    // once it arrived nobody removes it (owner, 20 October 2026): not its uploader, an admin or the owner
+    await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = any($1)", [[byOwner, byManager]]));
+    for (const u of [manager, admin, owner]) {
+      expect(await removed(u, byOwner), u.email).toBe(0);
+      expect(await removed(u, byManager), u.email).toBe(0);
+    }
   });
 
-  it("a payment's file follows the payment: recorders attach, readers read, the uploader or an admin removes (PAY-01 follow-up)", async () => {
+  it("a payment's file follows the payment: recorders attach, readers read, nobody removes (PAY-01 follow-up)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
     const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
@@ -556,10 +558,12 @@ describe("roles and record visibility", () => {
     expect(await seen(viewer, byOwner)).toBe(1);
     expect((await pgError(attach(viewer))).code).toBe("42501");
     expect(await removed(viewer, byOwner)).toBe(0);
-    // a manager removes their own file, not the owner's; an admin removes anyone's
-    expect(await removed(manager, byOwner)).toBe(0);
-    expect(await removed(manager, byManager)).toBe(1);
-    expect(await removed(admin, byOwner)).toBe(1);
+    // once it arrived nobody removes it (owner, 20 October 2026): not its uploader, an admin or the owner
+    await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = any($1)", [[byOwner, byManager]]));
+    for (const u of [manager, admin, owner]) {
+      expect(await removed(u, byOwner), u.email).toBe(0);
+      expect(await removed(u, byManager), u.email).toBe(0);
+    }
   });
 
   it("a quote's views follow the quote: whoever reads it reads them, nobody writes them (QUO-10)", async () => {

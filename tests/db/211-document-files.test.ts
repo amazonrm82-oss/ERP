@@ -61,6 +61,11 @@ describe("files on accounting documents", () => {
   const visible = (u: U, fileId: string) => run(u, (q) => count(q, "select 1 from public.files where id = $1", [fileId]));
   const exists = (fileId: string) => asAdmin((q) => count(q, "select 1 from public.files where id = $1", [fileId]));
   const remove = (u: U, fileId: string) => run(u, async (q) => (await q("delete from public.files where id = $1", [fileId])).rowCount);
+  // what confirm_file_upload does once the object is there (a person's row waits until then)
+  const confirmed = async (file: F) => {
+    await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = $1", [file.id]));
+    return file;
+  };
   const setFeatures = (features: Record<string, boolean>) =>
     asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(features)]));
   // what the Storage API does: the object row as the user, then the metadata it measured
@@ -186,21 +191,34 @@ describe("files on accounting documents", () => {
     // a file of another document is not an earlier version of this one
     const otherDoc = await record(owner, { contact: await newContact(owner) });
     expect((await pgError(attach(owner, otherDoc, { previous: third.id }))).hint).toBe("file:version_taken");
-    // removing the middle one keeps the history one line
-    expect(await remove(manager, second.id)).toBe(1);
-    expect(await asAdmin(async (q) => (await one<{ previous_id: string }>(q, "select previous_id from public.files where id = $1", [third.id])).previous_id)).toBe(first.id);
+    // a new version keeps the previous ones: the whole line stays, one current file at its head
+    expect(await asAdmin((q) => count(q, "select 1 from public.files where accounting_document_id = $1", [doc]))).toBe(3);
     expect(await asAdmin((q) => count(q, "select 1 from public.files where accounting_document_id = $1 and previous_id is null", [doc]))).toBe(1);
   });
 
-  it("is removed by its uploader or an admin who may record documents, never by anyone else", async () => {
+  it("is never removed (owner, 20 October 2026): not by its uploader, an admin or the owner, not even by a definer path", async () => {
     const doc = await record(owner, { contact: await newContact(owner) });
-    const byManager = await attach(manager, doc);
-    const byKey = await attach(keyHolder, doc);
-    // a recorder who did not upload it, a member, a viewer and an outsider remove nothing
-    for (const u of [keyHolder, member, viewer, outsider]) expect(await remove(u, byManager.id), u.email).toBe(0);
-    expect(await exists(byManager.id)).toBe(1);
-    expect(await remove(keyHolder, byKey.id)).toBe(1);
-    expect(await remove(admin, byManager.id)).toBe(1);
+    const byManager = await confirmed(await attach(manager, doc));
+    const byOwner = await confirmed(await attach(owner, doc));
+    for (const u of [manager, admin, owner, keyHolder, member, viewer, outsider]) {
+      expect(await remove(u, byManager.id), u.email).toBe(0);
+      expect(await remove(u, byOwner.id), u.email).toBe(0);
+    }
+    // a server path is refused too (the trigger), and the business's own deletion is the only cascade that takes it
+    expect((await pgError(asAdmin((q) => q("delete from public.files where id = $1", [byOwner.id])))).hint).toBe("file:kept");
+    for (const f of [byManager, byOwner]) expect(await exists(f.id)).toBe(1);
+    // Storage keeps the object: neither the uploader nor an admin removes it
+    // (the object goes up while the row waits, as in the app; then the row is confirmed)
+    await asAdmin((q) => q("update public.files set unconfirmed_since = now() where id = $1", [byOwner.id]));
+    await run(owner, (q) => q("insert into storage.objects (bucket_id, name) values ('record-files', $1)", [byOwner.storage_path]));
+    await confirmed(byOwner);
+    for (const u of [owner, admin]) {
+      expect(await run(u, async (q) => (await q("delete from storage.objects where bucket_id = 'record-files' and name = $1", [byOwner.storage_path])).rowCount), u.email).toBe(0);
+    }
+    // an upload that never arrived (still waiting) is removed by its uploader alone, as the app does when an upload fails
+    const waiting = await attach(keyHolder, doc);
+    expect(await remove(admin, waiting.id)).toBe(0);
+    expect(await remove(keyHolder, waiting.id)).toBe(1);
     // a DELETE with no WHERE from another business reaches nothing
     const kept = await attach(owner, doc);
     await run(outsider, (q) => q("delete from public.files"));

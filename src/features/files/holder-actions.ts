@@ -6,16 +6,17 @@ import { z } from "zod";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
-import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
-import { HOLDER_COLUMN, type FileHolder, type HolderPage } from "./holder";
+import type { FileHolder, HolderPage } from "./holder";
 import { ATTACHMENT_TYPE_PROBLEM, FILE_MAX_BYTES, FILES_BUCKET, isDocumentFileType, uploadProblemMessage } from "./types";
 
 // DOC-01 / PAY-01 follow-ups: the file of a recorded accounting document or payment (a PDF or an image of the paper),
 // through the shared files mechanism with the user's session. The database decides: whoever may record documents
 // (payments) adds one to a document (payment) they read; it links a new file to the latest one, so each has one current
-// file and its earlier ones stay as versions; the uploader or an admin removes one.
+// file and its earlier ones stay as versions. Nobody removes one (owner, 20 October 2026): only an upload that never
+// arrived goes, here, by its uploader.
 
 const pageSchema = z.object({ kind: z.enum(["deal", "contact"]), id: z.guid() });
 const holderSchema = z.object({ kind: z.enum(["document", "payment"]), id: z.guid() });
@@ -94,26 +95,3 @@ export async function finishHolderFileAction(orgId: string, page: HolderPage, fi
   return ok();
 }
 
-/** Removes one file of a document or payment: the object first (its policy needs the row), then the row. */
-export async function deleteHolderFileAction(orgId: string, page: HolderPage, holder: FileHolder, fileId: string): Promise<ActionResult> {
-  if (!validArg(pageSchema, page) || !validArg(holderSchema, holder)) return fail(INVALID_ARGS);
-  const context = await actionContext(orgId, fileId);
-  if (!context.ok) return context;
-  const { data: file, error: fileError } = await context.supabase
-    .from("files")
-    .select("storage_path")
-    .eq("organization_id", orgId)
-    .eq("id", fileId)
-    .eq(HOLDER_COLUMN[holder.kind], holder.id)
-    .maybeSingle();
-  if (fileError) return fail(dbErrorMessage(fileError));
-  if (!file) return fail(NOT_FOUND_OR_FORBIDDEN);
-  const { data: removed, error: storageError } = await context.supabase.storage.from(FILES_BUCKET).remove([file.storage_path]);
-  if (storageError) return fail("לא הצלחנו למחוק את הקובץ. נסו שוב.");
-  const { data, error } = await context.supabase.from("files").delete().eq("organization_id", orgId).eq("id", fileId).select("id");
-  if (error) return fail(dbErrorMessage(error, "לא הצלחנו למחוק."));
-  // nothing removed and no row deleted: not permitted (the uploader, or an admin, who may also record)
-  if (data.length === 0) return fail(removed?.length ? "לא הצלחנו למחוק." : "רק מי שהעלה את הקובץ או מנהל מערכת יכולים למחוק אותו.");
-  revalidatePath(pageOf(orgId, page));
-  return ok();
-}

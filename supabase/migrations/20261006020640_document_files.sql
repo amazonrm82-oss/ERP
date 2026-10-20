@@ -6,8 +6,14 @@
 --   so in practice only its business's deletion takes the files). A document's file is never on a timeline entry.
 -- * Who: reading follows the document (accounting_documents_select: its deal, else its contact, else owners, admins and
 --   managers); adding needs the document rules (app.can_record_documents in a writable business with the `documents`
---   flag) besides app.can_write; removing also needs the uploader or an admin, as for every file. The files policies
---   branch on the column, so a record's file keeps exactly its rules of 020210.
+--   flag) besides app.can_write. The files policies branch on the column, so a record's file keeps exactly its rules of
+--   020210.
+-- * Never removed (owner, 20 October 2026, DECISIONS.md): nobody deletes a document's file, owners and admins included; a
+--   wrong file is replaced by a new version (the earlier ones stay) or the document is cancelled with a reason. The delete
+--   policy refuses it, the Storage delete policy keeps its object, and trigger files_keep_attached refuses it for every
+--   writer, definer paths included. Two exceptions: the business's own deletion (its cascade), and an upload that never
+--   arrived (a row still waiting for confirm_file_upload, which only its uploader removes, as the app does when an upload
+--   fails).
 -- * A cancelled document takes files too: cancelling records why the document no longer counts, but the paper that was
 --   issued still exists and is what an accountant asks for; a file adds nothing to the document's frozen facts (type,
 --   number, date, amount), and every file is audited with its uploader.
@@ -16,7 +22,7 @@
 -- * One current file per document: the server links a new file to the document's latest file (files.previous_id, the
 --   REC-07 versions), under a lock per document, read with the caller's rights in app.files_links_check. A person who
 --   names an earlier version that is no longer the latest is refused (hint file:version_taken).
--- * Storage needs no change: its policies read public.files with the caller's rights.
+-- * Storage reads public.files with the caller's rights as before; its delete policy also keeps a document's file.
 -- Every statement is safe to run twice. No drops, no row removal.
 
 alter table public.files add column if not exists accounting_document_id uuid;
@@ -82,14 +88,40 @@ alter policy files_delete on public.files
   using (app.can_write(organization_id)
          and (uploaded_by = (select auth.uid()) or app.is_admin(organization_id))
          and case when accounting_document_id is not null
-                  then app.can_record_documents(organization_id) and app.org_writable(organization_id)
-                       and exists (select 1 from public.accounting_documents d
-                                    where d.organization_id = files.organization_id and d.id = files.accounting_document_id)
+                  -- never removed (owner); only the uploader's own upload that never arrived goes
+                  then unconfirmed_since is not null and uploaded_by = (select auth.uid())
                   else app.can_read_activity_subject(lead_id, contact_id, company_id, deal_id)
                        and (activity_id is null
                             or exists (select 1 from public.activities a
                                         where a.organization_id = files.organization_id and a.id = files.activity_id))
              end);
+
+-- Storage keeps the object of a document's file (the row is kept): only an upload that never arrived goes
+alter policy record_files_delete on storage.objects
+  using (bucket_id = 'record-files'
+         and exists (select 1 from public.files f
+                      where f.storage_path = objects.name and app.can_write(f.organization_id)
+                        and (f.uploaded_by = (select auth.uid()) or app.is_admin(f.organization_id))
+                        and (f.accounting_document_id is null
+                             or (f.unconfirmed_since is not null and f.uploaded_by = (select auth.uid())))));
+
+-- For every writer, definer paths included: a document's file is never deleted, but with its business or while its upload
+-- never arrived
+create or replace function app.files_keep_attached() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  if old.accounting_document_id is not null and old.unconfirmed_since is null and app.org_exists(old.organization_id) then
+    raise exception 'a document''s file is kept; add a new version instead' using errcode = 'P0001', hint = 'file:kept';
+  end if;
+  return old;
+end;
+$$;
+revoke all on function app.files_keep_attached() from public, anon, authenticated;
+
+create or replace trigger files_keep_attached before delete on public.files
+  for each row execute function app.files_keep_attached();
 
 -- ----------------------------------------------------------------------------
 -- The path, the uploader, the waiting state and the quota (020445), plus a document's flag and types

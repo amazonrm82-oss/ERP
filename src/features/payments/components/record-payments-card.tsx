@@ -41,7 +41,6 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
     "payment",
     payments.map((p) => p.id),
   );
-  const isAdmin = context.role === "owner" || context.role === "admin";
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -102,8 +101,6 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                         files={files.get(payment.id)}
                         names={uploaders}
                         canRecord={access.canRecord}
-                        userId={context.user.id}
-                        isAdmin={isAdmin}
                         label={label}
                       />
                     </div>

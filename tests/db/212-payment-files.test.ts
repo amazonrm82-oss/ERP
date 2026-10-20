@@ -121,7 +121,7 @@ describe("files on payments, and their erasure", () => {
     expect(await run(owner, async (q) => (await one<{ r: unknown }>(q, "select public.confirm_file_upload($1, $2) as r", [org, image.id])).r)).toEqual({ ok: false, reason: "type" });
   });
 
-  it("is read by whoever reads the payment; removed by its uploader or an admin who may record payments", async () => {
+  it("is read by whoever reads the payment, and removed by nobody once it arrived (owner, 20 October 2026)", async () => {
     await run(owner, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
     try {
       // the owner's deal: under "own" the members and the key holder do not read it, so neither its payment nor the file
@@ -130,8 +130,11 @@ describe("files on payments, and their erasure", () => {
       for (const u of [owner, admin]) expect(await visible(u, byOwner.id), u.email).toBe(1);
       for (const u of [member, keyHolder, viewer, outsider]) expect(await visible(u, byOwner.id), u.email).toBe(0);
       expect((await pgError(attach(keyHolder, "payment_id", payment))).code).toBe("42501");
-      for (const u of [member, keyHolder, viewer, outsider]) expect(await remove(u, byOwner.id), u.email).toBe(0);
-      expect(await remove(admin, byOwner.id)).toBe(1);
+      // confirmed (what confirm_file_upload does once the object is there): nobody removes it, a server path neither
+      await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = $1", [byOwner.id]));
+      for (const u of [owner, admin, member, keyHolder, viewer, outsider]) expect(await remove(u, byOwner.id), u.email).toBe(0);
+      expect((await pgError(asAdmin((q) => q("delete from public.files where id = $1", [byOwner.id])))).hint).toBe("file:kept");
+      expect(await visible(owner, byOwner.id)).toBe(1);
     } finally {
       await run(owner, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
     }
@@ -170,8 +173,8 @@ describe("files on payments, and their erasure", () => {
     const payment = await pay(owner, { contact });
     const doc = await recordDoc(owner, contact);
     const otherPayment = await pay(owner, { contact: other });
-    // the current files, and earlier versions removed before the erasure: a removed file's entry holds its row (the name
-    // included); an added file's entry holds no values (app.audit_row)
+    // the current files, and uploads that never arrived, removed by their uploader before the erasure (the one removal
+    // there is): a removed row's entry holds the row (the name included); an added file's entry holds no values (app.audit_row)
     const paymentFile = await attach(owner, "payment_id", payment, { name: "קבלה מיכל לוי.pdf" });
     const docFile = await attach(owner, "accounting_document_id", doc, { name: "חשבונית מיכל לוי.pdf" });
     const paymentGone = await attach(owner, "payment_id", payment, { name: "קבלה מיכל לוי 2.pdf" });
