@@ -634,7 +634,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020630 (DOC-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020635 (PAY-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -975,7 +975,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   read follows the parent; detached orders read by owners/admins/managers. Purge detaches numbered orders (`former_*_id`,
   `customer_deleted_at`); merges move them in `app.merge_move_links` since 020590 (`app.merge_orders` is a no-op). Switch `org_modules.orders_enabled`
   (only with the flag) hides screens only. Server writes set `app.order_server`. `app.sample_untouched` and
-  `app.import_record_worked` were last redefined in 020630 (DOC-01), `app.audit_erase_core` in 020630.
+  `app.import_record_worked` were last redefined in 020635 (PAY-01), `app.audit_erase_core` in 020635.
   Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
   (composite FK set null, only with `price_source = 'price_list'`, flag `price_lists`, name copied from the list).
   `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
@@ -995,6 +995,15 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   (`document:frozen`); server paths: the FK set-null (`pg_trigger_depth() > 1`), merge (`app.document_server = 'on'`, contact only, through the
   `merged` entry by `app.merge_accounting_documents`, until `merge_move_links` takes it) and erasure (`'erase'`: a cancel reason becomes
   "הסיבה נמחקה (מחיקת פרטיות)"; found through the audit entries). No attached file yet (shared `files` work, lane ד).
+- Payments received (PAY-01/05/06, migration 020635; owner 20 October 2026; plan flag `payments`): `public.payments` (a deal and/or contact,
+  amount_agorot > 0 + currency, paid_on, method credit|transfer|cash|cheque|bit_paybox|standing_order|other, installments 1..36 for credit only,
+  reference, note; status recorded|confirmed|failed|refunded|cancelled). Recorders: owner/admin/manager by role or the PRM-01 key
+  `record_payments` (now built). Anyone who records moves recorded/confirmed/failed; correction, refunded and cancel are owners/admins only
+  (`payment:correction`). Never deleted (no delete grant or policy): cancelled with a required reason, then frozen (`payment:cancelled`).
+  Totals and reports count recorded + confirmed only. Definer trigger `app.payments_check` (outsider guard first); server paths as DOC-01:
+  FK set-null, merge (`app.payment_server = 'on'`, contact only, `app.merge_payments` through the `merged` entry) and erasure (`'erase'`:
+  reference and note emptied, a cancel reason becomes "הסיבה נמחקה (מחיקת פרטיות)"). `app.audit_erase_core`, `app.sample_untouched`,
+  `app.import_record_worked` and `app.member_permission_built_keys` were last redefined in 020635. No attached file yet (lane ד).
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
