@@ -14,8 +14,8 @@
 -- * PDF and images only (app.document_file_types), as declared and as stored; one current file per payment, linked by the
 --   server to the payment's latest file under a lock (as for documents).
 -- * Privacy erasure (app.audit_erase_core, the body of 020635): the entries of the files of every document and payment the
---   erasure reaches are erased too (a file's name may carry the customer's name). The files themselves stay with the
---   document or payment, as those do.
+--   erasure reaches are erased too, and those files get a neutral name ("מסמך <number>" / "תשלום <date>", extension kept),
+--   since a file's name may carry the customer's name. The files themselves stay with the document or payment, as those do.
 -- * Storage reads public.files with the caller's rights as before; its delete policy also keeps a payment's file.
 -- Every statement is safe to run twice. No drops, no row removal.
 
@@ -186,6 +186,10 @@ begin
   if v_person and not app.can_write(new.organization_id) then
     return new;
   end if;
+  -- The latest row is taken even while it still waits for confirm_file_upload (review of 020640, low 1): it already holds
+  -- the one newer slot of the confirmed file before it (files_one_newer), so linking past it would collide and refuse every
+  -- later file. The card follows the line through a waiting row and shows confirmed files only; a waiting row that is later
+  -- confirmed becomes a real version in its place, and one its uploader removes is linked around by files_relink_versions.
   if new.accounting_document_id is not null then
     perform pg_advisory_xact_lock(hashtextextended('files_document:' || new.organization_id::text || ':' || new.accounting_document_id::text, 0));
     -- the latest file: the one no other file of the document replaces (the history is one line)
@@ -587,6 +591,18 @@ begin
   loop
     v_children := v_children || ('files:' || v_child.entity_id);
   end loop;
+  -- their names too (review of 020640, low 2): a name such as "חשבונית מיכל לוי.pdf" becomes "מסמך <number>.pdf" or
+  -- "תשלום <date>.pdf". The file and its object stay (a tax document); the extension is kept, the name was never a fact
+  update public.files f
+     set name = case when f.accounting_document_id is not null
+                     then 'מסמך ' || coalesce((select d.number from public.accounting_documents d
+                                                where d.organization_id = f.organization_id and d.id = f.accounting_document_id), '')
+                     else 'תשלום ' || coalesce((select to_char(pm.paid_on, 'YYYY-MM-DD') from public.payments pm
+                                                 where pm.organization_id = f.organization_id and pm.id = f.payment_id), '')
+                end || coalesce(lower(substring(f.name from '(\.[A-Za-z0-9]{1,8})$')), '')
+   where f.organization_id = p_org
+     and ('files:' || f.id) = any (v_children)
+     and (f.accounting_document_id is not null or f.payment_id is not null);
 
   update public.audit_log a set changes = '{"erased": true}'::jsonb
    where a.organization_id = p_org

@@ -177,6 +177,7 @@ describe("files on payments, and their erasure", () => {
     // there is): a removed row's entry holds the row (the name included); an added file's entry holds no values (app.audit_row)
     const paymentFile = await attach(owner, "payment_id", payment, { name: "קבלה מיכל לוי.pdf" });
     const docFile = await attach(owner, "accounting_document_id", doc, { name: "חשבונית מיכל לוי.pdf" });
+    const otherKept = await attach(owner, "payment_id", otherPayment, { name: "קבלה של אחר.pdf" });
     const paymentGone = await attach(owner, "payment_id", payment, { name: "קבלה מיכל לוי 2.pdf" });
     const docGone = await attach(owner, "accounting_document_id", doc, { name: "חשבונית מיכל לוי 2.pdf" });
     const otherGone = await attach(owner, "payment_id", otherPayment, { name: "קבלה מיכל לוי 3.pdf" });
@@ -199,5 +200,13 @@ describe("files on payments, and their erasure", () => {
     expect(await named(otherGone.id)).toBe(1);
     // the files stay with their payment and document (business records), as those do
     for (const f of [paymentFile, docFile]) expect(await asAdmin((q) => count(q, "select 1 from public.files where id = $1", [f.id]))).toBe(1);
+    // ...under a neutral name: the document's number or the payment's date, the extension kept
+    const fileName = (fileId: string) => asAdmin(async (q) => (await one<{ name: string }>(q, "select name from public.files where id = $1", [fileId])).name);
+    const docNumber = await asAdmin(async (q) => (await one<{ number: string }>(q, "select number from public.accounting_documents where id = $1", [doc])).number);
+    const paidOn = await asAdmin(async (q) => (await one<{ d: string }>(q, "select to_char(paid_on, 'YYYY-MM-DD') as d from public.payments where id = $1", [payment])).d);
+    expect(await fileName(docFile.id)).toBe(`מסמך ${docNumber}.pdf`);
+    expect(await fileName(paymentFile.id)).toBe(`תשלום ${paidOn}.pdf`);
+    // another customer's file keeps its name
+    expect(await fileName(otherKept.id)).toBe("קבלה של אחר.pdf");
   });
 });
