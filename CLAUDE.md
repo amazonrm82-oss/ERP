@@ -96,6 +96,9 @@ and build this CRM here instead. The old code is preserved on the branch
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
    In use (QUO-09, owner 18 October 2026, migration 020370): the customer's accept/decline (`src/features/quotes/public-server.ts`, route
    `POST /api/forms/quote/<token>/decide`), which calls only `public.quote_public_decide()` and `public.quote_public_version()`.
+   In use (ORD-05, owner 20 October 2026, migration 020625): the customer's order confirmation (`src/features/orders/public-server.ts`, page
+   `/f/order/<token>`, route `POST /api/forms/order/<token>/decide`), which calls only `public.order_public()` and `public.order_public_decide()`;
+   in the eslint allow-list.
    In use (BIZ-03 part one, owner 13 October 2026, migration 020295): the QR scan route (`src/features/qr-codes/scan-server.ts`, route
    `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>` or `/f/book/<token>`; in the eslint allow-list.
    In use (SPD-07, owner 13 October 2026, migration 020305): the site widget (`src/features/site-widgets/public-server.ts`; script
@@ -631,7 +634,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020620 (ORD-04; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020625 (ORD-05; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -858,6 +861,16 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   when nothing is left); drafts go with the cascade; `quotes_has_parent` holds for drafts only; a quote with no parent is read by
   owners/admins and managers by role (`quotes_select`, last altered in 020320, QUO-07 follow-up; erasure also empties its lines' free text). Erasure empties its personal details. `app.quotes_check`,
   `app.quotes_detach_contact` and `app.audit_erase_core` were last redefined in 020270.
+- Order link (ORD-05, migration 020625; owner 20 October 2026): `app.order_links` (one per order, SHA-256 of the token only, no grants; a new
+  link replaces the old one). `public.order_link_create/revoke/status(org, order)` (definer; `app.order_editable` and the `orders` flag; numbered,
+  not cancelled, customer not deleted; audited without the token). The one rule for the link is `app.order_link_usable`: not found only for an
+  unknown/revoked token, a draft, a deleted customer, closed public pages or no flag; a cancelled order answers `{status_page}` without prices.
+  `public.order_public(token, ip_hash)` (service_role) returns no ids; 120 views per link and 60 per sender (FXS-11 scope `order`, re-scoped per
+  order by `app.order_link_sender`, 1,024 reused buckets in `app.order_link_view_counts`) in 10 minutes. `public.order_public_decide` (service_role)
+  decides once an order in state `new` (fingerprint `app.order_fingerprint`, order FOR UPDATE, 10 tries per 10 minutes) into
+  `public.order_decisions` (shaped like quote_decisions; owners/admins read; not audited); the order's status is NOT changed (staff move it); the
+  order's active owner, else owners/admins, get kind `system`. The approval wording is a DRAFT (`ORDER_ACCEPT_WORDING`). `app.audit_erase_core`
+  was last redefined in 020625 (empties a detached order's decision).
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
@@ -972,7 +985,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   order like its lines (a draft the caller may edit); definer trigger `app.order_payment_steps_check` (outsider guard first, order FOR
   SHARE against `order_confirm`'s FOR UPDATE): 20 steps, never over 100% (`order_schedule:max|over`), frozen once numbered for every
   writer (`order:frozen`). `order_from_quote` copies the quote's schedule; `order_confirm` refuses a schedule that is not 100%
-  (`order:schedule_total`). `public.order_confirm`, `public.order_from_quote` and `app.audit_erase_core` were last redefined in 020620.
+  (`order:schedule_total`). `public.order_confirm` and `public.order_from_quote` were last redefined in 020620 (`app.audit_erase_core` in 020625).
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
