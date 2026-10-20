@@ -410,6 +410,42 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("payments follow their deal; owners, admins and managers record, only owners and admins correct and cancel, nobody deletes (PAY-01, PAY-06)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה לתשלום', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const insert = (u: U, ref: string) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string }>("insert into public.payments (organization_id, deal_id, amount_agorot, method, reference) values ($1, $2, 100, 'cash', $3) returning id", [org, deal, ref])).rows[0].id,
+      );
+    const pay = await insert(owner, "R03-1");
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payments where id = $1", [pay]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // m1 reads the deal but holds no key: records, moves and deletes nothing
+    expect((await pgError(insert(m1, "R03-2"))).code).toBe("42501");
+    expect(await asUser(m1.id, async (q) => (await q("update public.payments set status = 'confirmed' where id = $1", [pay])).rowCount)).toBe(0);
+    expect((await pgError(asUser(m1.id, (q) => q("delete from public.payments where id = $1", [pay])))).code).toBe("42501");
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.payments set status = 'confirmed' where id = $1", [pay])).rowCount)).toBe(0);
+    expect((await pgError(asUser(viewer.id, (q) => q("delete from public.payments where id = $1", [pay])))).code).toBe("42501");
+    // the manager records and moves the status, but neither corrects nor deletes
+    const byManager = await insert(manager, "R03-3");
+    expect(await asUser(manager.id, async (q) => (await q("update public.payments set status = 'confirmed' where id = $1", [pay])).rowCount)).toBe(1);
+    expect((await pgError(asUser(manager.id, (q) => q("update public.payments set amount_agorot = 200 where id = $1", [byManager])))).hint).toBe("payment:correction");
+    expect((await pgError(asUser(manager.id, (q) => q("update public.payments set status = 'refunded' where id = $1", [byManager])))).hint).toBe("payment:correction");
+    expect((await pgError(asUser(manager.id, (q) => q("update public.payments set status = 'cancelled', cancel_reason = 'x' where id = $1", [byManager])))).hint).toBe("payment:correction");
+    // an admin corrects and cancels
+    expect(await asUser(admin.id, async (q) => (await q("update public.payments set amount_agorot = 250, status = 'refunded' where id = $1", [byManager])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("update public.payments set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [byManager])).rowCount)).toBe(1);
+    // nobody deletes a payment, admins included
+    expect((await pgError(asUser(admin.id, (q) => q("delete from public.payments where id = $1", [byManager])))).code).toBe("42501");
+  });
+
   it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
     await setVisibility("org");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));

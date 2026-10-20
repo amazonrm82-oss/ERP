@@ -163,6 +163,11 @@ describe("currency next to every amount", () => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח למסמך') returning id", [org])).rows[0].id;
         await q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'CUR-1', 1000)", [org, contact]);
       },
+      // PAY-01
+      payments: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לתשלום') returning id", [org])).rows[0].id;
+        await q("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer')", [org, contact]);
+      },
       // QUO-04
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;

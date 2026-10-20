@@ -61,7 +61,12 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
   },
   { key: "issue_documents", label: "הפקת מסמכים", description: "הפקת חשבוניות וקבלות.", built: false },
   { key: "issue_credits", label: "זיכוי", description: "הפקת מסמכי זיכוי.", built: false },
-  { key: "record_payments", label: "רישום תשלומים", description: "רישום תשלומים שהתקבלו.", built: false },
+  {
+    key: "record_payments",
+    label: "רישום תשלומים",
+    description: "רישום תשלומים שהתקבלו על עסקה או איש קשר, ושינוי המצב שלהם. בעלים, מנהלי מערכת ומנהלי צוות רושמים תמיד; תיקון וביטול רק לבעלים ולמנהלי מערכת.",
+    built: true,
+  },
   { key: "mass_send", label: "שליחה המונית", description: "שליחת הודעה לקבוצה גדולה של לקוחות.", built: false },
 ];
 
@@ -120,4 +125,10 @@ export function canRecordDocuments(role: MembershipRole | null, granted: readonl
 export function canViewCosts(role: MembershipRole | null, granted: readonly string[]): boolean {
   if (role === null) return false;
   return role === "owner" || role === "admin" || role === "manager" || (canReceivePermissions(role) && granted.includes("view_costs"));
+}
+
+/** PAY-06: app.can_record_payments(): owners, admins and managers by role, or the personal key. */
+export function canRecordPayments(role: MembershipRole | null, granted: readonly string[]): boolean {
+  if (role === null) return false;
+  return role === "owner" || role === "admin" || role === "manager" || (canReceivePermissions(role) && granted.includes("record_payments"));
 }

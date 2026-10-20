@@ -86,6 +86,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   order_lines: "שורה בהזמנה",
   order_payment_steps: "תשלום בלוח התשלומים של הזמנה",
   accounting_documents: "מסמך חשבונאי",
+  payments: "תשלום",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",
   quote_template_lines: "שורה בתבנית הצעת מחיר",

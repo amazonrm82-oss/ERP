@@ -1789,6 +1789,29 @@ export type QuotePaymentStepRow = {
   updated_at: string;
 };
 
+// PAY-01: a payment received, recorded on a deal or a contact (migration payments). Never deleted; cancelled with a reason.
+export type PaymentRow = {
+  id: string;
+  organization_id: string;
+  deal_id: string | null;
+  contact_id: string | null;
+  amount_agorot: number;
+  currency: string;
+  paid_on: string;
+  method: string;
+  installments: number | null;
+  reference: string | null;
+  note: string | null;
+  status: string;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // DOC-01: an accounting document issued outside the system, recorded on a deal or a contact (migration
 // accounting_documents). Never deleted; cancelled with a reason.
 export type AccountingDocumentRow = {
@@ -2632,6 +2655,33 @@ export type Database = {
         OrderLineRow,
         OrderLineWrite & { organization_id: string; order_id: string; name: string; kind?: "item" | "group"; product_id?: string | null; currency?: string },
         OrderLineWrite
+      >;
+      // PAY-01: column grants; the links never change by hand, corrections and cancelling are for owners and admins; no delete
+      payments: Table<
+        PaymentRow,
+        {
+          organization_id: string;
+          deal_id?: string | null;
+          contact_id?: string | null;
+          amount_agorot: number;
+          currency?: string;
+          paid_on?: string;
+          method: string;
+          installments?: number | null;
+          reference?: string | null;
+          note?: string | null;
+          status?: string;
+        },
+        {
+          amount_agorot?: number;
+          paid_on?: string;
+          method?: string;
+          installments?: number | null;
+          reference?: string | null;
+          note?: string | null;
+          status?: string;
+          cancel_reason?: string | null;
+        }
       >;
       // DOC-01: column grants; a person records and cancels, nothing else (no delete)
       accounting_documents: Table<
