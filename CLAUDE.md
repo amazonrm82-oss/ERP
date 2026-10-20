@@ -483,6 +483,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   against `max_products`. Since 0159 (PRD-05) products import like leads (`import_jobs.entity_type` 'product', `products.import_job_id`
   guarded by `app.guard_import_tag('product')`, `product_sku_matches()` invoker; owners/admins only; undo archives a product a
   document uses) and export through `log_list_export('product')`. PRD-07 price history reads `audit_log` (owners/admins).
+- Quotes table (LST-09 for quotes, migration 020600): `list_preferences` and `saved_views` take `quote`; sort fields `sort_owner(quotes)`,
+  `sort_customer(quotes)` (invoker); `log_list_export('quote')` and `/o/[org]/quotes/export`; no inline edit or bulk change (a quote changes
+  only on its own screen; bulk refuses `quote` except export). `public.log_list_export` and `app.export_choice_values` were last redefined in 020600.
 - Products table (LST-09 for products, migration 020280): `list_preferences` and `saved_views` take object type `product`; inline edit
   (name, category), bulk (state, category, export; undo in `src/features/products/bulk-server.ts`) and the filtered export use the
   user's session, so the products policies decide. The export keeps PRD-05's fixed columns.
