@@ -148,8 +148,9 @@ describe("recurring tasks on working days only (HEB-02)", () => {
           })
           .map((r) => `${r.day} -> ${r.next}`);
         expect(wrong, `${JSON.stringify(settings)} ${JSON.stringify(rule)}`).toEqual([]);
-        // clean the round's tasks out of the next round's way
-        await asAdmin((q) => q("update public.tasks set title = 'נבדקה' where organization_id = $1 and title like 'השוואה %'", [org]));
+        // clean the round's tasks out of the next round's way, and out of the database: 3,400 tasks left behind made every
+        // later file that scans tasks under RLS slow (test 02's statements with no WHERE clause, RVW-39)
+        await asAdmin((q) => q("delete from public.tasks where organization_id = $1 and title like 'השוואה %'", [org]));
         await clearOutbox();
       }
     }

@@ -66,11 +66,16 @@ describe("automations: a new deal that follows its source deal (DEAL-08 follow-u
         )
       ).rows[0],
     );
+  // Lines here keep the default position and a copy keeps the source's, while the copied lines share one created_at: so they
+  // are ordered by position and then by every compared column, and two deals with the same lines give the same list whatever
+  // order the rows were written in (RVW-39; created_at, or id, as the tie-break made the comparison fail by chance).
   const lines = (dealId: string) =>
     asAdmin(async (q) =>
       (
         await q<Line>(
-          "select description, quantity::text, unit_price_agorot::text, discount_bp, billing, product_id, total_agorot::text from public.deal_lines where deal_id = $1 order by position, created_at",
+          `select description, quantity::text, unit_price_agorot::text, discount_bp, billing, product_id, total_agorot::text
+             from public.deal_lines where deal_id = $1
+            order by position, description collate "C", quantity, unit_price_agorot, discount_bp, billing, product_id, total_agorot`,
           [dealId],
         )
       ).rows,
@@ -203,7 +208,8 @@ describe("automations: a new deal that follows its source deal (DEAL-08 follow-u
     );
     try {
       expect(await run("deal", [step({ copy_from_source: true })], source)).toEqual([{ action: "create_deal", status: "ok", warning: "some lines were not copied" }]);
-      expect((await lines((await followUp(source)).id)).map((l) => l.description)).toEqual(["ישן", "חופשי"]);
+      // the copied lines share their position and creation time, so which lines, not their order
+      expect((await lines((await followUp(source)).id)).map((l) => l.description).sort()).toEqual(["ישן", "חופשי"].sort());
     } finally {
       await asAdmin((q) =>
         q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ products: true, discounts: true, granular_permissions: true })]),

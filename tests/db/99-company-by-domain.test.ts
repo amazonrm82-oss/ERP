@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
 
 import { CANDIDATE_CASES, EMAIL_CASES, REGISTERED_CASES, WEBSITE_CASES } from "../unit/fixtures/company-domain-cases";
 import { addMember, asAdmin, asAnon, asService, asUser, closePool, createOrg, createUser, insertLead, pgError } from "./helpers";
@@ -492,6 +492,16 @@ describe("company by email domain (CON-09)", () => {
   it("stays fast under RLS on 20,000 companies (indexes, not a scan)", async () => {
     const bigOwner = await createUser("dom-big");
     const big = await createOrg(bigOwner.id);
+    // The 20,000 rows are committed (the lookup runs in its own session), so they go again when the test ends: left behind,
+    // they made every later file that scans companies under RLS slow, and test 02's statements with no WHERE clause ran past
+    // its 30-second limit whenever this file happened to run first (RVW-39). Removed the way they came (no triggers).
+    onTestFinished(async () => {
+      await asAdmin(async (q) => {
+        await q("set local session_replication_role = replica");
+        await q("delete from public.companies where organization_id = $1", [big]);
+      });
+      await asAdmin((q) => q("analyze public.companies"));
+    });
     await asAdmin(async (q) => {
       await q("set local session_replication_role = replica");
       await q(

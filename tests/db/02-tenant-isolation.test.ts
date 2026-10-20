@@ -694,6 +694,10 @@ describe("tenant isolation", () => {
     }
   });
 
+  // Mallory's statements have no WHERE clause, so each one runs the table's policy on every row in the database, including
+  // what the files that ran before this one left behind (vitest orders files by their last duration): mostly the managed
+  // lists seeded for every organization the suite creates. Under the full suite that passed the default 30 seconds; run
+  // last it took 95-101 s on 20 October 2026 (RVW-39). The budget grows, the checks stay the same.
   it("an UPDATE or DELETE with no WHERE clause never reaches another organization", async () => {
     // Postgres applies SELECT policies to UPDATE/DELETE only when the statement
     // reads the existing row (WHERE / RETURNING). A bare "delete from t" is
@@ -790,7 +794,8 @@ describe("tenant isolation", () => {
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
-      ["member_leaves", "ends_on = '2027-01-01'", "ends_on = '2027-01-01'"],
+      // A mark no real leave holds (they end 41-45 days ahead), relative so it never turns into a natural date (RVW-39).
+      ["member_leaves", "ends_on = current_date + 400", "ends_on = current_date + 400"],
       ["conversion_field_maps", "target_field_id = null", "target_field_id is null"],
       ["card_layouts", "groups = '[]'", "groups = '[]'"],
       ["lead_score_rules", "points = 77", "points = 77"],
@@ -836,7 +841,7 @@ describe("tenant isolation", () => {
         expect(after, `${table} lost rows`).toBe(before[table]);
       }
     });
-  });
+  }, 300_000);
 
   it("cannot point a row of its own at another organization's rows", async () => {
     const statusB = await defaultLeadStatus(orgB);
