@@ -631,7 +631,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020570 (ORD-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020620 (ORD-04; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -968,6 +968,11 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
   update too; only the FK's own set-null, `pg_trigger_depth() > 1`, clears a line's list alone). Order document:
   `/o/[org]/orders/[id]/document` (quote design, stored totals, "אינו חשבונית מס"; billing details read live, only the name is a snapshot).
+  Since 020620 (ORD-04 part one, owner 20 October 2026) `public.order_payment_steps` is GAP-09's schedule on orders: rights follow the
+  order like its lines (a draft the caller may edit); definer trigger `app.order_payment_steps_check` (outsider guard first, order FOR
+  SHARE against `order_confirm`'s FOR UPDATE): 20 steps, never over 100% (`order_schedule:max|over`), frozen once numbered for every
+  writer (`order:frozen`). `order_from_quote` copies the quote's schedule; `order_confirm` refuses a schedule that is not 100%
+  (`order:schedule_total`). `public.order_confirm`, `public.order_from_quote` and `app.audit_erase_core` were last redefined in 020620.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
