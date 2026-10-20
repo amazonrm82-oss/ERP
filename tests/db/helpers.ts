@@ -37,9 +37,27 @@ function getPool(): Pool {
   return pool;
 }
 
+/**
+ * Ends the file: its organizations go first, then the pool. Files run one at a time (fileParallelism: false) and the
+ * build makes no organization, so every organization still here is this file's. Left behind, they made every later file
+ * that scans a table under RLS slower, test 02's statements with no WHERE clause most of all (about 15 seeded list rows
+ * per organization, 676 organizations by the end of a run). Deleting an organization cascades to all its rows; the only
+ * thing it adds is its files' and logo's paths in app.orphan_files, which are taken back in the same transaction.
+ */
 export async function closePool(): Promise<void> {
-  await pool?.end();
-  pool = undefined;
+  try {
+    if (pool) {
+      await asAdmin(async (q) => {
+        const ids = (await q<{ id: string }>("delete from public.organizations returning id")).rows.map((r) => r.id);
+        if (ids.length > 0) {
+          await q("delete from app.orphan_files where deleted_at = now() and split_part(storage_path, '/', 1) = any($1::text[])", [ids]);
+        }
+      });
+    }
+  } finally {
+    await pool?.end();
+    pool = undefined;
+  }
 }
 
 export type Query = <R extends QueryResultRow = QueryResultRow>(
