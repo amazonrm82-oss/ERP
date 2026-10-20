@@ -9,6 +9,8 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName } from "@/components/ui/search-picker-logic";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
@@ -17,8 +19,6 @@ import { addDealContactAction, removeDealContactAction, setDealContactRoleAction
 import type { DealContactItem } from "../queries";
 import { roleChoices, type DealContactRoleOption } from "../roles";
 
-type ContactOption = { id: string; name: string };
-
 type Props = {
   orgId: string;
   dealId: string;
@@ -26,8 +26,8 @@ type Props = {
   items: DealContactItem[];
   // the business's list of roles, hidden ones included (CON-03 follow-up)
   roles: DealContactRoleOption[];
-  // contacts the user may pick (already without the linked ones)
-  options: ContactOption[];
+  // contacts the add search leaves out: the main contact and the linked ones
+  exclude: string[];
   // FLD-10: the business's words
   terms?: OrgTerms;
 };
@@ -118,7 +118,7 @@ function DealContactRow({ orgId, dealId, canEdit, item, roles }: { orgId: string
  * CON-03: the contacts on a deal, each with a role in the purchase from the business's list (by default מקבל
  * החלטה, משפיע, משתמש, איש כספים). Whoever may edit the deal adds, changes and removes them.
  */
-export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options, terms = DEFAULT_TERMS }: Props) {
+export function DealContactsCard({ orgId, dealId, canEdit, items, roles, exclude, terms = DEFAULT_TERMS }: Props) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(addDealContactAction.bind(null, orgId, dealId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -139,36 +139,25 @@ export function DealContactsCard({ orgId, dealId, canEdit, items, roles, options
         )}
 
         {canEdit ? (
-          options.length === 0 ? (
-            <p className="text-sm text-ink-soft">אין עוד {terms.contact.plural} להוספה.</p>
-          ) : (
-            // a new key after a failed submit puts back what was chosen (React resets the form)
-            <form key={failure ? JSON.stringify(failure.values ?? {}) : "add"} action={dispatch} className="space-y-3 border-t border-line pt-4">
-              <SelectField
-                label={terms.contact.singular}
-                name="contact_id"
-                required
-                defaultValue={failure?.values?.contact_id ?? ""}
-                error={failure?.fieldErrors?.contact_id}
-              >
-                <option value="" disabled>
-                  בחירת {terms.contact.singular}
-                </option>
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </SelectField>
-              <SelectField label="תפקיד" name="role_id" defaultValue={failure?.values?.role_id ?? ""}>
-                <RoleOptions roles={roles} currentId={null} />
-              </SelectField>
-              <SubmitButton size="sm" pending={pending} pendingText="מוסיפים…">
-                הוספה {withPrefixThe("ל", terms.deal)}
-              </SubmitButton>
-              <FormError message={failure && !failure.fieldErrors?.contact_id ? failure.message : null} />
-            </form>
-          )
+          // a new key after a failed submit puts back what was chosen (React resets the form)
+          <form key={failure ? JSON.stringify(failure.values ?? {}) : `add:${items.length}`} action={dispatch} className="space-y-3 border-t border-line pt-4">
+            <ContactPicker
+              orgId={orgId}
+              label={terms.contact.singular}
+              name="contact_id"
+              required
+              exclude={exclude}
+              initial={initialChoice(failure?.values?.contact_id, failure?.values?.[pickerLabelName("contact_id")], terms.contact.singular)}
+              error={failure?.fieldErrors?.contact_id}
+            />
+            <SelectField label="תפקיד" name="role_id" defaultValue={failure?.values?.role_id ?? ""}>
+              <RoleOptions roles={roles} currentId={null} />
+            </SelectField>
+            <SubmitButton size="sm" pending={pending} pendingText="מוסיפים…">
+              הוספה {withPrefixThe("ל", terms.deal)}
+            </SubmitButton>
+            <FormError message={failure && !failure.fieldErrors?.contact_id ? failure.message : null} />
+          </form>
         ) : null}
       </CardBody>
     </Card>

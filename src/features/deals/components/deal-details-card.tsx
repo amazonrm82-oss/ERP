@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName } from "@/components/ui/search-picker-logic";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import { LayoutDetails } from "@/features/card-layout/components/layout-details";
 import type { CardLayoutGroup } from "@/features/card-layout/layout";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import { LossFields } from "@/features/deal-loss-reasons/components/loss-fields";
 import type { LossReasonOption } from "@/features/deal-loss-reasons/queries";
@@ -77,7 +79,6 @@ export type DealDetailsView = {
 type Props = {
   orgId: string;
   deal: DealDetailsView;
-  contacts: Option[];
   // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
   companies: Option[] | null;
   lossReasons: LossReasonOption[];
@@ -91,7 +92,7 @@ type Props = {
 const linkClass = "text-accent underline underline-offset-4";
 
 /** Deal details that switch in place between reading and editing. */
-export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons, canEdit, focus, layout = null, terms = DEFAULT_TERMS }: Props) {
+export function DealDetailsCard({ orgId, deal, companies, lossReasons, canEdit, focus, layout = null, terms = DEFAULT_TERMS }: Props) {
   // DQL-01: a missing field on the completeness card opens the card for editing at that input
   const [editing, setEditing] = useState(Boolean(focus) && canEdit);
   // a message from the last save (PL-03: the existing lines keep their prices when the customer changes)
@@ -104,7 +105,6 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
       <DealEditForm
         orgId={orgId}
         deal={deal}
-        contacts={contacts}
         companies={companies}
         lossReasons={lossReasons}
         terms={terms}
@@ -175,9 +175,9 @@ export function DealDetailsCard({ orgId, deal, contacts, companies, lossReasons,
   );
 }
 
-type EditProps = { orgId: string; deal: DealDetailsView; contacts: Option[]; companies: Option[] | null; lossReasons: LossReasonOption[]; onDone: (message?: string) => void; terms: OrgTerms };
+type EditProps = { orgId: string; deal: DealDetailsView; companies: Option[] | null; lossReasons: LossReasonOption[]; onDone: (message?: string) => void; terms: OrgTerms };
 
-function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone, terms }: EditProps) {
+function DealEditForm({ orgId, deal, companies, lossReasons, onDone, terms }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await updateDealAction(orgId, deal.id, prev, formData);
     if (result?.ok) {
@@ -188,7 +188,10 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone, t
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
-  const contactValue = values?.contact_id ?? deal.contactId ?? "";
+  // a refused form shows the contact it sent, named by the label the picker sent with it
+  const contactValue = values
+    ? initialChoice(values.contact_id, values[pickerLabelName("contact_id")], terms.contact.singular)
+    : initialChoice(deal.contactId, deal.contactName, terms.contact.singular);
   const companyValue = values?.company_id ?? deal.companyId ?? "";
 
   return (
@@ -217,14 +220,14 @@ function DealEditForm({ orgId, deal, contacts, companies, lossReasons, onDone, t
             error={errors.amount}
             hint={dealValueHint(deal.amountAuto, deal.amountSource)}
           />
-          <SelectField key={`contact-${contactValue}`} label={terms.contact.singular} name="contact_id" defaultValue={contactValue} error={errors.contact_id}>
-            <option value="">ללא {terms.contact.singular}</option>
-            {contacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.name}
-              </option>
-            ))}
-          </SelectField>
+          <ContactPicker
+            key={`contact-${contactValue?.id ?? ""}`}
+            orgId={orgId}
+            label={terms.contact.singular}
+            name="contact_id"
+            initial={contactValue}
+            error={errors.contact_id}
+          />
           {companies ? (
             <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
               <option value="">ללא חברה</option>

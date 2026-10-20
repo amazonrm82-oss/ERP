@@ -45,11 +45,12 @@ export function stageFieldMissing(field: StageRequiredField, deal: Record<string
  * The field as the move asks for it: a definition the custom-field inputs know how to show and parse
  * (amount: shekels into agorot; date; contact: a choice from the business's contacts).
  */
-export function stageRequiredDefinition(field: StageRequiredField, contacts: Array<{ id: string; name: string }> = []): FieldDefinition {
+export function stageRequiredDefinition(field: StageRequiredField, orgId?: string): FieldDefinition {
   const base = { id: `${BUILTIN_PREFIX}${field}`, key: `${BUILTIN_PREFIX}${field}`, label: STAGE_REQUIRED_LABELS[field], options: [], isRequired: true, isActive: true, helpText: null };
   if (field === "amount") return { ...base, type: "currency" };
   if (field === "expected_close_date") return { ...base, type: "date" };
-  return { ...base, type: "user", choices: contacts.map((contact) => ({ value: contact.id, label: contact.name })) };
+  // the contact is searched (ContactPicker), not listed; the server accepts any contact the person reads (withSentContact)
+  return { ...base, type: "user", choices: [], ...(orgId ? { contactPicker: { orgId } } : {}) };
 }
 
 /** Whether a field asked by a move is one of these built-in fields. */

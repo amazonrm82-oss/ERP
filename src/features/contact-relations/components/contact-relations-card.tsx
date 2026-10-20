@@ -7,6 +7,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName } from "@/components/ui/search-picker-logic";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
@@ -23,18 +25,15 @@ type Props = {
   items: ContactRelationItem[];
   // each active type in this contact's direction ("הורה של", "ילד/ה של" …)
   choices: Option[];
-  // other live contacts the user may pick
-  people: Array<{ id: string; name: string }>;
 };
 
 /**
  * CON-06: the people this contact is related to: spouse, parent and child, who referred whom, and the business's own
  * types. Each line reads from this contact: "<this contact's relation> <the other person>".
  */
-export function ContactRelationsCard({ orgId, contactId, canEdit, items, choices, people }: Props) {
+export function ContactRelationsCard({ orgId, contactId, canEdit, items, choices }: Props) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(addContactRelationAction.bind(null, orgId, contactId), null);
   const failure = state && !state.ok ? state : null;
-  const others = people.filter((person) => person.id !== contactId);
 
   return (
     <Card aria-labelledby="contact-relations-title">
@@ -74,8 +73,8 @@ export function ContactRelationsCard({ orgId, contactId, canEdit, items, choices
         )}
 
         {canEdit ? (
-          choices.length === 0 || others.length === 0 ? (
-            <p className="text-sm text-ink-soft">{choices.length === 0 ? "אין סוגי קשר פעילים ברשימה של העסק." : "אין עוד אנשי קשר לקשר אליהם."}</p>
+          choices.length === 0 ? (
+            <p className="text-sm text-ink-soft">אין סוגי קשר פעילים ברשימה של העסק.</p>
           ) : (
             // a new key after a failed submit puts back what was chosen (React resets the form)
             <form key={failure ? JSON.stringify(failure.values ?? {}) : `add:${items.length}`} action={dispatch} className="space-y-3 border-t border-line pt-4">
@@ -89,16 +88,15 @@ export function ContactRelationsCard({ orgId, contactId, canEdit, items, choices
                   </option>
                 ))}
               </SelectField>
-              <SelectField label="איש קשר" name="other_id" required defaultValue={failure?.values?.other_id ?? ""} error={failure?.fieldErrors?.other_id}>
-                <option value="" disabled>
-                  בחירת איש קשר
-                </option>
-                {others.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </SelectField>
+              <ContactPicker
+                orgId={orgId}
+                label="איש קשר"
+                name="other_id"
+                required
+                exclude={[contactId]}
+                initial={initialChoice(failure?.values?.other_id, failure?.values?.[pickerLabelName("other_id")], "איש קשר")}
+                error={failure?.fieldErrors?.other_id}
+              />
               <SubmitButton size="sm" pending={pending} pendingText="שומרים…">
                 הוספת קשר
               </SubmitButton>

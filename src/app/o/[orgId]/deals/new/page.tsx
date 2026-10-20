@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { getOrgModules } from "@/features/modules/queries";
-import { listContactOptions } from "@/features/contacts/queries";
+import { getContactChoice } from "@/features/contacts/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { DealForm } from "@/features/deals/components/deal-form";
 import { getPipeline } from "@/features/deals/queries";
@@ -42,17 +42,16 @@ export default async function NewDealPage({ params, searchParams }: Props) {
   }
 
   const query = await searchParams;
-  const [pipeline, contacts, companies, fields] = await Promise.all([
+  const contactParam = firstParam(query.contact);
+  const [pipeline, defaultContact, companies, fields] = await Promise.all([
     getPipeline(orgId, firstParam(query.pipeline)),
-    listContactOptions(orgId),
+    // only preselect a contact the user may read and that is not in the bin
+    getContactChoice(orgId, contactParam),
     // LEAD-08: with companies switched off there is no company field (null)
     getOrgModules(orgId).then((modules) => (modules.companies ? listCompanyOptions(orgId) : null)),
     listFieldDefinitions(orgId, "deal"),
   ]);
-  const contactParam = firstParam(query.contact);
   const companyParam = firstParam(query.company);
-  // only preselect a contact that is actually in the list
-  const defaultContactId = isUuid(contactParam) && contacts.some((contact) => contact.id === contactParam) ? contactParam : "";
   const defaultCompanyId = isUuid(companyParam) && companies?.some((company) => company.id === companyParam) ? companyParam : "";
 
   return (
@@ -65,9 +64,8 @@ export default async function NewDealPage({ params, searchParams }: Props) {
               orgId={orgId}
               pipelineId={pipeline.id}
               stages={pipeline.stages}
-              contacts={contacts}
               companies={companies}
-              defaultContactId={defaultContactId}
+              defaultContact={defaultContact}
               defaultCompanyId={defaultCompanyId}
               fields={fields}
             />

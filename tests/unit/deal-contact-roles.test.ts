@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { contactDealsWithRoles } from "@/features/deal-contacts/contact-deals";
-import { addableDealContacts } from "@/features/deal-contacts/options";
+import { dealContactExclude } from "@/features/deal-contacts/options";
 import {
   DEAL_CONTACT_ROLE_KEYS,
   DEAL_CONTACT_ROLES,
@@ -76,11 +76,10 @@ describe("roles of contacts in a deal (CON-03)", () => {
     ]);
   });
 
-  it("offers to add only contacts that are neither the deal's main contact nor linked already", () => {
-    const options = ["a", "b", "c", "d"].map((id) => ({ id, name: id }));
-    expect(addableDealContacts(options, ["b"], "c").map((option) => option.id)).toEqual(["a", "d"]);
-    expect(addableDealContacts(options, [], null).map((option) => option.id)).toEqual(["a", "b", "c", "d"]);
-    expect(addableDealContacts(options, ["a", "b", "c", "d"], null)).toEqual([]);
+  it("leaves out of the add search the deal's main contact and the contacts linked already, each once", () => {
+    expect(dealContactExclude(["b"], "c")).toEqual(["b", "c"]);
+    expect(dealContactExclude([], null)).toEqual([]);
+    expect(dealContactExclude(["a", "b", "a"], "b")).toEqual(["a", "b"]);
   });
 });
 

@@ -36,7 +36,7 @@ import { getCardLayout } from "@/features/card-layout/queries";
 import { ContactDetailsCard } from "@/features/contacts/components/contact-details-card";
 import { contactDisplayName } from "@/features/contacts/display";
 import { preferredContactChannel } from "@/features/contacts/preferences";
-import { getContact, listContactOptions } from "@/features/contacts/queries";
+import { getContact } from "@/features/contacts/queries";
 import { DomainLinkNote } from "@/features/company-domain/components/domain-link-note";
 import { getDomainLinkInfo } from "@/features/company-domain/queries";
 import { listRecordTypes } from "@/features/record-type-options/queries";
@@ -107,16 +107,15 @@ export default async function ContactPage({ params, searchParams }: Props) {
   const canEdit = canEditRecordHint(context, contact.owner_id);
   // LEAD-08: with companies switched off, the company field, the companies card and the domain note are left out
   const modules = await getOrgModules(orgId);
-  const [companyOptions, types, domainLink, companyLinks, relationTypes, people, hasQuotes] = await Promise.all([
+  const [companyOptions, types, domainLink, companyLinks, relationTypes, hasQuotes] = await Promise.all([
     canEdit && modules.companies ? listCompanyOptions(orgId) : [],
     canEdit ? listRecordTypes(orgId, "contact") : [],
     // CON-09: a company linked by the email domain, or the companies to pick from
     modules.companies ? getDomainLinkInfo(orgId, contact) : null,
     // CON-05: every company of the contact, with the role there
     modules.companies ? listContactCompanies(orgId, contact.id) : [],
-    // CON-06: the business's relation types, and the people to relate to
+    // CON-06: the business's relation types (the other person is searched in the form)
     listRelationTypes(orgId),
-    canEdit ? listContactOptions(orgId) : [],
     // QUO-01
     orgHasFeature(orgId, "quotes"),
   ]);
@@ -223,7 +222,6 @@ export default async function ContactPage({ params, searchParams }: Props) {
             canEdit={canEdit}
             items={relations}
             choices={relationChoices(relationTypes)}
-            people={people}
           />
 
           {billing ? <BillingCard orgId={orgId} recordId={contact.id} billing={billing} canEdit={canEdit} today={zoneDate(new Date(), context.org.timeZone)} /> : null}

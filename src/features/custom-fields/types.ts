@@ -60,6 +60,8 @@ export type FieldDefinition = {
   optionColors?: Record<string, string>;
   // user: the business's members, filled in when the definitions are read
   choices?: Array<{ value: string; label: string }>;
+  // DEAL-05's built-in contact: asked with the contact search picker of this business instead of a list of choices
+  contactPicker?: { orgId: string };
   isRequired: boolean;
   isActive: boolean;
   helpText: string | null;

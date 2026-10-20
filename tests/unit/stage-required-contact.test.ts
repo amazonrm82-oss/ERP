@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { REQUIRED_ASKED_FIELD } from "@/features/custom-fields/required-move";
 import { inputName } from "@/features/custom-fields/types";
 
-// DEAL-05 review: a stage that requires the contact offers the newest 200 contacts, but the server accepts any contact
-// the person's session reads in this business and that is not in the bin. The stand-in client plays RLS: CONTACTS
+// DEAL-05 review: a stage that requires the contact asks for it with the contact search picker, and the server accepts any
+// contact the person's session reads in this business and that is not in the bin. The stand-in client plays RLS: CONTACTS
 // holds what a select by organization and id returns (another business's contact and a binned one are filtered out).
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -52,10 +52,6 @@ function query(table: string) {
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: query }) }));
 vi.mock("@/features/custom-fields/queries", () => ({ listFieldDefinitions: async () => [] }));
-// the dropdown's 200 newest: OLD is not among them
-vi.mock("@/features/contacts/queries", () => ({
-  listContactOptions: async () => Array.from({ length: 200 }, (_, i) => ({ id: `77777777-7777-4777-8777-${String(i).padStart(12, "0")}`, name: `חדש ${i}` })),
-}));
 
 const sendContact = (id: string) => {
   const form = new FormData();
@@ -65,7 +61,7 @@ const sendContact = (id: string) => {
 };
 
 describe("the required contact of a stage (DEAL-05 review)", () => {
-  it("a contact outside the newest 200 is accepted when the person reads it; another business's or a binned one is refused", async () => {
+  it("a contact the person reads is accepted, however old; another business's or a binned one is refused", async () => {
     const { requiredForMove } = await import("@/features/custom-fields/required-server");
     const accepted = await requiredForMove(ORG, "deal", DEAL, { "builtin:stage": STAGE }, sendContact(OLD));
     expect(accepted).toEqual({ ok: true, merge: undefined, columns: { contact_id: OLD } });
@@ -74,8 +70,8 @@ describe("the required contact of a stage (DEAL-05 review)", () => {
       expect(refused.ok, id).toBe(false);
       expect(!refused.ok && "fieldErrors" in refused && refused.fieldErrors?.[inputName("builtin:contact_id")]).toBe("יש לבחור איש קשר מהרשימה.");
     }
-    // not asked yet: the refusal offers the 200 for the dropdown
+    // not asked yet: the refusal asks for the contact with the search picker of this business, no list of contacts
     const first = await requiredForMove(ORG, "deal", DEAL, { "builtin:stage": STAGE }, null);
-    expect(!first.ok && "missing" in first && first.missing[0].choices).toHaveLength(200);
+    expect(!first.ok && "missing" in first && first.missing[0]).toMatchObject({ choices: [], contactPicker: { orgId: ORG } });
   });
 });

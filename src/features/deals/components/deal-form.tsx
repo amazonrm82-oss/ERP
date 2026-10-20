@@ -5,8 +5,10 @@ import { useActionState } from "react";
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName, type SearchPickerChoice } from "@/components/ui/search-picker-logic";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
@@ -21,24 +23,24 @@ type Props = {
   // the pipeline the stages belong to (a pipeline condition of a custom field reads it)
   pipelineId: string;
   stages: StageOption[];
-  contacts: Array<{ id: string; name: string }>;
   // LEAD-08: null = the companies module is switched off (no picker; the stored company is kept)
   companies: Array<{ id: string; name: string }> | null;
   // preselected when the form is opened from a contact's or a company's page
-  defaultContactId: string;
+  defaultContact: SearchPickerChoice;
   defaultCompanyId: string;
   fields: FieldDefinition[];
 };
 
 /** New deal form. On success the action redirects to the board. */
-export function DealForm({ orgId, pipelineId, stages, contacts, companies, defaultContactId, defaultCompanyId, fields }: Props) {
+export function DealForm({ orgId, pipelineId, stages, companies, defaultContact, defaultCompanyId, fields }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createDealAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? {};
   const errors = failure?.fieldErrors ?? {};
 
   const stageValue = values.stage_id ?? stages.find((stage) => stage.kind === "open")?.id ?? stages[0]?.id ?? "";
-  const contactValue = values.contact_id ?? defaultContactId;
+  // a refused form shows the contact it sent, named by the label the picker sent with it
+  const contactValue = failure?.values ? initialChoice(values.contact_id, values[pickerLabelName("contact_id")], "איש קשר") : defaultContact;
   const companyValue = values.company_id ?? defaultCompanyId;
 
   return (
@@ -77,21 +79,15 @@ export function DealForm({ orgId, pipelineId, stages, contacts, companies, defau
         </SelectField>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField
-          key={`contact-${contactValue}`}
+        <ContactPicker
+          key={`contact-${contactValue?.id ?? ""}`}
+          orgId={orgId}
           label="איש קשר"
           name="contact_id"
-          defaultValue={contactValue}
+          initial={contactValue}
           error={errors.contact_id}
-          hint={contacts.length === 0 ? "עוד אין אנשי קשר. אפשר לקשר אחד מאוחר יותר." : undefined}
-        >
-          <option value="">ללא איש קשר</option>
-          {contacts.map((contact) => (
-            <option key={contact.id} value={contact.id}>
-              {contact.name}
-            </option>
-          ))}
-        </SelectField>
+          hint="לא חובה. אפשר לקשר איש קשר גם מאוחר יותר."
+        />
         {companies ? (
           <SelectField key={`company-${companyValue}`} label="חברה" name="company_id" defaultValue={companyValue} error={errors.company_id}>
             <option value="">ללא חברה</option>

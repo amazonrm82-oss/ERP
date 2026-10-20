@@ -43,8 +43,10 @@ describe("built-in fields required to enter a stage (DEAL-05)", () => {
     const fields = [
       stageRequiredDefinition("amount"),
       stageRequiredDefinition("expected_close_date"),
-      stageRequiredDefinition("contact_id", [{ id: "c-1", name: "דנה" }]),
+      // the contact is searched in the form; the server adds the sent contact to the choices once it reads it (withSentContact)
+      { ...stageRequiredDefinition("contact_id", "org-1"), choices: [{ value: "c-1", label: "דנה" }] },
     ];
+    expect(stageRequiredDefinition("contact_id", "org-1")).toMatchObject({ type: "user", choices: [], contactPicker: { orgId: "org-1" } });
     // first try: a refusal that names them (also the bulk skip's wording)
     const refused = requiredAnswer(fields, null);
     expect(refused.ok).toBe(false);

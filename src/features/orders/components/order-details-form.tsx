@@ -3,9 +3,11 @@
 import { useActionState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { TextareaField, TextField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName, type SearchPickerChoice } from "@/components/ui/search-picker-logic";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import type { FormState } from "@/lib/action-result";
 
 import { updateOrderDetailsAction } from "../actions";
@@ -15,13 +17,13 @@ type Props = {
   orgId: string;
   orderId: string;
   values: { deliveryDate: string | null; shippingAddress: string | null; notes: string | null; deliveryContactId: string | null };
-  // contacts to pick from for delivery; the current one is kept even when it is not in the list
-  contacts: { value: string; label: string }[];
+  // the delivery contact as it is now, named (null = none)
+  deliveryContact: SearchPickerChoice;
   editable: boolean;
 };
 
 /** ORD-01 (owner (2)): delivery date, shipping address, notes and the delivery contact, editable until cancelled. */
-export function OrderDetailsForm({ orgId, orderId, values, contacts, editable }: Props) {
+export function OrderDetailsForm({ orgId, orderId, values, deliveryContact, editable }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(updateOrderDetailsAction.bind(null, orgId, orderId), null);
   const failed = state && !state.ok ? state : null;
   const v = (name: string, fallback: string | null) => failed?.values?.[name] ?? fallback ?? "";
@@ -39,14 +41,18 @@ export function OrderDetailsForm({ orgId, orderId, values, contacts, editable }:
           error={failed?.fieldErrors?.delivery_date}
           className="max-w-48"
         />
-        <SelectField name="delivery_contact_id" label="איש קשר לאספקה" defaultValue={v("delivery_contact_id", values.deliveryContactId)} error={failed?.fieldErrors?.delivery_contact_id}>
-          <option value="">בלי</option>
-          {contacts.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </SelectField>
+        <ContactPicker
+          key={failed?.values ? JSON.stringify(failed.values) : `delivery:${deliveryContact?.id ?? ""}`}
+          orgId={orgId}
+          name="delivery_contact_id"
+          label="איש קשר לאספקה"
+          initial={
+            failed?.values
+              ? initialChoice(failed.values?.delivery_contact_id, failed.values?.[pickerLabelName("delivery_contact_id")], "איש קשר")
+              : deliveryContact
+          }
+          error={failed?.fieldErrors?.delivery_contact_id}
+        />
         <TextareaField
           name="shipping_address"
           label="כתובת משלוח"

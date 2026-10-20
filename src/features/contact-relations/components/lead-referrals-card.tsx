@@ -6,7 +6,8 @@ import { useActionState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FormError } from "@/components/ui/feedback";
-import { SelectField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName } from "@/components/ui/search-picker-logic";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
@@ -22,12 +23,10 @@ type Props = {
   items: ContactRelationItem[];
   // the business's referral type, while it is active ("הפנה/תה את")
   phrase: string | null;
-  // live contacts the user may pick
-  people: Array<{ id: string; name: string }>;
 };
 
 /** CON-06: the contacts this lead referred. On conversion they move to the lead's new contact. */
-export function LeadReferralsCard({ orgId, leadId, canEdit, items, phrase, people }: Props) {
+export function LeadReferralsCard({ orgId, leadId, canEdit, items, phrase }: Props) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(addLeadReferralAction.bind(null, orgId, leadId), null);
   const failure = state && !state.ok ? state : null;
 
@@ -68,21 +67,19 @@ export function LeadReferralsCard({ orgId, leadId, canEdit, items, phrase, peopl
         )}
 
         {canEdit ? (
-          phrase === null || people.length === 0 ? (
-            <p className="text-sm text-ink-soft">{phrase === null ? "סוג הקשר של הפניות לא פעיל ברשימה של העסק." : "אין אנשי קשר לבחור."}</p>
+          phrase === null ? (
+            <p className="text-sm text-ink-soft">סוג הקשר של הפניות לא פעיל ברשימה של העסק.</p>
           ) : (
             // a new key after a failed submit puts back what was chosen (React resets the form)
             <form key={failure ? JSON.stringify(failure.values ?? {}) : `add:${items.length}`} action={dispatch} className="space-y-3 border-t border-line pt-4">
-              <SelectField label={`הליד ${phrase}`} name="other_id" required defaultValue={failure?.values?.other_id ?? ""} error={failure?.fieldErrors?.other_id}>
-                <option value="" disabled>
-                  בחירת איש קשר
-                </option>
-                {people.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </SelectField>
+              <ContactPicker
+                orgId={orgId}
+                label={`הליד ${phrase}`}
+                name="other_id"
+                required
+                initial={initialChoice(failure?.values?.other_id, failure?.values?.[pickerLabelName("other_id")], "איש קשר")}
+                error={failure?.fieldErrors?.other_id}
+              />
               <SubmitButton size="sm" pending={pending} pendingText="שומרים…">
                 הוספת הפניה
               </SubmitButton>

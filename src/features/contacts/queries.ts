@@ -8,6 +8,9 @@ import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
+import { isUuid } from "@/lib/paths";
+
+import { contactPickerName } from "./picker";
 
 import type { StoredChannel } from "./channels";
 
@@ -181,22 +184,20 @@ export async function getContact(orgId: string, contactId: string) {
   };
 }
 
-export type ContactOption = { id: string; name: string };
+export type ContactChoice = { id: string; label: string };
 
-/** Recent contacts for a "pick a contact" select (latest 200). */
-export async function listContactOptions(orgId: string): Promise<ContactOption[]> {
+/**
+ * A contact the user may read and that is not in the bin, named for a picker's starting value (a deal opened from a
+ * contact's page); null otherwise.
+ */
+export async function getContactChoice(orgId: string, contactId: string): Promise<ContactChoice | null> {
+  if (!isUuid(contactId)) return null;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("id, full_name, email, phone")
-    .eq("organization_id", orgId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) {
-    throw new Error(`contact options query failed: ${error.message}`);
-  }
-  return data.map((row) => ({ id: row.id, name: row.full_name || row.email || row.phone || "איש קשר ללא שם" }));
+  const row = must(
+    await supabase.from("contacts").select("id, full_name, email, phone").eq("organization_id", orgId).eq("id", contactId).is("deleted_at", null).maybeSingle(),
+    "contact choice",
+  );
+  return row ? { id: row.id, label: contactPickerName(row) } : null;
 }
 
 /** CON-01: a contact's further phones and emails, in their order. */

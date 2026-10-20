@@ -1,6 +1,5 @@
 import "server-only";
 
-import { listContactOptions } from "@/features/contacts/queries";
 import { BUILTIN_PREFIX, splitMovePatch, stageFieldMissing, stageRequiredDefinition, stageRequiredFields, type StageRequiredField } from "@/features/deals/stage-required";
 import { isUuid } from "@/lib/paths";
 import { formValues } from "@/lib/action-result";
@@ -103,15 +102,7 @@ async function missingStageFields(
     if (fields.length > 0) empty.set(deal.id, fields);
   }
   if (empty.size === 0) return { ok: true, missing };
-  let contacts: Array<{ id: string; name: string }> = [];
-  if ([...empty.values()].some((fields) => fields.includes("contact_id"))) {
-    try {
-      contacts = await listContactOptions(orgId);
-    } catch (readError) {
-      return { ok: false, error: readError };
-    }
-  }
-  for (const [id, fields] of empty) missing.set(id, fields.map((field) => stageRequiredDefinition(field, contacts)));
+  for (const [id, fields] of empty) missing.set(id, fields.map((field) => stageRequiredDefinition(field, orgId)));
   return { ok: true, missing };
 }
 
@@ -140,9 +131,9 @@ export async function requiredForMove(
 }
 
 /**
- * DEAL-05 review: the list of contacts a move offers holds the newest 200 only, so the contact the form sent is judged
- * by whether the person may read it in this business and it is not in the bin (one read with the user's session), not
- * by the list. A readable one joins the field's choices, so the shared parsing accepts it; any other stays refused.
+ * DEAL-05 review: a move asks for the contact with the search picker (no list of choices), so the contact the form sent
+ * is judged by whether the person may read it in this business and it is not in the bin (one read with the user's
+ * session). A readable one joins the field's choices, so the shared parsing accepts it; any other stays refused.
  */
 async function withSentContact(
   orgId: string,

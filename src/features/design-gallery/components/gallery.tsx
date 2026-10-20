@@ -14,6 +14,7 @@ import { Checkbox, SelectField, Switch, TextareaField, TextField } from "@/compo
 import * as Icons from "@/components/ui/icons";
 import { BellIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { Popover } from "@/components/ui/popover";
+import { SearchPicker, type SearchPickerResult } from "@/components/ui/search-picker";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
 import { ListSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { ListCard, ListCards, Table, Td, Th, Tr } from "@/components/ui/table";
@@ -46,6 +47,18 @@ const BRAND_SAMPLES = ["#0f7b6c", "#ffd400", "#5b2a86"];
 
 const ok = async () => ({ ok: true as const });
 const failing = async () => ({ ok: false as const, message: "לא הצלחנו להעביר לסל. נסו שוב." });
+
+// the search picker's sample people, searched in the browser (the real pickers search on the server)
+const SAMPLE_PEOPLE = [
+  { id: "p1", label: "דנה כהן", detail: "052-1234567" },
+  { id: "p2", label: "דני לוי", detail: "dani@example.co.il" },
+  { id: "p3", label: "Daniel Green", detail: "054-7654321 · daniel@example.com" },
+  { id: "p4", label: "רונית אברהם", detail: null },
+];
+async function sampleSearch(query: string): Promise<SearchPickerResult> {
+  const q = query.toLowerCase();
+  return { hits: SAMPLE_PEOPLE.filter((person) => `${person.label} ${person.detail ?? ""}`.toLowerCase().includes(q)) };
+}
 
 /** Every shared component in every state (DSN-08). Rendered once per theme by the page. */
 export function DesignGallery({ theme }: { theme: "light" | "dark" }) {
@@ -222,6 +235,14 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
 
       <Section title="שינויים שלא נשמרו">
         <UnsavedSample prefix={p("unsaved")} />
+      </Section>
+
+      <Section title="בחירה בחיפוש">
+        <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+          <SearchPicker label="איש קשר" name={p("picker-empty")} initial={null} search={sampleSearch} hint="הקלידו &quot;דנ&quot; כדי לראות תוצאות." />
+          <SearchPicker label="איש קשר לאספקה" name={p("picker-picked")} initial={{ id: "p1", label: "דנה כהן" }} search={sampleSearch} />
+          <SearchPicker label="איש קשר" name={p("picker-error")} initial={null} search={sampleSearch} required clearable={false} error="יש לבחור איש קשר." />
+        </div>
       </Section>
 
       <Section title="בורר תאריך">

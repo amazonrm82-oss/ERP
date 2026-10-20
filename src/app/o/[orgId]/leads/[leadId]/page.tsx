@@ -51,7 +51,6 @@ import { LeadScoreCard } from "@/features/lead-score/components/lead-score-card"
 import { LeadReferralsCard } from "@/features/contact-relations/components/lead-referrals-card";
 import { listLeadReferrals, listRelationTypes } from "@/features/contact-relations/queries";
 import { REFERRAL_TYPE_KEY } from "@/features/contact-relations/types";
-import { listContactOptions } from "@/features/contacts/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { byGender, withPrefixThe } from "@/features/terminology/terms";
 
@@ -107,7 +106,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
   const isConverted = lead.converted_at !== null;
   // CON-06: the contacts this lead referred; added while the lead is not converted (then they live on its contact)
   const canRefer = canWrite && canEditRecordHint(context, lead.owner_id) && !isConverted;
-  const [relationTypes, referralPeople] = await Promise.all([listRelationTypes(orgId), canRefer ? listContactOptions(orgId) : []]);
+  const relationTypes = await listRelationTypes(orgId);
   const referrals = await listLeadReferrals(orgId, lead.id, relationTypes);
   const referralType = relationTypes.find((type) => type.key === REFERRAL_TYPE_KEY && type.isActive) ?? null;
 
@@ -271,7 +270,6 @@ export default async function LeadPage({ params, searchParams }: Props) {
               canEdit={canRefer}
               items={referrals}
               phrase={referralType?.name ?? null}
-              people={referralPeople}
             />
           ) : null}
 

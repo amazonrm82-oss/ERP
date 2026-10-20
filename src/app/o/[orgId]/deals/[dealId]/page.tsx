@@ -20,10 +20,9 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { getOrgModules } from "@/features/modules/queries";
-import { listContactOptions } from "@/features/contacts/queries";
 import { trashDealAction } from "@/features/deals/actions";
 import { DealContactsCard } from "@/features/deal-contacts/components/deal-contacts-card";
-import { addableDealContacts } from "@/features/deal-contacts/options";
+import { dealContactExclude } from "@/features/deal-contacts/options";
 import { listDealContactRoles, listDealContacts } from "@/features/deal-contacts/queries";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { getCardLayout } from "@/features/card-layout/queries";
@@ -105,9 +104,9 @@ export default async function DealPage({ params, searchParams }: Props) {
   const canEdit = canEditRecordHint(context, deal.owner_id);
   // LEAD-08: with companies switched off the deal's company field is left out (null)
   const modules = await getOrgModules(orgId);
-  const [contacts, companyOptions, members, calendar] = canEdit
-    ? await Promise.all([listContactOptions(orgId), modules.companies ? listCompanyOptions(orgId) : [], listMembers(orgId), getCalendarSettings(orgId)])
-    : [[], [], [], DEFAULT_CALENDAR_SETTINGS];
+  const [companyOptions, members, calendar] = canEdit
+    ? await Promise.all([modules.companies ? listCompanyOptions(orgId) : [], listMembers(orgId), getCalendarSettings(orgId)])
+    : [[], [], DEFAULT_CALENDAR_SETTINGS];
   const companies = modules.companies ? companyOptions : null;
   // DEAL-04: the close window of a move into a won stage; the onboarding task goes to an active member who writes
   const closeWindow = {
@@ -299,7 +298,6 @@ export default async function DealPage({ params, searchParams }: Props) {
             focus={focus}
             orgId={orgId}
             canEdit={canEdit}
-            contacts={contacts}
             companies={companies}
             lossReasons={lossOptions}
             deal={{
@@ -347,8 +345,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             canEdit={canEdit}
             items={dealContacts}
             roles={contactRoles}
-            options={addableDealContacts(
-              contacts,
+            exclude={dealContactExclude(
               dealContacts.map((item) => item.contactId),
               deal.contact_id,
             )}

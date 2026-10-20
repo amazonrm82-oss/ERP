@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
-import { listContactOptions } from "@/features/contacts/queries";
 import { confirmOrderAction, deleteOrderAction, deleteOrderLineAction, setOrderStatusAction } from "@/features/orders/actions";
 import { OrderDetailsForm } from "@/features/orders/components/order-details-form";
 import { OrderStatusBadge } from "@/features/orders/components/order-list-items";
@@ -54,16 +53,11 @@ export default async function OrderPage({ params }: Props) {
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const editing = orderEditing(order.status);
-  const contacts = mayEdit && editing.details ? await listContactOptions(orgId) : [];
   // a draft's new lines are priced like deal lines (PL-03): the order's day, VAT mode and the customer's price list
   const [pricing, hasProducts, hasDiscounts] =
     mayEdit && editing.lines
       ? await Promise.all([getOrderPricing(orgId, order), orgHasFeature(orgId, "products"), orgHasFeature(orgId, "discounts")])
       : [null, false, false];
-  const contactOptions = contacts.map((c) => ({ value: c.id, label: c.name }));
-  if (order.deliveryContactId && !contactOptions.some((c) => c.value === order.deliveryContactId)) {
-    contactOptions.unshift({ value: order.deliveryContactId, label: parties.deliveryContact ?? "איש קשר" });
-  }
   const back = order.dealId
     ? { href: paths.deal(orgId, order.dealId), label: parties.deal ?? "עסקה" }
     : order.contactId
@@ -270,7 +264,7 @@ export default async function OrderPage({ params }: Props) {
                 notes: order.notes,
                 deliveryContactId: order.deliveryContactId,
               }}
-              contacts={contactOptions}
+              deliveryContact={order.deliveryContactId ? { id: order.deliveryContactId, label: parties.deliveryContact ?? "איש קשר" } : null}
               editable={mayEdit && editing.details}
             />
           </CardBody>

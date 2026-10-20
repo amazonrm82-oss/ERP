@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { initialChoice, pickerLabelName } from "@/components/ui/search-picker-logic";
+import { ContactPicker } from "@/features/contacts/components/contact-picker";
 import { NoteEditor } from "@/features/activities/components/note-editor";
 
 import { conditionApplies, fieldState, hasConditions, shownMarkerName, type ConditionValues } from "../conditions";
@@ -233,6 +235,21 @@ function fieldInput(
         </SelectField>
       );
     case "user":
+      // DEAL-05: the deal's contact is searched, not listed (the server accepts any contact the person reads)
+      if (field.contactPicker) {
+        return (
+          <ContactPicker
+            key={`${field.id}-${value}`}
+            orgId={field.contactPicker.orgId}
+            name={name}
+            label={field.label}
+            required={required}
+            initial={initialChoice(value, submitted?.[pickerLabelName(name)], "איש קשר")}
+            error={errors[name]}
+            hint={field.helpText ?? undefined}
+          />
+        );
+      }
       return (
         <SelectField key={`${field.id}-${value}`} {...common} defaultValue={value}>
           <option value="">לא נבחר</option>
