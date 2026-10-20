@@ -158,6 +158,11 @@ describe("currency next to every amount", () => {
         const order = (await q<{ id: string }>("insert into public.orders (organization_id) values ($1) returning id", [org])).rows[0].id;
         await q("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, order]);
       },
+      // DOC-01
+      accounting_documents: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח למסמך') returning id", [org])).rows[0].id;
+        await q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'CUR-1', 1000)", [org, contact]);
+      },
       // QUO-04
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;

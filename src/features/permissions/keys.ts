@@ -19,6 +19,8 @@ export const MEMBER_PERMISSION_KEYS = [
   "edit_catalog",
   "mass_send",
   "manage_automations",
+  // DOC-01 (owner, 20 October 2026): recording documents issued outside the system
+  "documents",
 ] as const;
 
 export type MemberPermission = (typeof MEMBER_PERMISSION_KEYS)[number];
@@ -50,6 +52,12 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
     built: true,
     warning: AUTOMATIONS_WARNING,
     confirm: true,
+  },
+  {
+    key: "documents",
+    label: "רישום מסמכים",
+    description: "רישום חשבוניות וקבלות שהופקו מחוץ למערכת על עסקה או איש קשר, וביטול רישום עם סיבה. בעלים, מנהלי מערכת ומנהלי צוות רושמים תמיד.",
+    built: true,
   },
   { key: "issue_documents", label: "הפקת מסמכים", description: "הפקת חשבוניות וקבלות.", built: false },
   { key: "issue_credits", label: "זיכוי", description: "הפקת מסמכי זיכוי.", built: false },
@@ -103,6 +111,12 @@ export function canManageAutomations(role: MembershipRole, granted: readonly str
  * owners, admins and managers by role, or a member holding the view_costs grant. For the screens
  * only: the cost itself comes from public.product_costs, whose RLS applies the same rule.
  */
+/** DOC-01: app.can_record_documents(): owners, admins and managers by role, or the personal key. */
+export function canRecordDocuments(role: MembershipRole | null, granted: readonly string[]): boolean {
+  if (role === null) return false;
+  return role === "owner" || role === "admin" || role === "manager" || (canReceivePermissions(role) && granted.includes("documents"));
+}
+
 export function canViewCosts(role: MembershipRole | null, granted: readonly string[]): boolean {
   if (role === null) return false;
   return role === "owner" || role === "admin" || role === "manager" || (canReceivePermissions(role) && granted.includes("view_costs"));

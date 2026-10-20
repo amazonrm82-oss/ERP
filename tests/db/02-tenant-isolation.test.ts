@@ -243,6 +243,8 @@ describe("tenant isolation", () => {
       await q("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.orderA]);
       // ORD-04
       await q("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'באישור')", [orgA, ids.orderA]);
+      // DOC-01
+      await q("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'A-1', 1000)", [orgA, ids.dealA]);
     });
     // ORD-05: a customer's answer on an order is written only by public.order_public_decide (no client grant)
     await asAdmin((q) =>
@@ -359,6 +361,8 @@ describe("tenant isolation", () => {
     "order_payment_steps",
     // ORD-05
     "order_decisions",
+    // DOC-01
+    "accounting_documents",
     // QUO-09
     "quote_decisions",
     // QUO-10
@@ -544,6 +548,8 @@ describe("tenant isolation", () => {
       order_payment_steps: "name = name",
       // no write grant at all (order_public_decide() writes): a permission error is the expected outcome
       order_decisions: "ip = ip",
+      // no delete grant at all (never deleted): a permission error is the expected outcome for the delete
+      accounting_documents: "cancel_reason = cancel_reason",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
@@ -675,6 +681,7 @@ describe("tenant isolation", () => {
       ["insert into public.order_lines (organization_id, order_id, name) values ($1, $2, 'x')", [orgA, ids.orderA]],
       ["insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.orderA]],
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
+      ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
@@ -789,6 +796,7 @@ describe("tenant isolation", () => {
       ["order_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["order_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
+      ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],

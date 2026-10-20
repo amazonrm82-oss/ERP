@@ -146,6 +146,11 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readByIds(supabase, orgId, "order_payment_steps", "*", "order_id", orderIds),
     readByIds(supabase, orgId, "order_decisions", "*", "order_id", orderIds),
   ]);
+  // DOC-01: the accounting documents recorded on the person's contacts and deals
+  const documentFilter = [contactIds.length ? `contact_id.in.(${contactIds.join(",")})` : null, ids.deal.length ? `deal_id.in.(${ids.deal.join(",")})` : null]
+    .filter(Boolean)
+    .join(",");
+  const accountingDocuments = await readLinked(supabase, orgId, "accounting_documents", "*", documentFilter || null);
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
@@ -189,6 +194,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     order_lines: orderLines,
     order_payment_steps: orderPaymentSteps,
     order_decisions: orderDecisions,
+    accounting_documents: accountingDocuments,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,

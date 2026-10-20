@@ -436,6 +436,29 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("accounting documents follow their deal; owners, admins and managers record and cancel, members and viewers only read (DOC-01)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה למסמך', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const docId = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'R03-1', 100) returning id", [org, deal])).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.accounting_documents where id = $1", [docId]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // m1 reads the deal but holds no key: records and cancels nothing
+    expect((await pgError(asUser(m1.id, (q) => q("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'R03-2', 1)", [org, deal])))).code).toBe("42501");
+    expect(await asUser(m1.id, async (q) => (await q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'x' where id = $1", [docId])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'x' where id = $1", [docId])).rowCount)).toBe(0);
+    // the manager manages m1's team: records and cancels
+    expect(await asUser(manager.id, async (q) => (await q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [docId])).rowCount)).toBe(1);
+  });
+
   it("a quote's views follow the quote: whoever reads it reads them, nobody writes them (QUO-10)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

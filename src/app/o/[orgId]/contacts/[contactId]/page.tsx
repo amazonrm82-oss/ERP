@@ -59,6 +59,7 @@ import { BillingCard } from "@/features/billing/components/billing-card";
 import { getRecordBilling } from "@/features/billing/queries";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
+import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
 // FLD-10: the tab title in the business's word
@@ -243,6 +244,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordQuotesCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} canCreate={hasQuotes && canEdit} />
           {/* ORD-01: the contact's orders while the orders module is on */}
           <RecordOrdersCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} canCreate={canEdit} />
+          {/* DOC-01: documents issued outside the system and recorded here */}
+          <RecordDocumentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
 
           <RelatedDealsCard
             orgId={orgId}

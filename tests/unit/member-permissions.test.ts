@@ -15,7 +15,13 @@ import {
 } from "@/features/permissions/keys";
 
 const dir = path.resolve(__dirname, "../../supabase/migrations");
-const migration = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_member_permissions.sql"))!), "utf8");
+// the latest migration that defines the keys and the constraint (DOC-01 added `documents` in accounting_documents)
+const migration = readdirSync(dir)
+  .filter((f) => f.endsWith(".sql"))
+  .sort()
+  .map((f) => readFileSync(path.join(dir, f), "utf8"))
+  .filter((text) => text.includes("function app.member_permission_keys()") && text.includes("constraint member_permissions_known check"))
+  .at(-1)!;
 
 // PRM-01: the closed list of keys is the same in the app and in the database
 describe("member permission keys", () => {

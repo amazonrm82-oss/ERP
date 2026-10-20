@@ -1789,6 +1789,27 @@ export type QuotePaymentStepRow = {
   updated_at: string;
 };
 
+// DOC-01: an accounting document issued outside the system, recorded on a deal or a contact (migration
+// accounting_documents). Never deleted; cancelled with a reason.
+export type AccountingDocumentRow = {
+  id: string;
+  organization_id: string;
+  deal_id: string | null;
+  contact_id: string | null;
+  doc_type: string;
+  number: string;
+  doc_date: string;
+  amount_agorot: number;
+  currency: string;
+  status: string;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ORD-04: a step of an order's payment schedule (migration order_payment_steps); the shape of a quote's
 export type OrderPaymentStepRow = {
   id: string;
@@ -2611,6 +2632,21 @@ export type Database = {
         OrderLineRow,
         OrderLineWrite & { organization_id: string; order_id: string; name: string; kind?: "item" | "group"; product_id?: string | null; currency?: string },
         OrderLineWrite
+      >;
+      // DOC-01: column grants; a person records and cancels, nothing else (no delete)
+      accounting_documents: Table<
+        AccountingDocumentRow,
+        {
+          organization_id: string;
+          deal_id?: string | null;
+          contact_id?: string | null;
+          doc_type: string;
+          number: string;
+          doc_date?: string;
+          amount_agorot: number;
+          currency?: string;
+        },
+        { status?: string; cancel_reason?: string | null }
       >;
       // ORD-04: column grants; the order is fixed once inserted
       order_payment_steps: Table<

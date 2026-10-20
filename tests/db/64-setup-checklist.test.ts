@@ -505,6 +505,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_payment_steps.sql",
       // ORD-05 redefines app.audit_erase_core() of _order_payment_steps.sql last (the answers on erased orders)
       "_order_links.sql",
+      // DOC-01 redefines app.sample_untouched() and app.import_record_worked() of _orders.sql and app.audit_erase_core() of
+      // _order_links.sql last (documents are work; erasure reaches them)
+      "_accounting_documents.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

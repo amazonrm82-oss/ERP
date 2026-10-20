@@ -34,7 +34,8 @@ describe("automations permission conditions (PRM-01)", () => {
       expect((await pgError(grant(member.id, [key]))).hint, key).toBe("permissions:not_built");
     }
     const built = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.member_permission_built_keys() as k")).rows[0].k);
-    expect([...built].sort()).toEqual(["edit_catalog", "export", "import", "manage_automations", "view_costs"]);
+    // DOC-01 (migration accounting_documents) made `documents` grantable
+    expect([...built].sort()).toEqual(["documents", "edit_catalog", "export", "import", "manage_automations", "view_costs"]);
   });
 
   it("granting and revoking the automations permission are both in the audit log", async () => {
