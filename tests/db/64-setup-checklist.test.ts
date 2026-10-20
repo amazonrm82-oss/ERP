@@ -511,6 +511,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // PAY-01 redefines app.sample_untouched(), app.import_record_worked(), app.audit_erase_core() and
       // app.member_permission_built_keys() of _accounting_documents.sql last (payments are work; erasure reaches them)
       "_payments.sql",
+      // the DOC-01 files follow-up redefines app.files_before_insert() of _quota_outsider_guard.sql last (a document's file)
+      "_document_files.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

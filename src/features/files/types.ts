@@ -24,6 +24,14 @@ export const ALLOWED_TYPES: Record<string, string> = {
 };
 export const ACCEPT = Object.keys(ALLOWED_TYPES).join(",");
 
+// DOC-01 follow-up: a recorded accounting document takes a PDF or an image only (app.document_file_types)
+export const DOCUMENT_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"] as const;
+export const DOCUMENT_ACCEPT = DOCUMENT_FILE_TYPES.join(",");
+export const DOCUMENT_TYPE_PROBLEM = "למסמך חשבונאי אפשר לצרף רק PDF או תמונה.";
+export function isDocumentFileType(type: string): boolean {
+  return (DOCUMENT_FILE_TYPES as readonly string[]).includes(type);
+}
+
 // FXS-07: the types that open inside the browser (?view=1, thumbnails). Everything else downloads, SVG above all
 // (files from before the bucket refused it): an SVG opened on the storage domain can run a script.
 const INLINE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"]);

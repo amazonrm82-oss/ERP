@@ -1038,6 +1038,9 @@ export type FileRow = {
   // REC-07: the timeline entry it is attached to, and the earlier version it replaces (both set once, on insert)
   activity_id: string | null;
   previous_id: string | null;
+  // DOC-01 follow-up (migration document_files): the recorded document it belongs to instead of a record (PDF or image; the
+  // server links it to the document's latest file)
+  accounting_document_id: string | null;
   // FXS-07: set (server only) while a person's upload waits for confirm_file_upload(); null = confirmed or made by the server
   unconfirmed_since: string | null;
   upload_checked_at: string | null;
@@ -2493,6 +2496,7 @@ export type Database = {
           size_bytes: number;
           activity_id?: string | null;
           previous_id?: string | null;
+          accounting_document_id?: string | null;
         },
         Record<string, never>
       >;

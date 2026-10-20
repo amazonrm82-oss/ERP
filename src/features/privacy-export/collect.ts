@@ -11,7 +11,8 @@ import { countRows, personLinkFilter, uniqueIds, withoutOthersPrivate, type Pers
 const CONSENT_COLUMNS =
   "id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, method, copied_from, lift_method, lift_note, recorded_by, created_at";
 const SUBMISSION_COLUMNS = "id, form_id, form_name, status, lead_id, payload, created_at";
-const FILE_COLUMNS = "id, name, mime_type, size_bytes, lead_id, contact_id, deal_id, activity_id, previous_id, uploaded_by, created_at, storage_path";
+const FILE_COLUMNS =
+  "id, name, mime_type, size_bytes, lead_id, contact_id, deal_id, activity_id, previous_id, accounting_document_id, uploaded_by, created_at, storage_path";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -156,6 +157,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     .filter(Boolean)
     .join(",");
   const payments = await readLinked(supabase, orgId, "payments", "*", paymentFilter || null);
+  // and their files (the copy of the paper that was issued), listed and stored like the records' files
+  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "accounting_document_id", uniqueIds(accountingDocuments.map((d) => d.id)))));
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);

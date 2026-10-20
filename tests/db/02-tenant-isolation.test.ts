@@ -244,7 +244,17 @@ describe("tenant isolation", () => {
       // ORD-04
       await q("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'באישור')", [orgA, ids.orderA]);
       // DOC-01
-      await q("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'A-1', 1000)", [orgA, ids.dealA]);
+      ids.documentA = (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'A-1', 1000) returning id", [
+          orgA,
+          ids.dealA,
+        ])
+      ).rows[0].id;
+      // DOC-01 follow-up: the document's file (its one subject is the document)
+      await q("insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'קבלה.pdf', 'application/pdf', 1000)", [
+        orgA,
+        ids.documentA,
+      ]);
       // PAY-01
       await q("insert into public.payments (organization_id, deal_id, amount_agorot, method, reference) values ($1, $2, 1000, 'cash', 'A-1')", [orgA, ids.dealA]);
     });
@@ -635,6 +645,7 @@ describe("tenant isolation", () => {
       ["insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'x.csv', 'skip')", [orgA]],
       ["insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]],
       ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
+      ["insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.documentA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
       ["insert into public.record_followers (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       // no organizer: the policy, not the organizer trigger, has to refuse it
@@ -927,6 +938,20 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaFile.code);
+
+    // DOC-01 follow-up: a file in org B hung on org A's document (B has the documents key, so only the tenant rules answer)
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"documents\": true}'::jsonb where organization_id = $1", [orgB]),
+    );
+    const viaDocumentFile = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [
+          orgB,
+          ids.documentA,
+        ]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaDocumentFile.code);
 
     // a consent in org B recorded on org A's lead (CNS-01)
     const viaConsent = await pgError(

@@ -495,6 +495,40 @@ describe("roles and record visibility", () => {
     expect(await asUser(manager.id, async (q) => (await q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [docId])).rowCount)).toBe(1);
   });
 
+  it("a document's file follows the document: recorders attach, readers read, the uploader or an admin removes (DOC-01 follow-up)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה לקובץ', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const docId = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'R03-F1', 100) returning id", [org, deal])).rows[0].id,
+    );
+    const attach = (u: U) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string }>("insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'קבלה.pdf', 'application/pdf', 10) returning id", [org, docId])).rows[0].id,
+      );
+    const seen = (u: U, fileId: string) => asUser(u.id, (q) => count(q, "select 1 from public.files where id = $1", [fileId]));
+    const removed = (u: U, fileId: string) => asUser(u.id, async (q) => (await q("delete from public.files where id = $1", [fileId])).rowCount);
+    const byOwner = await attach(owner);
+    const byManager = await attach(manager);
+    const byAdmin = await attach(admin);
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u, byOwner), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u, byOwner), u.email).toBe(0);
+    // m1 reads the document but holds no key: attaches and removes nothing (not even an admin's file)
+    expect((await pgError(attach(m1))).code).toBe("42501");
+    expect(await removed(m1, byAdmin)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer, byOwner)).toBe(1);
+    expect((await pgError(attach(viewer))).code).toBe("42501");
+    expect(await removed(viewer, byOwner)).toBe(0);
+    // a manager removes their own file, not the owner's; an admin removes anyone's
+    expect(await removed(manager, byOwner)).toBe(0);
+    expect(await removed(manager, byManager)).toBe(1);
+    expect(await removed(admin, byOwner)).toBe(1);
+  });
+
   it("a quote's views follow the quote: whoever reads it reads them, nobody writes them (QUO-10)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
