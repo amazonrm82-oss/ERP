@@ -518,6 +518,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_files.sql",
       // ORD-05b redefines app.audit_erase_core() of _payment_files.sql last (the customer's decline reason on the timeline and notices)
       "_order_answer_timeline.sql",
+      // the DOC-01 / PAY-01 merge follow-up redefines app.merge_move_links() of _merge_orders_move.sql and
+      // app.merge_accounting_documents() / app.merge_payments() last (documents and payments move with the links)
+      "_merge_docs_payments_move.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
