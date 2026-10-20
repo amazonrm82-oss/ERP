@@ -1273,8 +1273,10 @@ that back.
   `src/features/terminology/terms.ts`, which holds every Hebrew form by hand; members read, owners/admins of a writable org write,
   no delete, audited). Read with `getOrgTerms(orgId)` (separate from org_context; falls back to today's words); `recordTypeNames(type,
   terms)` in record-types.ts. Used in the nav, the + menu, the three lists, "new" pages and waiting leads; since part two also on the record pages,
-  report titles/columns (`reportTexts`) and the import wizard (`importEntityLabel`; `withPrefixThe` for ל/ב/כ forms). DB-written
-  notification texts still use today's words (a later migration item).
+  report titles/columns (`reportTexts`) and the import wizard (`importEntityLabel`; `withPrefixThe` for ל/ב/כ forms). Part three
+  (migration 020615): notifications stay stored in today's words; `src/features/notifications/notification-text.ts` redraws them from a
+  closed list of anchored patterns (bell, page, push; unknown text shown as stored); `claim_push_notifications` (last redefined in
+  020615) returns the term keys. A new notification text naming a record must be covered there: the unit test reads the migrations.
 - Saving a one-row-per-org settings table whose UPDATE is column-granted: update and select back, insert only when 0 rows, retry
   the update once on 23505. Never PostgREST `.upsert(..., {onConflict})`: its `DO UPDATE SET` names `organization_id`, which has no
   UPDATE grant, so it fails with 42501 (FLD-10 review, QUO-05).
