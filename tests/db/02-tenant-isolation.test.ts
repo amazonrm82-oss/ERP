@@ -708,10 +708,10 @@ describe("tenant isolation", () => {
     }
   });
 
-  // Mallory's statements have no WHERE clause, so each one runs the table's policy on every row in the database, including
-  // what the files that ran before this one left behind (vitest orders files by their last duration): mostly the managed
-  // lists seeded for every organization the suite creates. Under the full suite that passed the default 30 seconds; run
-  // last it took 95-101 s on 20 October 2026 (RVW-39). The budget grows, the checks stay the same.
+  // Mallory's statements have no WHERE clause, so each one runs the table's policy on every row in the database. Run last it
+  // once took 95-110 s (RVW-39), because every file left its organizations behind; since each file removes them in
+  // closePool() it takes about 1.5 s wherever it runs. The 60-second budget leaves room for slow machines; the checks stay
+  // the same.
   it("an UPDATE or DELETE with no WHERE clause never reaches another organization", async () => {
     // Postgres applies SELECT policies to UPDATE/DELETE only when the statement
     // reads the existing row (WHERE / RETURNING). A bare "delete from t" is
@@ -857,7 +857,7 @@ describe("tenant isolation", () => {
         expect(after, `${table} lost rows`).toBe(before[table]);
       }
     });
-  }, 300_000);
+  }, 60_000);
 
   it("cannot point a row of its own at another organization's rows", async () => {
     const statusB = await defaultLeadStatus(orgB);
