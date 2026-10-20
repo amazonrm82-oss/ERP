@@ -585,7 +585,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages
   and statuses before the closed ones, adds automations switched off, skips and reports items over a plan limit, and
-  records the key in `organizations.industry_templates` (server only) only when nothing was cut. "My day" (TASK-09, no
+  records the key in `organizations.industry_templates` (server only) only when nothing was cut. Since 020605 (FLD-05 wave 2) it also adds
+  three sample products per industry from `app.industry_template_products(key)` (mirrors `TEMPLATE_PRODUCTS`, test 65), only with the
+  `products` flag; `public.apply_industry_template` was last redefined there. "My day" (TASK-09, no
   migration) uses `report_stuck_deals`' `no_next_step`, the same rule as the board.
 - Call-back time (SPD-05, migration 0119): `forms.callback_choice` (owners/admins, column grants) adds "now" or a slot today
   or tomorrow (09-12, 12-15, 15-18, 18-20, org time zone; `src/features/intake/callback.ts` mirrors `app.intake_callback_*`).
