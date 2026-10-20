@@ -140,6 +140,8 @@ All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is
 `db:test:start` refuses a port another server already answers on and checks that the started postmaster owns it; `test:db`
 refuses to rebuild unless the server at `TEST_DATABASE_URL` reports `TEST_DB_DIR/data` (default `/tmp/crm-saas-pgtest/data`)
 as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker sets `TEST_DB_DIR` together with its port.
+A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_DB_PORT` in the same command (a bare
+`npm run db:test:stop` stops the default `/tmp/crm-saas-pgtest` that the lead's checks use; seen four times on 20 October 2026).
 
 ## Architecture rules
 
@@ -634,7 +636,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020635 (PAY-01; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020645 (files; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -975,7 +977,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   read follows the parent; detached orders read by owners/admins/managers. Purge detaches numbered orders (`former_*_id`,
   `customer_deleted_at`); merges move them in `app.merge_move_links` since 020590 (`app.merge_orders` is a no-op). Switch `org_modules.orders_enabled`
   (only with the flag) hides screens only. Server writes set `app.order_server`. `app.sample_untouched` and
-  `app.import_record_worked` were last redefined in 020635 (PAY-01), `app.audit_erase_core` in 020635.
+  `app.import_record_worked` were last redefined in 020635 (PAY-01), `app.audit_erase_core` in 020645.
   Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
   (composite FK set null, only with `price_source = 'price_list'`, flag `price_lists`, name copied from the list).
   `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
@@ -1004,6 +1006,16 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   FK set-null, merge (`app.payment_server = 'on'`, contact only, `app.merge_payments` through the `merged` entry) and erasure (`'erase'`:
   reference and note emptied, a cancel reason becomes "הסיבה נמחקה (מחיקת פרטיות)"). `app.audit_erase_core`, `app.sample_untouched`,
   `app.import_record_worked` and `app.member_permission_built_keys` were last redefined in 020635. No attached file yet (lane ד).
+- Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
+  and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
+  adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
+  (`app.document_file_types`, also checked on the real object). One current file each: `app.files_links_check` links a new file to the
+  latest one under a lock (versions through `previous_id`). Never removed (owner): the files policy, `record_files_delete` on storage and
+  the definer trigger `files_keep_attached` (hint `file:kept`) refuse it for every writer; exceptions: the business's own cascade
+  (`app.org_exists` false) and the uploader's own upload still waiting for confirmation. Erasure (`app.audit_erase_core`, last redefined in
+  020645) erases those files' audit entries and renames them "מסמך <number>" / "תשלום <date>" (extension kept); the files stay.
+  The files policies, `app.files_before_insert`, `app.files_links_check`, `public.confirm_file_upload` and `app.reconcile_pending_files`
+  were last redefined in 020645.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
