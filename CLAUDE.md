@@ -701,7 +701,7 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  020465/019620 (`app.run_automation_actions` in 020215); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020465/019620 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
@@ -1124,6 +1124,9 @@ as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker s
   skips it). Custom fields: active field of the record's type, `app.custom_value_ok`,
   a user value must be a member, read-only filled once, unique judged inside the step (constraint set immediate, then deferred again).
   App: `src/features/automations/set-field.ts`, builder action "עדכון שדה".
+  Since 020610 (DEAL-08 follow-up) `create_deal` takes `pipeline: "source"` and `copy_from_source: true` (deal triggers): the source's
+  process, its recurring revenue for the next period (term rounded to whole months) and its lines, copied as the server (the JWT claims
+  are cleared around the copy and restored); `app.run_automation_actions` was last redefined in 020610.
 - Date triggers (AUT-03 part one, migration 020245): trigger type `date_reached` {field, days 0..365, direction before|after} on
   every record type; fields `app.automation_date_fields(entity)` (mirrored by `DATE_TRIGGER_FIELDS` in
   `src/features/automations/date-trigger.ts`) plus active date/datetime custom fields. Once per record and date (run key), from
