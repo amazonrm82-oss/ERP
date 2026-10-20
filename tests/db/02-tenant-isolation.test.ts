@@ -241,6 +241,8 @@ describe("tenant isolation", () => {
     await asUser(a.id, async (q) => {
       ids.orderA = (await q<{ id: string }>("insert into public.orders (organization_id, deal_id, contact_id, notes) values ($1, $2, $3, 'הזמנה של א') returning id", [orgA, ids.dealA, ids.contactA])).rows[0].id;
       await q("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.orderA]);
+      // ORD-04
+      await q("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'באישור')", [orgA, ids.orderA]);
     });
     await asService((q) =>
       q("select public.intake_submit($1, 'form', $2)", [ids.formTokenA, JSON.stringify({ full_name: "פונה מהאתר", phone: "050-7654321" })]),
@@ -349,6 +351,8 @@ describe("tenant isolation", () => {
     // ORD-01
     "orders",
     "order_lines",
+    // ORD-04
+    "order_payment_steps",
     // QUO-09
     "quote_decisions",
     // QUO-10
@@ -531,6 +535,7 @@ describe("tenant isolation", () => {
       quote_payment_steps: "name = name",
       orders: "notes = notes",
       order_lines: "name = name",
+      order_payment_steps: "name = name",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
@@ -660,6 +665,7 @@ describe("tenant isolation", () => {
       ["insert into public.quote_payment_steps (organization_id, quote_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.quoteA]],
       ["insert into public.orders (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       ["insert into public.order_lines (organization_id, order_id, name) values ($1, $2, 'x')", [orgA, ids.orderA]],
+      ["insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.orderA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
@@ -768,6 +774,7 @@ describe("tenant isolation", () => {
       ["quote_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["orders", "notes = 'HACKED'", "notes = 'HACKED'"],
       ["order_lines", "name = 'HACKED'", "name = 'HACKED'"],
+      ["order_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
@@ -1007,6 +1014,11 @@ describe("tenant isolation", () => {
     // ORD-01: B cannot add a line to A's order, nor order A's deal or quote
     const viaOrderLine = await pgError(asUser(b.id, (q) => q("insert into public.order_lines (organization_id, order_id, name) values ($1, $2, 'x')", [orgB, ids.orderA])));
     expect(["42501", "23503"]).toContain(viaOrderLine.code);
+    // ORD-04: nor a payment step to A's order
+    const viaOrderStep = await pgError(
+      asUser(b.id, (q) => q("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgB, ids.orderA])),
+    );
+    expect(["42501", "23503"]).toContain(viaOrderStep.code);
     expect((await pgError(asUser(b.id, (q) => q("select public.order_from_deal($1, $2)", [orgA, ids.dealA])))).code).toBe("42501");
     expect((await pgError(asUser(b.id, (q) => q("select public.order_from_quote($1, $2)", [orgA, ids.quoteA])))).code).toBe("42501");
     expect((await pgError(asUser(b.id, (q) => q("select public.order_confirm($1, $2)", [orgA, ids.orderA])))).code).toBe("42501");

@@ -363,6 +363,12 @@ describe("roles and record visibility", () => {
     const line = await asUser(m1.id, async (q) =>
       (await q<{ id: string }>("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot) values ($1, $2, 'שורה', 100) returning id", [org, order])).rows[0].id,
     );
+    // ORD-04: the payment steps follow the order like its lines
+    const step = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'מקדמה', 3000, 'באישור') returning id", [org, order])).rows[0].id,
+    );
+    const seenStep = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.order_payment_steps where id = $1", [step]));
+    const editsStep = (u: U) => asUser(u.id, async (q) => (await q("update public.order_payment_steps set name = 'מקדמה' where id = $1", [step])).rowCount);
     const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.orders where id = $1", [order]));
     const seenLine = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.order_lines where id = $1", [line]));
     const edits = (u: U) => asUser(u.id, async (q) => (await q("update public.orders set notes = 'x' where id = $1", [order])).rowCount);
@@ -372,10 +378,13 @@ describe("roles and record visibility", () => {
       expect(await seenLine(u), u.email).toBe(1);
       expect(await edits(u), u.email).toBe(1);
       expect(await editsLine(u), u.email).toBe(1);
+      expect(await seenStep(u), u.email).toBe(1);
+      expect(await editsStep(u), u.email).toBe(1);
     }
     for (const u of [m2, viewer]) {
       expect(await seen(u), u.email).toBe(0);
       expect(await seenLine(u), u.email).toBe(0);
+      expect(await seenStep(u), u.email).toBe(0);
     }
     await setVisibility("org");
     try {
@@ -384,6 +393,13 @@ describe("roles and record visibility", () => {
         expect(await seenLine(u), u.email).toBe(1);
         expect(await edits(u), u.email).toBe(0);
         expect(await editsLine(u), u.email).toBe(0);
+        expect(await seenStep(u), u.email).toBe(1);
+        expect(await editsStep(u), u.email).toBe(0);
+        expect(await asUser(u.id, async (q) => (await q("delete from public.order_payment_steps where id = $1", [step])).rowCount), u.email).toBe(0);
+        expect(
+          (await pgError(asUser(u.id, (q) => q("insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [org, order])))).code,
+          u.email,
+        ).toBe("42501");
         expect(await asUser(u.id, async (q) => (await q("delete from public.order_lines where id = $1", [line])).rowCount), u.email).toBe(0);
         expect(await asUser(u.id, async (q) => (await q("delete from public.orders where id = $1", [order])).rowCount), u.email).toBe(0);
         expect((await pgError(asUser(u.id, (q) => q("insert into public.orders (organization_id, deal_id, contact_id) values ($1, $2, $3)", [org, deal, contact])))).code, u.email).toBe("42501");

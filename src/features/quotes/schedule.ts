@@ -72,12 +72,15 @@ export function percentText(bp: number): string {
   return `${Number.isInteger(value) ? value : value.toFixed(2).replace(/0$/, "")}%`;
 }
 
+/** Whose schedule it is: a quote's (GAP-09) or an order's (ORD-04, the same mechanism). */
+export type ScheduleOwner = "quote" | "order";
+
 /** What the screen says about the schedule's total; null when there is nothing to say. */
-export function scheduleTotalNote(steps: readonly Pick<ScheduleStep, "percentBp">[]): string | null {
+export function scheduleTotalNote(steps: readonly Pick<ScheduleStep, "percentBp">[], owner: ScheduleOwner = "quote"): string | null {
   if (steps.length === 0) return null;
   const total = scheduleTotalBp(steps);
   if (total === FULL_BP) return null;
-  return `סך האחוזים ${percentText(total)}. לפני שליחת ההצעה הלוח צריך להגיע בדיוק ל-100%.`;
+  return `סך האחוזים ${percentText(total)}. לפני ${owner === "order" ? "אישור ההזמנה" : "שליחת ההצעה"} הלוח צריך להגיע בדיוק ל-100%.`;
 }
 
 /** A percent as typed ("30", "33.33", "12,5") in basis points; null when it is not a percent with up to two decimals. */

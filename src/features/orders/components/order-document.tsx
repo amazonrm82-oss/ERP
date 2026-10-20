@@ -1,6 +1,7 @@
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { BILLING_LABELS } from "@/features/products/schema";
+import { ScheduleSection } from "@/features/quotes/components/schedule-section";
 import { groupSubtotals } from "@/features/quotes/totals";
 import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -237,6 +238,9 @@ export function OrderDocument({ data, headingLevel = 1 }: { data: OrderDocumentD
             <p className="text-sm text-ink-soft">מסמך זה {NOT_A_TAX_INVOICE}.</p>
           </dl>
         </section>
+
+        {/* ORD-04: the payment schedule, each step with its share of the total */}
+        <ScheduleSection rows={data.schedule} id="order-schedule" />
 
         {order.notes ? (
           <section aria-label="הערות" className="space-y-1" data-print-keep="">

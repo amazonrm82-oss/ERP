@@ -138,7 +138,12 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     .filter(Boolean)
     .join(",");
   const orders = await readLinked(supabase, orgId, "orders", "*", orderFilter || null);
-  const orderLines = await readByIds(supabase, orgId, "order_lines", "*", "order_id", uniqueIds(orders.map((o) => o.id)));
+  // ORD-04: and their payment schedule
+  const orderIds = uniqueIds(orders.map((o) => o.id));
+  const [orderLines, orderPaymentSteps] = await Promise.all([
+    readByIds(supabase, orgId, "order_lines", "*", "order_id", orderIds),
+    readByIds(supabase, orgId, "order_payment_steps", "*", "order_id", orderIds),
+  ]);
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
@@ -180,6 +185,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     quote_payment_steps: quotePaymentSteps,
     orders,
     order_lines: orderLines,
+    order_payment_steps: orderPaymentSteps,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,

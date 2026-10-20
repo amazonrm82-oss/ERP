@@ -64,6 +64,7 @@ const data: OrderDocumentData = {
   customer: { name: "דנה כהן", attention: null, address: null, email: null, taxId: null },
   order,
   lines: [line],
+  schedule: [],
 };
 
 // ORD-05 part one: the order confirmation says on its face that it is not a tax invoice (SPEC-ADDITIONS 6.3)
@@ -77,6 +78,27 @@ describe("order confirmation (ORD-05)", () => {
     expect(html).toContain("הרצל 1, חיפה");
     expect(html).toContain("להתקשר לפני");
     expect(html).toContain("חודשי");
+  });
+
+  it("shows the payment schedule with each step's share, and no section without one (ORD-04)", () => {
+    expect(renderToStaticMarkup(createElement(OrderDocument, { data }))).not.toContain("לוח תשלומים");
+    const html = renderToStaticMarkup(
+      createElement(OrderDocument, {
+        data: {
+          ...data,
+          schedule: [
+            { key: "s1", name: "מקדמה", percentBp: 3000, dueDate: "2026-10-26", milestone: null, amountAgorot: 7080 },
+            { key: "s2", name: "יתרה", percentBp: 7000, dueDate: null, milestone: "באספקה", amountAgorot: 16520 },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain("לוח תשלומים");
+    expect(html).toContain("מקדמה");
+    expect(html).toContain("באספקה");
+    expect(html).toContain("30%");
+    expect(html).toContain("70.80");
+    expect(html).toContain("165.20");
   });
 
   it("a draft prints without a number", () => {

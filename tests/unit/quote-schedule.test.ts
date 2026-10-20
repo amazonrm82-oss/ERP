@@ -36,6 +36,8 @@ describe("a quote's payment schedule (GAP-09)", () => {
     expect(scheduleTotalNote([{ percentBp: 3000 }])).toBe("סך האחוזים 30%. לפני שליחת ההצעה הלוח צריך להגיע בדיוק ל-100%.");
     expect(scheduleTotalNote([{ percentBp: 3000 }, { percentBp: 7000 }])).toBeNull();
     expect(scheduleTotalNote([])).toBeNull();
+    // ORD-04: an order's schedule says when it must be complete
+    expect(scheduleTotalNote([{ percentBp: 3000 }], "order")).toBe("סך האחוזים 30%. לפני אישור ההזמנה הלוח צריך להגיע בדיוק ל-100%.");
     const rows = scheduleRows(10001, [
       { id: "a", position: 0, name: "א", percentBp: 5000, dueDate: null, milestone: "x" },
       { id: "b", position: 1, name: "ב", percentBp: 5000, dueDate: "2027-01-01", milestone: null },

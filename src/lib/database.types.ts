@@ -1789,6 +1789,20 @@ export type QuotePaymentStepRow = {
   updated_at: string;
 };
 
+// ORD-04: a step of an order's payment schedule (migration order_payment_steps); the shape of a quote's
+export type OrderPaymentStepRow = {
+  id: string;
+  organization_id: string;
+  order_id: string;
+  position: number;
+  name: string;
+  percent_bp: number;
+  due_date: string | null;
+  milestone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // QUO-09: the customer's decision on a quote (migration quote_decisions); written only by public.quote_public_decide, read
 // only by owners and admins. ip and user_agent are kept in full (owner, 18 October 2026); a privacy erasure empties them.
 export type QuoteDecisionRow = {
@@ -2576,6 +2590,12 @@ export type Database = {
         OrderLineRow,
         OrderLineWrite & { organization_id: string; order_id: string; name: string; kind?: "item" | "group"; product_id?: string | null; currency?: string },
         OrderLineWrite
+      >;
+      // ORD-04: column grants; the order is fixed once inserted
+      order_payment_steps: Table<
+        OrderPaymentStepRow,
+        { organization_id: string; order_id: string; position?: number; name: string; percent_bp: number; due_date?: string | null; milestone?: string | null },
+        { position?: number; name?: string; percent_bp?: number; due_date?: string | null; milestone?: string | null }
       >;
       quote_designs: Table<QuoteDesignDbRow, QuoteDesignWrite & { organization_id: string }, QuoteDesignWrite>;
       // QUO-04: column grants; the VAT mode is set when the template is made

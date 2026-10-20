@@ -15,17 +15,43 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 import { formatDate, formatMoney } from "@/lib/format";
 
-import { FULL_BP, percentText, SCHEDULE_MAX, SCHEDULE_MILESTONE_MAX, SCHEDULE_NAME_MAX, scheduleRows, scheduleTotalBp, scheduleTotalNote, type ScheduleStep } from "../schedule";
+import { addOrderScheduleStepAction, deleteOrderScheduleStepAction, updateOrderScheduleStepAction } from "@/features/orders/schedule-actions";
+
+import {
+  FULL_BP,
+  percentText,
+  SCHEDULE_MAX,
+  SCHEDULE_MILESTONE_MAX,
+  SCHEDULE_NAME_MAX,
+  scheduleRows,
+  scheduleTotalBp,
+  scheduleTotalNote,
+  type ScheduleOwner,
+  type ScheduleStep,
+} from "../schedule";
 import { addScheduleStepAction, deleteScheduleStepAction, updateScheduleStepAction } from "../schedule-actions";
 
 type Props = {
   orgId: string;
-  quoteId: string;
+  // the quote's id, or the order's (kind "order", ORD-04: the same mechanism)
+  ownerId: string;
+  kind?: ScheduleOwner;
   steps: ScheduleStep[];
-  // the quote's total to pay, for each step's share
+  // the total to pay, for each step's share
   totalAgorot: number;
-  // a hint only: the quote is a draft the user may edit (RLS decides)
+  // a hint only: a draft the user may edit (RLS decides)
   canEdit: boolean;
+};
+
+// each kind writes its own table through its own actions
+const ACTIONS = {
+  quote: { add: addScheduleStepAction, update: updateScheduleStepAction, remove: deleteScheduleStepAction },
+  order: { add: addOrderScheduleStepAction, update: updateOrderScheduleStepAction, remove: deleteOrderScheduleStepAction },
+} as const;
+
+const EMPTY_TEXT: Record<ScheduleOwner, string> = {
+  quote: "אין לוח תשלומים. אפשר לחלק את הסכום לתשלומים לפי תאריכים או אבני דרך, והלקוח יראה אותם בהצעה.",
+  order: "אין לוח תשלומים. אפשר לחלק את הסכום לתשלומים לפי תאריכים או אבני דרך (מקדמה, אבני דרך, יתרה), והם יופיעו באישור ההזמנה.",
 };
 
 /** When a step is due: its date, its milestone, or both. */
@@ -36,8 +62,24 @@ export function scheduleWhen(step: { dueDate: string | null; milestone: string |
 
 const percentInput = (bp: number) => (bp % 100 === 0 ? String(bp / 100) : (bp / 100).toFixed(2).replace(/0$/, ""));
 
-function StepForm({ orgId, quoteId, step, rest, onDone, onCancel }: { orgId: string; quoteId: string; step: ScheduleStep | null; rest: number; onDone: () => void; onCancel: () => void }) {
-  const action = step ? updateScheduleStepAction.bind(null, orgId, quoteId, step.id) : addScheduleStepAction.bind(null, orgId, quoteId);
+function StepForm({
+  orgId,
+  ownerId,
+  kind,
+  step,
+  rest,
+  onDone,
+  onCancel,
+}: {
+  orgId: string;
+  ownerId: string;
+  kind: ScheduleOwner;
+  step: ScheduleStep | null;
+  rest: number;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const action = step ? ACTIONS[kind].update.bind(null, orgId, ownerId, step.id) : ACTIONS[kind].add.bind(null, orgId, ownerId);
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await action(prev, formData);
     if (result?.ok) onDone();
@@ -91,23 +133,25 @@ function StepForm({ orgId, quoteId, step, rest, onDone, onCancel }: { orgId: str
 }
 
 /**
- * GAP-09: the quote's payment schedule. Each step has a name, a percent of the total to pay and when (a date, a milestone,
- * or both), and shows its share of the total. A draft may be incomplete; sending needs exactly 100%.
+ * GAP-09: the quote's payment schedule (ORD-04: and an order's). Each step has a name, a percent of the total to pay and
+ * when (a date, a milestone, or both), and shows its share of the total. A draft may be incomplete; sending a quote, or
+ * confirming an order, needs exactly 100%.
  */
-export function QuoteScheduleCard({ orgId, quoteId, steps, totalAgorot, canEdit }: Props) {
+export function PaymentScheduleCard({ orgId, ownerId, kind = "quote", steps, totalAgorot, canEdit }: Props) {
   const [editing, setEditing] = useState<ScheduleStep | "new" | null>(null);
   const rows = scheduleRows(totalAgorot, steps);
   const total = scheduleTotalBp(steps);
-  const note = scheduleTotalNote(steps);
+  const note = scheduleTotalNote(steps, kind);
+  const titleId = `${kind}-schedule-title`;
   const full = steps.length >= SCHEDULE_MAX || total >= FULL_BP;
   const close = () => setEditing(null);
 
   if (!canEdit && steps.length === 0) return null;
 
   return (
-    <Card aria-labelledby="quote-schedule-title" className="mb-5">
+    <Card aria-labelledby={titleId} className={kind === "quote" ? "mb-5" : undefined}>
       <CardHeader
-        id="quote-schedule-title"
+        id={titleId}
         title="לוח תשלומים"
         action={
           canEdit && !full ? (
@@ -120,7 +164,7 @@ export function QuoteScheduleCard({ orgId, quoteId, steps, totalAgorot, canEdit 
       />
       <CardBody className="space-y-3">
         {steps.length === 0 ? (
-          <p className="text-md text-ink-soft">אין לוח תשלומים. אפשר לחלק את הסכום לתשלומים לפי תאריכים או אבני דרך, והלקוח יראה אותם בהצעה.</p>
+          <p className="text-md text-ink-soft">{EMPTY_TEXT[kind]}</p>
         ) : (
           <ol aria-label="התשלומים" className="divide-y divide-line">
             {steps.map((step, index) => (
@@ -144,7 +188,7 @@ export function QuoteScheduleCard({ orgId, quoteId, steps, totalAgorot, canEdit 
                       <ConfirmButton
                         title={`למחוק את התשלום "${step.name}"?`}
                         confirmLabel="מחיקה"
-                        action={() => deleteScheduleStepAction(orgId, quoteId, step.id)}
+                        action={() => ACTIONS[kind].remove(orgId, ownerId, step.id)}
                       >
                         מחיקה
                       </ConfirmButton>
@@ -173,7 +217,8 @@ export function QuoteScheduleCard({ orgId, quoteId, steps, totalAgorot, canEdit 
             <StepForm
               key={editing === "new" ? "new" : editing.id}
               orgId={orgId}
-              quoteId={quoteId}
+              ownerId={ownerId}
+              kind={kind}
               step={editing === "new" ? null : editing}
               rest={editing === "new" ? FULL_BP - total : 0}
               onDone={close}

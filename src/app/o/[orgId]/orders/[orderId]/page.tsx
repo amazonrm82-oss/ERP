@@ -12,7 +12,8 @@ import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
 import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
 import { ButtonLink } from "@/components/ui/button";
-import { getOrder, getOrderParties, getOrderPricing, listOrderLines } from "@/features/orders/queries";
+import { getOrder, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
+import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { orderEditing, ORDER_SOURCE_LABELS } from "@/features/orders/schema";
 import { quotePath } from "@/features/quotes/paths";
 import { priceSourceText } from "@/features/deal-lines/schema";
@@ -49,7 +50,12 @@ export default async function OrderPage({ params }: Props) {
       : order.companyId
         ? supabase.from("companies").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", order.companyId).maybeSingle()
         : null;
-  const [lines, parties, parent] = await Promise.all([listOrderLines(orgId, order.id), getOrderParties(orgId, order), parentQuery]);
+  const [lines, parties, parent, schedule] = await Promise.all([
+    listOrderLines(orgId, order.id),
+    getOrderParties(orgId, order),
+    parentQuery,
+    listOrderSchedule(orgId, order.id),
+  ]);
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const editing = orderEditing(order.status);
@@ -251,6 +257,9 @@ export default async function OrderPage({ params }: Props) {
             ) : null}
           </CardBody>
         </Card>
+
+        {/* ORD-04: the payment schedule (a quote's order carries the accepted quote's, locked); built while a draft */}
+        <PaymentScheduleCard orgId={orgId} ownerId={order.id} kind="order" steps={schedule} totalAgorot={order.totalAgorot} canEdit={mayEdit && editing.lines} />
 
         <Card aria-labelledby="order-delivery">
           <CardHeader id="order-delivery" title="אספקה" />

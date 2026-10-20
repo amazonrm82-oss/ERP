@@ -6,7 +6,9 @@ import { getOrgBranding } from "@/features/branding/queries";
 import { quoteColor, type DocumentCustomer, type QuoteDesign } from "@/features/quotes/design";
 import { customerFrom, getDocumentBusiness, getQuoteDesign, plain, type DocumentBusiness } from "@/features/quotes/design-server";
 
-import { getOrderParties, listOrderLines, type Order, type OrderLine } from "./queries";
+import { scheduleRows, type ScheduleRow } from "@/features/quotes/schedule";
+
+import { getOrderParties, listOrderLines, listOrderSchedule, type Order, type OrderLine } from "./queries";
 
 export type OrderDocumentData = {
   design: QuoteDesign;
@@ -16,6 +18,8 @@ export type OrderDocumentData = {
   customer: DocumentCustomer | null;
   order: Order;
   lines: OrderLine[];
+  // ORD-04: the payment schedule with each step's share of the total (none = no section)
+  schedule: ScheduleRow[];
 };
 
 const EMPTY: Billing = { name: null, taxId: null, address: null, shippingAddress: null, email: null, terms: null, priceListId: null };
@@ -31,12 +35,13 @@ const EMPTY: Billing = { name: null, taxId: null, address: null, shippingAddress
  * migration (and for DOC, where an accounting document must keep them).
  */
 export async function getOrderDocumentData(orgId: string, order: Order, displayName: string): Promise<OrderDocumentData> {
-  const [design, branding, business, lines, parties] = await Promise.all([
+  const [design, branding, business, lines, parties, steps] = await Promise.all([
     getQuoteDesign(orgId),
     getOrgBranding(orgId),
     getDocumentBusiness(orgId, displayName),
     listOrderLines(orgId, order.id),
     getOrderParties(orgId, order),
+    listOrderSchedule(orgId, order.id),
   ]);
   let billing: Billing | null = null;
   if (order.contactId) {
@@ -59,6 +64,7 @@ export async function getOrderDocumentData(orgId: string, order: Order, displayN
     customer,
     order,
     lines,
+    schedule: scheduleRows(order.totalAgorot, steps),
   };
 }
 

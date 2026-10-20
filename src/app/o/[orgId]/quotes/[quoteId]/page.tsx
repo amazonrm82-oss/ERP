@@ -30,7 +30,7 @@ import { fromDealText } from "@/features/quotes/from-deal";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
-import { QuoteScheduleCard } from "@/features/quotes/components/quote-schedule-card";
+import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
@@ -493,7 +493,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
       />
       {/* GAP-09: the payment schedule, shown on the document and the customer's page too */}
       <div className="mt-5">
-        <QuoteScheduleCard orgId={orgId} quoteId={quote.id} steps={schedule} totalAgorot={quote.totalAgorot} canEdit={canEdit} />
+        <PaymentScheduleCard orgId={orgId} ownerId={quote.id} steps={schedule} totalAgorot={quote.totalAgorot} canEdit={canEdit} />
       </div>
     </div>
   );

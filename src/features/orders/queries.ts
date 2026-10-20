@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { customerPriceList } from "@/features/deal-lines/queries";
+import type { ScheduleStep } from "@/features/quotes/schedule";
 import { conversionRateBp, type NamedPriceList } from "@/features/deal-lines/pricing";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type VatRate } from "@/features/tax/rates";
@@ -139,6 +140,22 @@ export async function listOrderLines(orgId: string, orderId: string): Promise<Or
     "order_lines",
   );
   return rows.map(toLine);
+}
+
+/** ORD-04: the order's payment schedule, in order (RLS: whoever reads the order). */
+export async function listOrderSchedule(orgId: string, orderId: string): Promise<ScheduleStep[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("order_payment_steps")
+      .select("id, position, name, percent_bp, due_date, milestone")
+      .eq("organization_id", orgId)
+      .eq("order_id", orderId)
+      .order("position")
+      .order("id"),
+    "order payment schedule",
+  );
+  return rows.map((row) => ({ id: row.id, position: row.position, name: row.name, percentBp: row.percent_bp, dueDate: row.due_date, milestone: row.milestone }));
 }
 
 export type OrderSummary = {
