@@ -167,14 +167,18 @@ export type RunItem = {
   entityType: string;
   entityId: string;
   createdAt: string;
-  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string }>;
+  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string; attempt?: number }>;
+  // AUT-06: retries of the failed steps
+  retryCount: number;
+  nextRetryAt: string | null;
+  retryNote: string | null;
 };
 
 export async function listRuns(orgId: string, automationId: string): Promise<RunItem[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("automation_runs")
-    .select("id, status, entity_type, entity_id, created_at, steps")
+    .select("id, status, entity_type, entity_id, created_at, steps, retry_count, next_retry_at, retry_note")
     .eq("organization_id", orgId)
     .eq("automation_id", automationId)
     .order("created_at", { ascending: false })
@@ -194,7 +198,11 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
       error: typeof s.error === "string" ? s.error : undefined,
       warning: typeof s.warning === "string" ? s.warning : undefined,
       warningName: typeof s.warning_name === "string" ? s.warning_name : undefined,
+      attempt: typeof s.attempt === "number" ? s.attempt : undefined,
     })),
+    retryCount: row.retry_count ?? 0,
+    nextRetryAt: row.next_retry_at ?? null,
+    retryNote: row.retry_note ?? null,
   }));
 }
 

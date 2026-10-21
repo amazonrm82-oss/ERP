@@ -11,7 +11,7 @@ import { deleteAutomationAction, setAutomationActiveAction } from "@/features/au
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
 import { actionsMissingReason } from "@/features/automations/convert";
-import { describeRule, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
+import { describeRule, retryLine, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -143,6 +143,7 @@ export default async function AutomationPage({ params }: Props) {
             {runs.map((run) => {
               const status = RUN_STATUS[run.status as keyof typeof RUN_STATUS] ?? RUN_STATUS.skipped;
               const recordPath = RECORD_PATH[run.entityType as keyof typeof RECORD_PATH];
+              const retry = retryLine(run, run.nextRetryAt ? formatDateTime(run.nextRetryAt) : null);
               return (
                 <li key={run.id} className="space-y-1 px-4 py-3 sm:px-5">
                   <p className="flex flex-wrap items-center gap-2 text-sm">
@@ -168,10 +169,12 @@ export default async function AutomationPage({ params }: Props) {
                             : step.warning
                               ? stepWarningText(step.warning, step.warningName)
                               : "בוצע"}
+                          {step.attempt ? ` (ניסיון ${step.attempt})` : null}
                         </li>
                       ))}
                     </ul>
                   ) : null}
+                  {retry ? <p className="text-sm text-ink-soft">{retry}</p> : null}
                 </li>
               );
             })}

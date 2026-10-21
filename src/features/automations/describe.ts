@@ -149,3 +149,32 @@ export function stepWarningText(warning: string, name?: string): string {
   const who = name?.trim() || "האחראי הנוכחי";
   return text.replace("{name}", () => who);
 }
+
+/** AUT-06: the most retries of a run's failed steps (the engine's app.retry_automation_run, 3 after the first attempt). */
+export const MAX_STEP_RETRIES = 3;
+
+const RETRY_NOTES: Record<string, string> = {
+  rule_changed: "לא ננסה שוב: האוטומציה נערכה או נמחקה מאז ההרצה.",
+  rule_off: "לא ננסה שוב: האוטומציה כבויה.",
+  record_gone: "לא ננסה שוב: הרשומה נמחקה או בסל המחזור.",
+  conditions: "לא ננסה שוב: הרשומה כבר לא עומדת בתנאים של האוטומציה.",
+  error: "לא ננסה שוב: הניסיונות החוזרים נכשלו בשגיאה.",
+  // the owner's wording, 21 October 2026
+  event_changed: "לא רץ: האירוע השתנה",
+  org_closed: "לא רץ: העסק סגור",
+};
+
+/**
+ * AUT-06: one line about a run's retries for the run log, or null when there is nothing to say.
+ * `when` is the next retry's time, already formatted for the business.
+ */
+export function retryLine(run: { retryCount: number; nextRetryAt: string | null; retryNote: string | null }, when: string | null): string | null {
+  if (run.retryNote) return RETRY_NOTES[run.retryNote] ?? null;
+  if (run.nextRetryAt && when) {
+    return `הצעדים שנכשלו ינוסו שוב ב-${when} (ניסיון חוזר ${run.retryCount + 1} מתוך ${MAX_STEP_RETRIES}).`;
+  }
+  if (run.retryCount > 0) {
+    return run.retryCount === 1 ? "הצעדים שנכשלו נוסו שוב פעם אחת." : `הצעדים שנכשלו נוסו שוב ${run.retryCount} פעמים.`;
+  }
+  return null;
+}

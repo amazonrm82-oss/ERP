@@ -966,6 +966,12 @@ export type AutomationRunRow = {
   status: string;
   steps: Json;
   created_at: string;
+  // AUT-06: retries of the failed steps (server-written)
+  retry_count: number;
+  next_retry_at: string | null;
+  retry_note: string | null;
+  // what the run saw, kept for the event check before a retry (server-written)
+  event_facts: Json | null;
 };
 
 export type NotificationRow = {
