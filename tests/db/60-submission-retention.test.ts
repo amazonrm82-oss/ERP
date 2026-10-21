@@ -4,11 +4,15 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { asAdmin, asService, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
+import { migrationFile, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
-const RETENTION = readFileSync(join(process.cwd(), "supabase/migrations/20261006009100_submission_retention.sql"), "utf8");
-const PURGE = readFileSync(join(process.cwd(), "supabase/migrations/20261006009110_submission_retention_purge.sql"), "utf8");
+// found by name, so renumbering keeps the test; both files are re-run below
+const RETENTION_FILE = migrationFile("_submission_retention.sql");
+const PURGE_FILE = migrationFile("_submission_retention_purge.sql");
+const RETENTION = readFileSync(join(process.cwd(), "supabase/migrations", RETENTION_FILE), "utf8");
+const PURGE = readFileSync(join(process.cwd(), "supabase/migrations", PURGE_FILE), "utf8");
 
 type U = { id: string; email: string };
 
@@ -48,6 +52,13 @@ describe("inquiries of a deleted form are kept 12 months (CAP-04)", () => {
     // 52-keep-submissions re-runs 0062, which puts back the old trigger function; this migration
     // must be safe to run again anyway
     await asAdmin((q) => q(RETENTION));
+  });
+
+  it("re-running these two files leaves every function they define at its latest body (RVW-44)", () => {
+    // test 52 re-runs the older body of app.keep_form_submissions() and restores it with rerunClosure; this file re-runs
+    // its own two migrations directly, which is safe only while they hold the latest body of what they define. A newer
+    // migration that redefines one of them fails here by name, not at teardown and not by test order.
+    expect(staleRestores([RETENTION_FILE, PURGE_FILE])).toEqual([]);
   });
 
   it("the connector-applied migration holds no drop statement and no delete, the purge file only its function", () => {
