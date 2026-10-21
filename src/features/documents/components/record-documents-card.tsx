@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
+import type { MoneySubject } from "@/features/payments/money-subject";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -12,7 +13,7 @@ import { getDocumentsAccess, listRecordDocuments } from "../queries";
 import { DOCUMENT_TYPE_LABELS } from "../schema";
 import { CancelDocumentButton, RecordDocumentButton } from "./document-forms";
 
-type Props = { orgId: string; subject: { kind: "deal" | "contact"; id: string } };
+type Props = { orgId: string; subject: MoneySubject };
 
 /**
  * DOC-01: the accounting documents issued outside the system and recorded on this deal or contact (type, number, date,

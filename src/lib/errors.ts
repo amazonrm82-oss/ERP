@@ -271,6 +271,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_schedule:max": "אפשר עד 20 תשלומים בלוח אחד.",
   // ORD-05: the customer's link to an order
   "order_link:draft": "קישור ללקוח נוצר רק להזמנה שאושרה וקיבלה מספר.",
+  // ORD-06 part two: documents and payments of an order
+  "order_money:draft": "מסמכים ותשלומים רושמים רק בהזמנה שאושרה וקיבלה מספר.",
+  "order_money:parent": "מסמך או תשלום של הזמנה נרשם על העסקה או איש הקשר של ההזמנה עצמה.",
   "order_link:cancelled": "להזמנה שבוטלה לא יוצרים קישור חדש.",
   "order_link:customer_deleted": "הלקוח של ההזמנה נמחק, ולכן אין לה קישור.",
   // ORD-04: an order's payment schedule

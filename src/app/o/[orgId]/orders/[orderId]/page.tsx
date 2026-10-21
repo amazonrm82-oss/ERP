@@ -17,6 +17,8 @@ import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderParties, getOrd
 import { OrderLinkCard } from "@/features/orders/components/order-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
+import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
+import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { orderEditing } from "@/features/orders/schema";
 import { deliveryContactLabel, orderSourceLabels, shippingAddressHint } from "@/features/orders/texts";
 import { getOrgTerms } from "@/features/terminology/queries";
@@ -288,6 +290,13 @@ export default async function OrderPage({ params }: Props) {
 
         {/* ORD-04: the payment schedule (a quote's order carries the accepted quote's, locked); built while a draft */}
         <PaymentScheduleCard orgId={orgId} ownerId={order.id} kind="order" steps={schedule} totalAgorot={order.totalAgorot} canEdit={mayEdit && editing.lines} />
+        {/* ORD-06 part two: the order's documents and payments (a numbered order only; each card shows with its plan key) */}
+        {order.status !== "draft" ? (
+          <>
+            <RecordDocumentsCard orgId={orgId} subject={{ kind: "order", id: order.id }} />
+            <RecordPaymentsCard orgId={orgId} subject={{ kind: "order", id: order.id }} />
+          </>
+        ) : null}
 
         <Card aria-labelledby="order-delivery">
           <CardHeader id="order-delivery" title="אספקה" />

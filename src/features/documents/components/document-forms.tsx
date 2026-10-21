@@ -10,12 +10,13 @@ import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PlusIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import type { MoneySubject } from "@/features/payments/money-subject";
 import type { FormState } from "@/lib/action-result";
 
 import { cancelDocumentAction, recordDocumentAction } from "../actions";
 import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "../schema";
 
-type Subject = { kind: "deal" | "contact"; id: string };
+type Subject = MoneySubject;
 
 function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string; subject: Subject; today: string; onDone: () => void; onCancel: () => void }) {
   const action = recordDocumentAction.bind(null, orgId, subject);

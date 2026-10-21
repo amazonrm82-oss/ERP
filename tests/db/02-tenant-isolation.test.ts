@@ -1105,6 +1105,14 @@ describe("tenant isolation", () => {
     expect((await pgError(asUser(b.id, (q) => q("select public.order_from_deal($1, $2)", [orgA, ids.dealA])))).code).toBe("42501");
     expect((await pgError(asUser(b.id, (q) => q("select public.order_from_quote($1, $2)", [orgA, ids.quoteA])))).code).toBe("42501");
     expect((await pgError(asUser(b.id, (q) => q("select public.order_confirm($1, $2)", [orgA, ids.orderA])))).code).toBe("42501");
+    // ORD-06 part two: B's own document or payment cannot name A's order
+    for (const sql of [
+      "insert into public.accounting_documents (organization_id, deal_id, order_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'receipt', 'B-ORD', 1)",
+      "insert into public.payments (organization_id, deal_id, order_id, amount_agorot, method) values ($1, $2, $3, 1, 'cash')",
+    ]) {
+      const viaOrder = await pgError(asUser(b.id, (q) => q(sql, [orgB, dealB, ids.orderA])));
+      expect(["42501", "23503", "P0001"], sql).toContain(viaOrder.code);
+    }
     const viaQuoteProduct = await pgError(
       asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, product_id, name, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, quoteB, ids.productA])),
     );

@@ -537,6 +537,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_erase_deal_documents_payments.sql",
       // AUT-07 redefines app.execute_automation() of _automation_permission_answer.sql and public.org_plan_usage() last
       "_automation_run_quota.sql",
+      // ORD-06 part two grants insert (order_id) again after _accounting_documents.sql and _payments.sql re-ran their grants
+      "_order_documents_payments.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

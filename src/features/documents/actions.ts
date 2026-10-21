@@ -7,9 +7,9 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
-import { readableDealContact } from "@/features/payments/deal-contact";
+import { moneyRowParents } from "@/features/payments/deal-contact";
+import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
 import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema } from "./schema";
 
@@ -20,10 +20,10 @@ import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema } from "./sche
 const CANNOT = "אין לכם הרשאה לרשום מסמכים כאן. רושמים בעלים, מנהלי מערכת, מנהלי צוות ומי שקיבל הרשאת רישום מסמכים.";
 const writeError = (error: { code?: string; message?: string; hint?: string }) => (error.code === "42501" ? CANNOT : dbErrorMessage(error));
 
-const subjectSchema = z.object({ kind: z.enum(["deal", "contact"]), id: z.guid() });
+const subjectSchema = z.object({ kind: z.enum(MONEY_SUBJECT_KINDS), id: z.guid() });
 type Subject = z.infer<typeof subjectSchema>;
 
-const pageOf = (orgId: string, subject: Subject) => (subject.kind === "deal" ? paths.deal(orgId, subject.id) : paths.contact(orgId, subject.id));
+const pageOf = (orgId: string, subject: Subject) => moneySubjectPath(orgId, subject);
 
 /**
  * A new document on the deal or the contact. RVW-45: a document on a deal is also the deal's contact's when the user reads
@@ -35,16 +35,13 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
   if (!context.ok) return context;
   const parsed = documentSchema.safeParse(pick(formData, DOCUMENT_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
-  let contactId: string | null = subject.kind === "contact" ? subject.id : null;
-  if (subject.kind === "deal") {
-    const found = await readableDealContact(context.supabase, orgId, subject.id);
-    if (found.error) return fail(dbErrorMessage(found.error), { values: formValues(formData) });
-    contactId = found.contactId;
-  }
+  // ORD-06 part two: on an order, the document hangs on the order's own deal or contact and names the order
+  const parents = await moneyRowParents(context.supabase, orgId, subject);
+  if ("error" in parents) return fail(dbErrorMessage(parents.error), { values: formValues(formData) });
+  if ("missing" in parents) return fail(CANNOT, { values: formValues(formData) });
   const { error } = await context.supabase.from("accounting_documents").insert({
     organization_id: orgId,
-    deal_id: subject.kind === "deal" ? subject.id : null,
-    contact_id: contactId,
+    ...parents,
     doc_type: parsed.data.doc_type,
     number: parsed.data.number,
     doc_date: parsed.data.doc_date,

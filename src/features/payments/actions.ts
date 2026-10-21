@@ -7,10 +7,10 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
-import { readableDealContact } from "./deal-contact";
+import { moneyRowParents } from "./deal-contact";
+import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "./money-subject";
 
 import { cancelReasonSchema, newPaymentStatusSchema, PAYMENT_FIELD_NAMES, paymentSchema, paymentStatusSchema } from "./schema";
 
@@ -23,12 +23,12 @@ const CANNOT_CORRECT = "תיקון וביטול של תשלום רק לבעלי�
 const writeError = (error: { code?: string; message?: string; hint?: string }, cannot = CANNOT) => (error.code === "42501" ? cannot : dbErrorMessage(error));
 
 const subjectSchema = z.object({
-  kind: z.enum(["deal", "contact"]),
+  kind: z.enum(MONEY_SUBJECT_KINDS),
   id: z.guid(),
 });
 type Subject = z.infer<typeof subjectSchema>;
 
-const pageOf = (orgId: string, subject: Subject) => (subject.kind === "deal" ? paths.deal(orgId, subject.id) : paths.contact(orgId, subject.id));
+const pageOf = (orgId: string, subject: Subject) => moneySubjectPath(orgId, subject);
 
 /** A new payment on the deal (with the deal's contact, when the user reads it) or on the contact. */
 export async function recordPaymentAction(orgId: string, subject: Subject, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -41,17 +41,14 @@ export async function recordPaymentAction(orgId: string, subject: Subject, _prev
   if (!status.success) return fail(INVALID_ARGS, { values: formValues(formData) });
 
   // a payment on a deal is the deal's contact's too, when the user reads that contact (the insert policy asks for it)
-  let contactId: string | null = subject.kind === "contact" ? subject.id : null;
-  if (subject.kind === "deal") {
-    const found = await readableDealContact(context.supabase, orgId, subject.id);
-    if (found.error) return fail(dbErrorMessage(found.error), { values: formValues(formData) });
-    contactId = found.contactId;
-  }
+  // ORD-06 part two: on an order, the payment hangs on the order's own deal or contact and names the order
+  const parents = await moneyRowParents(context.supabase, orgId, subject);
+  if ("error" in parents) return fail(dbErrorMessage(parents.error), { values: formValues(formData) });
+  if ("missing" in parents) return fail(CANNOT, { values: formValues(formData) });
 
   const { error } = await context.supabase.from("payments").insert({
     organization_id: orgId,
-    deal_id: subject.kind === "deal" ? subject.id : null,
-    contact_id: contactId,
+    ...parents,
     amount_agorot: parsed.data.amount,
     paid_on: parsed.data.paid_on,
     method: parsed.data.method,

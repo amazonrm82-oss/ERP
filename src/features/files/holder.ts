@@ -6,8 +6,8 @@ export type FileHolder = { kind: FileHolderKind; id: string };
 
 export const HOLDER_COLUMN = { document: "accounting_document_id", payment: "payment_id" } as const satisfies Record<FileHolderKind, string>;
 
-// the record page the holder is shown on (for revalidation)
-export type HolderPage = { kind: "deal" | "contact"; id: string };
+// the record page the holder is shown on (for revalidation): a deal, a contact or an order (ORD-06 part two)
+export type HolderPage = { kind: "deal" | "contact" | "order"; id: string };
 
 /** A holder's file, as shown. */
 export type HolderFile = {

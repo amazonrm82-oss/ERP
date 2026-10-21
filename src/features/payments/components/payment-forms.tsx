@@ -13,6 +13,7 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 
 import { cancelPaymentAction, correctPaymentAction, recordPaymentAction, setPaymentStatusAction } from "../actions";
+import type { MoneySubject } from "../money-subject";
 import {
   CANCEL_REASON_MAX,
   NEW_PAYMENT_STATUSES,
@@ -27,7 +28,7 @@ import {
   type PaymentStatus,
 } from "../schema";
 
-type Subject = { kind: "deal" | "contact"; id: string };
+type Subject = MoneySubject;
 
 /** The values a correction starts from (the amount as typed in shekels). */
 export type PaymentFormValues = {

@@ -15,6 +15,17 @@ export function definedFunctions(sql: string): Set<string> {
   return new Set([...sql.matchAll(FUNCTION_NAME)].map((m) => m[1].toLowerCase()));
 }
 
+// grant/revoke … on [table] public.<t>: the tables whose client grants a migration sets. "on function", "on schema" and
+// "on all tables in schema" do not match (no schema-qualified name right after "on [table]"); a list "on public.a,
+// public.b" names every table in it.
+const GRANT_TABLE =
+  /\b(?:grant|revoke)\b[^;]*?\bon\s+(?:table\s+)?(public\.[a-z_][a-z0-9_]*(?:\s*,\s*public\.[a-z_][a-z0-9_]*)*)\b(?!\s*\()/gi;
+
+/** The public tables a migration grants or revokes client rights on, lower case. */
+export function grantedTables(sql: string): Set<string> {
+  return new Set([...sql.matchAll(GRANT_TABLE)].flatMap((m) => m[1].toLowerCase().split(/\s*,\s*/)));
+}
+
 /** The migration file whose name ends with this suffix (the number changes when the lead renumbers it). */
 export function migrationFile(suffix: string): string {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith(suffix));
@@ -26,6 +37,8 @@ export function migrationFile(suffix: string): string {
  * The SQL to re-run, in name order: the given migrations, and every migration after the first of them that
  * redefines a function a file already in the list defines (growing as files join, in name order), or that
  * `also` asks for. A file between two given ones is judged by the functions of the files before it.
+ * Grants close the same way: a re-run `revoke all … grant (cols)` drops a column grant a later migration added, so every
+ * later migration that grants or revokes on a table a file already in the list grants or revokes on joins too.
  */
 export function rerunClosure(
   files: string[],
@@ -35,15 +48,18 @@ export function rerunClosure(
   const start = new Set(files);
   const first = [...files].sort()[0];
   const names = new Set<string>();
+  const tables = new Set<string>();
   const picked: string[] = [];
   const texts: string[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql") && f >= first).sort()) {
     const sql = readFileSync(join(dir, file), "utf8");
     const defines = definedFunctions(sql);
-    if (start.has(file) || [...defines].some((name) => names.has(name)) || also(sql)) {
+    const grants = grantedTables(sql);
+    if (start.has(file) || [...defines].some((name) => names.has(name)) || [...grants].some((t) => tables.has(t)) || also(sql)) {
       picked.push(file);
       texts.push(sql);
       for (const name of defines) names.add(name);
+      for (const t of grants) tables.add(t);
     }
   }
   const missing = files.filter((file) => !picked.includes(file));

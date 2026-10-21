@@ -8,6 +8,8 @@ import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { customerNames } from "@/features/documents/queries";
 import { must } from "@/lib/db-read";
+
+import { MONEY_SUBJECT_COLUMN, type MoneySubject } from "./money-subject";
 import { readAllPages } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +38,7 @@ export type Payment = {
   updatedAt: string;
 };
 
-export type PaymentsSubject = { kind: "deal" | "contact"; id: string };
+export type PaymentsSubject = MoneySubject;
 
 export type PaymentsAccess = {
   inPlan: boolean;
@@ -67,7 +69,7 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
         "id, amount_agorot, paid_on, method, installments, reference, note, status, cancel_reason, cancelled_at, cancelled_by, created_by, updated_by, created_at, updated_at",
       )
       .eq("organization_id", orgId)
-      .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
+      .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
       .order("paid_on", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id")

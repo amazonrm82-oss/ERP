@@ -7,7 +7,7 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
-import { paths } from "@/lib/paths";
+import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
 import type { FileHolder, HolderPage } from "./holder";
 import { ATTACHMENT_TYPE_PROBLEM, FILE_MAX_BYTES, FILES_BUCKET, isDocumentFileType, uploadProblemMessage } from "./types";
@@ -18,7 +18,7 @@ import { ATTACHMENT_TYPE_PROBLEM, FILE_MAX_BYTES, FILES_BUCKET, isDocumentFileTy
 // file and its earlier ones stay as versions. Nobody removes one (owner, 20 October 2026): only an upload that never
 // arrived goes, here, by its uploader.
 
-const pageSchema = z.object({ kind: z.enum(["deal", "contact"]), id: z.guid() });
+const pageSchema = z.object({ kind: z.enum(MONEY_SUBJECT_KINDS), id: z.guid() });
 const holderSchema = z.object({ kind: z.enum(["document", "payment"]), id: z.guid() });
 
 const fileSchema = z.object({
@@ -31,7 +31,7 @@ const CANNOT: Record<FileHolder["kind"], string> = {
   document: "אין לכם הרשאה לצרף קבצים למסמך הזה. מצרפים בעלים, מנהלי מערכת, מנהלי צוות ומי שקיבל הרשאת רישום מסמכים.",
   payment: "אין לכם הרשאה לצרף קבצים לתשלום הזה. מצרפים בעלים, מנהלי מערכת, מנהלי צוות ומי שקיבל הרשאת רישום תשלומים.",
 };
-const pageOf = (orgId: string, page: HolderPage) => (page.kind === "deal" ? paths.deal(orgId, page.id) : paths.contact(orgId, page.id));
+const pageOf = (orgId: string, page: HolderPage) => moneySubjectPath(orgId, page);
 
 /** Step 1: the row (the database checks the rights, the type, the plan's storage and links it to the latest file). */
 export async function prepareHolderFileAction(

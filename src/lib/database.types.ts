@@ -1814,6 +1814,8 @@ export type PaymentRow = {
   organization_id: string;
   deal_id: string | null;
   contact_id: string | null;
+  // ORD-06 part two: the numbered order it belongs to (set on insert only)
+  order_id: string | null;
   amount_agorot: number;
   currency: string;
   paid_on: string;
@@ -1838,6 +1840,8 @@ export type AccountingDocumentRow = {
   organization_id: string;
   deal_id: string | null;
   contact_id: string | null;
+  // ORD-06 part two: the numbered order it belongs to (set on insert only)
+  order_id: string | null;
   doc_type: string;
   number: string;
   doc_date: string;
@@ -2690,6 +2694,7 @@ export type Database = {
           organization_id: string;
           deal_id?: string | null;
           contact_id?: string | null;
+          order_id?: string | null;
           amount_agorot: number;
           currency?: string;
           paid_on?: string;
@@ -2717,6 +2722,7 @@ export type Database = {
           organization_id: string;
           deal_id?: string | null;
           contact_id?: string | null;
+          order_id?: string | null;
           doc_type: string;
           number: string;
           doc_date?: string;

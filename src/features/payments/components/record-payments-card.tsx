@@ -9,13 +9,14 @@ import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
 import { paymentsPath } from "../paths";
+import type { MoneySubject } from "../money-subject";
 import { getPaymentsAccess, listRecordPayments } from "../queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, receivedTotal, type PaymentStatus } from "../schema";
 import { CancelPaymentButton, CorrectPaymentButton, PaymentStatusSelect, RecordPaymentButton } from "./payment-forms";
 
 type Props = {
   orgId: string;
-  subject: { kind: "deal" | "contact"; id: string };
+  subject: MoneySubject;
 };
 
 const STATUS_TONES: Record<PaymentStatus, BadgeTone> = {

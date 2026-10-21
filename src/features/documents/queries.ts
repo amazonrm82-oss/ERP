@@ -6,6 +6,7 @@ import { canRecordDocuments } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { MONEY_SUBJECT_COLUMN, type MoneySubject } from "@/features/payments/money-subject";
 import { must } from "@/lib/db-read";
 import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
@@ -31,7 +32,7 @@ export type AccountingDocument = {
   createdAt: string;
 };
 
-export type DocumentsSubject = { kind: "deal" | "contact"; id: string };
+export type DocumentsSubject = MoneySubject;
 
 /** Whether the documents capability is in the plan, and whether the user may record (owners, admins, managers, the key). */
 export const getDocumentsAccess = cache(async (orgId: string): Promise<{ inPlan: boolean; canRecord: boolean }> => {
@@ -47,7 +48,7 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
       .from("accounting_documents")
       .select("id, doc_type, number, doc_date, amount_agorot, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
       .eq("organization_id", orgId)
-      .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
+      .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
       .order("doc_date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id")
