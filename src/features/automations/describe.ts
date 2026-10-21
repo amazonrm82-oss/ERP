@@ -23,6 +23,9 @@ export function describeRule(
     const n = rule.triggerConfig[trigger.number.key];
     when += trigger.number.key === "days" ? ` (${n} ימים)` : ` (${n} דקות לפני)`;
   }
+  if (trigger?.minAmount && typeof rule.triggerConfig.min_agorot === "number") {
+    when += ` (לפחות ₪${(rule.triggerConfig.min_agorot / 100).toLocaleString("he-IL")})`;
+  }
   if (trigger?.date) {
     when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
   }

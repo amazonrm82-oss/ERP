@@ -12,7 +12,8 @@ export type TriggerType =
   | "stuck_in_stage"
   | "birthday"
   | "task_due_soon"
-  | "date_reached";
+  | "date_reached"
+  | "payment_received";
 
 export type TriggerOption = {
   key: string;
@@ -25,6 +26,8 @@ export type TriggerOption = {
   number?: { key: "days" | "minutes"; label: string; default: number };
   // AUT-03: X days before or after a date field (field, days and direction are chosen in the builder)
   date?: true;
+  // PAY-07: an optional minimum amount in shekels (stored as trigger_config.min_agorot)
+  minAmount?: true;
 };
 
 export const TRIGGERS: TriggerOption[] = [
@@ -50,7 +53,16 @@ export const TRIGGERS: TriggerOption[] = [
   { key: "company:date", label: "תאריך בחברה", entity: "company", type: "date_reached", date: true },
   { key: "deal:date", label: "תאריך בעסקה", entity: "deal", type: "date_reached", date: true },
   { key: "task:date", label: "תאריך במשימה", entity: "task", type: "date_reached", date: true },
+  // PAY-07: a payment recorded on the deal or the contact (a payment on a deal with a contact starts both kinds of rules);
+  // offered only with the `payments` plan flag (Lookups.payments)
+  { key: "deal:payment", label: "התקבל תשלום בעסקה", entity: "deal", type: "payment_received", minAmount: true },
+  { key: "contact:payment", label: "התקבל תשלום מאיש קשר", entity: "contact", type: "payment_received", minAmount: true },
 ];
+
+/** PAY-07: whether the builder offers a trigger (payment triggers need the `payments` flag; a saved rule keeps its own). */
+export function triggerOffered(trigger: TriggerOption, lookups: { payments?: boolean }, current?: string): boolean {
+  return trigger.type !== "payment_received" || !!lookups.payments || trigger.key === current;
+}
 
 export type ConditionOption = {
   key: string;

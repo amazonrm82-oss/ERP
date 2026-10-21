@@ -72,6 +72,8 @@ export const ruleSchema = z
     trigger_field: z.string().max(100).optional(),
     trigger_direction: z.enum(DATE_DIRECTIONS).optional(),
     trigger_days: z.coerce.number({ error: "יש להזין מספר ימים." }).int({ error: "יש להזין מספר ימים שלם." }).min(0).max(DATE_TRIGGER_MAX_DAYS, { error: `עד ${DATE_TRIGGER_MAX_DAYS} ימים.` }).optional(),
+    // PAY-07: the minimum payment in shekels as typed (checked in toDbRule)
+    trigger_min: z.string().max(30, { error: "הסכום ארוך מדי." }).optional(),
     conditions: z
       .array(z.object({ key: z.string().refine((key) => CONDITIONS.some((c) => c.key === key)), value: z.string().max(100).optional() }))
       .max(5, { error: "עד 5 תנאים." }),

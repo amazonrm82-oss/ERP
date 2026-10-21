@@ -16,7 +16,7 @@ import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
 import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
-import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, type ActionType, type Entity } from "../definitions";
+import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
 import { setFieldChoices, type SetFieldChoice } from "../set-field";
 
@@ -83,6 +83,8 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   const [dateField, setDateField] = useState(initial?.triggerField ?? "");
   const [dateDirection, setDateDirection] = useState(initial?.triggerDirection ?? "before");
   const [dateDays, setDateDays] = useState(initial?.triggerDays ?? "1");
+  // PAY-07: the minimum payment in shekels ("" = any amount)
+  const [triggerMin, setTriggerMin] = useState(initial?.triggerMin ?? "");
   const [conditions, setConditions] = useState<Condition[]>(initial?.conditions ?? []);
   const [actions, setActions] = useState<Draft[]>(
     initial?.actions.length ? initial.actions.map((a) => ({ ...blankAction(a.type as ActionType), ...a })) : [blankAction("create_task")],
@@ -101,6 +103,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     setTriggerKey(key);
     setTriggerTo("");
     setTriggerNumber(next.number ? String(next.number.default) : "");
+    setTriggerMin("");
     // a date field of another record type is picked again
     if (next.entity !== entity) setDateField("");
     // drop what does not fit the new record type
@@ -125,6 +128,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     ...(trigger.date
       ? { trigger_field: dateField, trigger_direction: dateDirection, ...(dateDirection === "on" ? {} : { trigger_days: dateDays }) }
       : {}),
+    ...(trigger.minAmount && triggerMin.trim() ? { trigger_min: triggerMin } : {}),
     conditions: conditions.map((c) => (c.value ? c : { key: c.key })),
     actions: actions.map(clean),
   });
@@ -174,7 +178,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
           <SelectField label="מה קורה" value={triggerKey} onChange={(e) => changeTrigger(e.target.value)}>
             {ENTITY_GROUPS.filter((group) => !fixedEntity || group.entity === fixedEntity).map((group) => (
               <optgroup key={group.entity} label={group.label}>
-                {TRIGGERS.filter((t) => t.entity === group.entity).map((t) => (
+                {TRIGGERS.filter((t) => t.entity === group.entity && triggerOffered(t, lookups, initial?.trigger)).map((t) => (
                   <option key={t.key} value={t.key}>
                     {t.label}
                   </option>
@@ -194,6 +198,23 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
           ) : null}
           {trigger.number ? (
             <TextField label={trigger.number.label} value={triggerNumber} onChange={(e) => setTriggerNumber(e.target.value)} dir="ltr" inputMode="numeric" className="max-w-40" />
+          ) : null}
+          {trigger.minAmount ? (
+            <div className="space-y-1">
+              <TextField
+                label="סכום מינימלי (₪, לא חובה)"
+                value={triggerMin}
+                onChange={(e) => setTriggerMin(e.target.value)}
+                dir="ltr"
+                inputMode="decimal"
+                className="max-w-40"
+              />
+              <p className="text-sm text-ink-soft">
+                {trigger.entity === "deal"
+                  ? "רץ כשנרשם תשלום על העסקה (נרשם או אושר). תשלום שמשתנה אחר כך לא מפעיל שוב."
+                  : "רץ כשנרשם תשלום שמשויך לאיש הקשר, גם כשהוא רשום על עסקה (נרשם או אושר). תשלום שמשתנה אחר כך לא מפעיל שוב."}
+              </p>
+            </div>
           ) : null}
           {trigger.date ? (
             <div className="grid gap-3 sm:grid-cols-3">

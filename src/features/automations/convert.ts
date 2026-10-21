@@ -11,6 +11,14 @@ import { customDefinition, setFieldDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
 
+/** A shekel amount as typed ("1,500", "₪ 99.90") in whole agorot, or null when it is not a non-negative amount. */
+export function shekelsToAgorot(value: string): number | null {
+  const shekels = Number(value.replace(/[,\s₪]/g, ""));
+  if (value.trim() === "" || !Number.isFinite(shekels) || shekels < 0) return null;
+  const agorot = Math.round(shekels * 100);
+  return Number.isSafeInteger(agorot) ? agorot : null;
+}
+
 export type DbRule = {
   name: string;
   entity_type: Entity;
@@ -48,6 +56,12 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
     const config = dateTriggerConfig(entity, { field: rule.trigger_field, days: rule.trigger_days, direction: rule.trigger_direction }, lookups);
     if (typeof config === "string") return config;
     Object.assign(trigger_config, config);
+  }
+  if (trigger.type === "payment_received" && !lookups.payments) return "תשלומים אינם כלולים בתוכנית של העסק.";
+  if (trigger.minAmount && rule.trigger_min?.trim()) {
+    const agorot = shekelsToAgorot(rule.trigger_min);
+    if (agorot === null) return "יש להזין סכום מינימלי תקין.";
+    if (agorot > 0) trigger_config.min_agorot = agorot;
   }
 
   const conditions: DbRule["conditions"] = [];
@@ -143,6 +157,8 @@ export type BuilderInitial = {
   triggerField?: string;
   triggerDays?: string;
   triggerDirection?: string;
+  // PAY-07: the minimum payment in shekels ("" = any amount)
+  triggerMin?: string;
   conditions: Array<{ key: string; value: string }>;
   actions: Array<Record<string, string>>;
 };
@@ -228,6 +244,9 @@ export function fromDbRule(
     triggerTo: str(rule.triggerConfig.to),
     triggerNumber: trigger.number ? str(rule.triggerConfig[trigger.number.key] ?? trigger.number.default) : "",
     ...(date ? { triggerField: date.field, triggerDays: date.days, triggerDirection: date.direction } : {}),
+    ...(trigger.minAmount
+      ? { triggerMin: typeof rule.triggerConfig.min_agorot === "number" ? String(rule.triggerConfig.min_agorot / 100) : "" }
+      : {}),
     conditions,
     actions,
   };

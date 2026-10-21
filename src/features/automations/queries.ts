@@ -3,7 +3,7 @@ import { getOrgTerms } from "@/features/terminology/queries";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
-import { listMembers, listTeams } from "@/features/settings/queries";
+import { listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +23,8 @@ export type Lookups = {
   fields: Partial<Record<"lead" | "contact" | "company" | "deal", FieldDefinition[]>>;
   // FLD-10 part three: the business's word for a deal, for the default name of a deal a rule makes (absent = "עסקה")
   dealWord?: string;
+  // PAY-07: whether the plan has payments (the "payment received" trigger is offered only then)
+  payments?: boolean;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -35,11 +37,14 @@ type ReadFailure = { message: string; code?: string | null };
 export async function readLookups(orgId: string): Promise<{ data: Lookups; error: null } | { data: null; error: ReadFailure }> {
   const supabase = await createClient();
   let fields: Lookups["fields"];
+  let payments: boolean;
   try {
-    const [lead, contact, company, deal] = await Promise.all(
-      (["lead", "contact", "company", "deal"] as const).map((type) => listFieldDefinitions(orgId, type)),
-    );
+    const [[lead, contact, company, deal], inPlan] = await Promise.all([
+      Promise.all((["lead", "contact", "company", "deal"] as const).map((type) => listFieldDefinitions(orgId, type))),
+      orgHasFeature(orgId, "payments"),
+    ]);
     fields = { lead, contact, company, deal };
+    payments = inPlan;
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
@@ -78,6 +83,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       reasons: reasons.data ?? [],
       fields,
       dealWord: terms.deal.singular,
+      payments,
     },
     error: null,
   };
