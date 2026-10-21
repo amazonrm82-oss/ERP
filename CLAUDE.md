@@ -1009,6 +1009,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 020660 (PAY-07 notices) trigger `payments_notify_received` (definer, after insert, recorded/confirmed only) sends one `system` notice
   "התקבל תשלום" (amount and method, no name; `app.payment_amount_text`, `app.payment_method_label` = `PAYMENT_METHOD_LABELS`) to the
   deal's owner, else the contact's, active and not a viewer, never the recorder; nobody else.
+  Since 020665 (PAY-07 part two) trigger type `payment_received` for deal and contact rules (optional `trigger_config.min_agorot`):
+  trigger `payments_emit_received` (definer, after insert, recorded/confirmed) writes one outbox event per linked record (deal and contact),
+  origin `automation` while an automation runs. `app.process_outbox` and `app.automation_event_matches` were last redefined in 020665; the
+  builder offers it only with the `payments` flag (server-checked in `toDbRule`).
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
