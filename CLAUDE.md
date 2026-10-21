@@ -636,7 +636,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   comes from the record's own state, neutral `consent:address_blocked` otherwise. A privacy erasure goes through
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
-  last redefined in 020590 (ORD-01 orders), `app.audit_erase_core` in 020650 (ORD-05b; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+  last redefined in 020655 (documents and payments), `app.audit_erase_core` in 020650 (ORD-05b; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -994,8 +994,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`app.can_record_documents`). Read follows the deal, else the contact; a row with no parent is read by owners/admins/managers. Never deleted:
   cancelled with a required reason (`document:cancel_reason`), audited. Type+number unique per business, also when cancelled
   (`document:duplicate`). Definer trigger `app.accounting_documents_check` (outsider guard first) freezes the facts for every writer
-  (`document:frozen`); server paths: the FK set-null (`pg_trigger_depth() > 1`), merge (`app.document_server = 'on'`, contact only, through the
-  `merged` entry by `app.merge_accounting_documents`, until `merge_move_links` takes it) and erasure (`'erase'`: a cancel reason becomes
+  (`document:frozen`); server paths: the FK set-null (`pg_trigger_depth() > 1`), merge (`app.document_server = 'on'`, contact only, in
+  `app.merge_move_links` since 020655; `app.merge_accounting_documents` is a no-op) and erasure (`'erase'`: a cancel reason becomes
   "הסיבה נמחקה (מחיקת פרטיות)"; found through the audit entries). No attached file yet (shared `files` work, lane ד).
 - Payments received (PAY-01/05/06, migration 020635; owner 20 October 2026; plan flag `payments`): `public.payments` (a deal and/or contact,
   amount_agorot > 0 + currency, paid_on, method credit|transfer|cash|cheque|bit_paybox|standing_order|other, installments 1..36 for credit only,
@@ -1003,7 +1003,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `record_payments` (now built). Anyone who records moves recorded/confirmed/failed; correction, refunded and cancel are owners/admins only
   (`payment:correction`). Never deleted (no delete grant or policy): cancelled with a required reason, then frozen (`payment:cancelled`).
   Totals and reports count recorded + confirmed only. Definer trigger `app.payments_check` (outsider guard first); server paths as DOC-01:
-  FK set-null, merge (`app.payment_server = 'on'`, contact only, `app.merge_payments` through the `merged` entry) and erasure (`'erase'`:
+  FK set-null, merge (`app.payment_server = 'on'`, contact only, in `app.merge_move_links` since 020655; `app.merge_payments` is a no-op) and erasure (`'erase'`:
   reference and note emptied, a cancel reason becomes "הסיבה נמחקה (מחיקת פרטיות)"). `app.audit_erase_core`, `app.sample_untouched`,
   `app.import_record_worked` and `app.member_permission_built_keys` were last redefined in 020635. No attached file yet (lane ד).
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
