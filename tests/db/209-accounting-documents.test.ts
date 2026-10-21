@@ -258,8 +258,9 @@ describe("accounting documents (DOC-01)", () => {
         ]),
       ),
     ).toBe(0);
-    // the deal's document waits for the deal's own erasure; another customer's is untouched
-    expect((await facts(onDeal)).cancel_reason).toBe("מיכל לוי שילמה במזומן");
+    // RVW-45: the document recorded on the contact's deal (no contact on it) is reached too; another customer's is untouched
+    expect((await facts(onDeal)).cancel_reason).toBe("הסיבה נמחקה (מחיקת פרטיות)");
+    expect(await entries(onDeal)).toBe(0);
     expect((await facts(untouched)).cancel_reason).toBe("סיבה של מישהו אחר");
     await run(owner, (q) => q("update public.deals set deleted_at = now() where id = $1", [deal]));
     expect(await run(owner, async (q) => (await q("delete from public.deals where id = $1", [deal])).rowCount)).toBe(1);
