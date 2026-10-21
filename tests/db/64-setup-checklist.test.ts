@@ -535,6 +535,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_erase_quote_notices.sql",
       // RVW-45 redefines app.audit_erase_core() of _erase_quote_notices.sql last (documents and payments on the contact's deal)
       "_erase_deal_documents_payments.sql",
+      // AUT-07 redefines app.execute_automation() of _automation_permission_answer.sql and public.org_plan_usage() last
+      "_automation_run_quota.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -11,9 +11,11 @@ import { createFromTemplateAction } from "@/features/automations/actions";
 import { actionsMissingReason } from "@/features/automations/convert";
 import { describeRule } from "@/features/automations/describe";
 import { getLookups, listAutomations } from "@/features/automations/queries";
+import { runQuotaState } from "@/features/automations/run-quota";
 import { TEMPLATES } from "@/features/automations/templates";
 import { canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
+import { getPlanUsage } from "@/features/settings/plan-usage";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -32,11 +34,26 @@ export default async function AutomationsPage({ params }: Props) {
       </div>
     );
   }
-  const [automations, lookups] = await Promise.all([listAutomations(orgId), getLookups(orgId)]);
+  const [automations, lookups, plan] = await Promise.all([listAutomations(orgId), getLookups(orgId), getPlanUsage(orgId)]);
+  // AUT-07: the month's runs against the plan
+  const runs = plan?.usage.find((row) => row.key === "max_automation_runs_per_month");
+  const quota = runs ? runQuotaState(runs.used, runs.limit) : null;
   const used = new Set(automations.map((a) => a.templateKey).filter(Boolean));
 
   return (
     <div className="space-y-5">
+      {quota ? (
+        <div
+          role={quota.level === "stopped" ? "alert" : "status"}
+          className={
+            quota.level === "stopped"
+              ? "rounded-lg border border-danger bg-danger-soft px-4 py-3 text-md text-danger sm:px-5"
+              : "rounded-lg border border-warning bg-warning-soft px-4 py-3 text-md text-warning sm:px-5"
+          }
+        >
+          {quota.text} <Link href={paths.settingsPlan(orgId)} className="underline">לחבילה ולשימוש</Link>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-md text-ink-soft">
           אוטומציה עושה עבודה קבועה בשבילכם: כאשר משהו קורה, ואם התנאים מתקיימים, היא מבצעת פעולות. היא רצה תוך דקה מהאירוע (ובדיקות

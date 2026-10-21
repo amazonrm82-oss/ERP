@@ -107,6 +107,8 @@ export const STEP_ERRORS: Record<string, string> = {
   "the status no longer exists": "הסטטוס נמחק",
   "the stage is not in this deal's pipeline": "השלב לא שייך לתהליך המכירה של העסקה",
   "daily limit for this record reached": "הגיע למגבלה של 20 הרצות ביום לרשומה",
+  // AUT-07: the run was skipped at 110% of the plan's monthly runs
+  "the monthly automation runs of the plan are used up": "ההרצות החודשיות של החבילה נוצלו. האוטומציות יחזרו לרוץ בתחילת החודש הבא או אחרי הגדלת החבילה.",
   // AUT-01: a set_field step
   "the field does not fit this record": "השדה לא מתאים לסוג הרשומה",
   "the field no longer exists": "השדה נמחק או הוסתר",
