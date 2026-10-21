@@ -5,6 +5,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { toCompletePath } from "@/features/data-quality/paths";
+import { documentsPath } from "@/features/documents/paths";
+import { paymentsPath } from "@/features/payments/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
 import { REPORTS, reportTexts } from "@/features/reports/definitions";
@@ -27,6 +29,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   // QUO-17: a report of a plan capability is listed only while the business has it (each capability read once)
   const features = [...new Set(REPORTS.flatMap((report) => (report.feature ? [report.feature] : [])))];
   const hasFeature = new Map(await Promise.all(features.map(async (key) => [key, await orgHasFeature(orgId, key)] as const)));
+  // LST-09: the money lists, each while the plan has its key (owner, 21 October 2026: reached from here and the record cards)
+  const [hasDocuments, hasPayments] = await Promise.all([orgHasFeature(orgId, "documents"), orgHasFeature(orgId, "payments")]);
   // LEAD-08: a leads-only report is left out while the leads module is off (the page itself still opens from a saved link)
   const modules = await getOrgModules(orgId);
   // FLD-10: report titles in the business's words
@@ -55,6 +59,16 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
             <ButtonLink href={toCompletePath(orgId)} variant="secondary" size="sm">
               רשומות להשלמה
             </ButtonLink>
+            {hasDocuments ? (
+              <ButtonLink href={documentsPath(orgId)} variant="secondary" size="sm">
+                מסמכים חשבונאיים
+              </ButtonLink>
+            ) : null}
+            {hasPayments ? (
+              <ButtonLink href={paymentsPath(orgId)} variant="secondary" size="sm">
+                תשלומים
+              </ButtonLink>
+            ) : null}
           </span>
         }
       />

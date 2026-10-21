@@ -5,6 +5,9 @@ import type { ListObject } from "@/features/list-columns/columns";
 import { CHANNEL_OPTIONS, LOCALE_OPTIONS } from "@/features/contacts/preferences";
 import { INDUSTRIES } from "@/features/onboarding/options";
 import { BILLING_LABELS, BILLINGS, PRODUCT_KIND_LABELS, PRODUCT_KINDS, VAT_KIND_LABELS, VAT_KINDS } from "@/features/products/schema";
+import { DOCUMENT_LIST_STATUS_LABELS, DOCUMENT_LIST_STATUSES } from "@/features/documents/list";
+import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schema";
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
 import { QUOTE_STATUS_LABELS, QUOTE_STATUSES } from "@/features/quotes/schema";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
 import { TIME_ZONE } from "@/lib/app";
@@ -213,6 +216,28 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       // the total with VAT, as the quote shows it
       { key: "total", label: "סכום (₪)", kind: "number", column: "total_agorot", scale: 100 },
       created,
+    ],
+    // LST-09: the accounting documents (no tags or custom fields); the customer's name is not filtered (read from the
+    // deal or contact); who recorded it is a user choice on created_by
+    document: [
+      text("number", "מספר", "number"),
+      { key: "type", label: "סוג", kind: "select", column: "doc_type", plain: true, options: DOCUMENT_TYPES.map((t) => ({ value: t, label: DOCUMENT_TYPE_LABELS[t] })) },
+      { key: "date", label: "תאריך המסמך", kind: "day", column: "doc_date" },
+      { key: "amount", label: "סכום (₪)", kind: "number", column: "amount_agorot", scale: 100 },
+      { key: "status", label: "מצב", kind: "select", column: "status", plain: true, options: DOCUMENT_LIST_STATUSES.map((s) => ({ value: s, label: DOCUMENT_LIST_STATUS_LABELS[s] })) },
+      { ...owner, key: "recorder", label: "נרשם על ידי", column: "created_by" },
+      { ...created, label: "תאריך הרישום" },
+    ],
+    // LST-09: the payments (no tags or custom fields; the note is not filtered: it stays on the record's card)
+    payment: [
+      { key: "amount", label: "סכום (₪)", kind: "number", column: "amount_agorot", scale: 100 },
+      { key: "date", label: "תאריך התשלום", kind: "day", column: "paid_on" },
+      { key: "method", label: "אמצעי תשלום", kind: "select", column: "method", plain: true, options: PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] })) },
+      { key: "installments", label: "מספר תשלומים", kind: "number", column: "installments" },
+      text("reference", "אסמכתא", "reference"),
+      { key: "status", label: "מצב", kind: "select", column: "status", plain: true, options: PAYMENT_STATUSES.map((s) => ({ value: s, label: PAYMENT_STATUS_LABELS[s] })) },
+      { ...owner, key: "recorder", label: "נרשם על ידי", column: "created_by" },
+      { ...created, label: "תאריך הרישום" },
     ],
   };
 

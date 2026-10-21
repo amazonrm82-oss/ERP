@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { HolderFiles } from "@/features/files/components/holder-files";
@@ -5,6 +7,7 @@ import { listHolderFiles } from "@/features/files/holder-queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
+import { documentsPath } from "../paths";
 import { getDocumentsAccess, listRecordDocuments } from "../queries";
 import { DOCUMENT_TYPE_LABELS } from "../schema";
 import { CancelDocumentButton, RecordDocumentButton } from "./document-forms";
@@ -91,6 +94,12 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
             })}
           </ul>
         )}
+        {/* LST-09: the business-wide list */}
+        <p className="border-t border-line px-4 py-2 text-sm">
+          <Link href={documentsPath(orgId)} className="text-accent-strong underline-offset-4 hover:underline">
+            לכל המסמכים
+          </Link>
+        </p>
       </CardBody>
     </Card>
   );

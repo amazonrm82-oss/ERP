@@ -10,6 +10,8 @@ import { pick, requiredText } from "@/lib/validation";
 
 import { columnChoicesSchema } from "@/features/list-columns/columns";
 import { productsPath } from "@/features/products/paths";
+import { documentsPath } from "@/features/documents/paths";
+import { paymentsPath } from "@/features/payments/paths";
 import { quotesPath } from "@/features/quotes/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
 
@@ -17,7 +19,15 @@ import { cleanFilters, VIEW_OBJECTS, VIEW_SORT_RE, type ViewObject } from "./typ
 
 // the list a view belongs to; the product catalog and quotes are not record types (LST-09)
 const listPathOf = (orgId: string, objectType: ViewObject) =>
-  objectType === "product" ? productsPath(orgId) : objectType === "quote" ? quotesPath(orgId) : RECORD_TYPES[objectType].list(orgId);
+  objectType === "product"
+    ? productsPath(orgId)
+    : objectType === "quote"
+      ? quotesPath(orgId)
+      : objectType === "document"
+        ? documentsPath(orgId)
+        : objectType === "payment"
+          ? paymentsPath(orgId)
+          : RECORD_TYPES[objectType].list(orgId);
 
 
 const viewSchema = z
@@ -54,7 +64,7 @@ export async function saveViewAction(orgId: string, objectType: ViewObject, _pre
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const filters = cleanFilters(pick(formData, ["q", "status", "tag", "f", "category", "kind", "owner", "from", "to"]));
+  const filters = cleanFilters(pick(formData, ["q", "status", "tag", "f", "category", "kind", "owner", "from", "to", "type", "method"]));
   const sortRaw = String(formData.get("sort") ?? "");
   const sort = VIEW_SORT_RE.test(sortRaw) ? sortRaw : null;
   const columns = readColumns(formData.get("columns"));

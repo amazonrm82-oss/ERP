@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { agorotInput } from "@/features/deals/recurring";
@@ -6,6 +8,7 @@ import { listHolderFiles } from "@/features/files/holder-queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
+import { paymentsPath } from "../paths";
 import { getPaymentsAccess, listRecordPayments } from "../queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, receivedTotal, type PaymentStatus } from "../schema";
 import { CancelPaymentButton, CorrectPaymentButton, PaymentStatusSelect, RecordPaymentButton } from "./payment-forms";
@@ -142,6 +145,12 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
             </ul>
           </>
         )}
+        {/* LST-09: the business-wide list */}
+        <p className="border-t border-line px-4 py-2 text-sm">
+          <Link href={paymentsPath(orgId)} className="text-accent-strong underline-offset-4 hover:underline">
+            לכל התשלומים
+          </Link>
+        </p>
       </CardBody>
     </Card>
   );

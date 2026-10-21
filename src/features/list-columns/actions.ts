@@ -11,13 +11,15 @@ import { isRecordType, RECORD_TYPES } from "@/lib/record-types";
 
 import { BOARD_PREFERENCE, boardCatalog, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
 import { productsPath } from "@/features/products/paths";
+import { documentsPath } from "@/features/documents/paths";
+import { paymentsPath } from "@/features/payments/paths";
 import { quotesPath } from "@/features/quotes/paths";
 import { paths } from "@/lib/paths";
 
 import { catalogFor, columnChoicesSchema, type ColumnChoice, type PreferenceKey } from "./columns";
 
 
-const isPreferenceKey = (object: unknown): object is PreferenceKey => object === BOARD_PREFERENCE || object === "product" || object === "quote" || isRecordType(object);
+const isPreferenceKey = (object: unknown): object is PreferenceKey => object === BOARD_PREFERENCE || object === "product" || object === "quote" || object === "document" || object === "payment" || isRecordType(object);
 
 // the page that shows a list's columns (or the board's card fields); the product catalog and quotes are not record types (LST-09)
 const pageOf = (orgId: string, object: PreferenceKey) =>
@@ -27,7 +29,11 @@ const pageOf = (orgId: string, object: PreferenceKey) =>
       ? productsPath(orgId)
       : object === "quote"
         ? quotesPath(orgId)
-        : RECORD_TYPES[object].list(orgId);
+        : object === "document"
+          ? documentsPath(orgId)
+          : object === "payment"
+            ? paymentsPath(orgId)
+            : RECORD_TYPES[object].list(orgId);
 
 /** What can be picked for a list: its columns, or the fields of a board card (DEAL-09). */
 async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<string>> {
@@ -35,7 +41,7 @@ async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<stri
     return new Set(boardCatalog(await listFieldDefinitions(orgId, "deal")).map((column) => column.key));
   }
   const [fields, products] = await Promise.all([
-    object === "task" || object === "product" || object === "quote" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
+    object === "task" || object === "product" || object === "quote" || object === "document" || object === "payment" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
     // LEAD-04: the leads' product column only with the product catalog
     object === "lead" ? requestedProductEnabled(orgId) : Promise.resolve(false),
   ]);

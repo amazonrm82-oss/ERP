@@ -2989,8 +2989,10 @@ export type Database = {
       // products by category name (PRD-01)
       sort_category: { Args: Record<string, never>; Returns: string | null };
       sort_unit: { Args: Record<string, never>; Returns: string | null };
-      // quotes by customer name (LST-09); sort_owner covers quotes too
+      // quotes, accounting documents and payments by customer name (LST-09); sort_owner covers quotes too
       sort_customer: { Args: Record<string, never>; Returns: string | null };
+      // accounting documents and payments by who recorded them (LST-09)
+      sort_recorder: { Args: Record<string, never>; Returns: string | null };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

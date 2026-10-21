@@ -21,8 +21,8 @@ function filterLookups(orgId: string, object: FilterObject) {
     object === "lead" || object === "contact" ? getLeadLookups(orgId) : null,
     // products have no owner
     object === "product" ? [] : listMembers(orgId),
-    // tasks, products and quotes have no tags
-    object === "task" || object === "product" || object === "quote" ? [] : listTags(orgId),
+    // tasks, products, quotes, documents and payments have no tags
+    object === "task" || object === "product" || object === "quote" || object === "document" || object === "payment" ? [] : listTags(orgId),
     object === "contact" || object === "company" ? listRecordTypes(orgId, object) : [],
     // TASK-08: the business's activity and task types
     object === "task" ? listActivityTypes(orgId) : [],

@@ -3,7 +3,7 @@ import { z } from "zod";
 // Which columns a list shows, in what order and how wide (LST-03). Shared by the
 // server (resolving a saved choice) and the "columns" panel in the browser.
 
-export type ListObject = "lead" | "contact" | "company" | "deal" | "task" | "product" | "quote";
+export type ListObject = "lead" | "contact" | "company" | "deal" | "task" | "product" | "quote" | "document" | "payment";
 // a saved choice in list_preferences: a list's columns, or the fields of a deal card on the board (DEAL-09)
 export type PreferenceKey = ListObject | "deal_board";
 export type ColumnWidth = "narrow" | "normal" | "wide";
@@ -121,6 +121,33 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "created", label: "נוצרה" },
     ],
     defaults: ["status", "customer", "owner", "quote_date", "valid_until", "total"],
+  },
+  // LST-09: the accounting documents (DOC-01); the name column is the type and number; no custom fields
+  document: {
+    columns: [
+      { key: "type", label: "סוג" },
+      { key: "customer", label: "לקוח" },
+      { key: "date", label: "תאריך המסמך" },
+      { key: "amount", label: "סכום" },
+      { key: "status", label: "מצב" },
+      { key: "recorder", label: "נרשם על ידי" },
+      { key: "created", label: "נרשם בתאריך" },
+    ],
+    defaults: ["type", "customer", "date", "amount", "status"],
+  },
+  // LST-09: the payments (PAY-01); the name column is the amount; no custom fields
+  payment: {
+    columns: [
+      { key: "customer", label: "לקוח" },
+      { key: "date", label: "תאריך התשלום" },
+      { key: "method", label: "אמצעי תשלום" },
+      { key: "installments", label: "מספר תשלומים" },
+      { key: "reference", label: "אסמכתא" },
+      { key: "status", label: "מצב" },
+      { key: "recorder", label: "נרשם על ידי" },
+      { key: "created", label: "נרשם בתאריך" },
+    ],
+    defaults: ["customer", "date", "method", "reference", "status"],
   },
 };
 
