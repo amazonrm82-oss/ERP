@@ -1364,6 +1364,7 @@ that back.
   (migration 020615): notifications stay stored in today's words; `src/features/notifications/notification-text.ts` redraws them from a
   closed list of anchored patterns (bell, page, push; unknown text shown as stored); `claim_push_notifications` (last redefined in
   020615) returns the term keys. A new notification text naming a record must be covered there: the unit test reads the migrations.
+  Every new module's screens use the terms too (RVW-49: orders, documents, payments through `src/features/<area>/texts.ts`).
 - Saving a one-row-per-org settings table whose UPDATE is column-granted: update and select back, insert only when 0 rows, retry
   the update once on 23505. Never PostgREST `.upsert(..., {onConflict})`: its `DO UPDATE SET` names `organization_id`, which has no
   UPDATE grant, so it fails with 42501 (FLD-10 review, QUO-05).
