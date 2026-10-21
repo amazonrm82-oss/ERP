@@ -11,6 +11,7 @@ import { countDealLines, listRecordQuotes } from "../queries";
 import { listQuoteTemplates } from "../template-server";
 import { QUOTE_STATUS_LABELS } from "../schema";
 import { NewQuoteButton } from "./new-quote-button";
+import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
 
 type Props = {
   orgId: string;
@@ -40,7 +41,9 @@ export async function RecordQuotesCard({ orgId, subject, canCreate }: Props) {
             <NewQuoteButton orgId={orgId} source={source} templates={templates.map((t) => ({ id: t.id, name: t.name }))} dealLines={dealLines} />
           ) : null
         } />
-      <CardBody>
+      <CardBody className="space-y-3">
+        {/* COL-05: a warning before selling to a held customer */}
+        {creates && source ? <CustomerHoldWarning orgId={orgId} subject={source} /> : null}
         {quotes.length === 0 ? (
           <p className="text-sm text-ink-soft">{`עוד אין הצעות מחיר ${subject.kind === "deal" ? withPrefixThe("ל", terms.deal) : subject.kind === "contact" ? withPrefixThe("ל", terms.contact) : "לחברה"}.`}</p>
         ) : (

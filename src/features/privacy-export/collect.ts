@@ -159,6 +159,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   const payments = await readLinked(supabase, orgId, "payments", "*", paymentFilter || null);
   // and their files (a receipt or a confirmation), listed and stored like the records' files
   files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "payment_id", uniqueIds(payments.map((p) => p.id)))));
+  // COL-05: the "do not sell" holds set on the person's contacts
+  const customerHolds = await readByIds(supabase, orgId, "customer_holds", "*", "contact_id", contactIds);
   // and their files (the copy of the paper that was issued), listed and stored like the records' files
   files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "accounting_document_id", uniqueIds(accountingDocuments.map((d) => d.id)))));
 
@@ -204,6 +206,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     order_lines: orderLines,
     order_payment_steps: orderPaymentSteps,
     payments,
+    customer_holds: customerHolds,
     order_decisions: orderDecisions,
     accounting_documents: accountingDocuments,
     segment_members: segmentMembers,

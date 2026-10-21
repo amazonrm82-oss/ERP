@@ -1795,6 +1795,20 @@ export type QuotePaymentStepRow = {
 };
 
 // PAY-01: a payment received, recorded on a deal or a contact (migration payments). Never deleted; cancelled with a reason.
+// COL-05: "לא למכור עד הסדרת חוב" on a contact or a company (migration customer_holds). Lifted, never deleted.
+export type CustomerHoldRow = {
+  id: string;
+  organization_id: string;
+  contact_id: string | null;
+  company_id: string | null;
+  reason: string;
+  created_by: string | null;
+  cleared_at: string | null;
+  cleared_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PaymentRow = {
   id: string;
   organization_id: string;
@@ -2664,6 +2678,12 @@ export type Database = {
         OrderLineWrite
       >;
       // PAY-01: column grants; the links never change by hand, corrections and cancelling are for owners and admins; no delete
+      // COL-05: column grants; a person sets a hold and lifts it, nothing else (no delete)
+      customer_holds: Table<
+        CustomerHoldRow,
+        { organization_id: string; contact_id?: string | null; company_id?: string | null; reason: string },
+        { cleared_at?: string | null }
+      >;
       payments: Table<
         PaymentRow,
         {

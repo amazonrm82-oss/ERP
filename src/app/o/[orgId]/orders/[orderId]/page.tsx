@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -124,6 +125,12 @@ export default async function OrderPage({ params }: Props) {
           </div>
         }
       />
+      {/* COL-05: a warning while the order is a draft */}
+      {order.status === "draft" ? (
+        <div className="mb-4 empty:hidden">
+          <CustomerHoldWarning orgId={orgId} customer={{ contactId: order.contactId, companyId: order.companyId }} />
+        </div>
+      ) : null}
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <OrderStatusBadge status={order.status} />
         <span>{ORDER_SOURCE_LABELS[order.source]}</span>

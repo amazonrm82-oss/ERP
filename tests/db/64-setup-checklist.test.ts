@@ -521,6 +521,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the DOC-01 / PAY-01 merge follow-up redefines app.merge_move_links() of _merge_orders_move.sql and
       // app.merge_accounting_documents() / app.merge_payments() last (documents and payments move with the links)
       "_merge_docs_payments_move.sql",
+      // COL-05 redefines app.sample_untouched() and app.import_record_worked() of _payments.sql and app.audit_erase_core() of
+      // _order_answer_timeline.sql last (holds are work; erasure erases their entries)
+      "_customer_holds.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -29,6 +29,7 @@ import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
+import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -192,6 +193,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <RecordQuotesCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={false} />
           {/* ORD-01: the company's orders while the orders module is on */}
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
+          {/* COL-05: "לא למכור עד הסדרת חוב" */}
+          <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
 
         </div>
       </div>

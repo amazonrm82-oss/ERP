@@ -7,6 +7,7 @@ import { getOrdersAccess } from "../access";
 import { listRecordOrders } from "../queries";
 import { NewOrderButton } from "./new-order-button";
 import { OrderListItems } from "./order-list-items";
+import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
 
 type Props = {
   orgId: string;
@@ -49,6 +50,12 @@ export async function RecordOrdersCard({ orgId, subject, canCreate, dealWon = fa
         }
       />
       <CardBody className="p-0">
+        {/* COL-05: a warning before selling to a held customer */}
+        {canCreate ? (
+          <div className="px-4 pt-3 empty:hidden">
+            <CustomerHoldWarning orgId={orgId} subject={subject} />
+          </div>
+        ) : null}
         {orders.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-soft">{empty}</p>
         ) : (

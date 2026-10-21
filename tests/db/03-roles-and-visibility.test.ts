@@ -410,6 +410,27 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a customer hold follows its contact; owners, admins and managers set and lift it, members and viewers only read (COL-05)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח עם חוב') returning id", [org])).rows[0].id,
+    );
+    const hold = await asUser(manager.id, async (q) =>
+      (await q<{ id: string }>("insert into public.customer_holds (organization_id, contact_id, reason) values ($1, $2, 'חוב פתוח') returning id", [org, contact])).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.customer_holds where id = $1", [hold]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // m1 reads the contact but holds no key: lifts nothing and sets nothing
+    expect(await asUser(m1.id, async (q) => (await q("update public.customer_holds set cleared_at = now() where id = $1", [hold])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.customer_holds set cleared_at = now() where id = $1", [hold])).rowCount)).toBe(0);
+    // nobody deletes a hold
+    expect((await pgError(asUser(admin.id, (q) => q("delete from public.customer_holds where id = $1", [hold])))).code).toBe("42501");
+    expect(await asUser(admin.id, async (q) => (await q("update public.customer_holds set cleared_at = now() where id = $1", [hold])).rowCount)).toBe(1);
+  });
+
   it("payments follow their deal; owners, admins and managers record, only owners and admins correct and cancel, nobody deletes (PAY-01, PAY-06)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

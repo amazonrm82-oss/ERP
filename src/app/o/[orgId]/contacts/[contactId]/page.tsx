@@ -61,6 +61,7 @@ import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-car
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
+import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
 // FLD-10: the tab title in the business's word
@@ -249,6 +250,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* PAY-01: payments received and recorded here */}
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
+          {/* COL-05: "לא למכור עד הסדרת חוב" */}
+          <CustomerHoldCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
 
           <RelatedDealsCard
             orgId={orgId}

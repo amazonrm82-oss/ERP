@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -305,6 +306,12 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </div>
         }
       />
+      {/* COL-05: a warning while the quote is drafted, or an order may be made from it */}
+      {quote.status === "draft" || quote.status === "accepted" ? (
+        <div className="mb-4 empty:hidden">
+          <CustomerHoldWarning orgId={orgId} customer={{ contactId: quote.contactId, companyId: quote.companyId }} />
+        </div>
+      ) : null}
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <Badge>{QUOTE_STATUS_LABELS[quote.status]}</Badge>
         {quote.cancelledFrom === "accepted" ? <span>בוטלה אחרי שהלקוח אישר{quote.cancelReason ? <> · סיבה: <bdi>{quote.cancelReason}</bdi></> : null}</span> : null}
