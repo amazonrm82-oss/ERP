@@ -991,7 +991,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.import_record_worked` were last redefined in 020635 (PAY-01), `app.audit_erase_core` in 020650.
   Since 020585 a person's product line on a draft may claim its price source like deal lines (PL-03); `order_lines.price_list_id`
   (composite FK set null, only with `price_source = 'price_list'`, flag `price_lists`, name copied from the list).
-  `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
+  Since 020700 (RVW-41) `order:customer` holds only on a person's insert or customer change (an order left with only its deal
+  after a purge stays workable), and an FK set-null of `delivery_contact_id`/`quote_id`/`original_order_id` at `pg_trigger_depth() > 1`
+  is a server write; since 020705 (RVW-47) a person changes nothing in a cancelled order (`order:cancelled`); `app.orders_check` was
+  last redefined in 020705. `public.order_from_deal` was last redefined in 020585, `app.order_lines_check` in 020595 (a person's list price names its list on
   update too; only the FK's own set-null, `pg_trigger_depth() > 1`, clears a line's list alone). Order document:
   `/o/[org]/orders/[id]/document` (quote design, stored totals, "אינו חשבונית מס"; billing details read live, only the name is a snapshot).
   Since 020620 (ORD-04 part one, owner 20 October 2026) `public.order_payment_steps` is GAP-09's schedule on orders: rights follow the
