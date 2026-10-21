@@ -1104,8 +1104,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `public.undo_own_import(org, job)` (definer): the caller's own finished import, within 7 days, records unchanged
   (`updated_at = created_at`) and not worked on (`app.import_record_worked`). Every rule keeps `created_by`/`updated_by`; an insert or
   update an automation makes names the rule in its audit entry, from `app.automation_rule_runs` (65,536 fixed slots keyed by
-  `txid_current() % 65536`, taken with SKIP LOCKED; never a session setting). `app.audit_row` and `app.execute_automation` were last
-  redefined in 020020.
+  `txid_current() % 65536`, taken with SKIP LOCKED; never a session setting). `app.audit_row` was last redefined in 020020 (`app.execute_automation` in
+  020735).
 - View seats (PRM-02, migrations 020120, 020325): an active view seat needs room in `view_seats_per_paid_seat` x the full seats bought
   (`subscriptions.seats`; while it is null, a trial, the active full seats; owner 18 October 2026: every `_per_user` key counts
   purchased seats the same way) (`app.view_seat_cap` over `app.paid_seat_count`, both last redefined in 020340, `app.assert_view_seat_available`, under the paid-seat check's subscription lock; hint
@@ -1217,6 +1217,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 020610 (DEAL-08 follow-up) `create_deal` takes `pipeline: "source"` and `copy_from_source: true` (deal triggers): the source's
   process, its recurring revenue for the next period (term rounded to whole months) and its lines, copied as the server (the JWT claims
   are cleared around the copy and restored); `app.run_automation_actions` was last redefined in 020610.
+- Automation run quota (AUT-07, migration 020735; owner 18 October 2026): `app.automation_run_months` (one row per business and
+  month in its zone, no grants) counted by `app.execute_automation` only while the plan has `max_automation_runs_per_month` (a plan
+  without a limit neither locks nor counts): the month row is taken FOR UPDATE before the run; at 110% the run is logged `skipped`
+  with its reason (never an error); a run that executed a step adds 1; one `system` notice to active owners at 80% and at 100%.
+  Manual runs (`manual:` keys) are neither counted nor stopped. `org_plan_usage` lists it. `app.execute_automation` was last
+  redefined in 020735, `public.org_plan_usage` in 020735.
 - Date triggers (AUT-03 part one, migration 020245): trigger type `date_reached` {field, days 0..365, direction before|after} on
   every record type; fields `app.automation_date_fields(entity)` (mirrored by `DATE_TRIGGER_FIELDS` in
   `src/features/automations/date-trigger.ts`) plus active date/datetime custom fields. Once per record and date (run key), from
@@ -1466,8 +1472,9 @@ file wins.
 - **A question does not stop the line.** Write it under "שאלות שמחכות לבעל המוצר" in
   `docs/DECISIONS.md` with the requirement id, skip that requirement, continue with the next one that
   does not depend on it, and ask the waiting questions in plain Hebrew at the end of the turn, **all of
-  them together in one numbered list**, each with the options and a recommendation, and he answers them all
-  (owner's request, 15 October 2026; it replaces "one question at a time" of 8 October). Stop completely only
+  them together in one numbered list**, each with its options and **no recommendation** (owner, 21 October 2026: "when you
+  ask me questions, leave out your recommendation"), and he answers them all (owner's request, 15 October 2026; it replaces
+  "one question at a time" of 8 October). What a worker builds meanwhile follows the lead's choice, recorded in DECISIONS.md. Stop completely only
   when nothing unblocked is left. Record each answer in DECISIONS.md.
 - **Design direction is the owner's choice** (`DSN-02`). Show the three directions on real screens,
   ask, and until he answers do only work that does not change how screens look. After the choice,
