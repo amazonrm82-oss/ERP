@@ -490,7 +490,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   document uses) and export through `log_list_export('product')`. PRD-07 price history reads `audit_log` (owners/admins).
 - Quotes table (LST-09 for quotes, migration 020600): `list_preferences` and `saved_views` take `quote`; sort fields `sort_owner(quotes)`,
   `sort_customer(quotes)` (invoker); `log_list_export('quote')` and `/o/[org]/quotes/export`; no inline edit or bulk change (a quote changes
-  only on its own screen; bulk refuses `quote` except export). `public.log_list_export` and `app.export_choice_values` were last redefined in 020600.
+  only on its own screen; bulk refuses `quote` except export). `public.log_list_export` and `app.export_choice_values` were last redefined in 020600 (then 020690).
+- Money lists (LST-09 for documents and payments, migration 020690): `list_preferences` and `saved_views` take `document` and `payment`;
+  sort fields `sort_customer` / `sort_recorder` on `accounting_documents` and `payments` (invoker); `log_list_export('document'|'payment')`
+  also refuses without the plan key (`documents` / `payments`, hint `feature:<key>`); export routes only (bulk `EXPORT_ONLY` = quote,
+  document, payment). `public.log_list_export` and `app.export_choice_values` were last redefined in 020690.
 - Products table (LST-09 for products, migration 020280): `list_preferences` and `saved_views` take object type `product`; inline edit
   (name, category), bulk (state, category, export; undo in `src/features/products/bulk-server.ts`) and the filtered export use the
   user's session, so the products policies decide. The export keeps PRD-05's fixed columns.
@@ -1033,8 +1037,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   with `cleared_at`/`cleared_by` and kept as history; audited). Set and lifted by `app.can_manage_customer_holds` (owner/admin/manager by
   role or the PRM-01 key `record_payments`); read follows the record; definer trigger `app.customer_holds_check` (outsider guard first).
   The warning is app-only (quote and order creation for a held contact or its held company); nothing is refused and no public page reads
-  the table. Merge moves the duplicate's active hold through the `merged` entry (`app.merge_customer_holds`), lifting it when the kept
-  record is held already. `app.audit_erase_core`, `app.sample_untouched` and `app.import_record_worked` were last redefined in 020680.
+  the table. Merge moves ALL the duplicate's holds (history included) through the `merged` entry (`app.merge_customer_holds`); when the
+  kept record is held already, the duplicate's active hold is lifted first (the header of 020680 says otherwise; 020690 corrects it). `app.audit_erase_core`, `app.sample_untouched` and `app.import_record_worked` were last redefined in 020680.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
