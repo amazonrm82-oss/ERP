@@ -9,7 +9,7 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
-import { holdReasonSchema } from "./schema";
+import { holdReasonSchema, isActiveHoldClash } from "./schema";
 
 // COL-05: setting and lifting a hold, with the user's session; RLS and the table's trigger decide (answer 1 (א)).
 
@@ -17,7 +17,9 @@ const CANNOT = "אין לכם הרשאה לסמן לקוח. מסמנים בעל�
 const subjectSchema = z.object({ kind: z.enum(["contact", "company"]), id: z.guid() });
 type Subject = z.infer<typeof subjectSchema>;
 const pageOf = (orgId: string, s: Subject) => (s.kind === "contact" ? paths.contact(orgId, s.id) : paths.company(orgId, s.id));
-const writeError = (error: { code?: string; message?: string; hint?: string }) => (error.code === "42501" ? CANNOT : dbErrorMessage(error));
+// a hold set at the same moment by someone else reads as "already held", like the trigger's own refusal
+const writeError = (error: { code?: string; message?: string; hint?: string; details?: string }) =>
+  error.code === "42501" ? CANNOT : dbErrorMessage(isActiveHoldClash(error) ? { code: "P0001", hint: "customer_hold:exists", message: error.message ?? "" } : error);
 
 export async function setHoldAction(orgId: string, subject: Subject, _prev: FormState, formData: FormData): Promise<FormState> {
   if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);

@@ -20,3 +20,17 @@ export function holdWarningText(hold: { on: "contact" | "company"; reason: strin
   const whose = hold.on === "company" ? "החברה של הלקוח מסומנת" : "הלקוח מסומן";
   return `${whose} "${HOLD_LABEL}"${hold.by ? ` (על ידי ${hold.by})` : ""}: ${hold.reason}`;
 }
+
+// the partial unique indexes that keep one active hold per contact and per company (migration customer_holds)
+const ACTIVE_HOLD_INDEXES = ["customer_holds_contact_active", "customer_holds_company_active"] as const;
+
+/**
+ * Two people setting a hold on the same customer at the same moment: the trigger's check (hint customer_hold:exists) let
+ * both through and the unique index refused the second with a plain 23505. It means the same thing, so the action answers
+ * with the same message (COL-05 review, low 1).
+ */
+export function isActiveHoldClash(error: { code?: string; message?: string; details?: string } | null | undefined): boolean {
+  if (!error || error.code !== "23505") return false;
+  const text = `${error.message ?? ""} ${error.details ?? ""}`;
+  return ACTIVE_HOLD_INDEXES.some((index) => text.includes(index));
+}
