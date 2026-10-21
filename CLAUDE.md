@@ -474,7 +474,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `documentTotals()` in `src/features/tax/calc.ts` (test 94 compares them; change both). `app.org_document_vat_rate(org, date)`:
   0 = no VAT, null = status not set. Every amount has a currency next to it, ILS only until DEAL-12 (`leads.currency`,
   `leads_currency_ils`, `deals_currency_ils`); a new money table carries `currency text not null default 'ILS' check (currency =
-  'ILS')`. `app.sample_row()` was last redefined in 0143 (ignores a missing `currency` key while it holds 'ILS').
+  'ILS')`. Since 020675 `organizations.currency` is ILS only too (`organizations_currency_ils`; DEAL-12 lifts it). `app.sample_row()` was last redefined in 0143 (ignores a missing `currency` key while it holds 'ILS').
 - Products (PRD-01/02/04, migrations 0152-0154): `public.product_categories` (two levels; trigger `app.product_categories_check`
   with an advisory lock per org, hints `product_categories:depth|max`) and `public.product_units` (cap 50, `product_units:max`) are
   managed lists seeded by `organizations_seed_product_lists` (mirrors `src/features/products/lists.ts`, test 96). `public.products`
