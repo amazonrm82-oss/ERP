@@ -11,8 +11,9 @@ type U = { id: string };
  * (app.orders_detach clears only contact_id). It must stay workable: a person moves its status, writes notes and the
  * delivery date, and cancels it; purging its delivery contact (FK set null) and erasing that person (PRV-03) go through.
  * A deal is enough of a customer for a numbered order; a person who changes the customer still names one.
+ * RVW-47 (low): a cancelled order is not changed by a person at all (hint order:cancelled); the server still detaches it.
  */
-describe("an order whose contact was purged (RVW-41)", () => {
+describe("an order whose contact was purged (RVW-41) and a cancelled order (RVW-47)", () => {
   let owner: U, admin: U, member: U, outsider: U;
   let org: string;
   let pipelineId: string, wonStage: string;
@@ -121,5 +122,27 @@ describe("an order whose contact was purged (RVW-41)", () => {
     const contact = await newContact("תמר");
     const draft = await asUser(member.id, async (q) => (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id);
     expect((await pgError(update(member, draft, "contact_id = null"))).code).toBe("42501");
+  });
+
+  it("a cancelled order is not changed by a person (RVW-47); the server still detaches it", async () => {
+    const contact = await newContact("גל");
+    const delivery = await newContact("נגה");
+    const { id } = await orderFromDeal(contact, null);
+    expect(await update(member, id, "notes = 'לפני ביטול', status = 'cancelled'")).toBe(1);
+    for (const [set, params] of [
+      ["notes = 'אחרי ביטול'", []],
+      ["delivery_date = '2026-12-01'", []],
+      ["shipping_address = 'רחוב אחר 1'", []],
+      ["delivery_contact_id = $2", [delivery]],
+    ] as const) {
+      for (const u of [member, owner]) expect((await pgError(update(u, id, set, [...params]))).hint, `${set}`).toBe("order:cancelled");
+    }
+    expect((await pgError(update(owner, id, "status = 'new'"))).hint).toBe("order:cancelled");
+    // touching it (nothing changes) still goes
+    expect(await update(owner, id, "notes = notes")).toBe(1);
+    expect(await order(id)).toMatchObject({ status: "cancelled", notes: "לפני ביטול", delivery_contact_id: null });
+    // a purge still detaches it
+    expect(await purge(contact)).toBe(1);
+    expect(await order(id)).toMatchObject({ status: "cancelled", contact_id: null });
   });
 });
