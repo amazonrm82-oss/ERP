@@ -17,3 +17,23 @@ export function conditionRemovalNote(action: string, changes: Json): string | nu
   if (labels.length === 0) return null;
   return `תהליך המכירה נמחק; תנאים הוסרו משדות: ${labels.join(", ")}`;
 }
+
+/**
+ * RVW-50: one line for entries whose details are not {old, new} pairs: a customer link of a quote or an order
+ * (actions 'quote_link' / 'order_link', changes {"link": "created" | "revoked"}) and a person's removal (action
+ * 'person_erase', changes {reason, counts}: the reason the owner or admin gave). Null for any other entry.
+ */
+export function auditEntryNote(action: string, changes: Json): string | null {
+  const removal = conditionRemovalNote(action, changes);
+  if (removal) return removal;
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) return null;
+  if (action === "quote_link" || action === "order_link") {
+    if (changes.link === "created") return "נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)";
+    if (changes.link === "revoked") return "הקישור ללקוח בוטל";
+    return null;
+  }
+  if (action === "person_erase" && typeof changes.reason === "string" && changes.reason.trim() !== "") {
+    return `סיבה: ${changes.reason.trim()}`;
+  }
+  return null;
+}

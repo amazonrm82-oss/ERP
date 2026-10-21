@@ -38,6 +38,10 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // ORD-05: the customer approved or declined an order through its link
     case "order":
       return orderPath(orgId, entityId);
+    // RVW-50 (HEB-08): an employee picked a deputy for a leave. The id is the leave's, not the employee's, so the
+    // notice opens the users list, which every member may see; owners and admins go on from there to the hours page
+    case "member_leaves":
+      return paths.settingsUsers(orgId);
     default:
       return null;
   }

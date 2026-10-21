@@ -281,6 +281,14 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_lines:max": "אפשר עד 200 שורות בהצעה אחת. מחקו שורה כדי להוסיף חדשה.",
   "quote_lines:product": "המוצר שנבחר לא פעיל או בארכיון. בחרו מוצר פעיל מהקטלוג.",
   "quote_lines:price_list": "חסר המחירון שממנו נלקח המחיר. רעננו את הדף ונסו שוב.",
+  // RVW-50: an order line's price source and its price list must match (ORD-01, PL-03)
+  "order_lines:price_list": "מקור המחיר והמחירון של השורה לא תואמים. רעננו את הדף ונסו שוב.",
+  // RVW-50: the won window of an accepted quote (QUO-13, public.quote_win_deal / quote_lines_to_deal)
+  "quote_deal:no_deal": "ההצעה לא שייכת לעסקה, ולכן אין עסקה לעדכן לפיה.",
+  "quote_deal:not_accepted": "רק הצעה שהלקוח אישר מעדכנת את העסקה. רעננו את הדף ובדקו את מצב ההצעה.",
+  // RVW-50 (found by the hint guard): a business in read-only mode, and a closed status picked as the default
+  "org:read_only": "העסק במצב קריאה בלבד, ולכן אי אפשר לשמור שינויים. בעלי העסק רואים את הפרטים ב\"הגדרות > חבילה ושימוש\".",
+  "lead_status:default_open": "רק סטטוס פתוח יכול להיות סטטוס ברירת המחדל.",
   // QUO-04 (migration quote_templates)
   "quote_template_lines:max": "אפשר עד 200 שורות בתבנית אחת.",
   "quote_templates:quote": "ההצעה לא נמצאה. רעננו את הדף ונסו שוב.",

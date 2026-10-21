@@ -114,6 +114,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   member_permissions: "הרשאות נוספות של משתמש",
   reports: "דוח",
   full_export: "כל נתוני העסק",
+  // RVW-50: PRV-03 writes its one entry with entity_type 'person_erase' (no record id: the records are gone)
+  person_erase: "אדם שנמחק",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -135,6 +137,10 @@ export const ACTION_LABELS: Record<string, string> = {
   conditions_removed: "הסרת תנאים של שדות",
   // RVW-25 / HEB-08: an employee picked their own deputy for a leave (app.member_leaves_deputy_notice)
   deputy_chosen: "בחירת ממלא מקום על ידי העובד",
+  // RVW-50: PRV-03, and the customer links of quotes (QUO-08) and orders (ORD-05); the details are in the entry's note
+  person_erase: "מחיקת אדם מכל מקום (בקשת פרטיות)",
+  quote_link: "קישור ללקוח להצעה",
+  order_link: "קישור ללקוח להזמנה",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

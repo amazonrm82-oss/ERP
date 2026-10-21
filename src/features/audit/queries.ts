@@ -7,7 +7,7 @@ import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
-import { conditionRemovalNote } from "./condition-removal";
+import { auditEntryNote } from "./condition-removal";
 
 export type AuditChange = { field: string; old: Json; new: Json };
 
@@ -117,7 +117,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
       entityId: r.entity_id,
       changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
-      note: conditionRemovalNote(r.action, r.changes),
+      note: auditEntryNote(r.action, r.changes),
     automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
     })),
     more: data.length > AUDIT_PAGE,
@@ -148,7 +148,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     entityId: r.entity_id,
     changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
-    note: conditionRemovalNote(r.action, r.changes),
+    note: auditEntryNote(r.action, r.changes),
     automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
   }));
 }
