@@ -1027,7 +1027,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   with no author on the order's deal and contact (else company), kinds `order_answer_accepted|rejected`, a decline with " · סיבה: …"; the
   status never changes. A person never writes, changes or deletes such an entry (`app.activities_order_answer_guard`, hint
   `activity:order_entry`). The notice to the order's owner carries the reason. Erasure strips the reason from the entry and the notices.
-  `app.audit_erase_core` was last redefined in 020650.
+  `app.audit_erase_core` was last redefined in 020650 (then 020680).
+- Customer holds (COL-05, migration 020680; owner's answers pending, built on the recommendations): `public.customer_holds` ("לא למכור עד
+  הסדרת חוב", a contact or a company, exactly one; reason 1..500 required; one active hold per record; never deleted by a person: lifted
+  with `cleared_at`/`cleared_by` and kept as history; audited). Set and lifted by `app.can_manage_customer_holds` (owner/admin/manager by
+  role or the PRM-01 key `record_payments`); read follows the record; definer trigger `app.customer_holds_check` (outsider guard first).
+  The warning is app-only (quote and order creation for a held contact or its held company); nothing is refused and no public page reads
+  the table. Merge moves the duplicate's active hold through the `merged` entry (`app.merge_customer_holds`), lifting it when the kept
+  record is held already. `app.audit_erase_core`, `app.sample_untouched` and `app.import_record_worked` were last redefined in 020680.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
