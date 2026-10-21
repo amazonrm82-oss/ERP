@@ -180,7 +180,8 @@ describe("the customer's decision on a quote (QUO-09)", () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]).toMatchObject({ user_id: member.id, type: "quote", title: "הצעת מחיר אושרה: שיפוץ", entity_type: "quote" });
     expect(notes[0].body).toMatch(/^הצעה /);
-    expect(JSON.stringify(notes[0])).not.toMatch(/500|590/);
+    // the text, not the random ids (a uuid may hold "500")
+    expect(`${notes[0].title} ${notes[0].body ?? ""}`).not.toMatch(/500|590/);
   });
 
   it("a typed signature, a refusal with a reason, and invalid answers that change nothing", async () => {

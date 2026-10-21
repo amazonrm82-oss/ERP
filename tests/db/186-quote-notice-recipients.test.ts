@@ -106,7 +106,8 @@ describe("who hears about a quote whose owner left (RVW-34)", () => {
       expect(answered.map((r) => r.user_id)).toEqual([dealRep.id]);
       expect(answered[0]).toMatchObject({ title: "הצעת מחיר אושרה: שיפוץ" });
       expect(answered[0].body).toMatch(/^הצעה /);
-      expect(JSON.stringify(answered)).not.toMatch(/נועה|500/);
+      // the text, not the random ids (a uuid may hold "500")
+      expect(answered.map((r) => `${r.title} ${r.body ?? ""}`).join(" ")).not.toMatch(/נועה|500/);
       await expire(b.quote);
       expect((await recipients(b.quote, "quote")).map((r) => r.user_id)).toEqual([dealRep.id]);
     } finally {

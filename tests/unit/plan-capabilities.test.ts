@@ -23,6 +23,12 @@ describe("plan capabilities", () => {
     expect(PLAN_CAPABILITIES.find((item) => item.feature === "discounts")?.built).toBe(true);
   });
 
+  it("marks the merged money modules as built (RVW-43)", () => {
+    for (const key of ["quotes", "orders", "documents", "payments", "collection"]) {
+      expect(PLAN_CAPABILITIES.find((item) => item.feature === key)?.built, key).toBe(true);
+    }
+  });
+
   it("names each capability once", () => {
     const keys = PLAN_CAPABILITIES.map((item) => item.feature);
     expect(new Set(keys).size).toBe(keys.length);

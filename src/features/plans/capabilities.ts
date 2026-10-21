@@ -22,7 +22,14 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "products", label: "קטלוג מוצרים, מחירונים, מוצר מבוקש בליד ושורות מוצר בעסקה", built: true },
   // DSC-01 (line part): a discount on a deal line (owner, 14 October 2026)
   { feature: "discounts", label: "הנחה בשורה", built: true },
-  { feature: "quotes", label: "הצעות מחיר וחתימה", built: false },
+  // QUO-01..17
+  { feature: "quotes", label: "הצעות מחיר וחתימה", built: true },
+  // DOC-01: invoices and receipts issued outside the system
+  { feature: "documents", label: "רישום חשבוניות וקבלות", built: true },
+  // PAY-01/05/06
+  { feature: "payments", label: "רישום תשלומים שהתקבלו", built: true },
+  // COL-05
+  { feature: "collection", label: "סימון \"לא למכור עד הסדרת חוב\"", built: true },
   { feature: "payment_links", label: "קישורי תשלום", built: false },
   { feature: "balances", label: "כרטסת לקוח", built: false },
   { feature: "booking_page", label: "דפי קביעת תור", built: true },

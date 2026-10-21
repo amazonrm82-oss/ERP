@@ -119,7 +119,8 @@ describe("quote expiry and cancelling (QUO-11)", () => {
     const notes = await asAdmin(async (q) => (await q<{ user_id: string; type: string; title: string; body: string | null }>("select user_id, type, title, body from public.notifications where entity_id = $1", [past.quote])).rows);
     expect(notes).toHaveLength(1);
     expect(notes[0]).toMatchObject({ user_id: member.id, type: "quote", title: "פג תוקפה של הצעת מחיר: הצעה שפגה" });
-    expect(JSON.stringify(notes[0])).not.toMatch(/500/);
+    // the text, not the random ids (a uuid may hold "500")
+    expect(`${notes[0].title} ${notes[0].body ?? ""}`).not.toMatch(/500/);
     // once: the next run finds nothing
     expect(await expire()).toBe(0);
     expect(await entries(past.quote)).toHaveLength(1);

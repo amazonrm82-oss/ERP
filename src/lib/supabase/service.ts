@@ -33,6 +33,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the customer's quote page and its accept/decline
  *     (src/features/quotes/public-server.ts): public.quote_public(),
  *     quote_public_decide() and quote_public_version() only;
+ *   - the customer's order page and its confirmation
+ *     (src/features/orders/public-server.ts): public.order_public() and
+ *     order_public_decide() only;
  *   - the QR scan (src/features/qr-codes/scan-server.ts): public.qr_scan() only;
  *   - the site widget (src/features/site-widgets/public-server.ts):
  *     public.site_widget_public() and site_widget_submit() only;
