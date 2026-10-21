@@ -1042,7 +1042,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   emptied; RVW-42), and a contact's erasure also reaches contact-less documents and payments on a deal the contact was unlinked
   from, when recorded at or before that unlink entry (RVW-45; the app now also saves the deal's readable contact on a new
   document). `public.privacy_erase_person` erases every audit entry with a `name` of the deals it renames (RVW-46).
-  `app.audit_erase_core` was last redefined in 020715, `public.privacy_erase_person` in 020720.
+  Since 020725 it also replaces, in that deal's notices, every old name of a renamed deal that held the person's name
+  (`app.person_erase_name_hit`) with the new name. `app.audit_erase_core` was last redefined in 020715, `public.privacy_erase_person`
+  in 020725. Audit labels for person_erase/quote_link/order_link and every P0001 hint's message are checked by
+  `tests/unit/rvw50-labels-hints-links.test.ts` (a new hint needs a message, a screen that answers it, or a server-only entry).
 - Order answer on the timeline (ORD-05b, migration 020650; owner 20 October 2026): `public.order_public_decide` writes one `system` entry
   with no author on the order's deal and contact (else company), kinds `order_answer_accepted|rejected`, a decline with " · סיבה: …"; the
   status never changes. A person never writes, changes or deletes such an entry (`app.activities_order_answer_guard`, hint
