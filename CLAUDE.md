@@ -1058,6 +1058,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   The warning is app-only (quote and order creation for a held contact or its held company); nothing is refused and no public page reads
   the table. Merge moves ALL the duplicate's holds (history included) through the `merged` entry (`app.merge_customer_holds`); when the
   kept record is held already, the duplicate's active hold is lifted first (the header of 020680 says otherwise; 020690 corrects it). `app.audit_erase_core`, `app.sample_untouched` and `app.import_record_worked` were last redefined in 020680.
+- Order documents and payments (ORD-06 part two, migration 020740; owner 21 October 2026: numbered orders only, a cancelled order
+  still takes them): nullable `order_id` on `accounting_documents` and `payments` (composite FK set null, full index, insert-only
+  column grant). Definer triggers `app.accounting_documents_order` / `app.payments_order` (outsider guard first) run
+  `app.money_order_link_check` on insert (same business, numbered, on the order's own deal or contact; hints
+  `order_money:draft|parent`) and refuse any later change but the FK's own set-null. Reading still follows the deal, else the
+  contact. `rerunClosure` (tests/db/rerun.ts) also re-runs later migrations that grant or revoke on a table a picked file
+  touches (multi-table statements included), so a re-run never drops a later column grant.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
