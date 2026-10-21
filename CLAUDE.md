@@ -948,6 +948,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `quote_decisions.decided_at` for owners/admins, else from the `quote_accepted` timeline entry; open value = sent/viewed and not past
   validity in the org zone, the current state. Report key `quotes` (`public.log_export`, last redefined in 020425, refuses it without
   the `quotes` flag). A report definition may carry `feature`: the index, the page and the export hide it without that flag.
+  Since 020695 the timeline fallback finds the entry on the quote's deal, else its contact (a quote with neither gets no fallback time);
+  `public.report_quotes` was last redefined there.
+- Indexes under RLS (QUO-17 follow-up, migration 020695): in a security invoker function, or any query a client runs, a condition on
+  `metadata ->> 'key'` (or `@>`) is never an index condition: under RLS PostgreSQL uses only leakproof operators there, and `->>` /
+  `jsonb_contains` are not. An index on such an expression helps a superuser and is ignored for real callers. Look the row up through
+  a column with a leakproof `=` (uuid, text: e.g. `deal_id` / `contact_id` and their FK indexes) and keep the metadata condition as a
+  filter only (measured: 1.1 s per lookup over 50,000 activities against 0.6 ms through `activities_deal_idx`).
 - Quote addenda (GAP-10, migration 020430): `quotes.addendum_of` (composite FK set null, server-only) points at an accepted quote;
   `public.quote_new_addendum(org, quote)` (definer, `app.quote_editable`, flag `quotes`) makes an empty draft on the same deal and
   contact. Definer trigger `quotes_zz_addendum_guard` (named to fire after `quotes_check`) is the only place the rules live: original
