@@ -527,6 +527,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the QUO-17 follow-up redefines public.report_quotes() of _report_quotes.sql last (the accepted entry through the deal
       // or the contact)
       "_report_quotes_lookup.sql",
+      // RVW-41 redefines app.orders_check() of _orders.sql last (an order whose contact was purged stays workable)
+      "_order_customer_gone.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
