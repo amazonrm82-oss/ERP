@@ -10,6 +10,8 @@ import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
+import { readableDealContact } from "./deal-contact";
+
 import { cancelReasonSchema, newPaymentStatusSchema, PAYMENT_FIELD_NAMES, paymentSchema, paymentStatusSchema } from "./schema";
 
 // PAY-01, PAY-06: recording, moving the status of, correcting and cancelling a payment, with the user's session. RLS and the
@@ -41,22 +43,9 @@ export async function recordPaymentAction(orgId: string, subject: Subject, _prev
   // a payment on a deal is the deal's contact's too, when the user reads that contact (the insert policy asks for it)
   let contactId: string | null = subject.kind === "contact" ? subject.id : null;
   if (subject.kind === "deal") {
-    const deal = await context.supabase.from("deals").select("contact_id").eq("organization_id", orgId).eq("id", subject.id).maybeSingle();
-    if (deal.error) return fail(dbErrorMessage(deal.error), { values: formValues(formData) });
-    if (deal.data?.contact_id) {
-      const contact = await context.supabase
-        .from("contacts")
-        .select("id")
-        .eq("organization_id", orgId)
-        .eq("id", deal.data.contact_id)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (contact.error)
-        return fail(dbErrorMessage(contact.error), {
-          values: formValues(formData),
-        });
-      contactId = contact.data?.id ?? null;
-    }
+    const found = await readableDealContact(context.supabase, orgId, subject.id);
+    if (found.error) return fail(dbErrorMessage(found.error), { values: formValues(formData) });
+    contactId = found.contactId;
   }
 
   const { error } = await context.supabase.from("payments").insert({

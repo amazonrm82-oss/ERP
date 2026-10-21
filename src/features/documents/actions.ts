@@ -9,6 +9,7 @@ import { fail, formValues, invalid, ok, type FormState } from "@/lib/action-resu
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
+import { readableDealContact } from "@/features/payments/deal-contact";
 
 import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema } from "./schema";
 
@@ -24,17 +25,26 @@ type Subject = z.infer<typeof subjectSchema>;
 
 const pageOf = (orgId: string, subject: Subject) => (subject.kind === "deal" ? paths.deal(orgId, subject.id) : paths.contact(orgId, subject.id));
 
-/** A new document on the deal or the contact. */
+/**
+ * A new document on the deal or the contact. RVW-45: a document on a deal is also the deal's contact's when the user reads
+ * that contact, like a payment, so a privacy erasure of the contact reaches it directly.
+ */
 export async function recordDocumentAction(orgId: string, subject: Subject, _prev: FormState, formData: FormData): Promise<FormState> {
   if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, subject.id);
   if (!context.ok) return context;
   const parsed = documentSchema.safeParse(pick(formData, DOCUMENT_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
+  let contactId: string | null = subject.kind === "contact" ? subject.id : null;
+  if (subject.kind === "deal") {
+    const found = await readableDealContact(context.supabase, orgId, subject.id);
+    if (found.error) return fail(dbErrorMessage(found.error), { values: formValues(formData) });
+    contactId = found.contactId;
+  }
   const { error } = await context.supabase.from("accounting_documents").insert({
     organization_id: orgId,
     deal_id: subject.kind === "deal" ? subject.id : null,
-    contact_id: subject.kind === "contact" ? subject.id : null,
+    contact_id: contactId,
     doc_type: parsed.data.doc_type,
     number: parsed.data.number,
     doc_date: parsed.data.doc_date,
