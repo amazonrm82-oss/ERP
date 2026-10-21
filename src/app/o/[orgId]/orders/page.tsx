@@ -11,9 +11,11 @@ import { OrderListItems } from "@/features/orders/components/order-list-items";
 import { isFiltered, orderListFilters, orderListHref } from "@/features/orders/list";
 import { ordersPath } from "@/features/orders/paths";
 import { listOrders } from "@/features/orders/queries";
-import { ORDER_SOURCE_LABELS, ORDER_SOURCES, ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/features/orders/schema";
+import { ORDER_SOURCES, ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/features/orders/schema";
+import { orderSourceLabels, ordersListTexts } from "@/features/orders/texts";
 import { listMembers } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 
 export const metadata: Metadata = { title: "הזמנות" };
 
@@ -30,14 +32,17 @@ export default async function OrdersPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const filters = orderListFilters(await searchParams);
   await getOrgContext(orgId);
-  const [{ orders, hasMore }, members] = await Promise.all([listOrders(orgId, filters), listMembers(orgId)]);
+  const [{ orders, hasMore }, members, terms] = await Promise.all([listOrders(orgId, filters), listMembers(orgId), getOrgTerms(orgId)]);
+  // RVW-49: the business's own words (FLD-10)
+  const texts = ordersListTexts(terms);
+  const sourceLabels = orderSourceLabels(terms);
   const filtered = isFiltered(filters);
 
   return (
     <>
       <PageHeader
         title="הזמנות"
-        description="כל ההזמנות של העסקאות, אנשי הקשר והחברות שאתם רואים. הזמנה יוצרים מהצעת מחיר שאושרה, מעסקה שנסגרה בהצלחה, או ידנית מכרטיס של איש קשר, חברה או עסקה."
+        description={texts.description}
       />
       <form method="get" action={ordersPath(orgId)} className="mb-5 flex flex-wrap items-end gap-3" aria-label="סינון הזמנות">
         <label>
@@ -57,7 +62,7 @@ export default async function OrdersPage({ params, searchParams }: Props) {
             <option value="">הכול</option>
             {ORDER_SOURCES.map((s) => (
               <option key={s} value={s}>
-                {ORDER_SOURCE_LABELS[s]}
+                {sourceLabels[s]}
               </option>
             ))}
           </Select>
@@ -96,7 +101,7 @@ export default async function OrdersPage({ params, searchParams }: Props) {
         <Card>
           <EmptyState
             title={filtered ? "אין הזמנות לפי הסינון" : "עוד אין הזמנות"}
-            description={filtered ? "נסו סינון אחר, או נקו אותו." : 'הזמנה יוצרים מהצעת מחיר שאושרה, מעסקה שנסגרה, או בכרטיס "הזמנות" של איש קשר, חברה או עסקה.'}
+            description={filtered ? "נסו סינון אחר, או נקו אותו." : texts.empty}
           />
         </Card>
       ) : (

@@ -30,6 +30,8 @@ import { prepareListFilter, startListFilterLookups } from "@/features/list-filte
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { documentsListTexts } from "@/features/documents/texts";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -52,7 +54,9 @@ type Props = {
  */
 export default async function DocumentsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const [context, access] = await Promise.all([getOrgContext(orgId), getDocumentsAccess(orgId)]);
+  const [context, access, terms] = await Promise.all([getOrgContext(orgId), getDocumentsAccess(orgId), getOrgTerms(orgId)]);
+  // RVW-49: the business's own words (FLD-10)
+  const texts = documentsListTexts(terms);
   if (!access.inPlan) {
     return (
       <>
@@ -108,7 +112,7 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
     <>
       <PageHeader
         title="מסמכים חשבונאיים"
-        description="כל החשבוניות והקבלות שנרשמו בעסקאות ובאנשי הקשר שאתם רואים. מסמך רושמים ומבטלים בכרטיס של העסקה או איש הקשר."
+        description={texts.description}
         actions={exportAllowed ? <ExportMenu href={exportHref(documentsPath(orgId), documentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
       />
       <SavedViewsBar
@@ -198,7 +202,7 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
         <Card>
           <EmptyState
             title={filtered ? "אין מסמכים לפי הסינון" : "עוד לא נרשמו מסמכים"}
-            description={filtered ? "נסו סינון אחר, או נקו אותו." : "חשבונית או קבלה שהופקה בתוכנת הנהלת החשבונות רושמים בכרטיס \"מסמכים חשבונאיים\" של עסקה או איש קשר."}
+            description={filtered ? "נסו סינון אחר, או נקו אותו." : texts.empty}
           />
         </Card>
       ) : (

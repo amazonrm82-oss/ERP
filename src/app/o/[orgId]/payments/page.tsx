@@ -22,6 +22,8 @@ import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { paymentsListTexts } from "@/features/payments/texts";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -44,7 +46,9 @@ type Props = {
  */
 export default async function PaymentsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const [context, access] = await Promise.all([getOrgContext(orgId), getPaymentsAccess(orgId)]);
+  const [context, access, terms] = await Promise.all([getOrgContext(orgId), getPaymentsAccess(orgId), getOrgTerms(orgId)]);
+  // RVW-49: the business's own words (FLD-10)
+  const texts = paymentsListTexts(terms);
   if (!access.inPlan) {
     return (
       <>
@@ -92,7 +96,7 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
     <>
       <PageHeader
         title="תשלומים"
-        description="כל התשלומים שנרשמו בעסקאות ובאנשי הקשר שאתם רואים. תשלום רושמים ומעדכנים בכרטיס של העסקה או איש הקשר."
+        description={texts.description}
         actions={exportAllowed ? <ExportMenu href={exportHref(paymentsPath(orgId), paymentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
       />
       <SavedViewsBar
@@ -171,7 +175,7 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
         <Card>
           <EmptyState
             title={filtered ? "אין תשלומים לפי הסינון" : "עוד לא נרשמו תשלומים"}
-            description={filtered ? "נסו סינון אחר, או נקו אותו." : "תשלום שהתקבל רושמים בכרטיס \"תשלומים\" של עסקה או איש קשר."}
+            description={filtered ? "נסו סינון אחר, או נקו אותו." : texts.empty}
           />
         </Card>
       ) : (

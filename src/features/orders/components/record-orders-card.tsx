@@ -8,6 +8,9 @@ import { listRecordOrders } from "../queries";
 import { NewOrderButton } from "./new-order-button";
 import { OrderListItems } from "./order-list-items";
 import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
+import { getOrgTerms } from "@/features/terminology/queries";
+
+import { orderFromDealTexts, ordersEmptyText } from "../texts";
 
 type Props = {
   orgId: string;
@@ -22,9 +25,11 @@ type Props = {
 export async function RecordOrdersCard({ orgId, subject, canCreate, dealWon = false }: Props) {
   const access = await getOrdersAccess(orgId);
   if (!access.on) return null;
-  const orders = await listRecordOrders(orgId, subject);
+  const [orders, terms] = await Promise.all([listRecordOrders(orgId, subject), getOrgTerms(orgId)]);
   if (orders.length === 0 && !canCreate) return null;
-  const empty = subject.kind === "deal" ? "עוד אין הזמנות לעסקה." : subject.kind === "contact" ? "עוד אין הזמנות לאיש הקשר." : "עוד אין הזמנות לחברה.";
+  // RVW-49: the business's own words (FLD-10)
+  const empty = ordersEmptyText(subject.kind, terms);
+  const fromDeal = orderFromDealTexts(terms);
   return (
     <Card aria-labelledby={`orders-${subject.id}`} className="print:hidden">
       <CardHeader
@@ -36,12 +41,12 @@ export async function RecordOrdersCard({ orgId, subject, canCreate, dealWon = fa
               {subject.kind === "deal" && dealWon ? (
                 <ConfirmButton
                   variant="secondary"
-                  title="ליצור הזמנה מהעסקה?"
-                  description="תיווצר הזמנה ממוספרת עם השורות של העסקה כפי שהן: מחיר, מע״מ וחיוב. אם לעסקה יש הצעת מחיר שאושרה, יוצרים את ההזמנה מההצעה."
+                  title={fromDeal.title}
+                  description={fromDeal.description}
                   confirmLabel="יצירת הזמנה"
                   action={orderFromDealAction.bind(null, orgId, subject.id)}
                 >
-                  הזמנה מהעסקה
+                  {fromDeal.button}
                 </ConfirmButton>
               ) : null}
               <NewOrderButton orgId={orgId} source={subject} />

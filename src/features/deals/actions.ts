@@ -25,6 +25,7 @@ import { quotePath } from "@/features/quotes/paths";
 import { DEAL_LOSS_FIELD_NAMES, dealLossSchema, type DealLoss } from "@/features/deal-loss-reasons/schema";
 import { createOrderForWonDeal, dealHasOrder } from "@/features/orders/won-order";
 import { wonOrderText } from "@/features/orders/won";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { ordersPath } from "@/features/orders/paths";
 
 import { closedAtFor, ONBOARDING_EXISTS, parseCloseWon } from "./close-window";
@@ -381,7 +382,7 @@ async function closeWon(orgId: string, dealId: string, stageId: string, formData
   // DEAL-04 wave 2: "what next" may also make the deal's order (ORD-01); the deal is won either way
   if (formData.get("create_order") === "on") {
     const order = await createOrderForWonDeal(supabase, orgId, dealId, quoteId);
-    notes.push(wonOrderText(order));
+    notes.push(wonOrderText(order, await getOrgTerms(orgId)));
     if (order.ok) revalidatePath(ordersPath(orgId));
   }
   return notes.length > 0 ? { ok: true, message: notes.join(" ") } : ok();

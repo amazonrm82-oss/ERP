@@ -20,10 +20,12 @@ type Props = {
   // the delivery contact as it is now, named (null = none)
   deliveryContact: SearchPickerChoice;
   editable: boolean;
+  // RVW-49: the texts that name a contact, in the business's own words (orders/texts.ts)
+  texts: { deliveryContact: string; contact: string; shippingHint: string };
 };
 
 /** ORD-01 (owner (2)): delivery date, shipping address, notes and the delivery contact, editable until cancelled. */
-export function OrderDetailsForm({ orgId, orderId, values, deliveryContact, editable }: Props) {
+export function OrderDetailsForm({ orgId, orderId, values, deliveryContact, editable, texts }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(updateOrderDetailsAction.bind(null, orgId, orderId), null);
   const failed = state && !state.ok ? state : null;
   const v = (name: string, fallback: string | null) => failed?.values?.[name] ?? fallback ?? "";
@@ -45,10 +47,10 @@ export function OrderDetailsForm({ orgId, orderId, values, deliveryContact, edit
           key={failed?.values ? JSON.stringify(failed.values) : `delivery:${deliveryContact?.id ?? ""}`}
           orgId={orgId}
           name="delivery_contact_id"
-          label="איש קשר לאספקה"
+          label={texts.deliveryContact}
           initial={
             failed?.values
-              ? initialChoice(failed.values?.delivery_contact_id, failed.values?.[pickerLabelName("delivery_contact_id")], "איש קשר")
+              ? initialChoice(failed.values?.delivery_contact_id, failed.values?.[pickerLabelName("delivery_contact_id")], texts.contact)
               : deliveryContact
           }
           error={failed?.fieldErrors?.delivery_contact_id}
@@ -60,7 +62,7 @@ export function OrderDetailsForm({ orgId, orderId, values, deliveryContact, edit
           maxLength={ORDER_SHIPPING_MAX}
           defaultValue={v("shipping_address", values.shippingAddress)}
           error={failed?.fieldErrors?.shipping_address}
-          hint="הועתקה מאיש הקשר או מהחברה כשההזמנה נוצרה. שינוי כאן לא משנה את הכרטיס שלהם."
+          hint={texts.shippingHint}
         />
         <TextareaField
           name="notes"

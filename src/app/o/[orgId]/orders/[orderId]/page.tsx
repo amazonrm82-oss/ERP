@@ -17,7 +17,9 @@ import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderParties, getOrd
 import { OrderLinkCard } from "@/features/orders/components/order-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
-import { orderEditing, ORDER_SOURCE_LABELS } from "@/features/orders/schema";
+import { orderEditing } from "@/features/orders/schema";
+import { deliveryContactLabel, orderSourceLabels, shippingAddressHint } from "@/features/orders/texts";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { quotePath } from "@/features/quotes/paths";
 import { priceSourceText } from "@/features/deal-lines/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -53,7 +55,7 @@ export default async function OrderPage({ params }: Props) {
       : order.companyId
         ? supabase.from("companies").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", order.companyId).maybeSingle()
         : null;
-  const [lines, parties, parent, schedule, linkStatus, decision] = await Promise.all([
+  const [lines, parties, parent, schedule, linkStatus, decision, terms] = await Promise.all([
     listOrderLines(orgId, order.id),
     getOrderParties(orgId, order),
     parentQuery,
@@ -61,6 +63,8 @@ export default async function OrderPage({ params }: Props) {
     // ORD-05: the customer's link (for who may manage it) and their answer (owners and admins, RLS)
     order.status === "draft" ? Promise.resolve(null) : getOrderLinkStatus(orgId, order.id),
     order.status === "draft" ? Promise.resolve(null) : getOrderDecision(orgId, order.id),
+    // RVW-49: the business's own words (FLD-10)
+    getOrgTerms(orgId),
   ]);
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -71,9 +75,9 @@ export default async function OrderPage({ params }: Props) {
       ? await Promise.all([getOrderPricing(orgId, order), orgHasFeature(orgId, "products"), orgHasFeature(orgId, "discounts")])
       : [null, false, false];
   const back = order.dealId
-    ? { href: paths.deal(orgId, order.dealId), label: parties.deal ?? "עסקה" }
+    ? { href: paths.deal(orgId, order.dealId), label: parties.deal ?? terms.deal.singular }
     : order.contactId
-      ? { href: paths.contact(orgId, order.contactId), label: parties.contact ?? "איש קשר" }
+      ? { href: paths.contact(orgId, order.contactId), label: parties.contact ?? terms.contact.singular }
       : order.companyId
         ? { href: paths.company(orgId, order.companyId), label: parties.company ?? "חברה" }
         : { href: ordersPath(orgId), label: "הזמנות" };
@@ -133,7 +137,7 @@ export default async function OrderPage({ params }: Props) {
       ) : null}
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
         <OrderStatusBadge status={order.status} />
-        <span>{ORDER_SOURCE_LABELS[order.source]}</span>
+        <span>{orderSourceLabels(terms)[order.source]}</span>
         <span>תאריך {formatDate(order.orderDate)}</span>
         {order.cancelledAt ? <span>בוטלה {formatDate(order.cancelledAt)}</span> : null}
         {order.customerName ? (
@@ -165,9 +169,9 @@ export default async function OrderPage({ params }: Props) {
           <CardBody className="space-y-1 text-sm">
             {order.contactId ? (
               <p>
-                איש קשר:{" "}
+                {terms.contact.singular}:{" "}
                 <Link href={paths.contact(orgId, order.contactId)} className={linkClass}>
-                  <bdi>{parties.contact ?? "איש קשר"}</bdi>
+                  <bdi>{parties.contact ?? terms.contact.singular}</bdi>
                 </Link>
               </p>
             ) : null}
@@ -181,9 +185,9 @@ export default async function OrderPage({ params }: Props) {
             ) : null}
             {order.dealId ? (
               <p>
-                עסקה:{" "}
+                {terms.deal.singular}:{" "}
                 <Link href={paths.deal(orgId, order.dealId)} className={linkClass}>
-                  <bdi>{parties.deal ?? "עסקה"}</bdi>
+                  <bdi>{parties.deal ?? terms.deal.singular}</bdi>
                 </Link>
               </p>
             ) : null}
@@ -297,8 +301,9 @@ export default async function OrderPage({ params }: Props) {
                 notes: order.notes,
                 deliveryContactId: order.deliveryContactId,
               }}
-              deliveryContact={order.deliveryContactId ? { id: order.deliveryContactId, label: parties.deliveryContact ?? "איש קשר" } : null}
+              deliveryContact={order.deliveryContactId ? { id: order.deliveryContactId, label: parties.deliveryContact ?? terms.contact.singular } : null}
               editable={mayEdit && editing.details}
+              texts={{ deliveryContact: deliveryContactLabel(terms), contact: terms.contact.singular, shippingHint: shippingAddressHint(terms) }}
             />
           </CardBody>
         </Card>
