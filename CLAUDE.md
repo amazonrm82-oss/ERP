@@ -1037,6 +1037,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   020645) erases those files' audit entries and renames them "מסמך <number>" / "תשלום <date>" (extension kept); the files stay.
   The files policies, `app.files_before_insert`, `app.files_links_check`, `public.confirm_file_upload` and `app.reconcile_pending_files`
   were last redefined in 020645.
+- Erasure follow-ups (weekly review 2026-10-21; migrations 020710, 020715, 020720): `app.audit_erase_core` cleans the notices of the
+  erased customer's quotes (kind `quote` titles cut after "<words>: " to "הצעת מחיר", " · סיבה: …" removed, `quote_viewed` body
+  emptied; RVW-42), and a contact's erasure also reaches contact-less documents and payments on a deal the contact was unlinked
+  from, when recorded at or before that unlink entry (RVW-45; the app now also saves the deal's readable contact on a new
+  document). `public.privacy_erase_person` erases every audit entry with a `name` of the deals it renames (RVW-46).
+  `app.audit_erase_core` was last redefined in 020715, `public.privacy_erase_person` in 020720.
 - Order answer on the timeline (ORD-05b, migration 020650; owner 20 October 2026): `public.order_public_decide` writes one `system` entry
   with no author on the order's deal and contact (else company), kinds `order_answer_accepted|rejected`, a decline with " · סיבה: …"; the
   status never changes. A person never writes, changes or deletes such an entry (`app.activities_order_answer_guard`, hint
