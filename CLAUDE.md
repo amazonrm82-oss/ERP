@@ -1005,7 +1005,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Totals and reports count recorded + confirmed only. Definer trigger `app.payments_check` (outsider guard first); server paths as DOC-01:
   FK set-null, merge (`app.payment_server = 'on'`, contact only, in `app.merge_move_links` since 020655; `app.merge_payments` is a no-op) and erasure (`'erase'`:
   reference and note emptied, a cancel reason becomes "הסיבה נמחקה (מחיקת פרטיות)"). `app.audit_erase_core`, `app.sample_untouched`,
-  `app.import_record_worked` and `app.member_permission_built_keys` were last redefined in 020635. No attached file yet (lane ד).
+  `app.import_record_worked` and `app.member_permission_built_keys` were last redefined in 020635. Files: see below.
+  Since 020660 (PAY-07 notices) trigger `payments_notify_received` (definer, after insert, recorded/confirmed only) sends one `system` notice
+  "התקבל תשלום" (amount and method, no name; `app.payment_amount_text`, `app.payment_method_label` = `PAYMENT_METHOD_LABELS`) to the
+  deal's owner, else the contact's, active and not a viewer, never the recorder; nobody else.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
