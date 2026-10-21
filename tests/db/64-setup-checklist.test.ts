@@ -531,6 +531,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_customer_gone.sql",
       // RVW-47 redefines app.orders_check() of _order_customer_gone.sql last (a cancelled order is not changed by a person)
       "_order_cancelled_frozen.sql",
+      // RVW-42 redefines app.audit_erase_core() of _customer_holds.sql last (the notices about an erased customer's quotes)
+      "_erase_quote_notices.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
