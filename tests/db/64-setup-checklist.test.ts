@@ -524,6 +524,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // COL-05 redefines app.sample_untouched() and app.import_record_worked() of _payments.sql and app.audit_erase_core() of
       // _order_answer_timeline.sql last (holds are work; erasure erases their entries)
       "_customer_holds.sql",
+      // the QUO-17 follow-up redefines public.report_quotes() of _report_quotes.sql last (the accepted entry through the deal
+      // or the contact)
+      "_report_quotes_lookup.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
