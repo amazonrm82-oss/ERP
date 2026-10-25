@@ -1043,7 +1043,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   from, when recorded at or before that unlink entry (RVW-45; the app now also saves the deal's readable contact on a new
   document). `public.privacy_erase_person` erases every audit entry with a `name` of the deals it renames (RVW-46).
   Since 020725 it also replaces, in that deal's notices, every old name of a renamed deal that held the person's name
-  (`app.person_erase_name_hit`) with the new name. `app.audit_erase_core` was last redefined in 020715, `public.privacy_erase_person`
+  (`app.person_erase_name_hit`) with the new name. `app.audit_erase_core` was last redefined in 020750 (DOC-04), `public.privacy_erase_person`
   in 020725. Audit labels for person_erase/quote_link/order_link and every P0001 hint's message are checked by
   `tests/unit/rvw50-labels-hints-links.test.ts` (a new hint needs a message, a screen that answers it, or a server-only entry).
 - Order answer on the timeline (ORD-05b, migration 020650; owner 20 October 2026): `public.order_public_decide` writes one `system` entry
@@ -1065,6 +1065,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `order_money:draft|parent`) and refuse any later change but the FK's own set-null. Reading still follows the deal, else the
   contact. `rerunClosure` (tests/db/rerun.ts) also re-runs later migrations that grant or revoke on a table a picked file
   touches (multi-table statements included), so a re-run never drops a later column grant.
+- Money on the timeline (DOC-04, migration 020750; owner 21 October 2026: type and number only, no amount): definer triggers
+  `accounting_documents_timeline` / `payments_timeline` (after insert or update of status) write one `system` entry with no author
+  on the row's deal and contact (none when the row has neither): `metadata.kind` document_recorded|document_cancelled|
+  payment_received (insert as recorded/confirmed only)|payment_cancelled, the cancel entries with " · סיבה: …"; type label
+  `app.document_type_label` (= `DOCUMENT_TYPE_LABELS`), method `app.payment_method_label`. A person never writes, changes or deletes
+  such an entry (`app.activities_money_entry_guard`, invoker, hint `activity:money_entry`); `activities_zz_money_entry_author`
+  clears the author. Erasure strips the reason from those entries and erases their audit history. `app.audit_erase_core` was last
+  redefined in 020750.
 - Running numbers (QUO-03, migration 0192): `public.number_sequences` (org + kind quote|order, prefix that never ends in a digit,
   start locked after the first number, server-only `last_number` 1..999,999,999 that never goes back; no delete except the org
   cascade, no DELETE/TRUNCATE for service_role). Numbers come only from `app.next_document_number(org, kind)` (definer, no grants,
