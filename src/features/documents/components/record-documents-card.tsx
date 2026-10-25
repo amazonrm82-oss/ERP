@@ -14,8 +14,8 @@ import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
 import { documentsPath } from "../paths";
 import { getDocumentsAccess, listRecordDocuments } from "../queries";
-import { DOCUMENT_TYPE_LABELS } from "../schema";
-import { CancelDocumentButton, RecordDocumentButton } from "./document-forms";
+import { DOCUMENT_TYPE_LABELS, takesDueDate } from "../schema";
+import { CancelDocumentButton, DueDateButton, RecordDocumentButton } from "./document-forms";
 
 type Props = { orgId: string; subject: MoneySubject };
 
@@ -42,13 +42,14 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
     ? await Promise.all([getMoneyState(orgId, ids, []), listAllocations(orgId, { documents: ids })])
     : [null, []];
   const numbers = new Map(documents.map((d) => [d.id, d.number]));
+  const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `documents-${subject.id}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
       <CardHeader
         id={titleId}
         title="מסמכים חשבונאיים"
-        action={access.canRecord ? <RecordDocumentButton orgId={orgId} subject={subject} today={zoneDate(new Date(), context.org.timeZone)} /> : null}
+        action={access.canRecord ? <RecordDocumentButton orgId={orgId} subject={subject} today={today} /> : null}
       />
       <CardBody className="p-0">
         {documents.length === 0 ? (
@@ -59,7 +60,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
               const label = `${DOCUMENT_TYPE_LABELS[doc.docType]} ${doc.number}`;
               const state = money?.documents.get(doc.id);
               const chip = state ? documentStateChip(state) : null;
-              const hasBalance = doc.docType === "tax_invoice" || doc.docType === "proforma";
+              const hasBalance = takesDueDate(doc.docType);
+              // PAY-02 answer 7: overdue = past its due date with a balance left
+              const overdue = !doc.cancelled && doc.dueDate !== null && doc.dueDate < today && takesPayments(state);
               return (
                 <li key={doc.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -77,6 +80,12 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                         <>
                           {" "}
                           <Badge tone={chip.tone}>{chip.label}</Badge>
+                        </>
+                      ) : null}
+                      {overdue ? (
+                        <>
+                          {" "}
+                          <Badge tone="danger">באיחור</Badge>
                         </>
                       ) : null}
                     </p>
@@ -99,6 +108,7 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                       <p className="text-sm text-ink-soft">
                         שולם <span className="tabular-nums">{formatMoney(state.paid)}</span>
                         {" · "}יתרה <span className="tabular-nums">{formatMoney(state.balance)}</span>
+                        {doc.dueDate ? ` · לתשלום עד ${formatDate(`${doc.dueDate}T12:00:00Z`)}` : ""}
                       </p>
                     ) : null}
                     {doc.proformaId ? (
@@ -127,6 +137,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                     <span className={`font-medium whitespace-nowrap tabular-nums ${doc.cancelled ? "text-ink-soft line-through" : ""}`}>{formatMoney(doc.amountAgorot)}</span>
                     {allocation.canAllocate && !doc.cancelled && takesPayments(state) ? (
                       <AllocateButton orgId={orgId} page={subject} from={{ kind: "document", id: doc.id, label }} available={state?.balance ?? 0} />
+                    ) : null}
+                    {access.canRecord && !doc.cancelled && hasBalance && state?.state !== "transferred" ? (
+                      <DueDateButton orgId={orgId} subject={subject} documentId={doc.id} label={label} dueDate={doc.dueDate} />
                     ) : null}
                     {access.canRecord && !doc.cancelled && doc.docType === "tax_invoice" && !doc.proformaId ? (
                       <LinkProformaButton orgId={orgId} page={subject} invoiceId={doc.id} invoiceLabel={label} />

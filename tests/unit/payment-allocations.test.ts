@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { documentSchema } from "@/features/documents/schema";
 import { defaultSplit, documentStateChip, parseCandidates, parseMoneyState, takesPayments } from "@/features/allocations/state";
 
 // PAY-02: the screen reads the database's answer (public.money_allocation_state / money_allocation_candidates) and labels it.
@@ -48,5 +49,14 @@ describe("payment allocations on screen (PAY-02)", () => {
     });
     expect(c.documents[0].balance).toBe(900);
     expect(c.proformas).toHaveLength(1);
+  });
+
+  it("a due date is optional, only on a tax invoice or a proforma, never before the document's date (answer 7)", () => {
+    const base = { doc_type: "tax_invoice", number: "1", doc_date: "2026-10-10", amount: "100" };
+    expect(documentSchema.parse({ ...base, due_date: "" }).due_date).toBeNull();
+    expect(documentSchema.parse({ ...base, due_date: "2026-11-01" }).due_date).toBe("2026-11-01");
+    expect(documentSchema.safeParse({ ...base, due_date: "2026-10-09" }).success).toBe(false);
+    expect(documentSchema.safeParse({ ...base, doc_type: "receipt", due_date: "2026-11-01" }).success).toBe(false);
+    expect(documentSchema.parse({ ...base, doc_type: "receipt", due_date: "" }).due_date).toBeNull();
   });
 });

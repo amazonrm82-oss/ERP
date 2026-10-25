@@ -26,6 +26,8 @@ export type AccountingDocument = {
   amountAgorot: number;
   // PAY-02: on a tax invoice, the proforma it bills
   proformaId: string | null;
+  // PAY-02 answer 7
+  dueDate: string | null;
   cancelled: boolean;
   cancelReason: string | null;
   cancelledAt: string | null;
@@ -48,7 +50,7 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
   const rows = must(
     await supabase
       .from("accounting_documents")
-      .select("id, doc_type, number, doc_date, amount_agorot, proforma_id, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
+      .select("id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
       .eq("organization_id", orgId)
       .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
       .order("doc_date", { ascending: false })
@@ -67,6 +69,7 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
             docDate: row.doc_date,
             amountAgorot: Number(row.amount_agorot),
             proformaId: row.proforma_id,
+            dueDate: row.due_date,
             cancelled: row.status === "cancelled",
             cancelReason: row.cancel_reason,
             cancelledAt: row.cancelled_at,

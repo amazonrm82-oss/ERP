@@ -1850,6 +1850,8 @@ export type AccountingDocumentRow = {
   order_id: string | null;
   // PAY-02: on a tax invoice, the proforma it bills (set once)
   proforma_id: string | null;
+  // PAY-02 answer 7: on a tax invoice or a proforma, when it should be paid (filled from the customer's terms)
+  due_date: string | null;
   doc_type: string;
   number: string;
   doc_date: string;
@@ -2749,13 +2751,14 @@ export type Database = {
           contact_id?: string | null;
           order_id?: string | null;
           proforma_id?: string | null;
+          due_date?: string | null;
           doc_type: string;
           number: string;
           doc_date?: string;
           amount_agorot: number;
           currency?: string;
         },
-        { status?: string; cancel_reason?: string | null; proforma_id?: string | null }
+        { status?: string; cancel_reason?: string | null; proforma_id?: string | null; due_date?: string | null }
       >;
       // PAY-02: column grants; recorders allocate, owners and admins change the amount or undo (no delete)
       payment_allocations: Table<

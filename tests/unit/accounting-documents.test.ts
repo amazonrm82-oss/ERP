@@ -30,6 +30,8 @@ describe("accounting documents (DOC-01)", () => {
       number: "1001",
       doc_date: "2026-10-20",
       amount: 117050,
+      // PAY-02 answer 7: no due date typed = from the customer's terms
+      due_date: null,
     });
     expect(documentSchema.safeParse({ doc_type: "bill", number: "1", doc_date: "2026-10-20", amount: "1" }).success).toBe(false);
     expect(documentSchema.safeParse({ doc_type: "receipt", number: "x".repeat(41), doc_date: "2026-10-20", amount: "1" }).success).toBe(false);

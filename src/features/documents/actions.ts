@@ -11,7 +11,7 @@ import { pick } from "@/lib/validation";
 import { moneyRowParents } from "@/features/payments/deal-contact";
 import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
-import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema } from "./schema";
+import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema } from "./schema";
 
 // DOC-01: recording and cancelling an external accounting document, with the user's session. RLS and the table's trigger
 // decide: owners, admins and managers, or the personal key `documents`; a deal or contact the user reads; the same type and
@@ -46,6 +46,8 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
     number: parsed.data.number,
     doc_date: parsed.data.doc_date,
     amount_agorot: parsed.data.amount,
+    // PAY-02 answer 7: empty = from the customer's payment terms
+    ...(parsed.data.due_date ? { due_date: parsed.data.due_date } : {}),
   });
   if (error) return fail(writeError(error), { values: formValues(formData) });
   revalidatePath(pageOf(orgId, subject));
@@ -62,6 +64,25 @@ export async function cancelDocumentAction(orgId: string, subject: Subject, docu
   const { data, error } = await context.supabase
     .from("accounting_documents")
     .update({ status: "cancelled", cancel_reason: reason.data.reason })
+    .eq("organization_id", orgId)
+    .eq("id", documentId)
+    .select("id");
+  if (error) return fail(writeError(error), { values: formValues(formData) });
+  if (data.length === 0) return fail(CANNOT, { values: formValues(formData) });
+  revalidatePath(pageOf(orgId, subject));
+  return ok();
+}
+
+/** PAY-02 answer 7: a new due date for an active tax invoice or proforma (empty clears it). */
+export async function setDocumentDueDateAction(orgId: string, subject: Subject, documentId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);
+  const context = await actionContext(orgId, subject.id, documentId);
+  if (!context.ok) return context;
+  const due = z.object({ due_date: dueDateSchema }).safeParse({ due_date: formData.get("due_date") ?? "" });
+  if (!due.success) return invalid(due.error, formData);
+  const { data, error } = await context.supabase
+    .from("accounting_documents")
+    .update({ due_date: due.data.due_date || null })
     .eq("organization_id", orgId)
     .eq("id", documentId)
     .select("id");

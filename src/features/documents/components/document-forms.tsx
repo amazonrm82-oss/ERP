@@ -13,8 +13,8 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import type { FormState } from "@/lib/action-result";
 
-import { cancelDocumentAction, recordDocumentAction } from "../actions";
-import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "../schema";
+import { cancelDocumentAction, recordDocumentAction, setDocumentDueDateAction } from "../actions";
+import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES, isDocumentType, takesDueDate } from "../schema";
 
 type Subject = MoneySubject;
 
@@ -28,11 +28,12 @@ function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string
   const failure = state && !state.ok ? state : null;
   const errors = failure?.fieldErrors ?? {};
   const values = failure?.values;
+  const [docType, setDocType] = useState(values?.doc_type ?? "");
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
-      <SelectField label="סוג המסמך" name="doc_type" required defaultValue={values?.doc_type ?? ""} error={errors.doc_type}>
+      <SelectField label="סוג המסמך" name="doc_type" required value={docType} onChange={(event) => setDocType(event.target.value)} error={errors.doc_type}>
         <option value="">בחירה</option>
         {DOCUMENT_TYPES.map((type) => (
           <option key={type} value={type}>
@@ -52,6 +53,15 @@ function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string
       />
       <DateField label="תאריך המסמך" name="doc_date" required defaultValue={values?.doc_date ?? today} error={errors.doc_date} />
       <TextField label="סכום (₪)" name="amount" required dir="ltr" inputMode="decimal" defaultValue={values?.amount ?? ""} hint='הסכום הכולל שעל המסמך.' error={errors.amount} />
+      {isDocumentType(docType) && takesDueDate(docType) ? (
+        <DateField
+          label="מועד תשלום (רשות)"
+          name="due_date"
+          defaultValue={values?.due_date ?? ""}
+          hint="ריק = לפי תנאי התשלום של הלקוח. אפשר לשנות אחר כך בכרטיס."
+          error={errors.due_date}
+        />
+      ) : null}
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="שומרים…">רישום המסמך</SubmitButton>
         <Button variant="ghost" onClick={onCancel}>
@@ -124,5 +134,49 @@ export function CancelDocumentButton({ orgId, subject, documentId, label }: { or
         {open ? <CancelForm orgId={orgId} subject={subject} documentId={documentId} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} /> : null}
       </Dialog>
     </>
+  );
+}
+
+/** PAY-02 answer 7: the due date of an active tax invoice or proforma, changed on the card (empty clears it). */
+export function DueDateButton({ orgId, subject, documentId, label, dueDate }: { orgId: string; subject: Subject; documentId: string; label: string; dueDate: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)} aria-label={`מועד התשלום של ${label}`}>
+        מועד תשלום
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title={`מועד התשלום של ${label}`} variant="sheet">
+        {open ? <DueDateForm orgId={orgId} subject={subject} documentId={documentId} dueDate={dueDate} onDone={() => setOpen(false)} /> : null}
+      </Dialog>
+    </>
+  );
+}
+
+function DueDateForm({ orgId, subject, documentId, dueDate, onDone }: { orgId: string; subject: Subject; documentId: string; dueDate: string | null; onDone: () => void }) {
+  const action = setDocumentDueDateAction.bind(null, orgId, subject, documentId);
+  const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
+    const result = await action(prev, formData);
+    if (result?.ok) onDone();
+    return result;
+  }, null);
+  const failure = state && !state.ok ? state : null;
+  return (
+    <form action={formAction} className="space-y-4" noValidate>
+      <FormGuard state={state} />
+      <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
+      <DateField
+        label="מועד תשלום"
+        name="due_date"
+        defaultValue={failure?.values?.due_date ?? dueDate ?? ""}
+        hint="ריק = בלי מועד. מסמך שהמועד שלו עבר ויש בו יתרה מסומן באיחור."
+        error={failure?.fieldErrors?.due_date}
+      />
+      <div className="flex flex-wrap gap-2 pt-1">
+        <SubmitButton pendingText="שומרים…">שמירה</SubmitButton>
+        <Button variant="ghost" onClick={onDone}>
+          חזרה
+        </Button>
+      </div>
+    </form>
   );
 }
