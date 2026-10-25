@@ -2,6 +2,9 @@ import Link from "next/link";
 
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { AllocateButton } from "@/features/allocations/components/allocation-forms";
+import { AllocationRows } from "@/features/allocations/components/allocation-rows";
+import { getAllocationAccess, getMoneyState, listAllocations } from "@/features/allocations/queries";
 import { agorotInput } from "@/features/deals/recurring";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
@@ -45,6 +48,12 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
     "payment",
     payments.map((p) => p.id),
   );
+  // PAY-02: what each payment allocated to documents, and its credit
+  const allocation = await getAllocationAccess(orgId);
+  const ids = payments.map((p) => p.id);
+  const [money, allocations] = allocation.inPlan
+    ? await Promise.all([getMoneyState(orgId, [], ids), listAllocations(orgId, { payments: ids })])
+    : [null, []];
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -87,6 +96,19 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                         {recorder ? ` · נרשם על ידי ${recorder}` : ""}
                       </p>
                       {payment.note ? <p className="text-sm break-words whitespace-pre-line">{payment.note}</p> : null}
+                      {money && !muted ? (
+                        <p className="text-sm text-ink-soft">
+                          שויך למסמכים <span className="tabular-nums">{formatMoney(money.payments.get(payment.id)?.allocated ?? 0)}</span>
+                          {" · "}יתרת זכות <span className="tabular-nums">{formatMoney(money.payments.get(payment.id)?.credit ?? 0)}</span>
+                        </p>
+                      ) : null}
+                      <AllocationRows
+                        orgId={orgId}
+                        page={subject}
+                        side="payment"
+                        allocations={allocations.filter((a) => a.paymentId === payment.id)}
+                        canChange={allocation.canChange}
+                      />
                       {cancelled ? (
                         <p className="text-sm break-words text-ink-soft">
                           בוטל{payment.cancelledAt ? ` ב-${formatDate(payment.cancelledAt)}` : ""}
@@ -110,6 +132,14 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                     </div>
                     {access.canRecord && !cancelled ? (
                       <span className="flex shrink-0 flex-wrap items-start gap-1">
+                        {allocation.canAllocate && !muted && (money?.payments.get(payment.id)?.credit ?? 0) > 0 ? (
+                          <AllocateButton
+                            orgId={orgId}
+                            page={subject}
+                            from={{ kind: "payment", id: payment.id, label }}
+                            available={money?.payments.get(payment.id)?.credit ?? 0}
+                          />
+                        ) : null}
                         <PaymentStatusSelect
                           orgId={orgId}
                           subject={subject}

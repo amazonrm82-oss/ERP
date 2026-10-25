@@ -264,6 +264,14 @@ describe("tenant isolation", () => {
       ).rows[0].id;
       // PAY-01 follow-up: the payment's file (its one subject is the payment)
       await q("insert into public.files (organization_id, payment_id, name, mime_type, size_bytes) values ($1, $2, 'אישור.pdf', 'application/pdf', 1000)", [orgA, ids.paymentA]);
+      // PAY-02: a tax invoice on the same deal, and part of the payment allocated to it
+      ids.invoiceA = (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'A-INV', 1000) returning id", [
+          orgA,
+          ids.dealA,
+        ])
+      ).rows[0].id;
+      await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [orgA, ids.paymentA, ids.invoiceA]);
       // COL-05
       await q("insert into public.customer_holds (organization_id, contact_id, reason) values ($1, $2, 'חוב פתוח')", [orgA, ids.contactA]);
     });
@@ -388,6 +396,8 @@ describe("tenant isolation", () => {
     "order_decisions",
     // DOC-01
     "accounting_documents",
+    // PAY-02
+    "payment_allocations",
     // QUO-09
     "quote_decisions",
     // QUO-10
@@ -579,6 +589,8 @@ describe("tenant isolation", () => {
       order_decisions: "ip = ip",
       // no delete grant at all (never deleted): a permission error is the expected outcome for the delete
       accounting_documents: "cancel_reason = cancel_reason",
+      // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
+      payment_allocations: "amount_agorot = amount_agorot",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
@@ -715,6 +727,7 @@ describe("tenant isolation", () => {
       ["insert into public.customer_holds (organization_id, company_id, reason) values ($1, $2, 'x')", [orgA, ids.companyA]],
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
       ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
+      ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
@@ -832,6 +845,7 @@ describe("tenant isolation", () => {
       ["customer_holds", "cleared_at = now()", "cleared_at = now()"],
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
+      ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
@@ -1113,6 +1127,18 @@ describe("tenant isolation", () => {
       const viaOrder = await pgError(asUser(b.id, (q) => q(sql, [orgB, dealB, ids.orderA])));
       expect(["42501", "23503", "P0001"], sql).toContain(viaOrder.code);
     }
+    // PAY-02: B's allocation cannot name A's payment or A's document; B cannot bill A's proforma
+    const viaAllocation = await pgError(
+      asUser(b.id, (q) => q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgB, ids.paymentA, ids.invoiceA])),
+    );
+    // RLS, the composite FK or the trigger's "same business" refusal (which answers the same whether the row exists or not)
+    expect(["42501", "23503", "P0001"]).toContain(viaAllocation.code);
+    const viaProforma = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.accounting_documents (organization_id, deal_id, proforma_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'tax_invoice', 'B-PRO', 1)", [orgB, dealB, ids.invoiceA]),
+      ),
+    );
+    expect(["42501", "23503", "P0001"]).toContain(viaProforma.code);
     const viaQuoteProduct = await pgError(
       asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, product_id, name, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, quoteB, ids.productA])),
     );

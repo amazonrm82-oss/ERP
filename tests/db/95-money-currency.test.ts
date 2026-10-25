@@ -168,6 +168,15 @@ describe("currency next to every amount", () => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לתשלום') returning id", [org])).rows[0].id;
         await q("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer')", [org, contact]);
       },
+      // PAY-02 (triggers are off here: the row is the server's)
+      payment_allocations: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לשיוך') returning id", [org])).rows[0].id;
+        const payment = (await q<{ id: string }>("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer') returning id", [org, contact])).rows[0].id;
+        const document = (
+          await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'CUR-AL', 1000) returning id", [org, contact])
+        ).rows[0].id;
+        await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [org, payment, document]);
+      },
       // QUO-04
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;

@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { AllocateButton, LinkProformaButton } from "@/features/allocations/components/allocation-forms";
+import { AllocationRows } from "@/features/allocations/components/allocation-rows";
+import { getAllocationAccess, getMoneyState, listAllocations } from "@/features/allocations/queries";
+import { documentStateChip, takesPayments } from "@/features/allocations/state";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
 import type { MoneySubject } from "@/features/payments/money-subject";
@@ -31,6 +35,13 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
     "document",
     documents.map((d) => d.id),
   );
+  // PAY-02: what each tax invoice and proforma was paid, and its balance and state
+  const allocation = await getAllocationAccess(orgId);
+  const ids = documents.map((d) => d.id);
+  const [money, allocations] = allocation.inPlan
+    ? await Promise.all([getMoneyState(orgId, ids, []), listAllocations(orgId, { documents: ids })])
+    : [null, []];
+  const numbers = new Map(documents.map((d) => [d.id, d.number]));
   const titleId = `documents-${subject.id}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
@@ -46,6 +57,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
           <ul className="divide-y divide-line">
             {documents.map((doc) => {
               const label = `${DOCUMENT_TYPE_LABELS[doc.docType]} ${doc.number}`;
+              const state = money?.documents.get(doc.id);
+              const chip = state ? documentStateChip(state) : null;
+              const hasBalance = doc.docType === "tax_invoice" || doc.docType === "proforma";
               return (
                 <li key={doc.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -58,6 +72,11 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                         <>
                           {" "}
                           <Badge tone="warning">בוטל</Badge>
+                        </>
+                      ) : chip ? (
+                        <>
+                          {" "}
+                          <Badge tone={chip.tone}>{chip.label}</Badge>
                         </>
                       ) : null}
                     </p>
@@ -76,6 +95,24 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                         ) : null}
                       </p>
                     ) : null}
+                    {state && hasBalance && !doc.cancelled && state.state !== "transferred" ? (
+                      <p className="text-sm text-ink-soft">
+                        שולם <span className="tabular-nums">{formatMoney(state.paid)}</span>
+                        {" · "}יתרה <span className="tabular-nums">{formatMoney(state.balance)}</span>
+                      </p>
+                    ) : null}
+                    {doc.proformaId ? (
+                      <p className="text-sm text-ink-soft">
+                        מחליפה את חשבון העסקה{numbers.get(doc.proformaId) ? <bdi dir="ltr"> {numbers.get(doc.proformaId)}</bdi> : null}
+                      </p>
+                    ) : null}
+                    <AllocationRows
+                      orgId={orgId}
+                      page={subject}
+                      side="document"
+                      allocations={allocations.filter((a) => a.documentId === doc.id)}
+                      canChange={allocation.canChange}
+                    />
                     <HolderFiles
                       orgId={orgId}
                       page={subject}
@@ -86,8 +123,14 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                       label={label}
                     />
                   </div>
-                  <span className="flex shrink-0 items-center gap-1">
+                  <span className="flex shrink-0 flex-wrap items-center gap-1">
                     <span className={`font-medium whitespace-nowrap tabular-nums ${doc.cancelled ? "text-ink-soft line-through" : ""}`}>{formatMoney(doc.amountAgorot)}</span>
+                    {allocation.canAllocate && !doc.cancelled && takesPayments(state) ? (
+                      <AllocateButton orgId={orgId} page={subject} from={{ kind: "document", id: doc.id, label }} available={state?.balance ?? 0} />
+                    ) : null}
+                    {access.canRecord && !doc.cancelled && doc.docType === "tax_invoice" && !doc.proformaId ? (
+                      <LinkProformaButton orgId={orgId} page={subject} invoiceId={doc.id} invoiceLabel={label} />
+                    ) : null}
                     {access.canRecord && !doc.cancelled ? <CancelDocumentButton orgId={orgId} subject={subject} documentId={doc.id} label={label} /> : null}
                   </span>
                 </li>

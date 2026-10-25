@@ -467,6 +467,43 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(admin.id, (q) => q("delete from public.payments where id = $1", [byManager])))).code).toBe("42501");
   });
 
+  it("allocations follow their document or payment; recorders allocate, only owners and admins change or undo, nobody deletes (PAY-02)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה לשיוך', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const { pay, invoice } = await asUser(owner.id, async (q) => ({
+      pay: (await q<{ id: string }>("insert into public.payments (organization_id, deal_id, amount_agorot, method) values ($1, $2, 1000, 'cash') returning id", [org, deal])).rows[0].id,
+      invoice: (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, deal_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'R03-AL', 1000) returning id", [org, deal])
+      ).rows[0].id,
+    }));
+    const allocate = (u: U, amount: number) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string }>("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, $4) returning id", [org, pay, invoice, amount]))
+          .rows[0].id,
+      );
+    const byManager = await allocate(manager, 100);
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payment_allocations where id = $1", [byManager]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // m1 reads the deal but holds no key: allocates and changes nothing
+    expect((await pgError(allocate(m1, 1))).code).toBe("42501");
+    expect(await asUser(m1.id, async (q) => (await q("update public.payment_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.payment_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    // the manager allocates but neither changes nor undoes
+    expect(await asUser(manager.id, async (q) => (await q("update public.payment_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    expect(await asUser(manager.id, async (q) => (await q("update public.payment_allocations set removed_at = now() where id = $1", [byManager])).rowCount)).toBe(0);
+    // an admin changes and undoes; nobody deletes
+    expect(await asUser(admin.id, async (q) => (await q("update public.payment_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("update public.payment_allocations set removed_at = now() where id = $1", [byManager])).rowCount)).toBe(1);
+    expect((await pgError(asUser(admin.id, (q) => q("delete from public.payment_allocations where id = $1", [byManager])))).code).toBe("42501");
+  });
+
   it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
     await setVisibility("org");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));

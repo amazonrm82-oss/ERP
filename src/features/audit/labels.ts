@@ -87,6 +87,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   order_payment_steps: "תשלום בלוח התשלומים של הזמנה",
   accounting_documents: "מסמך חשבונאי",
   payments: "תשלום",
+  // PAY-02
+  payment_allocations: "שיוך תשלום למסמך",
   customer_holds: "סימון לא למכור עד הסדרת חוב",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",

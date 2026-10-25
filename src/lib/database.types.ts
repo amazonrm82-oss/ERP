@@ -1848,6 +1848,8 @@ export type AccountingDocumentRow = {
   contact_id: string | null;
   // ORD-06 part two: the numbered order it belongs to (set on insert only)
   order_id: string | null;
+  // PAY-02: on a tax invoice, the proforma it bills (set once)
+  proforma_id: string | null;
   doc_type: string;
   number: string;
   doc_date: string;
@@ -1857,6 +1859,23 @@ export type AccountingDocumentRow = {
   cancel_reason: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// PAY-02: a share of a payment allocated to a tax invoice or a proforma (migration payment_allocations). Never deleted:
+// undone by an owner or admin (removed_at), released by the server (released_at).
+export type PaymentAllocationRow = {
+  id: string;
+  organization_id: string;
+  payment_id: string;
+  document_id: string;
+  amount_agorot: number;
+  currency: string;
+  released_at: string | null;
+  removed_at: string | null;
+  removed_by: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2729,13 +2748,20 @@ export type Database = {
           deal_id?: string | null;
           contact_id?: string | null;
           order_id?: string | null;
+          proforma_id?: string | null;
           doc_type: string;
           number: string;
           doc_date?: string;
           amount_agorot: number;
           currency?: string;
         },
-        { status?: string; cancel_reason?: string | null }
+        { status?: string; cancel_reason?: string | null; proforma_id?: string | null }
+      >;
+      // PAY-02: column grants; recorders allocate, owners and admins change the amount or undo (no delete)
+      payment_allocations: Table<
+        PaymentAllocationRow,
+        { organization_id: string; payment_id: string; document_id: string; amount_agorot: number; currency?: string },
+        { amount_agorot?: number; removed_at?: string | null }
       >;
       // ORD-04: column grants; the order is fixed once inserted
       order_payment_steps: Table<
@@ -3005,6 +3031,10 @@ export type Database = {
       sort_customer: { Args: Record<string, never>; Returns: string | null };
       // accounting documents and payments by who recorded them (LST-09)
       sort_recorder: { Args: Record<string, never>; Returns: string | null };
+      // PAY-02: each document's paid amount, balance and state and each payment's allocated amount and credit (invoker)
+      money_allocation_state: { Args: { p_org: string; p_documents: string[]; p_payments: string[] }; Returns: Json };
+      // PAY-02: what the allocation window offers for a payment or a document (invoker)
+      money_allocation_candidates: { Args: { p_org: string; p_payment: string | null; p_document: string | null }; Returns: Json };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)
