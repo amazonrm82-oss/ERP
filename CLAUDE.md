@@ -1027,6 +1027,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   trigger `payments_emit_received` (definer, after insert, recorded/confirmed) writes one outbox event per linked record (deal and contact),
   origin `automation` while an automation runs. `app.process_outbox` and `app.automation_event_matches` were last redefined in 020665; the
   builder offers it only with the `payments` flag (server-checked in `toDbRule`).
+  Since 020780 (PAY-07 answers, owner 21 October 2026) the notice is kind `payment` (mutable, shown in settings): the deal's owner, else
+  the contact's (active, not a viewer), else every active owner and admin; never the recorder (if the chosen owner recorded it, nobody).
+  Trigger type `payment_confirmed` (deal and contact rules, `min_agorot`): `app.emit_payment_confirmed` writes one outbox event per linked
+  record on insert as confirmed or a move recorded -> confirmed (not failed -> confirmed); its AUT-06 retry holds while still confirmed.
+  `app.process_outbox`, `app.automation_event_matches`, `app.automation_run_facts` and `app.automation_event_still_holds` were last
+  redefined in 020780. The run log badge of a quota skip reads "לא רץ: מכסה" (`quotaSkipLabel`, AUT-07).
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
