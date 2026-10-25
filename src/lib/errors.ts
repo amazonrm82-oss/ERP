@@ -86,6 +86,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "payment:cancelled": "תשלום שבוטל נשאר מבוטל, ואי אפשר לשנות בו דבר.",
   "payment:cancel_reason": "יש לכתוב למה התשלום מבוטל (עד 500 תווים).",
   "payment:allocated": "לתשלום הזה כבר משויך סכום גדול יותר. בטלו קודם שיוכים, ואז תקנו את הסכום.",
+  "ledger:period": "יש לבחור תקופה: תאריך התחלה ותאריך סיום, וההתחלה לפני הסיום.",
   "allocation:doc_type": "רק חשבונית מס או חשבון עסקה מקבלים שיוך של תשלום.",
   "allocation:payment_state": "רק תשלום במצב \"נרשם\" או \"אושר\" משויך למסמך.",
   "allocation:document_state": "מסמך שבוטל לא מקבל שיוך של תשלום.",

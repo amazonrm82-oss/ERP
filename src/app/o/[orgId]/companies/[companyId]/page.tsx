@@ -31,6 +31,7 @@ import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-car
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -51,11 +52,12 @@ export const metadata: Metadata = { title: "חברה" };
 type Props = {
   params: Promise<{ orgId: string; companyId: string }>;
   // REC-06: tl = the timeline filter
-  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[] }>;
+  // BAL-01: lf, lt = the ledger's period
+  searchParams: Promise<{ tl?: string | string[]; edit?: string | string[]; lf?: string | string[]; lt?: string | string[] }>;
 };
 
 export default async function CompanyPage({ params, searchParams }: Props) {
-  const [{ orgId, companyId }, { tl, edit }] = await Promise.all([params, searchParams]);
+  const [{ orgId, companyId }, { tl, edit, lf, lt }] = await Promise.all([params, searchParams]);
   // DQL-01: open the details for editing at this input
   const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
@@ -200,6 +202,14 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
           {/* PAY-03: the company's credit balance */}
           <CompanyCreditCard orgId={orgId} companyId={company.id} />
+          {/* BAL-01: the company's ledger (its contacts' and deals' documents and payments) */}
+          <LedgerCard
+            orgId={orgId}
+            where={{ contact: null, company: company.id }}
+            from={(Array.isArray(lf) ? lf[0] : lf)}
+            to={(Array.isArray(lt) ? lt[0] : lt)}
+            keep={{ tl: (Array.isArray(tl) ? tl[0] : tl) }}
+          />
 
         </div>
       </div>

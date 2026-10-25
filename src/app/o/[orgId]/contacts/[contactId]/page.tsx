@@ -62,6 +62,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
 // FLD-10: the tab title in the business's word
@@ -74,11 +75,12 @@ type Props = {
   params: Promise<{ orgId: string; contactId: string }>;
   // REC-06: tl = the timeline filter
   // CON-01: channels=failed after a create whose further phones or emails were not saved
-  searchParams: Promise<{ tl?: string | string[]; channels?: string | string[]; edit?: string | string[] }>;
+  // BAL-01: lf, lt = the ledger's period
+  searchParams: Promise<{ tl?: string | string[]; channels?: string | string[]; edit?: string | string[]; lf?: string | string[]; lt?: string | string[] }>;
 };
 
 export default async function ContactPage({ params, searchParams }: Props) {
-  const [{ orgId, contactId }, { tl, channels, edit }] = await Promise.all([params, searchParams]);
+  const [{ orgId, contactId }, { tl, channels, edit, lf, lt }] = await Promise.all([params, searchParams]);
   // DQL-01: open the details for editing at this input
   const focus = editFocusParam(edit);
   const context = await getOrgContext(orgId);
@@ -252,6 +254,14 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
+          {/* BAL-01: the customer's ledger (its company's contacts and deals too) */}
+          <LedgerCard
+            orgId={orgId}
+            where={{ contact: contact.id, company: null }}
+            from={(Array.isArray(lf) ? lf[0] : lf)}
+            to={(Array.isArray(lt) ? lt[0] : lt)}
+            keep={{ tl: (Array.isArray(tl) ? tl[0] : tl) }}
+          />
 
           <RelatedDealsCard
             orgId={orgId}

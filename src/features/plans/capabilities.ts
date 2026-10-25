@@ -31,7 +31,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   // COL-05
   { feature: "collection", label: "סימון \"לא למכור עד הסדרת חוב\"", built: true },
   { feature: "payment_links", label: "קישורי תשלום", built: false },
-  { feature: "balances", label: "כרטסת לקוח", built: false },
+  // BAL-01: the customer's ledger on the contact and company pages
+  { feature: "balances", label: "כרטסת לקוח", built: true },
   { feature: "booking_page", label: "דפי קביעת תור", built: true },
   // BIZ-02
   { feature: "business_card", label: "כרטיס ביקור דיגיטלי", built: true },

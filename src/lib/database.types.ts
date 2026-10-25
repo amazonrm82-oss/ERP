@@ -3024,6 +3024,8 @@ export type Database = {
       report_revenue_by_product: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // DLI-06
       report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // BAL-01: the customer's ledger (invoker; {"allowed": false} without the keys or membership)
+      customer_ledger: { Args: { p_org: string; p_contact: string | null; p_company: string | null; p_from: string; p_to: string }; Returns: Json };
       report_gross_profit: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // CON-06
       report_referrals: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
