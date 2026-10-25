@@ -40,11 +40,13 @@ describe("automations on a date (AUT-03)", () => {
   const runsOf = (ruleId: string) =>
     asAdmin(async (q) => (await q<{ entity_id: string }>("select entity_id from public.automation_runs where automation_id = $1 order by entity_id", [ruleId])).rows.map((r) => r.entity_id));
   const off = (ruleId: string) => asAdmin((q) => q("update public.automations set is_active = false where id = $1", [ruleId]));
+  // created at noon of the day N days ago in the business's zone, so a clock change (daylight saving) in between never
+  // moves it to another day
   const lead = (name: string, createdDaysAgo: number) =>
     asAdmin(async (q) =>
       (
         await q<{ id: string }>(
-          "insert into public.leads (organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, now() - make_interval(days => $5)) returning id",
+          "insert into public.leads (organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, (((now() at time zone 'Asia/Jerusalem')::date - $5::int) + time '12:00') at time zone 'Asia/Jerusalem') returning id",
           [org, name, owner.id, status, createdDaysAgo],
         )
       ).rows[0].id,
@@ -232,7 +234,7 @@ describe("automations on a date (AUT-03)", () => {
   const leadWithId = (o: string, id: string, name: string, createdDaysAgo: number, statusId: string, ownerId: string) =>
     asAdmin((q) =>
       q(
-        "insert into public.leads (id, organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, $5, now() - make_interval(days => $6))",
+        "insert into public.leads (id, organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, $5, (((now() at time zone 'Asia/Jerusalem')::date - $6::int) + time '12:00') at time zone 'Asia/Jerusalem')",
         [id, o, name, ownerId, statusId, createdDaysAgo],
       ),
     );
