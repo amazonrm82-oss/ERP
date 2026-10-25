@@ -36,7 +36,11 @@ describe("payment received trigger (PAY-07)", () => {
     expect(allowed).not.toBeNull();
     const types = [...allowed![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     for (const trigger of TRIGGERS) expect(types, trigger.key).toContain(trigger.type);
-    expect(ENGINE).toContain("'deal_lost', 'payment_received',\n                                   'payment_confirmed')");
+    // the outbox offers the event to both payment rule types
+    const offered = ENGINE.match(/and a\.trigger_type in \(([^)]*)\)/);
+    expect(offered).not.toBeNull();
+    expect(offered![1]).toContain("'payment_received'");
+    expect(offered![1]).toContain("'payment_confirmed'");
   });
 
   it("is offered for deal and contact rules", () => {

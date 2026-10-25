@@ -25,6 +25,9 @@ export type Lookups = {
   dealWord?: string;
   // PAY-07: whether the plan has payments (the "payment received" trigger is offered only then)
   payments?: boolean;
+  // AUT-04: whether the plan has quotes / documents (their triggers are offered only then)
+  quotes?: boolean;
+  documents?: boolean;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -38,13 +41,19 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   const supabase = await createClient();
   let fields: Lookups["fields"];
   let payments: boolean;
+  let quotes: boolean;
+  let documents: boolean;
   try {
-    const [[lead, contact, company, deal], inPlan] = await Promise.all([
+    const [[lead, contact, company, deal], hasPayments, hasQuotes, hasDocuments] = await Promise.all([
       Promise.all((["lead", "contact", "company", "deal"] as const).map((type) => listFieldDefinitions(orgId, type))),
       orgHasFeature(orgId, "payments"),
+      orgHasFeature(orgId, "quotes"),
+      orgHasFeature(orgId, "documents"),
     ]);
     fields = { lead, contact, company, deal };
-    payments = inPlan;
+    payments = hasPayments;
+    quotes = hasQuotes;
+    documents = hasDocuments;
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
@@ -84,6 +93,8 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       fields,
       dealWord: terms.deal.singular,
       payments,
+      quotes,
+      documents,
     },
     error: null,
   };

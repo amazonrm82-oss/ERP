@@ -25,7 +25,8 @@ export function describeRule(
     when += trigger.number.key === "days" ? ` (${n} ימים)` : ` (${n} דקות לפני)`;
   }
   if (trigger?.minAmount && typeof rule.triggerConfig.min_agorot === "number") {
-    when += ` (לפחות ₪${(rule.triggerConfig.min_agorot / 100).toLocaleString("he-IL")})`;
+    // AUT-04 (owner, answer 4 ב): a quote's minimum is before VAT
+    when += ` (לפחות ₪${(rule.triggerConfig.min_agorot / 100).toLocaleString("he-IL")}${trigger.type === "quote_accepted" ? " לפני מע״מ" : ""})`;
   }
   if (trigger?.date) {
     when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
@@ -145,6 +146,8 @@ const RETRY_NOTES: Record<string, string> = {
   // the owner's wording, 21 October 2026
   event_changed: "לא רץ: האירוע השתנה",
   org_closed: "לא רץ: העסק סגור",
+  // AUT-04 review: the rule's trigger needs a plan flag the business no longer has
+  feature_off: "לא רץ: לא כלול בתוכנית",
 };
 
 /** AUT-07: the engine's error of a run skipped because the plan's monthly runs are used up. */

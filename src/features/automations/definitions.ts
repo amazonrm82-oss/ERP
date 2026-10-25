@@ -14,7 +14,19 @@ export type TriggerType =
   | "task_due_soon"
   | "date_reached"
   | "payment_received"
-  | "payment_confirmed";
+  | "payment_confirmed"
+  // AUT-04: commercial triggers
+  | "quote_viewed"
+  | "quote_accepted"
+  | "quote_declined"
+  | "quote_expired"
+  | "document_recorded"
+  | "meeting_scheduled"
+  | "meeting_cancelled"
+  | "meeting_no_show";
+
+/** AUT-04: the plan flags a trigger may need (app.automation_trigger_feature). */
+export type TriggerFeature = "payments" | "quotes" | "documents";
 
 export type TriggerOption = {
   key: string;
@@ -27,7 +39,7 @@ export type TriggerOption = {
   number?: { key: "days" | "minutes"; label: string; default: number };
   // AUT-03: X days before or after a date field (field, days and direction are chosen in the builder)
   date?: true;
-  // PAY-07: an optional minimum amount in shekels (stored as trigger_config.min_agorot)
+  // PAY-07: an optional minimum amount in shekels (stored as trigger_config.min_agorot); AUT-04: also "quote accepted", before VAT
   minAmount?: true;
 };
 
@@ -61,16 +73,52 @@ export const TRIGGERS: TriggerOption[] = [
   // PAY-07 (owner, 21 October 2026, answer 3): a payment inserted as confirmed, or moved from recorded to confirmed
   { key: "deal:payment_confirmed", label: "תשלום בעסקה אושר", entity: "deal", type: "payment_confirmed", minAmount: true },
   { key: "contact:payment_confirmed", label: "תשלום של איש קשר אושר", entity: "contact", type: "payment_confirmed", minAmount: true },
+  // AUT-04: a quote's status changed (from the customer's page, the expiry job or the staff), on its deal and its contact
+  { key: "deal:quote_viewed", label: "הצעת מחיר בעסקה נצפתה", entity: "deal", type: "quote_viewed" },
+  { key: "contact:quote_viewed", label: "הצעת מחיר לאיש קשר נצפתה", entity: "contact", type: "quote_viewed" },
+  { key: "deal:quote_accepted", label: "הצעת מחיר בעסקה אושרה", entity: "deal", type: "quote_accepted", minAmount: true },
+  { key: "contact:quote_accepted", label: "הצעת מחיר לאיש קשר אושרה", entity: "contact", type: "quote_accepted", minAmount: true },
+  { key: "deal:quote_declined", label: "הצעת מחיר בעסקה נדחתה", entity: "deal", type: "quote_declined" },
+  { key: "contact:quote_declined", label: "הצעת מחיר לאיש קשר נדחתה", entity: "contact", type: "quote_declined" },
+  { key: "deal:quote_expired", label: "תוקף הצעת מחיר בעסקה פג", entity: "deal", type: "quote_expired" },
+  { key: "contact:quote_expired", label: "תוקף הצעת מחיר לאיש קשר פג", entity: "contact", type: "quote_expired" },
+  // AUT-04: a document issued outside the system was recorded (DOC-01)
+  { key: "deal:document", label: "נרשם מסמך בעסקה", entity: "deal", type: "document_recorded" },
+  { key: "contact:document", label: "נרשם מסמך לאיש קשר", entity: "contact", type: "document_recorded" },
+  // AUT-04: meetings linked to the record (of a weekly series only the first is "scheduled"; blocked time never)
+  { key: "lead:meeting_scheduled", label: "נקבעה פגישה עם הליד", entity: "lead", type: "meeting_scheduled" },
+  { key: "contact:meeting_scheduled", label: "נקבעה פגישה עם איש הקשר", entity: "contact", type: "meeting_scheduled" },
+  { key: "company:meeting_scheduled", label: "נקבעה פגישה עם החברה", entity: "company", type: "meeting_scheduled" },
+  { key: "deal:meeting_scheduled", label: "נקבעה פגישה בעסקה", entity: "deal", type: "meeting_scheduled" },
+  { key: "lead:meeting_cancelled", label: "פגישה עם הליד בוטלה", entity: "lead", type: "meeting_cancelled" },
+  { key: "contact:meeting_cancelled", label: "פגישה עם איש הקשר בוטלה", entity: "contact", type: "meeting_cancelled" },
+  { key: "company:meeting_cancelled", label: "פגישה עם החברה בוטלה", entity: "company", type: "meeting_cancelled" },
+  { key: "deal:meeting_cancelled", label: "פגישה בעסקה בוטלה", entity: "deal", type: "meeting_cancelled" },
+  { key: "lead:meeting_no_show", label: "הליד לא הגיע לפגישה", entity: "lead", type: "meeting_no_show" },
+  { key: "contact:meeting_no_show", label: "איש הקשר לא הגיע לפגישה", entity: "contact", type: "meeting_no_show" },
+  { key: "company:meeting_no_show", label: "פגישה עם החברה: הלקוח לא הגיע", entity: "company", type: "meeting_no_show" },
+  { key: "deal:meeting_no_show", label: "פגישה בעסקה: הלקוח לא הגיע", entity: "deal", type: "meeting_no_show" },
 ];
 
-/** The trigger types that need the `payments` plan flag. */
-export function isPaymentTrigger(type: TriggerType): boolean {
-  return type === "payment_received" || type === "payment_confirmed";
+/** The plan flag a trigger type needs, or null for a core trigger (mirrors app.automation_trigger_feature). */
+export function triggerFeature(type: TriggerType): TriggerFeature | null {
+  if (type === "payment_received" || type === "payment_confirmed") return "payments";
+  if (type === "quote_viewed" || type === "quote_accepted" || type === "quote_declined" || type === "quote_expired") return "quotes";
+  if (type === "document_recorded") return "documents";
+  return null;
 }
 
-/** PAY-07: whether the builder offers a trigger (payment triggers need the `payments` flag; a saved rule keeps its own). */
-export function triggerOffered(trigger: TriggerOption, lookups: { payments?: boolean }, current?: string): boolean {
-  return !isPaymentTrigger(trigger.type) || !!lookups.payments || trigger.key === current;
+/** Why a trigger cannot be saved without its plan flag. */
+export const FEATURE_MISSING: Record<TriggerFeature, string> = {
+  payments: "תשלומים אינם כלולים בתוכנית של העסק.",
+  quotes: "הצעות מחיר אינן כלולות בתוכנית של העסק.",
+  documents: "מסמכים אינם כלולים בתוכנית של העסק.",
+};
+
+/** Whether the builder offers a trigger: one that needs a plan flag only with it; a saved rule keeps its own. */
+export function triggerOffered(trigger: TriggerOption, lookups: Partial<Record<TriggerFeature, boolean>>, current?: string): boolean {
+  const feature = triggerFeature(trigger.type);
+  return feature === null || !!lookups[feature] || trigger.key === current;
 }
 
 export type ConditionOption = {

@@ -171,7 +171,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
           {trigger.minAmount ? (
             <div className="space-y-1">
               <TextField
-                label="סכום מינימלי (₪, לא חובה)"
+                label={trigger.type === "quote_accepted" ? "סכום מינימלי לפני מע״מ (₪, לא חובה)" : "סכום מינימלי (₪, לא חובה)"}
                 value={triggerMin}
                 onChange={(e) => setTriggerMin(e.target.value)}
                 dir="ltr"
@@ -179,7 +179,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
                 className="max-w-40"
               />
               <p className="text-sm text-ink-soft">
-                {trigger.entity === "deal"
+                {trigger.type === "quote_accepted"
+                  ? "רץ כשהלקוח מאשר הצעת מחיר שסכומה לפני מע״מ, אחרי הנחה, לפחות הסכום הזה."
+                  : trigger.entity === "deal"
                   ? "רץ כשנרשם תשלום על העסקה (נרשם או אושר). תשלום שמשתנה אחר כך לא מפעיל שוב."
                   : "רץ כשנרשם תשלום שמשויך לאיש הקשר, גם כשהוא רשום על עסקה (נרשם או אושר). תשלום שמשתנה אחר כך לא מפעיל שוב."}
               </p>
