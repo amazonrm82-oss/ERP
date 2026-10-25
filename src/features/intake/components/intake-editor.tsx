@@ -12,6 +12,15 @@ import type { Json } from "@/lib/database.types";
 import { createIntakeAction, updateIntakeAction } from "../actions";
 import { CALLBACK_SLOTS, slotInputName, slotLabel } from "../callback";
 import { parseFieldsConfig, storedFields, type FormFieldConfig, type FormFieldOption } from "../fields";
+import {
+  CATEGORY_PICKS_VALUE,
+  initialProductPicks,
+  MAX_FORM_PRODUCTS,
+  PRODUCTS_ALL_OVER,
+  PRODUCTS_GREW_WARNING,
+  type FormCategory,
+  type FormProduct,
+} from "../product";
 import { FormFieldsBuilder } from "./form-fields-builder";
 import type { IntakeDetails } from "../queries";
 
@@ -55,6 +64,20 @@ type EditProps = {
   teams: Option[];
   fieldOptions: FormFieldOption[];
   businessPhone: string | null;
+  // LEAD-04 / CAP-08: what the product question offers to pick; null when the business has no products flag
+  productChoices?: ProductChoices | null;
+};
+
+/** LEAD-04 / CAP-08: the product question's lists and counts, read by the settings page. */
+export type ProductChoices = {
+  // offerable products to pick, in the public form's order (stored picks always included)
+  options: FormProduct[];
+  // the catalog holds more offerable products than the list shows
+  cut: boolean;
+  categories: Array<FormCategory & { depth: 0 | 1 }>;
+  // offerable products of the business, and of the form's saved choice
+  offerable: number;
+  offer: number;
 };
 
 /** The builder's JSON (camelCase) in the stored shape, for parseFieldsConfig. */
@@ -67,7 +90,16 @@ function fieldsJsonToStored(json: string): Json {
   }
 }
 
-export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fieldOptions, businessPhone }: EditProps) {
+export function IntakeSettingsForm({
+  orgId,
+  intake,
+  sources,
+  members,
+  teams,
+  fieldOptions,
+  businessPhone,
+  productChoices = null,
+}: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
@@ -92,6 +124,7 @@ export function IntakeSettingsForm({ orgId, intake, sources, members, teams, fie
           <CallbackSettings intake={intake} values={values} />
           <ChannelSettings intake={intake} values={values} />
           <LocaleSettings intake={intake} values={values} />
+          {productChoices ? <ProductSettings intake={intake} values={values} choices={productChoices} error={errors.product_ids} /> : null}
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
         </>
@@ -272,6 +305,143 @@ function LocaleSettings({ intake, values }: { intake: IntakeDetails; values?: Re
         </span>
       </span>
     </label>
+  );
+}
+
+/**
+ * LEAD-04 / CAP-08: ask which product the person is interested in. The answer is the new lead's requested product, set
+ * before the distribution rules, so a rule by product applies. Every offerable product (only while the business has at
+ * most 100), or the picked products and categories (a top category includes its sub-categories). The inputs stay in the
+ * form while the question is off (hidden), so turning it off keeps the picks.
+ */
+function ProductSettings({
+  intake,
+  values,
+  choices,
+  error,
+}: {
+  intake: IntakeDetails;
+  values?: Record<string, string>;
+  choices: ProductChoices;
+  error?: string;
+}) {
+  const allAllowed = choices.offerable <= MAX_FORM_PRODUCTS;
+  const storedScope = intake.productIds || intake.productCategoryIds ? "picked" : "all";
+  const [on, setOn] = useState(values ? values.product_choice === "on" : intake.productChoice);
+  const [scope, setScope] = useState(values?.product_scope ?? (allAllowed ? storedScope : "picked"));
+  const legendId = useId();
+  const errorId = useId();
+  // after a failed save, the ticks the person sent; otherwise the stored picks
+  const picked = initialProductPicks(values, intake.productIds);
+  const pickedCategories = initialProductPicks(values, intake.productCategoryIds, CATEGORY_PICKS_VALUE);
+  // the saved choice offers more than 100 today (the business or a category grew): the form shows the first 100
+  const grew = intake.productChoice && choices.offer > MAX_FORM_PRODUCTS;
+  return (
+    <div className="space-y-3">
+      <input type="hidden" name="product_settings" value="1" />
+      <label className="flex items-start gap-2.5 text-md">
+        <input
+          type="checkbox"
+          name="product_choice"
+          checked={on}
+          onChange={(event) => setOn(event.target.checked)}
+          className="mt-1 size-4.5 accent-accent"
+        />
+        <span>
+          לשאול במה מתעניינים
+          <span className="block text-sm text-ink-soft">
+            רשימה של מוצרים מהקטלוג, בלי מחירים. הבחירה נשמרת כמוצר המבוקש של הליד, וכללי חלוקת לידים לפי מוצר חלים עליה.
+          </span>
+        </span>
+      </label>
+      {grew ? (
+        <p role="note" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning ms-7">
+          {PRODUCTS_GREW_WARNING}
+        </p>
+      ) : null}
+      <fieldset
+        hidden={!on}
+        aria-labelledby={legendId}
+        aria-describedby={error ? errorId : undefined}
+        className="space-y-2 rounded-md border border-line p-3 ms-7"
+      >
+        <legend id={legendId} className="px-1 text-sm font-medium">
+          אילו מוצרים להציג
+        </legend>
+        {choices.offerable === 0 ? <p className="text-sm text-ink-soft">אין בקטלוג מוצרים פעילים, ולכן השאלה לא תוצג בטופס.</p> : null}
+        <label className="flex items-start gap-2 text-md">
+          <input
+            type="radio"
+            name="product_scope"
+            value="all"
+            checked={scope === "all"}
+            disabled={!allAllowed}
+            onChange={() => setScope("all")}
+            className="mt-1 size-4.5 accent-accent"
+          />
+          <span>
+            כל המוצרים הפעילים
+            {allAllowed ? null : <span className="block text-sm text-ink-soft">{PRODUCTS_ALL_OVER}</span>}
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-md">
+          <input
+            type="radio"
+            name="product_scope"
+            value="picked"
+            checked={scope === "picked"}
+            onChange={() => setScope("picked")}
+            className="size-4.5 accent-accent"
+          />
+          רק המוצרים והקטגוריות שאבחר (עד {MAX_FORM_PRODUCTS} מוצרים בסך הכול)
+        </label>
+        <div hidden={scope !== "picked"} className="space-y-3 ms-7">
+          {choices.categories.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">קטגוריות</p>
+              <p className="text-sm text-ink-soft">קטגוריה ראשית כוללת גם את קטגוריות המשנה שלה.</p>
+              <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-md border border-line p-2">
+                {choices.categories.map((category) => (
+                  <label key={category.id} className={`flex items-start gap-2 text-md break-words ${category.depth === 1 ? "ps-6" : ""}`}>
+                    <input
+                      type="checkbox"
+                      name="product_category_ids"
+                      value={category.id}
+                      defaultChecked={pickedCategories.has(category.id)}
+                      className="mt-1 size-4.5 shrink-0 accent-accent"
+                    />
+                    <span className="min-w-0">{category.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">מוצרים</p>
+            <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-md border border-line p-2">
+              {choices.options.map((product) => (
+                <label key={product.id} className="flex items-start gap-2 text-md break-words">
+                  <input
+                    type="checkbox"
+                    name="product_ids"
+                    value={product.id}
+                    defaultChecked={picked.has(product.id)}
+                    className="mt-1 size-4.5 shrink-0 accent-accent"
+                  />
+                  <span className="min-w-0">{product.name}</span>
+                </label>
+              ))}
+              {choices.cut ? <p className="text-sm text-ink-soft">מוצגים 500 המוצרים הראשונים לפי שם, ומוצרים שכבר נבחרו.</p> : null}
+            </div>
+          </div>
+        </div>
+        {error ? (
+          <p id={errorId} className="text-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+      </fieldset>
+    </div>
   );
 }
 

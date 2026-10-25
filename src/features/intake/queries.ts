@@ -1,11 +1,12 @@
 import "server-only";
 
 import type { FormKind } from "@/lib/database.types";
-import { must } from "@/lib/db-read";
+import { DbReadError, must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { isCallbackSlotStart, type CallbackSlotStart } from "./callback";
 import { parseFieldsConfig, type FormFieldConfig } from "./fields";
+import { coveredCategoryIds, mergeFormProductOptions, orderedFormCategories, type FormCategory, type FormProduct } from "./product";
 
 export type IntakeSummary = {
   id: string;
@@ -76,13 +77,17 @@ export type IntakeDetails = {
   channelChoice: boolean;
   // CAP-08: the hosted form asks the person's preferred language
   localeChoice: boolean;
+  // LEAD-04 / CAP-08: the hosted form asks for a requested product; the picked ones (null = every offerable product)
+  productChoice: boolean;
+  productIds: string[] | null;
+  productCategoryIds: string[] | null;
 };
 
 export async function getIntake(orgId: string, formId: string): Promise<IntakeDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice, product_choice, product_ids, product_category_ids")
     .eq("organization_id", orgId)
     .eq("id", formId)
     // BIZ-02 / SPD-07: a business card's or site widget's form is managed with its card or widget, not here
@@ -117,6 +122,9 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     callbackSlotsOff: (data.callback_slots_off ?? []).filter(isCallbackSlotStart),
     channelChoice: data.channel_choice,
     localeChoice: data.locale_choice,
+    productChoice: data.product_choice,
+    productIds: data.product_ids,
+    productCategoryIds: data.product_category_ids,
   };
 }
 
@@ -166,4 +174,69 @@ export async function listKeptSubmissions(orgId: string): Promise<KeptSubmission
     "kept form submissions",
   );
   return data.map((row) => ({ ...toSubmissionItem(row), formName: row.form_name?.trim() || "טופס שנמחק" }));
+}
+
+/** How many offerable products the form settings list to pick from (a longer catalog shows the first ones by name). */
+export const FORM_PRODUCT_PICK_LIMIT = 500;
+
+/**
+ * LEAD-04 / CAP-08: offerable products (active, not archived) to pick for a form's product question, in the public
+ * form's order: the first FORM_PRODUCT_PICK_LIMIT by name, plus every stored pick the cut left out, so a save keeps it.
+ */
+export async function listFormProductOptions(orgId: string, storedPicks: readonly string[] | null): Promise<FormProduct[]> {
+  const supabase = await createClient();
+  const offerable = () =>
+    supabase.from("products").select("id, name").eq("organization_id", orgId).eq("is_active", true).is("archived_at", null);
+  const listed = must(await offerable().order("name").order("id").limit(FORM_PRODUCT_PICK_LIMIT), "form product options");
+  const seen = new Set(listed.map((row) => row.id));
+  const missing = (storedPicks ?? []).filter((id) => !seen.has(id));
+  const picked = missing.length > 0 ? must(await offerable().in("id", missing), "form product picks") : [];
+  return mergeFormProductOptions(
+    listed.map((row) => ({ id: row.id, name: row.name })),
+    picked.map((row) => ({ id: row.id, name: row.name })),
+  );
+}
+
+/** LEAD-04 / CAP-08: the business's product categories for the form's product question, tops each followed by its subs. */
+export async function listFormCategoryOptions(orgId: string): Promise<Array<FormCategory & { depth: 0 | 1 }>> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase.from("product_categories").select("id, name, parent_id").eq("organization_id", orgId).order("id").limit(1000),
+    "form category options",
+  );
+  return orderedFormCategories(rows.map((row) => ({ id: row.id, name: row.name, parentId: row.parent_id })));
+}
+
+/**
+ * How many offerable products the business has, and how many a form's choice offers (app.form_product_offer's rule:
+ * picked products plus the products of the picked categories and their sub-categories; no pick = all).
+ */
+export async function countFormProductOffer(
+  orgId: string,
+  productIds: readonly string[] | null,
+  categoryIds: readonly string[] | null,
+  categories: readonly FormCategory[],
+): Promise<{ offerable: number; offer: number }> {
+  const supabase = await createClient();
+  const offerable = () =>
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("is_active", true).is("archived_at", null);
+  const counted = async (query: ReturnType<typeof offerable>, what: string) => {
+    const result = await query;
+    if (result.error) throw new DbReadError(what, result.error);
+    return result.count ?? 0;
+  };
+  const all = await counted(offerable(), "offerable products");
+  if (!productIds && !categoryIds) {
+    return { offerable: all, offer: all };
+  }
+  const covered = [...coveredCategoryIds(categoryIds ?? [], categories)];
+  const parts = [
+    ...(productIds && productIds.length > 0 ? [`id.in.(${productIds.join(",")})`] : []),
+    ...(covered.length > 0 ? [`category_id.in.(${covered.join(",")})`] : []),
+  ];
+  if (parts.length === 0) {
+    return { offerable: all, offer: 0 };
+  }
+  const offer = await counted(offerable().or(parts.join(",")), "form product offer");
+  return { offerable: all, offer };
 }

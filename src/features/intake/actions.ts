@@ -6,13 +6,25 @@ import { redirect } from "next/navigation";
 import { actionContext } from "@/lib/action-context";
 import { fail, FORM_INVALID, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
-import { paths } from "@/lib/paths";
-import { pick } from "@/lib/validation";
+import { isUuid, paths } from "@/lib/paths";
+import { checkbox, pick } from "@/lib/validation";
 
 import { isFieldType, type FieldType } from "@/features/custom-fields/types";
-import type { Json } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { formFieldOptions, storedFields } from "./fields";
+import {
+  CATEGORY_PICKS_VALUE,
+  coveredCategoryIds,
+  MAX_FORM_CATEGORIES,
+  MAX_FORM_PRODUCTS,
+  pickedCategoryIds,
+  pickedProductIds,
+  productOfferRefusal,
+  PRODUCT_PICKS_VALUE,
+  productPicksValue,
+} from "./product";
 import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 import { defaultWhatsappButton, whatsappNumber } from "./whatsapp";
 
@@ -54,7 +66,23 @@ export async function createIntakeAction(orgId: string, _prev: FormState, formDa
   redirect(paths.settingsIntakeItem(orgId, data.id));
 }
 
-export async function updateIntakeAction(orgId: string, formId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+export async function updateIntakeAction(orgId: string, formId: string, prev: FormState, formData: FormData): Promise<FormState> {
+  const result = await updateIntake(orgId, formId, prev, formData);
+  // LEAD-04 / CAP-08: formValues keeps one value per name; carry every ticked product back, so a failed save keeps the ticks
+  if (result && !result.ok && result.values && formData.get(PRODUCT_SETTINGS_MARKER) === "1") {
+    return {
+      ...result,
+      values: {
+        ...result.values,
+        [PRODUCT_PICKS_VALUE]: productPicksValue(formData.getAll("product_ids")),
+        [CATEGORY_PICKS_VALUE]: productPicksValue(formData.getAll("product_category_ids")),
+      },
+    };
+  }
+  return result;
+}
+
+async function updateIntake(orgId: string, formId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, formId);
   if (!context.ok) {
     return context;
@@ -129,6 +157,16 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
     }
   }
 
+  // LEAD-04 / CAP-08: the product question, only when the editor showed it (a web form of a business with products)
+  let products: ProductPatch | Record<string, never> = {};
+  if (current.kind === "form" && formData.get(PRODUCT_SETTINGS_MARKER) === "1") {
+    const checked = await productSettings(context.supabase, orgId, formData);
+    if (!checked.ok) {
+      return fail(FORM_INVALID, { values: formValues(formData), fieldErrors: { product_ids: checked.message } });
+    }
+    products = checked.patch;
+  }
+
   // CAP-05: webhooks keep their WhatsApp columns as they are; with the button off
   // only the switch is saved, and the stored number and text stay untouched
   const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, channel_choice, locale_choice, ...settings } = parsed.data;
@@ -143,11 +181,15 @@ export async function updateIntakeAction(orgId: string, formId: string, _prev: F
       : { channel_choice, locale_choice, ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
   const { data, error } = await context.supabase
     .from("forms")
-    .update({ ...settings, ...thanks, ...formOnly, ...(fields !== undefined ? { fields } : {}) })
+    .update({ ...settings, ...thanks, ...formOnly, ...products, ...(fields !== undefined ? { fields } : {}) })
     .eq("organization_id", orgId)
     .eq("id", formId)
     .select("id");
   if (error) {
+    // LEAD-04 / CAP-08: the product question's refusals answer on its field
+    if (error.hint?.startsWith("form:product")) {
+      return fail(FORM_INVALID, { values: formValues(formData), fieldErrors: { product_ids: dbErrorMessage(error) } });
+    }
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."), { values: formValues(formData) });
   }
   if (data.length === 0) {
@@ -173,4 +215,95 @@ export async function deleteIntakeAction(orgId: string, formId: string): Promise
   }
   revalidatePath(paths.settingsIntake(orgId));
   redirect(paths.settingsIntake(orgId));
+}
+
+// LEAD-04 / CAP-08: the editor sends this marker with the product question's inputs
+const PRODUCT_SETTINGS_MARKER = "product_settings";
+
+type ProductPatch = { product_choice: boolean; product_ids: string[] | null; product_category_ids: string[] | null };
+
+/**
+ * The product question's columns from the settings form: asked or not, and every offerable product ("all") or the
+ * picked products and categories. Picks are kept only when they are offerable products / categories of this business,
+ * read with the user's session. While the question is asked, the offer may hold at most 100 offerable products (owner,
+ * 25 October 2026); the database refuses the same (form:products_over), this answers on the field first.
+ */
+async function productSettings(
+  supabase: SupabaseClient<Database>,
+  orgId: string,
+  formData: FormData,
+): Promise<{ ok: true; patch: ProductPatch } | { ok: false; message: string }> {
+  const ask = checkbox.parse(formData.get("product_choice"));
+  const ids = (name: string, max: number) =>
+    formData
+      .getAll(name)
+      .filter((value): value is string => typeof value === "string" && isUuid(value))
+      .slice(0, max * 2);
+  const offerable = () =>
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("is_active", true).is("archived_at", null);
+
+  if (formData.get("product_scope") !== "picked") {
+    if (ask) {
+      const { count, error } = await offerable();
+      if (error) return { ok: false, message: dbErrorMessage(error) };
+      const refusal = productOfferRefusal(ask, true, count ?? 0);
+      if (refusal) return { ok: false, message: refusal };
+    }
+    return { ok: true, patch: { product_choice: ask, product_ids: null, product_category_ids: null } };
+  }
+
+  const sentProducts = ids("product_ids", MAX_FORM_PRODUCTS);
+  const sentCategories = ids("product_category_ids", MAX_FORM_CATEGORIES);
+  if (sentProducts.length > MAX_FORM_PRODUCTS) {
+    return { ok: false, message: `אפשר לבחור עד ${MAX_FORM_PRODUCTS} מוצרים.` };
+  }
+  if (sentCategories.length > MAX_FORM_CATEGORIES) {
+    return { ok: false, message: `אפשר לבחור עד ${MAX_FORM_CATEGORIES} קטגוריות.` };
+  }
+  let offerableProducts = new Set<string>();
+  if (sentProducts.length > 0) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("is_active", true)
+      .is("archived_at", null)
+      .in("id", sentProducts);
+    if (error) return { ok: false, message: dbErrorMessage(error) };
+    offerableProducts = new Set(data.map((row) => row.id));
+  }
+  const { data: categoryRows, error: categoryError } = await supabase
+    .from("product_categories")
+    .select("id, parent_id")
+    .eq("organization_id", orgId)
+    .limit(1000);
+  if (categoryError) return { ok: false, message: dbErrorMessage(categoryError) };
+  const categories = categoryRows.map((row) => ({ id: row.id, name: "", parentId: row.parent_id }));
+  const productIds = pickedProductIds(sentProducts, offerableProducts);
+  const categoryIds = pickedCategoryIds(sentCategories, new Set(categories.map((c) => c.id)));
+  if (productIds.length === 0 && categoryIds.length === 0) {
+    if (ask) {
+      return { ok: false, message: "יש לבחור לפחות מוצר או קטגוריה אחת, או להציג את כל המוצרים." };
+    }
+    return { ok: true, patch: { product_choice: false, product_ids: null, product_category_ids: null } };
+  }
+  if (ask) {
+    const covered = [...coveredCategoryIds(categoryIds, categories)];
+    const parts = [
+      ...(productIds.length > 0 ? [`id.in.(${productIds.join(",")})`] : []),
+      ...(covered.length > 0 ? [`category_id.in.(${covered.join(",")})`] : []),
+    ];
+    const { count, error } = await offerable().or(parts.join(","));
+    if (error) return { ok: false, message: dbErrorMessage(error) };
+    const refusal = productOfferRefusal(ask, false, count ?? 0);
+    if (refusal) return { ok: false, message: refusal };
+  }
+  return {
+    ok: true,
+    patch: {
+      product_choice: ask,
+      product_ids: productIds.length > 0 ? productIds : null,
+      product_category_ids: categoryIds.length > 0 ? categoryIds : null,
+    },
+  };
 }

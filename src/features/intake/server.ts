@@ -8,6 +8,7 @@ import { parseAttribution, safeText } from "./attribution";
 import { CALLBACK_INPUT } from "./callback";
 import { CHANNEL_INPUT, channelInput } from "./channel";
 import { LOCALE_INPUT, localeInput } from "./locale";
+import { PRODUCT_INPUT, PRODUCT_INVALID, productInput } from "./product";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { INACTIVE_FORM_TEXT, readPublicForm } from "./public-form";
 import { checkSubmission, wrongField, type RawValues } from "./public-validate";
@@ -229,6 +230,11 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     if (wrong) {
       return respond(400, { ok: false, message: wrong[1], field: wrong[0] });
     }
+    // LEAD-04 / CAP-08: one of the offered products, only when the form asks (the database checks again)
+    const product = form.products ? productInput(text(body[PRODUCT_INPUT])?.slice(0, 64), form.products) : null;
+    if (product === "invalid") {
+      return respond(400, { ok: false, message: PRODUCT_INVALID, field: PRODUCT_INPUT });
+    }
     // SPD-05: the call-back choice; the database uses it only when the form asks, and checks it
     fields = {
       ...checked.builtins,
@@ -238,6 +244,7 @@ export async function handleIntake(request: Request, token: string, kind: Intake
       preferred_channel: form.channelChoice ? channelInput(text(body[CHANNEL_INPUT])) : null,
       // CAP-08: one of the contacts' languages, only when the form asks (checked again by the database)
       preferred_locale: form.localeChoice ? localeInput(text(body[LOCALE_INPUT])) : null,
+      [PRODUCT_INPUT]: product,
     };
   }
 
@@ -255,6 +262,7 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     if (error.code === "P0002") return respond(404, { ok: false, message: MESSAGES.notFound });
     if (error.hint === "callback:past") return respond(400, { ok: false, message: MESSAGES.callbackPast, field: CALLBACK_INPUT });
     if (error.hint === "callback:invalid") return respond(400, { ok: false, message: MESSAGES.callbackInvalid, field: CALLBACK_INPUT });
+    if (error.hint === "requested_product:invalid") return respond(400, { ok: false, message: PRODUCT_INVALID, field: PRODUCT_INPUT });
     if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid, field: wrongField(error.message) });
     if (error.code === "P0001" && error.hint === "rate_limited") return respond(429, { ok: false, message: MESSAGES.rateLimited });
     if (error.code === "P0001") return respond(403, { ok: false, message: MESSAGES.unavailable });

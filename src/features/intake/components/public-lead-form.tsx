@@ -13,6 +13,7 @@ import { collectAttribution } from "../attribution";
 import { CALLBACK_INPUT, type CallbackOffer } from "../callback";
 import { CHANNEL_INPUT, CHANNEL_QUESTION, PUBLIC_CHANNEL_OPTIONS } from "../channel";
 import { LOCALE_INPUT, LOCALE_QUESTION, PUBLIC_LOCALE_OPTIONS } from "../locale";
+import { PRODUCT_INPUT, PRODUCT_QUESTION, type FormProduct } from "../product";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
 
@@ -28,6 +29,8 @@ type Props = {
   channelChoice?: boolean;
   // CAP-08: ask the person's preferred language
   localeChoice?: boolean;
+  // LEAD-04 / CAP-08: the products the form offers, or null when it does not ask
+  products?: FormProduct[] | null;
 };
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
@@ -42,7 +45,7 @@ function rawValues(form: HTMLFormElement): RawValues {
 }
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
-export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false, localeChoice = false }: Props) {
+export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false, localeChoice = false, products = null }: Props) {
   const router = useRouter();
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
@@ -77,11 +80,12 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
         body: JSON.stringify({ ...collectAttribution(window.location.href, document.referrer), ...body, [STARTED_AT_FIELD]: startedAt }),
       });
       const reply = (await res.json()) as { ok: boolean; message: string; redirectUrl?: string | null; field?: string };
-      if (!reply.ok && reply.field && (reply.field === CALLBACK_INPUT || fields.some((field) => formInputName(field.key) === reply.field))) {
+      if (!reply.ok && reply.field && (reply.field === CALLBACK_INPUT || reply.field === PRODUCT_INPUT || fields.some((field) => formInputName(field.key) === reply.field))) {
         setFieldErrors({ [reply.field]: reply.message });
         // SPD-05: the call-back times on the page are stale (a slot ended, midnight passed):
         // fetch the current ones; what was typed stays in the fields
-        if (reply.field === CALLBACK_INPUT) {
+        // LEAD-04: a product that is no longer offered: fetch the current list
+        if (reply.field === CALLBACK_INPUT || reply.field === PRODUCT_INPUT) {
           setCallbackRound((n) => n + 1);
           router.refresh();
         }
@@ -123,6 +127,30 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
             })
           }
         /> : null}
+      {products && products.length > 0 ? (
+        <SelectField
+          // a refused choice empties the select along with the refreshed list
+          key={`product-${callbackRound}`}
+          label={PRODUCT_QUESTION}
+          name={PRODUCT_INPUT}
+          defaultValue=""
+          error={fieldErrors[PRODUCT_INPUT]}
+          onChange={() =>
+            setFieldErrors((errors) => {
+              const rest = { ...errors };
+              delete rest[PRODUCT_INPUT];
+              return rest;
+            })
+          }
+        >
+          <option value="">לא בטוחים עדיין</option>
+          {products.map((product) => (
+            <option key={product.id} value={product.id}>
+              {product.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
       {channelChoice ? (
         <SelectField label={CHANNEL_QUESTION} name={CHANNEL_INPUT} defaultValue="">
           <option value="">לא משנה</option>

@@ -918,6 +918,10 @@ export type FormRow = {
   channel_choice: boolean;
   // CAP-08: the hosted form asks the person's preferred language
   locale_choice: boolean;
+  // LEAD-04 / CAP-08: the hosted form asks for a requested product; which ones (null = every offerable product)
+  product_choice: boolean;
+  product_ids: string[] | null;
+  product_category_ids: string[] | null;
   // BIZ-02: the business card this form belongs to (kind 'card' only; made and changed by the card's triggers)
   business_card_id: string | null;
   // SPD-07: the site widget this form belongs to (kind 'widget' only; made and changed by the widget's triggers)
@@ -2484,6 +2488,9 @@ export type Database = {
           callback_slots_off?: string[];
           channel_choice?: boolean;
           locale_choice?: boolean;
+          product_choice?: boolean;
+          product_ids?: string[] | null;
+          product_category_ids?: string[] | null;
         },
         {
           name?: string;
@@ -2505,6 +2512,9 @@ export type Database = {
           callback_slots_off?: string[];
           channel_choice?: boolean;
           locale_choice?: boolean;
+          product_choice?: boolean;
+          product_ids?: string[] | null;
+          product_category_ids?: string[] | null;
         }
       >;
       // written only by intake_submit()

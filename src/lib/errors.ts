@@ -208,6 +208,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:amount_too_big": "שווי השנה הראשונה גדול מדי. הזינו את השווי בעצמכם.",
   // LEAD-04: a person picks only an offerable product (active, not archived)
   "lead:requested_product": "המוצר שנבחר כבר לא זמין. בחרו מוצר פעיל מהקטלוג.",
+  // LEAD-04 / CAP-08: the products a form offers are this business's own
+  "form:product_ids": "אחד המוצרים שנבחרו כבר לא נמצא בקטלוג. רעננו את הדף ובחרו שוב.",
+  "form:product_categories": "אחת הקטגוריות שנבחרו כבר לא קיימת. רעננו את הדף ובחרו שוב.",
+  // owner, 25 October 2026: over 100 active products the form must pick what it shows
+  "form:products_over": "בטופס אפשר להציג עד 100 מוצרים פעילים. בחרו אילו מוצרים או קטגוריות יוצגו בטופס.",
   // TAX-02 follow-up (trigger org_bank_details_check): no value in the error, so the account never leaks
   "bank:invalid": "פרטי הבנק אינם תקינים. סניף: עד 4 ספרות. חשבון: 2 עד 20 ספרות, ויחד איתו שם הבנק והסניף.",
   // TAX-03 (migration vat_rates, app.document_vat_rate): a document dated before the first VAT rate

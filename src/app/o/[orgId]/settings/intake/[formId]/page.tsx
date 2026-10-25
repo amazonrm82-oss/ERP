@@ -9,11 +9,19 @@ import { BackIcon } from "@/components/ui/icons";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { deleteIntakeAction } from "@/features/intake/actions";
 import { FormQr } from "@/features/intake/components/form-qr";
-import { CopyBlock, IntakeSettingsForm, ShareLink } from "@/features/intake/components/intake-editor";
+import { CopyBlock, IntakeSettingsForm, ShareLink, type ProductChoices } from "@/features/intake/components/intake-editor";
 import { SubmissionList } from "@/features/intake/components/submission-list";
 import { formFieldOptions, formInputName, isCustomFormKey } from "@/features/intake/fields";
 import { formQrUrl, qrFileName } from "@/features/intake/qr-link";
-import { getIntake, listSubmissions } from "@/features/intake/queries";
+import {
+  countFormProductOffer,
+  FORM_PRODUCT_PICK_LIMIT,
+  getIntake,
+  listFormCategoryOptions,
+  listFormProductOptions,
+  listSubmissions,
+} from "@/features/intake/queries";
+import { requestedProductEnabled } from "@/features/requested-product/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrganizationSettings, getTeam, listMembers, listTeams } from "@/features/settings/queries";
@@ -33,7 +41,7 @@ export default async function IntakeItemPage({ params }: Props) {
   if (!isUuid(formId) || !isAdminRole(role)) {
     notFound();
   }
-  const [intake, submissions, lookups, members, teams, origin, definitions, organization] = await Promise.all([
+  const [intake, submissions, lookups, members, teams, origin, definitions, organization, productsOn] = await Promise.all([
     getIntake(orgId, formId),
     listSubmissions(orgId, formId),
     getLeadLookups(orgId),
@@ -42,6 +50,8 @@ export default async function IntakeItemPage({ params }: Props) {
     siteOrigin(),
     listFieldDefinitions(orgId, "lead", { includeInactive: true }),
     getOrganizationSettings(orgId),
+    // LEAD-04 / CAP-08: the product question needs the products flag
+    requestedProductEnabled(orgId),
   ]);
   if (!intake) {
     notFound();
@@ -66,6 +76,13 @@ export default async function IntakeItemPage({ params }: Props) {
     : null;
 
   const fieldOptions = formFieldOptions(definitions);
+  // LEAD-04 / CAP-08: the product question's lists and counts (the business's products flag, web forms only)
+  let productChoices: ProductChoices | null = null;
+  if (productsOn && intake.kind === "form") {
+    const [options, categories] = await Promise.all([listFormProductOptions(orgId, intake.productIds), listFormCategoryOptions(orgId)]);
+    const counts = await countFormProductOffer(orgId, intake.productIds, intake.productCategoryIds, categories);
+    productChoices = { options, cut: options.length >= FORM_PRODUCT_PICK_LIMIT, categories, ...counts };
+  }
   // CAP-05: the business phone, as typed, when a WhatsApp chat can open it
   const businessPhone = organization?.phone && whatsappNumber(organization.phone) ? organization.phone : null;
   const customNames = intake.fields.filter((field) => isCustomFormKey(field.key)).map((field) => formInputName(field.key));
@@ -161,6 +178,7 @@ export default async function IntakeItemPage({ params }: Props) {
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
               fieldOptions={fieldOptions}
               businessPhone={businessPhone}
+              productChoices={productChoices}
             />
           ) : (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד.</p>
