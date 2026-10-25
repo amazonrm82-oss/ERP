@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
-import { Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { Checkbox, Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PlusIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 
+import { advanceLinkValue, type AdvanceTarget } from "../advance";
 import { cancelPaymentAction, correctPaymentAction, recordPaymentAction, setPaymentStatusAction } from "../actions";
 import { CHEQUE_BANK_NAME_MAX, CHEQUE_NUMBER_MAX, CHEQUE_STATUS_LABELS, CHEQUE_STATUSES, ISRAELI_BANKS, OTHER_BANK, OTHER_BANK_LABEL } from "../cheques";
 import type { MoneySubject } from "../money-subject";
@@ -127,13 +128,17 @@ function PaymentFields({
   errors,
   today,
   isNew,
+  advanceTargets = [],
 }: {
   values?: Partial<Record<string, string>>;
   errors: Record<string, string>;
   today: string;
   isNew: boolean;
+  // PAY-03: the sent quotes and numbered orders a new payment may be an advance for
+  advanceTargets?: AdvanceTarget[];
 }) {
   const [method, setMethod] = useState<string>(values?.method ?? "");
+  const [advance, setAdvance] = useState<boolean>(values?.is_advance === "on");
   return (
     <>
       <TextField
@@ -177,6 +182,26 @@ function PaymentFields({
         error={errors.reference}
       />
       <TextareaField label="הערה" name="note" rows={2} maxLength={PAYMENT_NOTE_MAX} defaultValue={values?.note ?? ""} error={errors.note} />
+      {isNew ? (
+        // PAY-03: an advance stays the customer's credit; when an invoice of its order is recorded, it is offset first
+        <Checkbox
+          name="is_advance"
+          label="מקדמה"
+          hint="תשלום לפני שהופק מסמך. הוא נשמר כיתרת זכות של הלקוח."
+          checked={advance}
+          onChange={(event) => setAdvance(event.target.checked)}
+        />
+      ) : null}
+      {isNew && advance && advanceTargets.length > 0 ? (
+        <SelectField label="על חשבון (רשות)" name="advance_link" defaultValue={values?.advance_link ?? ""} error={errors.advance_link}>
+          <option value="">בלי הצעה או הזמנה</option>
+          {advanceTargets.map((target) => (
+            <option key={advanceLinkValue(target)} value={advanceLinkValue(target)}>
+              {target.label}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
       {isNew && method !== "cheque" ? (
         <SelectField label="מצב" name="status" defaultValue={values?.status ?? "recorded"}>
           {NEW_PAYMENT_STATUSES.map((s) => (
@@ -195,6 +220,7 @@ function PaymentForm({
   today,
   initial,
   submitLabel,
+  advanceTargets,
   onDone,
   onCancel,
 }: {
@@ -202,6 +228,7 @@ function PaymentForm({
   today: string;
   initial?: PaymentFormValues;
   submitLabel: string;
+  advanceTargets?: AdvanceTarget[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -215,7 +242,7 @@ function PaymentForm({
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
-      <PaymentFields values={failure?.values ?? initial} errors={failure?.fieldErrors ?? {}} today={today} isNew={!initial} />
+      <PaymentFields values={failure?.values ?? initial} errors={failure?.fieldErrors ?? {}} today={today} isNew={!initial} advanceTargets={advanceTargets} />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="שומרים…">{submitLabel}</SubmitButton>
         <Button variant="ghost" onClick={onCancel}>
@@ -227,7 +254,7 @@ function PaymentForm({
 }
 
 /** PAY-01: "רישום תשלום" and its form, for whoever may record payments. */
-export function RecordPaymentButton({ orgId, subject, today }: { orgId: string; subject: Subject; today: string }) {
+export function RecordPaymentButton({ orgId, subject, today, advanceTargets = [] }: { orgId: string; subject: Subject; today: string; advanceTargets?: AdvanceTarget[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -241,6 +268,7 @@ export function RecordPaymentButton({ orgId, subject, today }: { orgId: string; 
             action={recordPaymentAction.bind(null, orgId, subject)}
             today={today}
             submitLabel="רישום התשלום"
+            advanceTargets={advanceTargets}
             onDone={() => setOpen(false)}
             onCancel={() => setOpen(false)}
           />

@@ -88,3 +88,37 @@ export function staleRestores(files: string[], dir: string = MIGRATIONS_DIR): st
     .filter(([name, file]) => latest.get(name) !== file)
     .map(([name, file]) => `${name}: list ends with ${file}, latest is ${latest.get(name)}`);
 }
+
+// revoke <privileges> on [table] public.<t> with no column list (`revoke all …`, `revoke insert, update …`): a table-level
+// revoke also drops every column grant of those privileges a later migration added to that table. A column revoke,
+// `revoke insert (x) …`, has a parenthesis in its privilege list and does not match.
+const REVOKE_TABLE_LEVEL =
+  /\brevoke\s+(?!grant\s+option)[a-z_,\s]+?\s+on\s+(?:table\s+)?(public\.[a-z_][a-z0-9_]*(?:\s*,\s*public\.[a-z_][a-z0-9_]*)*)\b(?!\s*\()/gi;
+
+/**
+ * For a hand-picked list of migrations re-run in the given order: every later migration (by name) that grants or revokes
+ * on a table one of the listed files revokes on at table level (no column list), but is not in the list, as
+ * "<file> (<table>)". A re-run of such a `revoke … grant (cols)` drops that migration's grants, so the list must re-run it
+ * too. Empty when the list puts back every grant it drops. (Column revokes, `revoke insert (x) …`, drop only their own
+ * columns and are not counted.)
+ */
+export function staleGrants(files: string[], dir: string = MIGRATIONS_DIR): string[] {
+  const firstRevoke = new Map<string, string>();
+  for (const file of files) {
+    const sql = readFileSync(join(dir, file), "utf8");
+    for (const m of sql.matchAll(REVOKE_TABLE_LEVEL)) {
+      for (const table of m[1].toLowerCase().split(/\s*,\s*/)) {
+        if (!firstRevoke.has(table) || file < firstRevoke.get(table)!) firstRevoke.set(table, file);
+      }
+    }
+  }
+  const out: string[] = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    if (files.includes(file)) continue;
+    for (const table of grantedTables(readFileSync(join(dir, file), "utf8"))) {
+      const first = firstRevoke.get(table);
+      if (first !== undefined && file > first) out.push(`${file} (${table})`);
+    }
+  }
+  return out;
+}

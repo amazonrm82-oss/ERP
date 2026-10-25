@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { moneyColumnsEnabled } from "@/features/allocations/queries";
 import { requestedProductEnabled } from "@/features/requested-product/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { actionContext } from "@/lib/action-context";
@@ -40,12 +41,13 @@ async function knownKeys(orgId: string, object: PreferenceKey): Promise<Set<stri
   if (object === BOARD_PREFERENCE) {
     return new Set(boardCatalog(await listFieldDefinitions(orgId, "deal")).map((column) => column.key));
   }
-  const [fields, products] = await Promise.all([
+  const [fields, products, money] = await Promise.all([
     object === "task" || object === "product" || object === "quote" || object === "document" || object === "payment" ? Promise.resolve([]) : listFieldDefinitions(orgId, object),
     // LEAD-04: the leads' product column only with the product catalog
     object === "lead" ? requestedProductEnabled(orgId) : Promise.resolve(false),
+    object === "contact" || object === "company" ? moneyColumnsEnabled(orgId) : Promise.resolve(false),
   ]);
-  return new Set(catalogFor(object, fields, { products }).map((column) => column.key));
+  return new Set(catalogFor(object, fields, { products, money }).map((column) => column.key));
 }
 
 /** Saves the user's columns for a list, or the fields of a deal card on the board (only ones that really exist). */

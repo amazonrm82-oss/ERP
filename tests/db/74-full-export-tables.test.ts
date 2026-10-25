@@ -23,6 +23,8 @@ const LEFT_OUT: Record<string, string> = {
   notifications: "a person's bell",
   org_usage: "server counters",
   outbox_events: "engine queue",
+  payment_credit_companies: "server-kept totals derived from payments and allocations, which are exported",
+  customer_credit_totals: "server-kept totals derived from payments and allocations, which are exported",
   plan_waitlist: "a person's request to hear about a plan; platform marketing, not business data",
   record_followers: "a person's choice",
   saved_views: "a person's screen settings",

@@ -22,6 +22,14 @@ function query(table: string) {
     is: () => builder,
     order: () => builder,
     limit: () => builder,
+    // PAY-03: the plan's money keys (one subscriptions and one plans read per request)
+    maybeSingle: () => ({
+      then: (resolve: (value: { data: unknown; error: null }) => unknown) => {
+        reads.push(table);
+        const row = table === "subscriptions" ? { plan_key: "pro", feature_overrides: {} } : table === "plans" ? { features: {} } : null;
+        return Promise.resolve({ data: row, error: null }).then(resolve);
+      },
+    }),
     then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => {
       reads.push(table);
       return Promise.resolve({ data: ROWS[table] ?? [], error: null }).then(resolve);

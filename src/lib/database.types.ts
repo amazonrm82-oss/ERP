@@ -1837,6 +1837,10 @@ export type PaymentRow = {
   cancel_reason: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  // PAY-03: the optional "מקדמה" mark, with at most one link to a quote or an order of the same customer
+  is_advance: boolean;
+  advance_quote_id: string | null;
+  advance_order_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1849,6 +1853,29 @@ export type PaymentRow = {
   cheque_due_date: string | null;
   cheque_status: string | null;
   cheque_unbounce_reason: string | null;
+};
+
+// PAY-03: the server's credit totals per company and per contact (owners and admins read them)
+export type CustomerCreditTotalRow = {
+  id: string;
+  organization_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  credit_agorot: number;
+  currency: string;
+  updated_at: string;
+};
+
+// PAY-03: the server's list of payments with credit per company they belong to (written by triggers only; members read the
+// rows of payments they read)
+export type PaymentCreditCompanyRow = {
+  id: string;
+  organization_id: string;
+  payment_id: string;
+  company_id: string;
+  credit_agorot: number;
+  currency: string;
+  updated_at: string;
 };
 
 // DOC-01: an accounting document issued outside the system, recorded on a deal or a contact (migration
@@ -2738,6 +2765,9 @@ export type Database = {
         { organization_id: string; contact_id?: string | null; company_id?: string | null; reason: string },
         { cleared_at?: string | null }
       >;
+      // PAY-03: server only (no client write grant)
+      payment_credit_companies: ReadOnlyTable<PaymentCreditCompanyRow>;
+      customer_credit_totals: ReadOnlyTable<CustomerCreditTotalRow>;
       payments: Table<
         PaymentRow,
         {
@@ -2759,6 +2789,9 @@ export type Database = {
           cheque_branch?: string | null;
           cheque_due_date?: string | null;
           cheque_status?: string | null;
+          is_advance?: boolean;
+          advance_quote_id?: string | null;
+          advance_order_id?: string | null;
         },
         {
           amount_agorot?: number;
@@ -2776,6 +2809,9 @@ export type Database = {
           cheque_due_date?: string | null;
           cheque_status?: string | null;
           cheque_unbounce_reason?: string | null;
+          is_advance?: boolean;
+          advance_quote_id?: string | null;
+          advance_order_id?: string | null;
         }
       >;
       // DOC-01: column grants; a person records and cancels, nothing else (no delete)
@@ -3080,6 +3116,11 @@ export type Database = {
       money_customer_credit: { Args: { p_org: string; p_deal: string | null; p_contact: string | null; p_company: string | null }; Returns: Json };
       // PAY-03: allocates the same customer's credit to a document, oldest payment first (invoker)
       money_apply_credit: { Args: { p_org: string; p_document: string; p_max?: number | null }; Returns: Json };
+      // PAY-03: a payment's credit (computed field, one rule)
+      payment_credit: { Args: Record<string, never>; Returns: number };
+      // PAY-03: computed fields on contacts and companies for the "יתרת זכות" column and filter (owners and admins; null / false for others)
+      credit_balance: { Args: Record<string, never>; Returns: number | null };
+      has_credit: { Args: Record<string, never>; Returns: boolean };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

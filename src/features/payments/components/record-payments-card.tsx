@@ -18,6 +18,8 @@ import { getPaymentsAccess, listRecordPayments } from "../queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, receivedTotal, type PaymentStatus } from "../schema";
 import { bankLabel, CHEQUE_STATUS_LABELS } from "../cheques";
 import { ChequeSeriesButton, ChequeStatusSelect } from "./cheque-forms";
+import { advanceLine } from "../advance";
+import { advanceLinkNumbers, listAdvanceTargets } from "../advance-queries";
 import { CancelPaymentButton, CorrectPaymentButton, PaymentStatusSelect, RecordPaymentButton } from "./payment-forms";
 
 type Props = {
@@ -59,6 +61,14 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
     : [null, [], NO_CREDIT];
   // PAY-03: the customer's credit (this record's, and its company's contacts and deals')
   const creditText = creditLine(credit);
+  // PAY-03: what a new payment may be an advance for, and the numbers the advances name
+  const [advanceTargets, advanceNumbers] = await Promise.all([
+    access.canRecord ? listAdvanceTargets(orgId, subject) : Promise.resolve([]),
+    advanceLinkNumbers(
+      orgId,
+      payments.flatMap((p) => (p.advance ? [p.advance] : [])),
+    ),
+  ]);
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -70,7 +80,7 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
         action={
           access.canRecord ? (
             <span className="flex flex-wrap gap-1">
-              <RecordPaymentButton orgId={orgId} subject={subject} today={today} />
+              <RecordPaymentButton orgId={orgId} subject={subject} today={today} advanceTargets={advanceTargets} />
               <ChequeSeriesButton orgId={orgId} subject={subject} today={today} />
             </span>
           ) : null
@@ -120,6 +130,14 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                           {payment.cheque.branch ? ` · סניף ${payment.cheque.branch}` : ""}
                           {payment.cheque.dueDate ? ` · לפירעון ${formatDate(`${payment.cheque.dueDate}T12:00:00Z`)}` : ""}
                           {` · ${CHEQUE_STATUS_LABELS[payment.cheque.status]}`}
+                        </p>
+                      ) : null}
+                      {payment.advance ? (
+                        <p className="text-sm text-ink-soft">
+                          {advanceLine({
+                            quoteNumber: payment.advance.quoteId ? advanceNumbers.quotes.get(payment.advance.quoteId) : null,
+                            orderNumber: payment.advance.orderId ? advanceNumbers.orders.get(payment.advance.orderId) : null,
+                          })}
                         </p>
                       ) : null}
                       {payment.cheque?.unbounceReason ? (

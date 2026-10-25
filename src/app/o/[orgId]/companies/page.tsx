@@ -10,9 +10,10 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, BuildingIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
+import { getCreditNumbers } from "@/features/allocations/queries";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
@@ -53,7 +54,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const filter = await prepareListFilter(orgId, "company", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
-  const sortKeys = [...Object.keys(COMPANY_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
+  const sortKeys = [...offeredSortKeys(Object.keys(COMPANY_SORT_COLUMNS), listColumns.catalog), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
@@ -68,6 +69,8 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   // a saved view in use (LST-04): its columns replace the user's own while it is open
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
   const shownColumns = activeView?.config.columns ? resolveColumns("company", activeView.config.columns, listColumns.catalog) : listColumns.columns;
+  // PAY-03: the credit only when the column is shown (it is in the catalog only for people who see money)
+  const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -177,6 +180,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               sortHref={sortHref}
               editing={editing}
               tags={tags}
+              credit={credit}
             />
           </div>
         </>

@@ -62,6 +62,8 @@ type Lookups = {
   // products (LST-09): the catalog's categories (with their parent) and units of measure
   categories?: Option[];
   units?: Option[];
+  // PAY-03: contacts and companies offer "יש יתרת זכות" only where the business sees money
+  money?: boolean;
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -77,6 +79,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
   const noContact: ServerField = { key: "no_contact", label: "ימים בלי מגע", kind: "idle", column: "last_contacted_at" };
   const text = (key: string, label: string, column: string): ServerField => ({ key, label, kind: "text", column });
   const type: ServerField = { key: "type", label: "סוג", kind: "select", column: "type_id", options: lookups.types ?? [] };
+  // PAY-03: the computed field public.has_credit (the cards' rule; false without the money keys)
+  const credit: ServerField[] = lookups.money ? [{ key: "has_credit", label: "יש יתרת זכות", kind: "checkbox", column: "has_credit" }] : [];
 
   const builtIn: Record<FilterObject, ServerField[]> = {
     lead: [
@@ -112,6 +116,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       owner,
       tag,
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
+      ...credit,
       created,
       lastContact,
       noContact,
@@ -128,6 +133,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       type,
       owner,
       tag,
+      ...credit,
       created,
     ],
     deal: [

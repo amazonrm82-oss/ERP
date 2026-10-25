@@ -177,6 +177,17 @@ describe("currency next to every amount", () => {
         ).rows[0].id;
         await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [org, payment, document]);
       },
+      // PAY-03 (triggers are off here: the rows are the server's)
+      payment_credit_companies: async (q) => {
+        const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה ליתרה') returning id", [org])).rows[0].id;
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, company_id) values ($1, 'לקוח ליתרה', $2) returning id", [org, company])).rows[0].id;
+        const payment = (await q<{ id: string }>("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer') returning id", [org, contact])).rows[0].id;
+        await q("insert into public.payment_credit_companies (organization_id, payment_id, company_id, credit_agorot) values ($1, $2, $3, 1000)", [org, payment, company]);
+      },
+      customer_credit_totals: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לסך יתרה') returning id", [org])).rows[0].id;
+        await q("insert into public.customer_credit_totals (organization_id, contact_id, credit_agorot) values ($1, $2, 1000)", [org, contact]);
+      },
       // QUO-04
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;

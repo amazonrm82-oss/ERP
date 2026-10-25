@@ -8,6 +8,7 @@ import { getPaymentsAccess } from "@/features/payments/queries";
 import { isPaymentMethod, type PaymentMethod } from "@/features/payments/schema";
 import { moneyRowParents } from "@/features/payments/deal-contact";
 import type { MoneySubject } from "@/features/payments/money-subject";
+import { getOrgContext } from "@/features/shell/queries";
 import { DbReadError, must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,30 @@ export const getAllocationAccess = cache(async (orgId: string): Promise<Allocati
   const inPlan = payments.inPlan && documents.inPlan;
   return { inPlan, canAllocate: inPlan && payments.canRecord, canChange: inPlan && payments.canCorrect };
 });
+
+/**
+ * PAY-03: whether the contacts' and companies' lists offer the credit column, its sort and its filter: owners and admins
+ * (the database's app.customer_credit_of answers null to anyone else, since the kept totals count every payment) of a
+ * business with both money keys (payments and documents), the rule of the cards. Nobody else is offered them at all.
+ */
+export async function moneyColumnsEnabled(orgId: string): Promise<boolean> {
+  const [access, context] = await Promise.all([getAllocationAccess(orgId), getOrgContext(orgId)]);
+  return access.inPlan && (context.role === "owner" || context.role === "admin");
+}
+
+/** PAY-03: the credit column's values for one page of contacts or companies (public.credit_balance, the cards' rule). */
+export async function getCreditNumbers(orgId: string, table: "contacts" | "companies", ids: string[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (ids.length === 0) return result;
+  const supabase = await createClient();
+  for (let i = 0; i < ids.length; i += 200) {
+    const rows = must(await supabase.from(table).select("id, credit_balance").eq("organization_id", orgId).in("id", ids.slice(i, i + 200)), "credit balance");
+    for (const row of rows as unknown as Array<{ id: string; credit_balance: number | string | null }>) {
+      if (row.credit_balance !== null) result.set(row.id, Number(row.credit_balance));
+    }
+  }
+  return result;
+}
 
 /** Each document's paid amount, balance and state, and each payment's allocated amount and credit (the database's rule). */
 export async function getMoneyState(

@@ -47,6 +47,8 @@ export type Payment = {
     status: ChequeStatus;
     unbounceReason: string | null;
   } | null;
+  // PAY-03: the "מקדמה" mark and its optional link (a quote or an order of the same customer)
+  advance: { quoteId: string | null; orderId: string | null } | null;
 };
 
 export type PaymentsSubject = MoneySubject;
@@ -77,7 +79,7 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
     await supabase
       .from("payments")
       .select(
-        "id, amount_agorot, paid_on, method, installments, reference, note, status, cancel_reason, cancelled_at, cancelled_by, created_by, updated_by, created_at, updated_at, cheque_number, cheque_bank, cheque_bank_name, cheque_branch, cheque_due_date, cheque_status, cheque_unbounce_reason",
+        "id, amount_agorot, paid_on, method, installments, reference, note, status, cancel_reason, cancelled_at, cancelled_by, created_by, updated_by, created_at, updated_at, cheque_number, cheque_bank, cheque_bank_name, cheque_branch, cheque_due_date, cheque_status, cheque_unbounce_reason, is_advance, advance_quote_id, advance_order_id",
       )
       .eq("organization_id", orgId)
       .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
@@ -117,6 +119,7 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
                   unbounceReason: row.cheque_unbounce_reason,
                 }
               : null,
+            advance: row.is_advance ? { quoteId: row.advance_quote_id, orderId: row.advance_order_id } : null,
           },
         ]
       : [],

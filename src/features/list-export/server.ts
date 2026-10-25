@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCreditNumbers } from "@/features/allocations/queries";
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
 import { channelLabel, localeLabel } from "@/features/contacts/preferences";
@@ -12,7 +13,7 @@ import { displayCustomFields } from "@/features/custom-fields/values";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
-import { CUSTOM_PREFIX, resolveColumns, type ListObject } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
 import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -76,7 +77,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   const statusId = object === "lead" && isUuid(params.get("status") ?? "") ? params.get("status") : null;
   const sortColumns = { lead: LEAD_SORT_COLUMNS, contact: CONTACT_SORT_COLUMNS, company: COMPANY_SORT_COLUMNS, deal: DEAL_SORT_COLUMNS, task: TASK_SORT_COLUMNS }[object];
   const defaultSort = { lead: LEAD_DEFAULT_SORT, contact: CONTACT_DEFAULT_SORT, company: COMPANY_DEFAULT_SORT, deal: DEAL_DEFAULT_SORT, task: TASK_DEFAULT_SORT }[object];
-  const sortKeys = [...Object.keys(sortColumns), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
+  const sortKeys = [...offeredSortKeys(Object.keys(sortColumns), listColumns.catalog), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
   const sort = parseSort(params.get("sort") ?? "", sortKeys, defaultSort as unknown as Sort<CustomSortKey>);
 
   // the columns of the open view, or the user's own
@@ -96,6 +97,9 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   // DQL-01: the completeness column is read only when it is exported
   const withScores = columns.some((column) => column.key === "completeness");
   const percent = (score: number | undefined) => (score === undefined ? null : `${score}%`);
+  // PAY-03: the credit column is read only when it is exported (in the catalog only for people who see money)
+  const withCredit = columns.some((column) => column.key === "credit");
+  const money = (value: number | undefined) => (value === undefined ? null : formatMoney(value));
 
   // one page of the list as export rows; read page after page until a short page (RVW-2: a read
   // returns at most 1,000 rows, so asking for more and stopping when fewer came back lost rows)
@@ -127,6 +131,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
     } else if (object === "contact") {
       const page = await listContacts(orgId, { ...options, chunk });
       const scores = withScores ? await getScoreNumbers(orgId, "contact", page.contacts.map((contact) => contact.id)) : null;
+      const credits = withCredit ? await getCreditNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
       for (const contact of page.contacts) {
         rows.push({
           name: contactDisplayName(contact),
@@ -142,6 +147,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             owner: contact.ownerName,
             created: created(contact.createdAt),
             completeness: percent(scores?.get(contact.id)),
+            credit: money(credits?.get(contact.id)),
           },
         });
       }
@@ -187,6 +193,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
       }
     } else {
       const page = await listCompanies(orgId, { ...options, chunk });
+      const credits = withCredit ? await getCreditNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
       for (const company of page.companies) {
         rows.push({
           name: company.name,
@@ -198,6 +205,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             type: company.typeName,
             owner: company.ownerName,
             created: created(company.createdAt),
+            credit: money(credits?.get(company.id)),
           },
         });
       }

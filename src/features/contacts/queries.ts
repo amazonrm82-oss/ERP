@@ -68,6 +68,8 @@ export const CONTACT_SORT_COLUMNS = {
   created: "created_at",
   // DQL-01: computed field public.completeness(contacts)
   completeness: "completeness",
+  // PAY-03: computed field public.credit_balance(contacts); offered only with the money keys (offeredSortKeys)
+  credit: "credit_balance",
 } as const;
 export type ContactSortKey = keyof typeof CONTACT_SORT_COLUMNS;
 export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", ascending: false };

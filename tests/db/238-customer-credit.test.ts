@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, pgError, type Query } from "./helpers";
@@ -5,7 +8,11 @@ import { addMember, asAdmin, asUser, closePool, createOrg, createUser, pgError, 
 afterAll(closePool);
 
 type U = { id: string; email: string };
-type Credit = { total: number; count: number; payments: { id: string; paid_on: string; method: string; amount: number; credit: number }[] };
+type Credit = {
+  total: number;
+  count: number;
+  payments: { id: string; paid_on: string; method: string; amount: number; credit: number; is_advance: boolean; advance_quote_id: string | null; advance_order_id: string | null }[];
+};
 type Applied = { allocated: number; payments: { payment_id: string; amount: number }[] };
 
 /**
@@ -82,12 +89,26 @@ describe("customer credit (PAY-03)", () => {
       ),
     );
 
+  const column = (u: U, table: "contacts" | "companies", id: string) =>
+    run(u, async (q) => {
+      const r = await one<{ c: string | null; h: boolean }>(q, `select public.credit_balance(t) as c, public.has_credit(t) as h from public.${table} t where t.id = $1`, [id]);
+      return { c: r.c === null ? null : Number(r.c), h: r.h };
+    });
+  const FEATURES = { documents: true, payments: true, orders: true, quotes: true };
+
   beforeAll(async () => {
     owner = await createUser("cr-owner");
     org = await createOrg(owner.id, "עסק היתרות");
     manager = await addMember(org, owner.id, "manager", "cr-manager");
     member = await addMember(org, owner.id, "member", "cr-member");
-    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ documents: true, payments: true })]));
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(FEATURES)]));
+    await asAdmin((q) =>
+      q(
+        `insert into public.org_document_settings (organization_id, vat_status, prices_include_vat) values ($1, 'licensed', false)
+         on conflict (organization_id) do update set vat_status = 'licensed', prices_include_vat = false`,
+        [org],
+      ),
+    );
     const pipe = await asAdmin((q) =>
       one<{ p: string; s: string }>(
         q,
@@ -177,6 +198,9 @@ describe("customer credit (PAY-03)", () => {
       expect((await credit(owner, { contact: mine })).total).toBe(3000);
       // the member reads their own contact's payment only
       expect((await credit(member, { contact: mine })).total).toBe(1000);
+      // the list column is for owners and admins, who read every payment
+      expect(await column(member, "contacts", mine)).toEqual({ c: null, h: false });
+      expect((await column(owner, "contacts", mine)).c).toBe(3000);
       const invoice = await doc("tax_invoice", 3000, { contact: mine });
       // a member does not record payments: the insert is refused and the refusal is not swallowed
       expect((await pgError(apply(member, invoice))).code).toBe("42501");
@@ -201,8 +225,269 @@ describe("customer credit (PAY-03)", () => {
     try {
       expect((await pgError(apply(owner, invoice))).hint).toBe("feature:documents");
     } finally {
-      await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ documents: true, payments: true })]));
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(FEATURES)]));
     }
+  });
+
+  const sentQuote = async (on: { deal: string | null; contact: string | null }) => {
+    const id = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, contact_id, valid_until) values ($1, 'הצעה', $2, $3, current_date + 14) returning id", [org, on.deal, on.contact])).id,
+    );
+    await run(owner, (q) => q("insert into public.quote_lines (organization_id, quote_id, position, name, unit_price_agorot) values ($1, $2, 0, 'עבודה', 10000)", [org, id]));
+    await run(owner, (q) => q("select public.quote_send($1, $2)", [org, id]));
+    return id;
+  };
+  const order = async (contactId: string, confirm = true) => {
+    const id = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contactId])).id);
+    await run(owner, (q) => q("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot, quantity) values ($1, $2, 'עבודה', 10000, 1)", [org, id]));
+    if (confirm) await run(owner, (q) => q("select public.order_confirm($1, $2)", [org, id]));
+    return id;
+  };
+  const advance = (u: U, amount: number, paidOn: string, on: { deal?: string | null; contact?: string | null }, link: { quote?: string | null; order?: string | null; mark?: boolean } = {}) =>
+    run(u, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          `insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, paid_on, method, is_advance, advance_quote_id, advance_order_id)
+           values ($1, $2, $3, $4, $5, 'transfer', $6, $7, $8) returning id`,
+          [org, on.deal ?? null, on.contact ?? null, amount, paidOn, link.mark ?? true, link.quote ?? null, link.order ?? null],
+        )
+      ).id,
+    );
+
+  it("an advance: an optional mark with one optional link to a sent quote or a numbered order of the same customer", async () => {
+    const x = await company("חברת מקדמות");
+    const a = await contact("עמית", x);
+    const b = await contact("ברק", x);
+    const z = await contact("זהבה");
+    const d = await deal(a, x);
+    const quote = await sentQuote({ deal: d, contact: a });
+    const numbered = await order(a);
+    const draft = await order(a, false);
+    const elsewhere = await order(z);
+    // the mark alone; a quote of the same company's other contact; an order of the contact
+    await advance(manager, 1000, "2026-08-01", { contact: a });
+    await advance(manager, 1000, "2026-08-01", { contact: b }, { quote });
+    const linked = await advance(manager, 1000, "2026-08-01", { contact: a }, { order: numbered });
+    // another customer, a draft, a link without the mark, both links
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { contact: a }, { order: elsewhere }))).hint).toBe("payment:advance_link");
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { contact: a }, { order: draft }))).hint).toBe("payment:advance_link");
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { contact: a }, { order: numbered, mark: false }))).code).toBe("23514");
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { contact: a }, { order: numbered, quote }))).code).toBe("23514");
+    // an advance is still credit
+    expect((await credit(owner, { contact: a })).payments.find((p) => p.id === linked)).toMatchObject({ is_advance: true, advance_order_id: numbered });
+    // after the insert: owners and admins only; never on a cancelled payment
+    expect((await pgError(run(manager, (q) => q("update public.payments set is_advance = false, advance_order_id = null where id = $1", [linked])))).hint).toBe("payment:correction");
+    await run(owner, (q) => q("update public.payments set advance_order_id = null where id = $1", [linked]));
+    await run(owner, (q) => q("update public.payments set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [linked]));
+    expect((await pgError(run(owner, (q) => q("update public.payments set is_advance = false where id = $1", [linked])))).hint).toBe("payment:cancelled");
+  });
+
+  it("offsetting offers first the advances of the document's order (or of the quote it was made from), then the oldest", async () => {
+    const a = await contact("אורית");
+    const d = await deal(a, null);
+    const numbered = await order(a);
+    const oldest = await pay(5000, "2026-01-01", { contact: a });
+    const forOrder = await advance(owner, 5000, "2026-09-01", { contact: a }, { order: numbered });
+    const invoice = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, contact_id, order_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'tax_invoice', $4, 5000) returning id",
+          [org, a, numbered, `CR-${++n}`],
+        )
+      ).id,
+    );
+    const applied = await apply(owner, invoice);
+    expect(applied.payments.map((p) => [p.payment_id, Number(p.amount)])).toEqual([[forOrder, 5000]]);
+    // an advance on the quote the order was made from counts as the order's
+    const quote = await sentQuote({ deal: d, contact: a });
+    await asAdmin((q) => q("update public.quotes set status = 'accepted' where id = $1", [quote]));
+    const fromQuote = await run(owner, async (q) => (await one<{ id: string }>(q, "select public.order_from_quote($1, $2) as id", [org, quote])).id);
+    const forQuote = await advance(owner, 2000, "2026-09-02", { deal: d, contact: a }, { quote });
+    const invoice2 = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, deal_id, contact_id, order_id, doc_type, number, amount_agorot) values ($1, $2, $3, $4, 'tax_invoice', $5, 3000) returning id",
+          [org, d, a, fromQuote, `CR-${++n}`],
+        )
+      ).id,
+    );
+    expect((await apply(owner, invoice2)).payments.map((p) => [p.payment_id, Number(p.amount)])).toEqual([
+      [forQuote, 2000],
+      [oldest, 1000],
+    ]);
+  });
+
+  it("the list column and filter equal the cards' credit for owners and admins, and answer null / false to anyone else", async () => {
+    const x = await company("חברת עמודה");
+    const a = await contact("עמודה א", x);
+    const b = await contact("עמודה ב", x);
+    const z = await contact("עמודה ז");
+    const d = await deal(null, x);
+    await pay(4000, "2026-02-01", { contact: a });
+    // a payment on the company's deal and its contact counts once
+    await pay(3000, "2026-02-02", { deal: d, contact: b });
+    await pay(2000, "2026-02-03", { deal: d });
+    await pay(1500, "2026-02-04", { contact: z });
+    for (const id of [a, b]) {
+      expect(await column(owner, "contacts", id)).toEqual({ c: (await credit(owner, { contact: id })).total, h: true });
+    }
+    expect((await column(owner, "contacts", a)).c).toBe(9000);
+    expect(await column(owner, "companies", x)).toEqual({ c: (await credit(owner, { company: x })).total, h: true });
+    expect(await column(owner, "contacts", z)).toEqual({ c: 1500, h: true });
+    const none = await contact("בלי יתרה");
+    expect(await column(owner, "contacts", none)).toEqual({ c: 0, h: false });
+    // sorted and filtered by the computed fields, as the lists do
+    const ordered = await run(owner, async (q) =>
+      (await q<{ id: string }>("select t.id from public.contacts t where t.organization_id = $1 and t.id = any($2) order by public.credit_balance(t) desc nulls last, t.id", [org, [z, a, none]])).rows.map((r) => r.id),
+    );
+    expect(ordered).toEqual([a, z, none]);
+    // a manager reads these records and their payments, but the totals are for owners and admins
+    expect(await column(manager, "contacts", a)).toEqual({ c: null, h: false });
+    expect(await column(manager, "companies", x)).toEqual({ c: null, h: false });
+  });
+
+  it("the server's company rows follow payments, allocations and company changes; the column stays equal to the card", async () => {
+    const x = await company("חברת מעקב א");
+    const y = await company("חברת מעקב ב");
+    const a = await contact("מעקב", x);
+    const d = await deal(null, x);
+    const both = async () => ({ x: (await column(owner, "companies", x)).c, y: (await column(owner, "companies", y)).c });
+    const equalToCards = async () => {
+      for (const id of [x, y]) expect((await column(owner, "companies", id)).c).toBe((await credit(owner, { company: id })).total);
+      expect((await column(owner, "contacts", a)).c).toBe((await credit(owner, { contact: a })).total);
+    };
+    const onContact = await pay(5000, "2026-03-01", { contact: a });
+    expect(await both()).toEqual({ x: 5000, y: 0 });
+    await run(owner, (q) => q("update public.contacts set company_id = $2 where id = $1", [a, y]));
+    expect(await both()).toEqual({ x: 0, y: 5000 });
+    const onDeal = await pay(3000, "2026-03-02", { deal: d });
+    expect(await both()).toEqual({ x: 3000, y: 5000 });
+    await run(owner, (q) => q("update public.deals set company_id = $2 where id = $1", [d, y]));
+    expect(await both()).toEqual({ x: 0, y: 8000 });
+    await equalToCards();
+    const invoice = await doc("tax_invoice", 2000, { contact: a });
+    await run(owner, (q) => q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 2000)", [org, onContact, invoice]));
+    expect(await both()).toEqual({ x: 0, y: 6000 });
+    await run(owner, (q) => q("update public.payments set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [onDeal]));
+    expect(await both()).toEqual({ x: 0, y: 3000 });
+    // cancelling the invoice releases its allocation
+    await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [invoice]));
+    expect(await both()).toEqual({ x: 0, y: 5000 });
+    await equalToCards();
+    // nobody writes the rows but the server
+    for (const sql of [
+      "update public.payment_credit_companies set credit_agorot = 1 where organization_id = $1",
+      "delete from public.payment_credit_companies where organization_id = $1",
+      "update public.customer_credit_totals set credit_agorot = 1 where organization_id = $1",
+      "delete from public.customer_credit_totals where organization_id = $1",
+    ]) {
+      expect((await pgError(run(owner, (q) => q(sql, [org])))).code).toBe("42501");
+    }
+  });
+
+  const allocate = (q: Query, payment: string, document: string, amount: number) =>
+    q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, $4)", [org, payment, document, amount]);
+  const companyTotal = (q: Query, id: string) =>
+    one<{ c: string }>(q, "select credit_agorot as c from public.customer_credit_totals where organization_id = $1 and company_id = $2", [org, id]);
+
+  it("the totals are refreshed once at commit: several changes of one company in one transaction leave the right total", async () => {
+    const x = await company("חברת עסקה אחת");
+    const a = await contact("עסקה א", x);
+    const b = await contact("עסקה ב", x);
+    const p1 = await pay(5000, "2026-08-01", { contact: a });
+    const p2 = await pay(4000, "2026-08-02", { contact: b });
+    const d1 = await doc("tax_invoice", 2000, { contact: a });
+    const d3 = await doc("tax_invoice", 1500, { contact: a });
+    expect((await column(owner, "companies", x)).c).toBe(9000);
+    const inside = await run(owner, async (q) => {
+      await allocate(q, p1, d1, 2000);
+      await allocate(q, p2, d3, 1500);
+      await q("insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 700, '2026-08-03', 'cash')", [org, b]);
+      // deferred: inside the writing transaction the shared total still shows the state before it
+      return Number((await companyTotal(q, x)).c);
+    });
+    expect(inside).toBe(9000);
+    expect((await column(owner, "companies", x)).c).toBe(3000 + 2500 + 700);
+    for (const id of [a, b]) expect((await column(owner, "contacts", id)).c).toBe((await credit(owner, { contact: id })).total);
+    expect((await column(owner, "companies", x)).c).toBe((await credit(owner, { company: x })).total);
+  });
+
+  it("two allocations of one company in two transactions wait for each other instead of deadlocking", async () => {
+    const x = await company("חברת נעילה");
+    const a = await contact("נעילה א", x);
+    const b = await contact("נעילה ב", x);
+    const p1 = await pay(5000, "2026-09-01", { contact: a });
+    const p2 = await pay(4000, "2026-09-02", { contact: b });
+    const d1 = await doc("tax_invoice", 2000, { contact: a });
+    const d2 = await doc("tax_invoice", 1000, { contact: b });
+    const d3 = await doc("tax_invoice", 1500, { contact: a });
+
+    const pids: { t1?: number; t2?: number } = {};
+    const waitsOnLock = async (pid: number | undefined) =>
+      pid !== undefined &&
+      (await asAdmin(async (q) => (await q("select 1 from pg_stat_activity where pid = $1 and wait_event_type = 'Lock'", [pid])).rowCount)) === 1;
+    const until = async (cond: () => Promise<boolean> | boolean) => {
+      for (let i = 0; i < 400; i++) {
+        if (await cond()) return;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      throw new Error("timed out waiting");
+    };
+    let t1First = false;
+    let t2First = false;
+    // T1: P1 -> D1, then (after T2 holds P2) P2 -> D3. T2: P2 -> D2, kept open until T1 waits on P2.
+    // Before the totals were deferred, T1 held the company's total after its first insert, T2 waited for it while holding
+    // P2, and T1's second insert waited for P2: 40P01.
+    const t1 = run(owner, async (q) => {
+      pids.t1 = Number((await one<{ p: number }>(q, "select pg_backend_pid() as p")).p);
+      await allocate(q, p1, d1, 2000);
+      t1First = true;
+      await until(async () => t2First || (await waitsOnLock(pids.t2)));
+      await allocate(q, p2, d3, 1500);
+    });
+    const t2 = run(owner, async (q) => {
+      pids.t2 = Number((await one<{ p: number }>(q, "select pg_backend_pid() as p")).p);
+      await until(() => t1First);
+      await allocate(q, p2, d2, 1000);
+      t2First = true;
+      await until(() => waitsOnLock(pids.t1));
+    });
+    const results = await Promise.allSettled([t1, t2]);
+    expect(results.map((r) => (r.status === "rejected" ? (r.reason as { code?: string }).code ?? String(r.reason) : "ok"))).toEqual(["ok", "ok"]);
+    expect((await column(owner, "companies", x)).c).toBe(3000 + 1500);
+    expect((await column(owner, "companies", x)).c).toBe((await credit(owner, { company: x })).total);
+  });
+
+  it("the sync triggers are deferred constraint triggers, and the migration refuses plain ones left by an earlier draft", async () => {
+    const triggers = await asAdmin(async (q) =>
+      (
+        await q<{ name: string; deferred: boolean }>(
+          `select tgname as name, (tgconstraint <> 0 and tgdeferrable and tginitdeferred) as deferred from pg_trigger
+            where not tgisinternal and tgname in ('payments_credit_companies', 'payment_allocations_credit_companies', 'contacts_credit_companies', 'deals_credit_companies')
+            order by tgname`,
+        )
+      ).rows,
+    );
+    expect(triggers).toEqual(
+      ["contacts_credit_companies", "deals_credit_companies", "payment_allocations_credit_companies", "payments_credit_companies"].map((name) => ({ name, deferred: true })),
+    );
+    const dir = path.resolve(__dirname, "../../supabase/migrations");
+    const file = readdirSync(dir).find((f) => f.endsWith("_credit_advances_list.sql"))!;
+    const sql = readFileSync(path.join(dir, file), "utf8");
+    // inside a transaction that is rolled back: the old draft's plain trigger
+    const error = await pgError(
+      asAdmin(async (q) => {
+        await q("drop trigger payments_credit_companies on public.payments");
+        await q("create trigger payments_credit_companies after insert or update on public.payments for each row execute function app.payment_credit_companies_on_payment()");
+        await q(sql);
+      }),
+    );
+    expect(error.code).toBe("55000");
+    expect(error.message).toContain("payments_credit_companies");
+    expect(await asAdmin(async (q) => (await q("select 1 from pg_trigger where tgname = 'payments_credit_companies' and tginitdeferred")).rowCount)).toBe(1);
   });
 
   it("a race refusal skips that payment (payment_over, payment_state) or re-reads the document (document_over); any other refusal is raised", async () => {

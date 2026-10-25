@@ -42,8 +42,8 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
   };
 }
 
-/** Effective feature flag (plan + per-organization override), as app.org_has_feature() computes it. */
-export async function orgHasFeature(orgId: string, key: string): Promise<boolean> {
+// the plan's features and the organization's overrides, read once per request (FXC-09: several cards and a list filter ask)
+const readPlanFeatures = cache(async (orgId: string): Promise<{ features: unknown; overrides: unknown } | null> => {
   const supabase = await createClient();
   const subscription = must(await supabase
     .from("subscriptions")
@@ -51,14 +51,20 @@ export async function orgHasFeature(orgId: string, key: string): Promise<boolean
     .eq("organization_id", orgId)
     .maybeSingle(), "subscriptions");
   if (!subscription) {
-    return false;
+    return null;
   }
   const plan = must(await supabase.from("plans").select("features").eq("key", subscription.plan_key).maybeSingle(), "plans");
   if (!plan) {
-    return false;
+    return null;
   }
+  return { features: plan.features, overrides: subscription.feature_overrides };
+});
+
+/** Effective feature flag (plan + per-organization override), as app.org_has_feature() computes it. */
+export async function orgHasFeature(orgId: string, key: string): Promise<boolean> {
+  const read = await readPlanFeatures(orgId);
   // the same rule as app.org_has_feature(), wave 2 defaults included
-  return effectiveFeature(key, plan.features, subscription.feature_overrides);
+  return read ? effectiveFeature(key, read.features, read.overrides) : false;
 }
 
 export type Member = {

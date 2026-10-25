@@ -7,7 +7,7 @@ import type { InlineEditing } from "@/features/inline-edit/server";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
@@ -27,10 +27,12 @@ type Props = {
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
   tags: TagOption[];
+  // PAY-03: the credit of each row, read only when the column is shown
+  credit?: Map<string, number>;
 };
 
 /** Companies as a table, with the columns the user chose. */
-export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags }: Props) {
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags, credit }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -107,6 +109,11 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
                   {company.ownerName}
                 </InlineEdit>
               );
+            case "credit": {
+              // PAY-03: the customer's credit (a contact with a company shows the company's)
+              const value = credit?.get(company.id);
+              return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
+            }
             case "created":
               return (
                 <time dateTime={company.createdAt} className="whitespace-nowrap text-ink-soft">

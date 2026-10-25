@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asAnon, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
-import { staleRestores } from "./rerun";
+import { staleGrants, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -541,12 +541,18 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_documents_payments.sql",
       // DOC-04 redefines app.audit_erase_core() of _erase_deal_documents_payments.sql last (the cancel reason in the timeline entries)
       "_money_timeline.sql",
+      // PAY-02 grants insert/update (proforma_id) and the due-date follow-up insert/update (due_date) on accounting_documents
+      // again after _accounting_documents.sql re-ran its revoke all
+      "_payment_allocations.sql",
+      "_document_due_date.sql",
       // the DOC-04 follow-up redefines app.payments_timeline() and app.activities_money_entry_guard() of _money_timeline.sql last
       "_payment_timeline_states.sql",
       // PAY-04 redefines app.audit_erase_core() of _money_timeline.sql last (a cheque's number, foreign bank and unbounce reason)
       "_cheques.sql",
       // TASK-06 part B redefines app.sample_untouched() and app.import_record_worked() of _customer_holds.sql last (sub-tasks)
       "_task_subtasks.sql",
+      // PAY-03 grants insert/update (is_advance, advance_quote_id, advance_order_id) again after _payments.sql re-ran its grants
+      "_credit_advances_list.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
@@ -555,6 +561,8 @@ describe("setup checklist and sample data (USR-04)", () => {
     // every function these files define must end at its latest body, or the teardown sees an old one; a newer
     // migration that redefines one of them is named here (add it to the list, in name order)
     expect(staleRestores(files, dir)).toEqual([]);
+    // and every table whose grants a listed file resets (revoke all) gets back the later migrations' grants
+    expect(staleGrants(files, dir)).toEqual([]);
     for (const file of files) {
       await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
     }

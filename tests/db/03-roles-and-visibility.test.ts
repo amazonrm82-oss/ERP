@@ -504,6 +504,44 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(admin.id, (q) => q("delete from public.payment_allocations where id = $1", [byManager])))).code).toBe("42501");
   });
 
+  it("the server's company credit rows follow their payment; nobody writes them (PAY-03)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const company = await asUser(m1.id, async (q) => (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברת יתרה') returning id", [org])).rows[0].id);
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id, company_id) values ($1, 'עסקה ליתרה', $2, $3, $4) returning id", [org, pipe, stage, company])).rows[0].id,
+    );
+    const pay = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.payments (organization_id, deal_id, amount_agorot, method) values ($1, $2, 1000, 'cash') returning id", [org, deal])).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payment_credit_companies where payment_id = $1 and company_id = $2 and credit_agorot = 1000", [pay, company]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    for (const u of [owner, admin, m1]) {
+      for (const sql of [
+        "update public.payment_credit_companies set credit_agorot = 1 where payment_id = $1",
+        "delete from public.payment_credit_companies where payment_id = $1",
+      ]) {
+        expect((await pgError(asUser(u.id, (q) => q(sql, [pay])))).code, `${u.email}: ${sql}`).toBe("42501");
+      }
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.payment_credit_companies (organization_id, payment_id, company_id) values ($1, $2, $3)", [org, pay, company])))).code,
+      ).toBe("42501");
+    }
+    // the totals (the list column): owners and admins only, whatever the visibility; nobody writes them
+    const total = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.customer_credit_totals where company_id = $1 and credit_agorot = 1000", [company]));
+    for (const u of [owner, admin]) expect(await total(u), u.email).toBe(1);
+    for (const u of [manager, m1, m2, viewer]) expect(await total(u), u.email).toBe(0);
+    for (const u of [owner, admin]) {
+      for (const sql of ["update public.customer_credit_totals set credit_agorot = 1 where company_id = $1", "delete from public.customer_credit_totals where company_id = $1"]) {
+        expect((await pgError(asUser(u.id, (q) => q(sql, [company])))).code, `${u.email}: ${sql}`).toBe("42501");
+      }
+    }
+  });
+
   it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
     await setVisibility("org");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));

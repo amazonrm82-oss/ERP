@@ -9,7 +9,7 @@ import { ListTable } from "@/features/list-columns/components/list-table";
 import type { TagOption } from "@/features/tags/queries";
 import { PhoneCell } from "@/features/whatsapp/components/phone-cell";
 import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
@@ -33,6 +33,8 @@ type Props = {
   tags: TagOption[];
   // DQL-01: the score of each row, read only when the column is shown
   completeness?: Map<string, number>;
+  // PAY-03: the credit of each row, read only when the column is shown
+  credit?: Map<string, number>;
   // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
   whatsapp?: WhatsappListContext | null;
   // SEG-01: static segments for the bulk "add to segment"; null for someone who does not write segments
@@ -40,7 +42,7 @@ type Props = {
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, whatsapp = null, segments = null }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, credit, whatsapp = null, segments = null }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -141,6 +143,11 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
             case "completeness": {
               const score = completeness?.get(contact.id);
               return score === undefined ? null : <span className="tabular-nums">{score}%</span>;
+            }
+            case "credit": {
+              // PAY-03: the customer's credit (a contact with a company shows the company's)
+              const value = credit?.get(contact.id);
+              return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
             }
             case "created":
               return (

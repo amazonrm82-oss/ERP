@@ -1,6 +1,7 @@
 import "server-only";
 
 import { listActivityTypes } from "@/features/activity-types/queries";
+import { moneyColumnsEnabled } from "@/features/allocations/queries";
 import { listCompanyOptions } from "@/features/companies/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { getLeadLookups } from "@/features/leads/queries";
@@ -26,6 +27,8 @@ function filterLookups(orgId: string, object: FilterObject) {
     object === "contact" || object === "company" ? listRecordTypes(orgId, object) : [],
     // TASK-08: the business's activity and task types
     object === "task" ? listActivityTypes(orgId) : [],
+    // PAY-03: "יש יתרת זכות" on contacts and companies, with the money keys (read once per request)
+    object === "contact" || object === "company" ? moneyColumnsEnabled(orgId) : false,
   ]);
 }
 
@@ -57,7 +60,7 @@ export async function prepareListFilter(
   extra: { stages?: Array<{ id: string; name: string }> } = {},
 ): Promise<PreparedFilter> {
   // memoized per request: the page has already read the context, and started the rest (startListFilterLookups)
-  const [context, [lookups, members, tags, types, activityTypes], companies, [categories, units]] = await Promise.all([
+  const [context, [lookups, members, tags, types, activityTypes, money], companies, [categories, units]] = await Promise.all([
     getOrgContext(orgId),
     filterLookups(orgId, object),
     // CON-05: the primary company of a contact
@@ -74,6 +77,7 @@ export async function prepareListFilter(
     companies: companies.map((c) => ({ value: c.id, label: c.name })),
     categories: categoryOptions(categories).map((c) => ({ value: c.id, label: c.label })),
     units: units.map((u) => ({ value: u.id, label: u.name })),
+    money,
     members: members.map((m) => ({ value: m.userId, label: m.name })),
     tags: tags.map((t) => ({ value: t.id, label: t.name })),
     fields: customFields,

@@ -9,6 +9,7 @@ import { fail, FORM_INVALID, formValues, invalid, ok, type ActionResult, type Fo
 import { dbErrorMessage } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
+import { ADVANCE_FIELD_NAMES, parseAdvance } from "./advance";
 import { moneyRowParents } from "./deal-contact";
 import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "./money-subject";
 
@@ -57,6 +58,10 @@ export async function recordPaymentAction(orgId: string, subject: Subject, _prev
     cheque = fields.data;
   }
 
+  // PAY-03: the optional "מקדמה" mark and its link (the database checks the quote or order)
+  const advance = parseAdvance(pick(formData, ADVANCE_FIELD_NAMES));
+  if (!advance.ok) return fail(advance.message, { values: formValues(formData) });
+
   // a payment on a deal is the deal's contact's too, when the user reads that contact (the insert policy asks for it)
   // ORD-06 part two: on an order, the payment hangs on the order's own deal or contact and names the order
   const parents = await moneyRowParents(context.supabase, orgId, subject);
@@ -74,6 +79,7 @@ export async function recordPaymentAction(orgId: string, subject: Subject, _prev
     note: parsed.data.note,
     status: status.data,
     ...(cheque ?? {}),
+    ...advance.columns,
   });
   if (error) return fail(writeError(error), { values: formValues(formData) });
   revalidatePath(pageOf(orgId, subject));

@@ -11,10 +11,11 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
+import { getCreditNumbers } from "@/features/allocations/queries";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
@@ -67,7 +68,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const filter = await prepareListFilter(orgId, "contact", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
-  const sortKeys = [...Object.keys(CONTACT_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
+  const sortKeys = [...offeredSortKeys(Object.keys(CONTACT_SORT_COLUMNS), listColumns.catalog), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof CONTACT_SORT_COLUMNS | CustomSortKey
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
@@ -87,6 +88,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const shownColumns = activeView?.config.columns ? resolveColumns("contact", activeView.config.columns, listColumns.catalog) : listColumns.columns;
   // DQL-01: scores only when the column is shown
   const completeness = shownColumns.some((c) => c.key === "completeness") && contacts.length > 0 ? await getScoreNumbers(orgId, "contact", contacts.map((c) => c.id)) : undefined;
+  // PAY-03: the credit only when the column is shown (it is in the catalog only for people who see money)
+  const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -216,6 +219,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               editing={editing}
               tags={tags}
               completeness={completeness}
+              credit={credit}
               whatsapp={whatsappListContext(context)}
               segments={segmentOptions}
             />
