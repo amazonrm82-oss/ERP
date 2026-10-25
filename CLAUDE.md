@@ -1033,6 +1033,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   record on insert as confirmed or a move recorded -> confirmed (not failed -> confirmed); its AUT-06 retry holds while still confirmed.
   `app.process_outbox`, `app.automation_event_matches`, `app.automation_run_facts` and `app.automation_event_still_holds` were last
   redefined in 020780. The run log badge of a quota skip reads "לא רץ: מכסה" (`quotaSkipLabel`, AUT-07).
+- Payment allocations (PAY-02, migrations 020790, 020795; owner 21 October 2026, lead's calls 25 October): `public.payment_allocations`
+  (payment, document, amount; never deleted: owners/admins undo with `removed_at`, the server releases with `released_at` when the
+  payment becomes failed/refunded/cancelled or the document is cancelled; a release is final). Allocating needs
+  `app.can_record_payments`, a writable business and both flags `payments` and `documents`; changing or undoing: owners/admins. Definer
+  trigger `app.payment_allocations_check` (outsider guard first): tax invoice or proforma only, recorded/confirmed payment, active
+  document, same customer (`app.money_same_customer`: same deal, contact, or company via the contact's or the deal's company; mirrored
+  inline in `public.money_allocation_candidates`, keep in step), never over the payment or the document (hints `allocation:*`). Lock
+  order payment, document, proforma (an admin's change racing a cancel can deadlock: 40P01, retry). Release triggers are plain
+  "after update" with an early return (a status derived by a BEFORE trigger is caught). `accounting_documents.proforma_id`: an active
+  tax invoice bills one active proforma of the same customer, set once (partial unique index over active invoices; a cancelled
+  invoice frees it; hint `document:proforma`). Counts are read, never stored: `public.money_allocation_state(org, docs, payments)`
+  (invoker) gives paid/balance/state and allocated/credit. `accounting_documents.due_date` (020795): tax invoice or proforma only,
+  filled on insert from the customer's terms (`app.document_customer_terms` + `app.payment_due_date`), frozen once cancelled (hint
+  `document:due_date`); "באיחור" = due before today with a balance. A payment correction below its allocations: `payment:allocated`.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
