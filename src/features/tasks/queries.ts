@@ -10,6 +10,7 @@ import { zoneDate, zonedIso } from "@/lib/format";
 import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
 import { must } from "@/lib/db-read";
+import { readAllPagesByIds } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { parseRecurrence, type Recurrence } from "./recurrence";
@@ -35,6 +36,8 @@ export type TaskItem = {
   recurrence: Recurrence | null;
   // the record the task belongs to, when there is one
   related: { kind: "lead" | "contact" | "company" | "deal"; id: string } | null;
+  // TASK-06 part B: the parent of a sub-task; null for a top-level task
+  parentId: string | null;
 };
 
 export type TaskGroups = {
@@ -49,7 +52,7 @@ export type TaskGroups = {
 
 const OPEN_LIMIT = 300;
 const DONE_SHOWN = 20;
-const TASK_ITEM_COLUMNS = "id, title, task_type, activity_type_id, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id";
+const TASK_ITEM_COLUMNS = "id, title, task_type, activity_type_id, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id, parent_task_id";
 
 type TaskItemRow = {
   id: string;
@@ -68,6 +71,7 @@ type TaskItemRow = {
   contact_id: string | null;
   company_id: string | null;
   deal_id: string | null;
+  parent_task_id: string | null;
 };
 
 function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
@@ -94,6 +98,7 @@ function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
           : row.company_id
             ? { kind: "company", id: row.company_id }
             : null,
+    parentId: row.parent_task_id,
   };
 }
 
@@ -253,6 +258,8 @@ export type TaskListItem = {
   ownerId: string | null;
   ownerName: string | null;
   related: { kind: "lead" | "contact" | "company" | "deal"; id: string; name: string | null } | null;
+  // TASK-06 part B: the parent task of a sub-task ("משימת אב"); title null when the user cannot see it
+  parent: { id: string; title: string | null } | null;
   createdAt: string;
 };
 
@@ -292,7 +299,7 @@ export async function listTasks(
 
   let query = supabase
     .from("tasks")
-    .select("id, title, task_type, activity_type_id, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, created_at")
+    .select("id, title, task_type, activity_type_id, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, parent_task_id, created_at")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   if (options.ownerId) {
@@ -318,10 +325,11 @@ export async function listTasks(
   }
   const rows = data.slice(0, size);
 
-  const [owners, related, types] = await Promise.all([
+  const [owners, related, types, parents] = await Promise.all([
     getUserNames(rows.map((row) => row.owner_id)),
     relatedRecords(orgId, rows),
     listActivityTypes(orgId),
+    taskTitles(orgId, rows.map((row) => row.parent_task_id)),
   ]);
 
   return {
@@ -339,6 +347,7 @@ export async function listTasks(
         ownerId: row.owner_id,
         ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
         related: related(row),
+        parent: row.parent_task_id ? { id: row.parent_task_id, title: parents.get(row.parent_task_id) ?? null } : null,
         createdAt: row.created_at,
       };
     }),
@@ -412,4 +421,56 @@ export async function listRecordTasks(orgId: string, column: keyof LinkColumns, 
     isOverdue: row.due_at !== null && Date.parse(row.due_at) < startOfToday,
     ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
   }));
+}
+
+/** TASK-06 part B: the titles of tasks by id (parents of sub-tasks), read with the user's rights; a hidden one is missing. */
+export async function taskTitles(orgId: string, ids: Array<string | null>): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  if (unique.length === 0) return new Map();
+  const supabase = await createClient();
+  const rows = await readAllPagesByIds(unique, async (slice, from, to) =>
+    must(await supabase.from("tasks").select("id, title").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "parent tasks"),
+  );
+  return new Map(rows.map((row) => [row.id, row.title]));
+}
+
+export type SubtaskItem = { id: string; parentId: string; title: string; status: TaskStatus; dueAt: string | null; ownerName: string | null };
+
+/**
+ * TASK-06 part B: the live sub-tasks of the given tasks that the user sees (RLS decides, so "N מתוך M" counts those),
+ * per parent, in the order they were made.
+ */
+export async function listSubtasks(orgId: string, parentIds: string[]): Promise<Map<string, SubtaskItem[]>> {
+  const byParent = new Map<string, SubtaskItem[]>();
+  if (parentIds.length === 0) return byParent;
+  const supabase = await createClient();
+  const rows = await readAllPagesByIds([...new Set(parentIds)], async (slice, from, to) =>
+    must(
+      await supabase
+        .from("tasks")
+        .select("id, parent_task_id, title, status, due_at, owner_id, created_at")
+        .eq("organization_id", orgId)
+        .in("parent_task_id", slice)
+        .is("deleted_at", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+      "sub-tasks",
+    ),
+  );
+  const owners = await getUserNames(rows.map((row) => row.owner_id));
+  for (const row of rows) {
+    if (!row.parent_task_id || row.status === "cancelled") continue;
+    const list = byParent.get(row.parent_task_id) ?? [];
+    list.push({
+      id: row.id,
+      parentId: row.parent_task_id,
+      title: row.title,
+      status: row.status,
+      dueAt: row.due_at,
+      ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
+    });
+    byParent.set(row.parent_task_id, list);
+  }
+  return byParent;
 }

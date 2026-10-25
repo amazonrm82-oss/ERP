@@ -2293,6 +2293,10 @@ export type TaskRow = {
   import_job_id: string | null;
   // TASK-08: a type of the business's list; sets task_type from its base (trigger tasks_activity_type_check)
   activity_type_id: string | null;
+  // TASK-06 part B: the parent task of a sub-task (one level); set on insert or from the edit form, links copied from it
+  parent_task_id: string | null;
+  // TASK-06 part B: true on a sub-task the bin took with its parent (server only)
+  binned_with_parent: boolean | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -2318,6 +2322,7 @@ export type TaskInsert = {
   deal_id?: string | null;
   recurrence?: Json | null;
   activity_type_id?: string | null;
+  parent_task_id?: string | null;
   deleted_at?: string | null;
 };
 

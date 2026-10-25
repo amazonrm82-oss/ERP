@@ -165,6 +165,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import_undo:type": "את הייבוא הזה אי אפשר לבטל כאן.",
   "import_undo:expired": "אפשר לבטל ייבוא רק בשבעת הימים הראשונים.",
   // FXD-07 (public.undo_import): nothing is undone while a record of the import is no longer the user's to change
+  "import_undo:subtasks": "יש משימות מיובאות שנוספו להן תתי-משימות, ולכן אי אפשר לבטל את הייבוא.",
   "import_undo:left": "חלק מהרשומות שנוצרו בייבוא כבר אינן שלכם לשנות, ולכן הייבוא לא בוטל ושום רשומה לא הועברה לסל המחזור.",
   // FLD-08 (migration card_layouts)
   "card_layout:invalid": "התצוגה אינה תקינה, או שאחד השדות הוסר בינתיים. רעננו את הדף ונסו שוב.",
@@ -194,6 +195,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "task:deputy_owner": "ממלא מקום לא מעביר משימה לאחראי אחר. אפשר לסיים, לדחות ולערוך אותה.",
   // TASK-07: a team task, for a team the user may not give tasks to
   "task:team": "אפשר לתת משימה לצוות רק אם אתם חברים בו או מנהלים אותו.",
+  // TASK-06 part B (migration task_subtasks): sub-tasks, one level, following the parent's record
+  "task:subtask_depth": "תת-משימה היא רמה אחת בלבד: אי אפשר להוסיף תת-משימה לתת-משימה.",
+  "task:parent": "משימת האב לא נמצאה, או שאין לכם הרשאה לערוך אותה.",
+  "task:subtask_recurrence": "תת-משימה לא חוזרת. בחרו \"בלי חזרה\" לפני הקישור למשימת אב, או קבעו חזרה במשימת האב.",
+  "task:subtask_callback": "משימת שיחה חוזרת לפנייה מטופס לא יכולה להיות תת-משימה או משימת אב.",
+  "task:subtask_links": "תת-משימה שייכת לרשומה של משימת האב. כדי לשנות את הקישור, נתקו אותה ממשימת האב או שנו את משימת האב.",
   // LEAD-06 (migration lead_convert_map)
   "convert_map:invalid": "אפשר לבחור רק שדה מאותו סוג. רעננו את הדף ונסו שוב.",
   // DEAL-03 (migration deal_loss_reasons)

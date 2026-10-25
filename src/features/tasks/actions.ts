@@ -8,7 +8,7 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import type { TaskInsert, TaskStatus } from "@/lib/database.types";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { zoneDate, zonedIso, zoneTime } from "@/lib/format";
-import { INVALID_ARGS } from "@/lib/action-args";
+import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { addDays } from "@/lib/calendar-grid";
 import { recordPage } from "@/lib/record-types";
 import { subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
@@ -19,7 +19,9 @@ import { movedToWorkingDayNotice } from "@/features/calendar-days/rest-day-note"
 import { calendarSettingsFromRow, type CalendarSettings } from "@/features/calendar-days/holidays";
 import { stepsForNewTask } from "@/features/task-checklists/server";
 
+import { relatedRecords } from "./queries";
 import { REPEAT_FIELD_NAMES, repeatFormSchema } from "./recurrence";
+import { moveToParentQuestion, SUBTASK_NO_REPEAT } from "./subtasks";
 import { TASK_FIELD_NAMES, taskSchema } from "./schema";
 
 // A task with a date but no time is due at the start of the working day.
@@ -146,6 +148,12 @@ export async function updateTaskAction(
     return invalid(parsed.error, formData);
   }
 
+  // TASK-06 part B (owner, answer (3) ב): the edit form may pick a parent task or detach from one
+  const parent = await parentChange(context.supabase, orgId, taskId, formData, parsed.data.recurrence !== null);
+  if (!parent.ok) {
+    return fail(parent.message, { values: formValues(formData), ...(parent.fieldErrors ? { fieldErrors: parent.fieldErrors } : {}) });
+  }
+
   // recurrence is always sent: "בלי חזרה" stops the series (TASK-04)
   const { data, error } = await context.supabase
     .from("tasks")
@@ -156,6 +164,7 @@ export async function updateTaskAction(
       recurrence: parsed.data.recurrence,
       ...schedule(parsed.data),
       ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
+      ...(parent.change !== undefined ? { parent_task_id: parent.change } : {}),
     })
     .eq("organization_id", orgId)
     .eq("id", taskId)
@@ -170,6 +179,56 @@ export async function updateTaskAction(
 
   revalidateTasks(orgId);
   return { ok: true };
+}
+
+type LinkRow = { lead_id: string | null; contact_id: string | null; company_id: string | null; deal_id: string | null };
+
+/**
+ * TASK-06 part B: what the edit form asks of the parent link. `change` is undefined when the form has no parent field or
+ * keeps the same parent, null to detach, or the new parent's id. Linking a repeating task asks to clear the repeat first,
+ * and linking a task whose record differs from the parent's asks to confirm (field `confirm_move`), because the task moves
+ * to the parent's record. The database judges the link again (one level, rights, same business).
+ */
+async function parentChange(
+  supabase: Supabase,
+  orgId: string,
+  taskId: string,
+  formData: FormData,
+  repeats: boolean,
+): Promise<{ ok: true; change?: string | null } | { ok: false; message: string; fieldErrors?: Record<string, string> }> {
+  if (!formData.has("parent_task_id")) return { ok: true };
+  const raw = String(formData.get("parent_task_id") ?? "");
+  if (raw !== "" && !z.uuid().safeParse(raw).success) return { ok: false, message: INVALID_ARGS };
+  const picked = raw === "" ? null : raw;
+  const { data: task, error } = await supabase
+    .from("tasks")
+    .select("parent_task_id, lead_id, contact_id, company_id, deal_id")
+    .eq("organization_id", orgId)
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error) return { ok: false, message: dbErrorMessage(error) };
+  if (!task) return { ok: false, message: NOT_FOUND_OR_FORBIDDEN };
+  if (picked === task.parent_task_id) return { ok: true };
+  if (picked === null) return { ok: true, change: null };
+  if (repeats) {
+    return { ok: false, message: SUBTASK_NO_REPEAT, fieldErrors: { repeat: SUBTASK_NO_REPEAT } };
+  }
+  const { data: parent, error: parentError } = await supabase
+    .from("tasks")
+    .select("lead_id, contact_id, company_id, deal_id")
+    .eq("organization_id", orgId)
+    .eq("id", picked)
+    .maybeSingle();
+  if (parentError) return { ok: false, message: dbErrorMessage(parentError) };
+  // a parent the user cannot see: the database refuses it with its own message
+  if (!parent || formData.get("confirm_move") === "1" || sameLinks(task, parent)) return { ok: true, change: picked };
+  const names = await relatedRecords(orgId, [parent]);
+  const question = moveToParentQuestion(names(parent)?.name ?? null, Boolean(parent.lead_id || parent.contact_id || parent.company_id || parent.deal_id));
+  return { ok: false, message: question, fieldErrors: { confirm_move: question } };
+}
+
+function sameLinks(a: LinkRow, b: LinkRow): boolean {
+  return a.lead_id === b.lead_id && a.contact_id === b.contact_id && a.company_id === b.company_id && a.deal_id === b.deal_id;
 }
 
 async function setTaskStatus(orgId: string, taskId: string, status: TaskStatus): Promise<ActionResult> {
@@ -374,4 +433,54 @@ export async function takeTaskAction(orgId: string, taskId: string): Promise<Act
     return fail(TAKE_REFUSED[answer.reason ?? ""] ?? "לא הצלחנו לקחת את המשימה. נסו שוב.");
   }
   return { ok: true, message: "המשימה עכשיו באחריותך." };
+}
+
+const subtaskArg = z.object({
+  title: z.string().max(1200),
+  dueDate: z.string().max(10).nullable(),
+  ownerId: z.string().max(40).nullable(),
+});
+
+/**
+ * TASK-06 part B: a sub-task from the parent's card: a title, and optionally a date (start of the working day) and an
+ * assignee (empty = the creator). The database copies the parent's record link, checks one level and that the user may
+ * update the parent.
+ */
+export async function addSubtaskAction(
+  orgId: string,
+  parentId: string,
+  input: { title: string; dueDate: string | null; ownerId: string | null },
+): Promise<ActionResult> {
+  if (!validArg(subtaskArg, input)) {
+    return fail(INVALID_ARGS);
+  }
+  const context = await actionContext(orgId, parentId);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = taskSchema.safeParse({
+    title: input.title,
+    due_date: input.dueDate || null,
+    due_time: null,
+    owner_id: input.ownerId || null,
+    task_type: null,
+    remind: null,
+    priority: null,
+  });
+  if (!parsed.success) {
+    return fail(parsed.error.issues[0]?.message ?? INVALID_ARGS);
+  }
+  const { error } = await context.supabase.from("tasks").insert({
+    organization_id: orgId,
+    title: parsed.data.title,
+    ...parsed.data.task_type,
+    parent_task_id: parentId,
+    due_at: dueAt(parsed.data.due_date, null),
+    ...(parsed.data.owner_id ? { owner_id: parsed.data.owner_id } : {}),
+  });
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו להוסיף את תת-המשימה. נסו שוב."));
+  }
+  revalidateTasks(orgId);
+  return ok();
 }

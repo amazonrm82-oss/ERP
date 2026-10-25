@@ -29,7 +29,7 @@ import { remindOption } from "@/features/tasks/components/task-fields";
 import { listChecklistSteps, listChecklistTemplates } from "@/features/task-checklists/queries";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
 import { TasksTable } from "@/features/tasks/components/tasks-table";
-import { listCoveringTasks, listOpenTeamTasks, listTaskGroups, listTasks, listTaskTeams, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
+import { listCoveringTasks, listOpenTeamTasks, listSubtasks, listTaskGroups, listTasks, listTaskTeams, taskTitles, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
 import { viewChips } from "@/features/views/server";
 import { absenceLabel } from "@/features/work-hours/leave";
@@ -139,7 +139,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
   // TASK-07: "mine" also shows the open tasks of the user's teams that nobody took yet ("all" has them in its groups)
   const teamTasks = showAll ? [] : await listOpenTeamTasks(orgId, teams.mine);
   // TASK-06: the steps of every task on the page, and the templates for "steps from a template"
-  const shownTaskIds = [
+  const shownTasks = [
     ...groups.overdue,
     ...groups.today,
     ...groups.upcoming,
@@ -147,12 +147,16 @@ export default async function TasksPage({ params, searchParams }: Props) {
     ...groups.done,
     ...covering.flatMap((group) => group.tasks),
     ...teamTasks,
-  ].map((task) => task.id);
-  const [checklists, checklistTemplates, kinds] = await Promise.all([
+  ];
+  const shownTaskIds = shownTasks.map((task) => task.id);
+  const [checklists, checklistTemplates, kinds, subtasks, parentTitles] = await Promise.all([
     listChecklistSteps(orgId, [...new Set(shownTaskIds)]),
     canWrite ? listChecklistTemplates(orgId) : [],
     // TASK-08: the business's activity and task types
     listActivityTypes(orgId),
+    // TASK-06 part B: the sub-tasks of the top-level tasks shown, and the titles of the parents of the sub-tasks shown
+    listSubtasks(orgId, shownTasks.filter((task) => task.parentId === null).map((task) => task.id)),
+    taskTitles(orgId, shownTasks.map((task) => task.parentId)),
   ]);
   const templates = checklistTemplates.map((t) => ({ id: t.id, name: t.name }));
   // HEB-03: "in N business days" counts from today in the business's zone
@@ -184,6 +188,15 @@ export default async function TasksPage({ params, searchParams }: Props) {
       recurrence: task.recurrence,
       related: task.related ? { href: relatedHref(orgId, task.related), label: RELATED_LABEL[task.related.kind] } : null,
       checklist: checklists.get(task.id) ?? [],
+      subtasks: (subtasks.get(task.id) ?? []).map((sub) => ({
+        id: sub.id,
+        title: sub.title,
+        done: sub.status === "done",
+        dueText: sub.dueAt ? formatDateTime(sub.dueAt) : null,
+        overdue: sub.status === "open" && sub.dueAt !== null && zoneDate(new Date(sub.dueAt), context.org.timeZone) < today,
+        ownerName: sub.ownerName,
+      })),
+      parent: task.parentId ? { id: task.parentId, title: parentTitles.get(task.parentId) ?? null } : null,
       teamTask:
         task.ownerId === null && task.teamId !== null && task.completedAt === null
           ? { teamName: teams.names.get(task.teamId) ?? "", canTake: teams.rights.has(task.teamId) }

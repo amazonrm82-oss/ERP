@@ -88,6 +88,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "status", label: "מצב" },
       { key: "priority", label: "עדיפות" },
       { key: "related", label: "שייכת ל" },
+      // TASK-06 part B: the parent of a sub-task
+      { key: "parent", label: "משימת אב" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצרה" },
     ],

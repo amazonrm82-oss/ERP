@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { Dialog } from "@/components/ui/dialog";
+import { SearchPicker } from "@/components/ui/search-picker";
 import { Input, Select } from "@/components/ui/field";
 import { FormError } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -19,6 +22,9 @@ import type { ActivityTypeOption } from "@/features/activity-types/types";
 import { addDays } from "@/lib/calendar-grid";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
+import { searchParentTasksAction } from "../picker-actions";
+import { openSubtasksQuestion, subtaskProgress, type SubtaskView } from "../subtasks";
+import { Subtasks } from "./subtasks";
 import { completeTaskAction, reopenTaskAction, setTaskOutcomeAction, snoozeTaskAction, takeTaskAction, updateTaskAction, type SnoozeWhen } from "../actions";
 import type { BusinessDaysContext } from "./business-days-picker";
 import { REMIND_OPTIONS, TaskFields, type AssigneeOption } from "./task-fields";
@@ -52,6 +58,11 @@ export type TaskRowView = {
   // TASK-07: an open task of a team that nobody took yet; the first to press "לקחתי" owns it
   // canTake: the user may take it (the rule of public.take_task); others see it without the button
   teamTask?: { teamName: string; canTake: boolean } | null;
+  // TASK-06 part B: a top-level task's sub-tasks (the ones the user sees)
+  subtasks?: SubtaskView[];
+  // TASK-06 part B: set on a sub-task (null on any other task); title null when the user cannot see the parent.
+  // Required, so every screen that shows the row (and its edit form, which hides the repeat for a sub-task) says it.
+  parent: { id: string; title: string | null } | null;
 };
 
 type Props = {
@@ -91,6 +102,8 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
   const reassign = (ownerId: string) => run(() => inlineEditAction(orgId, "task", task.id, "owner", { id: ownerId }));
   const owners =
     task.ownerId && !assignees.some((a) => a.userId === task.ownerId) ? [{ userId: task.ownerId, name: task.ownerName ?? "משתמש" }, ...assignees] : assignees;
+  // TASK-06 part B: completing a parent with open sub-tasks asks first, and never blocks
+  const openSubtasks = task.parent ? 0 : (subtaskProgress(task.subtasks ?? [])?.open ?? 0);
 
   function toggle() {
     setError(null);
@@ -117,6 +130,9 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
   return (
     <li className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
       <div className="min-w-0 flex-1">
+        {task.parent ? (
+          <p className="text-sm text-ink-soft">{task.parent.title ? `תת-משימה של: ${task.parent.title}` : "תת-משימה"}</p>
+        ) : null}
         <p className={cn("break-words font-medium", task.done && "text-ink-soft line-through")}>
           {!task.done && task.priority === 1 ? (
             <Badge tone="danger" className="me-1.5 align-middle">
@@ -145,6 +161,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
           ) : null}
         </p>
         <TaskChecklist orgId={orgId} taskId={task.id} taskTitle={task.title} steps={task.checklist ?? []} canEdit={canEdit} templates={templates} />
+        {task.parent ? null : <Subtasks orgId={orgId} taskId={task.id} taskTitle={task.title} subtasks={task.subtasks ?? []} canEdit={canEdit} assignees={assignees} />}
         {task.done && canEdit ? <TaskOutcome orgId={orgId} task={task} /> : task.done && task.outcome ? <p className="mt-1 text-sm">תוצאה: {task.outcome}</p> : null}
         {error ? (
           <p role="alert" className="mt-1 text-sm text-danger">
@@ -163,10 +180,24 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
               <span className="sr-only">: {task.title}</span>
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={toggle} disabled={pending} aria-busy={pending || undefined}>
-            {pending ? "מעדכנים…" : task.done ? "החזרה לפתוחות" : "בוצע"}
-            <span className="sr-only">: {task.title}</span>
-          </Button>
+          {!task.done && openSubtasks > 0 ? (
+            <ConfirmButton
+              variant="secondary"
+              title={openSubtasksQuestion(openSubtasks)}
+              description="תתי-המשימות הפתוחות יישארו פתוחות."
+              confirmLabel="לסיים בכל זאת"
+              action={() => completeTaskAction(orgId, task.id)}
+              disabled={pending}
+            >
+              בוצע
+              <span className="sr-only">: {task.title}</span>
+            </ConfirmButton>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={toggle} disabled={pending} aria-busy={pending || undefined}>
+              {pending ? "מעדכנים…" : task.done ? "החזרה לפתוחות" : "בוצע"}
+              <span className="sr-only">: {task.title}</span>
+            </Button>
+          )}
         </div>
       ) : null}
       {canEdit && !task.done ? (
@@ -280,6 +311,24 @@ function TaskEditForm({ orgId, task, assignees, businessDays, kinds, onDone }: E
     return result;
   }, null);
   const failure = state && !state.ok ? state : null;
+  // TASK-06 part B (owner, answer (3) ב): linking to a parent of another record asks first; the server sends the question
+  const formRef = useRef<HTMLFormElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
+  const moveQuestion = failure?.fieldErrors?.confirm_move ?? null;
+  // the answer whose question was closed (by "ביטול" or by confirming); a new answer asks again
+  const [answered, setAnswered] = useState<FormState>(null);
+  const asking = moveQuestion && answered !== state ? moveQuestion : null;
+  const errors = failure?.fieldErrors ? Object.fromEntries(Object.entries(failure.fieldErrors).filter(([key]) => key !== "confirm_move")) : {};
+  // a task with sub-tasks cannot become one (one level); a sub-task shows its parent and may be detached
+  const canPickParent = (task.subtasks ?? []).length === 0;
+  const parentInitial =
+    failure?.values && "parent_task_id" in failure.values
+      ? failure.values.parent_task_id
+        ? { id: failure.values.parent_task_id, label: failure.values.parent_task_id__label || "משימה" }
+        : null
+      : task.parent
+        ? { id: task.parent.id, label: task.parent.title ?? "משימה" }
+        : null;
   // the current assignee stays selectable even if they are no longer active
   const options =
     task.ownerId && !assignees.some((a) => a.userId === task.ownerId)
@@ -287,8 +336,9 @@ function TaskEditForm({ orgId, task, assignees, businessDays, kinds, onDone }: E
       : assignees;
 
   return (
-    <form action={formAction} className="space-y-4" noValidate aria-label={`עריכת המשימה ${task.title}`}>
+    <form ref={formRef} action={formAction} className="space-y-4" noValidate aria-label={`עריכת המשימה ${task.title}`}>
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
+      <input ref={confirmRef} type="hidden" name="confirm_move" defaultValue="" />
       <TaskFields
         values={
           failure?.values ?? {
@@ -302,11 +352,52 @@ function TaskEditForm({ orgId, task, assignees, businessDays, kinds, onDone }: E
             ...repeatValues(task.recurrence),
           }
         }
-        errors={failure?.fieldErrors ?? {}}
+        errors={errors}
         assignees={options}
         defaultOwnerId={task.ownerId ?? ""}
         businessDays={businessDays}
         kinds={kinds}
+        // TASK-06 part B: a sub-task does not repeat
+        repeat={!task.parent}
+      />
+      {canPickParent ? (
+        <SearchPicker
+          label="משימת אב"
+          name="parent_task_id"
+          initial={parentInitial}
+          search={(query) => searchParentTasksAction(orgId, task.id, query)}
+          placeholder="הקלידו את כותרת המשימה"
+          hint="תת-משימה עוברת לרשומה של משימת האב. הסרה מנתקת אותה ומשאירה את הרשומה שלה."
+          error={errors.parent_task_id}
+          onChange={() => {
+            // a new pick is asked about again
+            if (confirmRef.current) confirmRef.current.value = "";
+          }}
+        />
+      ) : (
+        <p className="text-sm text-ink-soft">למשימה הזו יש תתי-משימות, ולכן היא לא יכולה להיות תת-משימה.</p>
+      )}
+      <Dialog
+        open={asking !== null}
+        onClose={() => setAnswered(state)}
+        title="קישור למשימת אב"
+        description={asking ?? undefined}
+        footer={
+          <>
+            <Button variant="secondary" autoFocus onClick={() => setAnswered(state)}>
+              ביטול
+            </Button>
+            <Button
+              onClick={() => {
+                setAnswered(state);
+                if (confirmRef.current) confirmRef.current.value = "1";
+                formRef.current?.requestSubmit();
+              }}
+            >
+              לקשר ולהעביר
+            </Button>
+          </>
+        }
       />
       <div className="flex flex-wrap gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>

@@ -110,6 +110,9 @@ export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, edi
                   {task.related.name ?? "פתיחה"}
                 </Link>
               ) : null;
+            case "parent":
+              // TASK-06 part B: a sub-task's parent ("משימה" when the user cannot see it)
+              return task.parent ? <span className="break-words">{task.parent.title ?? "משימה"}</span> : null;
             case "owner":
               return (
                 <InlineEdit

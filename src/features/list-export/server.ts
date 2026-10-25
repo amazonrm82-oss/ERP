@@ -179,6 +179,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             status: TASK_STATUS_LABELS[task.status],
             priority: PRIORITY_LABELS[task.priority] ?? null,
             related: task.related?.name ?? null,
+            parent: task.parent ? (task.parent.title ?? "משימה") : null,
             owner: task.ownerName,
             created: created(task.createdAt),
           },

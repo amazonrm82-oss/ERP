@@ -545,6 +545,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_timeline_states.sql",
       // PAY-04 redefines app.audit_erase_core() of _money_timeline.sql last (a cheque's number, foreign bank and unbounce reason)
       "_cheques.sql",
+      // TASK-06 part B redefines app.sample_untouched() and app.import_record_worked() of _customer_holds.sql last (sub-tasks)
+      "_task_subtasks.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

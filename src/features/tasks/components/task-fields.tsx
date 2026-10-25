@@ -64,10 +64,12 @@ type Props = {
   teams?: Array<{ id: string; name: string }>;
   /** TASK-08: the business's activity and task types, offered beside the fixed "משימה" and "מעקב" */
   kinds?: ActivityTypeOption[];
+  /** TASK-06 part B: false for a sub-task, which does not repeat (the database refuses it) */
+  repeat?: boolean;
 };
 
 /** Title, due date and time, reminder, repeat, assignee. Shared by the new-task form and the edit form. */
-export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays, teams = [], kinds = [] }: Props) {
+export function TaskFields({ values, errors, assignees, defaultOwnerId, businessDays, teams = [], kinds = [], repeat = true }: Props) {
   const owner = values.owner_id || defaultOwnerId;
   return (
     <>
@@ -120,7 +122,7 @@ export function TaskFields({ values, errors, assignees, defaultOwnerId, business
           </option>
         ))}
       </SelectField>
-      <RecurrenceFields values={values} errors={errors} restWeekdays={businessDays ? restDays(businessDays.calendar) : undefined} />
+      {repeat ? <RecurrenceFields values={values} errors={errors} restWeekdays={businessDays ? restDays(businessDays.calendar) : undefined} /> : null}
       <SelectField
         key={`owner-${owner}`}
         label="באחריות"
