@@ -1031,8 +1031,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   the contact's (active, not a viewer), else every active owner and admin; never the recorder (if the chosen owner recorded it, nobody).
   Trigger type `payment_confirmed` (deal and contact rules, `min_agorot`): `app.emit_payment_confirmed` writes one outbox event per linked
   record on insert as confirmed or a move recorded -> confirmed (not failed -> confirmed); its AUT-06 retry holds while still confirmed.
-  `app.process_outbox`, `app.automation_event_matches`, `app.automation_run_facts` and `app.automation_event_still_holds` were last
-  redefined in 020780. The run log badge of a quota skip reads "לא רץ: מכסה" (`quotaSkipLabel`, AUT-07).
+  `app.process_outbox`, `app.automation_event_matches`, `app.automation_run_facts` and `app.automation_event_still_holds` were
+  redefined in 020780, then by AUT-04 (020800, 020805). The run log badge of a quota skip reads "לא רץ: מכסה" (`quotaSkipLabel`, AUT-07).
 - Payment allocations (PAY-02, migrations 020790, 020795; owner 21 October 2026, lead's calls 25 October): `public.payment_allocations`
   (payment, document, amount; never deleted: owners/admins undo with `removed_at`, the server releases with `released_at` when the
   payment becomes failed/refunded/cancelled or the document is cancelled; a release is final). Allocating needs
@@ -1262,6 +1262,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   judged at call time (an AUT-06 retry judges them again). A person's write is checked by invoker trigger
   `automations_conditions_check` (hint `automation:conditions`; values are text, gte/lte a number). The engine never raises over a
   stored shape, except the old number case (a gte/lte value that is not a number).
+- Commercial triggers (AUT-04, migrations 020800, 020805; owner 25 October 2026): trigger types quote_viewed|quote_accepted|
+  quote_declined|quote_expired (deal and contact rules, flag `quotes`; quote_accepted takes an optional `min_agorot` against
+  `net_total_agorot`, before VAT), document_recorded (DOC-01 insert, flag `documents`), meeting_scheduled|meeting_cancelled|
+  meeting_no_show (lead/contact/company/deal, core; blocks never; of a series only the first meeting is "scheduled"), and the
+  scheduled debt_overdue (deal and contact; an active tax invoice or proforma past `due_date + days_overdue` with a balance, once per
+  document and due date, from 08:00; flags `documents` and `payments`; pg_cron `crm-debt-automations`, 200 runs per business a pass,
+  scan cursor; `app.document_balance` = `money_allocation_state`'s balance). Events: `app.emit_commercial_event` (one outbox event per
+  linked record, origin automation while an automation runs) from triggers `quotes_emit_events`, `accounting_documents_emit_recorded`,
+  `meetings_emit_events`. Flags: `app.automation_trigger_feature` / `app.automation_trigger_flags(_ok)` (mirrored by `triggerFeature`
+  / `triggerFlags`), checked at save, in `app.process_outbox` and at retry (note `feature_off`). A new trigger type adds its branch to
+  the constraint, `app.automation_event_matches`, `app.process_outbox` (event types), `app.automation_run_facts` and
+  `app.automation_event_still_holds` (test 230). All five plus `app.retry_automation_run` were last redefined in 020805 (event
+  matching and the outbox in 020800).
 - Automation run quota (AUT-07, migration 020735; owner 18 October 2026): `app.automation_run_months` (one row per business and
   month in its zone, no grants) counted by `app.execute_automation` only while the plan has `max_automation_runs_per_month` (a plan
   without a limit neither locks nor counts): the month row is taken FOR UPDATE before the run; at 110% the run is logged `skipped`
