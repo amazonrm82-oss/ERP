@@ -2,7 +2,7 @@ import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
 import type { Json } from "@/lib/database.types";
 
-import { CONDITIONS, TRIGGERS, triggerOf, type Entity } from "./definitions";
+import { CONDITIONS, isPaymentTrigger, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft } from "./create-records";
@@ -57,7 +57,7 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
     if (typeof config === "string") return config;
     Object.assign(trigger_config, config);
   }
-  if (trigger.type === "payment_received" && !lookups.payments) return "תשלומים אינם כלולים בתוכנית של העסק.";
+  if (isPaymentTrigger(trigger.type) && !lookups.payments) return "תשלומים אינם כלולים בתוכנית של העסק.";
   if (trigger.minAmount && rule.trigger_min?.trim()) {
     const agorot = shekelsToAgorot(rule.trigger_min);
     if (agorot === null) return "יש להזין סכום מינימלי תקין.";

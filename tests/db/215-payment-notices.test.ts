@@ -8,11 +8,12 @@ type U = { id: string; email: string };
 type Notice = { user_id: string; type: string; title: string; body: string; entity_type: string; entity_id: string };
 
 /**
- * PAY-07, the notice part: recording a payment tells the owner of its deal, else of its contact, with the existing `system`
- * kind; never the person who recorded it, never a viewer or an inactive member; the amount and the method only.
+ * PAY-07, the notice part: recording a payment tells the owner of its deal, else of its contact, with the kind `payment`
+ * (owner, 21 October 2026, answer 4: it can be muted); an owner who is a viewer or inactive does not count, and with no usable
+ * owner the active owners and admins are told (answer 2); never the person who recorded it; the amount and the method only.
  */
 describe("a payment received tells the record's owner (PAY-07)", () => {
-  let owner: U, rep: U, other: U, viewer: U;
+  let owner: U, admin: U, rep: U, other: U, viewer: U;
   let org: string;
   let pipelineId: string, stageId: string;
 
@@ -67,6 +68,7 @@ describe("a payment received tells the record's owner (PAY-07)", () => {
   beforeAll(async () => {
     owner = await createUser("pn-owner");
     org = await createOrg(owner.id, "עסק ההתראות");
+    admin = await addMember(org, owner.id, "admin", "pn-admin");
     rep = await addMember(org, owner.id, "member", "pn-rep");
     other = await addMember(org, owner.id, "member", "pn-other");
     viewer = await addMember(org, owner.id, "viewer", "pn-viewer");
@@ -81,7 +83,7 @@ describe("a payment received tells the record's owner (PAY-07)", () => {
     const deal = await dealOf(owner, rep.id, contact);
     await pay(owner, { deal, contact, amount: 117050, method: "credit" });
     expect(await notices(deal)).toEqual([
-      { user_id: rep.id, type: "system", title: "התקבל תשלום", body: "1,170.50 ₪ · כרטיס אשראי", entity_type: "deal", entity_id: deal },
+      { user_id: rep.id, type: "payment", title: "התקבל תשלום", body: "1,170.50 ₪ · כרטיס אשראי", entity_type: "deal", entity_id: deal },
     ]);
     // the contact's owner is not told when the deal has an owner
     expect(await notices(contact)).toEqual([]);
@@ -102,21 +104,21 @@ describe("a payment received tells the record's owner (PAY-07)", () => {
     expect(await notices(contact)).toHaveLength(2);
   });
 
-  it("never the recorder, a viewer or an inactive member; nothing for a later change or a cancel", async () => {
-    // the recorder is the owner: nobody is told
+  it("never the recorder; an owner who is a viewer or inactive does not count; nothing for a later change or a cancel", async () => {
+    // the recorder is the owner: nobody is told (they know)
     const mine = await dealOf(owner, owner.id, null);
     await pay(owner, { deal: mine });
     expect(await notices(mine)).toEqual([]);
-    // a viewer owns the contact: nobody is told
+    // a viewer owns the contact: no usable owner, so the owners and admins, but not the recorder (the business owner)
     const seen = await contactOf(owner, viewer.id);
     await pay(owner, { contact: seen });
-    expect(await notices(seen)).toEqual([]);
-    // an inactive owner: nobody is told
+    expect(await notices(seen)).toEqual([expect.objectContaining({ user_id: admin.id, type: "payment", entity_type: "contact", entity_id: seen })]);
+    // an inactive owner of the deal: the owners and admins again
     const deal = await dealOf(owner, other.id, null);
     await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, other.id]));
     try {
       await pay(owner, { deal });
-      expect(await notices(deal)).toEqual([]);
+      expect((await notices(deal)).map((x) => x.user_id)).toEqual([admin.id]);
     } finally {
       await asAdmin((q) => q("update public.memberships set status = 'active' where organization_id = $1 and user_id = $2", [org, other.id]));
     }
@@ -127,5 +129,37 @@ describe("a payment received tells the record's owner (PAY-07)", () => {
     await run(owner, (q) => q("update public.payments set note = 'תוקן' where id = $1", [id]));
     await run(owner, (q) => q("update public.payments set status = 'cancelled', cancel_reason = 'נרשם פעמיים' where id = $1", [id]));
     expect(await notices(told)).toHaveLength(1);
+  });
+
+  it("with no usable owner, the active owners and admins are told, never the recorder (answer 2)", async () => {
+    // a second admin, so "the owners and admins" is more than one person
+    const admin2 = await addMember(org, owner.id, "admin", "pn-admin2");
+    // a deal and a contact with no owner, recorded by an admin: the owner and the other admin, on the deal
+    const contact = await contactOf(owner, rep.id);
+    await asAdmin((q) => q("update public.contacts set owner_id = null where id = $1", [contact]));
+    const deal = await dealOf(owner, rep.id, contact);
+    await asAdmin((q) => q("update public.deals set owner_id = null where id = $1", [deal]));
+    await pay(admin, { deal, contact });
+    const told = await notices(deal);
+    expect(told.map((x) => x.user_id).sort()).toEqual([owner.id, admin2.id].sort());
+    expect(told.every((x) => x.type === "payment" && x.entity_type === "deal")).toBe(true);
+    expect(await notices(contact)).toEqual([]);
+    // a suspended admin is not told
+    await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, admin2.id]));
+    const second = await contactOf(owner, rep.id);
+    await asAdmin((q) => q("update public.contacts set owner_id = null where id = $1", [second]));
+    await pay(owner, { contact: second });
+    expect((await notices(second)).map((x) => x.user_id)).toEqual([admin.id]);
+  });
+
+  it("a person who mutes the payment kind is not told (answer 4)", async () => {
+    await run(rep, (q) => q("select public.set_notification_settings($1, $2)", [["payment"], []]));
+    try {
+      const deal = await dealOf(owner, rep.id, null);
+      await pay(owner, { deal });
+      expect(await notices(deal)).toEqual([]);
+    } finally {
+      await run(rep, (q) => q("select public.set_notification_settings($1, $2)", [[], []]));
+    }
   });
 });

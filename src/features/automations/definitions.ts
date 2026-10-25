@@ -13,7 +13,8 @@ export type TriggerType =
   | "birthday"
   | "task_due_soon"
   | "date_reached"
-  | "payment_received";
+  | "payment_received"
+  | "payment_confirmed";
 
 export type TriggerOption = {
   key: string;
@@ -57,11 +58,19 @@ export const TRIGGERS: TriggerOption[] = [
   // offered only with the `payments` plan flag (Lookups.payments)
   { key: "deal:payment", label: "התקבל תשלום בעסקה", entity: "deal", type: "payment_received", minAmount: true },
   { key: "contact:payment", label: "התקבל תשלום מאיש קשר", entity: "contact", type: "payment_received", minAmount: true },
+  // PAY-07 (owner, 21 October 2026, answer 3): a payment inserted as confirmed, or moved from recorded to confirmed
+  { key: "deal:payment_confirmed", label: "תשלום בעסקה אושר", entity: "deal", type: "payment_confirmed", minAmount: true },
+  { key: "contact:payment_confirmed", label: "תשלום של איש קשר אושר", entity: "contact", type: "payment_confirmed", minAmount: true },
 ];
+
+/** The trigger types that need the `payments` plan flag. */
+export function isPaymentTrigger(type: TriggerType): boolean {
+  return type === "payment_received" || type === "payment_confirmed";
+}
 
 /** PAY-07: whether the builder offers a trigger (payment triggers need the `payments` flag; a saved rule keeps its own). */
 export function triggerOffered(trigger: TriggerOption, lookups: { payments?: boolean }, current?: string): boolean {
-  return trigger.type !== "payment_received" || !!lookups.payments || trigger.key === current;
+  return !isPaymentTrigger(trigger.type) || !!lookups.payments || trigger.key === current;
 }
 
 export type ConditionOption = {

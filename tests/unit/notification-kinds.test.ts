@@ -43,7 +43,8 @@ describe("notification kinds (USR-06)", () => {
     const groups = shownNotificationGroups();
     const shown = groups.flatMap((g) => g.kinds.map((k) => k.key as string));
     expect(shown).toEqual(expect.arrayContaining(["assigned", "lead_new", "mention", "follow", "meeting_scheduled", "meeting_reminder", "automation_failed"]));
-    expect(shown).not.toContain("payment");
+    // PAY-07: payment notices can be muted (owner, 21 October 2026)
+    expect(shown).toContain("payment");
     expect(groups.every((g) => g.kinds.length > 0)).toBe(true);
     // the labels are what the screen and the e2e find the fields by
     const labels = NOTIFICATION_KINDS.map((k) => k.label as string);

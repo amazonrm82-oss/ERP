@@ -21,7 +21,8 @@ export const NOTIFICATION_KINDS = [
   { key: "quote_viewed", label: "לקוח פתח הצעת מחיר", group: "money", shown: true },
   // QUO-09: the customer accepted or declined a quote (built, so it can be muted too)
   { key: "quote", label: "הצעת מחיר אושרה, נדחתה או פג תוקפה", group: "money", shown: true },
-  { key: "payment", label: "תשלום התקבל", group: "money", shown: false },
+  // PAY-07 (owner, 21 October 2026, answer 4): a payment was received
+  { key: "payment", label: "תשלום התקבל", group: "money", shown: true },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },
   { key: "automation_failed", label: "אוטומציה נכשלה (למנהלים)", group: "automations", shown: true },
 ] as const;

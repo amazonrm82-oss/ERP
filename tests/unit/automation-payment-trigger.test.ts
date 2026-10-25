@@ -10,9 +10,12 @@ import { ruleSchema } from "@/features/automations/schema";
 
 // PAY-07 part two: the "payment received" trigger: builder values -> stored setting -> builder values, and the texts.
 
-// found by its name, so renumbering the migration at merge keeps the test
+// the latest migration that sets the trigger types (found by its content, so renumbering at merge keeps the test)
 const ENGINE = readFileSync(
-  `supabase/migrations/${readdirSync("supabase/migrations").find((file) => file.endsWith("_payment_received_trigger.sql"))}`,
+  `supabase/migrations/${readdirSync("supabase/migrations")
+    .sort()
+    .filter((file) => readFileSync(`supabase/migrations/${file}`, "utf8").includes("automations_trigger_type_check check"))
+    .at(-1)}`,
   "utf8",
 );
 
@@ -33,15 +36,18 @@ describe("payment received trigger (PAY-07)", () => {
     expect(allowed).not.toBeNull();
     const types = [...allowed![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     for (const trigger of TRIGGERS) expect(types, trigger.key).toContain(trigger.type);
-    expect(ENGINE).toContain("'deal_lost', 'payment_received')");
+    expect(ENGINE).toContain("'deal_lost', 'payment_received',\n                                   'payment_confirmed')");
   });
 
   it("is offered for deal and contact rules", () => {
-    const payment = TRIGGERS.filter((t) => t.type === "payment_received");
-    expect(payment.map((t) => [t.key, t.entity, t.label])).toEqual([
-      ["deal:payment", "deal", "התקבל תשלום בעסקה"],
-      ["contact:payment", "contact", "התקבל תשלום מאיש קשר"],
+    const payment = TRIGGERS.filter((t) => t.type === "payment_received" || t.type === "payment_confirmed");
+    expect(payment.map((t) => [t.key, t.entity, t.type, t.label])).toEqual([
+      ["deal:payment", "deal", "payment_received", "התקבל תשלום בעסקה"],
+      ["contact:payment", "contact", "payment_received", "התקבל תשלום מאיש קשר"],
+      ["deal:payment_confirmed", "deal", "payment_confirmed", "תשלום בעסקה אושר"],
+      ["contact:payment_confirmed", "contact", "payment_confirmed", "תשלום של איש קשר אושר"],
     ]);
+    expect(payment.every((t) => t.minAmount)).toBe(true);
   });
 
   it("is offered only with the payments flag, while a saved rule keeps its own", () => {
@@ -53,6 +59,15 @@ describe("payment received trigger (PAY-07)", () => {
     expect(triggerOffered(deal, { payments: false }, "deal:payment")).toBe(true);
     expect(triggerOffered(created, { payments: false })).toBe(true);
     expect(toDbRule(parse("deal:payment"), { ...lookups, payments: false })).toBe("תשלומים אינם כלולים בתוכנית של העסק.");
+    const confirmed = TRIGGERS.find((t) => t.key === "contact:payment_confirmed")!;
+    expect(triggerOffered(confirmed, { payments: false })).toBe(false);
+    expect(triggerOffered(confirmed, { payments: false }, "contact:payment_confirmed")).toBe(true);
+    expect(toDbRule(parse("contact:payment_confirmed"), { ...lookups, payments: false })).toBe("תשלומים אינם כלולים בתוכנית של העסק.");
+    expect(store("contact:payment_confirmed", { trigger_min: "20" })).toMatchObject({
+      entity_type: "contact",
+      trigger_type: "payment_confirmed",
+      trigger_config: { min_agorot: 2000 },
+    });
   });
 
   it("stores no minimum, or the minimum in agorot, and reads it back in shekels", () => {
@@ -81,5 +96,6 @@ describe("payment received trigger (PAY-07)", () => {
     const rule = (triggerConfig: Record<string, unknown>) => ({ entity: "deal", triggerType: "payment_received", triggerConfig, conditions: [], actions: [] });
     expect(describeRule(rule({}), lookups).when).toBe("התקבל תשלום בעסקה");
     expect(describeRule(rule({ min_agorot: 100000 }), lookups).when).toBe("התקבל תשלום בעסקה (לפחות ₪1,000)");
+    expect(describeRule({ ...rule({ min_agorot: 5000 }), triggerType: "payment_confirmed" }, lookups).when).toBe("תשלום בעסקה אושר (לפחות ₪50)");
   });
 });

@@ -44,25 +44,25 @@ describe("payment received automations (PAY-07)", () => {
           )
         ).id,
     );
-  const events = (payment: string) =>
+  const events = (payment: string, type = "payment_received") =>
     asAdmin(
       async (q) =>
         (
           await q<Ev>(
-            "select entity_type, entity_id, payload, processed_at, last_error from public.outbox_events where event_type = 'payment_received' and payload ->> 'payment_id' = $1 order by id",
-            [payment],
+            "select entity_type, entity_id, payload, processed_at, last_error from public.outbox_events where event_type = $2 and payload ->> 'payment_id' = $1 order by id",
+            [payment, type],
           )
         ).rows,
     );
-  const rule = (entity: "deal" | "contact", config: Record<string, unknown> = {}) =>
+  const rule = (entity: "deal" | "contact", config: Record<string, unknown> = {}, trigger = "payment_received") =>
     run(
       async (q) =>
         (
           await one<{ id: string }>(
             q,
             `insert into public.automations (organization_id, name, entity_type, trigger_type, trigger_config, actions)
-             values ($1, $2, $3, 'payment_received', $4, $5) returning id`,
-            [org, `תשלום ${++n}`, entity, JSON.stringify(config), JSON.stringify([{ type: "notify", to: "owner", title: "התקבל תשלום" }])],
+             values ($1, $2, $3, $6, $4, $5) returning id`,
+            [org, `תשלום ${++n}`, entity, JSON.stringify(config), JSON.stringify([{ type: "notify", to: "owner", title: "התקבל תשלום" }]), trigger],
           )
         ).id,
     );
@@ -72,7 +72,8 @@ describe("payment received automations (PAY-07)", () => {
   const processFor = async (payment: string) => {
     for (let i = 0; i < 50; i += 1) {
       await asAdmin((q) => q("select app.process_outbox(5000)"));
-      if ((await events(payment)).every((e) => e.processed_at !== null)) return;
+      const all = [...(await events(payment)), ...(await events(payment, "payment_confirmed"))];
+      if (all.every((e) => e.processed_at !== null)) return;
       await asAdmin((q) => q("select pg_sleep(0.1)"));
     }
     throw new Error("events were not processed");
@@ -188,11 +189,81 @@ describe("payment received automations (PAY-07)", () => {
     await run((q) => q("update public.automations set is_active = false where id = $1", [contactRule]));
   });
 
+  it("a payment confirmed (inserted as confirmed, or moved from recorded) writes one confirmed event per record (answer 3)", async () => {
+    const contact = await newContact("אור");
+    const deal = await newDeal(contact);
+    // inserted as confirmed: both kinds of events
+    const direct = await pay(deal, contact, 4000, "confirmed");
+    expect((await events(direct)).map((e) => e.entity_type)).toEqual(["deal", "contact"]);
+    const confirmed = await events(direct, "payment_confirmed");
+    expect(confirmed.map((e) => [e.entity_type, e.entity_id])).toEqual([
+      ["deal", deal],
+      ["contact", contact],
+    ]);
+    for (const e of confirmed) expect(e.payload).toEqual({ payment_id: direct, amount_agorot: 4000, method: "transfer", status: "confirmed" });
+
+    // recorded, then confirmed: the confirmed events come with the move
+    const later = await pay(null, contact, 2500);
+    expect(await events(later, "payment_confirmed")).toEqual([]);
+    await run((q) => q("update public.payments set note = 'בדיקה' where id = $1", [later]));
+    expect(await events(later, "payment_confirmed")).toEqual([]);
+    await run((q) => q("update public.payments set status = 'confirmed' where id = $1", [later]));
+    expect((await events(later, "payment_confirmed")).map((e) => e.entity_type)).toEqual(["contact"]);
+    // a later change of a confirmed payment, or a cancel, writes none
+    await run((q) => q("update public.payments set note = 'עוד' where id = $1", [later]));
+    await run((q) => q("update public.payments set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [later]));
+    expect(await events(later, "payment_confirmed")).toHaveLength(1);
+
+    // failed, then confirmed: not a confirmation of a recorded payment, so no event
+    const failed = await pay(null, contact, 2500);
+    await run((q) => q("update public.payments set status = 'failed' where id = $1", [failed]));
+    await run((q) => q("update public.payments set status = 'confirmed' where id = $1", [failed]));
+    expect(await events(failed, "payment_confirmed")).toEqual([]);
+  });
+
+  it("confirmed rules run on the confirmation only, at or above their minimum; received rules are not run again", async () => {
+    const confirmedRule = await rule("deal", { min_agorot: 3000 }, "payment_confirmed");
+    const receivedRule = await rule("deal");
+    const deal = await newDeal(null);
+    const small = await pay(deal, null, 2999);
+    await run((q) => q("update public.payments set status = 'confirmed' where id = $1", [small]));
+    await processFor(small);
+    expect(await runsOf(confirmedRule, deal)).toBe(0);
+    expect(await runsOf(receivedRule, deal)).toBe(1);
+
+    const big = await pay(deal, null, 3000);
+    await processFor(big);
+    expect(await runsOf(confirmedRule, deal)).toBe(0);
+    expect(await runsOf(receivedRule, deal)).toBe(2);
+    await run((q) => q("update public.payments set status = 'confirmed' where id = $1", [big]));
+    await processFor(big);
+    expect(await runsOf(confirmedRule, deal)).toBe(1);
+    expect(await runsOf(receivedRule, deal)).toBe(2);
+    for (const id of [confirmedRule, receivedRule]) await run((q) => q("update public.automations set is_active = false where id = $1", [id]));
+  });
+
+  it("a payment confirmed while an automation runs is marked and starts no automation", async () => {
+    const confirmedRule = await rule("contact", {}, "payment_confirmed");
+    const contact = await newContact("שקד");
+    const payment = await pay(null, contact, 5000);
+    await asUser(owner.id, async (q) => {
+      await q("select set_config('app.automation_running', 'on', true)");
+      await q("update public.payments set status = 'confirmed' where id = $1", [payment]);
+    });
+    const [ev] = await events(payment, "payment_confirmed");
+    expect(ev.payload.origin).toBe("automation");
+    await processFor(payment);
+    expect(await runsOf(confirmedRule, contact)).toBe(0);
+    await run((q) => q("update public.automations set is_active = false where id = $1", [confirmedRule]));
+  });
+
   it("the event function is a trigger only: no role may run it", async () => {
     await asAdmin(async (q) => {
       for (const role of ["anon", "authenticated", "service_role"]) {
-        const row = await one<{ ok: boolean }>(q, "select has_function_privilege($1, 'app.emit_payment_received()', 'execute') as ok", [role]);
-        expect(row.ok, role).toBe(false);
+        for (const fn of ["app.emit_payment_received()", "app.emit_payment_confirmed()"]) {
+          const row = await one<{ ok: boolean }>(q, "select has_function_privilege($1, $2, 'execute') as ok", [role, fn]);
+          expect(row.ok, `${role} ${fn}`).toBe(false);
+        }
       }
     });
   });

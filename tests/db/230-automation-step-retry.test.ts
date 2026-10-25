@@ -558,6 +558,32 @@ describe("the event check before a retry, per trigger type (AUT-06, answer ב)",
     }
   });
 
+  it("payment_confirmed: the payment is still confirmed (PAY-07 answer 3)", async () => {
+    const auto = await rule("contact", "payment_confirmed");
+    const confirmOn = async (contact: string) => {
+      const payment = await insert("insert into public.payments (organization_id, contact_id, amount_agorot, method, status) values ($1, $2, 5000, 'cash', 'confirmed') returning id", [
+        org,
+        contact,
+      ]);
+      const event = await sqlText(
+        "select id::text as v from public.outbox_events where organization_id = $1 and event_type = 'payment_confirmed' and entity_id = $2 and payload ->> 'payment_id' = $3",
+        [org, contact, payment],
+      );
+      return { payment, key: `event:${event}` };
+    };
+    const holdsContact = await newContact();
+    const holds = await confirmOn(holdsContact);
+    const id = await execute(auto, holdsContact, holds.key);
+    expect((await runRow(id)).event_facts).toEqual({ payment_id: holds.payment });
+    await expectRetried(id, "payment_confirmed holds");
+    // moved back to recorded: the confirmation no longer holds
+    const contact = await newContact();
+    const p = await confirmOn(contact);
+    const id2 = await execute(auto, contact, p.key);
+    await own((q) => q("update public.payments set status = 'recorded' where id = $1", [p.payment]));
+    await expectEventChanged(id2, "payment_confirmed moved back");
+  });
+
   it("a trigger type without a decision keeps no facts and is never retried", async () => {
     const lead = await insertLead(owner.id, org, { full_name: "ליד לסוג לא מוכר" });
     const facts = await asAdmin((q) =>
