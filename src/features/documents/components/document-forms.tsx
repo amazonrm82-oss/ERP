@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
-import { SelectField, TextareaField, TextField } from "@/components/ui/field";
+import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PlusIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
+import { applyCreditLabel } from "@/features/allocations/credit";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import type { FormState } from "@/lib/action-result";
 
@@ -18,11 +19,25 @@ import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, DOCUMENT_
 
 type Subject = MoneySubject;
 
-function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string; subject: Subject; today: string; onDone: () => void; onCancel: () => void }) {
+function RecordForm({
+  orgId,
+  subject,
+  today,
+  credit,
+  onDone,
+  onCancel,
+}: {
+  orgId: string;
+  subject: Subject;
+  today: string;
+  credit: number;
+  onDone: (message: string | null) => void;
+  onCancel: () => void;
+}) {
   const action = recordDocumentAction.bind(null, orgId, subject);
   const [state, formAction] = useActionState<FormState, FormData>(async (prev, formData) => {
     const result = await action(prev, formData);
-    if (result?.ok) onDone();
+    if (result?.ok) onDone(result.message ?? null);
     return result;
   }, null);
   const failure = state && !state.ok ? state : null;
@@ -62,6 +77,15 @@ function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string
           error={errors.due_date}
         />
       ) : null}
+      {credit > 0 && isDocumentType(docType) && takesDueDate(docType) ? (
+        // PAY-03: the customer's credit is allocated to the new document, oldest payment first, up to its amount
+        <Checkbox
+          name="apply_credit"
+          label={applyCreditLabel(credit)}
+          hint="הסכום משויך מהתשלומים הוותיקים קודם, עד סכום המסמך. אפשר לבטל שיוך אחר כך."
+          defaultChecked={values ? values.apply_credit === "on" : true}
+        />
+      ) : null}
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="שומרים…">רישום המסמך</SubmitButton>
         <Button variant="ghost" onClick={onCancel}>
@@ -73,18 +97,44 @@ function RecordForm({ orgId, subject, today, onDone, onCancel }: { orgId: string
 }
 
 /** DOC-01: "רישום מסמך" and its form, for whoever may record documents. */
-export function RecordDocumentButton({ orgId, subject, today }: { orgId: string; subject: Subject; today: string }) {
+export function RecordDocumentButton({ orgId, subject, today, credit = 0 }: { orgId: string; subject: Subject; today: string; credit?: number }) {
   const [open, setOpen] = useState(false);
+  // PAY-03: what the last save said (the credit it allocated), shown beside the button after the window closes
+  const [notice, setNotice] = useState<string | null>(null);
   return (
-    <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+    <span className="flex flex-wrap items-center gap-2">
+      {notice ? (
+        <span role="status" className="text-sm text-ink-soft">
+          {notice}
+        </span>
+      ) : null}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => {
+          setNotice(null);
+          setOpen(true);
+        }}
+      >
         <PlusIcon className="size-4" />
         רישום מסמך
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} title="רישום מסמך שהופק מחוץ למערכת" variant="sheet">
-        {open ? <RecordForm orgId={orgId} subject={subject} today={today} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} /> : null}
+        {open ? (
+          <RecordForm
+            orgId={orgId}
+            subject={subject}
+            today={today}
+            credit={credit}
+            onDone={(message) => {
+              setOpen(false);
+              setNotice(message && message !== "המסמך נרשם." ? message : null);
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        ) : null}
       </Dialog>
-    </>
+    </span>
   );
 }
 

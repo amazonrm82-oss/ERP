@@ -3076,6 +3076,10 @@ export type Database = {
       money_allocation_state: { Args: { p_org: string; p_documents: string[]; p_payments: string[] }; Returns: Json };
       // PAY-02: what the allocation window offers for a payment or a document (invoker)
       money_allocation_candidates: { Args: { p_org: string; p_payment: string | null; p_document: string | null }; Returns: Json };
+      // PAY-03: the credit a document recorded on this deal / contact / company could use (invoker)
+      money_customer_credit: { Args: { p_org: string; p_deal: string | null; p_contact: string | null; p_company: string | null }; Returns: Json };
+      // PAY-03: allocates the same customer's credit to a document, oldest payment first (invoker)
+      money_apply_credit: { Args: { p_org: string; p_document: string; p_max?: number | null }; Returns: Json };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

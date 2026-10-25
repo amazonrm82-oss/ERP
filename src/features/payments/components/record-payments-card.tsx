@@ -4,7 +4,8 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { AllocateButton } from "@/features/allocations/components/allocation-forms";
 import { AllocationRows } from "@/features/allocations/components/allocation-rows";
-import { getAllocationAccess, getMoneyState, listAllocations } from "@/features/allocations/queries";
+import { creditLine, NO_CREDIT } from "@/features/allocations/credit";
+import { getAllocationAccess, getMoneyState, getSubjectCredit, listAllocations } from "@/features/allocations/queries";
 import { agorotInput } from "@/features/deals/recurring";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
@@ -53,9 +54,11 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
   // PAY-02: what each payment allocated to documents, and its credit
   const allocation = await getAllocationAccess(orgId);
   const ids = payments.map((p) => p.id);
-  const [money, allocations] = allocation.inPlan
-    ? await Promise.all([getMoneyState(orgId, [], ids), listAllocations(orgId, { payments: ids })])
-    : [null, []];
+  const [money, allocations, credit] = allocation.inPlan
+    ? await Promise.all([getMoneyState(orgId, [], ids), listAllocations(orgId, { payments: ids }), getSubjectCredit(orgId, subject)])
+    : [null, [], NO_CREDIT];
+  // PAY-03: the customer's credit (this record's, and its company's contacts and deals')
+  const creditText = creditLine(credit);
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -74,6 +77,7 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
         }
       />
       <CardBody className="p-0">
+        {creditText ? <p className="border-b border-line px-4 py-2 text-sm font-medium">{creditText}</p> : null}
         {payments.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-soft">עוד לא נרשמו תשלומים. כאן רושמים כל תשלום שהתקבל: סכום, תאריך ואמצעי.</p>
         ) : (

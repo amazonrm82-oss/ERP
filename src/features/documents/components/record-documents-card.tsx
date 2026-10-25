@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { AllocateButton, LinkProformaButton } from "@/features/allocations/components/allocation-forms";
 import { AllocationRows } from "@/features/allocations/components/allocation-rows";
-import { getAllocationAccess, getMoneyState, listAllocations } from "@/features/allocations/queries";
+import { NO_CREDIT } from "@/features/allocations/credit";
+import { getAllocationAccess, getMoneyState, getSubjectCredit, listAllocations } from "@/features/allocations/queries";
 import { documentStateChip, takesPayments } from "@/features/allocations/state";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
@@ -38,9 +39,14 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
   // PAY-02: what each tax invoice and proforma was paid, and its balance and state
   const allocation = await getAllocationAccess(orgId);
   const ids = documents.map((d) => d.id);
-  const [money, allocations] = allocation.inPlan
-    ? await Promise.all([getMoneyState(orgId, ids, []), listAllocations(orgId, { documents: ids })])
-    : [null, []];
+  const [money, allocations, credit] = allocation.inPlan
+    ? await Promise.all([
+        getMoneyState(orgId, ids, []),
+        listAllocations(orgId, { documents: ids }),
+        // PAY-03: the customer's credit, offered to a new tax invoice or proforma by whoever may allocate
+        access.canRecord && allocation.canAllocate ? getSubjectCredit(orgId, subject) : Promise.resolve(NO_CREDIT),
+      ])
+    : [null, [], NO_CREDIT];
   const numbers = new Map(documents.map((d) => [d.id, d.number]));
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `documents-${subject.id}`;
@@ -49,7 +55,7 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
       <CardHeader
         id={titleId}
         title="מסמכים חשבונאיים"
-        action={access.canRecord ? <RecordDocumentButton orgId={orgId} subject={subject} today={today} /> : null}
+        action={access.canRecord ? <RecordDocumentButton orgId={orgId} subject={subject} today={today} credit={credit.total} /> : null}
       />
       <CardBody className="p-0">
         {documents.length === 0 ? (

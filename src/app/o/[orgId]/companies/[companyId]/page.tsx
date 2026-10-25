@@ -29,6 +29,7 @@ import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
+import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -197,6 +198,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
+          {/* PAY-03: the company's credit balance */}
+          <CompanyCreditCard orgId={orgId} companyId={company.id} />
 
         </div>
       </div>

@@ -6,9 +6,12 @@ import { getDocumentsAccess } from "@/features/documents/queries";
 import { isDocumentType, type DocumentType } from "@/features/documents/schema";
 import { getPaymentsAccess } from "@/features/payments/queries";
 import { isPaymentMethod, type PaymentMethod } from "@/features/payments/schema";
-import { must } from "@/lib/db-read";
+import { moneyRowParents } from "@/features/payments/deal-contact";
+import type { MoneySubject } from "@/features/payments/money-subject";
+import { DbReadError, must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { NO_CREDIT, parseCustomerCredit, type CustomerCredit } from "./credit";
 import { parseCandidates, parseMoneyState, type AllocationCandidates, type DocumentMoneyState, type PaymentMoneyState } from "./state";
 
 // PAY-02: allocations of payments to documents, read with the user's session (RLS: whoever reads the document or the payment).
@@ -38,6 +41,30 @@ export async function getMoneyState(
   const supabase = await createClient();
   const raw = must(await supabase.rpc("money_allocation_state", { p_org: orgId, p_documents: documentIds, p_payments: paymentIds }), "allocation state");
   return parseMoneyState(raw);
+}
+
+/**
+ * PAY-03: the credit a document recorded here could use: the same customer's recorded and confirmed payments, the parts not
+ * allocated yet (the database's rule; RLS decides which payments count). `where` is where such a document hangs (a deal and
+ * its readable contact, a contact), or a company for its card.
+ */
+export async function getCustomerCredit(orgId: string, where: { deal: string | null; contact: string | null; company: string | null }): Promise<CustomerCredit> {
+  if (!where.deal && !where.contact && !where.company) return NO_CREDIT;
+  const supabase = await createClient();
+  const raw = must(
+    await supabase.rpc("money_customer_credit", { p_org: orgId, p_deal: where.deal, p_contact: where.contact, p_company: where.company }),
+    "customer credit",
+  );
+  return parseCustomerCredit(raw);
+}
+
+/** PAY-03: the credit a document recorded on this card's deal, contact or order would be offered. */
+export async function getSubjectCredit(orgId: string, subject: MoneySubject): Promise<CustomerCredit> {
+  const supabase = await createClient();
+  const parents = await moneyRowParents(supabase, orgId, subject);
+  if ("error" in parents) throw new DbReadError("credit parents", { message: parents.error.message ?? "", code: parents.error.code ?? null });
+  if ("missing" in parents) return NO_CREDIT;
+  return getCustomerCredit(orgId, { deal: parents.deal_id, contact: parents.contact_id, company: null });
 }
 
 /** What the allocation window offers for a payment (documents) or a document (payments, and proformas to bill). */

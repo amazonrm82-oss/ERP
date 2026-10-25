@@ -9,9 +9,10 @@ import { fail, formValues, invalid, ok, type FormState } from "@/lib/action-resu
 import { dbErrorMessage } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 import { moneyRowParents } from "@/features/payments/deal-contact";
+import { parseAppliedCredit, recordedMessage, type AppliedCredit } from "@/features/allocations/credit";
 import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
-import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema } from "./schema";
+import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema, takesDueDate } from "./schema";
 
 // DOC-01: recording and cancelling an external accounting document, with the user's session. RLS and the table's trigger
 // decide: owners, admins and managers, or the personal key `documents`; a deal or contact the user reads; the same type and
@@ -39,19 +40,32 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
   const parents = await moneyRowParents(context.supabase, orgId, subject);
   if ("error" in parents) return fail(dbErrorMessage(parents.error), { values: formValues(formData) });
   if ("missing" in parents) return fail(CANNOT, { values: formValues(formData) });
-  const { error } = await context.supabase.from("accounting_documents").insert({
-    organization_id: orgId,
-    ...parents,
-    doc_type: parsed.data.doc_type,
-    number: parsed.data.number,
-    doc_date: parsed.data.doc_date,
-    amount_agorot: parsed.data.amount,
-    // PAY-02 answer 7: empty = from the customer's payment terms
-    ...(parsed.data.due_date ? { due_date: parsed.data.due_date } : {}),
-  });
+  const { data: created, error } = await context.supabase
+    .from("accounting_documents")
+    .insert({
+      organization_id: orgId,
+      ...parents,
+      doc_type: parsed.data.doc_type,
+      number: parsed.data.number,
+      doc_date: parsed.data.doc_date,
+      amount_agorot: parsed.data.amount,
+      // PAY-02 answer 7: empty = from the customer's payment terms
+      ...(parsed.data.due_date ? { due_date: parsed.data.due_date } : {}),
+    })
+    .select("id")
+    .single();
   if (error) return fail(writeError(error), { values: formValues(formData) });
+  // PAY-03: "לקזז מיתרת הזכות" allocates the customer's credit to the new tax invoice or proforma, with the user's session
+  // (the allocation rules and RLS decide). The document stays recorded whatever happens here.
+  let applied: AppliedCredit | null = null;
+  let creditFailed = false;
+  if (formData.get("apply_credit") === "on" && takesDueDate(parsed.data.doc_type)) {
+    const result = await context.supabase.rpc("money_apply_credit", { p_org: orgId, p_document: created.id });
+    if (result.error) creditFailed = true;
+    else applied = parseAppliedCredit(result.data);
+  }
   revalidatePath(pageOf(orgId, subject));
-  return { ok: true, message: "המסמך נרשם." };
+  return { ok: true, message: recordedMessage(applied, creditFailed) };
 }
 
 /** Cancels a recorded document, with a reason (it is never deleted). */
