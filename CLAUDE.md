@@ -1238,6 +1238,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   with its reason (never an error); a run that executed a step adds 1; one `system` notice to active owners at 80% and at 100%.
   Manual runs (`manual:` keys) are neither counted nor stopped. `org_plan_usage` lists it. `app.execute_automation` was last
   redefined in 020735, `public.org_plan_usage` in 020735.
+- Step retries (AUT-06, migration 020755; owner 18, 21 and 25 October 2026): a run that ends failed or partial (not a `manual:` run)
+  is tried again up to 3 times, 15 minutes, 1 hour and 6 hours later (`automation_runs.retry_count/next_retry_at/retry_note/
+  event_facts`, server only; trigger `automation_runs_retry_plan` sets the first time and `event_facts` through
+  `app.automation_run_facts`). pg_cron `crm-automation-retries` (every 5 minutes) runs `app.retry_automation_runs()` (500 a run, one
+  exception block each; a raising retry still counts). Only steps whose status is not `ok` run again. The rule must be on and
+  unchanged, the record live and meeting the conditions, and the event must still hold for its type
+  (`app.automation_event_still_holds`, definer, one branch per trigger type, default false = no retry; test 230 fails when a trigger
+  type has no branch): no_activity = no activity after the run ended (rule of `app.scheduled_no_activity`), stuck_in_stage = same
+  stage and entry time, task_due_soon = open and due unchanged, date_reached = the date unchanged (rule of
+  `app.scheduled_date_reached`), payment_received = not cancelled/failed/refunded, birthday = birth date unchanged. Notes:
+  rule_changed|rule_off|record_gone|conditions|event_changed|org_closed|error. Retries are part of the run: not counted by AUT-07.
+  `app.notify_automation_failed` also tells the rule's creator (active, not owner/admin/viewer), once a day per person and rule.
+  A new trigger type adds a branch to both `app.automation_run_facts` and `app.automation_event_still_holds`.
 - Date triggers (AUT-03 part one, migration 020245): trigger type `date_reached` {field, days 0..365, direction before|after} on
   every record type; fields `app.automation_date_fields(entity)` (mirrored by `DATE_TRIGGER_FIELDS` in
   `src/features/automations/date-trigger.ts`) plus active date/datetime custom fields. Once per record and date (run key), from
