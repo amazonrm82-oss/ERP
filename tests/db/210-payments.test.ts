@@ -84,7 +84,12 @@ describe("payments (PAY-01, PAY-05, PAY-06)", () => {
         (
           await one<{ id: string }>(
             q,
-            "insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, method, installments, reference, note, status) values ($1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'recorded')) returning id",
+            // PAY-04: a person's cheque carries its details (number, bank, branch, due date, status)
+            `insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, method, installments, reference, note, status,
+                                          cheque_number, cheque_bank, cheque_branch, cheque_due_date, cheque_status)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'recorded'),
+                     case when $5 = 'cheque' then '100' end, case when $5 = 'cheque' then '12' end, case when $5 = 'cheque' then '601' end,
+                     case when $5 = 'cheque' then current_date end, case when $5 = 'cheque' then 'in_hand' end) returning id`,
             [
               orgId,
               fields.deal ?? null,

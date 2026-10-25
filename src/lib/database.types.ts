@@ -1837,6 +1837,14 @@ export type PaymentRow = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  // PAY-04: a cheque's details (migration cheques)
+  cheque_number: string | null;
+  cheque_bank: string | null;
+  cheque_bank_name: string | null;
+  cheque_branch: string | null;
+  cheque_due_date: string | null;
+  cheque_status: string | null;
+  cheque_unbounce_reason: string | null;
 };
 
 // DOC-01: an accounting document issued outside the system, recorded on a deal or a contact (migration
@@ -2730,6 +2738,12 @@ export type Database = {
           reference?: string | null;
           note?: string | null;
           status?: string;
+          cheque_number?: string | null;
+          cheque_bank?: string | null;
+          cheque_bank_name?: string | null;
+          cheque_branch?: string | null;
+          cheque_due_date?: string | null;
+          cheque_status?: string | null;
         },
         {
           amount_agorot?: number;
@@ -2740,6 +2754,13 @@ export type Database = {
           note?: string | null;
           status?: string;
           cancel_reason?: string | null;
+          cheque_number?: string | null;
+          cheque_bank?: string | null;
+          cheque_bank_name?: string | null;
+          cheque_branch?: string | null;
+          cheque_due_date?: string | null;
+          cheque_status?: string | null;
+          cheque_unbounce_reason?: string | null;
         }
       >;
       // DOC-01: column grants; a person records and cancels, nothing else (no delete)

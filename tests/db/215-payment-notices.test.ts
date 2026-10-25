@@ -49,7 +49,12 @@ describe("a payment received tells the record's owner (PAY-07)", () => {
         (
           await one<{ id: string }>(
             q,
-            "insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, method, status) values ($1, $2, $3, $4, $5, $6) returning id",
+            // PAY-04: a person's cheque carries its details
+            `insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, method, status,
+                                          cheque_number, cheque_bank, cheque_branch, cheque_due_date, cheque_status)
+             values ($1, $2, $3, $4, $5, $6,
+                     case when $5 = 'cheque' then '100' end, case when $5 = 'cheque' then '12' end, case when $5 = 'cheque' then '601' end,
+                     case when $5 = 'cheque' then current_date end, case when $5 = 'cheque' then 'in_hand' end) returning id`,
             [org, f.deal ?? null, f.contact ?? null, f.amount ?? 117000, f.method ?? "transfer", f.status ?? "recorded"],
           )
         ).id,

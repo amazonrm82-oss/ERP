@@ -15,6 +15,8 @@ import { paymentsPath } from "../paths";
 import type { MoneySubject } from "../money-subject";
 import { getPaymentsAccess, listRecordPayments } from "../queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, receivedTotal, type PaymentStatus } from "../schema";
+import { bankLabel, CHEQUE_STATUS_LABELS } from "../cheques";
+import { ChequeSeriesButton, ChequeStatusSelect } from "./cheque-forms";
 import { CancelPaymentButton, CorrectPaymentButton, PaymentStatusSelect, RecordPaymentButton } from "./payment-forms";
 
 type Props = {
@@ -59,7 +61,18 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
   const total = receivedTotal(payments);
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
-      <CardHeader id={titleId} title="תשלומים" action={access.canRecord ? <RecordPaymentButton orgId={orgId} subject={subject} today={today} /> : null} />
+      <CardHeader
+        id={titleId}
+        title="תשלומים"
+        action={
+          access.canRecord ? (
+            <span className="flex flex-wrap gap-1">
+              <RecordPaymentButton orgId={orgId} subject={subject} today={today} />
+              <ChequeSeriesButton orgId={orgId} subject={subject} today={today} />
+            </span>
+          ) : null
+        }
+      />
       <CardBody className="p-0">
         {payments.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-soft">עוד לא נרשמו תשלומים. כאן רושמים כל תשלום שהתקבל: סכום, תאריך ואמצעי.</p>
@@ -95,6 +108,21 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                         ) : null}
                         {recorder ? ` · נרשם על ידי ${recorder}` : ""}
                       </p>
+                      {payment.cheque ? (
+                        <p className="text-sm break-words text-ink-soft">
+                          {"צ'ק "}
+                          {payment.cheque.number ? <bdi dir="ltr">{payment.cheque.number}</bdi> : null}
+                          {payment.cheque.bank ? ` · ${bankLabel(payment.cheque.bank, payment.cheque.bankName)}` : ""}
+                          {payment.cheque.branch ? ` · סניף ${payment.cheque.branch}` : ""}
+                          {payment.cheque.dueDate ? ` · לפירעון ${formatDate(`${payment.cheque.dueDate}T12:00:00Z`)}` : ""}
+                          {` · ${CHEQUE_STATUS_LABELS[payment.cheque.status]}`}
+                        </p>
+                      ) : null}
+                      {payment.cheque?.unbounceReason ? (
+                        <p className="text-sm break-words text-ink-soft">
+                          הוחזר ממצב &quot;חזר&quot;: <bdi>{payment.cheque.unbounceReason}</bdi>
+                        </p>
+                      ) : null}
                       {payment.note ? <p className="text-sm break-words whitespace-pre-line">{payment.note}</p> : null}
                       {money && !muted ? (
                         <p className="text-sm text-ink-soft">
@@ -140,14 +168,25 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                             available={money?.payments.get(payment.id)?.credit ?? 0}
                           />
                         ) : null}
-                        <PaymentStatusSelect
-                          orgId={orgId}
-                          subject={subject}
-                          paymentId={payment.id}
-                          status={payment.status}
-                          canCorrect={access.canCorrect}
-                          label={label}
-                        />
+                        {payment.cheque && payment.status !== "refunded" ? (
+                          <ChequeStatusSelect
+                            orgId={orgId}
+                            subject={subject}
+                            paymentId={payment.id}
+                            status={payment.cheque.status}
+                            isAdmin={access.canCorrect}
+                            label={label}
+                          />
+                        ) : (
+                          <PaymentStatusSelect
+                            orgId={orgId}
+                            subject={subject}
+                            paymentId={payment.id}
+                            status={payment.status}
+                            canCorrect={access.canCorrect}
+                            label={label}
+                          />
+                        )}
                         {access.canCorrect ? (
                           <>
                             <CorrectPaymentButton
@@ -163,6 +202,12 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                                 installments: payment.installments ? String(payment.installments) : "1",
                                 reference: payment.reference ?? "",
                                 note: payment.note ?? "",
+                                cheque_number: payment.cheque?.number ?? "",
+                                cheque_bank: payment.cheque?.bank ?? "",
+                                cheque_bank_name: payment.cheque?.bankName ?? "",
+                                cheque_branch: payment.cheque?.branch ?? "",
+                                cheque_due_date: payment.cheque?.dueDate ?? "",
+                                cheque_status: payment.cheque?.status ?? "",
                               }}
                             />
                             <CancelPaymentButton orgId={orgId} subject={subject} paymentId={payment.id} label={label} />

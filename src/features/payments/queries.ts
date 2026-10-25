@@ -14,6 +14,7 @@ import { readAllPages } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
+import { isChequeStatus, type ChequeStatus } from "./cheques";
 import { PAYMENT_DEFAULT_SORT, PAYMENT_SORT_COLUMNS, type PaymentListFilters } from "./list";
 import { isPaymentMethod, isPaymentStatus, receivedTotal, type PaymentMethod, type PaymentStatus } from "./schema";
 
@@ -36,6 +37,16 @@ export type Payment = {
   updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  // PAY-04: a cheque's details (null on any other method, and on a cheque recorded before PAY-04)
+  cheque: {
+    number: string | null;
+    bank: string | null;
+    bankName: string | null;
+    branch: string | null;
+    dueDate: string | null;
+    status: ChequeStatus;
+    unbounceReason: string | null;
+  } | null;
 };
 
 export type PaymentsSubject = MoneySubject;
@@ -66,7 +77,7 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
     await supabase
       .from("payments")
       .select(
-        "id, amount_agorot, paid_on, method, installments, reference, note, status, cancel_reason, cancelled_at, cancelled_by, created_by, updated_by, created_at, updated_at",
+        "id, amount_agorot, paid_on, method, installments, reference, note, status, cancel_reason, cancelled_at, cancelled_by, created_by, updated_by, created_at, updated_at, cheque_number, cheque_bank, cheque_bank_name, cheque_branch, cheque_due_date, cheque_status, cheque_unbounce_reason",
       )
       .eq("organization_id", orgId)
       .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
@@ -95,6 +106,17 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
             updatedBy: row.updated_by,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
+            cheque: isChequeStatus(row.cheque_status)
+              ? {
+                  number: row.cheque_number,
+                  bank: row.cheque_bank,
+                  bankName: row.cheque_bank_name,
+                  branch: row.cheque_branch,
+                  dueDate: row.cheque_due_date,
+                  status: row.cheque_status,
+                  unbounceReason: row.cheque_unbounce_reason,
+                }
+              : null,
           },
         ]
       : [],
@@ -204,4 +226,70 @@ export async function listPaymentTotal(orgId: string, filters: PaymentListFilter
   );
   const counted = rows.flatMap((row) => (isPaymentStatus(row.status) ? [{ amountAgorot: Number(row.amount_agorot), status: row.status }] : []));
   return { count: counted.length, agorot: receivedTotal(counted), complete };
+}
+
+// ----------------------------------------------------------------------------
+// PAY-04 answer 7: the deferred cheques (in hand or deposited), by due date
+// ----------------------------------------------------------------------------
+
+export type DeferredCheque = {
+  id: string;
+  amountAgorot: number;
+  number: string | null;
+  bank: string | null;
+  bankName: string | null;
+  branch: string | null;
+  dueDate: string;
+  status: ChequeStatus;
+  dealId: string | null;
+  contactId: string | null;
+  customer: string | null;
+};
+
+// the screen reads at most this many cheques; past it the screen says the list is partial
+export const DEFERRED_CHEQUES_LIMIT = 2000;
+
+/** The cheques of the business the user reads that are not cashed yet (in hand or deposited), earliest due date first. */
+export async function listDeferredCheques(orgId: string): Promise<{ cheques: DeferredCheque[]; complete: boolean }> {
+  const supabase = await createClient();
+  const { rows, complete } = await readAllPages(
+    async (from, to) =>
+      must(
+        await supabase
+          .from("payments")
+          .select("id, amount_agorot, cheque_number, cheque_bank, cheque_bank_name, cheque_branch, cheque_due_date, cheque_status, deal_id, contact_id")
+          .eq("organization_id", orgId)
+          .eq("method", "cheque")
+          .in("cheque_status", ["in_hand", "deposited"])
+          .in("status", ["recorded", "confirmed"])
+          .order("cheque_due_date")
+          .order("id")
+          .range(from, to),
+        "deferred cheques",
+      ),
+    { limit: DEFERRED_CHEQUES_LIMIT },
+  );
+  const customers = await customerNames(orgId, rows);
+  return {
+    complete,
+    cheques: rows.flatMap((row): DeferredCheque[] =>
+      isChequeStatus(row.cheque_status) && row.cheque_due_date
+        ? [
+            {
+              id: row.id,
+              amountAgorot: Number(row.amount_agorot),
+              number: row.cheque_number,
+              bank: row.cheque_bank,
+              bankName: row.cheque_bank_name,
+              branch: row.cheque_branch,
+              dueDate: row.cheque_due_date,
+              status: row.cheque_status,
+              dealId: row.deal_id,
+              contactId: row.contact_id,
+              customer: customers(row),
+            },
+          ]
+        : [],
+    ),
+  };
 }

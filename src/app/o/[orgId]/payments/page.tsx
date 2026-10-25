@@ -16,7 +16,7 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { PAYMENT_STATUS_TONES, paymentCounts, paymentHome, PaymentsTable } from "@/features/payments/components/payments-table";
 import { PAYMENT_DEFAULT_SORT, paymentListFilters, paymentListHref, paymentSortStartsAscending, type PaymentSortKey } from "@/features/payments/list";
-import { paymentsPath } from "@/features/payments/paths";
+import { chequesPath, paymentsPath } from "@/features/payments/paths";
 import { getPaymentsAccess, listPayments, listPaymentTotal, PAYMENT_TOTALS_LIMIT } from "@/features/payments/queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -97,7 +97,15 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
       <PageHeader
         title="תשלומים"
         description={texts.description}
-        actions={exportAllowed ? <ExportMenu href={exportHref(paymentsPath(orgId), paymentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
+        actions={
+          <span className="flex flex-wrap items-center gap-2">
+            {/* PAY-04 answer 7 */}
+            <Link href={chequesPath(orgId)} className={buttonClasses("secondary", "sm")}>
+              צ&apos;קים דחויים
+            </Link>
+            {exportAllowed ? <ExportMenu href={exportHref(paymentsPath(orgId), paymentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
+          </span>
+        }
       />
       <SavedViewsBar
         orgId={orgId}

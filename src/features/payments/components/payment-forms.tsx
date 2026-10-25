@@ -13,6 +13,7 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 
 import { cancelPaymentAction, correctPaymentAction, recordPaymentAction, setPaymentStatusAction } from "../actions";
+import { CHEQUE_BANK_NAME_MAX, CHEQUE_NUMBER_MAX, CHEQUE_STATUS_LABELS, CHEQUE_STATUSES, ISRAELI_BANKS, OTHER_BANK, OTHER_BANK_LABEL } from "../cheques";
 import type { MoneySubject } from "../money-subject";
 import {
   CANCEL_REASON_MAX,
@@ -38,7 +39,88 @@ export type PaymentFormValues = {
   installments: string;
   reference: string;
   note: string;
+  // PAY-04
+  cheque_number?: string;
+  cheque_bank?: string;
+  cheque_bank_name?: string;
+  cheque_branch?: string;
+  cheque_due_date?: string;
+  cheque_status?: string;
 };
+
+/** PAY-04: a cheque's details (answer 5: a listed bank and a 3-digit branch, or "other" with the bank's name). */
+export function ChequeFieldsInputs({
+  values,
+  errors,
+  today,
+  withStatus,
+  numberLabel = "מספר הצ'ק",
+}: {
+  values?: Partial<Record<string, string>>;
+  errors: Record<string, string>;
+  today: string;
+  // the status is chosen on a new cheque; afterwards it moves on the card (hidden here, kept as it is)
+  withStatus: boolean;
+  numberLabel?: string;
+}) {
+  const [bank, setBank] = useState<string>(values?.cheque_bank ?? "");
+  return (
+    <>
+      <TextField
+        label={numberLabel}
+        name="cheque_number"
+        required
+        dir="ltr"
+        inputMode="numeric"
+        maxLength={CHEQUE_NUMBER_MAX}
+        defaultValue={values?.cheque_number ?? ""}
+        error={errors.cheque_number}
+      />
+      <SelectField label="בנק" name="cheque_bank" required value={bank} onChange={(event) => setBank(event.target.value)} error={errors.cheque_bank}>
+        <option value="">בחירה</option>
+        {ISRAELI_BANKS.map((b) => (
+          <option key={b.code} value={b.code}>
+            {b.name} ({b.code})
+          </option>
+        ))}
+        <option value={OTHER_BANK}>{OTHER_BANK_LABEL}</option>
+      </SelectField>
+      {bank === OTHER_BANK ? (
+        <TextField
+          label="שם הבנק"
+          name="cheque_bank_name"
+          required
+          maxLength={CHEQUE_BANK_NAME_MAX}
+          defaultValue={values?.cheque_bank_name ?? ""}
+          error={errors.cheque_bank_name}
+        />
+      ) : null}
+      <TextField
+        label="סניף"
+        name="cheque_branch"
+        required={bank !== OTHER_BANK}
+        dir="ltr"
+        inputMode="numeric"
+        maxLength={3}
+        defaultValue={values?.cheque_branch ?? ""}
+        hint={bank === OTHER_BANK ? "3 ספרות, אפשר להשאיר ריק." : "3 ספרות."}
+        error={errors.cheque_branch}
+      />
+      <DateField label="תאריך פירעון" name="cheque_due_date" required defaultValue={values?.cheque_due_date ?? today} error={errors.cheque_due_date} />
+      {withStatus ? (
+        <SelectField label="מצב הצ'ק" name="cheque_status" required defaultValue={values?.cheque_status ?? "in_hand"} error={errors.cheque_status}>
+          {CHEQUE_STATUSES.filter((s) => s !== "bounced").map((s) => (
+            <option key={s} value={s}>
+              {CHEQUE_STATUS_LABELS[s]}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <input type="hidden" name="cheque_status" value={values?.cheque_status ?? ""} />
+      )}
+    </>
+  );
+}
 
 function PaymentFields({
   values,
@@ -84,6 +166,7 @@ function PaymentFields({
           error={errors.installments}
         />
       ) : null}
+      {method === "cheque" ? <ChequeFieldsInputs values={values} errors={errors} today={today} withStatus={isNew || !values?.cheque_status} /> : null}
       <TextField
         label="אסמכתא"
         name="reference"
@@ -94,7 +177,7 @@ function PaymentFields({
         error={errors.reference}
       />
       <TextareaField label="הערה" name="note" rows={2} maxLength={PAYMENT_NOTE_MAX} defaultValue={values?.note ?? ""} error={errors.note} />
-      {isNew ? (
+      {isNew && method !== "cheque" ? (
         <SelectField label="מצב" name="status" defaultValue={values?.status ?? "recorded"}>
           {NEW_PAYMENT_STATUSES.map((s) => (
             <option key={s} value={s}>
