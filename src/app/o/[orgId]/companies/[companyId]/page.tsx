@@ -105,6 +105,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           phone={company.phone}
           phoneE164={company.phone_e164}
           email={company.email}
+          // TASK-02: dialling offers to log the call, as on the lead and contact pages
+          callLog={context.canWrite ? { orgId, subject: { kind: "company", id: company.id }, name: company.name } : undefined}
           // a company has no first name: {שם פרטי} stays for the person to complete
           whatsappLog={
             context.canWrite
