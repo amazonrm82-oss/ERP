@@ -539,6 +539,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_automation_run_quota.sql",
       // ORD-06 part two grants insert (order_id) again after _accounting_documents.sql and _payments.sql re-ran their grants
       "_order_documents_payments.sql",
+      // DOC-04 redefines app.audit_erase_core() of _erase_deal_documents_payments.sql last (the cancel reason in the timeline entries)
+      "_money_timeline.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

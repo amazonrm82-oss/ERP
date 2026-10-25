@@ -8,6 +8,7 @@ import { must } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
+import { moneyEntryKind, moneyEntryLabel } from "./money-entries";
 import { quoteEntryBy, quoteEntryKind, quoteEntryText } from "./quote-entries";
 import { conversionText, responsePassText, stageChangeText } from "./system-entries";
 import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
@@ -145,8 +146,12 @@ export async function getTimeline(
     let text = body;
     let isUserContent = body !== "";
     const quoteKind = quoteEntryKind(activity.type, metaString(activity.metadata, "kind"));
+    const moneyKind = moneyEntryKind(activity.type, metaString(activity.metadata, "kind"));
 
-    if (quoteKind) {
+    if (moneyKind) {
+      // DOC-04: written by the database when a document is recorded or cancelled, or a payment received or cancelled
+      isUserContent = false;
+    } else if (quoteKind) {
       // QUO-16: written by the database when the quote was sent, accepted, declined, expired or cancelled (QUO-11); shown as an
       // event, never as a note to edit, even though "sent" is stored as the sender's note so it counts as contact with the customer
       text = quoteEntryText(
@@ -209,13 +214,15 @@ export async function getTimeline(
       // a quote entry is an event on screen: no edit, delete or pin buttons
       type: quoteKind ? "system" : activity.type,
       // WA-01: a message opened from the record's WhatsApp button
-      label: quoteKind
-        ? "הצעת מחיר"
-        : activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
-          ? "נשלחה הודעת WhatsApp"
-          : logged
-            ? logged.name
-            : (TYPE_LABELS[activity.type] ?? "פעילות"),
+      label: moneyKind
+        ? moneyEntryLabel(moneyKind)
+        : quoteKind
+          ? "הצעת מחיר"
+          : activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
+            ? "נשלחה הודעת WhatsApp"
+            : logged
+              ? logged.name
+              : (TYPE_LABELS[activity.type] ?? "פעילות"),
       // TASK-08: the icon of the business's type (logged kinds only)
       icon: logged?.icon ?? null,
       text,
