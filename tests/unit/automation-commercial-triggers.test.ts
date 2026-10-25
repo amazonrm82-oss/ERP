@@ -49,7 +49,14 @@ describe("commercial triggers (AUT-04)", () => {
       expect(allowed, type).toContain(`'${type}'`);
       expect(outbox, type).toContain(`'${type}'`);
     }
-    for (const trigger of TRIGGERS) expect(allowed, trigger.key).toContain(`'${trigger.type}'`);
+    // every builder trigger is in the latest constraint (a later migration may add types)
+    const latestAllowed = readdirSync("supabase/migrations")
+      .sort()
+      .map((file) => readFileSync(`supabase/migrations/${file}`, "utf8"))
+      .filter((text) => text.includes("automations_trigger_type_check check"))
+      .at(-1)!
+      .match(/automations_trigger_type_check check \(trigger_type = any \(array\[([^\]]*)\]/)![1];
+    for (const trigger of TRIGGERS) expect(latestAllowed, trigger.key).toContain(`'${trigger.type}'`);
   });
 
   it("quote triggers on deals and contacts, documents on deals and contacts, meetings on every linked record type", () => {

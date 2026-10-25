@@ -10,14 +10,17 @@ import { ruleSchema } from "@/features/automations/schema";
 
 // PAY-07 part two: the "payment received" trigger: builder values -> stored setting -> builder values, and the texts.
 
-// the latest migration that sets the trigger types (found by its content, so renumbering at merge keeps the test)
-const ENGINE = readFileSync(
-  `supabase/migrations/${readdirSync("supabase/migrations")
-    .sort()
-    .filter((file) => readFileSync(`supabase/migrations/${file}`, "utf8").includes("automations_trigger_type_check check"))
-    .at(-1)}`,
-  "utf8",
-);
+// the latest migration holding a text (found by its content, so renumbering at merge keeps the test)
+const latest = (text: string) =>
+  readFileSync(
+    `supabase/migrations/${readdirSync("supabase/migrations")
+      .sort()
+      .filter((file) => readFileSync(`supabase/migrations/${file}`, "utf8").includes(text))
+      .at(-1)}`,
+    "utf8",
+  );
+// the latest migration that sets the trigger types
+const ENGINE = latest("automations_trigger_type_check check");
 
 const lookups: Lookups = { statuses: [], sources: [], tags: [], pipelines: [], members: [], teams: [], reasons: [], fields: {}, payments: true };
 
@@ -36,8 +39,9 @@ describe("payment received trigger (PAY-07)", () => {
     expect(allowed).not.toBeNull();
     const types = [...allowed![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     for (const trigger of TRIGGERS) expect(types, trigger.key).toContain(trigger.type);
-    // the outbox offers the event to both payment rule types
-    const offered = ENGINE.match(/and a\.trigger_type in \(([^)]*)\)/);
+    // the outbox (its latest definition) offers the event to both payment rule types
+    const outbox = latest("create or replace function app.process_outbox");
+    const offered = outbox.match(/and a\.trigger_type in \(([^)]*)\)/);
     expect(offered).not.toBeNull();
     expect(offered![1]).toContain("'payment_received'");
     expect(offered![1]).toContain("'payment_confirmed'");

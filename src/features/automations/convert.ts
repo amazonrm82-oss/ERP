@@ -3,7 +3,7 @@ import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 import type { Json } from "@/lib/database.types";
 
 import { conditionsFromDb, conditionsToDb, type ConditionItem } from "./conditions";
-import { FEATURE_MISSING, TRIGGERS, triggerFeature, triggerOf, type Entity } from "./definitions";
+import { DEBT_OVERDUE_MAX_DAYS, FEATURE_MISSING, TRIGGERS, triggerFlags, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft } from "./create-records";
@@ -59,8 +59,14 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
     Object.assign(trigger_config, config);
   }
   // PAY-07, AUT-04: a trigger of a module needs its plan flag
-  const feature = triggerFeature(trigger.type);
-  if (feature && !lookups[feature]) return FEATURE_MISSING[feature];
+  const missing = triggerFlags(trigger.type).find((flag) => !lookups[flag]);
+  if (missing) return FEATURE_MISSING[missing];
+  // AUT-04 follow-up: days after the due date (0 = the day after it)
+  if (trigger.overdue) {
+    const days = rule.trigger_days ?? 0;
+    if (days > DEBT_OVERDUE_MAX_DAYS) return `עד ${DEBT_OVERDUE_MAX_DAYS} ימים.`;
+    trigger_config.days_overdue = days;
+  }
   if (trigger.minAmount && rule.trigger_min?.trim()) {
     const agorot = shekelsToAgorot(rule.trigger_min);
     if (agorot === null) return "יש להזין סכום מינימלי תקין.";
@@ -229,6 +235,7 @@ export function fromDbRule(
     triggerTo: str(rule.triggerConfig.to),
     triggerNumber: trigger.number ? str(rule.triggerConfig[trigger.number.key] ?? trigger.number.default) : "",
     ...(date ? { triggerField: date.field, triggerDays: date.days, triggerDirection: date.direction } : {}),
+    ...(trigger.overdue ? { triggerDays: typeof rule.triggerConfig.days_overdue === "number" ? String(rule.triggerConfig.days_overdue) : "0" } : {}),
     ...(trigger.minAmount
       ? { triggerMin: typeof rule.triggerConfig.min_agorot === "number" ? String(rule.triggerConfig.min_agorot / 100) : "" }
       : {}),

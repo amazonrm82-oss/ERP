@@ -85,6 +85,8 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   const [dateField, setDateField] = useState(initial?.triggerField ?? "");
   const [dateDirection, setDateDirection] = useState(initial?.triggerDirection ?? "before");
   const [dateDays, setDateDays] = useState(initial?.triggerDays ?? "1");
+  // AUT-04 follow-up: days after a debt's due date
+  const [overdueDays, setOverdueDays] = useState(initial?.triggerDays ?? "0");
   // PAY-07: the minimum payment in shekels ("" = any amount)
   const [triggerMin, setTriggerMin] = useState(initial?.triggerMin ?? "");
   const [conditions, setConditions] = useState<ConditionItem[]>(initial?.conditions ?? []);
@@ -130,6 +132,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
       ? { trigger_field: dateField, trigger_direction: dateDirection, ...(dateDirection === "on" ? {} : { trigger_days: dateDays }) }
       : {}),
     ...(trigger.minAmount && triggerMin.trim() ? { trigger_min: triggerMin } : {}),
+    ...(trigger.overdue ? { trigger_days: overdueDays.trim() || "0" } : {}),
     conditions: conditionsPayload(conditions),
     actions: actions.map(clean),
   });
@@ -167,6 +170,21 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
           ) : null}
           {trigger.number ? (
             <TextField label={trigger.number.label} value={triggerNumber} onChange={(e) => setTriggerNumber(e.target.value)} dir="ltr" inputMode="numeric" className="max-w-40" />
+          ) : null}
+          {trigger.overdue ? (
+            <div className="space-y-1">
+              <TextField
+                label="ימים אחרי מועד התשלום"
+                value={overdueDays}
+                onChange={(e) => setOverdueDays(e.target.value)}
+                dir="ltr"
+                inputMode="numeric"
+                className="max-w-40"
+              />
+              <p className="text-sm text-ink-soft">
+                רץ פעם אחת לכל חשבונית מס או חשבון עסקה שמועד התשלום שלה עבר ונשארה בה יתרה, החל מ-8:00 בבוקר. 0 = מהיום שאחרי המועד.
+              </p>
+            </div>
           ) : null}
           {trigger.minAmount ? (
             <div className="space-y-1">

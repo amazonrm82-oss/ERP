@@ -23,7 +23,9 @@ export type TriggerType =
   | "document_recorded"
   | "meeting_scheduled"
   | "meeting_cancelled"
-  | "meeting_no_show";
+  | "meeting_no_show"
+  // AUT-04 follow-up: a tax invoice or proforma passed its due date with a balance left
+  | "debt_overdue";
 
 /** AUT-04: the plan flags a trigger may need (app.automation_trigger_feature). */
 export type TriggerFeature = "payments" | "quotes" | "documents";
@@ -41,6 +43,8 @@ export type TriggerOption = {
   date?: true;
   // PAY-07: an optional minimum amount in shekels (stored as trigger_config.min_agorot); AUT-04: also "quote accepted", before VAT
   minAmount?: true;
+  // AUT-04 follow-up: days after the due date (stored as trigger_config.days_overdue, 0..365)
+  overdue?: true;
 };
 
 export const TRIGGERS: TriggerOption[] = [
@@ -98,7 +102,13 @@ export const TRIGGERS: TriggerOption[] = [
   { key: "contact:meeting_no_show", label: "איש הקשר לא הגיע לפגישה", entity: "contact", type: "meeting_no_show" },
   { key: "company:meeting_no_show", label: "פגישה עם החברה: הלקוח לא הגיע", entity: "company", type: "meeting_no_show" },
   { key: "deal:meeting_no_show", label: "פגישה בעסקה: הלקוח לא הגיע", entity: "deal", type: "meeting_no_show" },
+  // AUT-04 follow-up: a tax invoice or proforma of the deal / contact is past its due date with a balance left
+  { key: "deal:debt_overdue", label: "חוב בעסקה עבר את מועדו", entity: "deal", type: "debt_overdue", overdue: true },
+  { key: "contact:debt_overdue", label: "חוב של איש קשר עבר את מועדו", entity: "contact", type: "debt_overdue", overdue: true },
 ];
+
+/** The most days after the due date a debt rule may wait (app.scheduled_debt_overdue). */
+export const DEBT_OVERDUE_MAX_DAYS = 365;
 
 /** The plan flag a trigger type needs, or null for a core trigger (mirrors app.automation_trigger_feature). */
 export function triggerFeature(type: TriggerType): TriggerFeature | null {
@@ -115,10 +125,16 @@ export const FEATURE_MISSING: Record<TriggerFeature, string> = {
   documents: "מסמכים אינם כלולים בתוכנית של העסק.",
 };
 
-/** Whether the builder offers a trigger: one that needs a plan flag only with it; a saved rule keeps its own. */
+/** Every plan flag a trigger type needs (mirrors app.automation_trigger_flags): debt needs documents and payments. */
+export function triggerFlags(type: TriggerType): TriggerFeature[] {
+  if (type === "debt_overdue") return ["documents", "payments"];
+  const feature = triggerFeature(type);
+  return feature ? [feature] : [];
+}
+
+/** Whether the builder offers a trigger: one that needs plan flags only with all of them; a saved rule keeps its own. */
 export function triggerOffered(trigger: TriggerOption, lookups: Partial<Record<TriggerFeature, boolean>>, current?: string): boolean {
-  const feature = triggerFeature(trigger.type);
-  return feature === null || !!lookups[feature] || trigger.key === current;
+  return triggerFlags(trigger.type).every((flag) => !!lookups[flag]) || trigger.key === current;
 }
 
 export type ConditionOption = {

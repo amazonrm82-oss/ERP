@@ -28,6 +28,10 @@ export function describeRule(
     // AUT-04 (owner, answer 4 ב): a quote's minimum is before VAT
     when += ` (לפחות ₪${(rule.triggerConfig.min_agorot / 100).toLocaleString("he-IL")}${trigger.type === "quote_accepted" ? " לפני מע״מ" : ""})`;
   }
+  // AUT-04 follow-up: days after the due date
+  if (trigger?.overdue && typeof rule.triggerConfig.days_overdue === "number" && rule.triggerConfig.days_overdue > 0) {
+    when += ` (${rule.triggerConfig.days_overdue} ימים אחרי המועד)`;
+  }
   if (trigger?.date) {
     when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
   }
