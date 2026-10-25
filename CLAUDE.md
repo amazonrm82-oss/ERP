@@ -1238,6 +1238,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 020610 (DEAL-08 follow-up) `create_deal` takes `pipeline: "source"` and `copy_from_source: true` (deal triggers): the source's
   process, its recurring revenue for the next period (term rounded to whole months) and its lines, copied as the server (the JWT claims
   are cleared around the copy and restored); `app.run_automation_actions` was last redefined in 020610.
+- Automation conditions (AUT-05, migration 020785; owner 18 and 25 October 2026): `automations.conditions` items are a leaf
+  {field, op, value?, on?} (`on`: contact|company|deal|lead = the record the rule's record's `<on>_id` points at), an "or" group
+  {any: [2..10 leaves]}, working hours {kind: hours, value: in|out} or a weekday {kind: weekday, days: [0..6]}; at most 10 items and
+  20 leaves. Pure rule `app.automation_condition_tree` = `conditionTreeMatch()` (`src/features/automations/condition-match.ts`), both
+  run `tests/unit/fixtures/automation-conditions.json` (unit test and test 231). `app.automation_conditions_match` (same signature,
+  now stable definer) reads only the named linked records, org-scoped; a missing or binned linked record fails every condition on it
+  (owner, (א)); hours = `app.member_in_hours(org, owner, now)` (leave = outside, owner (א)), no owner = `app.automation_org_in_hours`;
+  judged at call time (an AUT-06 retry judges them again). A person's write is checked by invoker trigger
+  `automations_conditions_check` (hint `automation:conditions`; values are text, gte/lte a number). The engine never raises over a
+  stored shape, except the old number case (a gte/lte value that is not a number).
 - Automation run quota (AUT-07, migration 020735; owner 18 October 2026): `app.automation_run_months` (one row per business and
   month in its zone, no grants) counted by `app.execute_automation` only while the plan has `max_automation_runs_per_month` (a plan
   without a limit neither locks nor counts): the month row is taken FOR UPDATE before the run; at 110% the run is logged `skipped`
