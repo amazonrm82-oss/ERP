@@ -1047,6 +1047,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (invoker) gives paid/balance/state and allocated/credit. `accounting_documents.due_date` (020795): tax invoice or proforma only,
   filled on insert from the customer's terms (`app.document_customer_terms` + `app.payment_due_date`), frozen once cancelled (hint
   `document:due_date`); "באיחור" = due before today with a balance. A payment correction below its allocations: `payment:allocated`.
+- Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
+  of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
+  cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
+  `ISRAELI_BANKS`, or 'other' with a name). Definer trigger `app.payments_cheque` (`payments_a_cheque`, before `payments_check`):
+  the cheque status sets the payment's (in_hand/deposited = recorded, cleared = confirmed, bounced = failed; setting those directly
+  is refused, `cheque:status`); recorders move it; details are owner/admin corrections; leaving bounced needs owner/admin and a
+  reason (`cheque:bounced|reason`); a cancelled or refunded payment's cheque never changes; server passes only with the cheque
+  untouched or an erasure emptying number/name/reason. `payments_emit_confirmed` and `payments_timeline` are plain "after insert or
+  update" (a derived status is caught). Reminder: pg_cron `crm-cheque-reminders` (`app.send_cheque_reminders`, kind `payment`, the
+  recorder else owners/admins, once per cheque and day in `app.cheque_reminders_sent`, from 08:00). `app.audit_erase_core` was last
+  redefined in 020815 (cheque number, foreign bank name, unbounce reason and the reminders' number). DOC-04 follow-up (020810):
+  timeline kinds `payment_failed`, `payment_refunded`, and `payment_received` again on failed -> recorded/confirmed.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
@@ -1063,7 +1075,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   from, when recorded at or before that unlink entry (RVW-45; the app now also saves the deal's readable contact on a new
   document). `public.privacy_erase_person` erases every audit entry with a `name` of the deals it renames (RVW-46).
   Since 020725 it also replaces, in that deal's notices, every old name of a renamed deal that held the person's name
-  (`app.person_erase_name_hit`) with the new name. `app.audit_erase_core` was last redefined in 020750 (DOC-04), `public.privacy_erase_person`
+  (`app.person_erase_name_hit`) with the new name. `app.audit_erase_core` was last redefined in 020815 (PAY-04), `public.privacy_erase_person`
   in 020725. Audit labels for person_erase/quote_link/order_link and every P0001 hint's message are checked by
   `tests/unit/rvw50-labels-hints-links.test.ts` (a new hint needs a message, a screen that answers it, or a server-only entry).
 - Order answer on the timeline (ORD-05b, migration 020650; owner 20 October 2026): `public.order_public_decide` writes one `system` entry
