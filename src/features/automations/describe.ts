@@ -1,5 +1,6 @@
-import { ACTION_LABELS, CONDITIONS, TASK_TYPES, triggerOf, type ActionType, type Entity } from "./definitions";
+import { ACTION_LABELS, triggerOf, type ActionType, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
+import { describeConditions } from "./conditions";
 import { describeCreateDeal } from "./create-records";
 import { describeDateTrigger } from "./date-trigger";
 import { describeSetField } from "./set-field";
@@ -30,26 +31,8 @@ export function describeRule(
     when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
   }
 
-  const conditions = rule.conditions.map((c) => {
-    const option = CONDITIONS.find((o) => o.field === c.field && o.op === c.op);
-    if (!option) return "תנאי לא מוכר";
-    switch (option.input) {
-      case "source":
-        return `${option.label} ${nameIn(lookups.sources, c.value)}`;
-      case "status":
-        return `${option.label} ${nameIn(lookups.statuses, c.value)}`;
-      case "tag":
-        return `${option.label} ${nameIn(lookups.tags, c.value)}`;
-      case "pipeline":
-        return `${option.label} ${nameIn(lookups.pipelines, c.value)}`;
-      case "shekels":
-        return `${option.label} ${(Number(c.value) / 100).toLocaleString("he-IL")}`;
-      case "task_type":
-        return `${option.label} ${TASK_TYPES.find((t) => t.value === c.value)?.label ?? c.value}`;
-      default:
-        return option.label;
-    }
-  });
+  // AUT-05: "or" groups, linked records and time conditions
+  const conditions = describeConditions(rule.conditions, lookups);
 
   const actions = rule.actions.map((a) => {
     const label = ACTION_LABELS[a.type as ActionType] ?? "פעולה";

@@ -16,12 +16,14 @@ import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
 import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
-import { ACTION_LABELS, actionsFor, CONDITIONS, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
+import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
+import { ACTION_LABELS, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
 import { setFieldChoices, type SetFieldChoice } from "../set-field";
 
+import { ConditionsEditor } from "./conditions-editor";
+
 type Draft = Record<string, string>;
-type Condition = { key: string; value: string };
 
 const ENTITY_GROUPS = [
   { entity: "lead", label: "לידים" },
@@ -85,7 +87,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   const [dateDays, setDateDays] = useState(initial?.triggerDays ?? "1");
   // PAY-07: the minimum payment in shekels ("" = any amount)
   const [triggerMin, setTriggerMin] = useState(initial?.triggerMin ?? "");
-  const [conditions, setConditions] = useState<Condition[]>(initial?.conditions ?? []);
+  const [conditions, setConditions] = useState<ConditionItem[]>(initial?.conditions ?? []);
   const [actions, setActions] = useState<Draft[]>(
     initial?.actions.length ? initial.actions.map((a) => ({ ...blankAction(a.type as ActionType), ...a })) : [blankAction("create_task")],
   );
@@ -94,7 +96,6 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
 
   const trigger = TRIGGERS.find((t) => t.key === triggerKey)!;
   const entity = trigger.entity;
-  const conditionOptions = CONDITIONS.filter((c) => c.entities.includes(entity));
   const actionOptions = actionsFor(entity);
   const stages = lookups.pipelines.flatMap((p) => p.stages.map((s) => ({ id: s.id, name: `${p.name}: ${s.name}` })));
 
@@ -107,7 +108,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     // a date field of another record type is picked again
     if (next.entity !== entity) setDateField("");
     // drop what does not fit the new record type
-    setConditions((list) => list.filter((c) => CONDITIONS.find((o) => o.key === c.key)?.entities.includes(next.entity)));
+    setConditions((list) => fitConditions(list, next.entity));
     setActions((list) => {
       const kept = list
         .filter((a) => actionsFor(next.entity).includes(a.type as ActionType))
@@ -129,41 +130,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
       ? { trigger_field: dateField, trigger_direction: dateDirection, ...(dateDirection === "on" ? {} : { trigger_days: dateDays }) }
       : {}),
     ...(trigger.minAmount && triggerMin.trim() ? { trigger_min: triggerMin } : {}),
-    conditions: conditions.map((c) => (c.value ? c : { key: c.key })),
+    conditions: conditionsPayload(conditions),
     actions: actions.map(clean),
   });
-
-  const valueInput = (condition: Condition, index: number) => {
-    const option = CONDITIONS.find((c) => c.key === condition.key)!;
-    const set = (value: string) => setConditions((list) => list.map((c, i) => (i === index ? { ...c, value } : c)));
-    const label = `ערך לתנאי ${index + 1}`;
-    const list =
-      option.input === "source"
-        ? lookups.sources
-        : option.input === "status"
-          ? lookups.statuses
-          : option.input === "tag"
-            ? lookups.tags
-            : option.input === "pipeline"
-              ? lookups.pipelines
-              : option.input === "task_type"
-                ? TASK_TYPES.map((t) => ({ id: t.value, name: t.label }))
-                : null;
-    if (option.input === "none") return null;
-    if (option.input === "shekels") {
-      return <TextField label={label} hideLabel value={condition.value} onChange={(e) => set(e.target.value)} dir="ltr" inputMode="decimal" controlSize="sm" placeholder="10,000" />;
-    }
-    return (
-      <SelectField label={label} hideLabel value={condition.value} onChange={(e) => set(e.target.value)} controlSize="sm">
-        <option value="">בחירה</option>
-        {list!.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name}
-          </option>
-        ))}
-      </SelectField>
-    );
-  };
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
@@ -251,34 +220,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
       <Card aria-labelledby="if-title">
         <CardHeader id="if-title" title="אם (לא חובה)" />
         <CardBody className="space-y-3">
-          {conditions.length === 0 ? <p className="text-md text-ink-soft">בלי תנאים: האוטומציה רצה בכל פעם.</p> : null}
-          {conditions.map((condition, index) => (
-            <div key={index} className="flex flex-wrap items-start gap-2">
-              <div className="w-full sm:w-52">
-                <Select
-                  aria-label={`תנאי ${index + 1}`}
-                  controlSize="sm"
-                  value={condition.key}
-                  onChange={(e) => setConditions((list) => list.map((c, i) => (i === index ? { key: e.target.value, value: "" } : c)))}
-                >
-                  {conditionOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="min-w-40 flex-1">{valueInput(condition, index)}</div>
-              <Button variant="ghost" size="sm" onClick={() => setConditions((list) => list.filter((_, i) => i !== index))}>
-                הסרה<span className="sr-only"> של תנאי {index + 1}</span>
-              </Button>
-            </div>
-          ))}
-          {conditions.length < 5 && conditionOptions.length > 0 ? (
-            <Button variant="secondary" size="sm" onClick={() => setConditions((list) => [...list, { key: conditionOptions[0].key, value: "" }])}>
-              הוספת תנאי
-            </Button>
-          ) : null}
+          <ConditionsEditor entity={entity} lookups={lookups} items={conditions} onChange={setConditions} />
         </CardBody>
       </Card>
 

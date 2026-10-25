@@ -2,7 +2,8 @@ import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
 import type { Json } from "@/lib/database.types";
 
-import { CONDITIONS, isPaymentTrigger, TRIGGERS, triggerOf, type Entity } from "./definitions";
+import { conditionsFromDb, conditionsToDb, type ConditionItem } from "./conditions";
+import { isPaymentTrigger, TRIGGERS, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft } from "./create-records";
@@ -24,7 +25,7 @@ export type DbRule = {
   entity_type: Entity;
   trigger_type: string;
   trigger_config: Record<string, string | number>;
-  conditions: Array<{ field: string; op: string; value?: string }>;
+  conditions: Array<Record<string, Json>>;
   // AUT-01: a set_field step keeps the field's JSON value
   actions: Array<Record<string, Json>>;
 };
@@ -64,22 +65,9 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
     if (agorot > 0) trigger_config.min_agorot = agorot;
   }
 
-  const conditions: DbRule["conditions"] = [];
-  for (const condition of rule.conditions) {
-    const option = CONDITIONS.find((c) => c.key === condition.key)!;
-    if (!option.entities.includes(entity)) return "אחד התנאים לא מתאים לסוג הרשומה.";
-    let value = condition.value;
-    if (option.input === "source" && !has(lookups.sources, value)) return "המקור שנבחר כבר לא קיים.";
-    if (option.input === "status" && !has(lookups.statuses, value)) return "הסטטוס שנבחר כבר לא קיים.";
-    if (option.input === "tag" && !has(lookups.tags, value)) return "התגית שנבחרה כבר לא קיימת.";
-    if (option.input === "pipeline" && !has(lookups.pipelines, value)) return "תהליך המכירה שנבחר כבר לא קיים.";
-    if (option.input === "shekels") {
-      const shekels = Number(String(value).replace(/[,\s₪]/g, ""));
-      if (!Number.isFinite(shekels) || shekels < 0) return "יש להזין סכום תקין בתנאי.";
-      value = String(Math.round(shekels * 100));
-    }
-    conditions.push(option.op === "empty" ? { field: option.field, op: option.op } : { field: option.field, op: option.op, value });
-  }
+  // AUT-05: "or" groups, linked records, working hours and the weekday
+  const conditions = conditionsToDb(rule.conditions as ConditionItem[], entity, lookups);
+  if (typeof conditions === "string") return conditions;
 
   const actions: DbRule["actions"] = [];
   for (const action of rule.actions) {
@@ -159,7 +147,7 @@ export type BuilderInitial = {
   triggerDirection?: string;
   // PAY-07: the minimum payment in shekels ("" = any amount)
   triggerMin?: string;
-  conditions: Array<{ key: string; value: string }>;
+  conditions: ConditionItem[];
   actions: Array<Record<string, string>>;
 };
 
@@ -179,12 +167,7 @@ export function fromDbRule(
 ): BuilderInitial | null {
   const trigger = triggerOf(rule.entity, rule.triggerType, rule.triggerConfig);
   if (!trigger) return null;
-  const conditions = rule.conditions.flatMap((c) => {
-    const option = CONDITIONS.find((o) => o.field === c.field && o.op === c.op && o.entities.includes(trigger.entity));
-    if (!option) return [];
-    const value = option.input === "shekels" ? str(Number(c.value ?? 0) / 100) : str(c.value);
-    return [{ key: option.key, value: option.input === "none" ? "" : value }];
-  });
+  const conditions = conditionsFromDb(rule.conditions, trigger.entity);
   const actions = rule.actions.flatMap((a): Array<Record<string, string>> => {
     switch (a.type) {
       case "create_task": {

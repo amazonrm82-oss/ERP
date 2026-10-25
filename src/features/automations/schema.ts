@@ -4,10 +4,22 @@ import { BUSINESS_DAYS_FREE_MAX } from "@/features/calendar-days/business-days";
 
 import { DEAL_NAME_MAX, NOTE_BODY_MAX } from "./create-records";
 import { DATE_DIRECTIONS, DATE_TRIGGER_MAX_DAYS } from "./date-trigger";
+import { LINKS } from "./condition-match";
+import { countLeaves, knownConditionKey, MAX_CONDITION_ITEMS, MAX_CONDITION_LEAVES, MAX_GROUP_ITEMS, type ConditionItem } from "./conditions";
 import { CONDITIONS, TASK_TYPES, TRIGGERS } from "./definitions";
 
 const id = z.guid({ error: "יש לבחור ערך." });
 const text = (max: number, missing: string) => z.string().trim().min(1, { error: missing }).max(max, { error: "הטקסט ארוך מדי." });
+
+// AUT-05: the value of a gte/lte condition (as app.automation_condition_item_ok)
+export const CONDITION_NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
+
+// AUT-05: one condition of the builder (a field condition, "hours" or "weekday"; on = a linked record)
+const conditionLeaf = z.object({
+  key: z.string().refine(knownConditionKey),
+  value: z.string().max(100).optional(),
+  on: z.enum(LINKS).optional(),
+});
 
 const actionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -74,9 +86,11 @@ export const ruleSchema = z
     trigger_days: z.coerce.number({ error: "יש להזין מספר ימים." }).int({ error: "יש להזין מספר ימים שלם." }).min(0).max(DATE_TRIGGER_MAX_DAYS, { error: `עד ${DATE_TRIGGER_MAX_DAYS} ימים.` }).optional(),
     // PAY-07: the minimum payment in shekels as typed (checked in toDbRule)
     trigger_min: z.string().max(30, { error: "הסכום ארוך מדי." }).optional(),
+    // AUT-05: a condition, or an "or" group of conditions; a condition may test a linked record or the time
     conditions: z
-      .array(z.object({ key: z.string().refine((key) => CONDITIONS.some((c) => c.key === key)), value: z.string().max(100).optional() }))
-      .max(5, { error: "עד 5 תנאים." }),
+      .array(z.union([z.object({ any: z.array(conditionLeaf).min(2, { error: "בקבוצת \"או\" יש לפחות 2 תנאים." }).max(MAX_GROUP_ITEMS, { error: `בקבוצת "או" עד ${MAX_GROUP_ITEMS} תנאים.` }) }), conditionLeaf]))
+      .max(MAX_CONDITION_ITEMS, { error: `עד ${MAX_CONDITION_ITEMS} תנאים.` })
+      .refine((items) => countLeaves(items as ConditionItem[]) <= MAX_CONDITION_LEAVES, { error: `עד ${MAX_CONDITION_LEAVES} תנאים בסך הכול, כולל אלה שבתוך קבוצות "או".` }),
     actions: z.array(actionSchema).min(1, { error: "יש להוסיף לפחות פעולה אחת." }).max(10, { error: "עד 10 פעולות." }),
   })
   .superRefine((rule, ctx) => {
@@ -93,10 +107,18 @@ export const ruleSchema = z
         ctx.addIssue({ code: "custom", path: ["actions", index], message: `עד ${BUSINESS_DAYS_FREE_MAX} ימי עסקים.` });
       }
     });
-    rule.conditions.forEach((condition, index) => {
-      const option = CONDITIONS.find((c) => c.key === condition.key);
-      if (option && option.input !== "none" && !condition.value) {
-        ctx.addIssue({ code: "custom", path: ["conditions", index], message: "יש לבחור ערך לתנאי." });
+    rule.conditions.forEach((item, index) => {
+      const leaves = "any" in item ? item.any : [item];
+      for (const condition of leaves) {
+        const option = CONDITIONS.find((c) => c.key === condition.key);
+        const needsValue = option ? option.input !== "none" : true;
+        if (needsValue && !condition.value) {
+          ctx.addIssue({ code: "custom", path: ["conditions", index], message: "יש לבחור ערך לתנאי." });
+        }
+        // a number comparison needs a number (the database checks the stored value the same way)
+        if (option && (option.op as string === "gte" || option.op as string === "lte") && condition.value && !CONDITION_NUMBER.test(condition.value.replace(/[,\s₪]/g, ""))) {
+          ctx.addIssue({ code: "custom", path: ["conditions", index], message: "יש להזין סכום תקין בתנאי." });
+        }
       }
     });
   });

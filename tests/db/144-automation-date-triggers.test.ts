@@ -282,8 +282,15 @@ describe("automations on a date (AUT-03)", () => {
   });
 
   it("a rule that fails as a whole does not stop the other rules", async () => {
-    // a broken condition value ("1.2.3" is not a number) fails the rule when it is checked, not a step
-    const broken = await rule("lead", { field: "created_at", days: 11, direction: "after" }, { conditions: [{ field: "score", op: "gte", value: "1.2.3" }] });
+    // a broken condition value ("1.2.3" is not a number) fails the rule when it is checked, not a step. Since AUT-05 a
+    // person may not save it (hint automation:conditions), so the stored broken rule is written by the server here
+    const brokenConditions = JSON.stringify([{ field: "score", op: "gte", value: "1.2.3" }]);
+    const broken = await rule("lead", { field: "created_at", days: 11, direction: "after" });
+    const refused = await asUser(owner.id, (q) => q("update public.automations set conditions = $2 where id = $1", [broken, brokenConditions])).catch(
+      (e: { hint?: string }) => e,
+    );
+    expect((refused as { hint?: string }).hint).toBe("automation:conditions");
+    await asAdmin((q) => q("update public.automations set conditions = $2 where id = $1", [broken, brokenConditions]));
     const good = await rule("lead", { field: "created_at", days: 11, direction: "after" });
     const due = await lead("אחת עשרה", 11);
     await runDates();

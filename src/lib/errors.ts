@@ -148,6 +148,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import_undo:left": "חלק מהרשומות שנוצרו בייבוא כבר אינן שלכם לשנות, ולכן הייבוא לא בוטל ושום רשומה לא הועברה לסל המחזור.",
   // FLD-08 (migration card_layouts)
   "card_layout:invalid": "התצוגה אינה תקינה, או שאחד השדות הוסר בינתיים. רעננו את הדף ונסו שוב.",
+  // AUT-05: the conditions of an automation have a shape the engine does not know
+  "automation:conditions": "התנאים של האוטומציה אינם תקינים. רעננו את הדף ונסו שוב.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
