@@ -11,7 +11,7 @@ import { deleteAutomationAction, setAutomationActiveAction } from "@/features/au
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
 import { actionsMissingReason } from "@/features/automations/convert";
-import { describeRule, retryLine, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
+import { describeRule, quotaSkipLabel, retryLine, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -147,7 +147,7 @@ export default async function AutomationPage({ params }: Props) {
               return (
                 <li key={run.id} className="space-y-1 px-4 py-3 sm:px-5">
                   <p className="flex flex-wrap items-center gap-2 text-sm">
-                    <Badge tone={status.tone}>{status.label}</Badge>
+                    <Badge tone={status.tone}>{quotaSkipLabel(run) ?? status.label}</Badge>
                     <span className="text-ink-soft">{formatDateTime(run.createdAt)}</span>
                     {recordPath ? (
                       <Link href={recordPath(orgId, run.entityId)} className="text-accent underline underline-offset-4">

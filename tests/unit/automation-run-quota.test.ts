@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { runQuotaState, runQuotaStopAt } from "@/features/automations/run-quota";
-import { STEP_ERRORS } from "@/features/automations/describe";
+import { quotaSkipLabel, RUN_QUOTA_ERROR, STEP_ERRORS } from "@/features/automations/describe";
 
 // AUT-07: the automations screen's bar uses the thresholds app.execute_automation uses.
 
@@ -35,5 +35,16 @@ describe("monthly automation runs (AUT-07)", () => {
   it("the run log explains a run skipped at the stop", () => {
     expect(ENGINE).toContain("'the monthly automation runs of the plan are used up'");
     expect(STEP_ERRORS["the monthly automation runs of the plan are used up"]).toMatch(/נוצלו/);
+  });
+
+  it("the run log shows a quota skip as \"לא רץ: מכסה\", with the long sentence as its detail (7.2)", () => {
+    expect(ENGINE).toContain(`'${RUN_QUOTA_ERROR}'`);
+    const quota = { status: "skipped", steps: [{ action: null, status: "error", error: RUN_QUOTA_ERROR }] };
+    expect(quotaSkipLabel(quota)).toBe("לא רץ: מכסה");
+    expect(STEP_ERRORS[RUN_QUOTA_ERROR]).toMatch(/^ההרצות החודשיות של החבילה נוצלו/);
+    // the daily limit per record and other runs keep their own labels
+    expect(quotaSkipLabel({ status: "skipped", steps: [{ error: "daily limit for this record reached" }] })).toBeNull();
+    expect(quotaSkipLabel({ status: "failed", steps: [{ error: RUN_QUOTA_ERROR }] })).toBeNull();
+    expect(quotaSkipLabel({ status: "success", steps: [] })).toBeNull();
   });
 });

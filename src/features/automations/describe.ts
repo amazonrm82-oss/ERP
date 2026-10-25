@@ -164,6 +164,14 @@ const RETRY_NOTES: Record<string, string> = {
   org_closed: "לא רץ: העסק סגור",
 };
 
+/** AUT-07: the engine's error of a run skipped because the plan's monthly runs are used up. */
+export const RUN_QUOTA_ERROR = "the monthly automation runs of the plan are used up";
+
+/** AUT-07 (7.2): the run log's short label of a run skipped by the monthly quota, or null for any other run. */
+export function quotaSkipLabel(run: { status: string; steps: Array<{ error?: string | null }> }): string | null {
+  return run.status === "skipped" && run.steps.some((step) => step.error === RUN_QUOTA_ERROR) ? "לא רץ: מכסה" : null;
+}
+
 /**
  * AUT-06: one line about a run's retries for the run log, or null when there is nothing to say.
  * `when` is the next retry's time, already formatted for the business.
