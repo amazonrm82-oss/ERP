@@ -19,8 +19,14 @@ describe("documents and payments on the timeline (DOC-04)", () => {
     expect(pairs).toEqual(Object.fromEntries(DOCUMENT_TYPES.map((t) => [t, DOCUMENT_TYPE_LABELS[t]])));
   });
 
-  it("the guard and the author trigger name exactly MONEY_ENTRY_KINDS", () => {
-    const lists = [...migration.matchAll(/in \(('document_recorded'[^)]*)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
+  it("the guard and the author trigger name exactly MONEY_ENTRY_KINDS (their latest redefinition)", () => {
+    const latest = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .filter((sql) => sql.includes("function app.activities_money_entry_guard"))
+      .at(-1)!;
+    const lists = [...latest.matchAll(/in \(('document_recorded'[^)]*)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
     expect(lists.length).toBeGreaterThanOrEqual(3);
     for (const list of lists) expect(list).toEqual([...MONEY_ENTRY_KINDS]);
   });
@@ -32,5 +38,7 @@ describe("documents and payments on the timeline (DOC-04)", () => {
     expect(moneyEntryKind("system", null)).toBeNull();
     expect(moneyEntryLabel("document_cancelled")).toBe("מסמך");
     expect(moneyEntryLabel("payment_cancelled")).toBe("תשלום");
+    expect(moneyEntryKind("system", "payment_failed")).toBe("payment_failed");
+    expect(moneyEntryLabel("payment_refunded")).toBe("תשלום");
   });
 });

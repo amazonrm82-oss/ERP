@@ -541,6 +541,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_documents_payments.sql",
       // DOC-04 redefines app.audit_erase_core() of _erase_deal_documents_payments.sql last (the cancel reason in the timeline entries)
       "_money_timeline.sql",
+      // the DOC-04 follow-up redefines app.payments_timeline() and app.activities_money_entry_guard() of _money_timeline.sql last
+      "_payment_timeline_states.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
