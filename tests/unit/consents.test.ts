@@ -31,6 +31,19 @@ function consentsSql(): string {
   return sql ?? "";
 }
 
+// the newest migration that defines a check constraint of public.consents
+function latestConstraint(name: string): string {
+  const dir = join(process.cwd(), "supabase/migrations");
+  return (
+    readdirSync(dir)
+      .filter((file) => file.endsWith(".sql"))
+      .sort()
+      .map((file) => readFileSync(join(dir, file), "utf8"))
+      .filter((text) => text.includes(`${name} check (`))
+      .at(-1) ?? ""
+  );
+}
+
 function checkList(sql: string, constraint: string, column: string): string[] {
   const list = new RegExp(`${constraint} check \\(${column} in \\(([^)]*)\\)\\)`).exec(sql)?.[1] ?? "";
   return [...list.matchAll(/'([a-z_]+)'/g)].map((match) => match[1]);
@@ -40,7 +53,8 @@ describe("consents (CNS-01, CNS-03)", () => {
   it("the app's closed lists are the database's", () => {
     const sql = consentsSql();
     expect(checkList(sql, "consents_channel", "channel")).toEqual([...CONSENT_CHANNELS]);
-    expect(checkList(sql, "consents_state", "state")).toEqual([...CONSENT_STATES]);
+    // the state list was widened later (CAP-07 follow-up: awaiting_confirmation): the latest definition counts
+    expect(checkList(latestConstraint("consents_state"), "consents_state", "state")).toEqual([...CONSENT_STATES]);
     expect(checkList(sql, "consents_source", "source")).toEqual([...CONSENT_SOURCES]);
     expect(checkList(sql, "consents_lift_method", "lift_method")).toEqual([...LIFT_METHODS]);
     for (const m of LIFT_METHODS) expect(LIFT_METHOD_LABELS[m]).toBeTruthy();

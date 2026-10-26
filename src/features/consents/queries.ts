@@ -41,6 +41,9 @@ export type ChannelConsent = {
   // admins: on the business's blocklist) or 'blocked' (the neutral word for everyone else; also an opt-out or erasure
   // of the same address elsewhere). Display only: senders judge by app.consent_suppressed.
   block: "listed" | "blocked" | null;
+  // CAP-07 follow-up: a public-form tick newer than the latest state that waits for a double opt-in (lifts nothing);
+  // `method` names the form ("טופס: <name>")
+  awaiting: { createdAt: string; method: string | null } | null;
 };
 
 export type RecordConsents = { channels: ChannelConsent[]; history: ConsentEntry[] };
@@ -79,9 +82,16 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
     channels: CONSENT_CHANNELS.map((channel) => {
       const row = latest.find((r) => r.channel === channel);
       const found = blocks.find((b) => b.channel === channel)?.block;
+      // history is newest first; consent_current skips awaiting entries, so the newest one after the state is the marker
+      const waiting = history.find((r) => r.channel === channel && r.state === "awaiting_confirmation");
+      const awaiting =
+        waiting && (!row || Date.parse(waiting.created_at) > Date.parse(row.created_at))
+          ? { createdAt: waiting.created_at, method: waiting.method }
+          : null;
       return {
         channel,
         block: found === "listed" || found === "blocked" ? found : null,
+        awaiting,
         latest: row
           ? {
               channel,

@@ -6,7 +6,9 @@ import type { BadgeTone } from "@/components/ui/badge";
 export const CONSENT_CHANNELS = ["email", "sms", "whatsapp", "phone"] as const;
 export type ConsentChannel = (typeof CONSENT_CHANNELS)[number];
 
-export const CONSENT_STATES = ["granted", "denied", "withdrawn", "unknown"] as const;
+// "awaiting_confirmation" (CAP-07 follow-up): a public-form tick for an address that opted out, asked to be erased or is
+// on the blocklist; it lifts nothing and waits for a double opt-in (the server writes it, never a person)
+export const CONSENT_STATES = ["granted", "denied", "withdrawn", "unknown", "awaiting_confirmation"] as const;
 export type ConsentState = (typeof CONSENT_STATES)[number];
 
 export const CONSENT_SOURCES = ["form", "manual", "import", "api", "unsubscribe", "erasure"] as const;
@@ -27,6 +29,7 @@ export const STATE_LABELS: Record<ConsentState, string> = {
   denied: "לא הסכים",
   withdrawn: "הסיר את עצמו",
   unknown: "לא ידוע",
+  awaiting_confirmation: "ממתין לאישור כפול",
 };
 
 export const STATE_TONES: Record<ConsentState, BadgeTone> = {
@@ -34,6 +37,7 @@ export const STATE_TONES: Record<ConsentState, BadgeTone> = {
   denied: "neutral",
   withdrawn: "danger",
   unknown: "neutral",
+  awaiting_confirmation: "warning",
 };
 
 // CNS-06: the card's word when the record's own address is blocked for marketing (public.consent_record_blocks)

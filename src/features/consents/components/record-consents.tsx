@@ -36,7 +36,7 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
       />
       <CardBody className="space-y-4">
         <ul className="divide-y divide-line">
-          {channels.map(({ channel, latest, block }) => {
+          {channels.map(({ channel, latest, block, awaiting }) => {
             // CNS-06: a blocked address overrides a "granted" or unknown state of the record (an opt-out shows as itself)
             const blocked = block && (!latest || latest.state === "granted" || latest.state === "unknown") ? block : null;
             return (
@@ -56,6 +56,17 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
                     {" · "}
                     <time dateTime={latest.createdAt}>{formatDateTime(latest.createdAt)}</time>
                   </p>
+                ) : null}
+                {awaiting ? (
+                  <div className="mt-2 space-y-1">
+                    <Badge tone={STATE_TONES.awaiting_confirmation}>{STATE_LABELS.awaiting_confirmation}</Badge>
+                    <p className="text-sm text-ink-soft">
+                      {awaiting.method ?? SOURCE_LABELS.form}
+                      {" · "}
+                      <time dateTime={awaiting.createdAt}>{formatDateTime(awaiting.createdAt)}</time>
+                    </p>
+                    <p className="text-sm text-ink-soft">סומן בטופס אחרי הסרה או חסימה. ההסכמה לא חוזרת עד שהאדם יאשר אותה בעצמו.</p>
+                  </div>
                 ) : null}
                 {latest && latest.currentAddress === false ? (
                   <p className="mt-1 text-sm text-warning">

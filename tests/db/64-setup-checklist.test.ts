@@ -571,6 +571,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_pdf_erase.sql",
       // CNS-06 redefines app.consent_address_locked() of _import_consent.sql last (the blocklist)
       "_consent_blocklist.sql",
+      // CAP-07 follow-up redefines app.intake_marketing_consent() of _import_consent.sql last (awaiting a double opt-in)
+      "_consent_awaiting_confirmation.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

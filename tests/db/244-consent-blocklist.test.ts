@@ -199,6 +199,10 @@ describe("blocklist of phones and emails (CNS-06)", () => {
     );
     // SMS is listed for this phone; the email has no history
     expect(granted.map((row) => row.channel)).toEqual(["email"]);
+    // the SMS tick waits for a double opt-in (CAP-07 answer 3), which lifts nothing either
+    expect(
+      await asAdmin((q) => count(q, "select 1 from public.consents where lead_id = $1 and channel = 'sms' and state = 'awaiting_confirmation'", [r.lead_id])),
+    ).toBe(1);
     expect(await suppressed("sms", "050-7100003")).toBe(true);
   });
 

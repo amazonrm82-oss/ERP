@@ -231,7 +231,7 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
     expect((await consentsOf("contact", madeContact)).filter((row) => row.source === "form").map((row) => row.channel)).toEqual(["sms"]);
   });
 
-  it("a public-form tick does not lift an opt-out or an erasure block; an address with no history still records", async () => {
+  it("a public-form tick does not lift an opt-out or an erasure block (it waits for a double opt-in); an address with no history still records", async () => {
     const lead = await insertLead(member.id, org, { full_name: "הסירה", phone: "050-7700020" });
     await asUser(member.id, (q) =>
       q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'withdrawn', 'manual', 'ביקשה בטלפון')", [org, lead]),
@@ -239,11 +239,13 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
     const suppressed = (channel: string, value: string) =>
       asAdmin(async (q) => (await q<{ s: boolean | null }>("select app.consent_suppressed($1, $2, $3) as s", [org, channel, value])).rows[0].s);
     expect(await suppressed("sms", "050-7700020")).toBe(true);
-    // anyone who knows the number ticks SMS and WhatsApp: the opted-out SMS stays out, WhatsApp (no history) is recorded
+    // anyone who knows the number ticks SMS and WhatsApp: the opted-out SMS stays out (the tick waits for a double opt-in,
+    // owner's answer 3), WhatsApp (no history) is recorded
     await submit(form.token, { full_name: "מישהו", phone: "050-7700020", marketing_consent: ["sms", "whatsapp"] });
     expect(await suppressed("sms", "050-7700020")).toBe(true);
     expect((await consentsOf("lead", lead)).map((row) => [row.channel, row.state, row.source])).toEqual([
       ["sms", "withdrawn", "manual"],
+      ["sms", "awaiting_confirmation", "form"],
       ["whatsapp", "granted", "form"],
     ]);
     // the tick stays on the inquiry record
@@ -259,7 +261,10 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
     await asAdmin((q) => q("update public.leads set deleted_at = now() where id = $1", [erased]));
     const fresh = await submit(form.token, { full_name: "חדשה", phone: "050-7700022", email: "Erased@Example.test", marketing_consent: ["email", "sms"] });
     expect(fresh.status).toBe("accepted");
-    expect((await consentsOf("lead", fresh.lead_id as string)).map((row) => row.channel)).toEqual(["sms"]);
+    expect((await consentsOf("lead", fresh.lead_id as string)).map((row) => [row.channel, row.state])).toEqual([
+      ["email", "awaiting_confirmation"],
+      ["sms", "granted"],
+    ]);
     expect(await suppressed("email", "erased@example.test")).toBe(true);
   });
 
@@ -315,11 +320,16 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
     let lead: string;
     try {
       // SMS: the business has a hashed SMS opt-out that cannot be compared without the key, so nothing is lifted (fail
-      // closed); WhatsApp has none, so the tick is recorded and waits for its hash
+      // closed: the tick waits for a double opt-in); WhatsApp has none, so the tick is recorded; both wait for their hash
       const r = await submit(form.token, { full_name: "בלי מפתח", phone: "050-7700040", marketing_consent: ["whatsapp", "sms"] });
       lead = r.lead_id as string;
       const rows = await consentsOf("lead", lead);
-      expect(rows.map((row) => [row.channel, row.source, row.address_hash, row.hash_version, row.wording_version])).toEqual([["whatsapp", "form", null, 1, VERSION]]);
+      expect(
+        rows.map((row) => [row.channel, row.state, row.source, row.address_hash, row.hash_version, row.wording_version]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+      ).toEqual([
+        ["sms", "awaiting_confirmation", "form", null, 1, VERSION],
+        ["whatsapp", "granted", "form", null, 1, VERSION],
+      ]);
       const pending = await asAdmin(
         async (q) =>
           (
@@ -329,12 +339,12 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
             )
           ).rows,
       );
-      expect(pending).toEqual([{ value: "+972507700040" }]);
+      expect(pending).toEqual([{ value: "+972507700040" }, { value: "+972507700040" }]);
     } finally {
       await setKey(KEY);
     }
     await asAdmin((q) => q("select app.consent_backfill_hashes()"));
-    expect((await consentsOf("lead", lead)).map((row) => row.address_hash)).toEqual([hmac(`${org}:phone:+972507700040`)]);
+    expect((await consentsOf("lead", lead)).map((row) => row.address_hash)).toEqual([hmac(`${org}:phone:+972507700040`), hmac(`${org}:phone:+972507700040`)]);
   });
 
   it("the conversion copy keeps the wording and its version; a person's entry has none", async () => {
@@ -355,5 +365,74 @@ describe("marketing-consent box on the public form (CAP-07, CNS-04)", () => {
     );
     expect(forged.code).toBe("42501");
     expect(await asAdmin((q) => count(q, "select 1 from public.consents where lead_id = $1", [manual]))).toBe(0);
+  });
+
+  it("a tick on a locked address is kept as awaiting a double opt-in: the form, the wording and the hash, and it lifts nothing", async () => {
+    // owner's answer 3 (26 October 2026): the opted-out address stays out; the tick is a marker the double opt-in will confirm
+    const lead = await insertLead(member.id, org, { full_name: "ממתינה", phone: "050-7700060", email: "wait@example.test" });
+    await asUser(member.id, (q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'withdrawn', 'manual', 'ביקשה במייל')", [org, lead]),
+    );
+    const again = await submit(form.token, { full_name: "ממתינה", phone: "050-7700060", email: "WAIT@example.test", marketing_consent: ["email"] });
+    expect(again.status).toBe("duplicate");
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<Row>(
+            `select channel, state, source, method, wording, wording_version, address_hash, recorded_by
+               from public.consents where lead_id = $1 and state = 'awaiting_confirmation'`,
+            [lead],
+          )
+        ).rows,
+    );
+    expect(rows).toEqual([
+      {
+        channel: "email",
+        state: "awaiting_confirmation",
+        source: "form",
+        method: "טופס: טופס דיוור",
+        wording: wording("email", BUSINESS),
+        wording_version: VERSION,
+        address_hash: hmac(`${org}:email:wait@example.test`),
+        recorded_by: null,
+      },
+    ]);
+    // the same tick again the same day writes nothing new
+    await submit(form.token, { full_name: "ממתינה", phone: "050-7700060", email: "wait@example.test", marketing_consent: ["email"] });
+    expect(await asAdmin((q) => count(q, "select 1 from public.consents where lead_id = $1 and state = 'awaiting_confirmation'", [lead]))).toBe(1);
+    // nothing is lifted: the address is still suppressed, the state of the record is still "withdrawn"
+    const suppressedEmail = await asAdmin(
+      async (q) => (await q<{ s: boolean }>("select app.consent_suppressed($1, 'email', 'wait@example.test') as s", [org])).rows[0].s,
+    );
+    expect(suppressedEmail).toBe(true);
+    const current = await asUser(member.id, async (q) => (await q<Row>("select channel, state from public.consent_current($1, 'lead', $2)", [org, lead])).rows);
+    expect(current).toEqual([{ channel: "email", state: "withdrawn" }]);
+    // only the server writes it: a person cannot, not even an owner
+    const forged = await pgError(
+      asUser(owner.id, (q) =>
+        q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'awaiting_confirmation', 'manual', 'x')", [
+          org,
+          lead,
+        ]),
+      ),
+    );
+    expect(forged.code).toBe("23514");
+    expect((await pgError(asAdmin((q) => q("insert into public.consents (organization_id, lead_id, channel, state, source) values ($1, $2, 'sms', 'awaiting_confirmation', 'import')", [org, lead])))).code).toBe("23514");
+    // append-only like every entry
+    expect((await pgError(asAdmin((q) => q("update public.consents set state = 'granted' where lead_id = $1 and state = 'awaiting_confirmation'", [lead])))).hint).toBe(
+      "consent:append_only",
+    );
+    // the conversion carries the real state and the marker after it
+    const made = await asUser(member.id, async (q) => (await q<{ r: Row }>("select public.convert_lead($1, false) as r", [lead])).rows[0].r);
+    expect((await consentsOf("contact", made.contact_id as string)).map((row) => [row.channel, row.state])).toEqual([
+      ["email", "withdrawn"],
+      ["email", "awaiting_confirmation"],
+    ]);
+    // a later real state is the state; an older marker is history only
+    await asUser(member.id, (q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'denied', 'manual', 'שוב לא')", [org, lead]),
+    );
+    const lead2 = await asUser(member.id, async (q) => (await q<Row>("select channel, state from public.consent_current($1, 'lead', $2)", [org, lead])).rows);
+    expect(lead2).toEqual([{ channel: "email", state: "denied" }]);
   });
 });
