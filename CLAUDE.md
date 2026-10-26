@@ -666,6 +666,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   channel blocks): the tick then stays on the inquiry only, until the owner decides how an address is proven.
   `consents.wording_version` is server-only (trigger `consents_wording_version`). The inquiry keeps the server's record of the ticks
   (`app.trim_submission_payload`, last redefined in 020935; a spam row keeps none).
+- Consent in imports (CNS-05, migration 020950; privacy, every plan): a leads or contacts import may map one consent column per
+  channel (email|sms|whatsapp; closed value lists in `src/features/imports/consent.ts`, anything else is reported, never guessed);
+  no column = nothing written. Mapping one needs a declaration on the job (`import_jobs.consent_method` closed DRAFT list mirrored by
+  `app.import_consent_method_label`, `consent_note` 1..500; insert-only grants; audited `import_consent`). The only writer of source
+  'import' is `public.import_record_consents(org, job, items)` (definer, authenticated: `app.can_import`, the caller's own RUNNING
+  job, declared, 1,000 items): a record the job created, or one the caller may edit for an update-mode job, or a 'denied' only (a
+  row skipped as a duplicate still records an opt-out); the record's own primary address only; a 'granted' never lifts an opt-out
+  or erasure block (`app.consent_address_locked`, shared with CAP-07's `app.intake_marketing_consent`, both last redefined in
+  020950). Created rows are matched to returned ids by address, never by order. Undo never deletes consents (append-only).
+  The advisor's `authenticated_security_definer_function_executable` on it is expected.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
