@@ -710,7 +710,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  020465/019620 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020830 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+- Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
+  "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
+  category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
+  `app.form_product_offer` (invoker, org-filtered, granted to authenticated for the trigger); THE list both intake functions use is
+  `app.intake_form_products` (definer, no grants, first 100 by lower(name), id). Trigger `forms_product_ids_check` (invoker, a person's
+  write): picks of the form's own business, each once (hints `form:product_ids|product_categories`), and a web form that asks offers
+  at most 100 (hint `form:products_over`; a business that grows past 100 later shows the first 100 and the settings page warns).
+  `intake_form` returns `products` [{id, name}] only; `intake_submit` takes `requested_product_id` only if offered now (else 22023
+  `requested_product:invalid`, one answer for every other id), feeds CAP-08's product rule, stores it on the new lead, fills a matched
+  lead's empty one, keeps it on the inquiry entry, and with leads off adds its name to the "לחזור ללקוח" title.
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
@@ -1442,7 +1452,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` and `public.booking_submit` (both last redefined in 020465) match or create a contact instead of a lead
+  `public.intake_submit` (last redefined in 020830) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
