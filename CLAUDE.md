@@ -101,6 +101,10 @@ and build this CRM here instead. The old code is preserved on the branch
    In use (QUO-06 answer 1, owner 26 October 2026, migration 020995): the customer's PDF download (`src/features/quotes/pdf-public-server.ts`,
    route `GET /api/forms/quote/<token>/pdf`), which calls only `public.quote_public_pdf()` and downloads only the path it answers,
    compared with its SHA-256; in the eslint allow-list.
+   Owner, 26 October 2026 (ADM-01 answer 1, approved, not built yet): one more use under the same conditions: the public
+   subprocessors page reads the list through a server route calling one function granted to `service_role` only, which returns
+   only name, purpose, country, data categories and dates of active providers, takes no input from the visitor, cached for an
+   hour, rate limited, with database tests and an independent review.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
