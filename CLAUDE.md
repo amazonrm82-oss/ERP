@@ -647,6 +647,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `public.audit_erase_request(org, type, id, person_request)` (`audit_erase_record` = person's request); while the key is missing
   it pauses (`app.pending_erasures`, returns -1) and the backfill completes it. `app.merge_move_links` was
   last redefined in 020655 (documents and payments), `app.audit_erase_core` in 020650 (ORD-05b; 020520 hand-edited line names), `app.sample_untouched` in 020315 (TASK-06); a new table linking to leads/contacts must also be checked there.
+- Marketing consent on the public form (CAP-07 / CNS-04, migration 020935; privacy, every plan): `forms.marketing_consent_channels`
+  (email|sms|whatsapp, column grants); a box shows only while the form collects its address (`app.form_marketing_channels`).
+  The wording is a DRAFT with a version (`app.marketing_consent_wording`, `app.marketing_consent_version` = 'form-draft-1',
+  mirrored by `src/features/intake/marketing-consent.ts`; a new text is a new version in a new migration). `intake_form` returns
+  `marketing_consent`; `intake_submit` writes one `granted`/`form` consent per counted tick through
+  `app.intake_marketing_consent` (definer), only on a record whose own address is the typed one, and NEVER over an opt-out or
+  erasure block of that address (hash across the business; pending addresses by value; without the key any hashed opt-out on the
+  channel blocks): the tick then stays on the inquiry only, until the owner decides how an address is proven.
+  `consents.wording_version` is server-only (trigger `consents_wording_version`). The inquiry keeps the server's record of the ticks
+  (`app.trim_submission_payload`, last redefined in 020935; a spam row keeps none).
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -716,7 +726,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  020905 (`app.run_automation_actions` in 020920); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020935 (`app.run_automation_actions` in 020920); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
@@ -1515,7 +1525,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` (last redefined in 020905) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
+  `public.intake_submit` (last redefined in 020935) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
