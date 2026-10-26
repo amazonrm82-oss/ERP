@@ -672,6 +672,28 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   channel blocks): the tick then stays on the inquiry only, until the owner decides how an address is proven.
   `consents.wording_version` is server-only (trigger `consents_wording_version`). The inquiry keeps the server's record of the ticks
   (`app.trim_submission_payload`, last redefined in 020935; a spam row keeps none).
+- Blocklist (CNS-06, migration 020970; privacy, every plan): `public.consent_blocklist` (kind phone|email, channel all|email|sms|whatsapp|phone;
+  ONLY the HMAC hash with `consent_hash_key`, never the address; no select grant on the hash; owners/admins select; no client writes;
+  append-only by `consent_blocklist_guard`; removal is a mark with a closed-list reason; no free text, so erasure has nothing to
+  erase). While the key is missing the normalized address waits in `app.consent_blocklist_pending` until `app.consent_blocklist_backfill`
+  (per-row blocks, run by `app.consent_backfill_hashes` after `complete_pending_erasures`). The rule is `app.consent_listed`: the
+  organization-wide `app.consent_state_of` answers 'listed' first, so `app.consent_suppressed` is true, `app.consent_address_locked`
+  locks (a form tick or an import 'granted' never lifts it) and `consent_prepare` refuses a person's 'granted', even an owner's manual
+  lift (hint `consent:blocklisted` for owners/admins, neutral `consent:address_blocked` otherwise; also without the key, fail closed).
+  RPCs (definer, owners/admins): `consent_blocklist_add/remove/find/summary`; `public.consent_record_blocks` tells a record's card
+  (whoever reads the record) 'listed' (owners/admins) or 'blocked' for its own addresses only. `app.consent_state_of`,
+  `consent_suppressed`, `consent_address_locked`, `consent_prepare`, `consent_backfill_hashes` were last redefined in 020970.
+  **Senders (CNS-07 and every marketing send) judge only by `app.consent_suppressed(org, channel, address)`, never by a record's
+  consent state or its card**: the blocklist and an opt-out or erasure of the same address on another record are not in the
+  record's own state.
+- Awaiting double opt-in (CAP-07 follow-up, migration 020975; owner 26 October 2026, answer 3): a public-form tick on a locked address
+  (opt-out, erasure block, blocklist) writes `consents.state = 'awaiting_confirmation'` (source 'form' only, `consents_awaiting_form`;
+  one per record, channel and day in the org zone; `method` = "טופס: <form name>" from the transaction setting `app.intake_form_id`
+  that `intake_submit` sets); it lifts nothing (`consent_state_of` reads granted/withdrawn/denied only), `consent_current` skips it,
+  `convert_consents` carries the awaiting entries after the latest real one. The future double opt-in confirms it with a 'granted' copy
+  (`copied_from`) and MUST re-check `app.consent_suppressed` / `app.consent_address_locked` first. `public.intake_submit`,
+  `app.intake_marketing_consent`, `public.consent_current` and `app.convert_consents` were last redefined in 020975; any later
+  redefinition of `intake_submit` keeps the `app.intake_form_id` line.
 - Consent in imports (CNS-05, migration 020950; privacy, every plan): a leads or contacts import may map one consent column per
   channel (email|sms|whatsapp; closed value lists in `src/features/imports/consent.ts`, anything else is reported, never guessed);
   no column = nothing written. Mapping one needs a declaration on the job (`import_jobs.consent_method` closed DRAFT list mirrored by
@@ -750,7 +772,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   over `app.lead_distribution_pick` (CAP-09/HEB-08 eligibility unchanged; weighted = stride passes in `app.lead_rotation_passes` /
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
-  team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
+  team on the lead (deliberate). `public.intake_submit` was last redefined in 020975 and `public.intake_form` in
   020935 (`app.run_automation_actions` in 020945); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
@@ -1573,7 +1595,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` (last redefined in 020935) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
+  `public.intake_submit` (last redefined in 020975) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
