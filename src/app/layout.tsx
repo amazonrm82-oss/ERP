@@ -13,6 +13,7 @@ import { cspNonce, pageThemeChoice, PATH_HEADER, serverThemeAttribute, THEME_COO
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 import { getSupabaseEnv } from "@/lib/env";
 import { configuredSiteUrl } from "@/lib/site-origin";
+import { startupImages } from "@/lib/startup-images";
 
 export const metadata: Metadata = {
   // absolute links for the share image (src/app/opengraph-image.png)
@@ -28,7 +29,8 @@ export const metadata: Metadata = {
     apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180" },
   },
   // iPhone: opens full screen from the home screen
-  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
+  // USR-08: the launch screen while the installed app opens, one image per iPhone screen size
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default", startupImage: startupImages() },
   formatDetection: { telephone: false },
   // LND-11: not for search engines unless a page says otherwise; the app, the
   // sign-in screens and the customers' forms stay out. Public pages opt in:
