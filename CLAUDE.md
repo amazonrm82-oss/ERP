@@ -1291,7 +1291,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   writes, changes or deletes it (`app.activities_record_link_entry_guard`, hint `activity:record_link_entry`);
   `app.record_links_clear_ids` was last redefined in 020925. An address may be on public forms; lists filter link and file fields
   by filled/empty (filter kind `presence`); a file field may be required, checked only in the edit card (`missingRequiredFiles`),
-  never on create, board, table cell or bulk. Test 64's re-run list ends with 020905/020910/020925 because re-running 020640/020645
+  never on create, board, table cell or bulk.
+  Since 020965 (owner 26 October 2026): the entry is not activity (`app.scheduled_no_activity`, `app.automation_run_facts`,
+  `app.automation_event_still_holds` skip system entries of kind `record_link_removed` beside `automation_note`; all three last
+  redefined in 020965; keep the filter in any later redefinition); a required file (own box or a FLD-09 "require" condition on the
+  stored values) is replaced, never removed (app-only: `removeFieldFileAction` + `requiredFileRemovalProblem`); a conditional
+  "require" is checked for file fields on the edit card. Test 64's re-run list ends with 020905/020910/020925 because re-running 020640/020645
   resets the `record_files_delete` storage policy (the teardown compares function bodies only, not policies).
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
