@@ -6,11 +6,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { conversionMapNeedsFix } from "@/features/conversion-map/queries";
 import { TARGET_REMOVED_REMINDER } from "@/features/conversion-map/rules";
-import { canEditCatalog, canImportWith, canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
-import { settingsGroups } from "@/features/settings/sections";
+import { settingsAccessFor, settingsGroups } from "@/features/settings/sections";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -25,15 +24,7 @@ export default async function SettingsPage({ params }: Props) {
   const admin = isAdminRole(role);
   const [priceLists, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), getMyPermissions(orgId)]);
   // the owner also reaches the full export while the business is read-only; PRM-01: extra permissions
-  const groups = settingsGroups(orgId, {
-    admin,
-    canImport: (canWrite && canImportWith(role, granted)) || role === "owner",
-    canDelete,
-    priceLists,
-    catalog: canEditCatalog(role, granted),
-    automations: canManageAutomations(role, granted),
-    keptQuotes: admin || role === "manager",
-  });
+  const groups = settingsGroups(orgId, settingsAccessFor({ role, canWrite, canDelete, priceLists, granted }));
   // LEAD-06: a picked conversion target was deleted; owners and admins see it until someone chooses again
   const mappingNeedsFix = admin ? await conversionMapNeedsFix(orgId) : false;
 

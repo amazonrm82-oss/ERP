@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 
 import { IconButton } from "@/components/ui/button";
 import { CloseIcon, SearchIcon } from "@/components/ui/icons";
 
-import { searchAction, type SearchGroup, type SearchHit } from "../actions";
+import { commandsAction, searchAction, type SearchGroup, type SearchHit } from "../actions";
+import { COMMAND_GROUP_LABELS, matchCommands, type Command, type CommandGroup } from "../command-match";
 import { isSearchShortcut } from "../shortcut";
 
 const GROUP_LABELS: Record<SearchGroup, string> = {
@@ -17,8 +18,16 @@ const GROUP_LABELS: Record<SearchGroup, string> = {
   notes: "בציר הזמן",
 };
 
+type Section = CommandGroup | SearchGroup;
+// REC-09: actions and places first, then the records
+const SECTION_ORDER: Section[] = ["create", "navigate", "settings", "leads", "contacts", "companies", "deals", "notes"];
+const SECTION_LABELS: Record<Section, string> = { ...COMMAND_GROUP_LABELS, ...GROUP_LABELS };
+
+type Item = { key: string; section: Section; title: string; subtitle: string | null; href: string };
+
 /**
  * Search everything from the top bar. Opens with the button or Ctrl+K (Cmd+K).
+ * REC-09: besides records it offers actions ("ליד חדש") and places ("הגדרות") that match the text.
  * Arrow keys move between results, Enter opens one, Escape closes.
  */
 export function GlobalSearch({ orgId }: { orgId: string }) {
@@ -26,6 +35,8 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  // REC-09: what this person may do and open, asked once when the palette first opens
+  const [commands, setCommands] = useState<Command[] | null>(null);
   const [searched, setSearched] = useState("");
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
@@ -60,6 +71,18 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
     }
   }, [open]);
 
+  // REC-09: the commands are read once, the first time the palette opens
+  useEffect(() => {
+    if (!open || commands !== null) return;
+    let live = true;
+    commandsAction(orgId)
+      .then((list) => live && setCommands(list))
+      .catch(() => live && setCommands([]));
+    return () => {
+      live = false;
+    };
+  }, [open, commands, orgId]);
+
   // the highlighted result stays in view while the arrows move it (FXA-04)
   useEffect(() => {
     if (open) document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: "nearest" });
@@ -88,13 +111,24 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
     buttonRef.current?.focus();
   }
 
-  function go(hit: SearchHit) {
+  function go(item: Item) {
     close();
-    router.push(hit.href);
+    router.push(item.href);
   }
 
-  const shown = query.trim().length >= 2 ? hits : [];
-  const groups = (Object.keys(GROUP_LABELS) as SearchGroup[]).filter((g) => shown.some((h) => h.group === g));
+  const typed = query.trim();
+  const matched = useMemo(() => (typed.length >= 2 && commands ? matchCommands(commands, typed) : []), [commands, typed]);
+  // one list in the order it is shown, so the arrows and the highlighted row agree
+  const shown: Item[] = useMemo(() => {
+    if (typed.length < 2) return [];
+    const items: Item[] = [
+      ...matched.map((c) => ({ key: c.key, section: c.group, title: c.label, subtitle: c.hint, href: c.href })),
+      ...hits.map((h) => ({ key: h.key, section: h.group, title: h.title, subtitle: h.subtitle, href: h.href })),
+    ];
+    return SECTION_ORDER.flatMap((section) => items.filter((item) => item.section === section));
+  }, [typed, matched, hits]);
+  const groups = SECTION_ORDER.filter((g) => shown.some((h) => h.section === g));
+  const activeIndex = Math.min(active, Math.max(shown.length - 1, 0));
 
   return (
     <>
@@ -137,24 +171,27 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                 role="combobox"
                 aria-expanded={shown.length > 0}
                 aria-controls={listId}
-                aria-activedescendant={shown[active] ? `${listId}-${active}` : undefined}
-                aria-label="חיפוש לידים, אנשי קשר, חברות, עסקאות והערות"
-                placeholder="שם, טלפון, אימייל, ח.פ. או מילה מהערה"
+                aria-activedescendant={shown[activeIndex] ? `${listId}-${activeIndex}` : undefined}
+                aria-label="חיפוש רשומות, פעולות ומסכים"
+                placeholder="שם, טלפון, מילה מהערה, או פעולה כמו &quot;הגדרות&quot;"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActive(0);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     e.preventDefault();
                     close();
                   } else if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setActive((i) => Math.min(i + 1, shown.length - 1));
+                    setActive(Math.min(activeIndex + 1, shown.length - 1));
                   } else if (e.key === "ArrowUp") {
                     e.preventDefault();
-                    setActive((i) => Math.max(i - 1, 0));
-                  } else if (e.key === "Enter" && shown[active]) {
+                    setActive(Math.max(activeIndex - 1, 0));
+                  } else if (e.key === "Enter" && shown[activeIndex]) {
                     e.preventDefault();
-                    go(shown[active]);
+                    go(shown[activeIndex]);
                   }
                 }}
                 className="min-h-14 w-full bg-transparent text-base outline-none"
@@ -162,9 +199,9 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
               <IconButton label="סגירת החיפוש" icon={<CloseIcon className="size-5" />} onClick={close} className="-me-1" />
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
-              {query.trim().length < 2 ? (
-                <p className="px-4 py-4 text-sm text-ink-soft">הקלידו לפחות שתי אותיות.</p>
-              ) : shown.length === 0 && !pending && searched === query.trim() ? (
+              {typed.length < 2 ? (
+                <p className="px-4 py-4 text-sm text-ink-soft">הקלידו לפחות שתי אותיות. אפשר גם פעולה או מסך, כמו &quot;משימה חדשה&quot; או &quot;הגדרות&quot;.</p>
+              ) : shown.length === 0 && !pending && searched === typed ? (
                 <p className="px-4 py-4 text-sm text-ink-soft" role="status">
                   לא נמצא דבר.
                 </p>
@@ -172,18 +209,18 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
               <ul id={listId} role="listbox" aria-label="תוצאות">
                 {groups.map((group) => (
                   <li key={group} role="presentation">
-                    <p className="bg-canvas px-4 py-1.5 text-xs font-semibold text-ink-soft">{GROUP_LABELS[group]}</p>
+                    <p className="bg-canvas px-4 py-1.5 text-xs font-semibold text-ink-soft">{SECTION_LABELS[group]}</p>
                     <ul role="presentation">
                       {shown.map((hit, index) =>
-                        hit.group === group ? (
+                        hit.section === group ? (
                           <li
                             key={hit.key}
                             id={`${listId}-${index}`}
                             role="option"
-                            aria-selected={index === active}
+                            aria-selected={index === activeIndex}
                             onMouseEnter={() => setActive(index)}
                             onClick={() => go(hit)}
-                            className={`cursor-pointer px-4 py-2.5 ${index === active ? "bg-accent-soft ring-2 ring-accent ring-inset" : ""}`}
+                            className={`cursor-pointer px-4 py-2.5 ${index === activeIndex ? "bg-accent-soft ring-2 ring-accent ring-inset" : ""}`}
                           >
                             <span className="block truncate font-medium">
                               <bdi>{hit.title}</bdi>

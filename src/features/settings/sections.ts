@@ -40,6 +40,9 @@ import { checklistTemplatesPath } from "@/features/task-checklists/paths";
 import { activityTypesPath } from "@/features/activity-types/paths";
 import { modulesSettingsPath } from "@/features/modules/paths";
 import { termsSettingsPath } from "@/features/terminology/paths";
+import { canEditCatalog, canImportWith, canManageAutomations } from "@/features/permissions/keys";
+import { isAdminRole } from "@/features/settings/permissions";
+import type { MembershipRole } from "@/lib/database.types";
 import { paths } from "@/lib/paths";
 
 export type SettingsSection = {
@@ -67,6 +70,32 @@ export type SettingsAccess = {
   // QUO-07 (owner, 18 October 2026): owners, admins and managers by role read the kept quotes of deleted customers
   keptQuotes?: boolean;
 };
+
+/**
+ * Who sees which settings section, from the person's role, the business's state and the plan (the settings page, its
+ * side list and REC-09's command palette all ask this once, so they never disagree).
+ */
+export function settingsAccessFor(input: {
+  role: MembershipRole;
+  canWrite: boolean;
+  canDelete: boolean;
+  priceLists: boolean;
+  granted: readonly string[];
+}): SettingsAccess {
+  const { role, canWrite, canDelete, priceLists, granted } = input;
+  const admin = isAdminRole(role);
+  return {
+    admin,
+    // owners, admins and team managers import (app.can_import), and a member with the import permission (PRM-01); the
+    // owner also exports in read-only
+    canImport: (canWrite && canImportWith(role, granted)) || role === "owner",
+    canDelete,
+    priceLists,
+    catalog: canEditCatalog(role, granted),
+    automations: canManageAutomations(role, granted),
+    keptQuotes: admin || role === "manager",
+  };
+}
 
 /**
  * The settings area as one list in four groups (FXU-13), shared by the

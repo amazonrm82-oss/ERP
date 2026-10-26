@@ -2392,7 +2392,7 @@ try {
   await lost.goto(orgUrl);
   await lost.waitForLoadState("networkidle");
   await lost.keyboard.press("Control+k");
-  const searchBox = lost.getByRole("combobox", { name: /חיפוש לידים/ });
+  const searchBox = lost.getByRole("combobox", { name: /חיפוש רשומות/ });
   await searchBox.fill("סבב אחת");
   await lost.getByRole("option", { name: /סבב אחד/ }).first().waitFor({ timeout: 15000 });
   await shot(lost, "116-search-360");

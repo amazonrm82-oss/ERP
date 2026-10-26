@@ -1,11 +1,19 @@
 "use server";
 
 import { notePlainText } from "@/features/activities/markdown";
+import { withOrdersPlan } from "@/features/modules/modules";
 import { getOrgModules } from "@/features/modules/queries";
+import { getMyPermissions } from "@/features/permissions/queries";
+import { orgHasFeature } from "@/features/settings/queries";
+import { settingsAccessFor } from "@/features/settings/sections";
+import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { sessionCheck } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
+
+import { buildCommands, type Command } from "./commands";
 
 export type SearchHit = { key: string; group: SearchGroup; title: string; subtitle: string | null; href: string };
 export type SearchGroup = "leads" | "contacts" | "companies" | "deals" | "notes";
@@ -50,4 +58,32 @@ export async function searchAction(orgId: string, query: string): Promise<Search
     return href ? { title: notePlainText(str(r.body) ?? ""), subtitle: ACTIVITY_LABELS[String(r.type)] ?? null, href } : null;
   });
   return hits;
+}
+
+/**
+ * REC-09: the actions and places the command palette may offer this person, worked out from the same rules as the menu,
+ * the "+" menu and the settings list (role, extra permissions, modules, plan, the business's words). Asked once when the
+ * palette first opens; the matching happens in the browser. Any failure gives an empty list: the record search still works.
+ */
+export async function commandsAction(orgId: string): Promise<Command[]> {
+  if (!isUuid(orgId)) return [];
+  if (!(await sessionCheck()).ok) return [];
+  try {
+    const { role, canWrite, canDelete } = await getOrgContext(orgId);
+    const [terms, storedModules, priceLists, granted] = await Promise.all([
+      getOrgTerms(orgId),
+      getOrgModules(orgId),
+      orgHasFeature(orgId, "price_lists"),
+      getMyPermissions(orgId),
+    ]);
+    // ORD-01: orders only while the plan holds them too, like the menu
+    const ordersInPlan = storedModules.orders ? await orgHasFeature(orgId, "orders").catch(() => false) : false;
+    const modules = withOrdersPlan(storedModules, ordersInPlan);
+    return buildCommands(orgId, terms, modules, {
+      canWrite,
+      settings: settingsAccessFor({ role, canWrite, canDelete, priceLists, granted }),
+    });
+  } catch {
+    return [];
+  }
 }
