@@ -192,7 +192,8 @@ export function fieldState(field: FieldDefinition, definitions: FieldDefinition[
   if (condition.effect === "show") {
     return holds ? { visible: true, required: field.isRequired } : { visible: false, required: false };
   }
-  return { visible: true, required: field.isRequired || holds };
+  // FLD-06 part B: a file is added on the card after the record is saved, so a "require" condition never asks for it
+  return { visible: true, required: field.isRequired || (holds && field.type !== "file") };
 }
 
 /** True when any of these fields has a condition that applies (so the form must watch its values). */

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { checkbox, optionalText, requiredText } from "@/lib/validation";
 
 import { canBeUnique } from "./settings";
-import { FIELD_OBJECTS, FIELD_TYPES, TYPES_WITH_OPTIONS } from "./types";
+import { FIELD_OBJECTS, FIELD_TYPES, LINK_TARGETS, TYPES_WITH_OPTIONS } from "./types";
 
 /** One choice per line; blank lines and repeats dropped. */
 const optionLines = z.preprocess(
@@ -33,6 +33,12 @@ export const createFieldSchema = z
     ...fieldFields,
     object_type: z.enum(FIELD_OBJECTS),
     field_type: z.enum(FIELD_TYPES, { error: "יש לבחור סוג שדה." }),
+    // FLD-06 part B: what a record link points at (only for that type; never changed later)
+    link_target: z.preprocess((value) => (value === "" || value === null ? undefined : value), z.enum(LINK_TARGETS).optional()),
+  })
+  .refine((field) => field.field_type !== "record_link" || field.link_target !== undefined, {
+    path: ["link_target"],
+    error: "יש לבחור לאיזה סוג רשומה השדה מקשר.",
   })
   .refine((field) => !TYPES_WITH_OPTIONS.includes(field.field_type) || field.options.length > 0, {
     path: ["options"],

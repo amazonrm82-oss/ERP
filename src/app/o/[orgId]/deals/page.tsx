@@ -25,6 +25,8 @@ import { inlineEditing } from "@/features/inline-edit/server";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
+import { sortableField } from "@/features/custom-fields/types";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
@@ -337,7 +339,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
   const page = parsePage(query.page);
   const filter = await prepareListFilter(orgId, "deal", firstParam(query.f), context.user.id, listColumns.fields, { stages: pipeline.stages });
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
-  const sortKeys = [...Object.keys(DEAL_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof DEAL_SORT_COLUMNS | CustomSortKey>;
+  const sortKeys = [...Object.keys(DEAL_SORT_COLUMNS), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof DEAL_SORT_COLUMNS | CustomSortKey>;
   const sort = parseSort(firstParam(query.sort), sortKeys, DEAL_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const pipelineParam = pipelines.find((p) => p.id === pipeline.id)?.isDefault ? null : pipeline.id;
 
@@ -435,7 +437,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           stages={pipeline.stages}
           columns={shownColumns}
           catalog={listColumns.catalog}
-          fields={listColumns.fields}
+          fields={await withFieldRefs(orgId, listColumns.fields, deals.map((row) => row.customFields))}
           sort={sort}
           sortHref={sortHref}
           editing={editing}

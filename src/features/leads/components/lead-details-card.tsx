@@ -256,7 +256,7 @@ function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
             errors={errors}
             readOnlyNote
           />
-          <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} objectType="lead" builtins={lead.custom.builtins} />
+          <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} objectType="lead" record={{ object: "lead", id: lead.id }} builtins={lead.custom.builtins} />
           <div className="flex flex-wrap gap-2">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={onDone}>

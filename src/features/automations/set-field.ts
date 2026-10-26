@@ -23,8 +23,16 @@ export type SetFieldChoice = { key: string; label: string; definition?: FieldDef
 /** The fields a step may set on a record type: the built-in ones, then the active custom fields in their order. */
 export function setFieldChoices(entity: Entity, lookups: Pick<SetFieldLookups, "fields">): SetFieldChoice[] {
   const builtins = BUILTIN_SET_FIELDS.filter((field) => field.entities.includes(entity)).map((field) => ({ key: field.key, label: field.label }));
-  const custom = (lookups.fields[entity] ?? []).map((definition) => ({ key: `${CUSTOM_PREFIX}${definition.key}`, label: definition.label, definition }));
+  // FLD-06 part B: an automation never sets a record link or a file (the database refuses it in a run)
+  const custom = (lookups.fields[entity] ?? [])
+    .filter((definition) => automationSettable(definition))
+    .map((definition) => ({ key: `${CUSTOM_PREFIX}${definition.key}`, label: definition.label, definition }));
   return [...builtins, ...custom];
+}
+
+/** FLD-06 part B: whether a step may set this custom field (a record link and a file are a person's choice). */
+export function automationSettable(definition: Pick<FieldDefinition, "type">): boolean {
+  return definition.type !== "record_link" && definition.type !== "file";
 }
 
 /** The custom field a "cf:<key>" names, among the active ones of the record type. */
@@ -119,6 +127,7 @@ export function setFieldValue(
   }
   const definition = customDefinition(entity, field, lookups);
   if (!definition) return field.startsWith(CUSTOM_PREFIX) ? "השדה שנבחר כבר לא קיים או מוסתר." : "השדה לא מתאים לסוג הרשומה.";
+  if (!automationSettable(definition)) return `${definition.label}: אוטומציה לא מעדכנת שדה מהסוג הזה.`;
   const name = inputName(definition.key);
   const form = new FormData();
   if (definition.type === "multi_select") {

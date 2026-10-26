@@ -144,6 +144,7 @@ function ContactEditForm({ orgId, contact, companies, types, onDone, terms }: Ed
             definitions={contact.custom.definitions}
             stored={contact.custom.values}
             objectType="contact"
+            record={{ object: "contact", id: contact.id }}
             builtins={contact.custom.builtins}
             submitted={failure?.values}
             errors={failure?.fieldErrors}

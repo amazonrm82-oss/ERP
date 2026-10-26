@@ -39,6 +39,11 @@ const FILTER_KINDS: Record<FieldType, FilterKind | null> = {
   url: "text",
   il_id: "text",
   il_company_id: "text",
+  // FLD-06 part B: an address is text; a record link and a file hold ids, not filterable yet (a "filled / empty" kind is a
+  // follow-up)
+  address: "text",
+  record_link: null,
+  file: null,
 };
 
 export type FilterObject = ListObject;

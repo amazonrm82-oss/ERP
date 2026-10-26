@@ -9,9 +9,11 @@ import { NoteEditor } from "@/features/activities/components/note-editor";
 
 import { conditionApplies, fieldState, hasConditions, shownMarkerName, type ConditionValues } from "../conditions";
 import { readConditionValues } from "../live-conditions";
+import { FieldFileInput } from "./field-file-input";
+import { RecordLinkPicker } from "./record-link-picker";
 import { inputName, type CustomValues, type FieldDefinition, type FieldObject } from "../types";
 import { isEmptyCustomValue } from "../settings";
-import { displayCustomFields, inputValue } from "../values";
+import { displayCustomFields, inputValue, RECORD_LINK_FALLBACK } from "../values";
 
 type Props = {
   definitions: FieldDefinition[];
@@ -24,6 +26,8 @@ type Props = {
   // ("builtin:status" → id) that the form may not have an input for
   objectType?: FieldObject;
   builtins?: Record<string, string | null>;
+  // FLD-06 part B: the record an edit form belongs to (a file field uploads to it); absent on a create form
+  record?: { object: FieldObject; id: string };
 };
 
 /** A read-only field (FLD-07) that holds a value, in an edit form: the value as text, never an input. */
@@ -41,7 +45,7 @@ function ReadOnlyValue({ field, values }: { field: FieldDefinition; values: Cust
 }
 
 /** Inputs for a record's active custom fields. Renders nothing when there are none. */
-export function CustomFieldInputs({ definitions, stored, submitted, errors = {}, objectType, builtins }: Props) {
+export function CustomFieldInputs({ definitions, stored, submitted, errors = {}, objectType, builtins, record }: Props) {
   const editing = stored !== undefined;
   // FLD-07: a create form starts with the fields' default values
   const initial: CustomValues = editing
@@ -104,6 +108,31 @@ export function CustomFieldInputs({ definitions, stored, submitted, errors = {},
       ) : null}
       {definitions.map((field) => {
         const state = watching ? fieldState(field, definitions, conditionValues, objectType) : { visible: true, required: field.isRequired };
+        // FLD-06 part B: a file field acts on its own (it uploads at once), on a saved record only
+        if (field.type === "file") {
+          if (!state.visible) return null;
+          if (!record || !field.orgId) {
+            return (
+              <p key={field.id} className="text-sm text-ink-soft">
+                {field.label}: אפשר לצרף קובץ אחרי שמירת הרשומה.
+              </p>
+            );
+          }
+          const held = stored?.[field.key];
+          const fileId = typeof held === "string" ? held : null;
+          return (
+            <FieldFileInput
+              key={field.id}
+              orgId={field.orgId}
+              target={{ object: record.object, recordId: record.id, key: field.key }}
+              label={field.label}
+              current={fileId ? (field.refs?.[fileId] ?? null) : null}
+              held={fileId !== null}
+              locked={field.isReadOnly === true && fileId !== null}
+              hint={field.helpText ?? undefined}
+            />
+          );
+        }
         // FLD-07: open while empty (it may be filled once), locked once it holds a value
         if (editing && field.isReadOnly && !isEmptyCustomValue(stored[field.key])) {
           return state.visible ? <ReadOnlyValue key={field.id} field={field} values={stored} /> : null;
@@ -281,6 +310,28 @@ function fieldInput(
       return <TextField key={field.id} {...common} dir="ltr" inputMode="url" autoComplete="off" defaultValue={value} />;
     case "text":
       return <TextField key={field.id} {...common} maxLength={500} autoComplete="off" defaultValue={value} />;
+    case "address":
+      // FLD-06 part B: one line; the card shows it with Waze and Google Maps links
+      return <TextField key={field.id} {...common} maxLength={500} autoComplete="street-address" defaultValue={value} />;
+    case "record_link":
+      // FLD-06 part B: searched, never a capped list; the database checks the pick
+      if (!field.orgId || !field.linkTarget) return null;
+      return (
+        <RecordLinkPicker
+          key={`${field.id}-${value}`}
+          orgId={field.orgId}
+          target={field.linkTarget}
+          name={name}
+          label={field.label}
+          required={required}
+          initial={initialChoice(value, submitted?.[pickerLabelName(name)] ?? field.refs?.[value]?.label, RECORD_LINK_FALLBACK)}
+          error={errors[name]}
+          hint={common.hint}
+        />
+      );
+    case "file":
+      // drawn above (it is not an input of the form)
+      return null;
     default: {
       // every type has its own input: a new type fails the build here until it gets one
       const unhandled: never = field.type;

@@ -13,9 +13,9 @@ import type { FormState } from "@/lib/action-result";
 
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
 import { conditionReminder, describeCondition, type BuiltinChoices } from "../conditions";
-import { canBeUnique, canHaveDefault } from "../settings";
+import { canBeRequired, canBeUnique, canHaveDefault } from "../settings";
 import { STATUS_COLORS, statusTone } from "../status-colors";
-import { FIELD_TYPE_LABELS, FIELD_TYPES, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
+import { FIELD_OBJECT_LABELS, FIELD_TYPE_LABELS, FIELD_TYPES, LINK_TARGETS, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
 import { displayCustomFields } from "../values";
 import { ConditionEditor } from "./condition-editor";
 import { CustomFieldInputs } from "./custom-field-inputs";
@@ -89,11 +89,32 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
           error={errors.options}
         />
       ) : null}
+      {type === "record_link" ? (
+        // FLD-06 part B: what the link points at; it cannot change after the field is added
+        <SelectField
+          label="מקשר אל"
+          name="link_target"
+          required
+          defaultValue={values?.link_target ?? ""}
+          hint="אי אפשר לשנות אחרי שמוסיפים את השדה."
+          error={errors.link_target}
+        >
+          <option value="">בחירה</option>
+          {LINK_TARGETS.map((target) => (
+            <option key={target} value={target}>
+              {FIELD_OBJECT_LABELS[target]}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      {type === "file" ? <p className="text-sm text-ink-soft">קובץ אחד לשדה, עד 25 MB, נספר בנפח האחסון. מצרפים אותו בכרטיס אחרי שהרשומה נשמרה.</p> : null}
       <TextField label="הסבר קצר (לא חובה)" name="help_text" maxLength={200} autoComplete="off" defaultValue={values?.help_text} error={errors.help_text} />
-      <label className="flex items-center gap-2.5 text-md">
-        <input type="checkbox" name="is_required" defaultChecked={values?.is_required === "on"} className="size-4.5 accent-accent" />
-        שדה חובה
-      </label>
+      {canBeRequired(type as FieldType) ? (
+        <label className="flex items-center gap-2.5 text-md">
+          <input type="checkbox" name="is_required" defaultChecked={values?.is_required === "on"} className="size-4.5 accent-accent" />
+          שדה חובה
+        </label>
+      ) : null}
       <SettingBoxes type={type as FieldType} unique={unique} onUnique={setUnique} readOnly={values?.is_read_only === "on"} />
       {errors.is_unique ? <p className="text-sm text-danger">{errors.is_unique}</p> : null}
       <p className="text-sm text-ink-soft">ערך ברירת מחדל, ומתי השדה מופיע או חובה, קובעים בכפתור &quot;עריכה&quot; של השדה, אחרי שמוסיפים אותו.</p>
@@ -262,15 +283,20 @@ function EditFieldForm({ orgId, objectType, fields, builtins, field, onDone }: E
       ) : null}
       {field.type === "status" ? <StatusColorPickers field={field} /> : null}
       <TextField label="הסבר קצר" name="help_text" maxLength={200} autoComplete="off" defaultValue={values?.help_text ?? field.helpText ?? ""} error={errors.help_text} />
-      <label className="flex items-center gap-2.5 text-md">
-        <input
-          type="checkbox"
-          name="is_required"
-          defaultChecked={values ? values.is_required === "on" : field.isRequired}
-          className="size-4.5 accent-accent"
-        />
-        שדה חובה
-      </label>
+      {field.type === "record_link" && field.linkTarget ? (
+        <p className="text-sm text-ink-soft">מקשר אל: {FIELD_OBJECT_LABELS[field.linkTarget]}</p>
+      ) : null}
+      {canBeRequired(field.type) ? (
+        <label className="flex items-center gap-2.5 text-md">
+          <input
+            type="checkbox"
+            name="is_required"
+            defaultChecked={values ? values.is_required === "on" : field.isRequired}
+            className="size-4.5 accent-accent"
+          />
+          שדה חובה
+        </label>
+      ) : null}
       <SettingBoxes type={field.type} unique={unique} onUnique={setUnique} readOnly={values ? values.is_read_only === "on" : field.isReadOnly === true} />
       {canHaveDefault(field.type) && !unique ? (
         <CustomFieldInputs definitions={[defaultInput]} stored={{ [field.key]: field.defaultValue ?? null }} submitted={values} errors={errors} />

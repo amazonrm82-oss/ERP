@@ -17,7 +17,7 @@ import { buildCondition, sameAsStored, type FieldCondition } from "./conditions"
 import { conditionBuiltinChoices } from "./condition-queries";
 import { listFieldDefinitions } from "./queries";
 import { createFieldSchema, updateFieldSchema } from "./schema";
-import { canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
+import { canBeRequired, canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
 import { colorsForOptions } from "./status-colors";
 import { FIELD_OBJECTS, inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
 import { parseCustomFields } from "./values";
@@ -55,6 +55,7 @@ type NewField = {
   is_required: boolean;
   is_unique?: boolean;
   is_read_only?: boolean;
+  link_target?: FieldObject;
 };
 type Context = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
 
@@ -75,8 +76,10 @@ async function insertField(context: Context, orgId: string, field: NewField): Pr
     label: field.label,
     field_type: field.field_type,
     options: TYPES_WITH_OPTIONS.includes(field.field_type) ? field.options : [],
-    is_required: field.is_required,
+    // FLD-06 part B: a file field is never required (its file is added after the record is saved)
+    is_required: field.is_required && canBeRequired(field.field_type),
     is_unique: field.is_unique === true && canBeUnique(field.field_type),
+    link_target: field.field_type === "record_link" ? (field.link_target ?? null) : null,
     is_read_only: field.is_read_only === true,
     help_text: field.help_text,
     position: count ?? 0,
@@ -92,7 +95,7 @@ export async function createFieldAction(orgId: string, _prev: FormState, formDat
   if (!context.ok) {
     return context;
   }
-  const parsed = createFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required", "is_unique", "is_read_only", "object_type", "field_type"]));
+  const parsed = createFieldSchema.safeParse(pick(formData, ["label", "options", "help_text", "is_required", "is_unique", "is_read_only", "object_type", "field_type", "link_target"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
@@ -140,6 +143,10 @@ export async function createImportFieldAction(
   // a "user" field holds a member's id, which a file does not have
   if (parsed.data.field_type === "user") {
     return fail("אי אפשר ליצור שדה מסוג משתמש מתוך ייבוא.");
+  }
+  // FLD-06 part B: a record link and a file are not values a file of rows carries
+  if (parsed.data.field_type === "record_link" || parsed.data.field_type === "file") {
+    return fail("אי אפשר ליצור שדה מהסוג הזה מתוך ייבוא.");
   }
   const created = await insertField(context, orgId, parsed.data);
   if (created.error !== null) {
@@ -213,7 +220,7 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
       ...(condition.changed ? { condition: condition.value } : {}),
       label: parsed.data.label,
       help_text: parsed.data.help_text,
-      is_required: parsed.data.is_required,
+      is_required: parsed.data.is_required && canBeRequired(type),
       is_unique: isUnique,
       is_read_only: parsed.data.is_read_only,
       default_value: defaultValue,

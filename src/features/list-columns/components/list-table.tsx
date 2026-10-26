@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/sortable-header";
 import { displayCustomFields } from "@/features/custom-fields/values";
-import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
+import { sortableField, type CustomValues, type FieldDefinition } from "@/features/custom-fields/types";
 import { cn } from "@/lib/cn";
 import type { Sort } from "@/lib/sort";
 
@@ -59,15 +59,26 @@ export function ListTable<R>({
         <thead className="border-b border-line bg-canvas">
           <tr>
             <SortableHeader label={nameColumn.label} direction={direction(nameColumn.key)} href={sortHref(nameColumn.key)} className={`${th} sticky start-0 z-10 min-w-44 bg-canvas sm:min-w-52`} />
-            {columns.map((column) => (
-              <SortableHeader
-                key={column.key}
-                label={labels.get(column.key) ?? column.key}
-                direction={direction(column.key)}
-                href={sortHref(column.key)}
-                className={cn(th, WIDTH_CLASS[column.width])}
-              />
-            ))}
+            {columns.map((column) => {
+              const field = fieldByKey.get(column.key);
+              // FLD-06 part B: a record link or a file holds an id, so its column does not sort
+              if (field && !sortableField(field)) {
+                return (
+                  <th key={column.key} scope="col" className={cn(th, WIDTH_CLASS[column.width])}>
+                    {labels.get(column.key) ?? column.key}
+                  </th>
+                );
+              }
+              return (
+                <SortableHeader
+                  key={column.key}
+                  label={labels.get(column.key) ?? column.key}
+                  direction={direction(column.key)}
+                  href={sortHref(column.key)}
+                  className={cn(th, WIDTH_CLASS[column.width])}
+                />
+              );
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -81,7 +92,12 @@ export function ListTable<R>({
                   return (
                     <td key={column.key} className={cn(td, "group-hover:bg-canvas/50")}>
                       {shown.text ? (
-                        shown.href ? (
+                        shown.internalHref ? (
+                          // FLD-06 part B: a linked record or a field's file
+                          <a href={shown.internalHref} className="break-words text-accent-strong underline underline-offset-4">
+                            {shown.text}
+                          </a>
+                        ) : shown.href ? (
                           <a href={shown.href} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all text-accent-strong underline underline-offset-4">
                             {shown.text}
                             <span className="sr-only"> (נפתח בחלון חדש)</span>

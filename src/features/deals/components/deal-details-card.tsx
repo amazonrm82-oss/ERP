@@ -277,7 +277,7 @@ function DealEditForm({ orgId, deal, companies, lossReasons, onDone, terms }: Ed
               error={errors.competitor}
             />
           )}
-          <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} objectType="deal" builtins={deal.custom.builtins} />
+          <CustomFieldInputs definitions={deal.custom.definitions} stored={deal.custom.values} submitted={values} errors={errors} objectType="deal" record={{ object: "deal", id: deal.id }} builtins={deal.custom.builtins} />
           <div className="flex flex-wrap gap-2 pt-1">
             <SubmitButton size="sm">שמירה</SubmitButton>
             <Button variant="ghost" size="sm" onClick={() => onDone()}>

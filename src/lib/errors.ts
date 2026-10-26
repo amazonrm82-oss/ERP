@@ -64,6 +64,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "file:version_taken": "מישהו כבר העלה גרסה חדשה של הקובץ הזה. רעננו את הדף והעלו מעל הגרסה האחרונה.",
   "file:pending_max": "יותר מדי קבצים עדיין בהעלאה. חכו כמה דקות ונסו שוב.",
   "file:document_type": "למסמך או לתשלום אפשר לצרף רק PDF או תמונה.",
+  // FLD-06 part B (migration field_types_part_b)
+  "file:field": "הקובץ שייך לשדה מסוג קובץ: מחליפים או מסירים אותו מהשדה עצמו, ברשומה שמותר לכם לערוך.",
+  "custom_field:type_locked": "אי אפשר לשנות את הסוג של שדה קישור לרשומה או שדה קובץ, ולא את סוג הרשומה שהקישור מצביע עליה. אפשר להוסיף שדה חדש.",
+  "custom_field:automation": "אוטומציה לא מעדכנת שדה של קישור לרשומה או של קובץ.",
   "file:kept": "קובץ של מסמך או של תשלום לא נמחק. אפשר להעלות גרסה חדשה (הקודמת נשמרת), או לבטל את המסמך או התשלום עם סיבה.",
   // wave 2 plan keys (migration wave2_plan_keys; src/lib/plan-keys.ts)
   "feature:products": "קטלוג המוצרים אינו כלול בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -548,6 +552,15 @@ export function customFieldMessage(error: unknown): string | null {
       return "לשדה ייחודי אין ערך ברירת מחדל, כי כל רשומה חדשה הייתה מקבלת אותו ערך.";
     case "custom_field:default":
       return "ערך ברירת המחדל אינו מתאים לסוג השדה או לאפשרויות שלו. אם הסרתם אפשרות, בחרו ברירת מחדל אחרת קודם.";
+    // FLD-06 part B (migration field_types_part_b): the field's label travels in the detail
+    case "custom_field:record_link":
+      return detail
+        ? `הרשומה שנבחרה בשדה "${detail}" לא נמצאה, נמצאת בסל המחזור או שאין לכם גישה אליה. בחרו רשומה אחרת.`
+        : "הרשומה המקושרת לא נמצאה, נמצאת בסל המחזור או שאין לכם גישה אליה. בחרו רשומה אחרת.";
+    case "custom_field:file":
+      return detail
+        ? `הקובץ של השדה "${detail}" לא נמצא או שעדיין לא סיים לעלות. העלו אותו שוב.`
+        : "הקובץ של השדה לא נמצא או שעדיין לא סיים לעלות. העלו אותו שוב.";
     // FLD-09 (migration conditional_fields)
     case "custom_field:condition":
       return "אי אפשר לשמור את התנאי: השדה הקובע צריך להיות שדה פעיל אחר, בלי תנאי משלו, והערך צריך להתאים לו. רעננו את הדף ונסו שוב.";

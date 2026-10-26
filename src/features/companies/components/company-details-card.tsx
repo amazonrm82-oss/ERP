@@ -156,6 +156,7 @@ function CompanyEditForm({ orgId, company, types, onDone }: { orgId: string; com
             definitions={company.custom.definitions}
             stored={company.custom.values}
             objectType="company"
+            record={{ object: "company", id: company.id }}
             builtins={company.custom.builtins}
             submitted={failure?.values}
             errors={failure?.fieldErrors}

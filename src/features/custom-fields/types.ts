@@ -15,11 +15,13 @@ export const FIELD_OBJECT_LABELS: Record<FieldObject, string> = {
 };
 
 // Every field type the database accepts (FLD-01 added eight to the screens; FLD-06 part A added rich_text,
-// duration and status). A new type also needs its decision in every place listed in type-decisions.ts.
+// duration and status; part B address, record_link and file). A new type also needs its decision in every place listed
+// in type-decisions.ts.
 export const FIELD_TYPES = [
   "text", "long_text", "number", "currency", "percent", "rating", "select", "multi_select", "checkbox",
   "date", "datetime", "phone", "email", "url", "il_id", "il_company_id", "user",
   "rich_text", "duration", "status",
+  "address", "record_link", "file",
 ] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
@@ -44,7 +46,21 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   rich_text: "טקסט מעוצב",
   duration: "משך זמן",
   status: "סטטוס צבעוני",
+  address: "כתובת",
+  record_link: "קישור לרשומה",
+  file: "קובץ",
 };
+
+// FLD-06 part B: what a record_link field may point at (field_definitions.link_target, constraint
+// field_definitions_link_target_check)
+export const LINK_TARGETS = FIELD_OBJECTS;
+export type LinkTarget = FieldObject;
+export function isLinkTarget(value: unknown): value is LinkTarget {
+  return typeof value === "string" && (LINK_TARGETS as readonly string[]).includes(value);
+}
+
+/** FLD-06 part B: how a record link or a file value is shown, read for the page with the viewer's session. */
+export type FieldRef = { label: string; href: string | null };
 
 // types whose choices are typed in the field settings
 export const TYPES_WITH_OPTIONS: readonly FieldType[] = ["select", "multi_select", "status"];
@@ -60,6 +76,13 @@ export type FieldDefinition = {
   optionColors?: Record<string, string>;
   // user: the business's members, filled in when the definitions are read
   choices?: Array<{ value: string; label: string }>;
+  // FLD-06 part B: a record_link field's target type
+  linkTarget?: LinkTarget | null;
+  // FLD-06 part B: the record links' and files' names for this page, by id (filled by withFieldRefs); an id that is
+  // missing here is shown neutrally ("רשומה" / "קובץ"), never by its id
+  refs?: Record<string, FieldRef>;
+  // FLD-06 part B: the business, for the record link picker and the file field's upload
+  orgId?: string;
   // DEAL-05's built-in contact: asked with the contact search picker of this business instead of a list of choices
   contactPicker?: { orgId: string };
   isRequired: boolean;
@@ -89,4 +112,9 @@ export type CustomValues = Record<string, Json | undefined>;
 
 export function asCustomValues(value: Json): CustomValues {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+/** FLD-06 part B: a list sorts by a custom field's stored value; a record link or a file holds an id, so it does not sort. */
+export function sortableField(field: Pick<FieldDefinition, "type">): boolean {
+  return field.type !== "record_link" && field.type !== "file";
 }

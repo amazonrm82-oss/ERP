@@ -26,9 +26,9 @@ function sourceFiles(dir: string): string[] {
 const SWITCH = /"(multi_select|long_text|rich_text|il_company_id)"|eq\("field_type"|Record<FieldType\b/;
 
 describe("field type decisions (FLD-06)", () => {
-  it("the baseline is part of FIELD_TYPES, and part A added rich_text, duration and status", () => {
+  it("the baseline is part of FIELD_TYPES; part A added rich_text, duration and status, part B address, record_link and file", () => {
     for (const type of BASELINE_FIELD_TYPES) expect(FIELD_TYPES).toContain(type);
-    expect(ADDED).toEqual(["rich_text", "duration", "status"]);
+    expect(ADDED).toEqual(["rich_text", "duration", "status", "address", "record_link", "file"]);
   });
 
   it("every listed place decides for every added type, and nothing else", () => {

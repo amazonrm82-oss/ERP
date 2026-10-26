@@ -18,6 +18,8 @@ import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, lis
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
+import { sortableField } from "@/features/custom-fields/types";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
@@ -73,7 +75,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const filter = await prepareListFilter(orgId, "lead", firstParam(query.f), context.user.id, listColumns.fields);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   // any column the list can show sorts, custom fields included (LST-02, LST-03)
-  const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
+  const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof LEAD_SORT_COLUMNS | CustomSortKey
   >;
   const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
@@ -226,7 +228,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               sources={lookups.sources}
               columns={shownColumns}
               catalog={listColumns.catalog}
-              fields={listColumns.fields}
+              fields={await withFieldRefs(orgId, listColumns.fields, leads.map((row) => row.customFields))}
               sort={sort}
               sortHref={sortHref}
               editing={editing}

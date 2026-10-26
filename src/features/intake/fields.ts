@@ -20,8 +20,10 @@ export const MAX_FORM_FIELDS = 40;
 export const MAX_HELP_LENGTH = 300;
 export const MAX_SHOW_VALUE_LENGTH = 200;
 // picking a team member is not something a visitor does. FLD-06 part A: rich text (a visitor's text is shown
-// as plain text, REC-04), duration and status stay off public forms for now (a follow-up decides).
-export const FORM_EXCLUDED_TYPES: readonly FieldType[] = ["user", "rich_text", "duration", "status"];
+// as plain text, REC-04), duration and status stay off public forms for now (a follow-up decides). FLD-06 part B: an
+// address is a plain line a visitor types (on forms); a record link names a record of the business and a file needs the
+// record first, so neither is a visitor's.
+export const FORM_EXCLUDED_TYPES: readonly FieldType[] = ["user", "rich_text", "duration", "status", "record_link", "file"];
 
 /** Shown only when an earlier field has a value (any value when `value` is null, else that choice). */
 export type ShowIf = { field: string; value: string | null };

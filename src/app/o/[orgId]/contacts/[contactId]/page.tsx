@@ -23,6 +23,7 @@ import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
 import { RecordSummaryCard } from "@/features/record-summary/components/record-summary-card";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { getOrgModules } from "@/features/modules/queries";
@@ -88,7 +89,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [contact, mainDeals, dealRoles, fields, follow, billing, cardLayout, terms] = await Promise.all([
+  const [contact, mainDeals, dealRoles, fieldDefs, follow, billing, cardLayout, terms] = await Promise.all([
     getContact(orgId, contactId),
     listRelatedDeals(orgId, { contactId }),
     listContactDealRoles(orgId, contactId),
@@ -109,6 +110,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
   if (!contact) {
     notFound();
   }
+  // FLD-06 part B: the names of the record links and files this record holds, as this viewer may read them
+  const fields = await withFieldRefs(orgId, fieldDefs, [contact.custom_fields]);
   const canEdit = canEditRecordHint(context, contact.owner_id);
   // LEAD-08: with companies switched off, the company field, the companies card and the domain note are left out
   const modules = await getOrgModules(orgId);

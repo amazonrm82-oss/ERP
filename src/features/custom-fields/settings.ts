@@ -14,9 +14,17 @@ export function canBeUnique(type: FieldType): boolean {
   return UNIQUE_TYPES.includes(type);
 }
 
-/** A "user" field has no default: the person who fills it in is not known ahead. */
+/**
+ * A "user" field has no default: the person who fills it in is not known ahead. FLD-06 part B: nor a record link or a file
+ * (each names one record's own thing; the database refuses it, hint custom_field:default).
+ */
 export function canHaveDefault(type: FieldType): boolean {
-  return type !== "user";
+  return type !== "user" && type !== "record_link" && type !== "file";
+}
+
+/** FLD-06 part B: a file is uploaded on the record's card after it is saved, so a file field is never required. */
+export function canBeRequired(type: FieldType): boolean {
+  return type !== "file";
 }
 
 /** Why these settings cannot be saved, or null. The value itself is checked by parseCustomFields. */

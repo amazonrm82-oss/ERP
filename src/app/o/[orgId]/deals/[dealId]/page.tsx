@@ -17,6 +17,7 @@ import { recordSummary } from "@/features/share/summary";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { listCompanyOptions } from "@/features/companies/queries";
 import { getOrgModules } from "@/features/modules/queries";
@@ -88,7 +89,7 @@ export default async function DealPage({ params, searchParams }: Props) {
   }
   // CON-03 follow-up: the business's list of roles names each linked contact's role
   const contactRoles = await listDealContactRoles(orgId);
-  const [deal, fields, tags, follow, dealContacts, lossReasons, cardLayout, terms] = await Promise.all([
+  const [deal, fieldDefs, tags, follow, dealContacts, lossReasons, cardLayout, terms] = await Promise.all([
     getDeal(orgId, dealId),
     listFieldDefinitions(orgId, "deal"),
     listTags(orgId),
@@ -103,6 +104,8 @@ export default async function DealPage({ params, searchParams }: Props) {
   if (!deal) {
     notFound();
   }
+  // FLD-06 part B: the names of the record links and files this record holds, as this viewer may read them
+  const fields = await withFieldRefs(orgId, fieldDefs, [deal.custom_fields]);
   const canEdit = canEditRecordHint(context, deal.owner_id);
   // LEAD-08: with companies switched off the deal's company field is left out (null)
   const modules = await getOrgModules(orgId);

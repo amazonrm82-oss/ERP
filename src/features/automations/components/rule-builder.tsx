@@ -640,7 +640,13 @@ function SetFieldValue({
     case "rich_text":
     case "long_text":
     case "text":
+    // FLD-06 part B: an address is one line of text
+    case "address":
       return text({});
+    // FLD-06 part B: never offered (setFieldChoices leaves them out; the database refuses them in a run)
+    case "record_link":
+    case "file":
+      return null;
     default: {
       // every type has its own input: a new type fails the build here until it gets one
       const unhandled: never = field.type;

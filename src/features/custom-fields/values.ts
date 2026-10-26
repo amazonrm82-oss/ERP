@@ -6,6 +6,9 @@ import { statusTone, type StatusColor } from "./status-colors";
 import { inputName, type CustomValues, type FieldDefinition } from "./types";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { israeliIdNumber } from "@/lib/israeli-id";
+import { isUuid } from "@/lib/paths";
+
+import { mapLinks, type MapLinks } from "./links";
 
 export { israeliIdNumber };
 
@@ -16,6 +19,11 @@ const DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/;
 // FLD-06: a duration is whole minutes, from 0 to a year (app.custom_value_ok holds the same)
 export const MAX_DURATION_MINUTES = 525_600;
 export const MAX_RICH_TEXT_LENGTH = 5000;
+// FLD-06 part B: an address is one line (app.custom_value_ok holds the same)
+export const MAX_ADDRESS_LENGTH = 500;
+// FLD-06 part B: how a record link or a file is shown when the page did not read it (or the viewer may not read it)
+export const RECORD_LINK_FALLBACK = "רשומה";
+export const FILE_FALLBACK = "קובץ";
 
 /** "90" (minutes) or "1:30" (hours and minutes) -> minutes; null when it is neither, or past a year. */
 export function parseDuration(text: string): number | null {
@@ -65,6 +73,8 @@ export function parseCustomFields(
   const errors: Record<string, string> = {};
 
   for (const field of definitions) {
+    // FLD-06 part B: a file is uploaded and set on its own (field-file actions), never through the record's form
+    if (field.type === "file") continue;
     const name = inputName(field.key);
     const raw = formData.get(name);
     const text = typeof raw === "string" ? raw.trim() : "";
@@ -153,6 +163,17 @@ export function parseCustomFields(
         else values[field.key] = minutes;
         break;
       }
+      case "address":
+        // one line; the database checks the same (app.custom_value_ok)
+        if (/[\r\n]/.test(text)) errors[name] = "הכתובת צריכה להיות בשורה אחת.";
+        else if (text.length > MAX_ADDRESS_LENGTH) errors[name] = "הכתובת ארוכה מדי (עד 500 תווים).";
+        else values[field.key] = text;
+        break;
+      case "record_link":
+        // the picker's id; the database checks that it names a live record of the business that the writer reads
+        if (!isUuid(text)) errors[name] = "יש לבחור רשומה מהחיפוש.";
+        else values[field.key] = text.toLowerCase();
+        break;
       case "rich_text": {
         // REC-04: stored as cleaned Markdown, never HTML
         const clean = sanitizeNote(text);
@@ -255,6 +276,10 @@ export type CustomFieldDisplay = {
   markdown?: string | null;
   // FLD-06: a status value's palette key
   tone?: StatusColor | null;
+  // FLD-06 part B: a page inside the app (a linked record, a field's file), opened in the same tab
+  internalHref?: string | null;
+  // FLD-06 part B: an address's Waze and Google Maps links
+  maps?: MapLinks | null;
 };
 
 /** Active fields with their values, formatted for a details card. */
@@ -274,6 +299,8 @@ export function displayCustomFields(definitions: FieldDefinition[], values: Cust
       else if (field.type === "user" && typeof value === "string") text = field.choices?.find((c) => c.value === value)?.label ?? "משתמש שאינו בעסק";
       else if (field.type === "duration" && typeof value === "number") text = formatDuration(value);
       else if (field.type === "rich_text" && typeof value === "string") text = notePlainText(value) || null;
+      else if (field.type === "record_link" && typeof value === "string") text = field.refs?.[value]?.label ?? RECORD_LINK_FALLBACK;
+      else if (field.type === "file" && typeof value === "string") text = field.refs?.[value]?.label ?? FILE_FALLBACK;
       else text = String(value);
     } else if (field.type === "checkbox") {
       text = "לא";
@@ -286,6 +313,9 @@ export function displayCustomFields(definitions: FieldDefinition[], values: Cust
       href: field.type === "url" && typeof value === "string" ? value : null,
       markdown: field.type === "rich_text" && typeof value === "string" && value.trim() !== "" ? value : null,
       tone: field.type === "status" && typeof value === "string" && value !== "" ? statusTone(field, value) : null,
+      internalHref:
+        (field.type === "record_link" || field.type === "file") && typeof value === "string" ? (field.refs?.[value]?.href ?? null) : null,
+      maps: field.type === "address" && typeof value === "string" ? mapLinks(value) : null,
     };
   });
 }

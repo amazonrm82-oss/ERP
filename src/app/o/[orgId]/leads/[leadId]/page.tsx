@@ -23,6 +23,7 @@ import { Timeline } from "@/features/activities/components/timeline";
 import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
@@ -77,7 +78,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [lead, lookups, fields, reasons, follow, cardLayout, terms] = await Promise.all([
+  const [lead, lookups, fieldDefs, reasons, follow, cardLayout, terms] = await Promise.all([
     getLead(orgId, leadId),
     getLeadLookups(orgId),
     listFieldDefinitions(orgId, "lead"),
@@ -91,6 +92,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
   if (!lead) {
     notFound();
   }
+  // FLD-06 part B: the names of the record links and files this record holds, as this viewer may read them
+  const fields = await withFieldRefs(orgId, fieldDefs, [lead.custom_fields]);
   // LEAD-04: the requested product, and whether the plan has the product catalog
   const [tags, owners, productsEnabled, requestedProduct, hasQuotes] = await Promise.all([
     listTags(orgId),

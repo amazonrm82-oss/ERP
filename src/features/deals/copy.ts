@@ -81,6 +81,8 @@ export function copyCustomFields(values: Json, definitions: FieldDefinition[]): 
   for (const field of definitions) {
     const value = stored[field.key];
     if (value === null || value === undefined) continue;
+    // FLD-06 part B: a file belongs to the original deal; it is not copied (and not a value that "no longer fits")
+    if (field.type === "file") continue;
     const name = inputName(field.key);
     const form = new FormData();
     if (field.type === "multi_select") {

@@ -12,11 +12,12 @@ export type ConversionMapData = {
   rows: MapRow[];
 };
 
-const asMapField = (f: { id: string; label: string; type: string; isActive: boolean }): MapField => ({
+const asMapField = (f: { id: string; label: string; type: string; isActive: boolean; linkTarget?: string | null }): MapField => ({
   id: f.id,
   label: f.label,
   type: f.type,
   isActive: f.isActive,
+  linkTarget: f.linkTarget ?? null,
 });
 
 /** LEAD-06: the lead custom fields, the contact and deal fields, and the stored mapping (everyone in the organization reads it). */
@@ -34,7 +35,8 @@ export async function getConversionMap(orgId: string): Promise<ConversionMapData
   ]);
   const rows = must(result, "conversion_field_maps");
   return {
-    leadFields: lead.map(asMapField),
+    // FLD-06 part B: a file belongs to the lead and is never copied (app.carry_custom_fields)
+    leadFields: lead.filter((field) => field.type !== "file").map(asMapField),
     targets: { contact: contact.map(asMapField), deal: deal.map(asMapField) },
     rows: rows.flatMap((r) =>
       isMapTarget(r.target_type) && isMapMode(r.mode)

@@ -33,6 +33,7 @@ import { insertOnboardingTask, openOnboardingTask } from "./onboarding-server";
 import { RECURRING_FIELD_NAMES, recurringFormSchema, shownRecurringAmount, typedDealValue, type RecurringPatch } from "./recurring";
 import { createDealSchema, DEAL_FIELD_NAMES, moveDealSchema, UPDATE_DEAL_FIELD_NAMES, updateDealSchema } from "./schema";
 import { snoozeSchema } from "./snooze";
+import { unusableLinkKeys } from "@/features/custom-fields/refs";
 import {
   COPY_SKIPPED_PARAM,
   copyCloseDate,
@@ -606,9 +607,12 @@ export async function duplicateDealAction(orgId: string, dealId: string, _prev: 
   };
   // values a field no longer accepts are left out, and the new deal's page names those fields
   const custom = copyCustomFields(deal.custom_fields, fields.definitions);
-  let skipped: string[] | "all" = custom.skipped;
+  // FLD-06 part B: a record link the user cannot use (gone, in the bin, not readable) is left out and named too
+  const unusable = await unusableLinkKeys(orgId, fields.definitions, custom.values);
+  for (const key of unusable) delete custom.values[key];
+  let skipped: string[] | "all" = [...custom.skipped, ...unusable];
   let { data, error } = await supabase.from("deals").insert({ ...row, custom_fields: custom.values }).select("id").single();
-  if (error?.hint === "custom_field:invalid") {
+  if (error?.hint === "custom_field:invalid" || error?.hint === "custom_field:record_link") {
     // the database still refused one (its rule and the form's differ somewhere): the copy goes without custom fields
     skipped = "all";
     ({ data, error } = await supabase.from("deals").insert(row).select("id").single());

@@ -67,7 +67,7 @@ describe("new custom field types (FLD-06 part A)", () => {
   });
 
   it("another type is still refused", async () => {
-    expect((await failure(define("bad_type", "address"))).code).toBe("23514");
+    expect((await failure(define("bad_type", "geo_point"))).code).toBe("23514");
   });
 
   it("only a status field has colours, from the palette, for its own options", async () => {

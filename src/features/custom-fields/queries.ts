@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { parseCondition } from "./conditions";
 import { parseOptionColors } from "./status-colors";
-import { isFieldType, type FieldDefinition, type FieldObject } from "./types";
+import { isFieldType, isLinkTarget, type FieldDefinition, type FieldObject } from "./types";
 
 /** Custom field definitions of one object type, in order. Active ones only unless asked. */
 export async function listFieldDefinitions(
@@ -16,7 +16,7 @@ export async function listFieldDefinitions(
   const supabase = await createClient();
   let query = supabase
     .from("field_definitions")
-    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at, option_colors")
+    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at, option_colors, link_target")
     .eq("organization_id", orgId)
     .eq("object_type", objectType);
   if (!options.includeInactive) {
@@ -45,6 +45,9 @@ export async function listFieldDefinitions(
       defaultValue: row.default_value,
       condition: parseCondition(row.condition),
       conditionRemovedAt: row.condition_removed_at,
+      // FLD-06 part B
+      ...(row.field_type === "record_link" ? { linkTarget: isLinkTarget(row.link_target) ? row.link_target : null } : {}),
+      ...(row.field_type === "record_link" || row.field_type === "file" ? { orgId } : {}),
       };
     });
   // a "user" field picks one of the business's members (FLD-01); a former member keeps their name

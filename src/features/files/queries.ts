@@ -31,6 +31,8 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
     .eq(SUBJECT_COLUMN[subject.kind], subject.id)
     // FXS-07: an upload that has not been confirmed is not shown
     .is("unconfirmed_since", null)
+    // FLD-06 part B: a file field's file shows in its field, not among the record's files
+    .is("custom_field_key", null)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(`files query failed: ${error.message}`);

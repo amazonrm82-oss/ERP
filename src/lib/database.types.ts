@@ -866,6 +866,8 @@ export type FieldDefinitionRow = {
   condition_removed_at: string | null;
   // FLD-06: a status field's {option: palette key}; '{}' for every other type (check field_definitions_option_colors_check)
   option_colors: Json;
+  // FLD-06 part B: a record_link field's target type (lead|contact|company|deal); null for every other type; never changed
+  link_target: string | null;
 };
 
 export type SavedViewRow = {
@@ -1056,6 +1058,8 @@ export type FileRow = {
   // FXS-07: set (server only) while a person's upload waits for confirm_file_upload(); null = confirmed or made by the server
   unconfirmed_since: string | null;
   upload_checked_at: string | null;
+  // FLD-06 part B: the file field (custom field key) of its record this file was uploaded for; null = a plain record file
+  custom_field_key: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2482,6 +2486,7 @@ export type Database = {
           default_value?: Json | null;
           condition?: Json | null;
           option_colors?: Json;
+          link_target?: string | null;
         }
       >;
       saved_views: Table<
@@ -2595,6 +2600,7 @@ export type Database = {
           previous_id?: string | null;
           accounting_document_id?: string | null;
           payment_id?: string | null;
+          custom_field_key?: string | null;
         },
         Record<string, never>
       >;

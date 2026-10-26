@@ -8,7 +8,8 @@ import { DEAL_STATUS } from "@/features/deals/display";
 import { BILLING_KIND_LABELS, billingKindOf, recurringText } from "@/features/deals/recurring";
 import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, getPipeline, listDeals } from "@/features/deals/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
-import { asCustomValues } from "@/features/custom-fields/types";
+import { withFieldRefs } from "@/features/custom-fields/refs";
+import { asCustomValues, sortableField } from "@/features/custom-fields/types";
 import { displayCustomFields } from "@/features/custom-fields/values";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
@@ -77,7 +78,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   const statusId = object === "lead" && isUuid(params.get("status") ?? "") ? params.get("status") : null;
   const sortColumns = { lead: LEAD_SORT_COLUMNS, contact: CONTACT_SORT_COLUMNS, company: COMPANY_SORT_COLUMNS, deal: DEAL_SORT_COLUMNS, task: TASK_SORT_COLUMNS }[object];
   const defaultSort = { lead: LEAD_DEFAULT_SORT, contact: CONTACT_DEFAULT_SORT, company: COMPANY_DEFAULT_SORT, deal: DEAL_DEFAULT_SORT, task: TASK_DEFAULT_SORT }[object];
-  const sortKeys = [...offeredSortKeys(Object.keys(sortColumns), listColumns.catalog), ...listColumns.fields.map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
+  const sortKeys = [...offeredSortKeys(Object.keys(sortColumns), listColumns.catalog), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
   const sort = parseSort(params.get("sort") ?? "", sortKeys, defaultSort as unknown as Sort<CustomSortKey>);
 
   // the columns of the open view, or the user's own
@@ -85,7 +86,6 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   const view = viewId ? (await viewChips(orgId, object, context)).chips.find((v) => v.id === viewId) : null;
   const columns = view?.config.columns ? resolveColumns(object, view.config.columns, listColumns.catalog) : listColumns.columns;
   const labels = new Map(listColumns.catalog.map((column) => [column.key, column.label]));
-  const fieldByKey = new Map(listColumns.fields.map((field) => [`${CUSTOM_PREFIX}${field.key}`, field]));
 
   // picked rows ignore the list's filters: they were picked on screen
   const options = scope === "selected" ? { search: "", page: 1, sort, ids: picked } : { search, tagId, page: 1, sort, filter: filter.logic };
@@ -217,11 +217,14 @@ export async function exportList(request: Request, orgId: string, object: Exclud
     return text(`ברשימה יותר מ-${MAX_ROWS.toLocaleString("he-IL")} שורות. צמצמו בסינון, או השתמשו בייצוא המלא בהגדרות.`, 413);
   }
 
+  // FLD-06 part B: record links and files by name, as this user may read them
+  const refFields = await withFieldRefs(orgId, listColumns.fields, rows.map((row) => row.customFields));
+  const refFieldByKey = new Map(refFields.map((field) => [`${CUSTOM_PREFIX}${field.key}`, field]));
   const header = [object === "task" ? "כותרת" : "שם", ...columns.map((column) => labels.get(column.key) ?? column.key)];
   const body = rows.map((row) => [
     row.name,
     ...columns.map((column) => {
-      const field = fieldByKey.get(column.key);
+      const field = refFieldByKey.get(column.key);
       if (field) return displayCustomFields([field], asCustomValues(row.customFields))[0].text ?? "";
       return row.cells[column.key] ?? "";
     }),

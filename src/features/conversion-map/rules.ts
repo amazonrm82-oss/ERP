@@ -40,7 +40,8 @@ export function targetDeleteWarning(leadFieldLabel: string, type: MapTarget): st
   return `השדה הזה מקבל ערכים מלידים בהמרה. אחרי המחיקה הערך של ${leadFieldLabel} לא יועבר ${type === "deal" ? "לעסקה" : "לאיש הקשר"}.`;
 }
 
-export type MapField = { id: string; label: string; type: string; isActive: boolean };
+// FLD-06 part B: a record link field also names its target; it goes only to a field of the same target
+export type MapField = { id: string; label: string; type: string; isActive: boolean; linkTarget?: string | null };
 
 export type MapMode = "auto" | "none" | "field";
 export type MapRow = {
@@ -68,9 +69,12 @@ export function isMapMode(value: string): value is MapMode {
 
 const sameLabel = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/** The fields a lead field may go to: active, same type. `targets` come in screen order (position, created_at). */
+/**
+ * The fields a lead field may go to: active, same type (a record link: same target too, as app.carry_custom_fields).
+ * `targets` come in screen order (position, created_at).
+ */
 export function offeredTargets(lead: MapField, targets: MapField[]): MapField[] {
-  return targets.filter((t) => t.isActive && t.type === lead.type);
+  return targets.filter((t) => t.isActive && t.type === lead.type && (t.linkTarget ?? null) === (lead.linkTarget ?? null));
 }
 
 /** The fields of one record type that a lead field picked by hand: "auto" never reaches them. */

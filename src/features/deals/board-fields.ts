@@ -32,8 +32,10 @@ export const BOARD_DEFAULT_FIELDS = ["amount", "stuck", "contact"];
 export const MAX_BOARD_FIELDS = 8;
 
 /** Every field a card can show: the built-in ones, then the organization's deal custom fields. */
-export function boardCatalog(fields: Array<{ key: string; label: string }>): CatalogColumn[] {
-  return [...BOARD_FIELDS, ...fields.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
+export function boardCatalog(fields: Array<{ key: string; label: string; type?: string }>): CatalogColumn[] {
+  // FLD-06 part B: a record link or a file is not a card line (a dragged card does not read other records' names)
+  const shown = fields.filter((field) => field.type !== "record_link" && field.type !== "file");
+  return [...BOARD_FIELDS, ...shown.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
 }
 
 /**

@@ -15,6 +15,7 @@ import { RecordTasks } from "@/features/tasks/components/record-tasks";
 import { RecordMeetings } from "@/features/meetings/components/record-meetings";
 import { RecordSummaryCard } from "@/features/record-summary/components/record-summary-card";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { withFieldRefs } from "@/features/custom-fields/refs";
 import { asCustomValues } from "@/features/custom-fields/types";
 import { trashCompanyAction } from "@/features/companies/actions";
 import { getCardLayout } from "@/features/card-layout/queries";
@@ -65,7 +66,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  const [company, contacts, deals, fields, tags, types, follow, billing, cardLayout] = await Promise.all([
+  const [company, contacts, deals, fieldDefs, tags, types, follow, billing, cardLayout] = await Promise.all([
     getCompany(orgId, companyId),
     // CON-05: the people linked to the company, with their role there
     listCompanyPeople(orgId, companyId),
@@ -82,6 +83,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
   if (!company) {
     notFound();
   }
+  // FLD-06 part B: the names of the record links and files this record holds, as this viewer may read them
+  const fields = await withFieldRefs(orgId, fieldDefs, [company.custom_fields]);
   // CON-07: the parent and the child companies the user may read
   // CON-09: the domain the company gets from its contacts' emails, when it has none of its own
   const [family, contactDomain] = await Promise.all([
