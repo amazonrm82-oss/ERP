@@ -25,7 +25,8 @@ export function canHaveDefault(type: FieldType): boolean {
 /**
  * Every type may be required. FLD-06 part B follow-up (owner, 26 October 2026): a file field too, but a file is uploaded on
  * the record's card after it is saved, so "required" is checked only when an existing record is saved from its edit card
- * (missingRequiredFiles), never on create, a board drag, a table cell or a bulk change.
+ * (missingRequiredFiles), never on create, a board drag, a table cell or a bulk change. Owner, 26 October 2026: a "require"
+ * condition (FLD-09) asks for it there too, and a required file is replaced, never removed (fileFieldRequired).
  */
 export function canBeRequired(type: FieldType): boolean {
   void type;

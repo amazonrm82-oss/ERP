@@ -85,7 +85,7 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
   "src/features/custom-fields/settings.ts": {
     what: "unique types and defaults (FLD-07)",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_EXCLUDED },
-    note: "never unique (mirrors the database); a default is allowed for all three. Part B: never unique; an address takes a default, a record link or a file does not (canHaveDefault); a file field may be required, checked only when the edit card is saved (missingRequiredFiles, owner 26 October 2026)",
+    note: "never unique (mirrors the database); a default is allowed for all three. Part B: never unique; an address takes a default, a record link or a file does not (canHaveDefault); a file field may be required, checked only when the edit card is saved (missingRequiredFiles, owner 26 October 2026), also when a FLD-09 require condition holds there, and a required file is replaced, never removed (fileFieldRequired)",
   },
   "src/features/list-filters/server.ts": {
     what: "list filters",

@@ -182,8 +182,18 @@ export function conditionApplies(condition: FieldCondition, definitions: FieldDe
 
 export type FieldState = { visible: boolean; required: boolean };
 
-/** Whether a field shows and whether it is required, for these values. */
-export function fieldState(field: FieldDefinition, definitions: FieldDefinition[], values: ConditionValues, objectType?: FieldObject): FieldState {
+/**
+ * Whether a field shows and whether it is required, for these values. `files`: the edit card of a saved record, where a
+ * file field can be filled (FLD-06 part B follow-up, owner 26 October 2026, answer 4 (ב)): there a "require" condition
+ * holds for a file field too; anywhere else (a create form, a move, a table cell, bulk) it never asks for a file.
+ */
+export function fieldState(
+  field: FieldDefinition,
+  definitions: FieldDefinition[],
+  values: ConditionValues,
+  objectType?: FieldObject,
+  options: { files?: boolean } = {},
+): FieldState {
   const condition = field.condition ?? null;
   if (!condition || !conditionApplies(condition, definitions, objectType)) {
     return { visible: true, required: field.isRequired };
@@ -192,8 +202,24 @@ export function fieldState(field: FieldDefinition, definitions: FieldDefinition[
   if (condition.effect === "show") {
     return holds ? { visible: true, required: field.isRequired } : { visible: false, required: false };
   }
-  // FLD-06 part B: a file is added on the card after the record is saved, so a "require" condition never asks for it
-  return { visible: true, required: field.isRequired || (holds && field.type !== "file") };
+  // FLD-06 part B: a file is added on the card after the record is saved, so only the edit card asks for it
+  return { visible: true, required: field.isRequired || (holds && (field.type !== "file" || options.files === true)) };
+}
+
+/**
+ * FLD-06 part B follow-up (owner, 26 October 2026, answers 3 and 4 (ב)): a file field the edit card requires, by its own
+ * "required" box or by a "require" condition that holds for these values. Its file may be replaced by a new one, never
+ * removed. App-only, like "required" itself.
+ */
+export function fileFieldRequired(field: FieldDefinition, definitions: FieldDefinition[], values: ConditionValues, objectType?: FieldObject): boolean {
+  if (field.type !== "file" || !field.isActive) return false;
+  const state = fieldState(field, definitions, values, objectType, { files: true });
+  return state.visible && state.required;
+}
+
+/** Why a required file field's file is not removed (the edit card and the remove action). */
+export function requiredFileKeptMessage(label: string): string {
+  return `"${label}" הוא שדה חובה: אפשר להחליף את הקובץ, אבל לא להסיר אותו.`;
 }
 
 /** True when any of these fields has a condition that applies (so the form must watch its values). */

@@ -7,6 +7,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ACCEPT, FILES_BUCKET } from "@/features/files/types";
 import { createClient } from "@/lib/supabase/client";
 
+import { requiredFileKeptMessage } from "../conditions";
 import { finishFieldFileAction, prepareFieldFileAction, removeFieldFileAction, type FieldFileTarget } from "../field-file-actions";
 import type { FieldRef } from "../types";
 
@@ -20,7 +21,8 @@ type Props = {
   // FLD-07: a read-only field that holds a file is locked
   locked: boolean;
   hint?: string;
-  // FLD-06 part B follow-up: a required file field (checked when the edit card is saved) and that save's message
+  // FLD-06 part B follow-up: a required file field (checked when the edit card is saved) and that save's message; its file
+  // may be replaced, never removed (owner, 26 October 2026, answer 3 (ב))
   required?: boolean;
   error?: string;
 };
@@ -93,7 +95,7 @@ export function FieldFileInput({ orgId, target, label, current, held, locked, hi
             <input ref={inputRef} id={inputId} type="file" accept={ACCEPT} disabled={busy} className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
           </label>
         )}
-        {filled && !locked ? (
+        {filled && !locked && !required ? (
           <ConfirmButton
             title="להסיר את הקובץ מהשדה?"
             description="הקובץ יימחק."
@@ -116,6 +118,7 @@ export function FieldFileInput({ orgId, target, label, current, held, locked, hi
           {saveError}
         </p>
       ) : null}
+      {filled && !locked && required ? <p className="mt-1 text-sm text-ink-soft">{requiredFileKeptMessage(label)}</p> : null}
       {locked ? <p className="text-sm text-ink-soft">שדה לקריאה בלבד</p> : hint ? <p className="mt-1 text-sm text-ink-soft">{hint}</p> : null}
     </div>
   );

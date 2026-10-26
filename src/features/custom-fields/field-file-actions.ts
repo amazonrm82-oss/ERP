@@ -10,6 +10,7 @@ import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { requiredFileRemovalProblem } from "./server";
 import { FIELD_OBJECTS } from "./types";
 
 // FLD-06 part B: a file field's file. Like a record's files (prepareUploadAction / finishUploadAction): a row first (the
@@ -105,11 +106,16 @@ export async function finishFieldFileAction(orgId: string, target: FieldFileTarg
   return ok();
 }
 
-/** Empties a file field; the database releases its file (the object goes with the nightly cleanup). */
+/**
+ * Empties a file field; the database releases its file (the object goes with the nightly cleanup). A required field's file
+ * is replaced, never removed (owner, 26 October 2026, answer 3 (ב); app-only like "required").
+ */
 export async function removeFieldFileAction(orgId: string, target: FieldFileTarget): Promise<ActionResult> {
   if (!validArg(targetSchema, target)) return fail(INVALID_ARGS);
   const context = await actionContext(orgId, target.recordId);
   if (!context.ok) return context;
+  const kept = await requiredFileRemovalProblem(orgId, target.object, target.recordId, target.key);
+  if (kept) return fail(kept);
   const { data, error } = await context.supabase
     .from(RECORD_TYPES[target.object].table as "leads" | "contacts" | "companies" | "deals")
     .update({ custom_fields: { $merge: { [target.key]: null } } })

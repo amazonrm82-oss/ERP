@@ -107,7 +107,8 @@ export function CustomFieldInputs({ definitions, stored, submitted, errors = {},
         </p>
       ) : null}
       {definitions.map((field) => {
-        const state = watching ? fieldState(field, definitions, conditionValues, objectType) : { visible: true, required: field.isRequired };
+        // FLD-06 part B follow-up (owner, answer 4 (ב)): on a saved record's card a "require" condition asks for a file too
+        const state = watching ? fieldState(field, definitions, conditionValues, objectType, { files: record !== undefined }) : { visible: true, required: field.isRequired };
         // FLD-06 part B: a file field acts on its own (it uploads at once), on a saved record only
         if (field.type === "file") {
           if (!state.visible) return null;

@@ -286,6 +286,116 @@ describe("new custom field types (FLD-06 part B)", () => {
     expect(await asAdmin((q) => count(q, "select 1 from public.activities where id = $1", [entry.id]))).toBe(0);
   });
 
+  // owner, 26 October 2026, answer 1 (א): the entry is written even when the linking record is in the recycle bin
+  it("follow-up 2: the entry is written on a linking record that is in the recycle bin", async () => {
+    const target = await contact(owner.id, org, "יעד ברשומה שבסל");
+    const lead = await insertLead(owner.id, org, { full_name: "מקשר בסל", custom_fields: JSON.stringify({ client: target }) });
+    await asUser(owner.id, async (q) => {
+      await q("update public.leads set deleted_at = now() where id = $1", [lead]);
+      await q("update public.contacts set deleted_at = now() where id = $1", [target]);
+      await q("delete from public.contacts where id = $1", [target]);
+    });
+    expect((await fieldsOf("leads", lead)).client).toBeUndefined();
+    const entries = await linkEntries("lead_id", lead);
+    expect(entries.map((e) => e.body)).toEqual(["הקישור ל-איש קשר הוסר: הרשומה נמחקה"]);
+    expect(entries[0].created_by).toBeNull();
+    // still in the bin, and a restore keeps the entry
+    expect(await asAdmin((q) => count(q, "select 1 from public.leads where id = $1 and deleted_at is not null", [lead]))).toBe(1);
+    await asUser(owner.id, (q) => q("update public.leads set deleted_at = null where id = $1", [lead]));
+    expect(await linkEntries("lead_id", lead)).toHaveLength(1);
+  });
+
+  // owner, 26 October 2026, answer 2 (ב): the entry is not activity
+  it("follow-up 2: the entry is not activity for 'no activity', its retry, a stuck deal or the last contact", async () => {
+    await define(org, "deal", "client_d", "record_link", { target: "contact" });
+    const target = await contact(owner.id, org, "יעד שאינו פעילות");
+    // quiet for ten days (inserted by the server, so the creation time can be in the past)
+    const quiet = await asAdmin(async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.contacts (organization_id, first_name, owner_id, created_at, custom_fields) values ($1, 'שקטה', $2, now() - interval '10 days', $3) returning id",
+          [org, owner.id, JSON.stringify({ client: target })],
+        )
+      ).rows[0].id,
+    );
+    const { pipelineId, stages } = await defaultPipeline(org);
+    const deal = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.deals (organization_id, name, pipeline_id, stage_id, custom_fields) values ($1, 'עסקה שקטה', $2, $3, $4) returning id",
+          [org, pipelineId, stages[0].id, JSON.stringify({ client_d: target })],
+        )
+      ).rows[0].id,
+    );
+    const rule = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          `insert into public.automations (organization_id, name, entity_type, trigger_type, trigger_config, conditions, actions, is_active)
+           values ($1, 'שקט אחרי קישור', 'contact', 'no_activity', '{"days": 3}', '[]', '[{"type": "create_note", "body": "עדיין אין פעילות"}]', false)
+           returning id`,
+          [org],
+        )
+      ).rows[0].id,
+    );
+    const facts = () =>
+      asAdmin(
+        async (q) =>
+          (await q<{ f: { last_at: string } }>("select app.automation_run_facts('no_activity', '{\"days\": 3}', 'contact', $1, $2, 'noact:x') as f", [org, quiet]))
+            .rows[0].f,
+      );
+    const attention = () =>
+      asUser(owner.id, async (q) =>
+        (
+          await q<{ last_activity_at: string | null; idle_days: number }>(
+            "select last_activity_at, idle_days from app.deal_attention_rows($1, null, null, 14, array[$2::uuid])",
+            [org, deal],
+          )
+        ).rows[0],
+      );
+    const cleanup = () =>
+      asUser(owner.id, async (q) => {
+        const r = (await q<{ r: { deals: Array<{ id: string; last_activity_at: string | null }> } }>("select public.report_pipeline_cleanup($1) as r", [org]))
+          .rows[0].r;
+        return r.deals.find((d) => d.id === deal) ?? null;
+      });
+    const lastContact = () =>
+      asAdmin(async (q) => (await q<{ at: string | null }>("select last_contacted_at as at from public.contacts where id = $1", [quiet])).rows[0].at);
+    const factsBefore = await facts();
+    const attentionBefore = await attention();
+    const cleanupBefore = await cleanup();
+
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [target]);
+      await q("delete from public.contacts where id = $1", [target]);
+    });
+    expect(await linkEntries("contact_id", quiet)).toHaveLength(1);
+    expect(await linkEntries("deal_id", deal)).toHaveLength(1);
+
+    // the AUT-06 facts and the retry's check read the same last activity as before the entry
+    expect(await facts()).toEqual(factsBefore);
+    const holds = await asAdmin(
+      async (q) =>
+        (
+          await q<{ h: boolean }>(
+            "select app.automation_event_still_holds('no_activity', '{\"days\": 3}', 'contact', $1, $2, to_jsonb(c), $3) as h from public.contacts c where c.id = $2",
+            [org, quiet, JSON.stringify(factsBefore)],
+          )
+        ).rows[0].h,
+    );
+    expect(holds).toBe(true);
+    // the scan still finds the contact quiet since its creation and runs the rule
+    await asAdmin(async (q) => {
+      await q("delete from app.automation_scan_cursors where automation_id = $1", [rule]);
+      await q("select app.scheduled_no_activity(a) from public.automations a where a.id = $1", [rule]);
+    });
+    expect(await asAdmin((q) => count(q, "select 1 from public.automation_runs where automation_id = $1 and entity_id = $2", [rule, quiet]))).toBe(1);
+    // a stuck deal's last activity and the weekly cleanup are unchanged
+    expect(await attention()).toEqual(attentionBefore);
+    expect(await cleanup()).toEqual(cleanupBefore);
+    // never a contact
+    expect(await lastContact()).toBeNull();
+  });
+
   it("a field's file: only on a file field of a record the person edits; the value must be that confirmed file", async () => {
     const lead = await insertLead(rep.id, org, { owner_id: rep.id });
     // not a file field, an unknown field, a note

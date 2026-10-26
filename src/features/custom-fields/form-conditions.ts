@@ -32,7 +32,8 @@ export function effectiveDefinitions(
   const conditionValues = conditionValuesFromForm(objectType, formData, parsed, stored ?? {}, written);
   const result: FieldDefinition[] = [];
   for (const field of definitions) {
-    const state = fieldState(field, definitions, conditionValues, objectType);
+    // FLD-06 part B follow-up (owner, answer 4 (ב)): on an edit a "require" condition asks for a file field too
+    const state = fieldState(field, definitions, conditionValues, objectType, { files: editing });
     if (!state.visible) continue;
     const conditional = field.condition ? conditionApplies(field.condition, definitions, objectType) : false;
     if (editing && conditional && !formData.has(shownMarkerName(field.key))) continue;

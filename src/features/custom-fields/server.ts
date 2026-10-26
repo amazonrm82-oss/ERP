@@ -4,7 +4,7 @@ import { fail, FORM_INVALID, formValues } from "@/lib/action-result";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
-import { BUILTIN_CONDITION_FIELDS, hasConditions, missingFieldsMessage } from "./conditions";
+import { BUILTIN_CONDITION_FIELDS, fileFieldRequired, hasConditions, missingFieldsMessage, requiredFileKeptMessage } from "./conditions";
 import { effectiveDefinitions, type StoredForConditions } from "./form-conditions";
 import { listFieldDefinitions } from "./queries";
 import { asCustomValues, inputName, type FieldObject } from "./types";
@@ -39,6 +39,23 @@ async function storedFileValues(orgId: string, objectType: FieldObject, recordId
   const { data, error } = await supabase.from(table).select("custom_fields").eq("organization_id", orgId).eq("id", recordId).maybeSingle();
   if (error || !data) return null;
   return asCustomValues((data as { custom_fields: Json | null }).custom_fields ?? null);
+}
+
+/**
+ * FLD-06 part B follow-up (owner, 26 October 2026, answers 3 and 4 (ב)): why this file field's file may not be removed from
+ * the record (a required field, by its own box or by a "require" condition that holds for what the record holds), or null.
+ * App-only, like "required": read with the user's session; a record that cannot be read gives null (the update then finds
+ * nothing either).
+ */
+export async function requiredFileRemovalProblem(orgId: string, objectType: FieldObject, recordId: string, key: string): Promise<string | null> {
+  const definitions = await listFieldDefinitions(orgId, objectType);
+  const field = definitions.find((item) => item.key === key);
+  if (!field || field.type !== "file") return null;
+  if (!field.isRequired && !field.condition) return null;
+  const stored = await storedForConditions(orgId, objectType, recordId);
+  if (!stored) return null;
+  const values = { ...stored.custom, ...stored.builtins };
+  return fileFieldRequired(field, definitions, values, objectType) ? requiredFileKeptMessage(field.label) : null;
 }
 
 /**
