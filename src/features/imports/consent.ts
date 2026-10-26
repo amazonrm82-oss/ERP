@@ -6,6 +6,7 @@
 import { z } from "zod";
 
 import { CHANNEL_LABELS } from "@/features/consents/model";
+import { formatNumber } from "@/lib/format";
 
 export const IMPORT_CONSENT_CHANNELS = ["email", "sms", "whatsapp"] as const;
 export type ImportConsentChannel = (typeof IMPORT_CONSENT_CHANNELS)[number];
@@ -116,6 +117,17 @@ export const consentNoAddress = (channel: ImportConsentChannel) =>
 export function consentsUndoneText(count: number | null | undefined): string {
   if (!count || count < 1) return "";
   return count === 1 ? " גם ההסכמה לדיוור שנרשמה בו בוטלה." : ` גם ${count} ההסכמות לדיוור שנרשמו בו בוטלו.`;
+}
+
+/**
+ * CNS-06 answer 3 (owner, 26 October 2026): the import report's line for the consents kept out because the address opted
+ * out, was erased or is on the blocklist (public.import_record_consents answered 'locked'); "" when there were none.
+ */
+export function consentsLockedText(count: number | null | undefined): string {
+  if (!count || count < 1) return "";
+  return count === 1
+    ? "כתובת אחת חסומה או שהוסרה: לא נרשמה הסכמה."
+    : `${formatNumber(count)} כתובות חסומות או שהוסרו: לא נרשמה הסכמה.`;
 }
 
 /** The row's warning for a consent the database did not write; null when it was written. */

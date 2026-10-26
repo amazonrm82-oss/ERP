@@ -1027,6 +1027,8 @@ export type ImportJobRow = {
   // CNS-05: the importer's declaration of where the file's marketing consents came from (both or neither)
   consent_method: string | null;
   consent_note: string | null;
+  // CNS-06: consents of the import kept out because the address is blocked or opted out (server only)
+  consents_locked: number;
 };
 
 export type SupportAccessGrantRow = {

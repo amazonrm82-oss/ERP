@@ -205,6 +205,78 @@ describe("consent columns in an import (CNS-05)", () => {
     expect(suppressed).toBe(true);
   });
 
+  it("CNS-06 answer 3: the job keeps how many granted consents were locked, over all its calls; only the server writes it", async () => {
+    await asUser(owner.id, (q) => q("select public.consent_blocklist_add($1, 'all', $2, 'complaint')", [org, ["listed-count@example.test", "050-7730001"]]));
+    const optedOut = await insertLead(owner.id, org, { full_name: "הסיר את עצמו", email: "gone-count@example.test" });
+    await asUser(owner.id, (q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'withdrawn', 'manual', 'ביקש בטלפון')", [org, optedOut]),
+    );
+    const job = await newJob(manager, org, declared);
+    const lockedOf = async () =>
+      asUser(manager.id, async (q) => (await q<{ n: number }>("select consents_locked as n from public.import_jobs where id = $1", [job])).rows[0].n);
+    expect(await lockedOf()).toBe(0);
+    const a = await importedLead(manager, job, { full_name: "א", email: "listed-count@example.test", phone: "050-7730001" });
+    const b = await importedLead(manager, job, { full_name: "ב", email: "gone-count@example.test", phone: "050-7730002" });
+    expect(
+      await record(manager, org, job, [
+        { record_id: a, channel: "email", state: "granted", address: "listed-count@example.test" },
+        { record_id: a, channel: "sms", state: "granted", address: "+972507730001" },
+        // a 'denied' of a listed address is written, and is not counted
+        { record_id: a, channel: "whatsapp", state: "denied", address: "+972507730001" },
+      ]),
+    ).toEqual(["locked", "locked", "written"]);
+    expect(await lockedOf()).toBe(2);
+    expect(
+      await record(manager, org, job, [
+        { record_id: b, channel: "email", state: "granted", address: "gone-count@example.test" },
+        { record_id: b, channel: "sms", state: "granted", address: "+972507730002" },
+      ]),
+    ).toEqual(["locked", "written"]);
+    // summed over the calls (each chunk of the wizard is one call)
+    expect(await lockedOf()).toBe(3);
+    // nothing was recorded for the locked ones
+    expect((await consentsOf("lead", a)).map((r) => [r.channel, r.state])).toEqual([["whatsapp", "denied"]]);
+    // server only: the importer cannot set it, and an owner cannot either
+    for (const who of [manager, owner]) {
+      const err = await asUser(who.id, (q) => q("update public.import_jobs set consents_locked = 0 where id = $1", [job])).catch((e) => e);
+      expect((err as { code?: string }).code).toBe("42501");
+    }
+    expect(await lockedOf()).toBe(3);
+  });
+
+  it("a register refusal for a blocklisted address (an admin's import racing an addition to the list) is a locked answer", async () => {
+    // the race made deterministic: the shared lock answers "open" for this one call (a function replaced inside the
+    // transaction, which is rolled back), while the register's own check (consents_prepare) sees the listed address and
+    // refuses an owner with the hint consent:blocklisted
+    await asUser(owner.id, (q) => q("select public.consent_blocklist_add($1, 'email', $2, 'complaint')", [org, ["race-listed@example.test"]]));
+    const job = await newJob(owner, org, declared);
+    const lead = await importedLead(owner, job, { full_name: "מרוץ", email: "race-listed@example.test" });
+    const ROLLBACK = new Error("rollback");
+    let answered: { r: string[]; n: number } | null = null;
+    await asUser(owner.id, async (q) => {
+      await q("reset role");
+      await q(
+        `create or replace function app.consent_address_locked(p_org uuid, p_lead uuid, p_contact uuid, p_channel text, p_address text)
+         returns boolean language sql stable as $$ select false $$`,
+      );
+      await q("set local role authenticated");
+      const r = (
+        await q<{ r: string[] }>("select public.import_record_consents($1, $2, $3) as r", [
+          org,
+          job,
+          JSON.stringify([{ record_id: lead, channel: "email", state: "granted", address: "race-listed@example.test" }]),
+        ])
+      ).rows[0].r;
+      const n = (await q<{ n: number }>("select consents_locked as n from public.import_jobs where id = $1", [job])).rows[0].n;
+      answered = { r, n };
+      throw ROLLBACK;
+    }).catch((e) => {
+      if (e !== ROLLBACK) throw e;
+    });
+    expect(answered).toEqual({ r: ["locked"], n: 1 });
+    expect(await consentsOf("lead", lead)).toEqual([]);
+  });
+
   it("only the caller's own running leads or contacts job in the business, with a declaration, by someone who may import", async () => {
     const job = await newJob(owner, org, declared);
     const lead = await importedLead(owner, job, { full_name: "שירה", email: "shira@example.test" });

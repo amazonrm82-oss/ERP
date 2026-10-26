@@ -8,6 +8,7 @@ import {
   consentChannelOf,
   consentDeclarationSchema,
   consentResultWarning,
+  consentsLockedText,
   consentsUndoneText,
   IMPORT_CONSENT_METHOD_LABELS,
   IMPORT_CONSENT_METHODS,
@@ -239,5 +240,24 @@ describe("undoing an import with consents (owner, 26 October 2026, answer 1)", (
     expect(consentsUndoneText(0)).toBe("");
     expect(consentsUndoneText(1)).toBe(" גם ההסכמה לדיוור שנרשמה בו בוטלה.");
     expect(consentsUndoneText(3)).toBe(" גם 3 ההסכמות לדיוור שנרשמו בו בוטלו.");
+  });
+});
+
+describe("the import report's line for blocked addresses (CNS-06, owner, 26 October 2026, answer 3)", () => {
+  it("counts the 'locked' answers, with a singular form, and says nothing when there were none", () => {
+    expect(consentsLockedText(undefined)).toBe("");
+    expect(consentsLockedText(0)).toBe("");
+    expect(consentsLockedText(1)).toBe("כתובת אחת חסומה או שהוסרה: לא נרשמה הסכמה.");
+    expect(consentsLockedText(4)).toBe("4 כתובות חסומות או שהוסרו: לא נרשמה הסכמה.");
+    expect(consentsLockedText(1200)).toBe("1,200 כתובות חסומות או שהוסרו: לא נרשמה הסכמה.");
+  });
+
+  it("is kept on the job by import_record_consents, server only (no client update grant)", () => {
+    const lockedFile = readdirSync(dir).find((f) => f.endsWith("_import_consent_locked_count.sql"));
+    expect(lockedFile).toBeDefined();
+    const lockedSql = readFileSync(join(dir, lockedFile as string), "utf8");
+    expect(lockedSql).toMatch(/add column if not exists consents_locked integer not null default 0/);
+    expect(lockedSql).toMatch(/set consents_locked = j\.consents_locked \+ v_locked/);
+    expect(lockedSql).not.toMatch(/grant update[^;]*consents_locked/);
   });
 });

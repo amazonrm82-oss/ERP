@@ -38,6 +38,7 @@ import {
   CONSENT_GRANTED_VALUES,
   CONSENT_DENIED_VALUES,
   consentDeclarationSchema,
+  consentsLockedText,
   IMPORT_CONSENT_METHOD_LABELS,
   IMPORT_CONSENT_METHODS,
   IMPORT_CONSENT_NOTE_MAX,
@@ -540,10 +541,11 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
             ))}
           </dl>
           {withConsent ? (
-            <p className="text-md">
-              הסכמות שנרשמו: {formatNumber(consentTotals.written)}.
-              {consentTotals.locked > 0 ? ` לא עודכנו כי הכתובת חסומה לדיוור: ${formatNumber(consentTotals.locked)}.` : ""}
-            </p>
+            <div className="space-y-1 text-md">
+              <p>הסכמות שנרשמו: {formatNumber(consentTotals.written)}.</p>
+              {/* CNS-06 answer 3: the addresses whose "מאשר" the register kept out */}
+              {consentTotals.locked > 0 ? <p>{consentsLockedText(consentTotals.locked)}</p> : null}
+            </div>
           ) : null}
           {stopped ? <p role="alert" className="text-danger">{stopped}</p> : null}
           {warnings.length > 0 ? (
