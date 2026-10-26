@@ -1003,6 +1003,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `quote_link_usable`, the shown version only while shown in full, link window shared with the page + 20 per sender in 10 minutes
   (`app.quote_pdf_download_counts`, `app.quote_link_sender`, scope `quote`), counts a view; answers path/sha256/name only.
   `public.quote_public` was last redefined in 020995 (`pdf`). The files insert policy and `record_files_insert` were last altered in 020995.
+  Legacy PDFs (021015, owner 26 October 2026, answer 1 (ג)): a confirmed quote PDF without `sha256` is made again by the server once:
+  `public.quote_pdf_remake_allowed` (invoker, the user's session; through `app.quote_pdf_remake_claim`, one render a minute per file)
+  then `quote_pdf_store` hands over to `app.quote_pdf_remake` (definer, no grants): its own path, the same files row moved to it with
+  the new SHA-256, the old object to the orphan cleanup, not counted in `max_pdf_per_month`, `done_at` in `app.quote_pdf_remakes`, audit
+  `pdf_remake` (sizes only); footer "נוצר מחדש ב-<date> מהנתונים השמורים". Unfinished attempts' paths are queued (trigger
+  `quote_pdf_remakes_gone`, pg_cron `crm-quote-pdf-remake-sweep` 02:40 UTC). `public.quote_pdf_store` was last redefined in 021015.
+  Accepted: the claim checks membership only (app schema, no API); an upload arriving after the nightly cleanup stays (as 020995).
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
@@ -1356,6 +1363,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   stored values) is replaced, never removed (app-only: `removeFieldFileAction` + `requiredFileRemovalProblem`); a conditional
   "require" is checked for file fields on the edit card. Test 64's re-run list ends with 020905/020910/020925 because re-running 020640/020645
   resets the `record_files_delete` storage policy (the teardown compares function bodies only, not policies).
+  Since 021020 (owner 26 October 2026, answer (ב)) a replaced field file is kept as the earlier version of the new one
+  (`app.custom_field_file_keep_version`, from `app.custom_field_files_release`; both files of this record and field, the old one with no
+  newer version and the new one with no history, else the old one stays as a plain earlier file); only a cleared value, a deleted field
+  and a merge's unused duplicate file are released. `files_custom_field_shape` allows `previous_id`; `app.files_field_check` refuses any
+  insert naming a version of or for a field's file (hint `file:field`). Both functions were last redefined in 021020.
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
