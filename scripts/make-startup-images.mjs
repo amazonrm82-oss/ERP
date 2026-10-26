@@ -1,6 +1,7 @@
 // USR-08: iPhone launch screens (apple-touch-startup-image) for the installed app.
 // The logo's "M" (public/icons/icon.svg, made by scripts/make-icons.mjs) centered on the light canvas of the
-// design system (--mx-canvas, the manifest's background_color), one PNG per screen size in public/startup/.
+// design system (--mx-canvas, the manifest's background_color), one PNG per screen size and orientation in public/startup/
+// (landscape = the portrait size turned on its side; iPhones only, no iPad sizes).
 // The sizes mirror STARTUP_SCREENS in src/lib/startup-images.ts (a unit test compares them).
 // Run after the logo changes: node scripts/make-startup-images.mjs
 import { mkdir, readFile, rm } from "node:fs/promises";
@@ -29,10 +30,14 @@ const svg = await readFile(path("public/icons/icon.svg"));
 await rm(path("public/startup"), { recursive: true, force: true });
 await mkdir(path("public/startup"), { recursive: true });
 
+// portrait first, then the same screens turned on their side
+const IMAGES = [
+  ...SCREENS.map(([w, h, ratio]) => [w * ratio, h * ratio, ratio]),
+  ...SCREENS.map(([w, h, ratio]) => [h * ratio, w * ratio, ratio]),
+];
+
 let total = 0;
-for (const [w, h, ratio] of SCREENS) {
-  const width = w * ratio;
-  const height = h * ratio;
+for (const [width, height, ratio] of IMAGES) {
   const markSize = MARK_POINTS * ratio;
   // icon.svg is 64 units wide; render it at the mark's pixel size
   const mark = await sharp(svg, { density: (72 * markSize) / 64 })
@@ -47,4 +52,4 @@ for (const [w, h, ratio] of SCREENS) {
   total += info.size;
   console.log(`${file.split("/").slice(-2).join("/")}  ${info.size} bytes`);
 }
-console.log(`${SCREENS.length} launch screens, ${total} bytes`);
+console.log(`${IMAGES.length} launch screens, ${total} bytes`);
