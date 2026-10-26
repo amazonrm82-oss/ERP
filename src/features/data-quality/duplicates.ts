@@ -16,7 +16,8 @@ import { companyNamePattern, sameCompanyName } from "./company-name";
 
 type Supabase = SupabaseClient<Database>;
 
-export type Existing = { kind: "lead" | "contact" | "company"; name: string; href: string };
+// id: the record found (GAP-08 offers to sell to an existing contact instead of making a new one)
+export type Existing = { kind: "lead" | "contact" | "company"; name: string; href: string; id?: string };
 
 const KIND_NOUN: Record<Existing["kind"], string> = { lead: "ליד", contact: "איש קשר", company: "חברה" };
 
@@ -53,6 +54,7 @@ export async function findPersonDuplicate(supabase: Supabase, orgId: string, pho
         kind,
         name: row.full_name || row.email || row.phone || "ללא שם",
         href: kind === "lead" ? paths.lead(orgId, row.id) : paths.contact(orgId, row.id),
+        id: row.id,
       };
     }
   }
@@ -75,7 +77,7 @@ export async function findPersonDuplicate(supabase: Supabase, orgId: string, pho
       "duplicate search",
     )?.[0];
     if (contact) {
-      return { kind: "contact", name: contact.full_name || contact.email || contact.phone || "ללא שם", href: paths.contact(orgId, contact.id) };
+      return { kind: "contact", name: contact.full_name || contact.email || contact.phone || "ללא שם", href: paths.contact(orgId, contact.id), id: contact.id };
     }
   }
   return null;

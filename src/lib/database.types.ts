@@ -168,6 +168,8 @@ export type OrgDocumentSettingsRow = {
   prices_include_vat: boolean;
   // QUO-13 (migration quote_accept_deal): text with a check: auto | ask | none (what an accepted quote does to its deal)
   quote_accept_deal: string;
+  // GAP-08 (migration quick_sale): the sales process of quick sales; null, hidden or deleted = the default one
+  quick_sale_pipeline_id: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -308,6 +310,7 @@ type OrgDocumentSettingsWrite = {
   other_charges_vat?: boolean | null;
   prices_include_vat?: boolean;
   quote_accept_deal?: "auto" | "ask" | "none";
+  quick_sale_pipeline_id?: string | null;
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -3394,6 +3397,8 @@ export type Database = {
         Args: { p_org: string; p_type: string; p_id: string; p_extra: Json; p_reason: string; p_deal_names?: Json; p_person_request?: boolean };
         Returns: Json;
       };
+      // GAP-08: a quick sale in one call (invoker): customer, won deal with lines, payment, optional recorded document
+      quick_sale: { Args: { p_org: string; p_sale: Json }; Returns: Json };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // ORD-01 / ORD-03: confirm a manual draft ({number}); make a numbered order from an accepted quote or a won deal (its id)

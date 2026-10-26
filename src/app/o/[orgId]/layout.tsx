@@ -24,6 +24,7 @@ import { BottomNav, SidebarNav } from "@/features/shell/components/nav";
 import { PlanBadge } from "@/features/shell/components/plan-badge";
 import { UserMenu } from "@/features/shell/components/user-menu";
 import { isAdminRole } from "@/features/settings/permissions";
+import { quickSaleOffered } from "@/features/quick-sale/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { ORG_STATUS_NOTICES, ROLE_LABELS } from "@/features/shell/labels";
 import { getOrgContextAllowClosed } from "@/features/shell/queries";
@@ -89,7 +90,7 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules, quickSale] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
@@ -99,6 +100,8 @@ export default async function OrgLayout({ children, params }: Props) {
     getOrgTerms(org.id),
     // LEAD-08: a switched-off module leaves the menu and the "+" menu
     getOrgModules(org.id),
+    // GAP-08: the quick sale in the "+" menu, for whoever records payments
+    context.canWrite ? quickSaleOffered(org.id) : Promise.resolve(false),
   ]);
   // ORD-01: orders show only while the plan holds them too; asked only when the business switched them on, and a failed
   // read hides them (the menu never breaks the page)
@@ -140,7 +143,7 @@ export default async function OrgLayout({ children, params }: Props) {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {/* REC-08: create anything from any screen, for who may write */}
-          {context.canWrite ? <CreateMenu orgId={org.id} terms={terms} modules={modules} /> : null}
+          {context.canWrite ? <CreateMenu orgId={org.id} terms={terms} modules={modules} quickSale={quickSale} /> : null}
           <GlobalSearch orgId={org.id} />
           <NotificationBell
             // new server data (after marking read, or navigation) starts the bell afresh

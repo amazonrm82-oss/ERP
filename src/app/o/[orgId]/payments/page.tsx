@@ -20,6 +20,8 @@ import { chequesPath, paymentsPath } from "@/features/payments/paths";
 import { getPaymentsAccess, listPayments, listPaymentTotal, PAYMENT_TOTALS_LIMIT } from "@/features/payments/queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
 import { getMyPermissions } from "@/features/permissions/queries";
+import { quickSalePath } from "@/features/quick-sale/paths";
+import { quickSaleOffered } from "@/features/quick-sale/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { paymentsListTexts } from "@/features/payments/texts";
@@ -65,10 +67,12 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
   const filters = paymentListFilters(query);
   const sort = filters.sort ?? PAYMENT_DEFAULT_SORT;
   // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
-  const [granted, listColumns] = await Promise.all([
+  const [granted, listColumns, quickSale] = await Promise.all([
     // PRM-01: extra permissions (export)
     getMyPermissions(orgId),
     getListColumns(orgId, "payment"),
+    // GAP-08: the quick sale, for whoever records payments while the plan holds products too
+    quickSaleOffered(orgId),
     startListFilterLookups(orgId, "payment"),
   ]);
   const filter = await prepareListFilter(orgId, "payment", firstParam(query.f), context.user.id, []);
@@ -99,6 +103,12 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
         description={texts.description}
         actions={
           <span className="flex flex-wrap items-center gap-2">
+            {/* GAP-08 */}
+            {quickSale ? (
+              <Link href={quickSalePath(orgId)} className={buttonClasses("primary", "sm")}>
+                מכירה מהירה
+              </Link>
+            ) : null}
             {/* PAY-04 answer 7 */}
             <Link href={chequesPath(orgId)} className={buttonClasses("secondary", "sm")}>
               צ&apos;קים דחויים

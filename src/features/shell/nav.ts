@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from "react";
 
 import {
   BoardIcon,
+  BoltIcon,
   BuildingIcon,
   CalendarIcon,
   ChartIcon,
@@ -18,6 +19,7 @@ import { calendarPath } from "@/features/calendar/range";
 import { DEFAULT_MODULES, type OrgModules } from "@/features/modules/modules";
 import { ordersPath } from "@/features/orders/paths";
 import { productsPath } from "@/features/products/paths";
+import { quickSalePath } from "@/features/quick-sale/paths";
 import { quotesPath } from "@/features/quotes/paths";
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
@@ -69,14 +71,20 @@ function moduleOn(key: string, modules: OrgModules): boolean {
 }
 
 export type CreateItem = {
-  key: "lead" | "contact" | "company" | "deal" | "task";
+  key: "lead" | "contact" | "company" | "deal" | "task" | "quick_sale";
   label: string;
   href: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
 /** REC-08: what the "+" button of the top bar can create; each opens that type's own create screen. */
-export function createItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules: OrgModules = DEFAULT_MODULES): CreateItem[] {
+export function createItems(
+  orgId: string,
+  terms: OrgTerms = DEFAULT_TERMS,
+  modules: OrgModules = DEFAULT_MODULES,
+  // GAP-08: the quick sale, for whoever records payments while the plan holds payments
+  options: { quickSale?: boolean } = {},
+): CreateItem[] {
   const items: CreateItem[] = [
     { key: "lead", label: terms.lead.newOne, href: paths.leadNew(orgId), icon: InboxIcon },
     { key: "contact", label: terms.contact.newOne, href: paths.contactNew(orgId), icon: UsersIcon },
@@ -84,6 +92,7 @@ export function createItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modu
     { key: "deal", label: terms.deal.newOne, href: paths.dealNew(orgId), icon: BoardIcon },
     { key: "task", label: "משימה חדשה", href: paths.taskNew(orgId), icon: CheckSquareIcon },
   ];
+  if (options.quickSale) items.push({ key: "quick_sale", label: "מכירה מהירה", href: quickSalePath(orgId), icon: BoltIcon });
   return items.filter((item) => moduleOn(item.key, modules));
 }
 
