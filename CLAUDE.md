@@ -85,6 +85,15 @@ and build this CRM here instead. The old code is preserved on the branch
    after the window) and a honeypot field; no cookies or visitor id; used only for that one message (with an unsubscribe
    link) and deleted after it is sent or after 12 months; read only through `platform_*` (counts; addresses for the
    platform owner only); database tests and an independent review before merge.
+   Owner, 26 October 2026 (wave 3, approved, not built yet): three more uses under the same conditions (one `security definer`
+   function granted to `service_role` only per use, no direct table access, rate limits, database tests, an independent review
+   before merge, and its own "In use" line here once built): (1) the route that sends queued messages (email, SMS) through the
+   provider, woken by the database with the shared secret (OPS-04 queue in the database, answer (א)); (2) one inbound webhook
+   per provider (delivery status, payment, provider document), refused before the database and without logging the body when
+   the signature is not valid; (3) the public privacy-request page (PRK-02): collects only request type, name, a contact
+   channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
+   `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
+   the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
