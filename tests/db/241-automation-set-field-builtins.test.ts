@@ -94,15 +94,15 @@ describe("automations set built-in fields and relative dates (AUT-01 part B)", (
     });
   });
 
-  it("sets and clears the preferred channel of a lead and a contact; the record keeps its previous source (owner, option ג)", async () => {
+  it("sets and clears the preferred channel of a lead and a contact; a record with a source keeps it (option ג), one with none gets 'form' (answer ב)", async () => {
     const lead = await insertLead(owner.id, org);
     const contact = await newContact();
     for (const [entity, table, id] of [["lead", "leads", lead], ["contact", "contacts", contact]] as const) {
-      // no channel before: the source stays empty
+      // no channel and no source before: the source becomes 'form', so a later public form may replace it (owner, answer ב)
       const r = await run(entity, [set("preferred_channel", "whatsapp")], id);
       expect(r.status, entity).toBe("success");
       expect(r.steps[0], entity).toEqual({ action: "set_field", status: "ok" });
-      expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "whatsapp", preferred_channel_source: null });
+      expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "whatsapp", preferred_channel_source: "form" });
       // a channel a public form set: the same channel or another one keeps the form as its source
       await asAdmin((q) => q(`update public.${table} set preferred_channel = 'sms', preferred_channel_source = 'form' where id = $1`, [id]));
       expect((await run(entity, [set("preferred_channel", "sms")], id)).steps[0].status).toBe("ok");
@@ -113,10 +113,12 @@ describe("automations set built-in fields and relative dates (AUT-01 part B)", (
       await asAdmin((q) => q(`update public.${table} set preferred_channel = 'sms', preferred_channel_source = 'manual' where id = $1`, [id]));
       expect((await run(entity, [set("preferred_channel", "email")], id)).steps[0].status).toBe("ok");
       expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "email", preferred_channel_source: "manual" });
-      // a channel with no source (older than the source, or set by a rule on an empty record): another one keeps none
+      // a channel with no source (older than the source): the same channel changes nothing, another one makes it 'form'
       await asAdmin((q) => q(`update public.${table} set preferred_channel = 'sms', preferred_channel_source = null where id = $1`, [id]));
+      expect((await run(entity, [set("preferred_channel", "sms")], id)).steps[0].status).toBe("ok");
+      expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "sms", preferred_channel_source: null });
       expect((await run(entity, [set("preferred_channel", "email")], id)).steps[0].status).toBe("ok");
-      expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "email", preferred_channel_source: null });
+      expect(await row(table, id, "preferred_channel, preferred_channel_source"), entity).toEqual({ preferred_channel: "email", preferred_channel_source: "form" });
       // a value off the list, or not a text, fails the step and changes nothing
       for (const value of ["fax", "WhatsApp", 3, ["phone"]]) {
         const bad = await run(entity, [set("preferred_channel", value)], id);
