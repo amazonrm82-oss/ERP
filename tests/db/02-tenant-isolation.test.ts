@@ -691,6 +691,8 @@ describe("tenant isolation", () => {
       ["insert into public.files (organization_id, lead_id, name, mime_type, size_bytes) values ($1, $2, 'x', 'text/plain', 1)", [orgA, ids.leadA]],
       ["insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.documentA]],
       ["insert into public.files (organization_id, payment_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.paymentA]],
+      // QUO-06: a quote's PDF
+      ["insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.quoteA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
       ["insert into public.record_followers (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       // no organizer: the policy, not the organizer trigger, has to refuse it
@@ -1016,6 +1018,14 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaPaymentFile.code);
+
+    // QUO-06: a file in org B hung on org A's quote
+    const viaQuoteFile = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgB, ids.quoteA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaQuoteFile.code);
 
     // a consent in org B recorded on org A's lead (CNS-01)
     const viaConsent = await pgError(

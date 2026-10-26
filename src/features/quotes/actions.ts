@@ -24,6 +24,7 @@ import { publicQuotePath, QUOTE_LINK_TOKEN } from "./public";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
 import { applyDealLinesToQuote } from "./from-deal-server";
 import { applyTemplateToQuote } from "./template-server";
+import { storeQuotePdf } from "./pdf-server";
 import {
   DEFAULT_VALID_DAYS,
   defaultQuoteTitle,
@@ -433,6 +434,8 @@ export type SentQuote = {
   linkError: string | null;
   // the running number the quote got
   numberDisplay: string | null;
+  // QUO-06: why the quote's PDF was not kept (the quote is sent all the same; the quote page offers it again)
+  pdfError: string | null;
 };
 
 /**
@@ -448,7 +451,7 @@ export async function sendQuoteAction(orgId: string, quoteId: string, withLink: 
   const { data, error } = await context.supabase.rpc("quote_send", { p_org: orgId, p_quote: quoteId });
   if (error) return fail(writeError(error));
   const number = (data as { number?: unknown } | null)?.number;
-  const sent: SentQuote = { url: null, linkError: null, numberDisplay: typeof number === "string" ? number : null };
+  const sent: SentQuote = { url: null, linkError: null, numberDisplay: typeof number === "string" ? number : null, pdfError: null };
   if (withLink) {
     const link = await context.supabase.rpc("quote_link_create", { p_org: orgId, p_quote: quoteId });
     if (link.error) sent.linkError = writeError(link.error);
@@ -456,9 +459,31 @@ export async function sendQuoteAction(orgId: string, quoteId: string, withLink: 
     else sent.url = `${await siteOrigin()}${publicQuotePath(link.data)}`;
   }
   const quote = await readQuote(context.supabase, orgId, quoteId);
+  // QUO-06: the sent version's PDF, made once and kept; a failure never undoes the sending
+  if (quote) {
+    const pdf = await storeQuotePdf(context.supabase, orgId, quote, context.user.id).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }));
+    if (!pdf.ok) sent.pdfError = pdf.message;
+  }
   if (quote) revalidateQuote(orgId, quote);
   else revalidatePath(quotePath(orgId, quoteId));
   return ok(sent);
+}
+
+const PDF_NOT_MADE = "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.";
+
+/**
+ * QUO-06: keeps the PDF of a sent quote that has none yet (sent before QUO-06, or its PDF failed when it was sent, e.g. a
+ * full monthly quota). Whoever may edit the quote's deal or contact asks; the database decides again.
+ */
+export async function storeQuotePdfAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (!quote) return fail(NOT_FOUND_OR_FORBIDDEN);
+  const pdf = await storeQuotePdf(context.supabase, orgId, quote, context.user.id).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }));
+  if (!pdf.ok) return fail(pdf.message);
+  revalidatePath(quotePath(orgId, quoteId));
+  return ok();
 }
 
 // QUO-12 ---------------------------------------------------------------------

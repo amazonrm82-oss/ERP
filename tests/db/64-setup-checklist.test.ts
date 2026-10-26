@@ -564,6 +564,11 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_form_marketing_consent.sql",
       // CNS-05 redefines app.intake_marketing_consent() of _form_marketing_consent.sql last (its check moved to a shared function)
       "_import_consent.sql",
+      // QUO-06 redefines app.files_keep_attached() of _payment_files.sql last, and alters the files policies and the storage
+      // policy record_files_delete after _field_types_part_b.sql (a quote's PDF is kept)
+      "_quote_pdfs.sql",
+      // the pasted erasure gives app.quote_pdf_drop() of _quote_pdfs.sql its body (020955 keeps it; listed for staleRestores)
+      "_quote_pdf_erase.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

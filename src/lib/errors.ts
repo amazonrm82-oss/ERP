@@ -137,6 +137,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_qr_codes": "הגעתם למספר קודי ה-QR המרבי בחבילה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   // per use; counted by the PDF module (QUO-06)
   "limit:max_pdf_per_month": `הגעתם למכסת קובצי ה-PDF החודשית. הקישור להצעה, הצפייה והחתימה ממשיכים לעבוד. לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
+  "rate:pdf": "הופקו הרבה קובצי PDF בדקה האחרונה. נסו שוב בעוד דקה.",
   // per use; emails a business sends to its own customers (wave 3 provider layer)
   "limit:max_customer_emails_per_month": `הגעתם למכסת האימיילים ללקוחות לחודש. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   "limit:max_customer_emails_per_day": `הגעתם למכסת האימיילים ללקוחות להיום. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
@@ -260,6 +261,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:closed": "ההצעה בוטלה או שתוקפה עבר, ולכן אין לה קישור ללקוח.",
   "quote:empty": "אי אפשר לשלוח הצעה בלי שורות. הוסיפו לפחות שורה אחת.",
   "quote:vat_unknown": 'עוד לא נקבע המעמד של העסק במע"מ, ולכן אי אפשר לשלוח את ההצעה. בעלי העסק קובעים אותו ב"הגדרות > מע"מ ופרטים למסמכים".',
+  "quote_pdf:draft": "לטיוטה אין קובץ PDF. הקובץ נשמר כשההצעה נשלחת.",
+  "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה).",
   "quote:frozen": "אי אפשר לשנות מחירים, הנחה או מע\"מ בהצעה שכבר אינה טיוטה.",
   // QUO-16: the timeline entries of a sent, accepted or declined quote are history
   "activity:quote_entry": "רישום של הצעת מחיר בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",

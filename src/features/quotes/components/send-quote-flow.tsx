@@ -42,11 +42,13 @@ export function SendQuoteFlow({ orgId, quoteId, canSend, businessName, recipient
         setError(result.message);
         return;
       }
-      if (!withLink) {
+      const data = result.data ?? { url: null, linkError: null, numberDisplay: null, pdfError: null };
+      // QUO-06: a PDF that was not kept is said here, so the window stays open even without a link
+      if (!withLink && !data.pdfError) {
         setOpen(false);
         return;
       }
-      setSent(result.data ?? { url: null, linkError: null, numberDisplay: null });
+      setSent(data);
     });
   }
 
@@ -88,7 +90,12 @@ export function SendQuoteFlow({ orgId, quoteId, canSend, businessName, recipient
           )
         }
       >
-        {sent ? (
+        {sent?.pdfError ? (
+          <p className="mb-3 text-sm text-ink-soft">
+            ההצעה סומנה כנשלחה, אבל קובץ ה-PDF שלה לא נשמר: {sent.pdfError} אפשר לשמור אותו אחר כך מדף ההצעה.
+          </p>
+        ) : null}
+        {sent && !sent.url && !sent.linkError && sent.pdfError ? null : sent ? (
           sent.url ? (
             <div className="space-y-3">
               <Label htmlFor={inputId}>הקישור להצעה</Label>

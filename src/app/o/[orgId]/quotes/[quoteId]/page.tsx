@@ -35,6 +35,8 @@ import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
+import { QuotePdfButton } from "@/features/quotes/components/quote-pdf-button";
+import { getQuotePdfFile, quotePdfStorable } from "@/features/quotes/pdf-server";
 import { currentNameIfChanged } from "@/features/quotes/share";
 import { QUOTE_STATUS_LABELS, VERSIONABLE_STATUSES } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -213,6 +215,10 @@ export default async function QuotePage({ params, searchParams }: Props) {
   };
   // QUO-07 point 9 (owner, 18 October 2026): a sent document keeps the name it was sent with; the card shows today's beside it
   const renamed = quote.status !== "draft" && !quote.customerDeletedAt ? currentNameIfChanged(quote.customerName, customerNow.name) : null;
+  // QUO-06: the PDF kept when the quote was sent; whoever may edit its record keeps a missing one
+  const pdfFile = quote.status !== "draft" ? await getQuotePdfFile(supabase, orgId, quote.id) : null;
+  const canStorePdf =
+    hasQuotes && quotePdfStorable(quote.status) && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
 
   return (
     <div className="max-w-4xl">
@@ -225,6 +231,9 @@ export default async function QuotePage({ params, searchParams }: Props) {
             <ButtonLink href={quoteDocumentPath(orgId, quote.id)} variant="secondary" size="sm">
               תצוגה והדפסה
             </ButtonLink>
+            {quote.status !== "draft" ? (
+              <QuotePdfButton orgId={orgId} quoteId={quote.id} href={pdfFile ? paths.file(orgId, pdfFile.id) : null} canStore={canStorePdf} />
+            ) : null}
             {/* QUO-07: the draft gets its number and is locked; QUO-08: its link and the WhatsApp and email buttons with it.
                 Mounted for every quote so the window survives the refresh that turns the draft into a sent quote. */}
             <SendQuoteFlow orgId={orgId} quoteId={quote.id} canSend={canEdit} businessName={context.org.name} recipient={recipient} />

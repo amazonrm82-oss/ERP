@@ -1065,6 +1065,8 @@ export type FileRow = {
   upload_checked_at: string | null;
   // FLD-06 part B: the file field (custom field key) of its record this file was uploaded for; null = a plain record file
   custom_field_key: string | null;
+  // QUO-06 (migration quote_pdfs): the sent quote whose PDF this is (one per quote, kept, never deleted)
+  quote_id: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2610,6 +2612,7 @@ export type Database = {
           accounting_document_id?: string | null;
           payment_id?: string | null;
           custom_field_key?: string | null;
+          quote_id?: string | null;
         },
         Record<string, never>
       >;
