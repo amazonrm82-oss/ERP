@@ -101,10 +101,12 @@ and build this CRM here instead. The old code is preserved on the branch
    In use (QUO-06 answer 1, owner 26 October 2026, migration 020995): the customer's PDF download (`src/features/quotes/pdf-public-server.ts`,
    route `GET /api/forms/quote/<token>/pdf`), which calls only `public.quote_public_pdf()` and downloads only the path it answers,
    compared with its SHA-256; in the eslint allow-list.
-   Owner, 26 October 2026 (ADM-01 answer 1, approved, not built yet): one more use under the same conditions: the public
-   subprocessors page reads the list through a server route calling one function granted to `service_role` only, which returns
-   only name, purpose, country, data categories and dates of active providers, takes no input from the visitor, cached for an
-   hour, rate limited, with database tests and an independent review.
+   In use (ADM-01, owner 26 October 2026, answer (ב), migration 021040): the public subprocessors page
+   (`src/features/legal/subprocessors-public-server.ts`, page `/legal/subprocessors`), which calls only
+   `public.subprocessors_public_page()` (no arguments; name, purpose, country, data categories and dates of live entries; at most 60
+   reads a minute in total through `app.subprocessor_page_reads`, then `{refused: 'rate'}`), cached for an hour through
+   `unstable_cache` (tag `subprocessors-public`, `updateTag` by the platform screen's actions); a failed read is not cached, backs off
+   for a minute and logs one redacted line; no visitor input, no uncached route; in the eslint allow-list.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
@@ -494,6 +496,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (logged in `app.platform_log`); a removed rate gets `cancelled_at` (never deleted) and `app.vat_rate_at` skips it; the guard also
   locks cancelling or reviving a started row; no TRUNCATE for API roles. `app.vat_rate_at` and `app.vat_rates_guard` were last
   redefined in 0193. Readers of `vat_rates` in TS must filter `cancelled_at is null`.
+  Subprocessors (ADM-01 rest, migration 021040; owner 26 October 2026): `public.subprocessors` (platform table, no API role reads or
+  writes it; RLS on, select policy `cancelled_at is null` kept as a guard). The platform owner (aal2) adds an entry 14 days ahead at least
+  (hint `subprocessor:notice`), corrects a future one, removes a future one (`cancelled_at`), or ends one from a future day
+  (`platform_add/update/remove/end_subprocessor`, logged); an entry in force is locked (`app.subprocessors_guard`, hint
+  `subprocessor:in_force`) but for a future end day and a fill-once location/website. Every change of what owners were told is
+  announced once per business to its active owners (`system`, DRAFT wording; `app.subprocessor_announcements` keeps the latest per
+  entry, `app.subprocessor_notices` keyed by its sequence). Staff read through `platform_list_subprocessors()`. Follow-ups: the
+  announcement runs in the owner's transaction without batching; end-day edits have no cool-down.
 - Prices, totals, currency (TAX-04..06, migrations 0141-0143): `org_document_settings.prices_include_vat` (default false); every
   document stores its own copy when made. `app.document_totals(lines, rate_bp, include_vat, discount_bp, discount_agorot,
   round)` (pure, agorot and basis points, half up, discounts before VAT, VAT once per document, hint `totals:invalid`) mirrors
