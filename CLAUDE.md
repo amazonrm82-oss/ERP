@@ -249,7 +249,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   and a deleted organization's logo folder, skipping any path a record file uses (`app.org_logo_path_shared`, because the queue
   is keyed on the path alone); `app.orphan_claimable` (last redefined there) never claims a current `logo_path`.
 - Handover (migration 0024): `public.transfer_records(org, from, to)` moves owner_id on leads,
-  contacts, companies, deals and tasks. It sets `app.bulk_transfer` (notify_assignment skips) and
+  contacts, companies, deals, tasks and meetings, and since 020875 quotes and orders in every status (lead's decision): their
+  owner is server-kept, so the definer trigger `app.document_owner_transfer` (`quotes_zzz_owner_transfer`, `orders_zz_owner_transfer`,
+  last BEFORE triggers) moves it only while transfer_records' transaction-local settings `app.owner_transfer_org/_from/_to` name the
+  row's org and old owner; nothing else unfreezes. `transfer_records` was last redefined in 020875. It sets `app.bulk_transfer` (notify_assignment skips) and
   `app.automation_running` (events marked as automation, so automations skip) for its duration.
 - Custom fields (migration 0026): `app.check_custom_fields()` (security invoker, `*_custom_fields_check`
   triggers) checks every changed key of `custom_fields` written by `authenticated`/`anon` against
@@ -452,6 +455,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   update that keeps the stage, refuses a person's snooze date that is not a day after today up to 366 days ahead or on a closed
   deal (hint `deal:snoozed_until`), and clears the snooze on any stage or pipeline move; `deals_snooze_cleared` logs one
   `system` activity (`metadata.kind = snooze_cleared`, no notification, not "last activity"). MNY-01 and MNY-05 read the same report.
+  Since 020870 (DEAL-02 gap) the rule lives in `app.deal_attention_rows` (invoker, no SET clause so it inlines; the advisor's
+  `function_search_path_mutable` on it is expected); `report_stuck_deals` (last redefined there, same output and 200 cap) and the
+  uncapped `public.deal_attention(org, deal ids)` (board and deal page) read it; `report_pipeline_cleanup` keeps its copy (test 93).
 - Tax and documents settings (TAX-01..03, migrations 0135-0138): `public.org_document_settings` (one row per org; members read,
   owners/admins of a writable org write; audited) holds `vat_status` (licensed|exempt|nonprofit|other, null = not set; Hebrew
   labels per owner), `legal_form` (informational only) and the business details for documents (legal_name, tax_id with
