@@ -75,6 +75,7 @@ function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<stri
       related: null,
       people: item.people,
       block: true,
+      blockSeriesIndex: item.seriesIndex,
     };
   }
   return {
@@ -95,6 +96,7 @@ function entry(orgId: string, item: CalendarItem, meetingTypes: ReadonlyMap<stri
     related: item.related ? { href: recordPage(item.related.type, orgId, item.related.id), label: RELATED_LABEL[item.related.type] } : null,
     people: item.people,
     block: false,
+    blockSeriesIndex: null,
   };
 }
 

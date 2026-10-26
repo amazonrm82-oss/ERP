@@ -27,6 +27,8 @@ export type CalendarItem = TimedItem & {
   people: string[];
   // GAP-07: blocked time (a meeting row with is_block); false for tasks
   block: boolean;
+  // CAL-09 / GAP-07: the meeting's place in its weekly series; null for a single meeting and for tasks
+  seriesIndex: number | null;
 };
 
 // "everyone I can see" over a month of a busy organization: past this, the screen says so
@@ -76,7 +78,7 @@ export async function listCalendarItems(
 
   let meetingQuery = supabase
     .from("meetings")
-    .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id, is_block")
+    .select("id, title, meeting_type, meeting_type_id, starts_at, ends_at, location, status, owner_id, lead_id, contact_id, company_id, deal_id, is_block, series_index")
     .eq("organization_id", orgId)
     .lt("starts_at", range.to)
     .gt("ends_at", range.from);
@@ -132,6 +134,7 @@ export async function listCalendarItems(
       related: relatedOf(m),
       people: ordered(meetingPeople.get(m.id)),
       block: m.is_block,
+      seriesIndex: m.series_index,
     })),
     ...tasks
       .filter((t): t is typeof t & { due_at: string } => t.due_at !== null)
@@ -150,6 +153,7 @@ export async function listCalendarItems(
         related: relatedOf(t),
         people: people && t.owner_id && people.includes(t.owner_id) ? [t.owner_id] : [],
         block: false,
+        seriesIndex: null,
       })),
   ];
   items.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id.localeCompare(b.id));

@@ -335,6 +335,8 @@ async function updateMeeting(orgId: string, meetingId: string, subject: Timeline
     .select("owner_id, status, starts_at, series_id, series_index, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .eq("id", meetingId)
+    // GAP-07: blocked time has its own editor (src/features/calendar/block-actions.ts), never this one
+    .eq("is_block", false)
     .maybeSingle();
   if (readError) {
     return fail(dbErrorMessage(readError), { values: formValues(formData) });
@@ -421,6 +423,7 @@ async function followingMeetings(
     .select("id, starts_at, series_index")
     .eq("organization_id", orgId)
     .eq("series_id", seriesId)
+    .eq("is_block", false)
     .gt("series_index", index)
     .eq("status", "planned")
     .order("series_index");
@@ -467,6 +470,7 @@ export async function setMeetingStatusAction(
       .select("series_id, series_index")
       .eq("organization_id", orgId)
       .eq("id", meetingId)
+      .eq("is_block", false)
       .maybeSingle();
     if (readError) {
       return fail(dbErrorMessage(readError));
@@ -629,6 +633,7 @@ async function splitSeries(
     .delete()
     .eq("organization_id", orgId)
     .in("id", ids)
+    .eq("is_block", false)
     .eq("status", "planned")
     .select("id");
   if (removeError) {
@@ -659,6 +664,7 @@ async function deletableFollowing(supabase: Client, orgId: string, meetingId: st
     .select("series_id, series_index")
     .eq("organization_id", orgId)
     .eq("id", meetingId)
+    .eq("is_block", false)
     .maybeSingle();
   if (error) return { error: dbErrorMessage(error) } as const;
   if (!current?.series_id || current.series_index === null) return { error: NOT_FOUND_OR_FORBIDDEN } as const;
@@ -667,6 +673,7 @@ async function deletableFollowing(supabase: Client, orgId: string, meetingId: st
     .select("id, starts_at, series_index, lead_id, contact_id, company_id, deal_id")
     .eq("organization_id", orgId)
     .eq("series_id", current.series_id)
+    .eq("is_block", false)
     .gte("series_index", current.series_index);
   if (readError) return { error: dbErrorMessage(readError) } as const;
   return { rows: fromHereNotPast(rows.map((row) => ({ ...row, series_index: row.series_index ?? 0 })), current.series_index, Date.now()) } as const;
@@ -699,7 +706,7 @@ export async function deleteFollowingMeetingsAction(orgId: string, meetingId: st
   const skipped: string[] = [];
   const gone: LinkedRecords[] = [];
   for (const row of found.rows) {
-    const { data, error } = await supabase.from("meetings").delete().eq("organization_id", orgId).eq("id", row.id).select(LINKED);
+    const { data, error } = await supabase.from("meetings").delete().eq("organization_id", orgId).eq("id", row.id).eq("is_block", false).select(LINKED);
     if (error || data.length === 0) skipped.push(zoneDate(new Date(row.starts_at), timeZone));
     else gone.push(...data);
   }

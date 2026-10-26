@@ -48,7 +48,7 @@ describe("deals without a next action (TASK-09)", () => {
 });
 
 function item(id: string, kind: "meeting" | "task", startsAt: string, endsAt: string | null, block = false): CalendarItem {
-  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", meetingTypeId: null, activityTypeId: null, location: null, ownerName: null, related: null, people: [], block };
+  return { id, kind, startsAt, endsAt, title: id, status: "planned", type: "phone", meetingTypeId: null, activityTypeId: null, location: null, ownerName: null, related: null, people: [], block, seriesIndex: null };
 }
 
 describe("today's meetings leave blocked time out (GAP-07)", () => {

@@ -25,6 +25,7 @@ import type { StageColor } from "@/features/deals/stage-colors";
 import type { MeetingTypeChoice } from "@/features/meeting-types/schema";
 import { ConflictWarning } from "@/features/meetings/components/conflict-warning";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
+import { blockSeriesLabel } from "../blocks";
 import { BlockEditor } from "./block-time";
 import { MeetingItemButtons, type MeetingChange } from "@/features/meetings/components/meeting-buttons";
 import type { MemberOption } from "@/features/meetings/components/meeting-form";
@@ -73,6 +74,8 @@ export type CalendarEntry = TimedItem & {
   people: string[];
   // GAP-07: blocked time
   block: boolean;
+  // GAP-07: a block's place in its weekly series; null for a single block and for everything else
+  blockSeriesIndex: number | null;
 };
 
 type Props = {
@@ -928,6 +931,12 @@ function ItemDetails({
             <dd>{seriesLabel(meeting.seriesIndex)}</dd>
           </>
         ) : null}
+        {item.blockSeriesIndex ? (
+          <>
+            <dt className="text-ink-soft">סדרה</dt>
+            <dd>{blockSeriesLabel(item.blockSeriesIndex)}</dd>
+          </>
+        ) : null}
         {meeting ? (
           <>
             <dt className="text-ink-soft">תזכורת</dt>
@@ -1007,6 +1016,7 @@ function ItemDetails({
         <BlockEditor
           orgId={orgId}
           blockId={item.id}
+          seriesIndex={item.blockSeriesIndex}
           timeZone={timeZone}
           initial={{
             title: item.title,
