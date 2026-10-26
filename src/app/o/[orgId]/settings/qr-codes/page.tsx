@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { FormIcon, PlusIcon } from "@/components/ui/icons";
 import { FormQr } from "@/features/intake/components/form-qr";
 import { qrFileName } from "@/features/intake/qr-link";
 import { deleteQrCodeAction, setQrCodeActiveAction } from "@/features/qr-codes/actions";
@@ -13,6 +16,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatNumber } from "@/lib/format";
+import { paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 
 export const metadata: Metadata = { title: "קודי QR" };
@@ -46,6 +50,18 @@ export default async function QrCodesPage({ params }: Props) {
     siteOrigin(),
   ]);
   const names = new Map([...targets.forms, ...targets.pages].map((t) => [t.value, t]));
+  const hasTargets = targets.forms.length + targets.pages.length > 0;
+  // the first step the user may take: the form above, or a web form first; nothing outside the plan or while read-only
+  const firstAction = !inPlan || !canWrite ? null : hasTargets ? (
+    <ButtonLink href="#qr-new" variant="secondary">
+      <PlusIcon className="size-4" />
+      יצירת קוד ראשון
+    </ButtonLink>
+  ) : (
+    <ButtonLink href={paths.settingsIntake(orgId)} variant="secondary">
+      לטפסי האתר
+    </ButtonLink>
+  );
 
   return (
     <div className="space-y-6">
@@ -61,10 +77,12 @@ export default async function QrCodesPage({ params }: Props) {
             </p>
           ) : !canWrite ? (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ולכן אי אפשר ליצור או לשנות קודים.</p>
-          ) : targets.forms.length + targets.pages.length === 0 ? (
+          ) : !hasTargets ? (
             <p className="text-md text-ink-soft">כדי ליצור קוד, צריך קודם טופס אתר או דף קביעת תור.</p>
           ) : (
-            <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} />
+            <div id="qr-new" className="scroll-mt-24">
+              <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} />
+            </div>
           )}
         </CardBody>
       </Card>
@@ -72,9 +90,14 @@ export default async function QrCodesPage({ params }: Props) {
       <Card aria-labelledby="qr-list">
         <CardHeader id="qr-list" title="הקודים של העסק" />
         {codes.length === 0 ? (
-          <CardBody>
-            <p className="text-md text-ink-soft">עדיין אין קודים.</p>
-          </CardBody>
+          <EmptyState
+            compact
+            icon={<FormIcon />}
+            title="עוד אין קודי QR"
+            description="כאן יופיעו הקודים שתולים על שלטים ופליירים, עם מספר הסריקות של כל אחד."
+            action={firstAction}
+            className="border-t border-line"
+          />
         ) : (
           <ul className="divide-y divide-line border-t border-line">
             {codes.map((code) => {

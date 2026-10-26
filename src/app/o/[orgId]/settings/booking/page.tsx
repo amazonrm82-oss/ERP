@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { CalendarIcon } from "@/components/ui/icons";
 import { AddBookingPageButton, BookingPageList } from "@/features/booking/components/booking-pages-editor";
 import { publicBookingPath } from "@/features/booking/paths";
 import { listBookingPages, managedBookingReps, repHasHours } from "@/features/booking/queries";
@@ -63,11 +65,20 @@ export default async function BookingPagesPage({ params }: Props) {
           <BookingPageList {...shared} pages={pages} noHours={noHours} editable={canWrite} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">{canWrite ? "עוד אין דפים. אפשר ליצור דף ראשון." : "אין דפים לתצוגה."}</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<CalendarIcon />}
+          title="עוד אין דפי קביעת תור"
+          description={
+            canWrite
+              ? "יוצרים דף, שולחים את הקישור ללקוחות, והם קובעים פגישה בזמן פנוי בלי טלפונים הלוך ושוב."
+              : "כאן יופיעו הדפים שלקוחות קובעים בהם פגישה בזמן פנוי."
+          }
+          action={canWrite ? <AddBookingPageButton {...shared} /> : null}
+          className="mt-3 border-t border-line"
+        />
       )}
-      {allowed && canWrite ? (
+      {allowed && canWrite && pages.length > 0 ? (
         <CardBody className="border-t border-line">
           <AddBookingPageButton {...shared} />
         </CardBody>

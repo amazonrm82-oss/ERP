@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ForwardIcon } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/feedback";
+import { ForwardIcon, InboxIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { getOrgModules } from "@/features/modules/queries";
 import { NewStaticSegmentForm } from "@/features/segments/components/segment-forms";
 import { canWriteSegments, SEGMENT_KIND_LABELS, SEGMENT_OBJECT_LABELS, SEGMENT_OBJECTS, SEGMENTS_NOT_IN_PLAN } from "@/features/segments/model";
 import { segmentPath } from "@/features/segments/paths";
@@ -21,7 +24,7 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function SegmentsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  const [segments, inPlan] = await Promise.all([listSegments(orgId), orgHasFeature(orgId, "segments")]);
+  const [segments, inPlan, modules] = await Promise.all([listSegments(orgId), orgHasFeature(orgId, "segments"), getOrgModules(orgId)]);
   const writer = canWriteSegments(role, canWrite);
 
   return (
@@ -71,9 +74,21 @@ export default async function SegmentsPage({ params }: Props) {
                   ))}
                 </ul>
               ) : (
-                <CardBody className="border-t border-line">
-                  <p className="text-md text-ink-soft">עוד אין סגמנטים של {SEGMENT_OBJECT_LABELS[objectType]}.</p>
-                </CardBody>
+                <EmptyState
+                  compact
+                  icon={objectType === "lead" ? <InboxIcon /> : <UsersIcon />}
+                  title={`עוד אין סגמנטים של ${SEGMENT_OBJECT_LABELS[objectType]}`}
+                  description={`סגמנט הוא קבוצה שמורה של ${SEGMENT_OBJECT_LABELS[objectType]}: לפי סינון של הרשימה, או רשימה ידנית.`}
+                  action={
+                    // saving a filter as a segment is for writers, only with segments in the plan, and leads only while their module is on
+                    inPlan && writer && (objectType !== "lead" || modules.leads) ? (
+                      <ButtonLink href={objectType === "lead" ? paths.leads(orgId) : paths.contacts(orgId)} variant="secondary">
+                        {`לרשימת ה${SEGMENT_OBJECT_LABELS[objectType]}`}
+                      </ButtonLink>
+                    ) : null
+                  }
+                  className="border-t border-line"
+                />
               )}
             </Card>
           );

@@ -19,9 +19,8 @@ import { QUOTE_TEMPLATE_NAME_MAX } from "../templates";
 /** QUO-04: the templates, with rename and delete for owners and admins. */
 export function QuoteTemplatesList({ orgId, templates, canEdit }: { orgId: string; templates: QuoteTemplateSummary[]; canEdit: boolean }) {
   const [renaming, setRenaming] = useState<string | null>(null);
-  if (templates.length === 0) {
-    return <p className="text-md text-ink-soft">עוד אין תבניות.</p>;
-  }
+  // the page shows the empty state (USR-05)
+  if (templates.length === 0) return null;
   return (
     <Card aria-label="תבניות הצעת מחיר">
       <CardBody>

@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 
+import { ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { QuoteIcon } from "@/components/ui/icons";
+import { quotesPath } from "@/features/quotes/paths";
 import { QuoteTemplatesList } from "@/features/quotes/components/quote-templates-list";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -22,7 +27,25 @@ export default async function QuoteTemplatesPage({ params }: Props) {
         חדשה או בכפתור &quot;מתבנית&quot; בעורך.
       </p>
       {hasQuotes ? null : <p className="text-sm text-ink-soft">הצעות מחיר אינן כלולות בחבילה הנוכחית.</p>}
-      <QuoteTemplatesList orgId={orgId} templates={templates} canEdit={isAdminRole(role) && canWrite} />
+      {templates.length === 0 ? (
+        <Card aria-label="תבניות הצעת מחיר">
+          <EmptyState
+            icon={<QuoteIcon />}
+            title="עוד אין תבניות"
+            description="תבנית חוסכת הקלדה בהצעות שחוזרות על עצמן. פותחים הצעה מוכנה ושומרים אותה כתבנית."
+            action={
+              // saving a template is for owners and admins of a writable business with quotes in the plan
+              hasQuotes && isAdminRole(role) && canWrite ? (
+                <ButtonLink href={quotesPath(orgId)} variant="secondary">
+                  להצעות המחיר
+                </ButtonLink>
+              ) : null
+            }
+          />
+        </Card>
+      ) : (
+        <QuoteTemplatesList orgId={orgId} templates={templates} canEdit={isAdminRole(role) && canWrite} />
+      )}
     </div>
   );
 }
