@@ -42,7 +42,23 @@ export const CONSENT_TARGETS = [
 ];
 
 // The closed list of cell values (lower case, spaces folded). Empty = nothing written; anything else = not guessed.
-export const CONSENT_GRANTED_VALUES = ["כן", "מאשר", "מאשרת", "מסכים", "מסכימה", "yes", "y", "true", "1", "v", "✓", "✔"] as const;
+// Owner, 26 October 2026 (answer 3 (ג)): also "אישר", "אושר" (and v, ✔, מאשרת, מסכימה, x, which were already here).
+export const CONSENT_GRANTED_VALUES = [
+  "כן",
+  "מאשר",
+  "מאשרת",
+  "אישר",
+  "אושר",
+  "מסכים",
+  "מסכימה",
+  "yes",
+  "y",
+  "true",
+  "1",
+  "v",
+  "✓",
+  "✔",
+] as const;
 export const CONSENT_DENIED_VALUES = ["לא", "לא מאשר", "לא מאשרת", "לא מסכים", "לא מסכימה", "no", "n", "false", "0", "x", "✗", "✘"] as const;
 
 export type ConsentCell = "granted" | "denied" | null | "invalid";
@@ -92,6 +108,15 @@ export const consentValueUnknown = (channel: ImportConsentChannel, value: string
   `הערך "${value}" בעמודת ההסכמה ${toChannel(channel)} לא מוכר (כן או לא). ההסכמה לא נרשמה.`;
 export const consentNoAddress = (channel: ImportConsentChannel) =>
   `אין בשורה ${channel === "email" ? "אימייל" : "טלפון"}, ולכן ההסכמה ${toChannel(channel)} לא נרשמה.`;
+
+/**
+ * CNS-05 undo (owner, 26 October 2026): the sentence added to "הייבוא בוטל." when undoing it cancelled consents the import
+ * recorded (public.undo_import / undo_own_import answer `consents` only when there were any); "" otherwise.
+ */
+export function consentsUndoneText(count: number | null | undefined): string {
+  if (!count || count < 1) return "";
+  return count === 1 ? " גם ההסכמה לדיוור שנרשמה בו בוטלה." : ` גם ${count} ההסכמות לדיוור שנרשמו בו בוטלו.`;
+}
 
 /** The row's warning for a consent the database did not write; null when it was written. */
 export function consentResultWarning(channel: ImportConsentChannel, result: ConsentResult): string | null {

@@ -93,14 +93,16 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
               {history.map((entry) => (
                 <li key={entry.id} className="text-sm">
                   <p>
-                    <span className="font-medium">{CHANNEL_LABELS[entry.channel]}:</span> {STATE_LABELS[entry.state]}
+                    <span className="font-medium">{CHANNEL_LABELS[entry.channel]}:</span>{" "}
+                    {entry.importUndo === "cancel" ? "הייבוא בוטל, ההסכמה שנרשמה בו לא תקפה" : STATE_LABELS[entry.state]}
                   </p>
+                  {entry.importUndo === "cancelled" ? <p className="text-ink-soft">לא תקף: הייבוא בוטל</p> : null}
                   <p className="text-ink-soft">
                     {[entry.source ? SOURCE_LABELS[entry.source] : null, entry.recordedBy].filter(Boolean).join(" · ")}
                     {" · "}
                     <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
                   </p>
-                  {entry.method ? <p className="break-words text-ink-soft">איך התקבלה: {entry.method}</p> : null}
+                  {entry.method && entry.importUndo !== "cancel" ? <p className="break-words text-ink-soft">איך התקבלה: {entry.method}</p> : null}
                   {entry.liftMethod ? <p className="text-ink-soft">ביטול הסרה: {LIFT_METHOD_LABELS[entry.liftMethod]}</p> : null}
                   {entry.wording ? (
                     <p className="break-words whitespace-pre-line text-ink-soft">

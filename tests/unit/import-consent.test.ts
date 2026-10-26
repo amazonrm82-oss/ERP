@@ -8,6 +8,7 @@ import {
   consentChannelOf,
   consentDeclarationSchema,
   consentResultWarning,
+  consentsUndoneText,
   IMPORT_CONSENT_METHOD_LABELS,
   IMPORT_CONSENT_METHODS,
   mapsConsent,
@@ -31,6 +32,15 @@ describe("consent cell values (closed list, never guessed)", () => {
     for (const v of ["לא", "לא  מאשר", "לא מאשרת", "לא מסכים", "No", "n", "False", "0", "X", "✗"]) {
       expect(parseConsentCell(v), v).toBe("denied");
     }
+  });
+
+  it("takes the owner's added values of 26 October 2026 (answer 3), trimmed and in any case", () => {
+    for (const v of ["v", "V", " v ", "✔", "אישר", " אישר ", "מאשרת", "מסכימה", "אושר", "  אושר"]) {
+      expect(parseConsentCell(v), v).toBe("granted");
+    }
+    for (const v of ["x", "X", " x "]) expect(parseConsentCell(v), v).toBe("denied");
+    // still never guessed
+    for (const v of ["לא אישר", "אושרה?", "vv", "xx", "✔✔"]) expect(parseConsentCell(v), v).toBe("invalid");
   });
 
   it("an empty cell writes nothing; anything else is invalid", () => {
@@ -220,5 +230,14 @@ describe("review of 8274c04 (CNS-05)", () => {
     const res = await processChunk(ctxOf(twice.supabase, true, "skip"), lookups, repeat, 1, "job");
     expect(res[1]).toMatchObject({ status: "skipped", warning: CONSENT_ROW_SKIPPED });
     expect(twice.calls).toHaveLength(0);
+  });
+});
+
+describe("undoing an import with consents (owner, 26 October 2026, answer 1)", () => {
+  it("says how many consents were cancelled, and nothing when none were", () => {
+    expect(consentsUndoneText(undefined)).toBe("");
+    expect(consentsUndoneText(0)).toBe("");
+    expect(consentsUndoneText(1)).toBe(" גם ההסכמה לדיוור שנרשמה בו בוטלה.");
+    expect(consentsUndoneText(3)).toBe(" גם 3 ההסכמות לדיוור שנרשמו בו בוטלו.");
   });
 });

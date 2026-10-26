@@ -163,7 +163,7 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
 export const EXPORT_COLUMNS: Partial<Record<ExportTableName, string>> = {
   // CNS-01: the address hash is not shown to anyone (column grants)
   consents:
-    "id, organization_id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, wording_version, method, copied_from, lift_method, lift_note, recorded_by, created_at",
+    "id, organization_id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, wording_version, method, copied_from, import_job_id, cancels, lift_method, lift_note, recorded_by, created_at",
 };
 
 // readable names added next to these id columns

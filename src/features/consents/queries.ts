@@ -31,12 +31,14 @@ export type ConsentEntry = {
   liftMethod: LiftMethod | null;
   recordedBy: string | null;
   createdAt: string;
+  // CNS-05 undo: this entry ends an import's entry ("cancel"), or an undone import's entry that no longer counts ("cancelled")
+  importUndo: "cancel" | "cancelled" | null;
 };
 
 export type ChannelConsent = {
   channel: ConsentChannel;
   // the latest entry; null = nothing recorded ("לא ידוע")
-  latest: (Omit<ConsentEntry, "id" | "liftMethod" | "wordingVersion"> & { currentAddress: boolean | null }) | null;
+  latest: (Omit<ConsentEntry, "id" | "liftMethod" | "wordingVersion" | "importUndo"> & { currentAddress: boolean | null }) | null;
   // CNS-06: the record's own address is blocked for marketing whatever this record's entries say: 'listed' (owners and
   // admins: on the business's blocklist) or 'blocked' (the neutral word for everyone else; also an opt-out or erasure
   // of the same address elsewhere). Display only: senders judge by app.consent_suppressed.
@@ -63,7 +65,7 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
     supabase.rpc("consent_current", { p_org: orgId, p_kind: subject.kind, p_id: subject.id }),
     supabase
       .from("consents")
-      .select("id, channel, state, source, method, wording, wording_version, lift_method, recorded_by, created_at")
+      .select("id, channel, state, source, method, wording, wording_version, lift_method, recorded_by, created_at, cancels")
       .eq("organization_id", orgId)
       .eq(SUBJECT_COLUMN[subject.kind], subject.id)
       // newest first by the time the consent was given (a conversion copy keeps its time), then by entry order
@@ -75,6 +77,7 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
   const blocks = must(blockRows, "consent record blocks") ?? [];
   const latest = must(current, "consent current") ?? [];
   const history = must(rows, "consents") ?? [];
+  const cancelled = new Set(history.flatMap((r) => (r.cancels ? [r.cancels] : [])));
   const names = await getUserNames([...latest.map((r) => r.recorded_by), ...history.map((r) => r.recorded_by)]);
   const name = (id: string | null) => (id ? (names.get(id) ?? null) : null);
 
@@ -120,6 +123,7 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
               liftMethod: (LIFT_METHODS as readonly string[]).includes(row.lift_method ?? "") ? (row.lift_method as LiftMethod) : null,
               recordedBy: name(row.recorded_by),
               createdAt: row.created_at,
+              importUndo: row.cancels ? ("cancel" as const) : cancelled.has(row.id) ? ("cancelled" as const) : null,
             },
           ]
         : [],

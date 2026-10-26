@@ -1313,6 +1313,10 @@ export type ConsentRow = {
   hash_version: number;
   // a copy made by the lead's conversion (LEAD-07): the lead's entry
   copied_from: string | null;
+  // CNS-05: the import that wrote the entry (server only)
+  import_job_id: string | null;
+  // CNS-05 undo: on a cancelling entry (state unknown, source import), the import entry it ends (server only)
+  cancels: string | null;
   // an owner's or admin's manual lift of an opt-out: LiftMethod (src/features/consents/model.ts) and a note
   lift_method: string | null;
   lift_note: string | null;

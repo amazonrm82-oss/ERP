@@ -573,6 +573,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_consent_blocklist.sql",
       // CAP-07 follow-up redefines app.intake_marketing_consent() of _import_consent.sql last (awaiting a double opt-in)
       "_consent_awaiting_confirmation.sql",
+      // CNS-05 undo redefines the consent readers, undo_import, undo_own_import and app.import_record_worked last
+      "_import_consent_undo.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -22,7 +22,7 @@ import {
   type DuplicateModeKey,
   type RecordImportEntity,
 } from "./fields";
-import { consentDeclarationSchema, mapsConsent } from "./consent";
+import { consentDeclarationSchema, consentsUndoneText, mapsConsent } from "./consent";
 import { DealImportStopped, loadDealLookups, processDealChunk, type DealImportContext } from "./deal-server";
 import { loadProductLookups, processProductChunk, ProductImportStopped, type ProductImportContext } from "./product-server";
 import { loadTaskLookups, processTaskChunk, TaskImportStopped, type TaskImportContext } from "./task-server";
@@ -431,11 +431,12 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   if (entity !== "product" && (await myRole(context.supabase, orgId, context.user.id)) === "member") {
     const { data, error } = await context.supabase.rpc("undo_own_import", { p_org: orgId, p_job: jobId });
     if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
-    const result = data as { done?: number; kept?: number } | null;
+    const result = data as { done?: number; kept?: number; consents?: number } | null;
     const kept = result?.kept ?? 0;
     revalidatePath(paths.imports(orgId));
     revalidatePath(paths.org(orgId), "layout");
-    return { ok: true, message: kept > 0 ? `הייבוא בוטל. לא בוטלו: ${kept}, כי שונו אחרי הייבוא.` : "הייבוא בוטל." };
+    const message = kept > 0 ? `הייבוא בוטל. לא בוטלו: ${kept}, כי שונו אחרי הייבוא.` : "הייבוא בוטל.";
+    return { ok: true, message: `${message}${consentsUndoneText(result?.consents)}` };
   }
   if (entity === "product") {
     const removeError = await removeImportedProducts(context.supabase, orgId, jobId);
@@ -453,7 +454,7 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   // FXD-07: the records to the recycle bin (for contacts, also the companies the import made that no live contact
   // uses) and the import marked undone, in one call: all or nothing. A record the user may no longer change keeps the
   // whole import as it was.
-  const { error } = await context.supabase.rpc("undo_import", { p_org: orgId, p_job: jobId });
+  const { data: undone, error } = await context.supabase.rpc("undo_import", { p_org: orgId, p_job: jobId });
   if (error) {
     if (error.hint === "import_undo:left") {
       const left = Number(error.details);
@@ -464,5 +465,6 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   }
   revalidatePath(paths.imports(orgId));
   revalidatePath(paths.org(orgId), "layout");
-  return ok();
+  const consents = (undone as { consents?: number } | null)?.consents;
+  return consents ? { ok: true, message: `הייבוא בוטל.${consentsUndoneText(consents)}` } : ok();
 }

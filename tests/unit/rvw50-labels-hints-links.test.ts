@@ -75,7 +75,8 @@ describe("Hebrew messages for the database's hints (RVW-50 ב)", () => {
     "transfer:target": "src/features/settings/actions.ts",
   };
   // raised only by server paths no person reaches (a merge copying consents between records of the business)
-  const SERVER_ONLY = new Set(["consent:copy"]);
+  // consent:cancel: only app.import_consents_cancel writes a cancelling entry (CNS-05 undo); no person reaches it
+  const SERVER_ONLY = new Set(["consent:copy", "consent:cancel"]);
 
   it("every P0001 hint the migrations raise has a message, is answered by its screen, or is server-only", () => {
     const hints = new Set([...sql.matchAll(/errcode = 'P0001', hint = '([a-z_:]+)'/g)].map((m) => m[1]));

@@ -139,6 +139,8 @@ export const ACTION_LABELS: Record<string, string> = {
   person_export: "ייצוא כל המידע על האדם",
   // CNS-05: the importer's declaration of where a file's marketing consents came from
   import_consent: "ייבוא הסכמות לדיוור (הצהרה על המקור)",
+  // CNS-05 undo: the consents an undone import recorded were cancelled (counts only)
+  import_consent_undo: "ביטול הסכמות לדיוור של ייבוא שבוטל",
   // CNS-06: counts, channel and codes only (never an address)
   consent_blocklist_add: "הוספה לרשימת החסימה לדיוור",
   consent_blocklist_remove: "הסרה מרשימת החסימה לדיוור",
