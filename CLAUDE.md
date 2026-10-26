@@ -382,6 +382,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   links, business type, series, reminder or buffers; planned or cancelled only). Booking slots, `meeting_busy` and the calendar feed treat
   blocks as busy unchanged; `public.report_meetings` (last redefined in 020115), My day and tomorrow's reminders leave them out. App:
   `src/features/calendar/blocks.ts`, `block-actions.ts`, `components/block-time.tsx`.
+  Since 021065 (owner 18 October 2026) a block may repeat weekly: `public.create_meeting_series` (last redefined there) reads optional
+  `is_block` and `owner_id` (judged by `meetings_check_owner`; only the person or an admin names an organizer) and refuses participants
+  on a block series (22023 `meeting_series:block_participants`); `meetings_block_shape` allows `series_id`. The app edits "this one" or
+  "this and following" row by row, moves a series to another weekday only for its owner or an owner/admin (checked before asking), and
+  the meeting series actions in `src/features/meetings/actions.ts` skip blocks (`is_block = false`).
 - Business cards (BIZ-02, migration 020235): `public.business_cards` (one per rep, secret `token` server-only, public fields only); each card owns
   one form of kind `card` (`forms.business_card_id`, `forms_card_shape`, made by `app.business_cards_make_form`, locked by
   `app.forms_card_lock`); `app.guard_form` was last redefined in 020305 (SPD-07). Views limited per card and keyed IP hash
