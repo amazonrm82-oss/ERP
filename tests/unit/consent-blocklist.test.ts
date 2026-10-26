@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   BLOCKLIST_CHANNEL_LABELS,
   BLOCKLIST_CHANNELS,
+  BLOCKLIST_NOTE_MAX,
   BLOCKLIST_REASON_LABELS,
   BLOCKLIST_REASONS,
   BLOCKLIST_REMOVED_REASON_LABELS,
@@ -47,5 +48,18 @@ describe("consent blocklist (CNS-06)", () => {
   it("splits pasted text by lines, commas and semicolons, keeping spaces inside a phone", () => {
     expect(splitAddresses(" 050-123 4567\r\na@b.co, c@d.co;\n\n;x ")).toEqual(["050-123 4567", "a@b.co", "c@d.co", "x"]);
     expect(splitAddresses("  \n ,")).toEqual([]);
+  });
+});
+
+describe("the note of an entry (CNS-06 answer 4)", () => {
+  it("the app's limit is the database's constraint and check", () => {
+    const dir = join(process.cwd(), "supabase/migrations");
+    const file = readdirSync(dir).find((name) => name.endsWith("_consent_blocklist_note.sql"));
+    expect(file).toBeDefined();
+    const sql = readFileSync(join(dir, file as string), "utf8");
+    expect(sql).toContain(`check (note is null or char_length(note) between 1 and ${BLOCKLIST_NOTE_MAX})`);
+    expect(sql).toContain(`if char_length(v_note) > ${BLOCKLIST_NOTE_MAX} then`);
+    // never selectable by clients: the column grant of the table is not widened
+    expect(sql).not.toMatch(/grant select[^;]*consent_blocklist/);
   });
 });

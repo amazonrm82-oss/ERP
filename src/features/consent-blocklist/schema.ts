@@ -22,6 +22,8 @@ export const blocklistEntrySchema = z.object({
   removed_at: z.string().nullable(),
   removed_by: z.string().nullable(),
   removed_reason: z.enum(BLOCKLIST_REMOVED_REASONS).nullable(),
+  // CNS-06 answer 4: emptied by a privacy erasure of the person
+  note: z.string().nullable(),
 });
 
 export const blocklistFindSchema = z.union([

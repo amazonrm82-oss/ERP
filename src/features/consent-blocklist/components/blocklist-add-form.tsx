@@ -3,12 +3,12 @@
 import { useActionState } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { SelectField, TextareaField } from "@/components/ui/field";
+import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { addToBlocklistAction } from "../actions";
-import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNEL_LABELS, BLOCKLIST_CHANNELS, BLOCKLIST_REASON_LABELS, BLOCKLIST_REASONS } from "../model";
+import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNEL_LABELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_REASON_LABELS, BLOCKLIST_REASONS } from "../model";
 
 /** CNS-06: one address or a pasted list, a channel and a reason. The addresses are hashed by the database. */
 export function BlocklistAddForm({ orgId }: { orgId: string }) {
@@ -45,6 +45,14 @@ export function BlocklistAddForm({ orgId }: { orgId: string }) {
           ))}
         </SelectField>
       </div>
+      <TextField
+        label="הערה (לא חובה)"
+        name="note"
+        maxLength={BLOCKLIST_NOTE_MAX}
+        defaultValue={values.note ?? ""}
+        error={failed?.fieldErrors?.note}
+        hint={`עד ${BLOCKLIST_NOTE_MAX} תווים. נמחקת אם האדם מבקש למחוק את פרטיו.`}
+      />
       <SubmitButton pendingText="מוסיפים…">הוספה לרשימה</SubmitButton>
     </form>
   );

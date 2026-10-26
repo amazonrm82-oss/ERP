@@ -589,6 +589,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_field_file_versions.sql",
       // CNS-06 answer 3 redefines public.import_record_consents() of _import_consent_undo.sql last (the locked count)
       "_import_consent_locked_count.sql",
+      // CNS-06 answer 4 redefines app.consent_blocklist_guard(), public.consent_blocklist_add() and _find() of
+      // _consent_blocklist.sql and app.audit_erase_core() of _quote_pdfs.sql last (the note, emptied by an erasure)
+      "_consent_blocklist_note.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

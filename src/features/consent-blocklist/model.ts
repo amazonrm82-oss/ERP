@@ -33,6 +33,12 @@ export const BLOCKLIST_REMOVED_REASON_LABELS: Record<BlocklistRemovedReason, str
   other: "אחר",
 };
 
+/**
+ * CNS-06 answer 4 (owner, 26 October 2026): an optional note on the entries of one add, emptied when the person is erased
+ * (constraint consent_blocklist_note; the database refuses more: consent_blocklist:note).
+ */
+export const BLOCKLIST_NOTE_MAX = 200;
+
 /** At most this many addresses in one add (the database refuses more: consent_blocklist:too_many). */
 export const BLOCKLIST_ADD_MAX = 500;
 

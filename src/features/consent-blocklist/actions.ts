@@ -8,7 +8,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 
-import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel } from "./model";
+import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel } from "./model";
 import { consentBlocklistPath } from "./paths";
 import { blocklistAddResultSchema, blocklistFindSchema } from "./schema";
 
@@ -27,6 +27,12 @@ const addSchema = z.object({
         .min(1, { error: "יש להקליד טלפון או אימייל אחד לפחות." })
         .max(BLOCKLIST_ADD_MAX, { error: `אפשר להוסיף עד ${BLOCKLIST_ADD_MAX} כתובות בבת אחת.` }),
     ),
+  // CNS-06 answer 4: optional; blank = none
+  note: z
+    .string()
+    .trim()
+    .max(BLOCKLIST_NOTE_MAX, { error: `עד ${BLOCKLIST_NOTE_MAX} תווים.` })
+    .transform((value) => (value === "" ? null : value)),
 });
 
 /** CNS-06: adds typed or pasted addresses to the list (owners and admins; the function decides). */
@@ -37,13 +43,15 @@ export async function addToBlocklistAction(orgId: string, _prev: FormState, form
     channel: formData.get("channel"),
     reason: formData.get("reason"),
     addresses: formData.get("addresses") ?? "",
+    note: formData.get("note") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error, formData);
-  const { data, error } = await context.supabase.rpc("consent_blocklist_add", {
+  const { data, error } = await context.supabase.rpc("consent_blocklist_add_noted", {
     p_org: orgId,
     p_channel: parsed.data.channel,
     p_addresses: parsed.data.addresses,
     p_reason: parsed.data.reason,
+    p_note: parsed.data.note,
   });
   if (error) {
     return fail(error.code === "42501" ? NOT_ADMIN : dbErrorMessage(error), { values: formValues(formData) });
@@ -77,6 +85,7 @@ export type BlocklistFindEntry = {
   removedAt: string | null;
   removedBy: string | null;
   removedReason: (typeof BLOCKLIST_REMOVED_REASONS)[number] | null;
+  note: string | null;
 };
 
 export type BlocklistFindResult =
@@ -115,6 +124,7 @@ export async function findInBlocklistAction(orgId: string, _prev: FormState<Bloc
         removedAt: e.removed_at,
         removedBy: name(e.removed_by),
         removedReason: e.removed_reason,
+        note: e.note,
       })),
     },
   };

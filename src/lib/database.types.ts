@@ -2019,6 +2019,9 @@ export type ConsentBlocklistRow = {
   removed_by: string | null;
   // BlocklistRemovedReason
   removed_reason: string | null;
+  // CNS-06 answer 4: the owner's or admin's note (up to 200 characters), emptied by a privacy erasure of the person;
+  // clients may not select it (read through consent_blocklist_find)
+  note: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3295,6 +3298,11 @@ export type Database = {
       // CNS-06: the business's do-not-market list (owners and admins; definer). Addresses go in, never come out.
       consent_blocklist_add: {
         Args: { p_org: string; p_channel: string; p_addresses: string[]; p_reason: string };
+        Returns: { added: number; existing: number; invalid: number[] };
+      };
+      // CNS-06 answer 4: the same with an optional note (up to 200 characters)
+      consent_blocklist_add_noted: {
+        Args: { p_org: string; p_channel: string; p_addresses: string[]; p_reason: string; p_note: string | null };
         Returns: { added: number; existing: number; invalid: number[] };
       };
       consent_blocklist_remove: { Args: { p_org: string; p_id: string; p_reason: string }; Returns: undefined };

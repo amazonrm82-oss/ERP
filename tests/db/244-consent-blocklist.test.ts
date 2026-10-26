@@ -305,4 +305,135 @@ describe("blocklist of phones and emails (CNS-06)", () => {
       await asAdmin((q) => q("update public.organizations set status = $2 where id = $1", [org, status]));
     }
   });
+
+  // CNS-06 answer 4 (owner, 26 October 2026): a short note on an entry, erased with the person
+  const addNoted = (who: U, channel: string, addresses: string[], note: string | null, reason = "complaint") =>
+    asUser(who.id, async (q) =>
+      (await q<{ r: Row }>("select public.consent_blocklist_add_noted($1, $2, $3, $4, $5) as r", [org, channel, addresses, reason, note])).rows[0].r,
+    );
+  const notesOf = async (address: string) => ((await find(owner, address)).entries as Row[]).map((e) => e.note);
+  const purgeAndErase = (lead: string, personRequest: boolean) =>
+    asUser(owner.id, async (q) => {
+      await q("update public.leads set deleted_at = now() where id = $1", [lead]);
+      await q("delete from public.leads where id = $1", [lead]);
+      return (await q<{ n: number }>("select public.audit_erase_request($1, 'leads', $2, $3) as n", [org, lead, personRequest])).rows[0].n;
+    });
+
+  it("a note of up to 200 characters is written when adding and shown to owners and admins only; the audit says only that there was one", async () => {
+    expect(await addNoted(admin, "email", ["note-a@example.test"], "  ביקש בטלפון ב-3.10  ")).toEqual({ added: 1, existing: 0, invalid: [] });
+    expect(await notesOf("note-a@example.test")).toEqual(["ביקש בטלפון ב-3.10"]);
+    expect(((await find(admin, "note-a@example.test")).entries as Row[])[0].note).toBe("ביקש בטלפון ב-3.10");
+    // blank = no note; the old call writes none
+    expect(await addNoted(owner, "sms", ["050-7100040"], "   ")).toMatchObject({ added: 1 });
+    expect(await add(owner, "sms", ["050-7100041"])).toMatchObject({ added: 1 });
+    expect(await notesOf("050-7100040")).toEqual([null]);
+    expect(await notesOf("050-7100041")).toEqual([null]);
+    expect((await pgError(addNoted(owner, "sms", ["050-7100042"], "א".repeat(201)))).hint).toBe("consent_blocklist:note");
+    expect(await addNoted(owner, "sms", ["050-7100042"], "א".repeat(200))).toMatchObject({ added: 1 });
+    for (const who of [manager, member, viewer, outsider]) {
+      expect((await pgError(addNoted(who, "sms", ["050-7100043"], "הערה"))).code, who.email).toBe("42501");
+      expect((await pgError(find(who, "note-a@example.test"))).code, who.email).toBe("42501");
+    }
+    // nobody selects the column through the API, owners included (the function is the only reader)
+    for (const who of [owner, admin, member]) {
+      expect((await pgError(asUser(who.id, (q) => q("select note from public.consent_blocklist where organization_id = $1", [org])))).code).toBe("42501");
+    }
+    const audit = await asAdmin(
+      async (q) =>
+        (
+          await q<{ changes: Row }>(
+            "select changes from public.audit_log where organization_id = $1 and action = 'consent_blocklist_add' order by id",
+            [org],
+          )
+        ).rows.map((r) => r.changes),
+    );
+    expect(JSON.stringify(audit)).not.toContain("ביקש בטלפון");
+    expect(audit.filter((c) => c.with_note === true)).toHaveLength(2);
+  });
+
+  it("a note is never changed, only emptied, and clients write none", async () => {
+    const id = await asAdmin(
+      async (q) => (await q<{ id: string }>("select id from public.consent_blocklist where organization_id = $1 and note like 'ביקש%'", [org])).rows[0].id,
+    );
+    expect((await pgError(asAdmin((q) => q("update public.consent_blocklist set note = 'אחרת' where id = $1", [id])))).hint).toBe(
+      "consent_blocklist:append_only",
+    );
+    expect((await pgError(asUser(owner.id, (q) => q("update public.consent_blocklist set note = null where id = $1", [id])))).code).toBe("42501");
+    expect(await notesOf("note-a@example.test")).toEqual(["ביקש בטלפון ב-3.10"]);
+  });
+
+  it("a privacy erasure empties the notes of every address the person had; the entries and other notes stay", async () => {
+    const lead = await insertLead(member.id, org, { full_name: "למחיקה", email: "old-erase@example.test", phone: "050-7100050" });
+    // a later email: the old one is left only in the record's audit history
+    await asUser(owner.id, (q) => q("update public.leads set email = 'erase-me@example.test' where id = $1", [lead]));
+    // an address known only from the person's consent (a WhatsApp number written on the record before)
+    // (written past the register's triggers, which would hash the record's current phone instead)
+    await asAdmin(async (q) => {
+      await q("set session_replication_role = replica");
+      try {
+        await q(
+          `insert into public.consents (organization_id, lead_id, subject_type, subject_id, channel, state, source, address_hash, hash_version)
+           values ($1, $2, 'lead', $2, 'whatsapp', 'granted', 'form', $3, 1)`,
+          [org, lead, hmac(`${org}:phone:+972507100051`)],
+        );
+      } finally {
+        await q("set session_replication_role = origin");
+      }
+    });
+    await addNoted(owner, "all", ["old-erase@example.test", "erase-me@example.test", "050-7100050", "050-7100051", "keep-note@example.test"], "הערה על האדם");
+    expect(await purgeAndErase(lead, true)).toBeGreaterThan(0);
+    for (const address of ["old-erase@example.test", "erase-me@example.test", "050-7100050", "050-7100051"]) {
+      expect(await notesOf(address), address).toEqual([null]);
+    }
+    expect(await notesOf("keep-note@example.test")).toEqual(["הערה על האדם"]);
+    expect(await notesOf("note-a@example.test")).toEqual(["ביקש בטלפון ב-3.10"]);
+    // the block itself outlives the person
+    expect(await suppressed("email", "erase-me@example.test")).toBe(true);
+    expect(await suppressed("sms", "050-7100050")).toBe(true);
+  });
+
+  it("a contact's erasure also empties the notes of its further phones and emails (CON-01), old values included", async () => {
+    const contact = await asUser(owner.id, async (q) => {
+      const id = (
+        await q<{ id: string }>("insert into public.contacts (organization_id, first_name, email, phone) values ($1, 'למחיקה', 'main-c@example.test', '050-7100060') returning id", [
+          org,
+        ])
+      ).rows[0].id;
+      await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'email', 'work', 'Extra-C@Example.test')", [org, id]);
+      // a phone typed with brackets keeps them: only the label in brackets at the end is cut off
+      await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'phone', 'home', '(03) 555-0060')", [org, id]);
+      await q("insert into public.contact_channels (organization_id, contact_id, kind, label, value) values ($1, $2, 'email', 'home', 'was-c@example.test')", [org, id]);
+      // a further email later changed: the old value lives only in the audit history
+      await q("update public.contact_channels set value = 'now-c@example.test' where contact_id = $1 and value = 'was-c@example.test'", [id]);
+      return id;
+    });
+    const mine = ["main-c@example.test", "050-7100060", "extra-c@example.test", "03-5550060", "was-c@example.test", "now-c@example.test"];
+    await addNoted(admin, "all", [...mine, "other-c@example.test", "03-5550061"], "הערה על איש הקשר");
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [contact]);
+      await q("delete from public.contacts where id = $1", [contact]);
+      await q("select public.audit_erase_request($1, 'contacts', $2, true)", [org, contact]);
+    });
+    for (const address of mine) {
+      expect(await notesOf(address), address).toEqual([null]);
+    }
+    expect(await notesOf("other-c@example.test")).toEqual(["הערה על איש הקשר"]);
+    expect(await notesOf("03-5550061")).toEqual(["הערה על איש הקשר"]);
+    expect(await suppressed("email", "extra-c@example.test")).toBe(true);
+  });
+
+  it("without the key an entry still waiting for its hash is matched by its address", async () => {
+    await setKey(null);
+    try {
+      expect(await addNoted(owner, "email", ["waiting-erase@example.test"], "ממתין")).toMatchObject({ added: 1 });
+      const lead = await insertLead(member.id, org, { full_name: "בלי מפתח למחיקה", email: "waiting-erase@example.test" });
+      // not the person's request and nothing waiting on the record: the erasure runs now
+      expect(await purgeAndErase(lead, false)).toBeGreaterThanOrEqual(0);
+      expect(await notesOf("waiting-erase@example.test")).toEqual([null]);
+    } finally {
+      await setKey(KEY);
+      await asAdmin((q) => q("select app.consent_backfill_hashes()"));
+    }
+    expect(await notesOf("keep-note@example.test")).toEqual(["הערה על האדם"]);
+  });
 });

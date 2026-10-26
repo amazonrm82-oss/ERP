@@ -92,6 +92,7 @@ function EntryRow({ orgId, entry, editable }: { orgId: string; entry: BlocklistF
             }`
           : ""}
       </p>
+      {entry.note ? <p className="text-sm break-words text-ink">{entry.note}</p> : null}
       <FormError message={state && !state.ok ? state.message : null} />
       <FormNotice message={state?.ok ? (state.message ?? null) : null} />
       {editable && !removed ? (

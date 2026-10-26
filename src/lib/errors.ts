@@ -442,6 +442,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "consent_blocklist:max": "רשימת החסימה מלאה (100,000 כתובות). הסירו כתובות שכבר לא צריכות להיות בה.",
   "consent_blocklist:gone": "הכתובת כבר הוסרה מהרשימה. רעננו את הדף.",
   "consent_blocklist:append_only": "אי אפשר לשנות רישום ברשימת החסימה.",
+  // CNS-06 answer 4: the note of an entry
+  "consent_blocklist:note": "ההערה ארוכה מדי: עד 200 תווים.",
   // CNS-05 (import_jobs_consent_check, public.import_record_consents)
   "import_consent:note": "כשמייבאים הסכמות צריך לבחור איך התקבלו ולכתוב פרטים על המקור.",
   "import_consent:entity": "הסכמות לדיוור מייבאים רק עם לידים או אנשי קשר.",
