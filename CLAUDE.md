@@ -1228,7 +1228,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   link against a live readable record (`custom_field:record_link`) and a file against a confirmed file of that record and field
   (`custom_field:file`). The current field file is never removed directly (`files_field_guard`, the `record_files_delete` storage
   policy, last altered in 020905, via `app.field_file_in_use`); a replaced or cleared value, a deleted field and a merge release it
-  through `app.custom_field_file_drop` (its delete lives in 020910; until pasted it is a no-op stub). Purging a record empties links
+  through `app.custom_field_file_drop` (its delete lives in 020910, pasted 26 October 2026). Purging a record empties links
   to it (`*_record_links_clear`, statement triggers); a merge repoints them (`activities_merge_field_links`). Automations never
   set them (`*_cf_zz_automation_guard`, hint `custom_field:automation`; server link writes pass with `app.field_links_server`).
   No defaults; conversion never copies a file and a link only to the same target (`app.carry_custom_fields`, last redefined in
