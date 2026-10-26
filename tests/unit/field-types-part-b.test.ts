@@ -99,14 +99,14 @@ describe("file", () => {
 });
 
 describe("where the new types go (type-decisions.ts)", () => {
-  it("public forms take an address only; no default for a link or a file; a file is never required", () => {
+  it("public forms take an address only; no default for a link or a file; a file may be required (owner, 26 October 2026)", () => {
     expect(FORM_EXCLUDED_TYPES).not.toContain("address");
     expect(FORM_EXCLUDED_TYPES).toContain("record_link");
     expect(FORM_EXCLUDED_TYPES).toContain("file");
     expect(canHaveDefault("address")).toBe(true);
     expect(canHaveDefault("record_link")).toBe(false);
     expect(canHaveDefault("file")).toBe(false);
-    expect(canBeRequired("file")).toBe(false);
+    expect(canBeRequired("file")).toBe(true);
     expect(canBeRequired("record_link")).toBe(true);
   });
 

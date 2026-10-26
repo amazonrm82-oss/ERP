@@ -20,6 +20,9 @@ type Props = {
   // FLD-07: a read-only field that holds a file is locked
   locked: boolean;
   hint?: string;
+  // FLD-06 part B follow-up: a required file field (checked when the edit card is saved) and that save's message
+  required?: boolean;
+  error?: string;
 };
 
 /**
@@ -27,7 +30,7 @@ type Props = {
  * with the user's session, the server's check), and the new file replaces the field's value; the old one is released by
  * the database. It sends nothing with the surrounding form.
  */
-export function FieldFileInput({ orgId, target, label, current, held, locked, hint }: Props) {
+export function FieldFileInput({ orgId, target, label, current, held, locked, hint, required = false, error: saveError }: Props) {
   const router = useRouter();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +58,17 @@ export function FieldFileInput({ orgId, target, label, current, held, locked, hi
   const filled = held || current !== null;
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium">{label}</p>
+      <p className="mb-1.5 text-sm font-medium">
+        {label}
+        {required ? (
+          <>
+            <span aria-hidden="true" className="ms-0.5 text-danger">
+              *
+            </span>
+            <span className="sr-only"> (חובה)</span>
+          </>
+        ) : null}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         {current ? (
           current.href ? (
@@ -97,6 +110,10 @@ export function FieldFileInput({ orgId, target, label, current, held, locked, hi
       {error ? (
         <p role="alert" className="mt-1 text-sm text-danger">
           {error}
+        </p>
+      ) : saveError && !filled ? (
+        <p role="alert" className="mt-1 text-sm text-danger">
+          {saveError}
         </p>
       ) : null}
       {locked ? <p className="text-sm text-ink-soft">שדה לקריאה בלבד</p> : hint ? <p className="mt-1 text-sm text-ink-soft">{hint}</p> : null}

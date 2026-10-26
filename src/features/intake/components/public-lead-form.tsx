@@ -360,6 +360,9 @@ function PublicInput({ field, error }: { field: PublicField; error?: string }) {
       return <TextField {...common} type="email" dir="ltr" inputMode="email" autoComplete="off" />;
     case "url":
       return <TextField {...common} dir="ltr" inputMode="url" autoComplete="off" />;
+    case "address":
+      // FLD-06 part B (owner, 26 October 2026): an address is a plain line a visitor types
+      return <TextField {...common} maxLength={500} autoComplete="street-address" />;
     default:
       return <TextField {...common} maxLength={500} autoComplete="off" />;
   }

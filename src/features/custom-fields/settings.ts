@@ -22,9 +22,19 @@ export function canHaveDefault(type: FieldType): boolean {
   return type !== "user" && type !== "record_link" && type !== "file";
 }
 
-/** FLD-06 part B: a file is uploaded on the record's card after it is saved, so a file field is never required. */
+/**
+ * Every type may be required. FLD-06 part B follow-up (owner, 26 October 2026): a file field too, but a file is uploaded on
+ * the record's card after it is saved, so "required" is checked only when an existing record is saved from its edit card
+ * (missingRequiredFiles), never on create, a board drag, a table cell or a bulk change.
+ */
 export function canBeRequired(type: FieldType): boolean {
-  return type !== "file";
+  void type;
+  return true;
+}
+
+/** The required file fields that hold no file on this record (FLD-06 part B follow-up; the edit card's save only). */
+export function missingRequiredFiles(definitions: FieldDefinition[], stored: Record<string, Json | undefined>): FieldDefinition[] {
+  return definitions.filter((field) => field.type === "file" && field.isRequired && field.isActive && isEmptyCustomValue(stored[field.key]));
 }
 
 /** Why these settings cannot be saved, or null. The value itself is checked by parseCustomFields. */

@@ -6,7 +6,8 @@ import { z } from "zod";
 // operator and value against the list's fields before it builds a query.
 
 // "idle": days since the last contact (LEAD-02); a record never contacted counts from its creation
-export type FilterKind = "text" | "select" | "user" | "tag" | "date" | "number" | "checkbox" | "day" | "idle";
+// "presence": only filled or empty (FLD-06 part B: a record link or a file field holds an id, not a value to compare)
+export type FilterKind = "text" | "select" | "user" | "tag" | "date" | "number" | "checkbox" | "day" | "idle" | "presence";
 
 export type FilterOp =
   | "contains"
@@ -41,6 +42,7 @@ export const OPS_BY_KIND: Record<FilterKind, FilterOp[]> = {
   date: ["on_or_after", "before", "last_days", "older_than_days", "this_week", "this_month", "empty", "not_empty"],
   day: ["on_or_after", "before", "last_days", "older_than_days", "this_week", "this_month", "empty", "not_empty"],
   idle: ["idle_days"],
+  presence: ["not_empty", "empty"],
 };
 
 export const OP_LABELS: Record<FilterOp, string> = {
@@ -65,6 +67,12 @@ export const OP_LABELS: Record<FilterOp, string> = {
   empty: "ריק",
   not_empty: "לא ריק",
 };
+
+/** The operator's label for a field of this kind ("מלא" / "ריק" for a record link or a file, owner 26 October 2026). */
+export function opLabel(kind: FilterKind, op: FilterOp): string {
+  if (kind === "presence" && op === "not_empty") return "מלא";
+  return OP_LABELS[op];
+}
 
 /** What value an operator needs: none, a typed text, a number of days, a date, or a choice from the field's options. */
 export function valueKind(kind: FilterKind, op: FilterOp): "none" | "text" | "number" | "days" | "date" | "option" {

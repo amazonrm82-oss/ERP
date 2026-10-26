@@ -39,11 +39,10 @@ const FILTER_KINDS: Record<FieldType, FilterKind | null> = {
   url: "text",
   il_id: "text",
   il_company_id: "text",
-  // FLD-06 part B: an address is text; a record link and a file hold ids, not filterable yet (a "filled / empty" kind is a
-  // follow-up)
+  // FLD-06 part B: an address is text; a record link and a file hold ids: only "filled" / "empty" (owner, 26 October 2026)
   address: "text",
-  record_link: null,
-  file: null,
+  record_link: "presence",
+  file: "presence",
 };
 
 export type FilterObject = ListObject;
@@ -306,10 +305,10 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
 
   if (op === "empty") {
     if (field.kind === "tag") return `${c}.eq.{}`;
-    return field.kind === "text" ? `or(${c}.is.null,${c}.eq."")` : `${c}.is.null`;
+    return field.kind === "text" || field.kind === "presence" ? `or(${c}.is.null,${c}.eq."")` : `${c}.is.null`;
   }
   if (op === "not_empty") {
-    return field.kind === "text" ? `and(${c}.not.is.null,${c}.neq."")` : `${c}.not.is.null`;
+    return field.kind === "text" || field.kind === "presence" ? `and(${c}.not.is.null,${c}.neq."")` : `${c}.not.is.null`;
   }
 
   switch (field.kind) {
@@ -368,6 +367,9 @@ function conditionFilter(field: ServerField, op: FilterOp, rawValue: string, ctx
       }
       return null;
     }
+    case "presence":
+      // only "filled" / "empty", answered above
+      return null;
     case "idle": {
       // the last contact is older than X days (the same bound as "older_than_days"); a record never
       // contacted counts from its creation, so one created in those days is not idle yet

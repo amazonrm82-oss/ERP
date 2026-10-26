@@ -423,6 +423,8 @@ export function missingRequiredAfter(
     (field) =>
       field.condition !== null &&
       field.condition !== undefined &&
+      // FLD-06 part B follow-up: a file is asked only by the edit card, never by a move
+      field.type !== "file" &&
       conditionApplies(field.condition, definitions, objectType) &&
       fieldState(field, definitions, after, objectType).required &&
       requiredValueMissing(field, after[field.key]),

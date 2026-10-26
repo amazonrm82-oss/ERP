@@ -120,7 +120,7 @@ export function CustomFieldInputs({ definitions, stored, submitted, errors = {},
           }
           const held = stored?.[field.key];
           const fileId = typeof held === "string" ? held : null;
-          return (
+          const fileInput = (
             <FieldFileInput
               key={field.id}
               orgId={field.orgId}
@@ -130,7 +130,19 @@ export function CustomFieldInputs({ definitions, stored, submitted, errors = {},
               held={fileId !== null}
               locked={field.isReadOnly === true && fileId !== null}
               hint={field.helpText ?? undefined}
+              // FLD-06 part B follow-up: a required file is checked when the edit card is saved
+              required={state.required}
+              error={errors[inputName(field.key)]}
             />
+          );
+          const fileConditional = watching && field.condition ? conditionApplies(field.condition, definitions, objectType) : false;
+          if (!fileConditional) return fileInput;
+          // shown: its marker tells the server the field counts (FLD-09), as for the other inputs
+          return (
+            <div key={field.id}>
+              <input type="hidden" name={shownMarkerName(field.key)} value="1" />
+              {fileInput}
+            </div>
           );
         }
         // FLD-07: open while empty (it may be filled once), locked once it holds a value

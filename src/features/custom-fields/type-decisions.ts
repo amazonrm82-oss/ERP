@@ -78,19 +78,19 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
   "src/features/custom-fields/conditions.ts": {
     what: "condition operators and choices (FLD-09)",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_EXCLUDED },
-    note: "mirrors the database: 'filled' / 'empty' only. Part B: 'filled' / 'empty' only; a 'require' condition never asks for a file (fieldState)",
+    note: "mirrors the database: 'filled' / 'empty' only. Part B: 'filled' / 'empty' only; a 'require' condition never asks for a file (fieldState), and a move never asks for one (missingRequiredAfter)",
   },
   "src/features/custom-fields/live-conditions.ts": { what: "reading a controller from the form", decisions: ALL_HANDLED, note: "text value, as select" },
   "src/features/custom-fields/server.ts": { what: "typed values kept after a failed submit", decisions: ALL_HANDLED, note: "one input each" },
   "src/features/custom-fields/settings.ts": {
     what: "unique types and defaults (FLD-07)",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_EXCLUDED },
-    note: "never unique (mirrors the database); a default is allowed for all three. Part B: never unique; an address takes a default, a record link or a file does not (canHaveDefault), and a file field is never required (canBeRequired)",
+    note: "never unique (mirrors the database); a default is allowed for all three. Part B: never unique; an address takes a default, a record link or a file does not (canHaveDefault); a file field may be required, checked only when the edit card is saved (missingRequiredFiles, owner 26 October 2026)",
   },
   "src/features/list-filters/server.ts": {
     what: "list filters",
-    decisions: { rich_text: "handled", duration: "handled", status: "handled", ...B_ADDRESS_ONLY },
-    note: "rich text as text, duration in minutes, status as a list. Part B: an address as text; a record link or a file holds an id, not filterable yet (a 'filled / empty' kind is a follow-up)",
+    decisions: ALL_HANDLED,
+    note: "rich text as text, duration in minutes, status as a list. Part B: an address as text; a record link or a file holds an id, so only 'filled' / 'empty' (kind 'presence', owner 26 October 2026)",
   },
   "src/features/list-columns/components/list-table.tsx": {
     what: "list cells",
@@ -145,7 +145,7 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
   "src/features/intake/components/public-lead-form.tsx": {
     what: "public form inputs",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_ADDRESS_ONLY },
-    note: "FORM_EXCLUDED_TYPES. Part B: an address takes the plain text input; the others are not on forms",
+    note: "FORM_EXCLUDED_TYPES. Part B: an address takes a plain one-line text input (allowed on forms, owner 26 October 2026); the others are not on forms",
   },
   "src/features/intake/public-validate.ts": {
     what: "public form messages",

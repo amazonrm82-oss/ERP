@@ -553,6 +553,13 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_task_subtasks.sql",
       // PAY-03 grants insert/update (is_advance, advance_quote_id, advance_order_id) again after _payments.sql re-ran its grants
       "_credit_advances_list.sql",
+      // FLD-06 part B alters the storage policy record_files_delete of _payment_files.sql last (a field's current file keeps its
+      // object); without it this re-run left the older policy for every later test file (seen as a flaky test 148)
+      "_field_types_part_b.sql",
+      // the pasted release gives app.custom_field_file_drop() of _field_types_part_b.sql its body (020905 keeps it; listed for staleRestores)
+      "_field_file_release.sql",
+      // its follow-up redefines app.record_links_clear_ids() of _field_types_part_b.sql last (the timeline entry)
+      "_record_link_removed_entry.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

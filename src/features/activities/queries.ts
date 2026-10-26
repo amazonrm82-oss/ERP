@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { moneyEntryKind, moneyEntryLabel } from "./money-entries";
 import { quoteEntryBy, quoteEntryKind, quoteEntryText } from "./quote-entries";
-import { conversionText, responsePassText, stageChangeText } from "./system-entries";
+import { conversionText, recordLinkRemovedText, responsePassText, stageChangeText } from "./system-entries";
 import { CALL_OUTCOME_LABEL, managesTeamChain, SUBJECT_COLUMN, type TimelineFilter, type TimelineSubject } from "./schema";
 
 export type TimelineItem = {
@@ -185,6 +185,11 @@ export async function getTimeline(
       // TASK-02: how the call ended, then the note
       const outcome = CALL_OUTCOME_LABEL[metaString(activity.metadata, "outcome") ?? ""];
       if (outcome) text = body ? `${outcome}. ${body}` : `${outcome}.`;
+    } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "record_link_removed") {
+      // FLD-06 part B follow-up: written by the database when a link field's target was purged; drawn from the target's type
+      // in the business's words (the stored text keeps today's words)
+      text = recordLinkRemovedText(metaString(activity.metadata, "target_type"), terms) ?? text;
+      isUserContent = false;
     } else if (activity.type === "system" && metaString(activity.metadata, "kind") === "snooze_cleared") {
       // written by the database when a move to another stage cancels a postponement
       isUserContent = false;

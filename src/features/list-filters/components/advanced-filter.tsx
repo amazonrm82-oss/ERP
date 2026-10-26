@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useEscapeToClose } from "@/components/ui/use-escape";
 import { Input, Select } from "@/components/ui/field";
 
-import { conditionCount, OP_LABELS, OPS_BY_KIND, valueKind, type FilterCondition, type FilterField, type FilterGroup, type FilterTree } from "../model";
+import { conditionCount, opLabel, OPS_BY_KIND, valueKind, type FilterCondition, type FilterField, type FilterGroup, type FilterTree } from "../model";
 
 type Props = {
   fields: FilterField[];
@@ -122,7 +122,7 @@ export function AdvancedFilter({ fields, current, listPath, keep, skipped }: Pro
                         <Select aria-label={`פעולה לתנאי ${n}`} controlSize="sm" value={condition.op} onChange={(e) => setCondition(gi, ci, { op: e.target.value })}>
                           {ops.map((op) => (
                             <option key={op} value={op}>
-                              {OP_LABELS[op]}
+                              {field ? opLabel(field.kind, op) : op}
                             </option>
                           ))}
                         </Select>

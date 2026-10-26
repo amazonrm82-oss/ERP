@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead, pgError } from "./helpers";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { MIGRATIONS_DIR, migrationFile, staleRestores } from "./rerun";
+import { MIGRATIONS_DIR, migrationFile, rerunClosure, staleRestores } from "./rerun";
 
 // review F5: 020905 alone, run again, must keep 020910's body of app.custom_field_file_drop (and leave every other function
 // it defines as the fresh build made it, which staleRestores checks)
@@ -184,6 +184,108 @@ describe("new custom field types (FLD-06 part B)", () => {
     expect((await fieldsOf("leads", d)).referrer).toBeUndefined();
   });
 
+  // FLD-06 part B follow-up (owner, 26 October 2026): a purge that empties a link leaves one system entry on the linking record
+  const linkEntries = (column: string, id: string) =>
+    asAdmin(
+      async (q) =>
+        (
+          await q<{ id: string; body: string; metadata: Record<string, unknown>; created_by: string | null }>(
+            `select id, body, metadata, created_by from public.activities
+              where ${column} = $1 and type = 'system' and metadata ->> 'kind' = 'record_link_removed' order by created_at`,
+            [id],
+          )
+        ).rows,
+    );
+
+  it("follow-up: a purge that empties a link writes one entry on each linking record, with the type and no name", async () => {
+    const target = await contact(owner.id, org, "שם-שלא-יופיע");
+    const lead = await insertLead(owner.id, org, { full_name: "מקשר", custom_fields: JSON.stringify({ client: target }) });
+    const peer = await contact(owner.id, org, "עמית קישור", { custom_fields: { client: target } });
+    const untouched = await insertLead(owner.id, org, { full_name: "בלי קישור" });
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [target]);
+      expect(await linkEntries("lead_id", lead)).toEqual([]);
+      await q("delete from public.contacts where id = $1", [target]);
+    });
+    const entries = await linkEntries("lead_id", lead);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].body).toBe("הקישור ל-איש קשר הוסר: הרשומה נמחקה");
+    expect(entries[0].metadata).toEqual({ kind: "record_link_removed", field_key: "client", target_type: "contact" });
+    expect(entries[0].created_by).toBeNull();
+    expect(JSON.stringify(entries)).not.toContain("שם-שלא-יופיע");
+    expect(JSON.stringify(entries)).not.toContain(target);
+    expect(await linkEntries("contact_id", peer)).toHaveLength(1);
+    expect(await linkEntries("lead_id", untouched)).toEqual([]);
+  });
+
+  it("follow-up: a deal's link to a company gets its entry on the deal", async () => {
+    await define(org, "deal", "partner_co", "record_link", { target: "company" });
+    const company = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה למחיקה') returning id", [org])).rows[0].id,
+    );
+    const { pipelineId, stages } = await defaultPipeline(org);
+    const deal = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.deals (organization_id, name, pipeline_id, stage_id, custom_fields) values ($1, 'עסקה מקשרת', $2, $3, $4) returning id",
+          [org, pipelineId, stages[0].id, JSON.stringify({ partner_co: company })],
+        )
+      ).rows[0].id,
+    );
+    await asUser(owner.id, async (q) => {
+      await q("update public.companies set deleted_at = now() where id = $1", [company]);
+      await q("delete from public.companies where id = $1", [company]);
+    });
+    expect((await fieldsOf("deals", deal)).partner_co).toBeUndefined();
+    const entries = await linkEntries("deal_id", deal);
+    expect(entries.map((e) => e.body)).toEqual(["הקישור ל-חברה הוסר: הרשומה נמחקה"]);
+    expect(entries[0].metadata.target_type).toBe("company");
+  });
+
+  it("follow-up: nobody but the server writes, changes or deletes such an entry, owners included", async () => {
+    const target = await contact(owner.id, org, "יעד שמירה");
+    const lead = await insertLead(owner.id, org, { full_name: "מקשר שמור", custom_fields: JSON.stringify({ client: target }) });
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [target]);
+      await q("delete from public.contacts where id = $1", [target]);
+    });
+    const [entry] = await linkEntries("lead_id", lead);
+    for (const sql of [
+      "update public.activities set body = 'אחר' where id = $1",
+      "update public.activities set is_pinned = true where id = $1",
+      "update public.activities set metadata = '{}' where id = $1",
+      "delete from public.activities where id = $1",
+    ]) {
+      expect((await failure(asUser(owner.id, (q) => q(sql, [entry.id])))).hint, sql).toBe("activity:record_link_entry");
+    }
+    expect(
+      (
+        await failure(
+          asUser(owner.id, (q) =>
+            q("insert into public.activities (organization_id, type, lead_id, body, metadata) values ($1, 'note', $2, 'מזויף', $3)", [
+              org,
+              lead,
+              JSON.stringify({ kind: "record_link_removed", target_type: "contact" }),
+            ]),
+          ),
+        )
+      ).hint,
+    ).toBe("activity:record_link_entry");
+    // a person's note may not take that kind later either
+    const note = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.activities (organization_id, type, lead_id, body) values ($1, 'note', $2, 'הערה') returning id", [org, lead])).rows[0].id,
+    );
+    expect((await failure(asUser(owner.id, (q) => q(`update public.activities set metadata = '{"kind": "record_link_removed"}' where id = $1`, [note]))))
+      .hint).toBe("activity:record_link_entry");
+    expect(await linkEntries("lead_id", lead)).toHaveLength(1);
+    // the record's own purge takes it (server path)
+    await asUser(owner.id, async (q) => {
+      await q("update public.leads set deleted_at = now() where id = $1", [lead]);
+      await q("delete from public.leads where id = $1", [lead]);
+    });
+    expect(await asAdmin((q) => count(q, "select 1 from public.activities where id = $1", [entry.id]))).toBe(0);
+  });
+
   it("a field's file: only on a file field of a record the person edits; the value must be that confirmed file", async () => {
     const lead = await insertLead(rep.id, org, { owner_id: rep.id });
     // not a file field, an unknown field, a note
@@ -313,6 +415,8 @@ describe("new custom field types (FLD-06 part B)", () => {
     const pointer = await insertLead(owner.id, org, { full_name: "מפנה", custom_fields: JSON.stringify({ referrer: dup }) });
     await asUser(owner.id, (q) => q("select public.merge_records($1, 'lead', $2, $3, '{}')", [org, keep, dup]));
     expect((await fieldsOf("leads", pointer)).referrer).toBe(keep);
+    // follow-up: repointing writes no entry
+    expect(await linkEntries("lead_id", pointer)).toEqual([]);
     const kept = await fieldsOf("leads", keep);
     expect(kept.contract).toBe(keepFile.id);
     expect(kept.scan).toBe(dupScan.id);
@@ -417,9 +521,13 @@ describe("new custom field types (FLD-06 part B)", () => {
   });
 
   it("review F5: running 020905 again keeps the pasted release", async () => {
-    // the stub is made only while the function is missing, so 020910's later body is the one that stays
-    expect(staleRestores([PART_B]).filter((line) => !line.startsWith("app.custom_field_file_drop:"))).toEqual([]);
-    await asAdmin((q) => q(readFileSync(join(MIGRATIONS_DIR, PART_B), "utf8")));
+    // the stub is made only while the function is missing, so 020910's later body is the one that stays; later files that
+    // redefine one of 020905's functions (the follow-up's app.record_links_clear_ids) run again after it. 020910 itself is
+    // left out on purpose: the point is that 020905 alone does not undo it.
+    const rerun = rerunClosure([PART_B]);
+    const files = rerun.files.filter((file) => !file.endsWith("_field_file_release.sql"));
+    expect(staleRestores(files).filter((line) => !line.startsWith("app.custom_field_file_drop:"))).toEqual([]);
+    for (const file of files) await asAdmin((q) => q(readFileSync(join(MIGRATIONS_DIR, file), "utf8")));
     const body = await asAdmin(async (q) => (await q<{ d: string }>("select pg_get_functiondef('app.custom_field_file_drop(uuid, text, uuid, text, uuid)'::regprocedure) as d")).rows[0].d);
     expect(body).toContain("delete from public.files");
   });
