@@ -727,6 +727,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `intake_form` returns `products` [{id, name}] only; `intake_submit` takes `requested_product_id` only if offered now (else 22023
   `requested_product:invalid`, one answer for every other id), feeds CAP-08's product rule, stores it on the new lead, fills a matched
   lead's empty one, keeps it on the inquiry entry, and with leads off adds its name to the "לחזור ללקוח" title.
+  Since 020930 (owner 26 October 2026, answer (ב)) `form:products_over` is judged only on an insert or a changed selection
+  (`app.forms_product_ids_check` was last redefined there): a stored selection that grew past 100 keeps saving the other settings, is
+  marked "דורש צמצום", and the form shows its first 100; a changed selection over 100 is not stored and the rest saves (`PRODUCTS_KEPT_SAVED`).
 - Conversion field mapping (LEAD-06, migration 0162): `public.conversion_field_maps` (per lead field and target contact|deal;
   `mode` auto|none|field; members read, owners/admins of a writable org write; saved in one transaction by
   `save_conversion_field_map(org, map)`, security invoker, never deletes). `app.carry_custom_fields()` (last redefined here):
