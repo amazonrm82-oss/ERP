@@ -1212,6 +1212,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   list, members read, owners/admins of a writable org write, 50 per org, hint `checklist_templates:max`, audited, two seeded defaults
   mirrored by `DEFAULT_CHECKLIST_TEMPLATES`). A recurring task's next occurrence copies the steps unticked (`tasks_checklist_carry`).
   `app.sample_untouched` was last redefined in 020315 (steps keep a sample task).
+- Sub-tasks (TASK-06 part B, migration 020845; owner 25 October 2026): `tasks.parent_task_id` (composite FK set null of the column,
+  insert and update column grants), one level both ways (`task:subtask_depth`). Trigger `tasks_parent_check` (invoker, advisory lock
+  per business, read committed): the parent readable, live and updatable by the person (`app.task_parent_writable` = the
+  `tasks_update` rule, keep in step), no repeat on a sub-task (`task:subtask_recurrence`), the parent's links copied on insert and on
+  linking, a person never moves a sub-task's links alone (`task:subtask_links`); an SPD-01 call-back task is never in a family
+  (`task:subtask_callback`). `tasks_insert` also admits a sub-task whose links equal an updatable parent's (`app.subtask_parent_ok`).
+  Definer `tasks_family_links` keeps one family on one record (a parent's change reaches its sub-tasks; a server write moving one
+  sub-task carries the parent and siblings). The bin by mark: `tasks_subtasks_bin` takes live sub-tasks with the parent and sets
+  server-only `binned_with_parent`; restore brings back only marked ones; `tasks_bin_mark` clears a mark on any other change.
+  `public.undo_import` refuses while an imported task has a live sub-task (`import_undo:subtasks`, count in detail).
+  `app.sample_untouched`, `app.import_record_worked` and `public.undo_import` were last redefined in 020845.
 - Team tasks (TASK-07, migration 020490; owner 18 October 2026): an open task with a team and no owner (not a lead's SPD-01
   call-back task, `app.intake_callback_tasks`) is visible to the team's active members (`tasks_select` adds
   `app.team_task_visible`, definer). `app.tasks_default_owner()` replaces `app.default_owner()` on tasks only: a person's insert with
