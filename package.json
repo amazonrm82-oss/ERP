@@ -19,14 +19,14 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "fflate": "^0.8.3",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "papaparse": "^5.7.0",
     "pdfkit": "0.20.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "read-excel-file": "^9.3.10",
     "web-push": "^3.6.7",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,7 +37,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.3",
     "pg": "^8.23.1",
     "playwright": "^1.63.0",
     "tailwindcss": "^4",
