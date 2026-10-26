@@ -1024,6 +1024,9 @@ export type ImportJobRow = {
   undone_at: string | null;
   // CON-09: the file's company column was mapped, so new contacts are not linked by email domain
   maps_company: boolean;
+  // CNS-05: the importer's declaration of where the file's marketing consents came from (both or neither)
+  consent_method: string | null;
+  consent_note: string | null;
 };
 
 export type SupportAccessGrantRow = {
@@ -2612,7 +2615,7 @@ export type Database = {
       >;
       import_jobs: Table<
         ImportJobRow,
-        { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number; maps_company?: boolean },
+        { organization_id: string; entity_type: ImportEntity; file_name: string; duplicate_mode: DuplicateMode; total_rows?: number; maps_company?: boolean; consent_method?: string | null; consent_note?: string | null },
         {
           status?: ImportStatus;
           created_count?: number;
@@ -3243,6 +3246,11 @@ export type Database = {
       import_find_duplicates: {
         Args: { p_org: string; p_entity: string; p_phones: string[]; p_emails: string[]; p_tax_ids: string[]; p_names: string[] };
         Returns: Array<{ id: string; phone_e164: string | null; email: string | null; tax_id: string | null; name: string | null }>;
+      };
+      // CNS-05: the import's consents through the register (caller's own running job; one word per item)
+      import_record_consents: {
+        Args: { p_org: string; p_job: string; p_items: Json };
+        Returns: Array<"written" | "locked" | "other_address" | "refused" | "invalid">;
       };
       // PRD-05: products whose SKU (without case) is one of these; security invoker
       product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };

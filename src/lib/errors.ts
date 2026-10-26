@@ -424,6 +424,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "consent:method": "צריך לכתוב איך התקבלה ההסכמה.",
   "consent:no_address": "אין ברשומה טלפון או אימייל לערוץ הזה. הוסיפו אותו קודם, ואז רשמו את ההסכמה.",
   "consent:append_only": "אי אפשר לשנות רישום הסכמה קיים. אפשר לרשום מצב חדש.",
+  // CNS-05 (import_jobs_consent_check, public.import_record_consents)
+  "import_consent:note": "כשמייבאים הסכמות צריך לבחור איך התקבלו ולכתוב פרטים על המקור.",
+  "import_consent:entity": "הסכמות לדיוור מייבאים רק עם לידים או אנשי קשר.",
+  "import_consent:undeclared": "כשמייבאים עמודת הסכמה צריך לבחור איך התקבלו ההסכמות. התחילו את הייבוא מחדש ובחרו.",
+  "import_consent:too_many": "נשלחו יותר מדי הסכמות בבת אחת. נסו שוב.",
   // CON-07: triggers companies_parent_check / companies_parent_tree
   "company:parent_invalid": "אי אפשר לשייך לחברה הזו: היא נמחקה, נמצאת בסל המחזור או שאין לכם גישה אליה.",
   "company:parent_cycle": "אי אפשר לשייך חברה לעצמה או לחברה שנמצאת תחתיה.",

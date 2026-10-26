@@ -22,6 +22,7 @@ import {
   type DuplicateModeKey,
   type RecordImportEntity,
 } from "./fields";
+import { consentDeclarationSchema, mapsConsent } from "./consent";
 import { DealImportStopped, loadDealLookups, processDealChunk, type DealImportContext } from "./deal-server";
 import { loadProductLookups, processProductChunk, ProductImportStopped, type ProductImportContext } from "./product-server";
 import { loadTaskLookups, processTaskChunk, TaskImportStopped, type TaskImportContext } from "./task-server";
@@ -33,6 +34,8 @@ const cellsSchema = z.array(z.array(z.string().max(10_000)).max(200)).max(CHUNK_
 const mappingSchema = z.array(z.string().max(100)).max(200);
 
 const UNDO_DAYS = 7;
+
+const CONSENT_DECLARATION_NEEDED = "כשמייבאים עמודת הסכמה צריך לבחור איך התקבלו ההסכמות. חזרו למיפוי ובחרו.";
 
 const PRODUCTS_FOR_ADMINS = "ייבוא מוצרים מותר לבעלים, למנהלי מערכת ולמי שקיבל הרשאה לעריכת הקטלוג.";
 
@@ -184,11 +187,26 @@ export async function previewImportAction(
 /** Creates the import job; the browser then sends the rows chunk by chunk. */
 export async function startImportAction(
   orgId: string,
-  input: { entity: string; mode: string; fileName: string; totalRows: number; mapsCompany?: boolean },
+  input: {
+    entity: string;
+    mode: string;
+    fileName: string;
+    totalRows: number;
+    mapsCompany?: boolean;
+    // CNS-05: where the file's marketing consents came from; required when a consent column is mapped
+    consent?: { method: string; note: string } | null;
+  },
 ): Promise<ActionResult<{ jobId: string }>> {
   if (
     !validArg(
-      z.object({ entity: z.string(), mode: z.string(), fileName: z.string().max(2000), totalRows: z.number(), mapsCompany: z.boolean().optional() }),
+      z.object({
+        entity: z.string(),
+        mode: z.string(),
+        fileName: z.string().max(2000),
+        totalRows: z.number(),
+        mapsCompany: z.boolean().optional(),
+        consent: z.object({ method: z.string().max(40), note: z.string().max(2000) }).nullable().optional(),
+      }),
       input,
     )
   ) {
@@ -207,6 +225,13 @@ export async function startImportAction(
   if (entity.data === "product" && !(await mayImportProducts(context.supabase, orgId))) {
     return fail(PRODUCTS_FOR_ADMINS);
   }
+  let consent: { consent_method: string; consent_note: string } | null = null;
+  if (input.consent) {
+    if (entity.data !== "lead" && entity.data !== "contact") return fail("הקובץ אינו תקין.");
+    const declared = consentDeclarationSchema.safeParse(input.consent);
+    if (!declared.success) return fail(declared.error.issues[0]?.message ?? CONSENT_DECLARATION_NEEDED);
+    consent = { consent_method: declared.data.method, consent_note: declared.data.note };
+  }
   const { data, error } = await context.supabase
     .from("import_jobs")
     .insert({
@@ -216,6 +241,7 @@ export async function startImportAction(
       file_name: (input.fileName || "file").slice(0, 255),
       total_rows: input.totalRows,
       maps_company: entity.data === "contact" && input.mapsCompany === true,
+      ...(consent ?? {}),
     })
     .select("id")
     .single();
@@ -241,7 +267,7 @@ export async function importChunkAction(
   // the job decides the object and the duplicate rule, not the browser
   const { data: job, error: jobError } = await context.supabase
     .from("import_jobs")
-    .select("entity_type, duplicate_mode, status, created_by")
+    .select("entity_type, duplicate_mode, status, created_by, consent_method")
     .eq("organization_id", orgId)
     .eq("id", jobId)
     .maybeSingle();
@@ -276,8 +302,11 @@ export async function importChunkAction(
       throw error;
     }
   }
+  // CNS-05: consent columns are written only under the importer's declaration, made when the job started
+  if (mapsConsent(mapping.data) && !job.consent_method) return fail(CONSENT_DECLARATION_NEEDED);
   const prepared = await importContext(orgId, entity, modeSchema.parse(job.duplicate_mode), mapping.data);
   if (!prepared.ok) return prepared;
+  prepared.ctx.consentDeclared = Boolean(job.consent_method);
   try {
     const lookups = await loadLookups(prepared.ctx);
     return ok({ outcomes: await processChunk(prepared.ctx, lookups, rows.data, input.firstRow, jobId), stopped: null });

@@ -3,6 +3,8 @@
 
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
+import { CONSENT_TARGETS } from "./consent";
+
 export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
   { value: "contact", label: "אנשי קשר" },
@@ -98,6 +100,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
       label: 'סיבה ל"לא רלוונטי" (לפי שם מהרשימה)',
       synonyms: ["סיבה", "סיבת פסילה", "סיבה ללא רלוונטי", "סיבת אי רלוונטיות", "למה לא רלוונטי", "disqualify reason", "disqualification reason", "lost reason", "reason"],
     },
+    // CNS-05: marketing consent per channel
+    ...CONSENT_TARGETS,
   ],
   contact: [
     { key: "full_name", label: "שם מלא (יפוצל לפרטי ומשפחה)", synonyms: NAME },
@@ -109,6 +113,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "company", label: "חברה (לפי שם, תיווצר אם חסרה)", synonyms: COMPANY },
     { key: "birth_date", label: "יום הולדת", synonyms: ["תאריך לידה", "יום הולדת", "birthday", "birth date", "date of birth", "dob"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+    // CNS-05
+    ...CONSENT_TARGETS,
   ],
   company: [
     { key: "name", label: "שם החברה", synonyms: [...COMPANY, "שם"] },

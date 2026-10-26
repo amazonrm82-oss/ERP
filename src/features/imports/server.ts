@@ -17,13 +17,32 @@ import { readAllPagesByIds } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { customCellValue } from "./record-cells";
+import {
+  CONSENT_TARGET,
+  consentNoAddress,
+  consentResultWarning,
+  consentValueUnknown,
+  IMPORT_CONSENT_CHANNELS,
+  parseConsentCell,
+  type ConsentResult,
+  type ImportConsentChannel,
+} from "./consent";
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
 
 type Client = SupabaseClient<Database>;
 
 // warning: the row is imported, but something in it was not kept (shown in the preview and the summary)
-export type RowOutcome = { row: number; status: "created" | "updated" | "skipped" | "failed" | "ok"; message?: string; warning?: string };
+// consents: CNS-05, how many of the row's consent columns were written into the register
+export type RowOutcome = {
+  row: number;
+  status: "created" | "updated" | "skipped" | "failed" | "ok";
+  message?: string;
+  warning?: string;
+  consents?: number;
+  // CNS-05: a 'granted' the register kept out because the address opted out or asked to be erased
+  consentsLocked?: number;
+};
 
 export type ImportContext = {
   supabase: Client;
@@ -34,6 +53,8 @@ export type ImportContext = {
   // per column: target key, "" = not imported
   mapping: string[];
   definitions: FieldDefinition[];
+  // CNS-05: the job carries the importer's consent declaration, so mapped consent columns are written
+  consentDeclared?: boolean;
 };
 
 type Lookups = {
@@ -153,7 +174,11 @@ type Prepared = {
   pendingTaxId: string | null;
   // something in the row that is not kept (the row is still imported)
   warning: string | null;
+  // CNS-05: the consents the row gives, each for an address the row has
+  consents: Array<{ channel: ImportConsentChannel; state: "granted" | "denied" }>;
 };
+
+const joinWarnings = (...parts: Array<string | null | undefined>) => parts.filter(Boolean).join(" ") || null;
 
 /** Validates one row and turns it into column values. Returns a message when the row cannot be imported. */
 function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: number): Prepared | string {
@@ -284,11 +309,27 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     values.custom_fields = customValues as Json;
   }
 
+  // CNS-05: consent columns (leads and contacts). A value outside the closed list is never guessed: that consent is
+  // skipped and the row says so; an empty cell writes nothing (the state stays unknown).
+  const phoneE164 = normalizePhone(values.phone as string | null);
+  const email = (values.email as string | null) ?? null;
+  const consents: Prepared["consents"] = [];
+  if (ctx.entity === "lead" || ctx.entity === "contact") {
+    for (const channel of IMPORT_CONSENT_CHANNELS) {
+      const cell = raw[CONSENT_TARGET[channel]];
+      const state = parseConsentCell(cell);
+      if (state === null) continue;
+      if (state === "invalid") warning = joinWarnings(warning, consentValueUnknown(channel, cell));
+      else if (!(channel === "email" ? email : phoneE164)) warning = joinWarnings(warning, consentNoAddress(channel));
+      else consents.push({ channel, state });
+    }
+  }
+
   return {
     row,
     values,
-    phoneE164: normalizePhone(values.phone as string | null),
-    email: (values.email as string | null) ?? null,
+    phoneE164,
+    email,
     taxIds,
     taxKeys,
     country: ctx.entity === "company" && typeof values.country === "string" ? values.country : null,
@@ -296,6 +337,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     companyName,
     pendingTaxId,
     warning,
+    consents,
   };
 }
 
@@ -488,6 +530,8 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   const countries = await companyCountries(ctx, existing);
   const currentStatus = await leadStatuses(ctx, look, existing, prepared);
   const toInsert: Prepared[] = [];
+  // CNS-05: rows written, whose consents go to the register at the end of the chunk
+  const consentWork: ConsentWork[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
     // a repeat of an earlier row in the same chunk counts as a duplicate too
@@ -495,7 +539,14 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     seen.push(row);
     const match = matchExisting(ctx.entity, existing, row, countries);
     if (earlier || (match && ctx.mode === "skip")) {
-      outcomes.push({ row: row.row, status: "skipped", message: "כבר קיים" });
+      const outcome: RowOutcome = { row: row.row, status: "skipped", message: "כבר קיים" };
+      outcomes.push(outcome);
+      // CNS-05: a skipped row still records a 'denied' (an opt-out) on the record it matched, when the caller may edit
+      // it (the database decides); a 'granted' is never written there, nor anything for a repeat within the file
+      const denied = match && !earlier ? row.consents.filter((c) => c.state === "denied") : [];
+      const dropped = row.consents.length - denied.length;
+      if (dropped > 0 && ctx.consentDeclared !== false) outcome.warning = joinWarnings(outcome.warning, CONSENT_ROW_SKIPPED) ?? undefined;
+      if (denied.length > 0 && match && jobId) consentWork.push({ outcome, row, recordId: match.id, consents: denied });
     } else if (match && ctx.mode === "update") {
       const ambiguous = ctx.entity === "company" ? ambiguousTaxId(existing, row, countries) : null;
       if (ambiguous) {
@@ -553,7 +604,11 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         .setHeader(IMPORT_HEADER, jobId)
         .select("id");
       if (error || !data?.length) outcomes.push({ row: row.row, status: "failed", message: error ? dbErrorMessage(error, "העדכון נכשל.") : NO_PERMISSION_TO_UPDATE });
-      else outcomes.push(withWarning(row, "updated"));
+      else {
+        const outcome = withWarning(row, "updated");
+        outcomes.push(outcome);
+        consentWork.push({ outcome, row, recordId: match.id, consents: row.consents });
+      }
     } else {
       // a new company without a country in the file gets the default, Israel
       const taxError = settleTaxId(row, ISRAEL);
@@ -576,23 +631,111 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     ...row.values,
   });
 
+  const created = (row: Prepared, id: string | undefined) => {
+    const outcome = withWarning(row, "created");
+    outcomes.push(outcome);
+    if (id) consentWork.push({ outcome, row, recordId: id, consents: row.consents });
+    // a new record that could not be told apart: its consents are not guessed onto another one
+    else if (wantIds && row.consents.length > 0) outcome.warning = joinWarnings(outcome.warning, CONSENTS_FAILED) ?? undefined;
+  };
+  // CNS-05: the new ids are read back only when the chunk has consents to write
+  const wantIds = Boolean(ctx.consentDeclared) && toInsert.some((row) => row.consents.length > 0);
+  // returns, per row sent, the id of the new record whose addresses are the row's (never the insert's return order)
+  const insert = async (rows: Prepared[]) => {
+    const query = ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(rows.map(insertRow) as never);
+    if (!wantIds) {
+      const { error } = await query;
+      return { ids: rows.map(() => undefined), error };
+    }
+    const { data, error } = await query.select("id, phone_e164, email");
+    return { ids: matchCreated(rows, (data ?? []) as CreatedRecord[]), error };
+  };
   if (toInsert.length) {
-    const { error } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(toInsert.map(insertRow) as never);
+    const { ids, error } = await insert(toInsert);
     if (!error) {
-      for (const row of toInsert) outcomes.push(withWarning(row, "created"));
+      toInsert.forEach((row, i) => created(row, ids[i]));
     } else if (error.code === "P0001") {
       // a plan limit: stop the whole import, nothing after this will fit either
       throw new ImportStopped(dbErrorMessage(error, "הגעתם למגבלת החבילה."));
     } else {
       // one bad row fails the batch: insert one by one to find it
       for (const row of toInsert) {
-        const { error: rowError } = await ctx.supabase.from(RECORD_TYPES[ctx.entity].table).insert(insertRow(row) as never);
+        const { ids: one, error: rowError } = await insert([row]);
         if (rowError?.code === "P0001") throw new ImportStopped(dbErrorMessage(rowError, "הגעתם למגבלת החבילה."));
-        outcomes.push(rowError ? { row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") } : withWarning(row, "created"));
+        if (rowError) outcomes.push({ row: row.row, status: "failed", message: dbErrorMessage(rowError, "השמירה נכשלה.") });
+        else created(row, one[0]);
       }
     }
   }
+  await recordConsents(ctx, jobId, consentWork);
   return outcomes.sort((a, b) => a.row - b.row);
+}
+
+// consents: the ones to send for this record (a skipped duplicate sends its 'denied' ones only)
+type ConsentWork = { outcome: RowOutcome; row: Prepared; recordId: string; consents: Prepared["consents"] };
+
+type CreatedRecord = { id: string; phone_e164: string | null; email: string | null };
+const lowerTrim = (v: string | null | undefined) => (v ? v.trim().toLowerCase() : null);
+
+/**
+ * CNS-05: which new record each row made, by its addresses (phone_e164 and email), since the order an insert returns
+ * its rows in is not promised. Rows with the same addresses are interchangeable (their consents hash alike); each
+ * record is used once while an unused one is left. When the counts differ, nothing is matched.
+ */
+export function matchCreated(rows: Prepared[], records: CreatedRecord[]): Array<string | undefined> {
+  if (records.length !== rows.length) return rows.map(() => undefined);
+  const used = new Set<string>();
+  return rows.map((row) => {
+    const same = records.filter((r) => (r.phone_e164 ?? null) === (row.phoneE164 ?? null) && lowerTrim(r.email) === lowerTrim(row.email));
+    const pick = same.find((r) => !used.has(r.id)) ?? same[0];
+    if (pick) used.add(pick.id);
+    return pick?.id;
+  });
+}
+
+export const CONSENT_ROW_SKIPPED = "ההסכמה לא נרשמה כי השורה דולגה.";
+
+export const CONSENTS_FAILED = "ההסכמות בשורה לא נרשמו בגלל תקלה. אפשר לרשום אותן בכרטיס.";
+const CONSENT_CALL_MAX = 1000;
+
+/**
+ * CNS-05: the written rows' consents, through public.import_record_consents (the database checks the job, the record
+ * and the address, and never lets a 'granted' lift an opt-out). Each row's outcome gets its count and a warning for
+ * every consent not written. A failed call leaves the rows imported and says their consents were not recorded.
+ */
+async function recordConsents(ctx: ImportContext, jobId: string, work: ConsentWork[]): Promise<void> {
+  if (!ctx.consentDeclared) return;
+  const items = work.flatMap((w) =>
+    w.consents.map((c) => ({
+      work: w,
+      channel: c.channel,
+      item: { record_id: w.recordId, channel: c.channel, state: c.state, address: c.channel === "email" ? w.row.email : w.row.phoneE164 },
+    })),
+  );
+  for (let i = 0; i < items.length; i += CONSENT_CALL_MAX) {
+    const slice = items.slice(i, i + CONSENT_CALL_MAX);
+    const { data, error } = await ctx.supabase.rpc("import_record_consents", {
+      p_org: ctx.orgId,
+      p_job: jobId,
+      p_items: slice.map((s) => s.item),
+    });
+    const results = (data ?? []) as ConsentResult[];
+    if (error || results.length !== slice.length) {
+      for (const outcome of new Set(slice.map((s) => s.work.outcome))) outcome.warning = joinWarnings(outcome.warning, CONSENTS_FAILED) ?? undefined;
+      continue;
+    }
+    slice.forEach((s, k) => {
+      const outcome = s.work.outcome;
+      // a skipped duplicate's 'denied' the database did not take: the row was skipped, so say that
+      const note =
+        outcome.status === "skipped" && results[k] !== "written" && results[k] !== "locked"
+          ? (outcome.warning?.includes(CONSENT_ROW_SKIPPED) ? null : CONSENT_ROW_SKIPPED)
+          : consentResultWarning(s.channel, results[k]);
+      if (results[k] === "locked") outcome.consentsLocked = (outcome.consentsLocked ?? 0) + 1;
+      if (note) outcome.warning = joinWarnings(outcome.warning, note) ?? undefined;
+      else outcome.consents = (outcome.consents ?? 0) + 1;
+    });
+  }
 }
 
 export { loadLookups };

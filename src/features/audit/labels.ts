@@ -4,6 +4,8 @@ import { GOAL_METRICS, GOAL_PERIOD_LABELS, GOAL_SCOPE_LABELS } from "@/features/
 
 export const ENTITY_LABELS: Record<string, string> = {
   leads: "ליד",
+  // CNS-05
+  import_jobs: "ייבוא",
   contacts: "איש קשר",
   companies: "חברה",
   deals: "עסקה",
@@ -133,6 +135,8 @@ export const ACTION_LABELS: Record<string, string> = {
   export: "ייצוא",
   // PRV-02: everything about one person, in one file
   person_export: "ייצוא כל המידע על האדם",
+  // CNS-05: the importer's declaration of where a file's marketing consents came from
+  import_consent: "ייבוא הסכמות לדיוור (הצהרה על המקור)",
   // QUO-03: an owner or admin moved the next number of a series forward
   number_jump: "קפיצה קדימה במספור",
   // FLD-09: a deleted pipeline took the conditions based on it (app.pipeline_conditions_cleanup)

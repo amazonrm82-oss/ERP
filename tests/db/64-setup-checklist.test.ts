@@ -562,6 +562,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_record_link_removed_entry.sql",
       // CAP-07 / CNS-04 redefines public.intake_form() and public.intake_submit() of _field_types_part_b.sql last (the consent box)
       "_form_marketing_consent.sql",
+      // CNS-05 redefines app.intake_marketing_consent() of _form_marketing_consent.sql last (its check moved to a shared function)
+      "_import_consent.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

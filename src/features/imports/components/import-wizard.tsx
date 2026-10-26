@@ -6,7 +6,7 @@ import { useId, useRef, useState } from "react";
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
-import { Select } from "@/components/ui/field";
+import { Select, SelectField, TextareaField } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { defuseFormula } from "@/lib/csv";
 import { formatNumber } from "@/lib/format";
@@ -34,6 +34,15 @@ import {
 } from "../fields";
 import type { RowOutcome } from "../server";
 import { cellText } from "../cell-text";
+import {
+  CONSENT_GRANTED_VALUES,
+  CONSENT_DENIED_VALUES,
+  consentDeclarationSchema,
+  IMPORT_CONSENT_METHOD_LABELS,
+  IMPORT_CONSENT_METHODS,
+  IMPORT_CONSENT_NOTE_MAX,
+  mapsConsent,
+} from "../consent";
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
 import { NewFieldForm } from "./new-field-form";
@@ -54,6 +63,8 @@ type Props = {
 type Sheet = { fileName: string; headers: string[]; rows: string[][] };
 type Step = "file" | "map" | "preview" | "running" | "done";
 type Totals = { created: number; updated: number; skipped: number; failed: number };
+// CNS-05: consents written to the register, and those an opt-out kept out
+type ConsentTotals = { written: number; locked: number };
 
 const PREVIEW_ROWS = 20;
 const WARNINGS_SHOWN = 10;
@@ -131,6 +142,10 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   const [failures, setFailures] = useState<RowOutcome[]>([]);
   const [warnings, setWarnings] = useState<RowOutcome[]>([]);
   const [stopped, setStopped] = useState<string | null>(null);
+  // CNS-05: the importer's declaration of where the file's consents came from
+  const [consentMethod, setConsentMethod] = useState("");
+  const [consentNote, setConsentNote] = useState("");
+  const [consentTotals, setConsentTotals] = useState<ConsentTotals>({ written: 0, locked: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
   const fileId = useId();
 
@@ -179,6 +194,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
       totalRows: sheet.rows.length,
       // CON-09: a mapped company column decides the company; otherwise the database links new contacts by email domain
       mapsCompany: entity === "contact" && mapping.includes("company"),
+      consent: withConsent ? { method: consentMethod, note: consentNote } : null,
     });
     if (!start.ok || !start.data) {
       setError(start.ok ? "לא הצלחנו להתחיל את הייבוא." : start.message);
@@ -189,6 +205,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
     const sum: Totals = { created: 0, updated: 0, skipped: 0, failed: 0 };
     const failed: RowOutcome[] = [];
     const warned: RowOutcome[] = [];
+    const consentSum: ConsentTotals = { written: 0, locked: 0 };
     let stop: string | null = null;
     for (let offset = 0; offset < sheet.rows.length && !stop; offset += CHUNK_SIZE) {
       const result = await importChunkAction(orgId, jobId, { mapping, rows: sheet.rows.slice(offset, offset + CHUNK_SIZE), firstRow: offset + 1 }).catch(() => null);
@@ -198,6 +215,8 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
       }
       stop = result.data.stopped;
       for (const outcome of result.data.outcomes) {
+        consentSum.written += outcome.consents ?? 0;
+        consentSum.locked += outcome.consentsLocked ?? 0;
         if (outcome.warning && outcome.status !== "failed") warned.push(outcome);
         if (outcome.status === "created") sum.created += 1;
         else if (outcome.status === "updated") sum.updated += 1;
@@ -208,6 +227,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
         }
       }
       setTotals({ ...sum });
+      setConsentTotals({ ...consentSum });
       setProgress(Math.min(sheet.rows.length, offset + CHUNK_SIZE));
     }
     await finishImportAction(orgId, jobId, { updated: sum.updated, skipped: sum.skipped, failed: sum.failed, stopped: Boolean(stop) });
@@ -241,6 +261,9 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
     setFailures([]);
     setWarnings([]);
     setStopped(null);
+    setConsentMethod("");
+    setConsentNote("");
+    setConsentTotals({ written: 0, locked: 0 });
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -255,6 +278,10 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   const missingRequired = required !== null && !mapping.includes(required.key);
   const ownHint = entity === "product" ? PRODUCT_DUPLICATE_HINT : entity === "deal" ? DEAL_DUPLICATE_HINT : entity === "task" ? TASK_DUPLICATE_HINT : null;
   const modes = DUPLICATE_MODES.filter((m) => duplicateModesFor(entity).includes(m.value));
+  // CNS-05: a mapped consent column needs the declaration before the check and the import
+  const withConsent = (entity === "lead" || entity === "contact") && mapsConsent(mapping);
+  const declaration = consentDeclarationSchema.safeParse({ method: consentMethod, note: consentNote });
+  const missingDeclaration = withConsent && !declaration.success;
   const listHref = isProduct ? productsPath(orgId) : RECORD_TYPES[entity].list(orgId);
 
   function chooseEntity(next: ImportEntityKey) {
@@ -408,9 +435,40 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               </div>
             </fieldset>
           )}
+          {withConsent ? (
+            <fieldset className="space-y-4 rounded-lg border border-line bg-surface p-4 sm:p-5">
+              <legend className="px-1 text-sm font-medium">מקור ההסכמות לדיוור</legend>
+              <div className="space-y-1 text-sm text-ink-soft">
+                <p>
+                  בעמודות ההסכמה נקראים רק הערכים: {CONSENT_GRANTED_VALUES.slice(0, 4).join(", ")} (הסכים), או {CONSENT_DENIED_VALUES.slice(0, 4).join(", ")} (לא הסכים). תא ריק
+                  לא משנה כלום. ערך אחר לא נרשם, והשורה תציין את זה.
+                </p>
+                <p>
+                  כתובת שחסומה לדיוור בעסק לא תסומן כמסכימה בגלל הקובץ. &quot;לא הסכים&quot; נרשם תמיד, גם בשורה שדולגה כי הרשומה כבר קיימת.
+                </p>
+              </div>
+              <SelectField label="איך התקבלו ההסכמות?" required value={consentMethod} onChange={(e) => setConsentMethod(e.target.value)}>
+                <option value="">בחרו</option>
+                {IMPORT_CONSENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {IMPORT_CONSENT_METHOD_LABELS[m]}
+                  </option>
+                ))}
+              </SelectField>
+              <TextareaField
+                label="פרטים על מקור ההסכמות"
+                required
+                hint="למשל: מאיזה טופס או אירוע, ובאילו תאריכים נאספו. הפרטים נשמרים עם כל הסכמה וביומן הפעולות."
+                maxLength={IMPORT_CONSENT_NOTE_MAX}
+                value={consentNote}
+                onChange={(e) => setConsentNote(e.target.value)}
+              />
+            </fieldset>
+          ) : null}
           {required && missingRequired ? <p className="text-sm text-ink-soft">{required.hint}</p> : null}
+          {missingDeclaration ? <p className="text-sm text-ink-soft">כדי לייבא הסכמות, בחרו איך התקבלו וכתבו פרטים.</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={check} disabled={busy || mappedCount === 0 || missingRequired} aria-busy={busy || undefined}>
+            <Button onClick={check} disabled={busy || mappedCount === 0 || missingRequired || missingDeclaration} aria-busy={busy || undefined}>
               {busy ? "בודקים…" : "בדיקת 20 השורות הראשונות"}
             </Button>
             <Button variant="ghost" onClick={reset}>
@@ -450,7 +508,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
           </div>
           <p className="text-sm text-ink-soft">מספרי השורות הם כמו בקובץ (שורה 1 היא הכותרות). שורות עם שגיאה לא ייובאו, ובסוף אפשר להוריד אותן לתיקון.</p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={run}>ייבוא {formatNumber(sheet.rows.length)} שורות</Button>
+            <Button onClick={run} disabled={missingDeclaration}>ייבוא {formatNumber(sheet.rows.length)} שורות</Button>
             <Button variant="ghost" onClick={() => setStep("map")}>
               חזרה למיפוי
             </Button>
@@ -481,6 +539,12 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
               </div>
             ))}
           </dl>
+          {withConsent ? (
+            <p className="text-md">
+              הסכמות שנרשמו: {formatNumber(consentTotals.written)}.
+              {consentTotals.locked > 0 ? ` לא עודכנו כי הכתובת חסומה לדיוור: ${formatNumber(consentTotals.locked)}.` : ""}
+            </p>
+          ) : null}
           {stopped ? <p role="alert" className="text-danger">{stopped}</p> : null}
           {warnings.length > 0 ? (
             <div className="text-md">
