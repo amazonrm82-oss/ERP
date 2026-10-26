@@ -934,7 +934,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`storeQuotePdf`), never the service key. Made only while the quote is sent or viewed (hint `quote_pdf:closed`). Kept: never removed
   (`files_keep_attached`, `files_delete`, storage `record_files_delete`), except an unconfirmed upload (its uploader, or an owner/admin
   for a quote PDF) and a privacy erasure: `app.audit_erase_core` (last redefined in 020955) calls `app.quote_pdf_drop` (body in the
-  pasted 020960; a stub until pasted) for the detached quotes it cleans, under the transaction setting `app.quote_pdf_erase` = the org.
+  pasted 020960, pasted 26 October 2026) for the detached quotes it cleans, under the transaction setting `app.quote_pdf_erase` = the org.
   Quota `max_pdf_per_month` by `app.pdf_take` (definer, `app.pdf_months`, month in the org zone, 30 a minute `rate:pdf`, one 80% notice);
   a removed waiting row gives its count back (`files_quote_pdf_return`). `public.confirm_file_upload` and `app.reconcile_pending_files`
   answer a non-PDF quote object `{ok:false, reason:'type'}`. The files policies, `app.files_keep_attached`, `confirm_file_upload` and
