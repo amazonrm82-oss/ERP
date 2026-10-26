@@ -750,6 +750,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.import_record_worked` ignores the job's own notes (all six last redefined in 021050; keep the condition). Owners/admins
   remove a wrong one from the timeline. Since 021055 `import_jobs.consents_locked_counted` (server only, false on jobs made
   before the CNS-06 count) shows "לא נספר בייבוא הזה" when a consent-mapped job shows 0.
+- Source attribution (SEG-02 + DQL-04, migration 021060; owner 18 and 26 October 2026): the first source is what the record holds
+  (`source_id`, `campaign`, `utm`; contacts got server-kept `campaign`/`utm`); the last source is server-only `last_source_id`,
+  `last_campaign`, `last_utm`, `last_source_at` on leads and contacts, moved only by an automatic inquiry: a lead made by intake
+  (`leads_last_source_new`, under `app.intake`), the server's `inquiry` entry (`activities_inquiry_source`), a booking's contact while
+  leads are off (`booking_links_source` on `app.booking_manage_links`), all through `app.attribution_touch`; conversion carries both
+  (`leads_convert_source`). DQL-04: once any part of the first source is set (`app.first_source_empty`), a person changes any part
+  only as owner/admin (invoker `app.first_source_lock`, hints `lead:|contact:first_source_locked`), merge picks too
+  (`app.merge_pick_check`, last redefined in 021060); an automation's set_field source fills only an empty first source, else the
+  warning 'the first source is already set' (`app.run_automation_actions`, last redefined in 021060). `public.report_revenue_by_source`
+  (invoker; report_revenue's won rule, keep in step) attributes a deal to its lead's first source, else its contact's, else its own;
+  report key `source_revenue` (`public.log_export`, last redefined in 021060). Follow-ups: a merge keeps the kept record's last
+  source; a repeat booking's last source has no UTM.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -831,7 +843,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` was last redefined in 021000 (AUT-03; keep its `app.emit_form_submitted` calls) and `public.intake_form` in
-  020935 (`app.run_automation_actions` in 021035); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020935 (`app.run_automation_actions` in 021060); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
