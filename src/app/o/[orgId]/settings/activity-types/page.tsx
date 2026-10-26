@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { CheckSquareIcon } from "@/components/ui/icons";
 import { ActivityTypeList, AddActivityTypeForm } from "@/features/activity-types/components/types-editor";
 import { listActivityTypes } from "@/features/activity-types/queries";
 import { ACTIVITY_TYPES_PER_ORG } from "@/features/activity-types/types";
@@ -36,9 +38,13 @@ export default async function ActivityTypesPage({ params }: Props) {
           <ActivityTypeList orgId={orgId} types={types} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סוגים ברשימה. כל עוד היא ריקה, מתעדים בששת הסוגים הבסיסיים.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<CheckSquareIcon />}
+          title="עוד אין סוגי פעילות"
+          description={editable ? "כל עוד הרשימה ריקה, מתעדים בששת הסוגים הבסיסיים. מוסיפים סוג ראשון בטופס שלמטה." : "כל עוד הרשימה ריקה, מתעדים בששת הסוגים הבסיסיים."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && types.length < ACTIVITY_TYPES_PER_ORG ? (
         <CardBody className="border-t border-line">

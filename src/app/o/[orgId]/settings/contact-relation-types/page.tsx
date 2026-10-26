@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { UsersIcon } from "@/components/ui/icons";
 import { AddRelationTypeForm, RelationTypeList } from "@/features/contact-relations/components/types-editor";
 import { listRelationTypes } from "@/features/contact-relations/queries";
 import { CONTACT_RELATION_TYPES_PER_ORG } from "@/features/contact-relations/types";
@@ -33,9 +35,13 @@ export default async function ContactRelationTypesPage({ params }: Props) {
           <RelationTypeList orgId={orgId} types={types} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סוגי קשר ברשימה. כל עוד היא ריקה, אי אפשר לרשום קשרים בין אנשי קשר.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<UsersIcon />}
+          title="עוד אין סוגי קשר"
+          description={editable ? "כל עוד הרשימה ריקה, אי אפשר לרשום קשרים בין אנשי קשר. מוסיפים סוג ראשון בטופס שלמטה." : "כל עוד הרשימה ריקה, אי אפשר לרשום קשרים בין אנשי קשר."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && types.length < CONTACT_RELATION_TYPES_PER_ORG ? (
         <CardBody className="border-t border-line">

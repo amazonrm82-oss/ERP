@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { TagIcon } from "@/components/ui/icons";
 import { AddCategoryForm, CategoryList } from "@/features/products/components/categories-editor";
 import { AddUnitForm, UnitList } from "@/features/products/components/units-editor";
 import { listProductCategories, listProductUnits } from "@/features/products/list-queries";
@@ -35,9 +37,13 @@ export default async function ProductListsPage({ params }: Props) {
             <CategoryList orgId={orgId} tree={tree} editable={editable} />
           </div>
         ) : (
-          <CardBody className="mt-3 border-t border-line">
-            <p className="text-md text-ink-soft">אין קטגוריות. מוצרים יכולים להיות גם בלי קטגוריה.</p>
-          </CardBody>
+          <EmptyState
+            compact
+            icon={<TagIcon />}
+            title="עוד אין קטגוריות"
+            description={editable ? "מוצרים יכולים להיות גם בלי קטגוריה. מוסיפים קטגוריה ראשונה בטופס שלמטה." : "מוצרים יכולים להיות גם בלי קטגוריה."}
+            className="mt-3 border-t border-line"
+          />
         )}
         {editable && categories.length < CATEGORIES_PER_ORG ? (
           <CardBody className="border-t border-line">
@@ -56,9 +62,13 @@ export default async function ProductListsPage({ params }: Props) {
             <UnitList orgId={orgId} units={units} editable={editable} />
           </div>
         ) : (
-          <CardBody className="mt-3 border-t border-line">
-            <p className="text-md text-ink-soft">אין יחידות מידה. מוצרים יכולים להיות גם בלי יחידה.</p>
-          </CardBody>
+          <EmptyState
+            compact
+            icon={<TagIcon />}
+            title="עוד אין יחידות מידה"
+            description={editable ? "מוצרים יכולים להיות גם בלי יחידה. מוסיפים יחידה ראשונה בטופס שלמטה." : "מוצרים יכולים להיות גם בלי יחידה."}
+            className="mt-3 border-t border-line"
+          />
         )}
         {editable && units.length < UNITS_PER_ORG ? (
           <CardBody className="border-t border-line">

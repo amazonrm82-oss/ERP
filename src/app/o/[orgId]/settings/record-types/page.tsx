@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { BuildingIcon, UsersIcon } from "@/components/ui/icons";
 import { AddTypeForm, TypeList } from "@/features/record-type-options/components/types-editor";
 import { listRecordTypes } from "@/features/record-type-options/queries";
 import { TYPE_TEXTS, TYPES_PER_OBJECT, type RecordType, type RecordTypeObject } from "@/features/record-type-options/schema";
@@ -43,9 +45,13 @@ function TypesCard({ orgId, object, types, editable }: { orgId: string; object: 
           <TypeList orgId={orgId} object={object} types={types} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סוגים ברשימה. כל עוד היא ריקה, הטפסים לא מציגים את השדה.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={object === "contact" ? <UsersIcon /> : <BuildingIcon />}
+          title="עוד אין סוגים"
+          description={editable ? "כל עוד הרשימה ריקה, הטפסים לא מציגים את השדה. מוסיפים סוג ראשון בטופס שלמטה." : "כל עוד הרשימה ריקה, הטפסים לא מציגים את השדה."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && types.length < TYPES_PER_OBJECT ? (
         <CardBody className="border-t border-line">

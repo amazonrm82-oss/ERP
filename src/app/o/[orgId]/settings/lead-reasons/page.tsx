@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { InboxIcon } from "@/components/ui/icons";
 import { AddReasonForm, ReasonList } from "@/features/disqualify-reasons/components/reasons-editor";
 import { listDisqualifyReasons } from "@/features/disqualify-reasons/queries";
 import { REASONS_PER_ORG } from "@/features/disqualify-reasons/schema";
@@ -30,9 +32,13 @@ export default async function DisqualifyReasonsPage({ params }: Props) {
           <ReasonList orgId={orgId} reasons={reasons} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סיבות ברשימה. כל עוד היא ריקה, כותבים את הסיבה בחופשיות.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<InboxIcon />}
+          title="עוד אין סיבות"
+          description={editable ? "כל עוד הרשימה ריקה, כותבים את הסיבה בחופשיות. מוסיפים סיבה ראשונה בטופס שלמטה." : "כל עוד הרשימה ריקה, כותבים את הסיבה בחופשיות."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && reasons.length < REASONS_PER_ORG ? (
         <CardBody className="border-t border-line">

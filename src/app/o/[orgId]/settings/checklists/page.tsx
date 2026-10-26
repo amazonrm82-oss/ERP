@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { CheckSquareIcon } from "@/components/ui/icons";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { NewTemplateForm, TemplateItem } from "@/features/task-checklists/components/template-forms";
@@ -37,9 +39,13 @@ export default async function ChecklistTemplatesPage({ params }: Props) {
             ))}
           </ul>
         ) : (
-          <CardBody className="mt-3 border-t border-line">
-            <p className="text-md text-ink-soft">אין תבניות. אפשר להוסיף שלבים לכל משימה גם בלי תבנית.</p>
-          </CardBody>
+          <EmptyState
+            compact
+            icon={<CheckSquareIcon />}
+            title="עוד אין תבניות"
+            description={editable ? "אפשר להוסיף שלבים לכל משימה גם בלי תבנית. מוסיפים תבנית ראשונה בטופס שלמטה." : "אפשר להוסיף שלבים לכל משימה גם בלי תבנית."}
+            className="mt-3 border-t border-line"
+          />
         )}
       </Card>
       {editable && templates.length < TEMPLATES_PER_ORG ? (

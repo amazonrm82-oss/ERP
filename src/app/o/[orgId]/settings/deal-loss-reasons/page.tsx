@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { BoardIcon } from "@/components/ui/icons";
 import { AddLossReasonForm, LossReasonList } from "@/features/deal-loss-reasons/components/reasons-editor";
 import { listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { LOSS_REASONS_PER_ORG } from "@/features/deal-loss-reasons/schema";
@@ -30,9 +32,13 @@ export default async function DealLossReasonsPage({ params }: Props) {
           <LossReasonList orgId={orgId} reasons={reasons} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סיבות ברשימה. כל עוד היא ריקה, אפשר לסמן עסקה כאבודה בלי סיבה.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<BoardIcon />}
+          title="עוד אין סיבות הפסד"
+          description={editable ? "כל עוד הרשימה ריקה, אפשר לסמן עסקה כאבודה בלי סיבה. מוסיפים סיבה ראשונה בטופס שלמטה." : "כל עוד הרשימה ריקה, אפשר לסמן עסקה כאבודה בלי סיבה."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && reasons.length < LOSS_REASONS_PER_ORG ? (
         <CardBody className="border-t border-line">

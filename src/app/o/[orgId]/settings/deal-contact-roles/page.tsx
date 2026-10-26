@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { UsersIcon } from "@/components/ui/icons";
 import { AddDealContactRoleForm, DealContactRoleList } from "@/features/deal-contacts/components/roles-editor";
 import { listDealContactRoles } from "@/features/deal-contacts/queries";
 import { DEAL_CONTACT_ROLES_PER_ORG } from "@/features/deal-contacts/roles";
@@ -30,9 +32,13 @@ export default async function DealContactRolesPage({ params }: Props) {
           <DealContactRoleList orgId={orgId} roles={roles} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין תפקידים ברשימה. כל עוד היא ריקה, מוסיפים אנשי קשר לעסקה בלי תפקיד.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<UsersIcon />}
+          title="עוד אין תפקידים"
+          description={editable ? "כל עוד הרשימה ריקה, מוסיפים אנשי קשר לעסקה בלי תפקיד. מוסיפים תפקיד ראשון בטופס שלמטה." : "כל עוד הרשימה ריקה, מוסיפים אנשי קשר לעסקה בלי תפקיד."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && roles.length < DEAL_CONTACT_ROLES_PER_ORG ? (
         <CardBody className="border-t border-line">

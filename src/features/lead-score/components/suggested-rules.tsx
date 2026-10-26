@@ -12,7 +12,6 @@ import { SUGGESTED_RULES, describeRule, pointsText, type ScoreLookups } from "..
 export function SuggestedRules({ orgId, lookups, editable }: { orgId: string; lookups: ScoreLookups; editable: boolean }) {
   return (
     <div className="space-y-3 text-md">
-      <p className="text-ink-soft">אין עדיין כללים, ולכן הציון של כל ליד הוא 0.</p>
       <div>
         <p className="mb-2 text-ink">הכללים שאנחנו מציעים להתחיל איתם:</p>
         <ul className="space-y-2">

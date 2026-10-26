@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { ChartIcon } from "@/components/ui/icons";
 import { AddRuleForm } from "@/features/lead-score/components/add-rule-form";
 import { SuggestedRules } from "@/features/lead-score/components/suggested-rules";
 import { ScoreRuleList } from "@/features/lead-score/components/rule-list";
@@ -39,9 +41,18 @@ export default async function LeadScoreSettingsPage({ params }: Props) {
           <ScoreRuleList orgId={orgId} rules={rules} lookups={lookups} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <SuggestedRules orgId={orgId} lookups={lookups} editable={editable} />
-        </CardBody>
+        <>
+          <EmptyState
+            compact
+            icon={<ChartIcon />}
+            title="עוד אין כללים"
+            description="בלי כללים, הציון של כל ליד הוא 0."
+            className="mt-3 border-t border-line"
+          />
+          <CardBody className="pt-0">
+            <SuggestedRules orgId={orgId} lookups={lookups} editable={editable} />
+          </CardBody>
+        </>
       )}
       {editable && rules.length < SCORE_RULES_MAX ? (
         <CardBody className="border-t border-line">

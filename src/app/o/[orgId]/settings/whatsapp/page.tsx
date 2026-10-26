@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { ChatIcon } from "@/components/ui/icons";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { AddTemplateForm, TemplateList } from "@/features/whatsapp/components/templates-editor";
@@ -42,9 +44,13 @@ export default async function WhatsappTemplatesPage({ params }: Props) {
           <TemplateList orgId={orgId} templates={templates} editable={editable} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין תבניות. כפתור ה-WhatsApp יפתח הודעה ריקה.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<ChatIcon />}
+          title="עוד אין תבניות"
+          description={editable ? "כל עוד הרשימה ריקה, כפתור ה-WhatsApp פותח הודעה ריקה. מוסיפים תבנית ראשונה בטופס שלמטה." : "כל עוד הרשימה ריקה, כפתור ה-WhatsApp פותח הודעה ריקה."}
+          className="mt-3 border-t border-line"
+        />
       )}
       {editable && templates.length < TEMPLATES_PER_ORG ? (
         <CardBody className="border-t border-line">

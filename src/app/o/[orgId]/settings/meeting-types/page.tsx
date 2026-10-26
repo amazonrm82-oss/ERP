@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
+import { CalendarIcon } from "@/components/ui/icons";
 import { AddMeetingTypeButton, MeetingTypeList } from "@/features/meeting-types/components/types-editor";
 import { listMeetingTypes } from "@/features/meeting-types/queries";
 import { MEETING_TYPES_PER_ORG } from "@/features/meeting-types/schema";
@@ -32,11 +34,16 @@ export default async function MeetingTypesPage({ params }: Props) {
           <MeetingTypeList orgId={orgId} types={types} editable={editable} products={products} />
         </div>
       ) : (
-        <CardBody className="mt-3 border-t border-line">
-          <p className="text-md text-ink-soft">אין סוגי פגישה. אפשר לקבוע פגישות גם בלי סוג.</p>
-        </CardBody>
+        <EmptyState
+          compact
+          icon={<CalendarIcon />}
+          title="עוד אין סוגי פגישה"
+          description={editable ? "סוג ממלא לבד משך, מיקום וצבע. אפשר לקבוע פגישות גם בלי סוג." : "אפשר לקבוע פגישות גם בלי סוג."}
+          action={editable ? <AddMeetingTypeButton orgId={orgId} products={products} /> : null}
+          className="mt-3 border-t border-line"
+        />
       )}
-      {editable && types.length < MEETING_TYPES_PER_ORG ? (
+      {editable && types.length > 0 && types.length < MEETING_TYPES_PER_ORG ? (
         <CardBody className="border-t border-line">
           <AddMeetingTypeButton orgId={orgId} products={products} />
         </CardBody>
