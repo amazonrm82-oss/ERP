@@ -704,7 +704,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   or erasure block (`app.consent_address_locked`, shared with CAP-07's `app.intake_marketing_consent`, both last redefined in
   020950). Created rows are matched to returned ids by address, never by order. Undo never deletes consents (append-only).
   The advisor's `authenticated_security_definer_function_executable` on it is expected.
-  Since 020985 (owner 26 October 2026, answer 1; fail-safe pending): `consents.import_job_id` (server only) and `consents.cancels` (a
+  Since 020985 (owner 26 October 2026, answer 1, and (א) on opt-outs: an undo never cancels a 'denied'; removal is always the safe side): `consents.import_job_id` (server only) and `consents.cancels` (a
   cancelling entry: unknown/import/no address, one per entry; constraint `consents_cancel_shape`). `undo_import` / `undo_own_import` call
   `app.import_consents_cancel` (definer; the caller's own undone job), which cancels only the import's 'granted' entries and their
   conversion copies (never a 'denied': an undo never lifts an opt-out; hint `consent:cancel`); it locks the records holding them FOR
