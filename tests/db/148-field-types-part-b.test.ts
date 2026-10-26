@@ -66,6 +66,8 @@ describe("new custom field types (FLD-06 part B)", () => {
     }
     return file;
   };
+  const previousOf = (id: string) =>
+    asAdmin(async (q) => (await q<{ p: string | null }>("select previous_id as p from public.files where id = $1", [id])).rows[0]?.p ?? null);
   const fileExists = (id: string) => asAdmin((q) => count(q, "select 1 from public.files where id = $1", [id]));
   const orphaned = (path: string) => asAdmin((q) => count(q, "select 1 from app.orphan_files where storage_path = $1", [path]));
 
@@ -437,7 +439,7 @@ describe("new custom field types (FLD-06 part B)", () => {
     ).toBe("file:field");
   });
 
-  it("the current file is not removed directly; replacing or clearing the value releases the old file", async () => {
+  it("the current file is not removed directly; replacing keeps the old file as a version, clearing releases it", async () => {
     const lead = await insertLead(rep.id, org, { owner_id: rep.id });
     const first = await upload(rep.id, lead, "contract");
     await setField(rep.id, "leads", lead, { contract: first.id });
@@ -445,19 +447,83 @@ describe("new custom field types (FLD-06 part B)", () => {
     expect((await failure(asUser(rep.id, (q) => q("delete from public.files where id = $1", [first.id])))).hint).toBe("file:field");
     expect((await failure(asUser(owner.id, (q) => q("delete from public.files where id = $1", [first.id])))).hint).toBe("file:field");
     expect((await asUser(rep.id, (q) => q("delete from storage.objects where name = $1", [first.storage_path]))).rowCount).toBe(0);
-    // replaced: the old file goes, its object waits for the cleanup
+    // replaced (FLD-06 follow-up, owner 26 October 2026, answer (ב)): the old file stays as the new one's earlier version
     const second = await upload(rep.id, lead, "contract");
     await setField(rep.id, "leads", lead, { contract: second.id });
-    expect(await fileExists(first.id)).toBe(0);
-    expect(await orphaned(first.storage_path)).toBe(1);
-    expect(await fileExists(second.id)).toBe(1);
-    // cleared
+    expect(await fileExists(first.id)).toBe(1);
+    expect(await orphaned(first.storage_path)).toBe(0);
+    expect(await previousOf(second.id)).toBe(first.id);
+    // cleared: the current file is released as before; its earlier version stays among the record's files
     await setField(rep.id, "leads", lead, { contract: null });
     expect(await fileExists(second.id)).toBe(0);
     expect(await orphaned(second.storage_path)).toBe(1);
+    expect(await fileExists(first.id)).toBe(1);
     // an upload never set as the value may be removed by its uploader
     const unused = await upload(rep.id, lead, "contract");
     expect((await asUser(rep.id, (q) => q("delete from public.files where id = $1", [unused.id]))).rowCount).toBe(1);
+  });
+
+  it("follow-up (answer (ב)): replaced files form one version line; an earlier version is removed like any record file", async () => {
+    const lead = await insertLead(rep.id, org, { owner_id: rep.id });
+    const v1 = await upload(rep.id, lead, "contract");
+    await setField(rep.id, "leads", lead, { contract: v1.id });
+    const v2 = await upload(rep.id, lead, "contract");
+    await setField(rep.id, "leads", lead, { contract: v2.id });
+    const v3 = await upload(rep.id, lead, "contract");
+    await setField(rep.id, "leads", lead, { contract: v3.id });
+    expect(await previousOf(v3.id)).toBe(v2.id);
+    expect(await previousOf(v2.id)).toBe(v1.id);
+    // every version is the record's file, seen with the lead and counted in storage
+    expect(await asUser(rep.id, (q) => count(q, "select 1 from public.files where lead_id = $1 and custom_field_key = 'contract'", [lead]))).toBe(3);
+    const used = await asAdmin(async (q) => (await q<{ n: string }>("select app.files_storage_used($1, null)::text as n", [org])).rows[0].n);
+    expect(Number(used)).toBeGreaterThanOrEqual(300);
+    // the current file stays protected; an earlier version is not in use: its uploader removes it (row and object), and the
+    // line is relinked
+    expect((await failure(asUser(rep.id, (q) => q("delete from public.files where id = $1", [v3.id])))).hint).toBe("file:field");
+    expect((await asUser(rep2.id, (q) => q("delete from public.files where id = $1", [v2.id]))).rowCount).toBe(0);
+    expect((await asUser(rep.id, (q) => q("delete from storage.objects where name = $1", [v2.storage_path]))).rowCount).toBe(1);
+    expect((await asUser(rep.id, (q) => q("delete from public.files where id = $1", [v2.id]))).rowCount).toBe(1);
+    expect(await previousOf(v3.id)).toBe(v1.id);
+    // an owner removes the oldest one too
+    expect((await asUser(owner.id, (q) => q("delete from public.files where id = $1", [v1.id]))).rowCount).toBe(1);
+    expect(await previousOf(v3.id)).toBe(null);
+    expect((await fieldsOf("leads", lead)).contract).toBe(v3.id);
+    // no person links versions of a field's file: neither a new field file naming an earlier one, nor a plain file naming a field file
+    for (const [key, prev] of [
+      ["contract", v3.id],
+      [null, v3.id],
+    ] as const) {
+      expect(
+        (
+          await failure(
+            asUser(rep.id, (q) =>
+              q(
+                "insert into public.files (organization_id, lead_id, name, mime_type, size_bytes, previous_id, custom_field_key) values ($1, $2, 'v.pdf', 'application/pdf', 1, $3, $4)",
+                [org, lead, prev, key],
+              ),
+            ),
+          )
+        ).hint,
+        String(key),
+      ).toBe("file:field");
+    }
+    // a value set back to an earlier version keeps the newer one as a plain file of the field (nothing deleted, no loop)
+    const v4 = await upload(rep.id, lead, "contract");
+    await setField(rep.id, "leads", lead, { contract: v4.id });
+    expect(await previousOf(v4.id)).toBe(v3.id);
+    await setField(rep.id, "leads", lead, { contract: v3.id });
+    expect(await fileExists(v4.id)).toBe(1);
+    expect(await previousOf(v4.id)).toBe(v3.id);
+    expect(await previousOf(v3.id)).toBe(null);
+    // deleting the field releases every file of it, versions included
+    const fieldId = await define(org, "lead", "versioned_tmp", "file");
+    const a = await upload(rep.id, lead, "versioned_tmp");
+    await setField(rep.id, "leads", lead, { versioned_tmp: a.id });
+    const b = await upload(rep.id, lead, "versioned_tmp");
+    await setField(rep.id, "leads", lead, { versioned_tmp: b.id });
+    await asUser(owner.id, (q) => q("delete from public.field_definitions where id = $1", [fieldId]));
+    expect(await fileExists(a.id)).toBe(0);
+    expect(await fileExists(b.id)).toBe(0);
   });
 
   it("a read-only file field is locked once filled", async () => {

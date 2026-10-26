@@ -584,6 +584,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the QUO-06 follow-up (answer 1 (ג)) redefines public.quote_pdf_store() of _quote_pdf_server.sql last (a PDF without a
       // fingerprint is made again once)
       "_quote_pdf_remake.sql",
+      // the FLD-06 follow-up (answer (ב)) redefines app.files_field_check() and app.custom_field_files_release() of
+      // _field_types_part_b.sql last (a replaced field file is kept as a version)
+      "_field_file_versions.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

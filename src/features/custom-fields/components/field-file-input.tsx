@@ -11,6 +11,9 @@ import { requiredFileKeptMessage } from "../conditions";
 import { finishFieldFileAction, prepareFieldFileAction, removeFieldFileAction, type FieldFileTarget } from "../field-file-actions";
 import type { FieldRef } from "../types";
 
+// FLD-06 part B follow-up (owner, 26 October 2026, answer (ב))
+const REPLACED_KEPT = "בהחלפה, הקובץ הקודם נשמר כגרסה קודמת בקבצי הרשומה.";
+
 type Props = {
   orgId: string;
   target: FieldFileTarget;
@@ -29,8 +32,9 @@ type Props = {
 
 /**
  * FLD-06 part B: a file field on an existing record. Uploading acts at once, like the record's files (the row, the object
- * with the user's session, the server's check), and the new file replaces the field's value; the old one is released by
- * the database. It sends nothing with the surrounding form.
+ * with the user's session, the server's check), and the new file replaces the field's value; the database keeps the old one
+ * as the new file's earlier version, shown with the record's files (owner, 26 October 2026, answer (ב)). Removing the value
+ * deletes the current file. It sends nothing with the surrounding form.
  */
 export function FieldFileInput({ orgId, target, label, current, held, locked, hint, required = false, error: saveError }: Props) {
   const router = useRouter();
@@ -119,6 +123,7 @@ export function FieldFileInput({ orgId, target, label, current, held, locked, hi
         </p>
       ) : null}
       {filled && !locked && required ? <p className="mt-1 text-sm text-ink-soft">{requiredFileKeptMessage(label)}</p> : null}
+      {filled && !locked ? <p className="mt-1 text-sm text-ink-soft">{REPLACED_KEPT}</p> : null}
       {locked ? <p className="text-sm text-ink-soft">שדה לקריאה בלבד</p> : hint ? <p className="mt-1 text-sm text-ink-soft">{hint}</p> : null}
     </div>
   );

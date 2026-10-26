@@ -20,22 +20,47 @@ export type RecordFile = {
   previousId: string | null;
   // a short-lived link to show a small preview of an image
   thumbnailUrl: string | null;
+  // FLD-06 part B: a file field's file (the field's label), and whether it is the field's current value. A replaced field
+  // file stays as the earlier version of the new one (owner, 26 October 2026, answer (ב)) and is listed with the record's files.
+  fieldKey: string | null;
+  fieldLabel: string | null;
+  inField: boolean;
 };
+
+const RECORD_TABLE = { lead: "leads", contact: "contacts", company: "companies", deal: "deals" } as const;
 
 export async function listFiles(orgId: string, subject: TimelineSubject): Promise<RecordFile[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("files")
-    .select("id, name, mime_type, size_bytes, storage_path, uploaded_by, created_at, activity_id, previous_id")
+    .select("id, name, mime_type, size_bytes, storage_path, uploaded_by, created_at, activity_id, previous_id, custom_field_key")
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id)
     // FXS-07: an upload that has not been confirmed is not shown
     .is("unconfirmed_since", null)
-    // FLD-06 part B: a file field's file shows in its field, not among the record's files
-    .is("custom_field_key", null)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(`files query failed: ${error.message}`);
+  // FLD-06 part B: which field files are a field's current value, and the fields' labels
+  const fieldKeys = [...new Set(data.flatMap((f) => (f.custom_field_key ? [f.custom_field_key] : [])))];
+  const current = new Set<string>();
+  const labels = new Map<string, string>();
+  if (fieldKeys.length > 0) {
+    const [record, definitions] = await Promise.all([
+      supabase.from(RECORD_TABLE[subject.kind]).select("custom_fields").eq("organization_id", orgId).eq("id", subject.id).maybeSingle(),
+      supabase.from("field_definitions").select("key, label").eq("organization_id", orgId).eq("object_type", subject.kind).in("key", fieldKeys),
+    ]);
+    if (record.error) throw new Error(`files query failed: ${record.error.message}`);
+    if (definitions.error) throw new Error(`files query failed: ${definitions.error.message}`);
+    const values = record.data?.custom_fields;
+    if (values && typeof values === "object" && !Array.isArray(values)) {
+      for (const key of fieldKeys) {
+        const value = (values as Record<string, unknown>)[key];
+        if (typeof value === "string") current.add(`${key}:${value}`);
+      }
+    }
+    for (const d of definitions.data) labels.set(d.key, d.label);
+  }
   const images = data.filter((f) => f.mime_type.startsWith("image/") && opensInBrowser(f.mime_type));
   const thumbs = new Map<string, string>();
   if (images.length > 0) {
@@ -58,6 +83,9 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
     activityId: f.activity_id,
     previousId: f.previous_id,
     thumbnailUrl: thumbs.get(f.storage_path) ?? null,
+    fieldKey: f.custom_field_key,
+    fieldLabel: f.custom_field_key ? (labels.get(f.custom_field_key) ?? null) : null,
+    inField: f.custom_field_key !== null && current.has(`${f.custom_field_key}:${f.id}`),
   }));
 }
 

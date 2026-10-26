@@ -6,24 +6,32 @@ import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 import { deleteFileAction } from "../actions";
-import { listFiles } from "../queries";
+import { listFiles, type RecordFile } from "../queries";
 import { ALLOWED_TYPES, formatBytes, opensInBrowser } from "../types";
 import { versionGroups } from "../versions";
 import { FileUploader } from "./file-uploader";
 import { NewVersionButton } from "./new-version-button";
+
+/** FLD-06 part B: where a file field's file stands (its current file, or an earlier one kept when it was replaced). */
+function fieldNote(file: RecordFile): string {
+  if (!file.fieldKey) return "";
+  const field = file.fieldLabel ? `"${file.fieldLabel}"` : "קובץ";
+  return file.inField ? ` · הקובץ הנוכחי בשדה ${field}` : ` · גרסה קודמת של השדה ${field}`;
+}
 
 type Props = { orgId: string; subject: TimelineSubject; canWrite: boolean; userId: string; isAdmin: boolean };
 
 /** Files card of a record: upload (drag and drop or pick), then the list, newest first. */
 export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }: Props) {
   const files = await listFiles(orgId, subject);
-  // REC-07: each file once, at its current version, with its earlier versions under it
-  const groups = versionGroups(files);
+  // REC-07: each file once, at its current version, with its earlier versions under it. FLD-06: a file field's current file
+  // shows in its field; here only when it has earlier versions (a replaced file is kept as one, owner 26 October 2026)
+  const groups = versionGroups(files).filter(({ current, earlier }) => !(current.inField && earlier.length === 0));
 
   return (
     // GAP-11 (owner, 14 October 2026): on paper, name, date and uploader of each file, no content
     // or links; a record with no files prints no files section
-    <Card aria-labelledby="files-title" className={files.length === 0 ? "print:hidden" : undefined}>
+    <Card aria-labelledby="files-title" className={groups.length === 0 ? "print:hidden" : undefined}>
       <CardHeader id="files-title" title={groups.length ? `קבצים (${groups.length})` : "קבצים"} />
       <CardBody className="space-y-4">
         {canWrite ? (
@@ -31,7 +39,7 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
             <FileUploader orgId={orgId} subject={subject} />
           </div>
         ) : null}
-        {files.length === 0 ? (
+        {groups.length === 0 ? (
           <p className="text-md text-ink-soft">אין קבצים.</p>
         ) : (
           <ul className="divide-y divide-line">
@@ -65,14 +73,16 @@ export async function RecordFiles({ orgId, subject, canWrite, userId, isAdmin }:
                         {formatBytes(file.sizeBytes)} · {formatDateTime(file.createdAt)}
                         {file.uploaderName ? ` · ${file.uploaderName}` : ""}
                         {file.activityId ? " · מצורף להערה בציר הזמן" : ""}
+                        {fieldNote(file)}
                       </p>
                     </div>
-                    {canWrite ? (
+                    {/* a field's file gets a new version by replacing it in the field */}
+                    {canWrite && !file.fieldKey ? (
                       <span className="print:hidden">
                         <NewVersionButton orgId={orgId} subject={subject} fileId={file.id} activityId={file.activityId} fileName={file.name} />
                       </span>
                     ) : null}
-                    {canWrite && (file.uploadedBy === userId || isAdmin) ? (
+                    {canWrite && !file.inField && (file.uploadedBy === userId || isAdmin) ? (
                       <ActionButton
                         action={deleteFileAction.bind(null, orgId, subject, file.id)}
                         pendingText="מוחקים…"

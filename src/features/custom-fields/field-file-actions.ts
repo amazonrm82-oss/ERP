@@ -16,8 +16,9 @@ import { FIELD_OBJECTS } from "./types";
 // FLD-06 part B: a file field's file. Like a record's files (prepareUploadAction / finishUploadAction): a row first (the
 // database checks the field, the rights, the storage and the waiting cap), the object straight to Storage with the user's
 // session, then confirm_file_upload reads what arrived. Only then the record's value names the file, with the user's
-// session (the database checks it is this record's confirmed file of this field); the file it replaces is released by the
-// database. Everything here uses the user's session.
+// session (the database checks it is this record's confirmed file of this field); the file it replaces is kept by the
+// database as the new file's earlier version (owner, 26 October 2026, answer (ב)), listed with the record's files. Clearing
+// the field releases its current file. Everything here uses the user's session.
 
 const fileSchema = z.object({
   name: z.string().trim().min(1).max(200),
