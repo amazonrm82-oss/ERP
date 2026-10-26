@@ -738,6 +738,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 021025 (CNS-06 answer 3) `public.import_record_consents` (last redefined there; the job is taken FOR NO KEY UPDATE) counts its
   'locked' answers into server-only `import_jobs.consents_locked` (wizard and import history line, `consentsLockedText`); a
   `consent:blocklisted` refusal is 'locked'.
+- Import history (GAP-12 part one, migration 021050; owner: opening balances and punch cards wait for his answer):
+  `original_created_on` (date, 1990..today) on leads, contacts, companies and deals, written only by an import (a person's
+  insert needs `import_job_id`, no person changes it later: `app.original_created_on_check`, invoker, hints
+  `import:original_date|original_date_fixed`; leads/contacts insert grant only); `created_at` stays the time the record entered
+  this system, which every timing rule reads. `public.import_record_notes(org, job, items)` (definer, authenticated, the caller's
+  own running lead/contact/company/deal import, 1,000 items) writes activities of type `import_note` (author = importer,
+  `metadata {kind, import_job_id}`, dated at 12:00 of the note's day, never after now; the same text on the same day answers
+  `exists`); never contact, never activity: `app.scheduled_no_activity`, `app.automation_run_facts`,
+  `app.automation_event_still_holds`, `app.deal_attention_rows` and `public.report_pipeline_cleanup` skip it, and
+  `app.import_record_worked` ignores the job's own notes (all six last redefined in 021050; keep the condition). Owners/admins
+  remove a wrong one from the timeline. Since 021055 `import_jobs.consents_locked_counted` (server only, false on jobs made
+  before the CNS-06 count) shows "לא נספר בייבוא הזה" when a consent-mapped job shows 0.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
