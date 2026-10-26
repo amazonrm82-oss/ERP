@@ -773,7 +773,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` was last redefined in 020975 and `public.intake_form` in
-  020935 (`app.run_automation_actions` in 020945); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020935 (`app.run_automation_actions` in 020980); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
@@ -1412,11 +1412,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   never names or phones; date fields take {"relative": {"days": 0..365, "unit": "calendar"|"business"}} worked out at run time in the
   business's zone (`app.automation_relative_date`, no grants; business days by `app.add_business_days`); an invalid one leaves the
   field and logs ok with the warning 'the relative date is invalid'. A date_reached rule whose own step moves its trigger date can
-  fire again on each new date, and an AUT-06 retry then sees `event_changed`. `app.run_automation_actions` was last redefined in 020945 (020940 AUT-02 `create_quote`; 020945 AUT-01: a channel written on a record with no source gets source 'form').
+  fire again on each new date, and an AUT-06 retry then sees `event_changed`. `app.run_automation_actions` was last redefined in 020980 (020940 AUT-02 `create_quote`; 020945 AUT-01: a channel written on a record with no source gets source 'form'; 020980 the create_quote owner and hold).
   Since 020940 (AUT-02 rest) action `create_quote` {template_id} on deal and contact rules makes a DRAFT quote from a QUO-04 template, written as
   the server (JWT claims put aside and restored, as create_deal's copied lines): owner = the record's active non-viewer owner, else none; product
   lines only while offerable, a line without a price priced by PL-03 (`app.product_line_price`, `app.price_list_discounted`), refused lines skipped
   per savepoint (warning 'some template lines were skipped' + `warning_count`); a missing template or the `quotes` flag off fails the step.
+  Since 020980 (owner 26 October 2026): an optional `owner_id` in the step (an active non-viewer member; set but not usable = no owner
+  and warning 'the chosen owner is not usable, the quote has no owner'; not set = the record's usable owner, else none and 'the record
+  owner is not usable, the quote has no owner'); a COL-05 hold on the quote's contact or its company (plan flag `collection`) never
+  refuses: the quote is made and the step is ok with 'the customer is on hold' / 'the customer''s company is on hold'. A create_quote
+  step carries `warning` (the first) and `warnings` (all). The JWT claims are put aside and restored only when they were set.
 - Automation conditions (AUT-05, migration 020785; owner 18 and 25 October 2026): `automations.conditions` items are a leaf
   {field, op, value?, on?} (`on`: contact|company|deal|lead = the record the rule's record's `<on>_id` points at), an "or" group
   {any: [2..10 leaves]}, working hours {kind: hours, value: in|out} or a weekday {kind: weekday, days: [0..6]}; at most 10 items and
