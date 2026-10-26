@@ -716,7 +716,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  020830 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020905 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
@@ -1220,6 +1220,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   checked by `app.field_option_colors_ok`). `app.custom_value_ok` was last redefined in 020265. Every switch on `field_type` is listed
   in `src/features/custom-fields/type-decisions.ts` (unit test `field-type-switches`): a new type needs a decision at each one.
   Public forms leave the three out (`FORM_EXCLUDED_TYPES`, app only).
+- Field types part B (FLD-06, migrations 020905 and 020910 pasted by hand; owner 18 October 2026, every plan): `address` (one line,
+  500, Waze/Google Maps links from the text, no geocoding), `record_link` (one record; `field_definitions.link_target`
+  lead|contact|company|deal, never changed, nor the key, type or record type: hint `custom_field:type_locked`) and `file` (one file
+  per field: a `public.files` row of the record with `files.custom_field_key`, so every upload rule applies; trigger `files_field_check`,
+  hint `file:field`). Values are lower-case uuid text; `app.check_custom_fields` (last redefined in 020905) checks a person's changed
+  link against a live readable record (`custom_field:record_link`) and a file against a confirmed file of that record and field
+  (`custom_field:file`). The current field file is never removed directly (`files_field_guard`, the `record_files_delete` storage
+  policy, last altered in 020905, via `app.field_file_in_use`); a replaced or cleared value, a deleted field and a merge release it
+  through `app.custom_field_file_drop` (its delete lives in 020910; until pasted it is a no-op stub). Purging a record empties links
+  to it (`*_record_links_clear`, statement triggers); a merge repoints them (`activities_merge_field_links`). Automations never
+  set them (`*_cf_zz_automation_guard`, hint `custom_field:automation`; server link writes pass with `app.field_links_server`).
+  No defaults; conversion never copies a file and a link only to the same target (`app.carry_custom_fields`, last redefined in
+  020905); never on a public form (`intake_form` / `intake_submit` skip them).
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
@@ -1491,7 +1504,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` (last redefined in 020830) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
+  `public.intake_submit` (last redefined in 020905) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
