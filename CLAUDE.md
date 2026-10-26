@@ -1185,6 +1185,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   record on insert as confirmed or a move recorded -> confirmed (not failed -> confirmed); its AUT-06 retry holds while still confirmed.
   `app.process_outbox`, `app.automation_event_matches`, `app.automation_run_facts` and `app.automation_event_still_holds` were
   redefined in 020780, then by AUT-04 (020800, 020805). The run log badge of a quota skip reads "לא רץ: מכסה" (`quotaSkipLabel`, AUT-07).
+- Quick sale (GAP-08, migration 021045; owner 26 October 2026, no plan key): `public.quick_sale(org, sale)` (INVOKER, all or nothing;
+  rights first: `app.can_record_payments` + writable, with a document also `app.can_record_documents`; then flags `payments`,
+  `products`, `documents`). A customer (existing readable contact, or a new one after the app's DQL-02 duplicate check), a deal in
+  the sales process of `org_document_settings.quick_sale_pipeline_id` (owners/admins, column grants, composite FK set null; else the
+  default) made in its first open stage and moved to its first won stage in the same call (so `deal_won` automations run), one-time
+  product lines whose PL-03 price is derived again in SQL (an inline copy of `app.price_list_discounted` / `app.product_line_price`,
+  test 247 compares them; keep in step) and a sent price that differs is refused (`quick_sale:price`); one payment of the total with
+  VAT (cash = confirmed, else recorded) or a series of 1..36 cheques summing exactly to it (in hand or cleared); optionally a
+  recorded tax invoice-receipt or receipt (no allocation). The deal name never holds the customer's name. App:
+  `src/features/quick-sale/`, page `/o/[org]/payments/quick-sale`, + menu entry; a COL-05 hold only warns.
 - Payment allocations (PAY-02, migrations 020790, 020795; owner 21 October 2026, lead's calls 25 October): `public.payment_allocations`
   (payment, document, amount; never deleted: owners/admins undo with `removed_at`, the server releases with `released_at` when the
   payment becomes failed/refunded/cancelled or the document is cancelled; a release is final). Allocating needs
