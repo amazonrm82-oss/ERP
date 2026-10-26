@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { actionsMissingReason, fromDbRule, REASON_REQUIRED, toDbRule } from "@/features/automations/convert";
 import type { Lookups } from "@/features/automations/queries";
-import { STEP_WARNINGS, stepWarningText } from "@/features/automations/describe";
+import { RETIRED_STEP_WARNINGS, STEP_WARNINGS, stepWarningText } from "@/features/automations/describe";
 import { ruleSchema } from "@/features/automations/schema";
 
 // RVW-9 (owner, 12 October 2026): an automation that makes a lead "not relevant" gives a reason from the list.
@@ -111,7 +111,6 @@ describe("run log warnings", () => {
       "some lines were not copied",
       "some template lines were skipped",
       "the business-day offset is invalid",
-      "the chosen owner is not usable, the quote has no owner",
       "the customer is on hold",
       "the customer's company is on hold",
       "the owner is away, the lead has no owner",
@@ -124,7 +123,13 @@ describe("run log warnings", () => {
     for (const warning of written) {
       expect(STEP_WARNINGS[warning]).toBeTruthy();
     }
-    expect(Object.keys(STEP_WARNINGS).sort()).toEqual([...new Set(written)].sort());
+    // a retired warning keeps its text for the runs logged before (and the engine must not write it any more)
+    for (const retired of RETIRED_STEP_WARNINGS) expect(written).not.toContain(retired);
+    expect(
+      Object.keys(STEP_WARNINGS)
+        .filter((key) => !RETIRED_STEP_WARNINGS.includes(key))
+        .sort(),
+    ).toEqual([...new Set(written)].sort());
   });
 
   it("the kept-owner warning names the owner the engine stored (HEB-08, owner's wording)", () => {

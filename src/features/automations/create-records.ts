@@ -159,6 +159,7 @@ export function describeCreateQuote(
   action: Record<string, unknown>,
   lookups: { quoteTemplates?: Array<{ id: string; name: string }>; members: Array<{ id: string; name: string }> },
 ): string {
-  const owner = action.owner_id ? `ל${nameIn(lookups.members, action.owner_id)}` : "לאחראי על הרשומה";
-  return `"${nameIn(lookups.quoteTemplates ?? [], action.template_id)}", טיוטה ${owner}`;
+  // AUT-02 (owner, 26 October 2026, (ב)): the record's owner first; the chosen one only as a fallback
+  const fallback = action.owner_id ? ` (גיבוי: ${nameIn(lookups.members, action.owner_id)})` : "";
+  return `"${nameIn(lookups.quoteTemplates ?? [], action.template_id)}", טיוטה לאחראי על הרשומה${fallback}`;
 }

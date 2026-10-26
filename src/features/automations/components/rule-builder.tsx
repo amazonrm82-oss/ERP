@@ -596,9 +596,9 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
           {templates.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {pick(`תבנית הצעת מחיר (פעולה ${n})`, "template_id", templates)}
-              {/* follow-up (owner, 26 October 2026): an optional owner; empty = the record's owner */}
-              <SelectField label="באחריות" value={action.owner_id ?? ""} onChange={(e) => onChange({ owner_id: e.target.value })} controlSize="sm">
-                <option value="">האחראי על הרשומה</option>
+              {/* owner's answer (ב), 26 October 2026: the record's owner first; this one only when the record's owner is not usable */}
+              <SelectField label="אחראי לגיבוי" value={action.owner_id ?? ""} onChange={(e) => onChange({ owner_id: e.target.value })} controlSize="sm">
+                <option value="">בלי גיבוי</option>
                 {lookups.members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -618,7 +618,8 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
           )}
           <p className="text-sm text-ink-soft">
             {entity === "deal" ? "ההצעה נוצרת על העסקה, עם איש הקשר והחברה שלה." : "ההצעה נוצרת על איש הקשר, עם החברה שלו."} היא נשמרת כטיוטה
-            ולא נשלחת ללקוח. אם האחראי לא פעיל או צופה בלבד, ההצעה נוצרת בלי אחראי. מוצר בלי מחיר בתבנית מקבל את המחיר של הלקוח (מחירון
+            ולא נשלחת ללקוח. היא באחריות האחראי על הרשומה; רק אם אין לרשומה אחראי פעיל, היא עוברת לאחראי לגיבוי. אם גם הוא לא פעיל או צופה בלבד,
+            ההצעה נוצרת בלי אחראי. מוצר בלי מחיר בתבנית מקבל את המחיר של הלקוח (מחירון
             או מחיר המוצר); שורה שכבר אי אפשר להציע לא נכנסת. גם לקוח שמסומן &quot;לא למכור עד הסדרת חוב&quot; מקבל את ההצעה. יומן ההרצות מציין כל
             אחד מאלה.
           </p>

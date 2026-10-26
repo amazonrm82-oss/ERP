@@ -136,6 +136,12 @@ export const STEP_ERRORS: Record<string, string> = {
   "the run stopped with an error": "ההרצה נעצרה בשגיאה ודולגה במועד הזה",
 };
 
+/**
+ * Warnings the engine no longer writes, kept in STEP_WARNINGS so runs logged before still read in Hebrew. AUT-02 (owner's
+ * answer (ב), 26 October 2026): a create_quote step's chosen owner is only a fallback for the record's owner.
+ */
+export const RETIRED_STEP_WARNINGS: readonly string[] = ["the chosen owner is not usable, the quote has no owner"];
+
 /** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */
 export const STEP_WARNINGS: Record<string, string> = {
   "no reason is set": "בוצע בלי סיבה: לאוטומציה לא נבחרה סיבה",
@@ -151,9 +157,11 @@ export const STEP_WARNINGS: Record<string, string> = {
   "the relative date is invalid": "השדה לא עודכן: לא ניתן לחשב את התאריך היחסי",
   // AUT-02 (rest): template lines the rules no longer let in (a product no longer offered, a feature not in the plan); {count}
   "some template lines were skipped": "הצעת המחיר נוצרה בלי {count}: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
-  // AUT-02 follow-up (owner, 26 October 2026): the quote's owner and a customer on hold (COL-05)
+  // AUT-02 follow-up (owner, 26 October 2026): the quote's owner and a customer on hold (COL-05). Since the owner's answer (ב)
+  // the engine writes only the second (neither the record's owner nor the step's fallback is usable); the first stays for
+  // the runs logged before it.
   "the chosen owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: המשתמש שנבחר לא פעיל או צופה בלבד",
-  "the record owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: לרשומה אין אחראי פעיל",
+  "the record owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: לרשומה אין אחראי פעיל, ואין גיבוי פעיל שנבחר בצעד",
   "the customer is on hold": "הצעת המחיר נוצרה, אבל הלקוח מסומן \"לא למכור עד הסדרת חוב\"",
   "the customer's company is on hold": "הצעת המחיר נוצרה, אבל החברה של הלקוח מסומנת \"לא למכור עד הסדרת חוב\"",
 };

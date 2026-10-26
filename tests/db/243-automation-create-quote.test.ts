@@ -327,7 +327,6 @@ describe("automations create a quote from a template (AUT-02)", () => {
   describe("a customer on hold and the step's owner (AUT-02 follow-up)", () => {
     const ON_HOLD = "the customer is on hold";
     const COMPANY_ON_HOLD = "the customer's company is on hold";
-    const CHOSEN_UNUSABLE = "the chosen owner is not usable, the quote has no owner";
     const RECORD_UNUSABLE = "the record owner is not usable, the quote has no owner";
     const hold = (values: { contact_id?: string; company_id?: string }) => insert(org, "customer_holds", { reason: "חוב פתוח", ...values });
     const step = (extra: Record<string, unknown> = {}) => [{ type: "create_quote", template_id: emptyTemplate, ...extra }];
@@ -379,20 +378,43 @@ describe("automations create a quote from a template (AUT-02)", () => {
       }
     });
 
-    it("a chosen owner who is an active member owns the quote, also when the record has another owner", async () => {
-      const contact = await insert(org, "contacts", { first_name: "לאחראי נבחר", owner_id: owner.id });
+    // owner's answer (ב) of 26 October 2026 (migration automation_quote_record_owner_first): the record's owner first,
+    // the chosen one only as a fallback
+    it("the record's owner while usable owns the quote, also when a usable owner is chosen in the step", async () => {
+      const contact = await insert(org, "contacts", { first_name: "לאחראי הרשומה", owner_id: owner.id });
       const { steps } = await runNow("contact", step({ owner_id: member.id }), contact);
       expect(steps).toEqual([{ action: "create_quote", status: "ok" }]);
-      expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(member.id);
+      expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(owner.id);
     });
 
-    it("a chosen owner who is a viewer, suspended, of another business or not an id: no owner and a warning", async () => {
+    it("the record's owner not usable: the chosen one owns the quote, with no warning", async () => {
+      const suspended = await addMember(org, owner.id, "member", "aq-rec-suspended");
+      await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, suspended.id]));
+      for (const recordOwner of [viewer.id, suspended.id, null]) {
+        const contact = await insert(org, "contacts", { first_name: "לגיבוי", owner_id: owner.id });
+        await asAdmin((q) => q("update public.contacts set owner_id = $2 where id = $1", [contact, recordOwner]));
+        const { steps } = await runNow("contact", step({ owner_id: member.id }), contact);
+        expect(steps).toEqual([{ action: "create_quote", status: "ok" }]);
+        expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(member.id);
+      }
+    });
+
+    it("a chosen owner who is not usable is not noted while the record's owner is usable", async () => {
+      for (const chosen of [viewer.id, stranger.id, randomUUID(), "not-a-uuid"]) {
+        const contact = await insert(org, "contacts", { first_name: "גיבוי לא שמיש", owner_id: member.id });
+        const { steps } = await runNow("contact", step({ owner_id: chosen }), contact);
+        expect(steps).toEqual([{ action: "create_quote", status: "ok" }]);
+        expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(member.id);
+      }
+    });
+
+    it("neither usable (a viewer, suspended, of another business or not an id): no owner and the record's warning only", async () => {
       const suspended = await addMember(org, owner.id, "member", "aq-suspended");
       await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, suspended.id]));
       for (const chosen of [viewer.id, suspended.id, stranger.id, randomUUID(), "not-a-uuid"]) {
-        const contact = await insert(org, "contacts", { first_name: "לא שמיש", owner_id: owner.id });
+        const contact = await insert(org, "contacts", { first_name: "לא שמיש", owner_id: viewer.id });
         const { steps } = await runNow("contact", step({ owner_id: chosen }), contact);
-        expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: CHOSEN_UNUSABLE, warnings: [CHOSEN_UNUSABLE] }]);
+        expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: RECORD_UNUSABLE, warnings: [RECORD_UNUSABLE] }]);
         expect((await quotesOf("contact_id", contact))[0].owner_id).toBeNull();
       }
     });
@@ -426,7 +448,8 @@ describe("automations create a quote from a template (AUT-02)", () => {
       const after = await one<{ status: string; steps: Step[] }>("select status, steps from public.automation_runs where id = $1", [runId]);
       expect(after.status).toBe("success");
       expect(after.steps).toEqual([
-        { action: "create_quote", status: "ok", warning: CHOSEN_UNUSABLE, warnings: [CHOSEN_UNUSABLE, ON_HOLD] },
+        // the record's owner owns it (the chosen viewer is only a fallback), so the hold is its only warning
+        { action: "create_quote", status: "ok", warning: ON_HOLD, warnings: [ON_HOLD] },
         { action: "add_tag", status: "ok", attempt: 2 },
       ]);
       expect(await quotesOf("contact_id", contact)).toHaveLength(1);

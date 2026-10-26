@@ -28,8 +28,9 @@ const lookups: Lookups = {
 };
 
 // found by its name, so renumbering the migration at merge keeps the test
+// the engine's latest body (owner's answer (ב): the record's owner first, the chosen one as a fallback)
 const ENGINE = readFileSync(
-  `supabase/migrations/${readdirSync("supabase/migrations").find((file) => file.endsWith("_automation_quote_owner_hold.sql"))}`,
+  `supabase/migrations/${readdirSync("supabase/migrations").find((file) => file.endsWith("_automation_quote_record_owner_first.sql"))}`,
   "utf8",
 );
 
@@ -72,15 +73,14 @@ describe("create quote step: owner and holds (AUT-02 follow-up)", () => {
       lookups,
     ).actions;
     expect(text).toEqual([
-      'יצירת הצעת מחיר מתבנית: "שיפוץ מטבח", טיוטה לדנה',
-      'יצירת הצעת מחיר מתבנית: "שיפוץ מטבח", טיוטה ל(נמחק)',
+      'יצירת הצעת מחיר מתבנית: "שיפוץ מטבח", טיוטה לאחראי על הרשומה (גיבוי: דנה)',
+      'יצירת הצעת מחיר מתבנית: "שיפוץ מטבח", טיוטה לאחראי על הרשומה (גיבוי: (נמחק))',
       'יצירת הצעת מחיר מתבנית: "שיפוץ מטבח", טיוטה לאחראי על הרשומה',
     ]);
   });
 
   it("every warning the engine writes has a Hebrew text, and all of a step's warnings are shown", () => {
     const keys = [
-      "the chosen owner is not usable, the quote has no owner",
       "the record owner is not usable, the quote has no owner",
       "the customer is on hold",
       "the customer's company is on hold",
@@ -92,9 +92,9 @@ describe("create quote step: owner and holds (AUT-02 follow-up)", () => {
     }
     expect(ENGINE).toContain("jsonb_build_object('warnings', to_jsonb(v_warnings))");
     expect(
-      stepWarningTexts({ warning: "the chosen owner is not usable, the quote has no owner", warnings: [keys[0], keys[2], keys[4]], warningCount: 2 }),
+      stepWarningTexts({ warning: "the record owner is not usable, the quote has no owner", warnings: [keys[0], keys[1], keys[3]], warningCount: 2 }),
     ).toEqual([
-      "הצעת המחיר נוצרה בלי אחראי: המשתמש שנבחר לא פעיל או צופה בלבד",
+      "הצעת המחיר נוצרה בלי אחראי: לרשומה אין אחראי פעיל, ואין גיבוי פעיל שנבחר בצעד",
       'הצעת המחיר נוצרה, אבל הלקוח מסומן "לא למכור עד הסדרת חוב"',
       "הצעת המחיר נוצרה בלי 2 שורות: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
     ]);
@@ -117,5 +117,22 @@ describe("create quote step: owner and holds (AUT-02 follow-up)", () => {
     for (const action of ["create_task", "notify", "assign_owner", "add_tag", "set_lead_status", "move_deal_stage", "set_field", "create_deal", "create_note", "create_quote"]) {
       expect(ENGINE, action).toContain(`v_type = '${action}'`);
     }
+  });
+});
+
+describe("create quote step: the record's owner first (owner's answer (ב), 26 October 2026)", () => {
+  it("the engine no longer writes the chosen-owner warning, and a run logged with it still reads in Hebrew", () => {
+    expect(ENGINE).not.toContain("'the chosen owner is not usable, the quote has no owner'::text");
+    expect(stepWarningTexts({ warnings: ["the chosen owner is not usable, the quote has no owner"] })).toEqual([
+      "הצעת המחיר נוצרה בלי אחראי: המשתמש שנבחר לא פעיל או צופה בלבד",
+    ]);
+  });
+
+  it("asks for the record's owner before the chosen one", () => {
+    const branch = ENGINE.slice(ENGINE.indexOf("elsif v_type = 'create_quote' then"));
+    const record = branch.indexOf("app.automation_member(v_org, (v_record ->> 'owner_id')::uuid)");
+    const chosen = branch.indexOf("app.automation_member(v_org, (v_action ->> 'owner_id')::uuid)");
+    expect(record).toBeGreaterThan(0);
+    expect(chosen).toBeGreaterThan(record);
   });
 });
