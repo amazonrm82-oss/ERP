@@ -783,7 +783,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   over `app.lead_distribution_pick` (CAP-09/HEB-08 eligibility unchanged; weighted = stride passes in `app.lead_rotation_passes` /
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
-  team on the lead (deliberate). `public.intake_submit` was last redefined in 020975 and `public.intake_form` in
+  team on the lead (deliberate). `public.intake_submit` was last redefined in 021000 (AUT-03; keep its `app.emit_form_submitted` calls) and `public.intake_form` in
   020935 (`app.run_automation_actions` in 020980); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
@@ -1465,6 +1465,21 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   the constraint, `app.automation_event_matches`, `app.process_outbox` (event types), `app.automation_run_facts` and
   `app.automation_event_still_holds` (test 230). All five plus `app.retry_automation_run` were last redefined in 020805 (event
   matching and the outbox in 020800).
+- Automation triggers, the rest (AUT-03, migration 021000; owner 26 October 2026: core, every plan, answers (א) to all eight):
+  `field_changed` watches any column or custom field (`cf:<key>`, through `app.automation_field_value`; a value to wait for only on
+  closed-list fields, free text = "changed"); `app.emit_event` (last redefined in 021000) adds `cf:<key>` to `payload.changed`.
+  `form_submitted` (lead/contact, optional `form_id`, every intake form kind): `public.intake_submit` calls `app.emit_form_submitted`
+  for each record it touched, never a converted lead. `schedule` (`{frequency daily|weekly, time HH:MM, days}`, business zone):
+  pg_cron `crm-schedule-automations` (every 15 minutes) runs `app.run_schedule_automations()`, once per record and scheduled time
+  (`sched:<record>:<time>`, `app.schedule_slot` compares instants so it never steps back), open records only
+  (`app.schedule_record_open`), dropped after 24 hours; a record whose run raises is logged `skipped`. Fairness: businesses take turns
+  by `app.schedule_business_turns` (server only, cascades), rules by their cursor time (`app.schedule_cursor_touch`, also on idle
+  turns; a cursor older than the rule's last change starts again); at most `app.schedule_runs_per_business()` (200) runs per business,
+  `app.schedule_runs_per_pass()` (2,000) and `app.schedule_scan_per_pass()` (20,000 records examined) a pass. `manual`
+  (lead/contact/company/deal): `public.manual_automations` / `public.run_manual_automation` (definer, authenticated only,
+  `app.can_edit_record`, conditions checked); run key `button:<uuid>`: AUT-07 counts and stops it (`manual:` stays an admin's test
+  run), AUT-06 never retries it. `app.automation_event_matches`, `app.process_outbox`, `app.automation_run_facts` and
+  `app.automation_event_still_holds` were last redefined in 021000. The inbound webhook trigger waits for wave 3.
 - Automation run quota (AUT-07, migration 020735; owner 18 October 2026): `app.automation_run_months` (one row per business and
   month in its zone, no grants) counted by `app.execute_automation` only while the plan has `max_automation_runs_per_month` (a plan
   without a limit neither locks nor counts): the month row is taken FOR UPDATE before the run; at 110% the run is logged `skipped`
@@ -1620,7 +1635,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` (last redefined in 020975) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
+  `public.intake_submit` (last redefined in 021000) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
