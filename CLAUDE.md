@@ -1232,7 +1232,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   to it (`*_record_links_clear`, statement triggers); a merge repoints them (`activities_merge_field_links`). Automations never
   set them (`*_cf_zz_automation_guard`, hint `custom_field:automation`; server link writes pass with `app.field_links_server`).
   No defaults; conversion never copies a file and a link only to the same target (`app.carry_custom_fields`, last redefined in
-  020905); never on a public form (`intake_form` / `intake_submit` skip them).
+  020905); a record link or file is never on a public form (`intake_form` / `intake_submit` skip them).
+  Follow-ups (owner 26 October 2026, migration 020925): a link emptied by a purge writes one `system` entry per field on the linking
+  record, "הקישור ל-[סוג] הוסר: הרשומה נמחקה" (no name; metadata kind `record_link_removed`, field_key, target_type; the app redraws
+  the type in the business's terms, `recordLinkRemovedText()`); no author (`activities_zz_record_link_entry_author`); a person never
+  writes, changes or deletes it (`app.activities_record_link_entry_guard`, hint `activity:record_link_entry`);
+  `app.record_links_clear_ids` was last redefined in 020925. An address may be on public forms; lists filter link and file fields
+  by filled/empty (filter kind `presence`); a file field may be required, checked only in the edit card (`missingRequiredFiles`),
+  never on create, board, table cell or bulk. Test 64's re-run list ends with 020905/020910/020925 because re-running 020640/020645
+  resets the `record_files_delete` storage policy (the teardown compares function bodies only, not policies).
 - Custom fields and tags are merged in the database (FXD-04, migration 0042): an update of an existing
   record sends `custom_fields = {"$merge": {key: value | null}}` and trigger `*_cf_merge` (runs before
   `*_custom_fields_check`) merges it into the row; tags change through `change_record_tags(table, org, id,
