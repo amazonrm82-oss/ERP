@@ -1,5 +1,6 @@
 import "server-only";
 
+import { sourceLine } from "@/features/attribution/source";
 import { getCreditNumbers } from "@/features/allocations/queries";
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
@@ -119,6 +120,8 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             company: lead.companyName,
             status: statusName.get(lead.statusId) ?? null,
             source: lead.sourceId ? (sourceName.get(lead.sourceId) ?? null) : null,
+            last_source: sourceLine(lead.lastSourceId ? (sourceName.get(lead.lastSourceId) ?? null) : null, lead.lastCampaign ?? null),
+            last_inquiry: lead.lastSourceAt ? created(lead.lastSourceAt) : null,
             owner: lead.ownerName,
             last_contact: lead.lastContactedAt ? created(lead.lastContactedAt) : null,
             product: lead.requestedProductName ?? null,
@@ -145,6 +148,10 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             type: contact.typeName,
             locale: localeLabel(contact.preferredLocale),
             channel: channelLabel(contact.preferredChannel),
+            source: contact.sourceName ?? null,
+            campaign: contact.campaign ?? null,
+            last_source: sourceLine(contact.lastSourceName ?? null, contact.lastCampaign ?? null),
+            last_inquiry: contact.lastSourceAt ? created(contact.lastSourceAt) : null,
             owner: contact.ownerName,
             created: created(contact.createdAt),
             original_created: contact.originalCreatedOn ? formatDate(contact.originalCreatedOn) : null,

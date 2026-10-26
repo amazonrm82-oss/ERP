@@ -1247,6 +1247,13 @@ export type ContactRow = {
   // CON-09: exact | parent | contacts, how that link was made (server only; cleared with it)
   company_match_kind: string | null;
   source_id: string | null;
+  // SEG-02: the first source's campaign and UTM (from conversion or the first automatic inquiry) and the last source; server only
+  campaign: string | null;
+  utm: Json | null;
+  last_source_id: string | null;
+  last_campaign: string | null;
+  last_utm: Json | null;
+  last_source_at: string | null;
   address_line: string | null;
   city: string | null;
   birth_date: string | null;
@@ -1450,6 +1457,12 @@ export type LeadRow = {
   preferred_channel_source: string | null;
   // CAP-08: null or ContactLocale (check constraint), copied to the contact on conversion when empty
   preferred_locale: string | null;
+  // SEG-02: the latest automatic inquiry (form, card, widget, booking page); server only. source_id/campaign/utm are the
+  // first source, locked once set (DQL-04, owners/admins change it)
+  last_source_id: string | null;
+  last_campaign: string | null;
+  last_utm: Json | null;
+  last_source_at: string | null;
 };
 
 export type LeadInsert = {
@@ -3115,6 +3128,8 @@ export type Database = {
       report_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // RPT-01: the won deals' lines by product and billing
       report_revenue_by_product: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // SEG-02: revenue of won deals by first source and campaign
+      report_revenue_by_source: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // DLI-06
       report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // BAL-01: the customer's ledger (invoker; {"allowed": false} without the keys or membership)

@@ -18,7 +18,9 @@ import { CustomFieldInputs } from "@/features/custom-fields/components/custom-fi
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { RecordType } from "@/features/record-type-options/schema";
 import type { FormState } from "@/lib/action-result";
+import { Detail, DetailList } from "@/components/detail-list";
 import { paths } from "@/lib/paths";
+import type { AttributionRow } from "@/features/intake/attribution";
 
 import { updateContactAction } from "../actions";
 import { channelTypeLabel, draftsFrom, type ChannelKind } from "../channels";
@@ -39,6 +41,9 @@ export type ContactDetailsView = ContactValues & {
   preferred_channel_source?: string | null;
   // formatted on the server so server and browser output cannot differ
   createdAtText: string;
+  // SEG-02: the first source's campaign and UTM, and the latest automatic inquiry (source, campaign, UTM, time)
+  firstSource?: AttributionRow[];
+  lastSource?: AttributionRow[];
   // active custom fields and the values stored on the record
   custom: { definitions: FieldDefinition[]; values: CustomValues; builtins?: Record<string, string | null> };
 };
@@ -112,8 +117,26 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
             created_at: { value: contact.createdAtText },
           }}
         />
+        <SourceSection id="contact-first-source-title" title="פרטי המקור הראשון" rows={contact.firstSource} />
+        <SourceSection id="contact-last-source-title" title="פנייה אחרונה" rows={contact.lastSource} />
       </CardBody>
     </Card>
+  );
+}
+
+function SourceSection({ id, title, rows }: { id: string; title: string; rows?: AttributionRow[] }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <section aria-labelledby={id} className="mt-4 border-t border-line pt-4">
+      <h3 id={id} className="mb-3 text-sm text-ink-soft">
+        {title}
+      </h3>
+      <DetailList>
+        {rows.map((row) => (
+          <Detail key={row.label} label={row.label} value={row.value} ltr={row.ltr} />
+        ))}
+      </DetailList>
+    </section>
   );
 }
 

@@ -164,6 +164,8 @@ export const STEP_WARNINGS: Record<string, string> = {
   "the record owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: לרשומה אין אחראי פעיל, ואין גיבוי פעיל שנבחר בצעד",
   "the customer is on hold": "הצעת המחיר נוצרה, אבל הלקוח מסומן \"לא למכור עד הסדרת חוב\"",
   "the customer's company is on hold": "הצעת המחיר נוצרה, אבל החברה של הלקוח מסומנת \"לא למכור עד הסדרת חוב\"",
+  // SEG-02 / DQL-04 (owner, 26 October 2026): an automation fills only an empty first source of a lead or contact
+  "the first source is already set": "מקור ראשון כבר קיים",
 };
 
 /** "שורה אחת" / "3 שורות" / "חלק מהשורות" (no count). */

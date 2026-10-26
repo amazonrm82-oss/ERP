@@ -1,0 +1,40 @@
+{
+  "totals": {
+    "deals": 2,
+    "amount": 140000,
+    "from_deal": 0,
+    "from_lead": 1,
+    "from_contact": 1,
+    "without_source": 1
+  },
+  "by_source": [
+    {
+      "deals": 1,
+      "amount": 100000,
+      "source_id": "00000000-0000-4000-8000-000000000001",
+      "source_name": "WhatsApp"
+    },
+    {
+      "deals": 1,
+      "amount": 40000,
+      "source_id": null,
+      "source_name": null
+    }
+  ],
+  "by_campaign": [
+    {
+      "deals": 1,
+      "amount": 100000,
+      "campaign": "חורף",
+      "source_id": "00000000-0000-4000-8000-000000000001",
+      "source_name": "WhatsApp"
+    },
+    {
+      "deals": 1,
+      "amount": 40000,
+      "campaign": null,
+      "source_id": null,
+      "source_name": null
+    }
+  ]
+}

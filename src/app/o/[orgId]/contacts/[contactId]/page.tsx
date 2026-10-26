@@ -51,6 +51,7 @@ import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
 import { formatDate, formatDateTime, zoneDate } from "@/lib/format";
+import { sourceRows } from "@/features/attribution/source";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
@@ -220,6 +221,11 @@ export default async function ContactPage({ params, searchParams }: Props) {
               ...contact,
               // GAP-12: an imported record shows its original creation day first
               createdAtText: createdLineText(formatDateTime(contact.created_at), contact.original_created_on ? formatDate(contact.original_created_on) : null),
+              // SEG-02: the source itself is a card field; its campaign and UTM, then the latest automatic inquiry
+              firstSource: sourceRows({ name: null, campaign: contact.campaign, utm: contact.utm }),
+              lastSource: contact.last_source_at
+                ? sourceRows({ name: contact.lastSourceName, campaign: contact.last_campaign, utm: contact.last_utm, atText: formatDateTime(contact.last_source_at) })
+                : [],
               birthDateText: contact.birth_date ? formatDate(contact.birth_date) : null,
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields), builtins: { "builtin:type": contact.type_id } },
             }}

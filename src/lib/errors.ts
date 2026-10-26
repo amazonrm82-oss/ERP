@@ -237,6 +237,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "deal:snoozed_until": "אפשר לדחות עסקה ליום שאחרי היום, עד שנה קדימה.",
   // DEAL-11: the deal a follow-up continues is set once, to a live deal the user reads
   "deal:previous_deal": "העסקה הקודמת כבר לא זמינה. רעננו את הדף ונסו שוב.",
+  // DQL-04: the first source of a lead (source, campaign, a UTM value) once set
+  "lead:first_source_locked": "המקור הראשון של הליד נעול. רק בעלים או מנהל מערכת יכולים לשנות אותו.",
+  "contact:first_source_locked": "המקור הראשון של איש הקשר נעול. רק בעלים או מנהל מערכת יכולים לשנות אותו.",
   // DEAL-07: the first-year value would pass the largest amount the system keeps
   "deal:amount_too_big": "שווי השנה הראשונה גדול מדי. הזינו את השווי בעצמכם.",
   // LEAD-04: a person picks only an offerable product (active, not archived)

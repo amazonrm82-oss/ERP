@@ -195,8 +195,15 @@ describe("automations update a field (AUT-01)", () => {
       expect((await run(entity, [set("source_id", source)], id)).steps[0].status, entity).toBe("ok");
       expect(await asAdmin((q) => count(q, `select 1 from public.${table} where id = $1 and source_id = $2`, [id, source]))).toBe(1);
       expect((await run(entity, [set("source_id", hiddenSource)], id)).steps[0].error, entity).toBe("the source no longer exists");
-      expect((await run(entity, [set("source_id", null)], id)).steps[0].status, entity).toBe("ok");
-      expect(await asAdmin((q) => count(q, `select 1 from public.${table} where id = $1 and source_id is null`, [id]))).toBe(1);
+      const cleared = (await run(entity, [set("source_id", null)], id)).steps[0];
+      expect(cleared.status, entity).toBe("ok");
+      if (entity === "deal") {
+        expect(await asAdmin((q) => count(q, `select 1 from public.${table} where id = $1 and source_id is null`, [id]))).toBe(1);
+      } else {
+        // SEG-02 / DQL-04 (owner, 26 October 2026): a lead's or contact's first source, once set, is not replaced by an automation
+        expect((cleared as { warning?: string }).warning, entity).toBe("the first source is already set");
+        expect(await asAdmin((q) => count(q, `select 1 from public.${table} where id = $1 and source_id = $2`, [id, source]))).toBe(1);
+      }
     }
     // another business's source
     const foreignSource = await asUser(stranger.id, async (q) =>

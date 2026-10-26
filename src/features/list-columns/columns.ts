@@ -19,6 +19,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "company", label: "חברה" },
       { key: "status", label: "סטטוס" },
       { key: "source", label: "מקור" },
+      // SEG-02: the latest automatic inquiry (form, card, widget, booking page)
+      { key: "last_source", label: "מקור אחרון" },
+      { key: "last_inquiry", label: "פנייה אחרונה" },
       { key: "owner", label: "אחראי" },
       // LEAD-02: set from the timeline
       { key: "last_contact", label: "מגע אחרון" },
@@ -45,6 +48,11 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       // CON-10
       { key: "locale", label: "שפה מועדפת" },
       { key: "channel", label: "ערוץ מועדף" },
+      // SEG-02: the first source with its campaign, and the latest automatic inquiry's source
+      { key: "source", label: "מקור" },
+      { key: "campaign", label: "קמפיין" },
+      { key: "last_source", label: "מקור אחרון" },
+      { key: "last_inquiry", label: "פנייה אחרונה" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
       // GAP-12: the creation date in the system the record was imported from

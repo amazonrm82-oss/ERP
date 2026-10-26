@@ -7,6 +7,7 @@ import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
 import type { InlineEditing } from "@/features/inline-edit/server";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
+import { SourceCell } from "@/features/attribution/components/source-cell";
 import type { TagOption } from "@/features/tags/queries";
 import { PhoneCell } from "@/features/whatsapp/components/phone-cell";
 import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
@@ -147,6 +148,15 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
             }
             case "source":
               return lead.sourceId ? sourceById.get(lead.sourceId) : null;
+            // SEG-02: the latest automatic inquiry
+            case "last_source":
+              return <SourceCell name={lead.lastSourceId ? (sourceById.get(lead.lastSourceId) ?? null) : null} campaign={lead.lastCampaign ?? null} />;
+            case "last_inquiry":
+              return lead.lastSourceAt ? (
+                <time dateTime={lead.lastSourceAt} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(lead.lastSourceAt)}
+                </time>
+              ) : null;
             case "product":
               return lead.requestedProductName ?? null;
             case "owner":

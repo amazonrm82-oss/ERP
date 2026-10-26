@@ -18,6 +18,7 @@ import { LayoutDetails } from "@/features/card-layout/components/layout-details"
 import type { CardLayoutGroup } from "@/features/card-layout/layout";
 import { CustomFieldInputs } from "@/features/custom-fields/components/custom-field-inputs";
 import type { AttributionRow } from "@/features/intake/attribution";
+import type { FirstSourceLock } from "@/features/attribution/source";
 import type { CustomValues, FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { formatMoney } from "@/lib/format";
@@ -63,6 +64,10 @@ export type LeadDetailsView = {
   preferredChannelSource?: string | null;
   // CAP-08: the stored language code
   preferredLocale?: string | null;
+  // SEG-02: the latest automatic inquiry's source, campaign, UTM and time; empty when none arrived
+  lastSource?: AttributionRow[];
+  // DQL-04: the set parts of the first source this user may not change (null: owner or admin, nothing locked)
+  firstSourceLock?: FirstSourceLock | null;
 };
 
 // layout: the business's card layout (FLD-08); null or missing = the default layout
@@ -146,6 +151,18 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout 
             </DetailList>
           </section>
         ) : null}
+        {lead.lastSource && lead.lastSource.length > 0 ? (
+          <section aria-labelledby="lead-last-source-title" className="mt-4 border-t border-line pt-4">
+            <h3 id="lead-last-source-title" className="mb-3 text-sm text-ink-soft">
+              פנייה אחרונה
+            </h3>
+            <DetailList>
+              {lead.lastSource.map((row) => (
+                <Detail key={row.label} label={row.label} value={row.value} ltr={row.ltr} />
+              ))}
+            </DetailList>
+          </section>
+        ) : null}
       </CardBody>
     </Card>
   );
@@ -162,6 +179,9 @@ function RequestedProductValue({ orgId, product }: { orgId: string; product: Req
   );
 }
 
+// DQL-04: under a locked part of the first source
+export const FIRST_SOURCE_LOCKED_HINT = "המקור הראשון נעול. רק בעלים או מנהל מערכת יכולים לשנות אותו.";
+
 type EditProps = { orgId: string; lead: LeadDetailsView; sources: LeadSourceOption[]; onDone: () => void; terms: OrgTerms };
 
 function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
@@ -175,7 +195,10 @@ function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const errors = failure?.fieldErrors ?? {};
-  const sourceValue = values?.source_id ?? lead.sourceId ?? "";
+  const lock = lead.firstSourceLock ?? null;
+  // DQL-04: a set source stays as it is (sent unchanged in a hidden input; the database refuses a change anyway)
+  const sourceLocked = Boolean(lock?.source);
+  const sourceValue = sourceLocked ? (lead.sourceId ?? "") : (values?.source_id ?? lead.sourceId ?? "");
 
   return (
     <Card aria-labelledby="lead-details-title">
@@ -222,7 +245,16 @@ function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
             defaultValue={values?.company_name ?? lead.companyName ?? ""}
             error={errors.company_name}
           />
-          <SelectField key={`source-${sourceValue}`} label="מקור" name="source_id" defaultValue={sourceValue} error={errors.source_id}>
+          {sourceLocked ? <input type="hidden" name="source_id" value={sourceValue} /> : null}
+          <SelectField
+            key={`source-${sourceValue}`}
+            label="מקור"
+            name={sourceLocked ? undefined : "source_id"}
+            defaultValue={sourceValue}
+            disabled={sourceLocked}
+            hint={sourceLocked ? FIRST_SOURCE_LOCKED_HINT : undefined}
+            error={errors.source_id}
+          >
             <option value="">ללא מקור</option>
             {sources.filter((source) => source.isActive || source.id === lead.sourceId).map((source) => (
               <option key={source.id} value={source.id}>
@@ -255,6 +287,7 @@ function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
             }}
             errors={errors}
             readOnlyNote
+            locked={lock ? { campaign: lock.campaign, utm: lock.utm } : null}
           />
           <CustomFieldInputs definitions={lead.custom.definitions} stored={lead.custom.values} submitted={values} errors={errors} objectType="lead" record={{ object: "lead", id: lead.id }} builtins={lead.custom.builtins} />
           <div className="flex flex-wrap gap-2">

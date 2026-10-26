@@ -215,6 +215,7 @@ describe("report result shapes (FXC-12)", () => {
       report_stuck_deals: ["public.report_stuck_deals($1)", [org]],
       report_revenue: ["public.report_revenue($1, $2, $3)", range],
       report_revenue_by_product: ["public.report_revenue_by_product($1, $2, $3)", range],
+      report_revenue_by_source: ["public.report_revenue_by_source($1, $2, $3)", range],
       report_revenue_by_category: ["public.report_revenue_by_category($1, $2, $3)", range],
       report_gross_profit: ["public.report_gross_profit($1, $2, $3)", range],
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],

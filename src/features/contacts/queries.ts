@@ -36,7 +36,28 @@ export type ContactListItem = {
   // GAP-12: the creation date in the system it was imported from
   originalCreatedOn: string | null;
   customFields: Json;
+  // SEG-02: the first source (and its campaign) and the latest automatic inquiry's source (listContacts only)
+  sourceName?: string | null;
+  campaign?: string | null;
+  lastSourceName?: string | null;
+  lastCampaign?: string | null;
+  lastSourceAt?: string | null;
 };
+
+/** Names of lead sources by id, hidden ones included (a record keeps showing its source). */
+async function getSourceNames(orgId: string, sourceIds: Array<string | null>): Promise<Map<string, string>> {
+  const ids = [...new Set(sourceIds.filter((id): id is string => Boolean(id)))];
+  const names = new Map<string, string>();
+  if (ids.length === 0) {
+    return names;
+  }
+  const supabase = await createClient();
+  const data = must(await supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).in("id", ids), "lead_sources");
+  for (const source of data ?? []) {
+    names.set(source.id, source.name);
+  }
+  return names;
+}
 
 /** Names of live companies by id (for list rows and cards). */
 async function getCompanyNames(orgId: string, companyIds: Array<string | null>): Promise<Map<string, string>> {
@@ -90,7 +111,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, original_created_on, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, original_created_on, custom_fields, source_id, campaign, last_source_id, last_campaign, last_source_at")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -120,13 +141,14 @@ export async function listContacts(
   }
 
   const rows = data.slice(0, size);
-  const [owners, companies, types] = await Promise.all([
+  const [owners, companies, types, sources] = await Promise.all([
     getUserNames(rows.map((row) => row.owner_id)),
     getCompanyNames(
       orgId,
       rows.map((row) => row.company_id),
     ),
     recordTypeNames(orgId, "contact"),
+    getSourceNames(orgId, rows.flatMap((row) => [row.source_id, row.last_source_id])),
   ]);
 
   return {
@@ -150,6 +172,11 @@ export async function listContacts(
       createdAt: row.created_at,
       originalCreatedOn: row.original_created_on,
       customFields: row.custom_fields,
+      sourceName: row.source_id ? (sources.get(row.source_id) ?? null) : null,
+      campaign: row.campaign,
+      lastSourceName: row.last_source_id ? (sources.get(row.last_source_id) ?? null) : null,
+      lastCampaign: row.last_campaign,
+      lastSourceAt: row.last_source_at,
     })),
   };
 }
@@ -159,7 +186,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, preferred_locale, preferred_channel, preferred_channel_source, created_at, original_created_on, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, preferred_locale, preferred_channel, preferred_channel_source, created_at, original_created_on, custom_fields, tag_ids, campaign, utm, last_source_id, last_campaign, last_utm, last_source_at")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)
@@ -171,7 +198,7 @@ export async function getContact(orgId: string, contactId: string) {
     return null;
   }
 
-  const [owners, companies, types, source, channels] = await Promise.all([
+  const [owners, companies, types, source, channels, lastSources] = await Promise.all([
     getUserNames([data.owner_id]),
     getCompanyNames(orgId, [data.company_id]),
     recordTypeNames(orgId, "contact"),
@@ -179,6 +206,7 @@ export async function getContact(orgId: string, contactId: string) {
       ? supabase.from("lead_sources").select("name").eq("organization_id", orgId).eq("id", data.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
     listContactChannels(orgId, contactId),
+    getSourceNames(orgId, [data.last_source_id]),
   ]);
 
   return {
@@ -187,6 +215,8 @@ export async function getContact(orgId: string, contactId: string) {
     ownerName: data.owner_id ? (owners.get(data.owner_id) ?? null) : null,
     companyName: data.company_id ? (companies.get(data.company_id) ?? null) : null,
     sourceName: source.data?.name ?? null,
+    // SEG-02: the latest automatic inquiry's source
+    lastSourceName: data.last_source_id ? (lastSources.get(data.last_source_id) ?? null) : null,
     typeName: data.type_id ? (types.get(data.type_id) ?? null) : null,
   };
 }

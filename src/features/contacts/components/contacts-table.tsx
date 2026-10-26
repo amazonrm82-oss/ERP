@@ -6,6 +6,7 @@ import { InlineEdit } from "@/features/inline-edit/components/inline-edit";
 import type { InlineEditing } from "@/features/inline-edit/server";
 import type { CatalogColumn, ColumnChoice } from "@/features/list-columns/columns";
 import { ListTable } from "@/features/list-columns/components/list-table";
+import { SourceCell } from "@/features/attribution/components/source-cell";
 import type { TagOption } from "@/features/tags/queries";
 import { PhoneCell } from "@/features/whatsapp/components/phone-cell";
 import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
@@ -123,6 +124,19 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
               return localeLabel(contact.preferredLocale);
             case "channel":
               return channelLabel(contact.preferredChannel);
+            // SEG-02: the first source, its campaign, and the latest automatic inquiry
+            case "source":
+              return contact.sourceName ?? null;
+            case "campaign":
+              return contact.campaign ? <bdi>{contact.campaign}</bdi> : null;
+            case "last_source":
+              return <SourceCell name={contact.lastSourceName ?? null} campaign={contact.lastCampaign ?? null} />;
+            case "last_inquiry":
+              return contact.lastSourceAt ? (
+                <time dateTime={contact.lastSourceAt} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(contact.lastSourceAt)}
+                </time>
+              ) : null;
             case "owner":
               return (
                 <InlineEdit

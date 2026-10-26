@@ -313,6 +313,13 @@ export const REPORT_SCHEMAS = {
       elapsed: z.number().min(0).max(1),
     }),
   ),
+  // SEG-02: the deals won in the period by first source and campaign (the converted lead's, else the contact's, else the
+  // deal's own source); `from_*` say through which record each deal was attributed
+  report_revenue_by_source: z.object({
+    totals: z.object({ deals: count, amount, from_lead: count, from_contact: count, from_deal: count, without_source: count }),
+    by_source: z.array(z.object({ source_id: id, source_name: text, deals: count, amount })),
+    by_campaign: z.array(z.object({ source_id: id, source_name: text, campaign: text, deals: count, amount })),
+  }),
   // CON-06: referrals made in the period, by the contact who referred
   report_referrals: z.object({
     totals: z.object({ referrals: count, referrers: count, customers: count, won_amount: amount }),

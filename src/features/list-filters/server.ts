@@ -98,6 +98,10 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       text("campaign", "קמפיין", "campaign"),
       { key: "status", label: "סטטוס", kind: "select", column: "status_id", options: lookups.statuses ?? [] },
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
+      // SEG-02: the latest automatic inquiry
+      { key: "last_source", label: "מקור אחרון", kind: "select", column: "last_source_id", options: lookups.sources ?? [] },
+      text("last_campaign", "קמפיין אחרון", "last_campaign"),
+      { key: "last_inquiry", label: "פנייה אחרונה", kind: "date", column: "last_source_at" },
       owner,
       tag,
       // LEAD-05: the score the business's rules give
@@ -116,6 +120,11 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       // CON-05: the primary company; "ריק" = contacts without a primary company
       { key: "primary_company", label: "חברה ראשית", kind: "select", column: "company_id", options: lookups.companies ?? [] },
       { key: "source", label: "מקור", kind: "select", column: "source_id", options: lookups.sources ?? [] },
+      // SEG-02: the first source's campaign and the latest automatic inquiry
+      text("campaign", "קמפיין", "campaign"),
+      { key: "last_source", label: "מקור אחרון", kind: "select", column: "last_source_id", options: lookups.sources ?? [] },
+      text("last_campaign", "קמפיין אחרון", "last_campaign"),
+      { key: "last_inquiry", label: "פנייה אחרונה", kind: "date", column: "last_source_at" },
       type,
       // CON-10: stored codes, picked from the closed lists
       { key: "locale", label: "שפה מועדפת", kind: "select", column: "preferred_locale", plain: true, options: [...LOCALE_OPTIONS] },

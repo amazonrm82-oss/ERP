@@ -30,6 +30,7 @@ import { asCustomValues } from "@/features/custom-fields/types";
 import { trashLeadAction } from "@/features/leads/actions";
 import { ConvertLeadPanel } from "@/features/leads/components/convert-lead-panel";
 import { attributionRows } from "@/features/intake/attribution";
+import { lockedFirstSource, mayChangeFirstSource, sourceRows } from "@/features/attribution/source";
 import { getCardLayout } from "@/features/card-layout/queries";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
@@ -266,6 +267,16 @@ export default async function LeadPage({ params, searchParams }: Props) {
               preferredChannel: lead.preferred_channel,
               preferredChannelSource: lead.preferred_channel_source,
               preferredLocale: lead.preferred_locale,
+              // SEG-02 / DQL-04
+              lastSource: lead.last_source_at
+                ? sourceRows({
+                    name: lead.last_source_id ? (lookups.sources.find((source) => source.id === lead.last_source_id)?.name ?? null) : null,
+                    campaign: lead.last_campaign,
+                    utm: lead.last_utm,
+                    atText: formatDateTime(lead.last_source_at),
+                  })
+                : [],
+              firstSourceLock: mayChangeFirstSource(context.role) ? null : lockedFirstSource({ sourceId: lead.source_id, campaign: lead.campaign, utm: lead.utm }),
             }}
             terms={terms}
           />

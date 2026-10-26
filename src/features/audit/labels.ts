@@ -178,7 +178,9 @@ export const LOGIN_ACTION_LABELS: Record<string, string> = {
 // fields that are noise in a change list
 export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "created_by", "custom_fields", "tag_ids", "import_job_id",
   // DEAL-03: the reason's name is logged as lost_reason in the same change
-  "lost_reason_id"]);
+  "lost_reason_id",
+  // SEG-02: the latest inquiry's UTM and time are technical; its source and campaign are listed (FIELD_LABELS)
+  "last_utm", "last_source_at"]);
 
 export const FIELD_LABELS: Record<string, string> = {
   // QUO-06 follow-up (pdf_remake)
@@ -233,6 +235,9 @@ export const FIELD_LABELS: Record<string, string> = {
   job_title: "תפקיד",
   status_id: "סטטוס",
   source_id: "מקור",
+  // SEG-02: the latest automatic inquiry (form, card, widget, booking page)
+  last_source_id: "מקור אחרון",
+  last_campaign: "קמפיין אחרון",
   owner_id: "אחראי",
   team_id: "צוות",
   stage_id: "שלב",

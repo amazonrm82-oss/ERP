@@ -815,6 +815,54 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       };
     }
 
+    // SEG-02: the deals won in the period by first source and campaign (owner, 18 October 2026: by first source)
+    case "source_revenue": {
+      const data = obj(await rpc("report_revenue_by_source", { ...range, p_pipeline: pipelineId, p_owner: ownerId }));
+      const totals = obj(data.totals as Json);
+      const bySource = list(data.by_source as Json);
+      const byCampaign = list(data.by_campaign as Json);
+      const sourceName = (r: Obj) => (str(r.source_id) ? (str(r.source_name) ?? "מקור") : "ללא מקור");
+      const throughDeal = num(totals.from_deal);
+      return {
+        kpis: [
+          { label: "הכנסה", value: formatMoney(num(totals.amount)), hint: `${formatNumber(num(totals.deals))} ${D.plural} שנסגרו` },
+          { label: "מקורות", value: formatNumber(bySource.filter((r) => str(r.source_id)).length) },
+          { label: `${D.plural} בלי מקור`, value: formatNumber(num(totals.without_source)) },
+        ],
+        sections: [
+          {
+            title: "לפי מקור ראשון",
+            columns: [
+              { key: "source", label: "מקור", kind: "text" },
+              { key: "deals", label: D.plural, kind: "number" },
+              { key: "amount", label: "הכנסה", kind: "money" },
+            ],
+            rows: bySource.map((r): ReportRow => ({ source: sourceName(r), deals: num(r.deals), amount: num(r.amount) })),
+            bar: "amount",
+            empty: "לא נסגרו עסקאות בתקופה הזו.",
+            note: [
+              `${D.singular} ${byGender(D, "משויך", "משויכת")} למקור הראשון של ה${L.singular} שממנו ${byGender(D, "נוצר", "נוצרה")}; אם אין כזה, למקור הראשון של ${terms.contact.theSingular}; ואם גם אין, למקור שנרשם ב${D.singular} ${byGender(D, "עצמו", "עצמה")}.`,
+              throughDeal ? `${formatNumber(throughDeal)} ${byGender(D, "מהם", "מהן")} שויכו לפי המקור שב${D.singular}.` : null,
+              "המקור האחרון מוצג ברשימות הלידים ואנשי הקשר, ואפשר לסנן לפיו.",
+            ]
+              .filter(Boolean)
+              .join(" "),
+          },
+          {
+            title: "לפי מקור וקמפיין",
+            columns: [
+              { key: "source", label: "מקור", kind: "text" },
+              { key: "campaign", label: "קמפיין", kind: "text" },
+              { key: "deals", label: D.plural, kind: "number" },
+              { key: "amount", label: "הכנסה", kind: "money" },
+            ],
+            rows: byCampaign.map((r): ReportRow => ({ source: sourceName(r), campaign: str(r.campaign) ?? "ללא קמפיין", deals: num(r.deals), amount: num(r.amount) })),
+            empty: "לא נסגרו עסקאות בתקופה הזו.",
+          },
+        ],
+      };
+    }
+
     // RPT-01: the lines of the deals won in the period, by product and billing (stored line totals)
     case "products": {
       const data = obj(await rpc("report_revenue_by_product", { ...range, p_pipeline: pipelineId, p_owner: ownerId }));

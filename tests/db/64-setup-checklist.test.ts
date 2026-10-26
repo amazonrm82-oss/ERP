@@ -595,6 +595,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // GAP-12 redefines app.import_record_worked() of _import_consent_undo.sql and app.automation_run_facts() /
       // app.automation_event_still_holds() of _automation_more_triggers.sql last (an import's notes are neither work nor activity)
       "_import_history.sql",
+      // SEG-02 redefines public.log_export() of _report_quotes.sql last (the source_revenue report key)
+      "_source_attribution.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

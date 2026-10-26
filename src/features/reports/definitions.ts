@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -30,6 +30,13 @@ export const REPORTS: ReportDefinition[] = [
   { key: "cycle", title: "אורך מחזור מכירה", description: "ימים מליד לסגירה, וימים בכל שלב.", filters: ["period", "owner", "pipeline"] },
   { key: "stuck", title: "עסקאות תקועות", description: "עסקאות פתוחות שנמצאות בשלב יותר מדי זמן, או בלי משימה או פגישה הבאה.", filters: ["owner", "pipeline"] },
   { key: "revenue", title: "הכנסות", description: "הכנסה שנסגרה לפי חודש, אחראי ולקוח.", filters: ["period", "owner", "pipeline"] },
+  // SEG-02: revenue by the first source of the deal's lead or contact
+  {
+    key: "source_revenue",
+    title: "הכנסה לפי מקור וקמפיין",
+    description: "הכנסה מעסקאות שנסגרו, לפי המקור הראשון והקמפיין של הליד או איש הקשר שממנו הגיעו.",
+    filters: ["period", "owner", "pipeline"],
+  },
   // RPT-01
   { key: "products", title: "הכנסה לפי מוצר", description: "מה נמכר בעסקאות שנסגרו: כמות, מספר עסקאות וסכום לכל מוצר.", filters: ["period", "owner", "pipeline"] },
   // DLI-06
@@ -83,6 +90,11 @@ export function reportTexts(report: ReportDefinition, terms: OrgTerms = DEFAULT_
       return {
         title: `${deal.plural} ${byGender(deal, "תקועים", "תקועות")}`,
         description: `${open} ${byGender(deal, "שנמצאים", "שנמצאות")} בשלב יותר מדי זמן, או בלי משימה או פגישה הבאה.`,
+      };
+    case "source_revenue":
+      return {
+        title: report.title,
+        description: `הכנסה מ${closed}, לפי המקור הראשון והקמפיין של ה${lead.singular} או ${contact.theSingular} שממנו הגיעו.`,
       };
     case "products":
       return { title: report.title, description: `מה נמכר ב${closed}: כמות, מספר ${deal.plural} וסכום לכל מוצר.` };
