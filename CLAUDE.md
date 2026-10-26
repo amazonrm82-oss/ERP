@@ -925,6 +925,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `public.order_decisions` (shaped like quote_decisions; owners/admins read; not audited); the order's status is NOT changed (staff move it); the
   order's active owner, else owners/admins, get kind `system`. The approval wording is a DRAFT (`ORDER_ACCEPT_WORDING`). `app.audit_erase_core`
   was redefined in 020625 (empties a detached order's decision), then in 020630.
+- Quote PDF (QUO-06, migrations 020955 and 020960 pasted by hand; owner 13 October 2026: made on our server): `src/features/pdf/`
+  (pdfkit 0.20.2 pinned, Heebo fonts as base64 modules, own bidi `bidi.ts`, line layout `text-layout.ts`, pagination with repeated
+  table headers `paginate.ts`, renderer `render.ts`: fontkit gets `features: "latn"` because lines arrive in visual order; the real-PDF
+  unit test fails if that changes). `quotes/pdf.ts` mirrors the QUO-05 document (stored totals only). The PDF is stored once per sent
+  quote as a `public.files` row with `files.quote_id` (composite FK cascade; `files_quote_pdf_shape`: PDF only, never note/version/field;
+  `files_one_subject` counts seven columns; unique `files_quote_pdf_one`) in `record-files`, with the sender's session
+  (`storeQuotePdf`), never the service key. Made only while the quote is sent or viewed (hint `quote_pdf:closed`). Kept: never removed
+  (`files_keep_attached`, `files_delete`, storage `record_files_delete`), except an unconfirmed upload (its uploader, or an owner/admin
+  for a quote PDF) and a privacy erasure: `app.audit_erase_core` (last redefined in 020955) calls `app.quote_pdf_drop` (body in the
+  pasted 020960; a stub until pasted) for the detached quotes it cleans, under the transaction setting `app.quote_pdf_erase` = the org.
+  Quota `max_pdf_per_month` by `app.pdf_take` (definer, `app.pdf_months`, month in the org zone, 30 a minute `rate:pdf`, one 80% notice);
+  a removed waiting row gives its count back (`files_quote_pdf_return`). `public.confirm_file_upload` and `app.reconcile_pending_files`
+  answer a non-PDF quote object `{ok:false, reason:'type'}`. The files policies, `app.files_keep_attached`, `confirm_file_upload` and
+  `reconcile_pending_files` were last redefined in 020955. No customer download from the public link yet (owner's question).
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
