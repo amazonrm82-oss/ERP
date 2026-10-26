@@ -4,6 +4,7 @@
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
 import { CONSENT_TARGETS } from "./consent";
+import { HISTORY_TARGETS } from "./history";
 
 export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
@@ -92,7 +93,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "status", label: "סטטוס (לפי שם)", synonyms: ["סטטוס", "מצב", "status", "lead status"] },
     { key: "source", label: "מקור (לפי שם)", synonyms: ["מקור", "source", "lead source", "ערוץ"] },
     { key: "campaign", label: "קמפיין", synonyms: ["קמפיין", "campaign", "utm_campaign"] },
-    { key: "message", label: "הודעה / הערות", synonyms: ["הודעה", "הערות", "הערה", "message", "notes", "note", "comments", "תיאור"] },
+    // GAP-12: "הערות" go to the timeline (import_note); the lead's own message stays here
+    { key: "message", label: "הודעה מהליד", synonyms: ["הודעה", "message", "תיאור", "פנייה"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
     // RVW-9: kept only when it is a name on the business's list of reasons
     {
@@ -102,6 +104,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     },
     // CNS-05: marketing consent per channel
     ...CONSENT_TARGETS,
+    // GAP-12: history
+    ...HISTORY_TARGETS,
   ],
   contact: [
     { key: "full_name", label: "שם מלא (יפוצל לפרטי ומשפחה)", synonyms: NAME },
@@ -115,6 +119,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
     // CNS-05
     ...CONSENT_TARGETS,
+    // GAP-12
+    ...HISTORY_TARGETS,
   ],
   company: [
     { key: "name", label: "שם החברה", synonyms: [...COMPANY, "שם"] },
@@ -126,6 +132,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "city", label: "עיר", synonyms: ["עיר", "ישוב", "יישוב", "city", "town"] },
     { key: "address_line", label: "כתובת", synonyms: ["כתובת", "רחוב", "address", "street"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
+    // GAP-12
+    ...HISTORY_TARGETS,
   ],
   // PRD-05: the same headers the product export writes, so an exported file imports back
   product: [
@@ -160,6 +168,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "recurring_amount", label: "סכום חוזר (₪)", synonyms: ["סכום חוזר", "סכום חודשי", "סכום שנתי", "recurring amount", "mrr"] },
     { key: "recurring_start_date", label: "תאריך התחלה (עסקה חוזרת)", synonyms: ["תאריך התחלה", "התחלה", "start date", "start"] },
     { key: "renewal_date", label: "תאריך חידוש", synonyms: ["תאריך חידוש", "חידוש", "renewal", "renewal date"] },
+    // GAP-12
+    ...HISTORY_TARGETS,
   ],
   // IMP-03: tasks have no custom fields and no tags
   task: [

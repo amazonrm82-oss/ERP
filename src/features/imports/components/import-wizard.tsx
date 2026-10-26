@@ -44,6 +44,7 @@ import {
   IMPORT_CONSENT_NOTE_MAX,
   mapsConsent,
 } from "../consent";
+import { HISTORY_HINTS, mapsHistory } from "../history";
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
 import { NewFieldForm } from "./new-field-form";
@@ -465,6 +466,14 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
                 onChange={(e) => setConsentNote(e.target.value)}
               />
             </fieldset>
+          ) : null}
+          {mapsHistory(mapping) ? (
+            <div className="space-y-1 rounded-lg border border-line bg-surface p-4 text-sm text-ink-soft sm:p-5">
+              <p className="font-medium text-ink">היסטוריה מהמערכת הקודמת</p>
+              {HISTORY_HINTS.map((hint) => (
+                <p key={hint}>{hint}</p>
+              ))}
+            </div>
           ) : null}
           {required && missingRequired ? <p className="text-sm text-ink-soft">{required.hint}</p> : null}
           {missingDeclaration ? <p className="text-sm text-ink-soft">כדי לייבא הסכמות, בחרו איך התקבלו וכתבו פרטים.</p> : null}

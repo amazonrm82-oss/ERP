@@ -361,7 +361,7 @@ export async function getDeal(orgId: string, dealId: string) {
   const { data, error } = await supabase
     .from("deals")
     .select(
-      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto, amount_quote_id",
+      "id, name, amount_agorot, pipeline_id, stage_id, status, expected_close_date, closed_at, lost_reason, lost_reason_id, competitor, contact_id, company_id, owner_id, created_at, original_created_on, custom_fields, tag_ids, snoozed_until, previous_deal_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date, amount_auto, amount_source, recurring_amount_auto, amount_quote_id",
     )
     .eq("organization_id", orgId)
     .eq("id", dealId)
@@ -421,6 +421,8 @@ export type DealListItem = {
   recurringStartDate: string | null;
   renewalDate: string | null;
   createdAt: string;
+  // GAP-12: the creation date in the system it was imported from
+  originalCreatedOn: string | null;
   customFields: Json;
 };
 
@@ -439,6 +441,8 @@ export const DEAL_SORT_COLUMNS = {
   recurring_start: "recurring_start_date",
   renewal: "renewal_date",
   created: "created_at",
+  // GAP-12: written by an import only
+  original_created: "original_created_on",
 } as const;
 export type DealSortKey = keyof typeof DEAL_SORT_COLUMNS;
 export const DEAL_DEFAULT_SORT: Sort<DealSortKey> = { key: "created", ascending: false };
@@ -463,7 +467,7 @@ export async function listDeals(
 
   let query = supabase
     .from("deals")
-    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_amount_auto, recurring_start_date, renewal_date, created_at, custom_fields")
+    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_amount_auto, recurring_start_date, renewal_date, created_at, original_created_on, custom_fields")
     .eq("organization_id", orgId)
     .eq("pipeline_id", options.pipelineId)
     .is("deleted_at", null);
@@ -520,6 +524,7 @@ export async function listDeals(
       recurringStartDate: row.recurring_start_date,
       renewalDate: row.renewal_date,
       createdAt: row.created_at,
+      originalCreatedOn: row.original_created_on,
       customFields: row.custom_fields,
     })),
   };

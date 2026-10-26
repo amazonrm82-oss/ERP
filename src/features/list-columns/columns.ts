@@ -25,6 +25,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       // LEAD-04: the requested product from the catalog
       { key: "product", label: "מוצר מבוקש" },
       { key: "created", label: "נוצר" },
+      // GAP-12: the creation date in the system the record was imported from
+      { key: "original_created", label: "תאריך יצירה מקורי" },
       // DQL-01: share of the important fields that are filled
       { key: "completeness", label: "שלמות" },
       // LEAD-05: the sum of the business's score rules the lead matches
@@ -45,6 +47,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "channel", label: "ערוץ מועדף" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
+      // GAP-12: the creation date in the system the record was imported from
+      { key: "original_created", label: "תאריך יצירה מקורי" },
       // DQL-01
       { key: "completeness", label: "שלמות" },
       // PAY-03: the customer's credit, only where the business sees money (CREDIT_COLUMN)
@@ -61,6 +65,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "type", label: "סוג" },
       { key: "owner", label: "אחראי" },
       { key: "created", label: "נוצר" },
+      // GAP-12: the creation date in the system the record was imported from
+      { key: "original_created", label: "תאריך יצירה מקורי" },
       // PAY-03
       { key: "credit", label: "יתרת זכות" },
     ],
@@ -82,6 +88,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "recurring_start", label: "תאריך התחלה" },
       { key: "renewal", label: "תאריך חידוש" },
       { key: "created", label: "נוצרה" },
+      // GAP-12: the creation date in the system the record was imported from
+      { key: "original_created", label: "תאריך יצירה מקורי" },
     ],
     defaults: ["amount", "stage", "contact", "owner", "expected_close"],
   },

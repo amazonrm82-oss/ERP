@@ -23,7 +23,8 @@ type StuckRow = {
 };
 
 // DEAL-02 gap: report_stuck_deals now reads the shared rule; re-running 0129 is followed by the file that redefines it
-const RERUN = ["20261006012900_deal_stage_entered.sql", migrationFile("_deal_attention.sql")];
+// GAP-12 redefines app.deal_attention_rows() of _deal_attention.sql last (import notes are not a deal's last activity)
+const RERUN = ["20261006012900_deal_stage_entered.sql", migrationFile("_deal_attention.sql"), migrationFile("_import_history.sql")];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
 // stage: days since it entered the stage > the stage's rot_days (null = 14). Postponed deals are

@@ -592,6 +592,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // CNS-06 answer 4 redefines app.consent_blocklist_guard(), public.consent_blocklist_add() and _find() of
       // _consent_blocklist.sql and app.audit_erase_core() of _quote_pdfs.sql last (the note, emptied by an erasure)
       "_consent_blocklist_note.sql",
+      // GAP-12 redefines app.import_record_worked() of _import_consent_undo.sql and app.automation_run_facts() /
+      // app.automation_event_still_holds() of _automation_more_triggers.sql last (an import's notes are neither work nor activity)
+      "_import_history.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

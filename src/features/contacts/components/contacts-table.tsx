@@ -149,6 +149,12 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
               const value = credit?.get(contact.id);
               return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
             }
+            case "original_created":
+              return contact.originalCreatedOn ? (
+                <time dateTime={contact.originalCreatedOn} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(contact.originalCreatedOn)}
+                </time>
+              ) : null;
             case "created":
               return (
                 <time dateTime={contact.createdAt} className="whitespace-nowrap text-ink-soft">

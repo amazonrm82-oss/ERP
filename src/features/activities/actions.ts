@@ -22,6 +22,7 @@ import type { TaskInsert } from "@/lib/database.types";
 import {
   CALL_OUTCOME_LABEL,
   callLogSchema,
+  IMPORT_NOTE_LOCKED,
   NOTE_LOCKED,
   noteEditSchema,
   noteSchema,
@@ -285,6 +286,34 @@ export async function deleteNoteAction(orgId: string, subject: TimelineSubject, 
     return fail(NOTE_LOCKED);
   }
 
+  revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
+  return ok();
+}
+
+/** GAP-12: removes a note an import wrote. The activities_delete policy lets only owners and admins remove it. */
+export async function deleteImportNoteAction(orgId: string, subject: TimelineSubject, activityId: string): Promise<ActionResult> {
+  const parsedSubject = subjectSchema.safeParse(subject);
+  if (!parsedSubject.success) {
+    return fail(NOT_FOUND);
+  }
+  const context = await actionContext(orgId, parsedSubject.data.id, activityId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("activities")
+    .delete()
+    .eq("organization_id", orgId)
+    .eq("id", activityId)
+    .eq(SUBJECT_COLUMN[parsedSubject.data.kind], parsedSubject.data.id)
+    .eq("type", "import_note")
+    .select("id");
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו למחוק. נסו שוב."));
+  }
+  if (data.length === 0) {
+    return fail(IMPORT_NOTE_LOCKED);
+  }
   revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
   return ok();
 }

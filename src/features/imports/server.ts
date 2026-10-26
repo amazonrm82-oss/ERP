@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -15,6 +17,7 @@ import { israeliIdNumber } from "@/lib/israeli-id";
 import { optionalDate, optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
 import { readAllPagesByIds } from "@/lib/paged-read";
 import { RECORD_TYPES } from "@/lib/record-types";
+import { zoneDate } from "@/lib/format";
 
 import { customCellValue } from "./record-cells";
 import {
@@ -29,6 +32,8 @@ import {
 } from "./consent";
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
+import { importNote, NOTE_FAILED, NOTE_ROW_SKIPPED, ORIGINAL_DATE_ON_UPDATE, originalCreatedOn, type ImportNote } from "./history";
+import { orgTimeZone } from "./link-lookups";
 
 type Client = SupabaseClient<Database>;
 
@@ -65,6 +70,8 @@ type Lookups = {
   // leads: the ids of the "not relevant" statuses and the names of the active reasons (RVW-9)
   disqualified?: Set<string>;
   reasons?: Set<string>;
+  // GAP-12: the business's calendar day, for the history dates of the file
+  today?: string;
 };
 
 /** The reason a file gave is not on the list: the row is imported without it (RVW-9). */
@@ -101,11 +108,12 @@ export function normalizeDate(value: string): string {
 
 async function loadLookups(ctx: ImportContext): Promise<Lookups> {
   const { supabase, orgId } = ctx;
-  const [statuses, sources, reasons, members] = await Promise.all([
+  const [statuses, sources, reasons, members, timeZone] = await Promise.all([
     ctx.entity === "lead" ? supabase.from("lead_statuses").select("id, name, is_default, kind").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
     ctx.entity === "lead" ? supabase.from("lead_sources").select("id, name").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
     ctx.entity === "lead" ? supabase.from("disqualify_reasons").select("name").eq("organization_id", orgId).eq("is_active", true) : Promise.resolve({ data: [], error: null }),
     supabase.from("memberships").select("user_id").eq("organization_id", orgId).eq("status", "active").neq("role", "viewer"),
+    orgTimeZone(supabase, orgId),
   ]);
   const ids = (members.data ?? []).map((m) => m.user_id);
   const { data: profiles } = ids.length ? await supabase.from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
@@ -124,6 +132,7 @@ async function loadLookups(ctx: ImportContext): Promise<Lookups> {
     defaultStatus: statusRows.find((s) => s.is_default)?.id ?? statusRows[0]?.id ?? null,
     sources: new Map(((sources.data ?? []) as Array<{ id: string; name: string }>).map((s) => [key(s.name), s.id])),
     owners,
+    today: zoneDate(new Date(), timeZone),
   };
 }
 
@@ -176,6 +185,8 @@ type Prepared = {
   warning: string | null;
   // CNS-05: the consents the row gives, each for an address the row has
   consents: Array<{ channel: ImportConsentChannel; state: "granted" | "denied" }>;
+  // GAP-12: the row's note for the timeline
+  note: ImportNote | null;
 };
 
 const joinWarnings = (...parts: Array<string | null | undefined>) => parts.filter(Boolean).join(" ") || null;
@@ -298,6 +309,13 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     values.owner_id = owner;
   }
 
+  // GAP-12: the original creation date and the note; a cell that is not a valid day is reported, never guessed
+  const today = lookups.today ?? zoneDate(new Date());
+  const original = originalCreatedOn(raw.original_created_on, today);
+  if (original.date) values.original_created_on = original.date;
+  const noted = importNote(raw.import_note, raw.import_note_date, today);
+  warning = joinWarnings(warning, original.warning, noted.warning);
+
   const mappedFields = ctx.definitions.filter((d) => ctx.mapping.includes(`${CUSTOM_PREFIX}${d.key}`));
   if (mappedFields.length > 0) {
     const { values: customValues, errors } = parseCustomFields(
@@ -338,6 +356,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     pendingTaxId,
     warning,
     consents,
+    note: noted.note,
   };
 }
 
@@ -532,6 +551,8 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   const toInsert: Prepared[] = [];
   // CNS-05: rows written, whose consents go to the register at the end of the chunk
   const consentWork: ConsentWork[] = [];
+  // GAP-12: rows written whose note goes to the timeline at the end of the chunk
+  const noteWork: NoteWork[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
     // a repeat of an earlier row in the same chunk counts as a duplicate too
@@ -546,6 +567,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
       const denied = match && !earlier ? row.consents.filter((c) => c.state === "denied") : [];
       const dropped = row.consents.length - denied.length;
       if (dropped > 0 && ctx.consentDeclared !== false) outcome.warning = joinWarnings(outcome.warning, CONSENT_ROW_SKIPPED) ?? undefined;
+      if (row.note) outcome.warning = joinWarnings(outcome.warning, NOTE_ROW_SKIPPED) ?? undefined;
       if (denied.length > 0 && match && jobId) consentWork.push({ outcome, row, recordId: match.id, consents: denied });
     } else if (match && ctx.mode === "update") {
       const ambiguous = ctx.entity === "company" ? ambiguousTaxId(existing, row, countries) : null;
@@ -575,6 +597,11 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
           outcomes.push({ row: row.row, status: "failed", message: look.reasons?.size ? REASON_NEEDED_TO_DISQUALIFY : REASON_LIST_EMPTY });
           continue;
         }
+      }
+      // GAP-12: the original date is written on new records only (an update has no grant for it)
+      if (row.values.original_created_on !== undefined) {
+        delete row.values.original_created_on;
+        row.warning = joinWarnings(row.warning, ORIGINAL_DATE_ON_UPDATE);
       }
       if (!jobId) {
         outcomes.push(withWarning(row, "updated"));
@@ -608,6 +635,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         const outcome = withWarning(row, "updated");
         outcomes.push(outcome);
         consentWork.push({ outcome, row, recordId: match.id, consents: row.consents });
+        if (row.note) noteWork.push({ outcome, recordId: match.id, note: row.note });
       }
     } else {
       // a new company without a country in the file gets the default, Israel
@@ -623,7 +651,11 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   }
 
   const companies = ctx.entity === "contact" ? await resolveCompanies(ctx, toInsert, jobId) : new Map<string, string>();
+  // GAP-12: every new record gets its id here, so a row's note reaches its own record (every row of one insert sends
+  // the same columns)
+  const newIds = new Map(toInsert.map((row) => [row.row, randomUUID()]));
   const insertRow = (row: Prepared) => ({
+    id: newIds.get(row.row),
     organization_id: ctx.orgId,
     import_job_id: jobId,
     ...(ctx.entity === "lead" && !row.values.status_id ? { status_id: look.defaultStatus } : {}),
@@ -634,6 +666,8 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   const created = (row: Prepared, id: string | undefined) => {
     const outcome = withWarning(row, "created");
     outcomes.push(outcome);
+    const newId = newIds.get(row.row);
+    if (row.note && newId) noteWork.push({ outcome, recordId: newId, note: row.note });
     if (id) consentWork.push({ outcome, row, recordId: id, consents: row.consents });
     // a new record that could not be told apart: its consents are not guessed onto another one
     else if (wantIds && row.consents.length > 0) outcome.warning = joinWarnings(outcome.warning, CONSENTS_FAILED) ?? undefined;
@@ -668,7 +702,32 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     }
   }
   await recordConsents(ctx, jobId, consentWork);
+  await recordNotes(ctx, jobId, noteWork);
   return outcomes.sort((a, b) => a.row - b.row);
+}
+
+type NoteWork = { outcome: RowOutcome; recordId: string; note: ImportNote };
+const NOTE_CALL_MAX = 1000;
+
+/**
+ * GAP-12: the written rows' notes, through public.import_record_notes (the database checks the job and the record and
+ * writes an 'import_note' entry by the importer, which is neither contact nor activity; a note the record already has
+ * on that day, from an earlier run of the file, is answered "exists" and not added again). A note not written leaves its
+ * row imported, with a warning.
+ */
+export async function recordNotes(ctx: { supabase: Client; orgId: string }, jobId: string, work: NoteWork[]): Promise<void> {
+  for (let i = 0; i < work.length; i += NOTE_CALL_MAX) {
+    const slice = work.slice(i, i + NOTE_CALL_MAX);
+    const { data, error } = await ctx.supabase.rpc("import_record_notes", {
+      p_org: ctx.orgId,
+      p_job: jobId,
+      p_items: slice.map((w) => ({ record_id: w.recordId, body: w.note.body, date: w.note.date })),
+    });
+    const results = (data ?? []) as string[];
+    slice.forEach((w, k) => {
+      if (error || (results[k] !== "written" && results[k] !== "exists")) w.outcome.warning = joinWarnings(w.outcome.warning, NOTE_FAILED) ?? undefined;
+    });
+  }
 }
 
 // consents: the ones to send for this record (a skipped duplicate sends its 'denied' ones only)

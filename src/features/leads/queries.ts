@@ -61,6 +61,8 @@ export type LeadListItem = {
   // LEAD-05 (listLeads only)
   score?: number;
   createdAt: string;
+  // GAP-12: the creation date in the system it was imported from
+  originalCreatedOn: string | null;
   customFields: Json;
 };
 
@@ -78,6 +80,8 @@ export const LEAD_SORT_COLUMNS = {
   // LEAD-04: computed field public.sort_requested_product(leads)
   product: "sort_requested_product",
   created: "created_at",
+  // GAP-12: written by an import only
+  original_created: "original_created_on",
   // DQL-01: computed field public.completeness(leads)
   completeness: "completeness",
   // LEAD-05: set by the database from the score rules
@@ -108,7 +112,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   let query = supabase
     .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, score, created_at, custom_fields")
+    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, score, created_at, original_created_on, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -162,6 +166,7 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
       lastContactedAt: row.last_contacted_at,
       score: row.score,
       createdAt: row.created_at,
+      originalCreatedOn: row.original_created_on,
       customFields: row.custom_fields,
     })),
   };
@@ -175,7 +180,7 @@ export async function getLead(orgId: string, leadId: string) {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, requested_product_id, preferred_channel, preferred_channel_source, preferred_locale, message, disqualify_reason, owner_id, last_contacted_at, created_at, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
+      "id, full_name, phone, phone_e164, email, company_name, job_title, status_id, source_id, requested_product_id, preferred_channel, preferred_channel_source, preferred_locale, message, disqualify_reason, owner_id, last_contacted_at, created_at, original_created_on, converted_at, converted_contact_id, converted_deal_id, custom_fields, tag_ids, campaign, utm, budget_agorot, referrer_url, landing_url, gclid, fbclid, ctwa_clid, meta_lead_id",
     )
     .eq("organization_id", orgId)
     .eq("id", leadId)

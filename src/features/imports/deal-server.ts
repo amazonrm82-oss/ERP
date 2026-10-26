@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { parseCustomFields } from "@/features/custom-fields/values";
@@ -11,9 +13,10 @@ import { readAllPages } from "@/lib/paged-read";
 
 import { closedAtForRow, parseDealRow, resolveStage, type PipelineRef, type StageRef } from "./deal-rows";
 import { CUSTOM_PREFIX } from "./fields";
+import { importNote, originalCreatedOn, type ImportNote } from "./history";
 import { companyFound, findCompanies, findPeople, LinkLookupFailed, linkMessage, loadOwners, orgTimeZone, ownerOf, personLookupKey, type Owners } from "./link-lookups";
 import { customCellValue, nameKey, type PersonKey } from "./record-cells";
-import type { RowOutcome } from "./server";
+import { recordNotes, type RowOutcome } from "./server";
 
 // IMP-03: importing deals. Writes with the user's session (RLS decides each row, as for leads), and
 // tags each deal with the import, so undoing it moves exactly those deals to the recycle bin. The
@@ -83,6 +86,9 @@ type Prepared = {
   company: { name: string; domain: string | null } | null;
   tags: string[];
   warning: string | null;
+  // GAP-12: the row's note for the timeline, and the new deal's id (made here, so the note reaches its own deal)
+  history: ImportNote | null;
+  id: string;
 };
 
 function cellsOf(mapping: string[], definitions: FieldDefinition[], cells: string[]): { raw: Record<string, string>; custom: FormData } {
@@ -106,13 +112,23 @@ function prepare(ctx: DealImportContext, look: DealLookups, cells: string[], row
   if (typeof parsed === "string") return parsed;
   const { row: deal } = parsed;
   let warning = parsed.warning;
+  // GAP-12: the original creation date and the note; a cell that is not a valid day is reported, never guessed
+  const original = originalCreatedOn(raw.original_created_on, today);
+  const noted = importNote(raw.import_note, raw.import_note_date, today);
+  for (const part of [original.warning, noted.warning]) if (part) warning = warning ? `${warning} ${part}` : part;
 
   const stage = resolveStage(look.pipelines, look.stages, deal.pipeline, deal.stage);
   if (typeof stage === "string") return stage;
   const closed = closedAtForRow(stage.kind, deal.closedDate, deal.values.expected_close_date, today, now, look.timeZone ?? "Asia/Jerusalem");
   if (closed.warning) warning = warning ? `${warning} ${closed.warning}` : closed.warning;
 
-  const values: Omit<DealInsert, "organization_id"> = { ...deal.values, pipeline_id: stage.pipelineId, stage_id: stage.stageId };
+  // the original date is always sent, so every row of the chunk has the same columns
+  const values: Omit<DealInsert, "organization_id"> = {
+    ...deal.values,
+    pipeline_id: stage.pipelineId,
+    stage_id: stage.stageId,
+    original_created_on: original.date,
+  };
   if (closed.closedAt) values.closed_at = closed.closedAt;
   if (deal.owner) {
     const owner = ownerOf(look.owners, deal.owner);
@@ -136,7 +152,7 @@ function prepare(ctx: DealImportContext, look: DealLookups, cells: string[], row
     if (error) return error;
     values.custom_fields = customValues as Json;
   }
-  return { row, values, contact: deal.contact, company: deal.company, tags: deal.tags, warning };
+  return { row, values, contact: deal.contact, company: deal.company, tags: deal.tags, warning, history: noted.note, id: randomUUID() };
 }
 
 /** Creates the missing tags of the chunk; returns a message per name that failed. */
@@ -249,8 +265,13 @@ export async function processDealChunk(
     toWrite.push({ ...row, note: announce(row, TAG_CREATED) });
   }
 
-  const insertRow = (row: Prepared) => ({ organization_id: ctx.orgId, import_job_id: jobId, ...row.values });
-  const done = (row: Prepared & { note?: string }): RowOutcome => (row.note ? { row: row.row, status: "created", warning: row.note } : { row: row.row, status: "created" });
+  const insertRow = (row: Prepared) => ({ id: row.id, organization_id: ctx.orgId, import_job_id: jobId, ...row.values });
+  const noteWork: Array<{ outcome: RowOutcome; recordId: string; note: ImportNote }> = [];
+  const done = (row: Prepared & { note?: string }): RowOutcome => {
+    const outcome: RowOutcome = row.note ? { row: row.row, status: "created", warning: row.note } : { row: row.row, status: "created" };
+    if (row.history) noteWork.push({ outcome, recordId: row.id, note: row.history });
+    return outcome;
+  };
 
   let stopped: string | null = null;
   if (toWrite.length) {
@@ -273,5 +294,6 @@ export async function processDealChunk(
       }
     }
   }
+  await recordNotes(ctx, jobId, noteWork);
   return { outcomes: outcomes.sort((a, b) => a.row - b.row), stopped };
 }

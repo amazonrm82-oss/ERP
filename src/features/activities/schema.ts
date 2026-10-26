@@ -81,6 +81,14 @@ export function canEditNoteHint(item: { type: string; createdBy: string | null; 
 }
 
 /**
+ * GAP-12: an owner or admin of a writable business may remove a wrong note an import wrote (type 'import_note'), as the
+ * activities_delete policy allows them any entry. Nobody edits it here, and nobody else removes it.
+ */
+export function canRemoveImportNoteHint(item: { type: string }, viewer: Viewer): boolean {
+  return viewer.canWrite && item.type === "import_note" && (viewer.role === "owner" || viewer.role === "admin");
+}
+
+/**
  * REC-01: who sees the pin button, mirroring the activities_update policy: the organization is
  * writable for the user, and the user wrote the entry, is an owner/admin, or is a manager of the
  * record's team (owner's decision, 12 October 2026: pin and unpin only). No time limit: the 24
@@ -121,6 +129,9 @@ export function managesTeamChain(
 // Said when an edit or a delete touched nothing.
 export const NOTE_LOCKED = "לא ניתן לשנות את הרשומה הזו. ייתכן שנמחקה, או שעברו 24 שעות מאז שנכתבה (אחרי זה רק מנהל מערכת יכול לשנות או למחוק אותה).";
 
+// GAP-12: said when removing an import's note touched nothing
+export const IMPORT_NOTE_LOCKED = "לא ניתן למחוק את ההערה הזו. ייתכן שכבר נמחקה. הערה מייבוא מוחקים בעלים ומנהלי מערכת בלבד.";
+
 // GAP-05: only a note can be private (check activities_private_note in the database)
 export const PRIVATE_NOTE_TYPE = "note";
 export const PRIVATE_ONLY_NOTE = "רק הערה יכולה להיות פרטית. שיחות, פגישות והודעות גלויות לכל מי שרואה את הרשומה.";
@@ -151,12 +162,13 @@ export const noteEditSchema = z
 // (`?tl=call`), so a shared link and the back button keep the filter.
 export const TIMELINE_FILTERS = [
   { key: "all", label: "הכול" },
-  { key: "note", label: "הערות", types: ["note"] },
+  // GAP-12: a note from an imported file is a note, not a change
+  { key: "note", label: "הערות", types: ["note", "import_note"] },
   { key: "call", label: "שיחות", types: ["call"] },
   { key: "meeting", label: "פגישות", types: ["meeting"] },
   { key: "message", label: "הודעות", types: ["whatsapp", "email", "sms"] },
   // everything the system wrote: status and stage changes, conversions, repeat inquiries
-  { key: "system", label: "שינויים", excludeTypes: LOGGED_TYPE_VALUES },
+  { key: "system", label: "שינויים", excludeTypes: [...LOGGED_TYPE_VALUES, "import_note"] },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; types?: readonly string[]; excludeTypes?: readonly string[] }>;
 
 export type TimelineFilterKey = (typeof TIMELINE_FILTERS)[number]["key"];

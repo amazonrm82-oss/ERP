@@ -114,6 +114,12 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
               const value = credit?.get(company.id);
               return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
             }
+            case "original_created":
+              return company.originalCreatedOn ? (
+                <time dateTime={company.originalCreatedOn} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(company.originalCreatedOn)}
+                </time>
+              ) : null;
             case "created":
               return (
                 <time dateTime={company.createdAt} className="whitespace-nowrap text-ink-soft">

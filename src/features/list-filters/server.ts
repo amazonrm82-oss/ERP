@@ -78,6 +78,8 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
   const owner: ServerField = { key: "owner", label: "אחראי", kind: "user", column: "owner_id", options: [{ value: "me", label: "אני" }, ...lookups.members] };
   const tag: ServerField = { key: "tag", label: "תגית", kind: "tag", column: "tag_ids", options: lookups.tags };
   const created: ServerField = { key: "created", label: "תאריך יצירה", kind: "date", column: "created_at" };
+  // GAP-12: the creation date in the system the record was imported from (a plain date)
+  const originalCreated: ServerField = { key: "original_created", label: "תאריך יצירה מקורי", kind: "day", column: "original_created_on" };
   const lastContact: ServerField = { key: "last_contact", label: "מגע אחרון", kind: "date", column: "last_contacted_at" };
   // LEAD-02: "no contact for X days"; a record never contacted counts from the day it was created
   const noContact: ServerField = { key: "no_contact", label: "ימים בלי מגע", kind: "idle", column: "last_contacted_at" };
@@ -101,6 +103,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       // LEAD-05: the score the business's rules give
       { key: "score", label: "ציון", kind: "number", column: "score" },
       created,
+      originalCreated,
       lastContact,
       noContact,
     ],
@@ -122,6 +125,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
       ...credit,
       created,
+      originalCreated,
       lastContact,
       noContact,
     ],
@@ -139,6 +143,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       tag,
       ...credit,
       created,
+      originalCreated,
     ],
     deal: [
       text("name", "שם", "name"),
@@ -163,6 +168,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       { key: "recurring_amount", label: "סכום חוזר (חודשי או שנתי, ₪)", kind: "number", column: "recurring_amount_agorot", scale: 100 },
       { key: "renewal", label: "תאריך חידוש", kind: "day", column: "renewal_date" },
       created,
+      originalCreated,
     ],
     // tasks have no tags and no custom fields
     task: [

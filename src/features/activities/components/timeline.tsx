@@ -18,8 +18,8 @@ import { paths } from "@/lib/paths";
 import { recordPage } from "@/lib/record-types";
 
 import { getTimeline, managesRecordTeam } from "../queries";
-import { canEditNoteHint, canPinHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
-import { NoteActions } from "./note-actions";
+import { canEditNoteHint, canPinHint, canRemoveImportNoteHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
+import { ImportNoteRemove, NoteActions } from "./note-actions";
 import { NoteForm } from "./note-form";
 import { NoteText } from "./note-text";
 import { PinButton } from "./pin-button";
@@ -176,6 +176,12 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                         mentions={mentions}
                       />
                     ) : null}
+                  </div>
+                ) : null}
+                {canRemoveImportNoteHint(item, viewer) ? (
+                  // GAP-12: a wrong note from an import; owners and admins only (the activities_delete policy)
+                  <div className="mt-1 -ms-3 flex flex-wrap items-start gap-1">
+                    <ImportNoteRemove orgId={orgId} subject={subject} activityId={item.id} label={item.label} />
                   </div>
                 ) : null}
               </li>

@@ -51,6 +51,8 @@ const TYPE_LABELS: Record<string, string> = {
   inquiry: "פנייה חוזרת",
   // AUT-02: written by an automation step; not contact with the customer
   automation_note: "הערה מאוטומציה",
+  // GAP-12: a note from an imported file, by the importer; not contact with the customer
+  import_note: "הערה מייבוא",
 };
 
 function metaString(metadata: Json, key: string): string | null {

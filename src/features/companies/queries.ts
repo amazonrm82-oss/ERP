@@ -21,6 +21,8 @@ export type CompanyListItem = {
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
+  // GAP-12: the creation date in the system it was imported from
+  originalCreatedOn: string | null;
   customFields: Json;
 };
 
@@ -34,6 +36,8 @@ export const COMPANY_SORT_COLUMNS = {
   type: "sort_type",
   owner: "sort_owner",
   created: "created_at",
+  // GAP-12: written by an import only
+  original_created: "original_created_on",
   // PAY-03: computed field public.credit_balance(companies); offered only with the money keys (offeredSortKeys)
   credit: "credit_balance",
 } as const;
@@ -52,7 +56,7 @@ export async function listCompanies(
 
   let query = supabase
     .from("companies")
-    .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, custom_fields")
+    .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, original_created_on, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   const searchFilter = personSearchFilter(options.search);
@@ -94,6 +98,7 @@ export async function listCompanies(
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
+      originalCreatedOn: row.original_created_on,
       customFields: row.custom_fields,
     })),
   };
@@ -104,7 +109,7 @@ export async function getCompany(orgId: string, companyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("companies")
-    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, custom_fields, tag_ids, parent_company_id, contact_domain_off")
+    .select("id, name, country, tax_id, industry, phone, phone_e164, email, website, city, address_line, type_id, company_type, owner_id, created_at, original_created_on, custom_fields, tag_ids, parent_company_id, contact_domain_off")
     .eq("organization_id", orgId)
     .eq("id", companyId)
     .is("deleted_at", null)

@@ -33,6 +33,8 @@ export type ContactListItem = {
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
+  // GAP-12: the creation date in the system it was imported from
+  originalCreatedOn: string | null;
   customFields: Json;
 };
 
@@ -66,6 +68,8 @@ export const CONTACT_SORT_COLUMNS = {
   channel: "preferred_channel",
   owner: "sort_owner",
   created: "created_at",
+  // GAP-12: written by an import only
+  original_created: "original_created_on",
   // DQL-01: computed field public.completeness(contacts)
   completeness: "completeness",
   // PAY-03: computed field public.credit_balance(contacts); offered only with the money keys (offeredSortKeys)
@@ -86,7 +90,7 @@ export async function listContacts(
 
   let query = supabase
     .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, custom_fields")
+    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, original_created_on, custom_fields")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
 
@@ -144,6 +148,7 @@ export async function listContacts(
       ownerId: row.owner_id,
       ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
+      originalCreatedOn: row.original_created_on,
       customFields: row.custom_fields,
     })),
   };
@@ -154,7 +159,7 @@ export async function getContact(orgId: string, contactId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, preferred_locale, preferred_channel, preferred_channel_source, created_at, custom_fields, tag_ids")
+    .select("id, first_name, last_name, full_name, phone, phone_e164, phone_type, email, email_type, job_title, company_id, company_matched_domain, company_match_kind, type_id, contact_type, source_id, owner_id, birth_date, preferred_locale, preferred_channel, preferred_channel_source, created_at, original_created_on, custom_fields, tag_ids")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .is("deleted_at", null)

@@ -1,4 +1,5 @@
 import { FollowButton } from "@/features/followers/components/follow-button";
+import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -38,7 +39,7 @@ import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 import { listTags } from "@/features/tags/queries";
-import { formatDateTime, zoneDate } from "@/lib/format";
+import { formatDate, formatDateTime, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { RecordHistory } from "@/features/audit/components/record-history";
 import { RecordFiles } from "@/features/files/components/record-files";
@@ -154,7 +155,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             types={types}
             company={{
               ...company,
-              createdAtText: formatDateTime(company.created_at),
+              // GAP-12: an imported record shows its original creation day first
+              createdAtText: createdLineText(formatDateTime(company.created_at), company.original_created_on ? formatDate(company.original_created_on) : null),
               parent: family.parent,
               custom: { definitions: fields, values: asCustomValues(company.custom_fields), builtins: { "builtin:type": company.type_id } },
             }}

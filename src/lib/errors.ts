@@ -473,6 +473,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import_consent:entity": "הסכמות לדיוור מייבאים רק עם לידים או אנשי קשר.",
   "import_consent:undeclared": "כשמייבאים עמודת הסכמה צריך לבחור איך התקבלו ההסכמות. התחילו את הייבוא מחדש ובחרו.",
   "import_consent:too_many": "נשלחו יותר מדי הסכמות בבת אחת. נסו שוב.",
+  // GAP-12: history in an import
+  "import:original_date": "תאריך היצירה המקורי צריך להיות תאריך בין 1990 להיום.",
+  "import:original_date_fixed": "תאריך היצירה המקורי נכתב רק בייבוא, ואי אפשר לשנות אותו.",
+  "import_note:too_many": "נשלחו יותר מדי הערות בבת אחת. נסו שוב.",
+  "import_note:items": "ההערות שנשלחו אינן תקינות. נסו שוב.",
   // CON-07: triggers companies_parent_check / companies_parent_tree
   "company:parent_invalid": "אי אפשר לשייך לחברה הזו: היא נמחקה, נמצאת בסל המחזור או שאין לכם גישה אליה.",
   "company:parent_cycle": "אי אפשר לשייך חברה לעצמה או לחברה שנמצאת תחתיה.",

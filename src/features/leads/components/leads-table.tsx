@@ -180,6 +180,12 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
             }
             case "score":
               return lead.score === undefined ? null : <span className="tabular-nums" dir="ltr">{lead.score}</span>;
+            case "original_created":
+              return lead.originalCreatedOn ? (
+                <time dateTime={lead.originalCreatedOn} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(lead.originalCreatedOn)}
+                </time>
+              ) : null;
             case "created":
               return (
                 <time dateTime={lead.createdAt} className="whitespace-nowrap text-ink-soft">

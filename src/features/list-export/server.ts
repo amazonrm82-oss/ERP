@@ -123,6 +123,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             last_contact: lead.lastContactedAt ? created(lead.lastContactedAt) : null,
             product: lead.requestedProductName ?? null,
             created: created(lead.createdAt),
+            original_created: lead.originalCreatedOn ? formatDate(lead.originalCreatedOn) : null,
             completeness: percent(scores?.get(lead.id)),
             score: lead.score === undefined ? null : String(lead.score),
           },
@@ -146,6 +147,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             channel: channelLabel(contact.preferredChannel),
             owner: contact.ownerName,
             created: created(contact.createdAt),
+            original_created: contact.originalCreatedOn ? formatDate(contact.originalCreatedOn) : null,
             completeness: percent(scores?.get(contact.id)),
             credit: money(credits?.get(contact.id)),
           },
@@ -170,6 +172,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             recurring_start: deal.recurringStartDate ? formatDate(deal.recurringStartDate) : null,
             renewal: deal.renewalDate ? formatDate(deal.renewalDate) : null,
             created: created(deal.createdAt),
+            original_created: deal.originalCreatedOn ? formatDate(deal.originalCreatedOn) : null,
           },
         });
       }
@@ -205,6 +208,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             type: company.typeName,
             owner: company.ownerName,
             created: created(company.createdAt),
+            original_created: company.originalCreatedOn ? formatDate(company.originalCreatedOn) : null,
             credit: money(credits?.get(company.id)),
           },
         });

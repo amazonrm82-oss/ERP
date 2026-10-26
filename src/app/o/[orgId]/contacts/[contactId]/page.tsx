@@ -1,4 +1,5 @@
 import { getOrgTerms } from "@/features/terminology/queries";
+import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { byGender } from "@/features/terminology/terms";
 import { RecordConsents } from "@/features/consents/components/record-consents";
@@ -217,7 +218,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
             types={types}
             contact={{
               ...contact,
-              createdAtText: formatDateTime(contact.created_at),
+              // GAP-12: an imported record shows its original creation day first
+              createdAtText: createdLineText(formatDateTime(contact.created_at), contact.original_created_on ? formatDate(contact.original_created_on) : null),
               birthDateText: contact.birth_date ? formatDate(contact.birth_date) : null,
               custom: { definitions: fields, values: asCustomValues(contact.custom_fields), builtins: { "builtin:type": contact.type_id } },
             }}

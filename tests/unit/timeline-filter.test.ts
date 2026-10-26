@@ -11,7 +11,8 @@ describe("timeline filter (REC-06)", () => {
   });
 
   it("each kind maps to its activity types", () => {
-    expect(parseTimelineFilter("note").types).toEqual(["note"]);
+    // GAP-12: a note from an imported file sits with the notes
+    expect(parseTimelineFilter("note").types).toEqual(["note", "import_note"]);
     expect(parseTimelineFilter("call").types).toEqual(["call"]);
     expect(parseTimelineFilter("meeting").types).toEqual(["meeting"]);
     expect(parseTimelineFilter("message").types).toEqual(["whatsapp", "email", "sms"]);
@@ -20,7 +21,7 @@ describe("timeline filter (REC-06)", () => {
   it("'changes' is everything a person did not log, so a new system event type is covered too", () => {
     const system = parseTimelineFilter("system");
     expect(system.types).toBeNull();
-    expect([...(system.excludeTypes ?? [])].sort()).toEqual(LOGGED_TYPES.map((t) => t.value).sort());
+    expect([...(system.excludeTypes ?? [])].sort()).toEqual([...LOGGED_TYPES.map((t) => t.value), "import_note"].sort());
   });
 
   it("every logged type is reachable through exactly one filter", () => {

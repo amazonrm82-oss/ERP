@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { MentionCandidate } from "@/features/mentions/token";
 import type { FormState } from "@/lib/action-result";
 
-import { deleteNoteAction, updateNoteAction } from "../actions";
+import { deleteImportNoteAction, deleteNoteAction, updateNoteAction } from "../actions";
 import { PRIVATE_NOTE_HINT, PRIVATE_NOTE_TYPE, type TimelineSubject } from "../schema";
 import { NoteEditor } from "./note-editor";
 
@@ -117,5 +117,20 @@ function EditNoteForm({ orgId, subject, activityId, body, privacy, mentions, onD
         </Button>
       </div>
     </form>
+  );
+}
+
+/** GAP-12: an owner or admin removes a wrong note an import wrote (no editing: it is the file's text). */
+export function ImportNoteRemove({ orgId, subject, activityId, label }: Pick<Props, "orgId" | "subject" | "activityId" | "label">) {
+  return (
+    <ConfirmButton
+      title="למחוק את ההערה מהייבוא?"
+      description="המחיקה סופית, ונרשמת ביומן הביקורת."
+      confirmLabel="מחיקה"
+      action={deleteImportNoteAction.bind(null, orgId, subject, activityId)}
+    >
+      מחיקה
+      <span className="sr-only">: {label}</span>
+    </ConfirmButton>
   );
 }

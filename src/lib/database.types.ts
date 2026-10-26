@@ -1174,6 +1174,8 @@ export type CompanyRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // GAP-12: the creation date in the system the record was imported from
+  original_created_on: string | null;
   // CON-08 (migration billing_details): billing details; payment_terms is PaymentTermsKind
   // (src/features/billing/terms.ts) with payment_days for net / eom; price_list_id -> price_lists
   billing_name: string | null;
@@ -1190,6 +1192,8 @@ export type CompanyRow = {
 export type CompanyInsert = {
   organization_id: string;
   import_job_id?: string | null;
+  // GAP-12: written by an import only
+  original_created_on?: string | null;
   name: string;
   tax_id?: string | null;
   company_type?: string | null;
@@ -1261,6 +1265,8 @@ export type ContactRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // GAP-12: the creation date in the system the record was imported from
+  original_created_on: string | null;
   // CON-01: the type of the primary phone and email (null when cleared or not said)
   // text columns with a check constraint: ContactPhoneType / ContactEmailType
   phone_type: string | null;
@@ -1352,6 +1358,8 @@ export type ConsentRow = {
 export type ContactInsert = {
   organization_id: string;
   import_job_id?: string | null;
+  // GAP-12: written by an import only
+  original_created_on?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
@@ -1422,6 +1430,8 @@ export type LeadRow = {
   deleted_at: string | null;
   // set when the record was created by an import (undo moves these to the recycle bin)
   import_job_id: string | null;
+  // GAP-12: the creation date in the system the record was imported from
+  original_created_on: string | null;
   // CAP-02 / ADS-01: set by the lead intake only (no client grant); first touch, never overwritten
   referrer_url: string | null;
   landing_url: string | null;
@@ -1443,6 +1453,8 @@ export type LeadRow = {
 export type LeadInsert = {
   organization_id: string;
   import_job_id?: string | null;
+  // GAP-12: written by an import only
+  original_created_on?: string | null;
   status_id: string;
   full_name?: string | null;
   email?: string | null;
@@ -2274,6 +2286,8 @@ export type DealRow = {
   amount_quote_id: string | null;
   // IMP-03: the import that created the deal; set on insert only (deals_import_tag)
   import_job_id: string | null;
+  // GAP-12: the creation date in the system the record was imported from
+  original_created_on: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -2288,6 +2302,8 @@ export type DealInsert = {
   stage_id: string;
   // null = empty: the database fills it from the product lines or a recurring deal's first year, else 0 (deals_amount_auto)
   amount_agorot?: number | null;
+  // GAP-12: written by an import only
+  original_created_on?: string | null;
   currency?: string;
   expected_close_date?: string | null;
   // DEAL-04: the close window's date; cleared on an open deal, never more than a day ahead (deals_sync_stage_close)
@@ -2732,7 +2748,7 @@ export type Database = {
         },
         Record<string, never>
       >;
-      deals: Table<DealRow, DealInsert & { import_job_id?: string | null }, Partial<DealInsert>>;
+      deals: Table<DealRow, DealInsert & { import_job_id?: string | null; id?: string }, Partial<Omit<DealInsert, "original_created_on">>>;
       deal_loss_reasons: Table<DealLossReasonRow, { organization_id: string; name: string; position?: number; is_active?: boolean }>;
       // TASK-06: column grants
       task_checklist_items: Table<
@@ -3311,6 +3327,11 @@ export type Database = {
       import_record_consents: {
         Args: { p_org: string; p_job: string; p_items: Json };
         Returns: Array<"written" | "locked" | "other_address" | "refused" | "invalid">;
+      };
+      // GAP-12: an import's notes, one 'import_note' timeline entry each (definer; the caller's own running import)
+      import_record_notes: {
+        Args: { p_org: string; p_job: string; p_items: Json };
+        Returns: Array<"written" | "exists" | "refused" | "invalid">;
       };
       // PRD-05: products whose SKU (without case) is one of these; security invoker
       product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };

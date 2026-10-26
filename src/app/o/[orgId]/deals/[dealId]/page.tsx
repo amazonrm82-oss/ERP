@@ -1,4 +1,5 @@
 import { getOrgTerms } from "@/features/terminology/queries";
+import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { byGender } from "@/features/terminology/terms";
 import { FollowButton } from "@/features/followers/components/follow-button";
@@ -344,7 +345,8 @@ export default async function DealPage({ params, searchParams }: Props) {
               // DEAL-04: a day the close window picked is kept at midday, so the day is shown, not the hour
               closedAtText: deal.closed_at ? formatDate(zoneDate(new Date(deal.closed_at), context.org.timeZone)) : null,
               ownerName: deal.ownerName,
-              createdAtText: formatDateTime(deal.created_at),
+              // GAP-12: an imported record shows its original creation day first
+              createdAtText: createdLineText(formatDateTime(deal.created_at), deal.original_created_on ? formatDate(deal.original_created_on) : null),
               custom: { definitions: fields, values: asCustomValues(deal.custom_fields), builtins: { "builtin:stage": deal.stage_id, "builtin:pipeline": deal.pipeline_id } },
             }}
             terms={terms}

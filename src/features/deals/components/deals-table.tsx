@@ -148,6 +148,12 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
               return deal.recurringStartDate ? <time dateTime={deal.recurringStartDate} className="whitespace-nowrap">{formatDate(deal.recurringStartDate)}</time> : null;
             case "renewal":
               return deal.renewalDate ? <time dateTime={deal.renewalDate} className="whitespace-nowrap">{formatDate(deal.renewalDate)}</time> : null;
+            case "original_created":
+              return deal.originalCreatedOn ? (
+                <time dateTime={deal.originalCreatedOn} className="whitespace-nowrap text-ink-soft">
+                  {formatDate(deal.originalCreatedOn)}
+                </time>
+              ) : null;
             case "created":
               return (
                 <time dateTime={deal.createdAt} className="whitespace-nowrap text-ink-soft">

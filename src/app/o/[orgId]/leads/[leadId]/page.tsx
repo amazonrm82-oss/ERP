@@ -1,4 +1,5 @@
 import { RecordConsents } from "@/features/consents/components/record-consents";
+import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
@@ -253,7 +254,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
               // an old reason left on a lead that is no longer "not relevant" is not shown (RVW-9)
               disqualifyReason: status?.kind === "disqualified" ? lead.disqualify_reason : null,
               ownerName: lead.owner_id ? (owners.get(lead.owner_id) ?? null) : null,
-              createdAtText: formatDateTime(lead.created_at),
+              // GAP-12: an imported record shows its original creation day first
+              createdAtText: createdLineText(formatDateTime(lead.created_at), lead.original_created_on ? formatDate(lead.original_created_on) : null),
               lastContactText: lead.last_contacted_at ? formatDateTime(lead.last_contacted_at) : null,
               custom: { definitions: fields, values: asCustomValues(lead.custom_fields), builtins: { "builtin:status": lead.status_id, "builtin:source": lead.source_id } },
               attribution: attributionRows(lead),
