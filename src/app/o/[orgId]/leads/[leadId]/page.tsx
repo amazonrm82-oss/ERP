@@ -159,7 +159,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* On phones the record's own details come before its history. */}
         <div className="order-2 space-y-5 lg:order-1">
-          <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} filter={tl} />
+          <Timeline orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={canWrite} filter={tl} chatImport={canEditRecordHint(context, lead.owner_id)} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "lead", id: lead.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <div className="space-y-5 print:hidden empty:hidden">

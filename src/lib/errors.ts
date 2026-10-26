@@ -481,6 +481,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import:original_date_fixed": "תאריך היצירה המקורי נכתב רק בייבוא, ואי אפשר לשנות אותו.",
   "import_note:too_many": "נשלחו יותר מדי הערות בבת אחת. נסו שוב.",
   "import_note:items": "ההערות שנשלחו אינן תקינות. נסו שוב.",
+  // WAB-07: an imported WhatsApp chat
+  "whatsapp_import:body": "השיחה ריקה או ארוכה מדי לרשומה אחת.",
+  "whatsapp_import:mention": "אי אפשר לתייג עובדים בשיחה מיובאת.",
+  "whatsapp_import:occurred_at": "מועד השיחה בקובץ אינו תקין.",
+  "whatsapp_import:meta": "פרטי השיחה אינם תקינים. נסו לייצא אותה שוב.",
   // CON-07: triggers companies_parent_check / companies_parent_tree
   "company:parent_invalid": "אי אפשר לשייך לחברה הזו: היא נמחקה, נמצאת בסל המחזור או שאין לכם גישה אליה.",
   "company:parent_cycle": "אי אפשר לשייך חברה לעצמה או לחברה שנמצאת תחתיה.",

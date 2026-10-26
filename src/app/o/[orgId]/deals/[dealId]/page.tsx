@@ -252,7 +252,7 @@ export default async function DealPage({ params, searchParams }: Props) {
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} />
           {/* PAY-01: payments received and recorded here */}
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} />
-          <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} />
+          <Timeline orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} filter={tl} chatImport={canEdit} />
           {/* GAP-11: the files list prints (names, dates, uploaders); the card hides itself on paper when empty */}
           <RecordFiles orgId={orgId} subject={{ kind: "deal", id: deal.id }} canWrite={context.canWrite} userId={context.user.id} isAdmin={isAdminRole(context.role)} />
           <div className="space-y-5 print:hidden empty:hidden">

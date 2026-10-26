@@ -3350,6 +3350,11 @@ export type Database = {
         Args: { p_org: string; p_job: string; p_items: Json };
         Returns: Array<"written" | "exists" | "refused" | "invalid">;
       };
+      // WAB-07: an exported WhatsApp chat as one import note on a lead, contact or deal the caller may edit; definer
+      whatsapp_chat_import: {
+        Args: { p_org: string; p_type: string; p_id: string; p_body: string; p_occurred_at: string; p_meta: Json };
+        Returns: string;
+      };
       // PRD-05: products whose SKU (without case) is one of these; security invoker
       product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };
       // IMP-03: live deals the caller reads whose name equals one of the given ones; security invoker

@@ -17,6 +17,8 @@ import { formatDateTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { recordPage } from "@/lib/record-types";
 
+import { ChatImportButton } from "@/features/whatsapp/components/chat-import-button";
+
 import { getTimeline, managesRecordTeam } from "../queries";
 import { canEditNoteHint, canPinHint, canRemoveImportNoteHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
 import { ImportNoteRemove, NoteActions } from "./note-actions";
@@ -30,13 +32,15 @@ type Props = {
   canWrite: boolean;
   // REC-06: the `tl` value of the page's URL, checked here
   filter?: string | string[];
+  // WAB-07: offer "ייבוא שיחת WhatsApp" (lead, contact and deal pages, for whoever may edit the record)
+  chatImport?: boolean;
 };
 
 /**
  * Timeline card of a record: add-note form on top, a filter by kind of activity (REC-06),
  * then pinned entries (REC-01), then the rest, newest first.
  */
-export async function Timeline({ orgId, subject, canWrite, filter: filterParam }: Props) {
+export async function Timeline({ orgId, subject, canWrite, filter: filterParam, chatImport }: Props) {
   const filter = parseTimelineFilter(filterParam);
   // getOrgContext is memoized per request: the page already loaded it
   // TASK-08: the business's activity types name the entries and fill the log form's choices
@@ -72,6 +76,11 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
         {canWrite ? (
           <div className="mb-6 print:hidden">
             <NoteForm orgId={orgId} subject={subject} mentions={mentions} choices={logChoices(types)} />
+            {chatImport && writable ? (
+              <div className="mt-3">
+                <ChatImportButton orgId={orgId} subject={subject} />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -127,7 +136,18 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam }
                     <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
                   </p>
                 </div>
-                {item.text && isPinnableType(item.type) ? (
+                {item.text && item.chatImport ? (
+                  // WAB-07: an imported chat runs long, so it is folded and opened on request (on paper it prints only when opened)
+                  <details className="group mt-1">
+                    <summary className="cursor-pointer text-sm text-accent-strong underline-offset-4 hover:underline print:hidden">
+                      <span className="group-open:hidden">הצגת השיחה</span>
+                      <span className="hidden group-open:inline">הסתרת השיחה</span>
+                    </summary>
+                    <div className="mt-2 max-h-96 overflow-y-auto rounded-md border border-line p-3 print:max-h-none print:overflow-visible print:border-0 print:p-0">
+                      <NoteText text={item.text} names={names} />
+                    </div>
+                  </details>
+                ) : item.text && isPinnableType(item.type) ? (
                   // REC-04: what a person logged may carry basic formatting
                   <NoteText text={item.text} names={names} className="mt-1" />
                 ) : item.text ? (

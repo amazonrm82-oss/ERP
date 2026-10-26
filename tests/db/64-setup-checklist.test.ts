@@ -597,6 +597,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_import_history.sql",
       // SEG-02 redefines public.log_export() of _report_quotes.sql last (the source_revenue report key)
       "_source_attribution.sql",
+      // WAB-07 redefines app.import_record_worked() of _import_history.sql last (an imported chat is work on the record)
+      "_whatsapp_chat_import.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

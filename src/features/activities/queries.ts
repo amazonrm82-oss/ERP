@@ -8,6 +8,8 @@ import { must } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
+import { isWhatsappImport } from "@/features/whatsapp/chat-import";
+
 import { moneyEntryKind, moneyEntryLabel } from "./money-entries";
 import { quoteEntryBy, quoteEntryKind, quoteEntryText } from "./quote-entries";
 import { conversionText, recordLinkRemovedText, responsePassText, stageChangeText } from "./system-entries";
@@ -34,6 +36,8 @@ export type TimelineItem = {
   pinned: boolean;
   // GAP-05: seen only by its author and the owners/admins (the database hides it from everyone else)
   isPrivate: boolean;
+  // WAB-07: an imported WhatsApp chat; long, so the screen shows it folded
+  chatImport: boolean;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -227,7 +231,9 @@ export async function getTimeline(
           ? "הצעת מחיר"
           : activity.type === "whatsapp" && metaString(activity.metadata, "via") === "link"
             ? "נשלחה הודעת WhatsApp"
-            : logged
+            : isWhatsappImport(activity.type, metaString(activity.metadata, "kind"))
+              ? "שיחת WhatsApp מיובאת"
+              : logged
               ? logged.name
               : (TYPE_LABELS[activity.type] ?? "פעילות"),
       // TASK-08: the icon of the business's type (logged kinds only)
@@ -247,6 +253,7 @@ export async function getTimeline(
       createdAt: activity.created_at,
       pinned: activity.is_pinned,
       isPrivate: activity.is_private,
+      chatImport: isWhatsappImport(activity.type, metaString(activity.metadata, "kind")),
     };
   });
 }
