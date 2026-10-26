@@ -217,12 +217,13 @@ describe("history in an import (GAP-12)", () => {
       ]),
     ).toEqual(["exists", "exists", "written", "written"]);
     expect(await asAdmin((q) => count(q, "select 1 from public.activities where lead_id = $1 and type = 'import_note'", [lead]))).toBe(4);
-    // a note dated today is 12:00 of today at the latest, and never after now
+    // a note dated today is 12:00 of today, or the time it was written when that is earlier (before noon in Israel);
+    // compared with the row's own created_at, never with a later now(), so the test holds at any hour
     const today = await asAdmin(async (q) => (await q<{ d: string }>("select to_char(now() at time zone 'Asia/Jerusalem', 'YYYY-MM-DD') as d")).rows[0].d);
     const third = await newJob(owner, "lead", "update");
     expect(await notes(owner, third, [{ record_id: lead, body: "מהיום", date: today }])).toEqual(["written"]);
     const late = await asAdmin((q) =>
-      count(q, "select 1 from public.activities where lead_id = $1 and body = 'מהיום' and occurred_at <= now() and occurred_at >= least(now(), ($2::date + time '12:00') at time zone 'Asia/Jerusalem')", [lead, today]),
+      count(q, "select 1 from public.activities where lead_id = $1 and body = 'מהיום' and occurred_at <= now() and occurred_at = least(created_at, ($2::date + time '12:00') at time zone 'Asia/Jerusalem')", [lead, today]),
     );
     expect(late).toBe(1);
   });
