@@ -301,8 +301,14 @@ describe("set_field values (AUT-01)", () => {
     };
     expect(listAfter("preferred_channel")).toEqual([...CONTACT_CHANNELS]);
     expect(listAfter("preferred_locale")).toEqual([...CONTACT_LOCALES]);
-    // the relative-date limits of the engine's helper
-    expect(sql).toMatch(/\(p_spec ->> 'days'\)::numeric > 365/);
-    expect(sql).toMatch(/not in \('calendar', 'business'\)/);
+    // the relative-date limits of the engine's helper (the latest migration that redefines app.automation_relative_date)
+    const helperFile = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.automation_relative_date"))
+      .at(-1)!;
+    const helper = readFileSync(join(dir, helperFile), "utf8");
+    expect(helper).toMatch(/\(p_spec ->> 'days'\)::numeric > 365/);
+    expect(helper).toMatch(/not in \('calendar', 'business'\)/);
   });
 });
