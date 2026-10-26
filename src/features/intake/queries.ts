@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { isCallbackSlotStart, type CallbackSlotStart } from "./callback";
 import { parseFieldsConfig, type FormFieldConfig } from "./fields";
+import { isMarketingConsentChannel, type MarketingConsentChannel } from "./marketing-consent";
 import { coveredCategoryIds, mergeFormProductOptions, orderedFormCategories, type FormCategory, type FormProduct } from "./product";
 
 export type IntakeSummary = {
@@ -81,13 +82,15 @@ export type IntakeDetails = {
   productChoice: boolean;
   productIds: string[] | null;
   productCategoryIds: string[] | null;
+  // CAP-07 / CNS-04: channels with a marketing-consent box
+  marketingConsentChannels: MarketingConsentChannel[];
 };
 
 export async function getIntake(orgId: string, formId: string): Promise<IntakeDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice, product_choice, product_ids, product_category_ids")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice, product_choice, product_ids, product_category_ids, marketing_consent_channels")
     .eq("organization_id", orgId)
     .eq("id", formId)
     // BIZ-02 / SPD-07: a business card's or site widget's form is managed with its card or widget, not here
@@ -125,6 +128,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     productChoice: data.product_choice,
     productIds: data.product_ids,
     productCategoryIds: data.product_category_ids,
+    marketingConsentChannels: (data.marketing_consent_channels ?? []).filter(isMarketingConsentChannel),
   };
 }
 

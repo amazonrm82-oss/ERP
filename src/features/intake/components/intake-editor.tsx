@@ -14,6 +14,14 @@ import { createIntakeAction, updateIntakeAction } from "../actions";
 import { CALLBACK_SLOTS, slotInputName, slotLabel } from "../callback";
 import { parseFieldsConfig, storedFields, type FormFieldConfig, type FormFieldOption } from "../fields";
 import {
+  addressField,
+  MARKETING_CONSENT_CHANNELS,
+  MARKETING_CONSENT_DRAFT_NOTE,
+  MARKETING_CONSENT_INPUT,
+  MARKETING_CONSENT_LABELS,
+  marketingConsentWording,
+} from "../marketing-consent";
+import {
   CATEGORY_PICKS_VALUE,
   initialProductPicks,
   MAX_FORM_PRODUCTS,
@@ -69,6 +77,8 @@ type EditProps = {
   teams: Option[];
   fieldOptions: FormFieldOption[];
   businessPhone: string | null;
+  // CAP-07 / CNS-04: the business's display name, for the consent box's wording
+  businessName?: string;
   // LEAD-04 / CAP-08: what the product question offers to pick; null when the business has no products flag
   productChoices?: ProductChoices | null;
 };
@@ -103,6 +113,7 @@ export function IntakeSettingsForm({
   teams,
   fieldOptions,
   businessPhone,
+  businessName = "",
   productChoices = null,
 }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
@@ -129,6 +140,7 @@ export function IntakeSettingsForm({
           <CallbackSettings intake={intake} values={values} />
           <ChannelSettings intake={intake} values={values} />
           <LocaleSettings intake={intake} values={values} />
+          <MarketingConsentSettings intake={intake} values={values} businessName={businessName} fieldKeys={builderInitial.map((field) => field.key)} />
           {productChoices ? <ProductSettings intake={intake} values={values} choices={productChoices} error={errors.product_ids} /> : null}
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
           <ThanksSettings intake={intake} businessPhone={businessPhone} values={values} errors={errors} />
@@ -290,6 +302,59 @@ function ChannelSettings({ intake, values }: { intake: IntakeDetails; values?: R
         </span>
       </span>
     </label>
+  );
+}
+
+/**
+ * CAP-07 / CNS-04: an unticked marketing-consent box per channel. A box shows on the form only while the form asks for
+ * its address (email; phone for SMS and WhatsApp). A tick is recorded as the person's consent with this wording and its
+ * version. The wording is a DRAFT until the lawyer edits it.
+ */
+function MarketingConsentSettings({
+  intake,
+  values,
+  businessName,
+  fieldKeys,
+}: {
+  intake: IntakeDetails;
+  values?: Record<string, string>;
+  businessName: string;
+  fieldKeys: string[];
+}) {
+  const legendId = useId();
+  return (
+    <fieldset aria-labelledby={legendId} className="space-y-2 rounded-md border border-line p-3">
+      <legend id={legendId} className="px-1 text-md font-medium">
+        הסכמה לדיוור
+      </legend>
+      <p className="text-sm text-ink-soft">
+        תיבה לא מסומנת לכל ערוץ. מי שמסמן נרשם כמי שהסכים לקבל דיוור בערוץ הזה, עם הנוסח ותאריך. בלי סימון לא נרשם כלום.
+      </p>
+      {MARKETING_CONSENT_CHANNELS.map((channel) => {
+        const name = `${MARKETING_CONSENT_INPUT}_${channel}`;
+        const collected = fieldKeys.includes(addressField(channel));
+        return (
+          <label key={channel} className="flex items-start gap-2.5 text-md">
+            <input
+              type="checkbox"
+              name={name}
+              defaultChecked={values ? values[name] === "on" : intake.marketingConsentChannels.includes(channel)}
+              className="mt-1 size-4.5 shrink-0 accent-accent"
+            />
+            <span>
+              {MARKETING_CONSENT_LABELS[channel]}
+              <span className="block text-sm text-ink-soft">{marketingConsentWording(channel, businessName)}</span>
+              {collected ? null : (
+                <span className="block text-sm text-ink-soft">
+                  {channel === "email" ? "מוצג רק כשהטופס מבקש אימייל." : "מוצג רק כשהטופס מבקש טלפון."}
+                </span>
+              )}
+            </span>
+          </label>
+        );
+      })}
+      <p className="text-sm text-ink-soft">{MARKETING_CONSENT_DRAFT_NOTE}</p>
+    </fieldset>
   );
 }
 

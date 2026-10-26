@@ -82,7 +82,11 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
                   </p>
                   {entry.method ? <p className="break-words text-ink-soft">איך התקבלה: {entry.method}</p> : null}
                   {entry.liftMethod ? <p className="text-ink-soft">ביטול הסרה: {LIFT_METHOD_LABELS[entry.liftMethod]}</p> : null}
-                  {entry.wording ? <p className="break-words whitespace-pre-line text-ink-soft">נוסח: {entry.wording}</p> : null}
+                  {entry.wording ? (
+                    <p className="break-words whitespace-pre-line text-ink-soft">
+                      נוסח{entry.wordingVersion ? <span dir="ltr"> ({entry.wordingVersion})</span> : null}: {entry.wording}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ol>

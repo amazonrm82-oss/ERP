@@ -13,6 +13,7 @@ import { collectAttribution } from "../attribution";
 import { CALLBACK_INPUT, type CallbackOffer } from "../callback";
 import { CHANNEL_INPUT, CHANNEL_QUESTION, PUBLIC_CHANNEL_OPTIONS } from "../channel";
 import { LOCALE_INPUT, LOCALE_QUESTION, PUBLIC_LOCALE_OPTIONS } from "../locale";
+import { addressField, MARKETING_CONSENT_INPUT, type MarketingConsentOffer } from "../marketing-consent";
 import { PRODUCT_INPUT, PRODUCT_QUESTION, type FormProduct } from "../product";
 import { formInputName, HONEYPOT_FIELD, STARTED_AT_FIELD } from "../fields";
 import { checkSubmission, type PublicField, type RawValues } from "../public-validate";
@@ -31,6 +32,8 @@ type Props = {
   localeChoice?: boolean;
   // LEAD-04 / CAP-08: the products the form offers, or null when it does not ask
   products?: FormProduct[] | null;
+  // CAP-07 / CNS-04: the unticked marketing-consent boxes, or null for none
+  marketingConsent?: MarketingConsentOffer | null;
 };
 
 /** The form's inputs by name; a name sent more than once (a multiple choice) becomes a list. */
@@ -45,7 +48,7 @@ function rawValues(form: HTMLFormElement): RawValues {
 }
 
 /** The hosted lead form. Posts to /api/forms/<token>; works inside an iframe. */
-export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false, localeChoice = false, products = null }: Props) {
+export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callback, channelChoice = false, localeChoice = false, products = null, marketingConsent = null }: Props) {
   const router = useRouter();
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
@@ -171,6 +174,7 @@ export function PublicLeadForm({ token, fields, submitLabel, whatsappUrl, callba
           ))}
         </SelectField>
       ) : null}
+      {marketingConsent ? <MarketingConsentBoxes offer={marketingConsent} visible={visible} /> : null}
       {/* honeypot: hidden from people and from screen readers; bots fill it */}
       <div aria-hidden="true" className="absolute -start-[10000px] h-px w-px overflow-hidden">
         <label>
@@ -209,6 +213,27 @@ function ThankYou({ message, whatsappUrl }: { message: string; whatsappUrl: stri
           </a>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * CAP-07 / CNS-04: one box per channel, never ticked in advance; a box shows while its address field (email, phone) is
+ * shown. The text is the business's wording as the server returned it, and the server stores its own copy.
+ */
+function MarketingConsentBoxes({ offer, visible }: { offer: MarketingConsentOffer; visible: Set<string> }) {
+  const boxes = offer.boxes.filter((box) => visible.has(addressField(box.channel)));
+  if (boxes.length === 0) {
+    return null;
+  }
+  return (
+    <div className="space-y-2">
+      {boxes.map((box) => (
+        <label key={box.channel} className="flex items-start gap-2.5 text-md">
+          <input type="checkbox" name={MARKETING_CONSENT_INPUT} value={box.channel} defaultChecked={false} className="mt-1 size-4.5 shrink-0 accent-accent" />
+          <span>{box.text}</span>
+        </label>
+      ))}
     </div>
   );
 }

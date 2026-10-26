@@ -178,6 +178,7 @@ export default async function IntakeItemPage({ params }: Props) {
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
               fieldOptions={fieldOptions}
               businessPhone={businessPhone}
+              businessName={organization?.name ?? ""}
               productChoices={productChoices}
             />
           ) : (

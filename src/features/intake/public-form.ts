@@ -9,6 +9,7 @@ import { must } from "@/lib/db-read";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { callbackOfferFrom, type CallbackOffer } from "./callback";
+import { marketingConsentFrom, type MarketingConsentOffer } from "./marketing-consent";
 import { FORM_EXCLUDED_TYPES, INTAKE_FIELD_LABELS, isIntakeField, parseFieldsConfig } from "./fields";
 import { formProductsFrom, type FormProduct } from "./product";
 import type { PublicField } from "./public-validate";
@@ -33,6 +34,8 @@ export type PublicForm = {
   localeChoice: boolean;
   // LEAD-04 / CAP-08: the products the form offers (id and name), or null when it does not ask
   products: FormProduct[] | null;
+  // CAP-07 / CNS-04: the unticked marketing-consent boxes (channel and the business's DRAFT wording), or null for none
+  marketingConsent: MarketingConsentOffer | null;
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -101,6 +104,7 @@ export function publicFormFrom(data: Json): PublicForm | null {
     channelChoice: data.channel_choice === true,
     localeChoice: data.locale_choice === true,
     products: formProductsFrom(data.products),
+    marketingConsent: marketingConsentFrom(data.marketing_consent),
   };
 }
 

@@ -924,6 +924,8 @@ export type FormRow = {
   product_choice: boolean;
   product_ids: string[] | null;
   product_category_ids: string[] | null;
+  // CAP-07 / CNS-04: channels (email | sms | whatsapp) the web form shows an unticked marketing-consent box for
+  marketing_consent_channels: string[];
   // BIZ-02: the business card this form belongs to (kind 'card' only; made and changed by the card's triggers)
   business_card_id: string | null;
   // SPD-07: the site widget this form belongs to (kind 'widget' only; made and changed by the widget's triggers)
@@ -1295,6 +1297,8 @@ export type ConsentRow = {
   state: string;
   source: string;
   wording: string | null;
+  // CAP-07 / CNS-04: the version of a server writer's wording (the public form's DRAFT); null for a person's entry
+  wording_version: string | null;
   method: string | null;
   // HMAC-SHA256 (key app.settings consent_hash_key) of the organization, kind and the record's
   // address at the time, set by trigger; null while the key is missing (filled later by the backfill).
@@ -2528,6 +2532,7 @@ export type Database = {
           product_choice?: boolean;
           product_ids?: string[] | null;
           product_category_ids?: string[] | null;
+          marketing_consent_channels?: string[];
         },
         {
           name?: string;
@@ -2552,6 +2557,7 @@ export type Database = {
           product_choice?: boolean;
           product_ids?: string[] | null;
           product_category_ids?: string[] | null;
+          marketing_consent_channels?: string[];
         }
       >;
       // written only by intake_submit()

@@ -8,6 +8,7 @@ import { parseAttribution, safeText } from "./attribution";
 import { CALLBACK_INPUT } from "./callback";
 import { CHANNEL_INPUT, channelInput } from "./channel";
 import { LOCALE_INPUT, localeInput } from "./locale";
+import { MARKETING_CONSENT_INPUT, marketingConsentInput } from "./marketing-consent";
 import { PRODUCT_INPUT, PRODUCT_INVALID, productInput } from "./product";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { INACTIVE_FORM_TEXT, readPublicForm } from "./public-form";
@@ -245,6 +246,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
       // CAP-08: one of the contacts' languages, only when the form asks (checked again by the database)
       preferred_locale: form.localeChoice ? localeInput(text(body[LOCALE_INPUT])) : null,
       [PRODUCT_INPUT]: product,
+      // CAP-07 / CNS-04: the ticked marketing-consent boxes, only those the form shows (the database checks again)
+      [MARKETING_CONSENT_INPUT]: marketingConsentInput(body[MARKETING_CONSENT_INPUT], form.marketingConsent),
     };
   }
 

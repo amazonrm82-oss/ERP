@@ -30,6 +30,7 @@ import {
   sameProductSelection,
   type ProductSelection,
 } from "./product";
+import { marketingConsentSetting } from "./marketing-consent";
 import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 import { defaultWhatsappButton, whatsappNumber } from "./whatsapp";
 
@@ -194,7 +195,12 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
   const formOnly =
     current.kind !== "form"
       ? {}
-      : { channel_choice, locale_choice, ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
+      : {
+          channel_choice,
+          locale_choice,
+          // CAP-07 / CNS-04: the marketing-consent boxes
+          marketing_consent_channels: marketingConsentSetting(formData),
+          ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
   const save = (patch: ProductPatch | Record<string, never>) =>
     context.supabase
       .from("forms")

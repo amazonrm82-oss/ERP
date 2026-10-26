@@ -560,6 +560,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_field_file_release.sql",
       // its follow-up redefines app.record_links_clear_ids() of _field_types_part_b.sql last (the timeline entry)
       "_record_link_removed_entry.sql",
+      // CAP-07 / CNS-04 redefines public.intake_form() and public.intake_submit() of _field_types_part_b.sql last (the consent box)
+      "_form_marketing_consent.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

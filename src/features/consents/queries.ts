@@ -25,6 +25,8 @@ export type ConsentEntry = {
   source: ConsentSource | null;
   method: string | null;
   wording: string | null;
+  // CAP-07 / CNS-04: the version of a server writer's wording (the public form's DRAFT)
+  wordingVersion: string | null;
   // an owner's or admin's lift of an opt-out
   liftMethod: LiftMethod | null;
   recordedBy: string | null;
@@ -34,7 +36,7 @@ export type ConsentEntry = {
 export type ChannelConsent = {
   channel: ConsentChannel;
   // the latest entry; null = nothing recorded ("לא ידוע")
-  latest: (Omit<ConsentEntry, "id" | "liftMethod"> & { currentAddress: boolean | null }) | null;
+  latest: (Omit<ConsentEntry, "id" | "liftMethod" | "wordingVersion"> & { currentAddress: boolean | null }) | null;
 };
 
 export type RecordConsents = { channels: ChannelConsent[]; history: ConsentEntry[] };
@@ -54,7 +56,7 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
     supabase.rpc("consent_current", { p_org: orgId, p_kind: subject.kind, p_id: subject.id }),
     supabase
       .from("consents")
-      .select("id, channel, state, source, method, wording, lift_method, recorded_by, created_at")
+      .select("id, channel, state, source, method, wording, wording_version, lift_method, recorded_by, created_at")
       .eq("organization_id", orgId)
       .eq(SUBJECT_COLUMN[subject.kind], subject.id)
       // newest first by the time the consent was given (a conversion copy keeps its time), then by entry order
@@ -96,6 +98,7 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
               source: isConsentSource(row.source) ? row.source : null,
               method: row.method,
               wording: row.wording,
+              wordingVersion: row.wording_version,
               liftMethod: (LIFT_METHODS as readonly string[]).includes(row.lift_method ?? "") ? (row.lift_method as LiftMethod) : null,
               recordedBy: name(row.recorded_by),
               createdAt: row.created_at,
