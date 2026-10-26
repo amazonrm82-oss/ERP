@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultPipeline, pgError } from "./helpers";
+import { MIGRATIONS_DIR, migrationFile, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -21,7 +22,8 @@ type StuckRow = {
   postponed: boolean;
 };
 
-const MIGRATION = path.join(process.cwd(), "supabase/migrations/20261006012900_deal_stage_entered.sql");
+// DEAL-02 gap: report_stuck_deals now reads the shared rule; re-running 0129 is followed by the file that redefines it
+const RERUN = ["20261006012900_deal_stage_entered.sql", migrationFile("_deal_attention.sql")];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
 // stage: days since it entered the stage > the stage's rot_days (null = 14). Postponed deals are
@@ -378,11 +380,12 @@ describe("stuck deals by time in stage", () => {
         asAdmin(async (q) => (await q<{ s: string }>("select md5(string_agg(id::text || stage_entered_at::text || updated_at::text, ',' order by id)) as s from public.deals")).rows[0].s);
       const before = await snapshot();
       const missing = await asAdmin(async (q) => {
-        await q(readFileSync(MIGRATION, "utf8"));
+        for (const file of RERUN) await q(readFileSync(path.join(MIGRATIONS_DIR, file), "utf8"));
         return (await q<{ n: string }>("select count(*)::text as n from public.deals where stage_entered_at is null")).rows[0].n;
       });
       expect(missing).toBe("0");
       expect(await snapshot()).toBe(before);
+      expect(staleRestores(RERUN)).toEqual([]);
     });
   });
 });

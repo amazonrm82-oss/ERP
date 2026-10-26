@@ -2981,6 +2981,8 @@ export type Database = {
       report_lost_reasons: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       report_cycle_length: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       report_stuck_deals: { Args: { p_org: string; p_pipeline?: string | null; p_owner?: string | null; p_days?: number }; Returns: Json };
+      // DEAL-02: report_stuck_deals' rows for the listed deals, no cap
+      deal_attention: { Args: { p_org: string; p_deals: string[] }; Returns: Json };
       report_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // RPT-01: the won deals' lines by product and billing
       report_revenue_by_product: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };

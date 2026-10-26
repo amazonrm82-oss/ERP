@@ -15,7 +15,7 @@ import { DealsBoard } from "@/features/deals/components/deals-board";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
 import { listMembers, listTeams } from "@/features/settings/queries";
 import { isCalendarDate } from "@/lib/calendar-date";
-import { getStuckDeals } from "@/features/deals/stuck";
+import { getDealAttention } from "@/features/deals/stuck";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
 import { DealsTable } from "@/features/deals/components/deals-table";
@@ -163,7 +163,7 @@ export default async function DealsPage({ params, searchParams }: Props) {
     return noPipeline(deal);
   }
 
-  const stuck = await getStuckDeals(orgId, board.pipeline.id);
+  const stuck = await getDealAttention(orgId, board.deals.map((d) => d.id));
   const openStages = board.stages.filter((stage) => stage.kind === "open");
   const openCount = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.count ?? 0), 0);
   const openTotal = openStages.reduce((sum, stage) => sum + (board.totals[stage.id]?.amountAgorot ?? 0), 0);

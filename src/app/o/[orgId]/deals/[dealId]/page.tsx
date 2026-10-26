@@ -36,7 +36,7 @@ import { DealContinuationCard } from "@/features/deals/components/deal-continuat
 import { skippedNotice } from "@/features/deals/copy";
 import { stageTone } from "@/features/deals/stage-colors";
 import { isSnoozed } from "@/features/deals/snooze";
-import { getStuckDeals } from "@/features/deals/stuck";
+import { getDealAttention } from "@/features/deals/stuck";
 import { DEFAULT_CALENDAR_SETTINGS } from "@/features/calendar-days/holidays";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { closeWindowSetup } from "@/features/deals/close-window";
@@ -160,7 +160,7 @@ export default async function DealPage({ params, searchParams }: Props) {
   const canEditCosts = seesCosts && canEdit && context.canWrite && hasProducts && deal.status === "open";
   // DEAL-11: right after a copy, the custom fields it could not carry
   const copyNotice = skippedNotice(copyFields, fields);
-  const attention = deal.status === "open" ? (await getStuckDeals(orgId, deal.pipeline_id))[deal.id] : undefined;
+  const attention = deal.status === "open" ? (await getDealAttention(orgId, [deal.id]))[deal.id] : undefined;
   const today = zoneDate(new Date(), context.org.timeZone);
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
