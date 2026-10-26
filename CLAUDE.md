@@ -704,6 +704,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   or erasure block (`app.consent_address_locked`, shared with CAP-07's `app.intake_marketing_consent`, both last redefined in
   020950). Created rows are matched to returned ids by address, never by order. Undo never deletes consents (append-only).
   The advisor's `authenticated_security_definer_function_executable` on it is expected.
+  Since 020985 (owner 26 October 2026, answer 1; fail-safe pending): `consents.import_job_id` (server only) and `consents.cancels` (a
+  cancelling entry: unknown/import/no address, one per entry; constraint `consents_cancel_shape`). `undo_import` / `undo_own_import` call
+  `app.import_consents_cancel` (definer; the caller's own undone job), which cancels only the import's 'granted' entries and their
+  conversion copies (never a 'denied': an undo never lifts an opt-out; hint `consent:cancel`); it locks the records holding them FOR
+  SHARE before reading, and `import_record_consents` holds the job FOR SHARE (a rare cycle with a concurrent merge ends in 40P01). Every
+  state reader (`consent_state_of`, `consent_suppressed`, `consent_address_locked`, `consent_current`, `convert_consents`,
+  `consent_follow_address`) skips a cancelled entry; a later redefinition keeps that line. `app.consent_prepare`, `app.consent_guard`,
+  `app.consent_state_of`, `app.consent_suppressed`, `app.consent_address_locked`, `public.consent_current`, `app.convert_consents`,
+  `public.import_record_consents`, `app.import_record_worked`, `public.undo_import` and `public.undo_own_import` were last redefined in
+  020985; the import's own consents are not "work" for `undo_own_import`.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
