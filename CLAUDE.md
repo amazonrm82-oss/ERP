@@ -94,6 +94,12 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   Owner, 26 October 2026 (QUO-06 answers, approved, not built yet): two more uses under the same conditions. (1) The customer's
+   download of a quote's stored PDF from the quote link: a public route in the `quote_public` pattern (same token, same display
+   rules through `app.quote_link_usable` / the shown version), serves only the stored file, rate limited, counted as a view, database
+   tests and an independent review. (2) The server writes the quote PDF itself: it checks edit rights with the user's session, renders
+   the file, writes it with the service key to a fixed path per version, stores its SHA-256 on the quote; `authenticated` gets no write
+   to the bucket path; every serving checks the fingerprint.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
