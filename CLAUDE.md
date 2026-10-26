@@ -94,12 +94,13 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
-   Owner, 26 October 2026 (QUO-06 answers, approved, not built yet): two more uses under the same conditions. (1) The customer's
-   download of a quote's stored PDF from the quote link: a public route in the `quote_public` pattern (same token, same display
-   rules through `app.quote_link_usable` / the shown version), serves only the stored file, rate limited, counted as a view, database
-   tests and an independent review. (2) The server writes the quote PDF itself: it checks edit rights with the user's session, renders
-   the file, writes it with the service key to a fixed path per version, stores its SHA-256 on the quote; `authenticated` gets no write
-   to the bucket path; every serving checks the fingerprint.
+   In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
+   (`src/features/quotes/pdf-store-server.ts`, called from `pdf-server.ts` after `public.quote_pdf_allowed` with the user's session),
+   which calls only `public.quote_pdf_store()` and uploads (upsert off) only to the path it answers, with the service key; in the
+   eslint allow-list.
+   In use (QUO-06 answer 1, owner 26 October 2026, migration 020995): the customer's PDF download (`src/features/quotes/pdf-public-server.ts`,
+   route `GET /api/forms/quote/<token>/pdf`), which calls only `public.quote_public_pdf()` and downloads only the path it answers,
+   compared with its SHA-256; in the eslint allow-list.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
@@ -968,15 +969,24 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   table headers `paginate.ts`, renderer `render.ts`: fontkit gets `features: "latn"` because lines arrive in visual order; the real-PDF
   unit test fails if that changes). `quotes/pdf.ts` mirrors the QUO-05 document (stored totals only). The PDF is stored once per sent
   quote as a `public.files` row with `files.quote_id` (composite FK cascade; `files_quote_pdf_shape`: PDF only, never note/version/field;
-  `files_one_subject` counts seven columns; unique `files_quote_pdf_one`) in `record-files`, with the sender's session
-  (`storeQuotePdf`), never the service key. Made only while the quote is sent or viewed (hint `quote_pdf:closed`). Kept: never removed
+  `files_one_subject` counts seven columns; unique `files_quote_pdf_one`) in `record-files`, since 020995 written by the server
+  only: `public.quote_pdf_allowed` (invoker, the user's session) then `public.quote_pdf_store` (service_role; `app.quote_pdf_user_may` =
+  `app.can_edit_record`'s rule for a named user, keep in step; upload/stored/busy, 2-minute takeover; each render attempt its own path,
+  `files_path` allows `<org>/<uuid>` on a quote's row only, abandoned paths queued by `app.quote_pdf_abandon`; confirms on object present
+  + PDF + size + the stored `files.sha256`, server-only). authenticated has no insert on `files.quote_id`, `files_insert` refuses a quote
+  branch, `record_files_insert` requires `quote_id is null`; server rows have no uploader; `app.reconcile_pending_files` (last redefined
+  in 020995) never confirms a quote's server row. Every serving compares the bytes with `files.sha256` (staff route `/o/[org]/files/[file]`
+  streams it, 409 "damaged" on a mismatch; legacy rows without one open as before). Made only while the quote is sent or viewed (hint `quote_pdf:closed`). Kept: never removed
   (`files_keep_attached`, `files_delete`, storage `record_files_delete`), except an unconfirmed upload (its uploader, or an owner/admin
   for a quote PDF) and a privacy erasure: `app.audit_erase_core` (last redefined in 020955) calls `app.quote_pdf_drop` (body in the
   pasted 020960, pasted 26 October 2026) for the detached quotes it cleans, under the transaction setting `app.quote_pdf_erase` = the org.
   Quota `max_pdf_per_month` by `app.pdf_take` (definer, `app.pdf_months`, month in the org zone, 30 a minute `rate:pdf`, one 80% notice);
   a removed waiting row gives its count back (`files_quote_pdf_return`). `public.confirm_file_upload` and `app.reconcile_pending_files`
   answer a non-PDF quote object `{ok:false, reason:'type'}`. The files policies, `app.files_keep_attached`, `confirm_file_upload` and
-  `reconcile_pending_files` were last redefined in 020955. No customer download from the public link yet (owner's question).
+  `reconcile_pending_files` were last redefined in 020955. Customer download (020995): `public.quote_public_pdf(token, ip_hash)` (service_role):
+  `quote_link_usable`, the shown version only while shown in full, link window shared with the page + 20 per sender in 10 minutes
+  (`app.quote_pdf_download_counts`, `app.quote_link_sender`, scope `quote`), counts a view; answers path/sha256/name only.
+  `public.quote_public` was last redefined in 020995 (`pdf`). The files insert policy and `record_files_insert` were last altered in 020995.
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
