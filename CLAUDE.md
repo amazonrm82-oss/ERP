@@ -1306,7 +1306,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   App: `src/features/automations/set-field.ts`, builder action "עדכון שדה".
   Since 020610 (DEAL-08 follow-up) `create_deal` takes `pipeline: "source"` and `copy_from_source: true` (deal triggers): the source's
   process, its recurring revenue for the next period (term rounded to whole months) and its lines, copied as the server (the JWT claims
-  are cleared around the copy and restored); `app.run_automation_actions` was last redefined in 020610.
+  are cleared around the copy and restored).
+  Since 020900 (AUT-01 part B, owner 18 October 2026) set_field also writes `preferred_channel` / `preferred_locale` (leads, contacts;
+  the CON-10 lists; a written channel gets source 'manual', the same channel keeps its source) and `expected_close_date` (deals),
+  never names or phones; date fields take {"relative": {"days": 0..365, "unit": "calendar"|"business"}} worked out at run time in the
+  business's zone (`app.automation_relative_date`, no grants; business days by `app.add_business_days`); an invalid one leaves the
+  field and logs ok with the warning 'the relative date is invalid'. A date_reached rule whose own step moves its trigger date can
+  fire again on each new date, and an AUT-06 retry then sees `event_changed`. `app.run_automation_actions` was last redefined in 020900.
 - Automation conditions (AUT-05, migration 020785; owner 18 and 25 October 2026): `automations.conditions` items are a leaf
   {field, op, value?, on?} (`on`: contact|company|deal|lead = the record the rule's record's `<on>_id` points at), an "or" group
   {any: [2..10 leaves]}, working hours {kind: hours, value: in|out} or a weekday {kind: weekday, days: [0..6]}; at most 10 items and
