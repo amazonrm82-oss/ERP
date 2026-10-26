@@ -1063,6 +1063,22 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (invoker) gives paid/balance/state and allocated/credit. `accounting_documents.due_date` (020795): tax invoice or proforma only,
   filled on insert from the customer's terms (`app.document_customer_terms` + `app.payment_due_date`), frozen once cancelled (hint
   `document:due_date`); "באיחור" = due before today with a balance. A payment correction below its allocations: `payment:allocated`.
+- Customer credit (PAY-03, migrations 020885, 020890; owner 25 October 2026): one rule for a payment's credit, computed field
+  `public.payment_credit(payments)` (recorded/confirmed amount less counted allocations; `money_allocation_state` reads it).
+  `public.money_customer_credit` (invoker, PAY-02's customer) feeds the cards; `public.money_apply_credit` (invoker) allocates credit to
+  a document, advances of the document's order or its quote first. Advances: `payments.is_advance` with one optional link
+  `advance_quote_id` | `advance_order_id` (trigger `payments_advance`, hint `payment:advance_link`). List column and filter for
+  owners/admins only: server-kept `public.payment_credit_companies` and `public.customer_credit_totals` (both `currency` ILS), refreshed
+  by DEFERRABLE INITIALLY DEFERRED constraint triggers under an org advisory lock at commit (no deadlock with PAY-02's locks);
+  `public.credit_balance` / `has_credit(contacts|companies)` over definer `app.customer_credit_of` (null to non-admins). The
+  advisor's `function_search_path_mutable` on `payment_credit`, `credit_balance`, `has_credit` is expected (inlined, no SET).
+  Test 64's re-run list is guarded by `staleGrants()` (tests/db/rerun.ts): any table-level revoke counts as a reset.
+- Customer ledger (BAL-01, migration 020895; owner 25 October 2026): `public.customer_ledger(org, contact, company, from, to)` (invoker),
+  opened only by `app.can_record_payments` with the `balances`, `documents`, `payments` keys. When any row of the customer (PAY-02 scope,
+  any date) is unreadable (`app.customer_money_rows`, definer, a count only), the answer is `partial: true` with the caller's lines and
+  no balance of any kind. A proforma is a debit on its own date; the tax invoice that bills it carries only the difference, netted
+  only against a proforma that is a line of this ledger and dated on or before it (lead's decision). Accepted: a conservative false
+  "partial"; a proforma billed by an invoice outside the ledger keeps its debit while open_debt gives it 0.
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
