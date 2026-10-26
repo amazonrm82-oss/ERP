@@ -1990,7 +1990,7 @@ try {
   await ownerDesk.locator('input[type="file"]').setInputFiles({ name: "לידים.csv", mimeType: "text/csv", buffer: Buffer.from("﻿" + leadsCsv, "utf8") });
   await expectText(ownerDesk, "6 שורות");
   if ((await ownerDesk.getByLabel("שדה לעמודה טלפון").inputValue()) !== "phone") throw new Error("the phone column was not mapped by itself");
-  if ((await ownerDesk.getByLabel("שדה לעמודה הערות").inputValue()) !== "message") throw new Error("the notes column was not mapped by itself");
+  if ((await ownerDesk.getByLabel("שדה לעמודה הערות").inputValue()) !== "import_note") throw new Error("the notes column was not mapped to timeline notes by itself");
   await ownerDesk.getByRole("button", { name: "בדיקת 20 השורות הראשונות" }).click();
   await expectText(ownerDesk, "חסר שם, טלפון או אימייל");
   await shot(ownerDesk, "90-import-preview-1280");
