@@ -688,6 +688,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   RPCs (definer, owners/admins): `consent_blocklist_add/remove/find/summary`; `public.consent_record_blocks` tells a record's card
   (whoever reads the record) 'listed' (owners/admins) or 'blocked' for its own addresses only. `app.consent_state_of`,
   `consent_suppressed`, `consent_address_locked`, `consent_prepare`, `consent_backfill_hashes` were last redefined in 020970.
+  Since 021030 (owner 26 October 2026, answer 4) `consent_blocklist.note` (1..200, no client select grant) is written once by
+  `public.consent_blocklist_add_noted` (`consent_blocklist_add` keeps its signature, no note; the audit says `with_note` only), returned by
+  `consent_blocklist_find`, only emptied (guard). `app.audit_erase_core` (last redefined in 021030) first calls
+  `app.consent_blocklist_erase_notes`: the record's addresses from its deleted row, audit history (CON-01 `extra_phone`/`extra_email`
+  lines included, label cut off) and consents, matched by hash or by a waiting entry's value. `app.consent_blocklist_guard`,
+  `consent_blocklist_add` and `consent_blocklist_find` were last redefined in 021030. The advisor's finding on `_add_noted` is expected.
   **Senders (CNS-07 and every marketing send) judge only by `app.consent_suppressed(org, channel, address)`, never by a record's
   consent state or its card**: the blocklist and an opt-out or erasure of the same address on another record are not in the
   record's own state.
@@ -719,6 +725,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.consent_state_of`, `app.consent_suppressed`, `app.consent_address_locked`, `public.consent_current`, `app.convert_consents`,
   `public.import_record_consents`, `app.import_record_worked`, `public.undo_import` and `public.undo_own_import` were last redefined in
   020985; the import's own consents are not "work" for `undo_own_import`.
+  Since 021025 (CNS-06 answer 3) `public.import_record_consents` (last redefined there; the job is taken FOR NO KEY UPDATE) counts its
+  'locked' answers into server-only `import_jobs.consents_locked` (wizard and import history line, `consentsLockedText`); a
+  `consent:blocklisted` refusal is 'locked'.
 - Meeting conflicts (CAL-05, migration 0084): `public.meeting_busy()` (security definer, writers only) returns busy
   times of colleagues; id and title only for a meeting the caller may read, mirroring the `meetings_select` policy (keep
   the two in step). The app warns and lets the user save anyway.
@@ -800,7 +809,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` was last redefined in 021000 (AUT-03; keep its `app.emit_form_submitted` calls) and `public.intake_form` in
-  020935 (`app.run_automation_actions` in 020980); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020935 (`app.run_automation_actions` in 021035); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
@@ -1470,6 +1479,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   owner is not usable, the quote has no owner'); a COL-05 hold on the quote's contact or its company (plan flag `collection`) never
   refuses: the quote is made and the step is ok with 'the customer is on hold' / 'the customer''s company is on hold'. A create_quote
   step carries `warning` (the first) and `warnings` (all). The JWT claims are put aside and restored only when they were set.
+  Since 021035 (owner's answer (ב)) the quote's owner is the record's usable owner first, else the step's `owner_id` as a fallback,
+  else none with 'the record owner is not usable, the quote has no owner'; the 'chosen owner' warning is retired
+  (`RETIRED_STEP_WARNINGS`). `app.run_automation_actions` was last redefined in 021035.
 - Automation conditions (AUT-05, migration 020785; owner 18 and 25 October 2026): `automations.conditions` items are a leaf
   {field, op, value?, on?} (`on`: contact|company|deal|lead = the record the rule's record's `<on>_id` points at), an "or" group
   {any: [2..10 leaves]}, working hours {kind: hours, value: in|out} or a weekday {kind: weekday, days: [0..6]}; at most 10 items and
