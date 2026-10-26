@@ -25,7 +25,7 @@ export function QuotePdfButton({ orgId, quoteId, href, canStore }: Props) {
   const [pending, startTransition] = useTransition();
   if (href) {
     return (
-      // a plain link: the route answers with a redirect to a one-minute signed address
+      // a plain link: the route checks the file against its SHA-256 and sends it
       <a href={href} className={buttonClasses("secondary", "sm")}>
         הורדת PDF
       </a>

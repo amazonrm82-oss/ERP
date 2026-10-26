@@ -3,13 +3,14 @@ import "@/features/print/print.css";
 import type { Metadata } from "next";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
+import { buttonClasses } from "@/components/ui/button";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
-import { STATUS_PAGE_TEXT } from "@/features/quotes/public";
+import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
 import { formatDate, formatMoney } from "@/lib/format";
 
@@ -154,8 +155,14 @@ export default async function PublicQuotePage({ params }: Props) {
           , שכבר אושרה.
         </p>
       ) : null}
-      <div data-print-page="" className="flex justify-end print:hidden">
-        <PrintButton label="הדפסה או שמירה כ-PDF" />
+      <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
+        {/* QUO-06 follow-up: the PDF the business kept for this version, only when one exists */}
+        {page.hasPdf ? (
+          <a href={publicQuotePdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
+            הורדת PDF
+          </a>
+        ) : null}
+        <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
       </div>
       <QuoteDocument
         data={{

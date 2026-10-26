@@ -64,6 +64,10 @@ const eslintConfig = defineConfig([
       "src/features/site-widgets/public-server.ts",
       // ORD-05: the customer's order confirmation page, approved public secret-link pattern (owner, 20 October 2026)
       "src/features/orders/public-server.ts",
+      // QUO-06 follow-ups (owner, 26 October 2026): the server alone writes a quote's PDF (public.quote_pdf_store), and the
+      // customer downloads it from the quote's link (public.quote_public_pdf)
+      "src/features/quotes/pdf-store-server.ts",
+      "src/features/quotes/pdf-public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

@@ -575,6 +575,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_consent_awaiting_confirmation.sql",
       // CNS-05 undo redefines the consent readers, undo_import, undo_own_import and app.import_record_worked last
       "_import_consent_undo.sql",
+      // the QUO-06 follow-ups redefine public.quote_public() of _quote_link_expired_lists.sql last, and alter the files insert
+      // policy and the storage policy record_files_insert after _quote_pdfs.sql (only the server writes a quote's PDF)
+      "_quote_pdf_server.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

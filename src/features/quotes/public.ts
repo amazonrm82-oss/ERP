@@ -15,6 +15,8 @@ import { isNoVatReason, isQuoteStatus } from "./schema";
 export const QUOTE_LINK_TOKEN = /^[A-Za-z0-9_-]{64}$/;
 
 export const publicQuotePath = (token: string) => `/f/quote/${token}`;
+/** QUO-06 follow-up: the customer's download of the stored PDF of the quote the link shows */
+export const publicQuotePdfPath = (token: string) => `/api/forms/quote/${token}/pdf`;
 
 const money = z.coerce.number().int();
 const nullableMoney = z.coerce.number().int().nullable();
@@ -88,6 +90,8 @@ const answerSchema = z.object({
   // GAP-10: the quote this one adds to, and this quote's accepted addenda (absent before 020430)
   addendum: z.object({ number: text }).nullish(),
   addenda: z.array(z.object({ number: text, title: z.string(), total_agorot: money })).optional(),
+  // QUO-06 follow-up: the version shown has a stored, fingerprinted PDF the customer may download
+  pdf: z.boolean().optional(),
   // GAP-09: the payment schedule, each step's share of the total worked out by the database
   schedule: z.array(
     z.object({
@@ -120,13 +124,15 @@ export type PublicQuote = {
   // GAP-10: this quote adds to an accepted quote (its number); and the accepted addenda of this quote
   addendumOf: { number: string | null } | null;
   addenda: { key: string; number: string | null; title: string; totalAgorot: number }[];
+  // QUO-06 follow-up: a stored PDF of this version can be downloaded from the link
+  hasPdf: boolean;
 };
 
 /** The answer as the page needs it, or null when it does not have the expected shape. */
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, accepted_on, addendum, addenda } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, accepted_on, addendum, addenda, pdf } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -214,6 +220,7 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     acceptedOn: accepted_on ?? null,
     addendumOf: addendum ? { number: addendum.number } : null,
     addenda: (addenda ?? []).map((a, index) => ({ key: `addendum-${index + 1}`, number: a.number, title: a.title, totalAgorot: a.total_agorot })),
+    hasPdf: pdf === true,
   };
 }
 

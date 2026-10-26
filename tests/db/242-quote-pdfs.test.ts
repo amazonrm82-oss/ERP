@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { addMember, asAdmin, asMfaUser, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead, pgError, type Query } from "./helpers";
+import { addMember, asAdmin, asMfaUser, asService, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead, pgError, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -32,24 +32,39 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
       if (send) await q("select public.quote_send($1, $2)", [org, id]);
       return id;
     });
-  const store = (u: U, quoteId: string, type = "application/pdf", orgId = org) =>
-    asUser(u.id, (q) =>
-      one<{ id: string; storage_path: string; unconfirmed_since: Date | null }>(
-        q,
-        "insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'הצעת מחיר.pdf', $3, 20000) returning id, storage_path, unconfirmed_since",
-        [orgId, quoteId, type],
-      ),
+  // QUO-06 follow-up (owner's answer 3): only the server writes a quote's PDF, through public.quote_pdf_store (service_role
+  // only), which answers the one path to upload to and confirms the row on the second call once the object is there
+  type Stored = { id: string; storage_path: string; unconfirmed_since: Date | null };
+  const SHA = "a".repeat(64);
+  const call = (u: U, quoteId: string, orgId = org, sha = SHA) =>
+    asService(async (q) =>
+      (
+        await one<{ r: { status: string; path?: string; file_id?: string } }>(q, "select public.quote_pdf_store($1, $2, $3, 20000, $4, 'הצעת מחיר.pdf') as r", [
+          orgId,
+          quoteId,
+          u.id,
+          sha,
+        ])
+      ).r,
     );
-  // what the Storage API and confirm_file_upload do after an upload: the object with its measured type, then the check
-  const upload = async (u: U, file: { id: string; storage_path: string }, type = "application/pdf") => {
-    await asUser(u.id, (q) => q("insert into storage.objects (bucket_id, name) values ('record-files', $1)", [file.storage_path]));
-    await asAdmin((q) =>
-      q("update storage.objects set metadata = jsonb_build_object('size', 20000::bigint, 'mimetype', $2::text) where bucket_id = 'record-files' and name = $1", [
+  const row = (quoteId: string) =>
+    asAdmin((q) => one<Stored>(q, "select id, storage_path, unconfirmed_since from public.files where quote_id = $1", [quoteId]));
+  // the first call: the waiting row (the quota is taken here)
+  const store = async (u: U, quoteId: string, orgId = org): Promise<Stored> => {
+    const answer = await call(u, quoteId, orgId);
+    expect(answer.status).toBe("upload");
+    return row(quoteId);
+  };
+  // what the server does next: the object with its measured type (the service key), then the second call
+  const upload = async (u: U, file: Stored, quoteId: string, type = "application/pdf") => {
+    await asAdmin(async (q) => {
+      await q("insert into storage.objects (bucket_id, name) values ('record-files', $1) on conflict do nothing", [file.storage_path]);
+      await q("update storage.objects set metadata = jsonb_build_object('size', 20000::bigint, 'mimetype', $2::text) where bucket_id = 'record-files' and name = $1", [
         file.storage_path,
         type,
-      ]),
-    );
-    return asUser(u.id, async (q) => (await one<{ r: { ok: boolean; reason?: string } }>(q, "select public.confirm_file_upload($1, $2) as r", [org, file.id])).r);
+      ]);
+    });
+    return call(u, quoteId);
   };
   const remove = (u: U, fileId: string) => asUser(u.id, async (q) => (await q("delete from public.files where id = $1", [fileId])).rowCount);
   const orphaned = (path: string) => asAdmin((q) => count(q, "select 1 from app.orphan_files where storage_path = $1", [path]));
@@ -83,12 +98,14 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
     await setLimit(1000);
   });
 
-  it("whoever may edit a sent quote stores its PDF; whoever reads the quote reads it; others do not", async () => {
+  it("whoever may edit a sent quote has its PDF stored by the server; whoever reads the quote reads it; others do not", async () => {
     const id = await quote(member);
     const file = await store(member, id);
     expect(file.storage_path).toBe(`${org}/${file.id}`);
-    // a person's row waits for its upload, like every file
+    // the row waits for its object; nobody's upload: the server's row has no uploader
     expect(file.unconfirmed_since).not.toBeNull();
+    expect(await asAdmin((q) => one<{ u: string | null }>(q, "select uploaded_by as u from public.files where id = $1", [file.id]))).toEqual({ u: null });
+    expect(await upload(member, file, id)).toEqual({ status: "stored", file_id: file.id });
     for (const u of [owner, admin, member]) expect(await sees(u, file.id), u.email).toBe(1);
     expect(await sees(outsider, file.id)).toBe(0);
     // a viewer reads what it reads of the quote, never more
@@ -96,44 +113,51 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
     expect(await sees(viewer, file.id)).toBe(viewerReadsQuote);
   });
 
-  it("a viewer, another member who may not edit the deal and an outsider cannot store one", async () => {
+  it("a viewer, another member who may not edit the deal and an outsider get none stored", async () => {
     const id = await quote(owner);
-    expect((await pgError(store(viewer, id))).code).toBe("42501");
-    expect((await pgError(store(outsider, id))).code).toBe("42501");
+    for (const u of [viewer, outsider, other]) expect((await pgError(call(u, id))).code, u.email).toBe("42501");
     // the outsider's own business, pointing at this business's quote
-    expect(["42501", "23503"]).toContain((await pgError(store(outsider, id, "application/pdf", outsiderOrg))).code);
-    // a member edits only the deals they own
-    expect((await pgError(store(other, id))).code).toBe("42501");
+    expect((await pgError(call(outsider, id, outsiderOrg))).code).toBe("42501");
+    // and a person never writes the row themselves any more
+    expect((await pgError(
+      asUser(owner.id, (q) => q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, id])),
+    )).code).toBe("42501");
+    expect(await asAdmin((q) => count(q, "select 1 from public.files where quote_id = $1", [id]))).toBe(0);
   });
 
   it("a draft has no PDF; a quote has one PDF; it is a PDF", async () => {
     const draft = await quote(owner, false);
-    expect((await pgError(store(owner, draft))).code).toBe("42501");
+    expect((await pgError(call(owner, draft))).hint).toBe("quote_pdf:draft");
     expect((await pgError(asAdmin((q) => q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, draft])))).hint).toBe(
       "quote_pdf:draft",
     );
     const sent = await quote(owner);
-    expect((await pgError(store(owner, sent, "image/png"))).code).toBe("23514");
-    await store(owner, sent);
-    expect((await pgError(store(owner, sent))).code).toBe("23505");
+    expect((await pgError(asAdmin((q) => q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.png', 'image/png', 1)", [org, sent])))).code).toBe(
+      "23514",
+    );
+    const file = await store(owner, sent);
+    await upload(owner, file, sent);
+    // asked again: the same file, never a second one
+    expect(await call(owner, sent)).toEqual({ status: "stored", file_id: file.id });
+    expect((await pgError(asAdmin((q) => q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, sent])))).code).toBe(
+      "23505",
+    );
     // never on a note, never a version of another file
-    const third = await quote(owner);
-    const first = await store(owner, third);
     const version = await pgError(
-      asUser(owner.id, (q) =>
-        q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes, previous_id) values ($1, $2, 'x.pdf', 'application/pdf', 1, $3)", [org, third, first.id]),
+      asAdmin((q) =>
+        q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes, previous_id) values ($1, $2, 'x.pdf', 'application/pdf', 1, $3)", [org, sent, file.id]),
       ),
     );
     expect(["23514", "23505", "P0001"]).toContain(version.code);
   });
 
-  it("is kept: nobody deletes a confirmed quote PDF; the uploader removes an upload that never arrived", async () => {
+  it("is kept: nobody deletes a confirmed quote PDF; an owner or admin removes a row whose object never arrived", async () => {
     const id = await quote(owner);
     const waiting = await store(owner, id);
-    expect(await asUser(owner.id, async (q) => (await q("delete from public.files where id = $1", [waiting.id])).rowCount)).toBe(1);
+    expect(await remove(owner, waiting.id)).toBe(1);
     const file = await store(owner, id);
-    await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = $1", [file.id]));
-    for (const u of [owner, admin]) expect(await asUser(u.id, async (q) => (await q("delete from public.files where id = $1", [file.id])).rowCount), u.email).toBe(0);
+    await upload(owner, file, id);
+    for (const u of [owner, admin]) expect(await remove(u, file.id), u.email).toBe(0);
     expect((await pgError(asAdmin((q) => q("delete from public.files where id = $1", [file.id])))).hint).toBe("file:kept");
     expect(await sees(owner, file.id)).toBe(1);
   });
@@ -194,7 +218,7 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
   it("is made later only while the quote is sent or viewed (review L3)", async () => {
     const id = await quote(owner);
     await asUser(owner.id, (q) => q("select public.quote_cancel($1, $2)", [org, id]));
-    expect((await pgError(store(owner, id))).code).toBe("42501");
+    expect((await pgError(store(owner, id))).hint).toBe("quote_pdf:closed");
     expect(
       (await pgError(asAdmin((q) => q("insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, id])))).hint,
     ).toBe("quote_pdf:closed");
@@ -203,24 +227,30 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
     await store(owner, viewed);
   });
 
-  it("a non-PDF object is answered, not raised; the real PDF confirms (review L2)", async () => {
+  it("a non-PDF object is not confirmed; the real PDF confirms (review L2)", async () => {
     const id = await quote(owner);
     const file = await store(owner, id);
-    expect(await upload(owner, file, "image/png")).toEqual({ ok: false, reason: "type" });
+    // review M1: that path is given up (queued for the cleanup) and the attempt gets a fresh one
+    const refused = await upload(owner, file, id, "image/png");
+    expect(refused.status).toBe("upload");
+    expect(refused.path).not.toBe(file.storage_path);
+    expect(await orphaned(file.storage_path)).toBe(1);
     const row = await asAdmin((q) => one<{ unconfirmed_since: Date | null; mime_type: string }>(q, "select unconfirmed_since, mime_type from public.files where id = $1", [file.id]));
     expect(row.unconfirmed_since).not.toBeNull();
     expect(row.mime_type).toBe("application/pdf");
     const other = await quote(owner);
-    expect(await upload(owner, await store(owner, other))).toEqual({ ok: true });
+    const second = await store(owner, other);
+    expect(await upload(owner, second, other)).toEqual({ status: "stored", file_id: second.id });
   });
 
-  it("an owner or admin removes someone else's upload that never arrived, never a confirmed PDF; a member cannot (review L1)", async () => {
+  it("an owner or admin removes a waiting row whose object never arrived, never a confirmed PDF; a member cannot (review L1)", async () => {
     const id = await quote(member);
     const waiting = await store(member, id);
     expect(await remove(other, waiting.id)).toBe(0);
     expect(await remove(admin, waiting.id)).toBe(1);
-    const again = await store(member, id);
-    await asAdmin((q) => q("update public.files set unconfirmed_since = null where id = $1", [again.id]));
+    expect(await remove(member, (await store(member, id)).id)).toBe(0);
+    const again = await row(id);
+    await upload(member, again, id);
     for (const u of [owner, admin, member]) expect(await remove(u, again.id), u.email).toBe(0);
   });
 
@@ -236,7 +266,7 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
         expect(await produced()).toBe(0);
       }
       const kept = await store(owner, id);
-      await upload(owner, kept);
+      await upload(owner, kept, id);
       expect(await produced()).toBe(1);
     } finally {
       await setLimit(1000);
@@ -252,7 +282,7 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
       return { contactId: contact, quoteId: id };
     });
     const file = await store(member, quoteId);
-    expect(await upload(member, file)).toEqual({ ok: true });
+    expect(await upload(member, file, quoteId)).toEqual({ status: "stored", file_id: file.id });
     // the purge alone keeps it (the quote is detached and still the business's)
     await asUser(owner.id, async (q) => {
       await q("update public.contacts set deleted_at = now() where id = $1", [contactId]);
@@ -295,7 +325,7 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
       return id;
     });
     const file = await store(member, quoteId);
-    expect(await upload(member, file)).toEqual({ ok: true });
+    expect(await upload(member, file, quoteId)).toEqual({ status: "stored", file_id: file.id });
     await asMfaUser(admin.id, (q) => q("select public.privacy_erase_person($1, 'leads', $2, '[]'::jsonb, 'הלקוח ביקש', '{}'::jsonb, true)", [org, lead]));
     expect(await asAdmin((q) => count(q, "select 1 from public.files where id = $1", [file.id]))).toBe(0);
     expect(await orphaned(file.storage_path)).toBe(1);

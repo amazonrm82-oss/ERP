@@ -1067,6 +1067,9 @@ export type FileRow = {
   custom_field_key: string | null;
   // QUO-06 (migration quote_pdfs): the sent quote whose PDF this is (one per quote, kept, never deleted)
   quote_id: string | null;
+  // QUO-06 follow-up (migration quote_pdf_server): the SHA-256 (hex) of a quote PDF's bytes, server-written; every serving
+  // compares the bytes with it. Null on every other file (and on a quote PDF kept before the fingerprint existed)
+  sha256: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2639,7 +2642,6 @@ export type Database = {
           accounting_document_id?: string | null;
           payment_id?: string | null;
           custom_field_key?: string | null;
-          quote_id?: string | null;
         },
         Record<string, never>
       >;
@@ -3427,6 +3429,11 @@ export type Database = {
       quote_link_revoke: { Args: { p_org: string; p_quote: string }; Returns: boolean };
       quote_link_status: { Args: { p_org: string; p_quote: string }; Returns: Json };
       quote_public: { Args: { p_token: string }; Returns: Json };
+      // QUO-06 follow-ups: the person's right (their own session); the server's write (service_role only); the customer's
+      // download of the shown version's stored PDF (service_role only)
+      quote_pdf_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
+      quote_pdf_store: { Args: { p_org: string; p_quote: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null }; Returns: Json };
+      quote_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };
       log_list_export: { Args: { p_org: string; p_object: string; p_format: string; p_rows: number; p_scope: string; p_filters: Json }; Returns: undefined };
