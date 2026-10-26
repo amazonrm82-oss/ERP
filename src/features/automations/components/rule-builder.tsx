@@ -19,7 +19,7 @@ import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "..
 import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
 import { ACTION_LABELS, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
-import { setFieldChoices, type SetFieldChoice } from "../set-field";
+import { CHANNEL_CHOICES, isDateSetField, LOCALE_CHOICES, RELATIVE_DATE_MAX_DAYS, setFieldChoices, type SetFieldChoice } from "../set-field";
 
 import { ConditionsEditor } from "./conditions-editor";
 
@@ -48,7 +48,7 @@ function blankAction(type: ActionType): Draft {
     case "move_deal_stage":
       return { type, stage_id: "" };
     case "set_field":
-      return { type, field: "", value: "" };
+      return { type, field: "", value: "", relative_unit: "", relative_days: "" };
     case "create_deal":
       return { type, name: "", pipeline_id: "", stage_id: "", amount: "", assign: "owner", user_id: "", pipeline_source: "", copy_source: "" };
     case "create_note":
@@ -482,7 +482,12 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
       }
       return (
         <div className="grid gap-3 sm:grid-cols-2">
-          <SelectField label={`שדה (פעולה ${n})`} value={action.field} onChange={(e) => onChange({ field: e.target.value, value: "" })} controlSize="sm">
+          <SelectField
+            label={`שדה (פעולה ${n})`}
+            value={action.field}
+            onChange={(e) => onChange({ field: e.target.value, value: "", relative_unit: "", relative_days: "" })}
+            controlSize="sm"
+          >
             <option value="">בחירת שדה</option>
             {choices.map((item) => (
               <option key={item.key} value={item.key}>
@@ -490,7 +495,36 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
               </option>
             ))}
           </SelectField>
-          {choice ? <SetFieldValue key={choice.key} choice={choice} value={action.value ?? ""} n={n} lookups={lookups} onChange={(value) => onChange({ value })} /> : null}
+          {/* AUT-01 part B: a date field takes a fixed date or one counted from the day the rule runs */}
+          {choice && isDateSetField(entity, choice.key, lookups) ? (
+            <SelectField
+              label={`איזה תאריך (פעולה ${n})`}
+              value={action.relative_unit ?? ""}
+              onChange={(e) => onChange({ relative_unit: e.target.value, relative_days: e.target.value ? action.relative_days || "0" : "", value: "" })}
+              controlSize="sm"
+            >
+              <option value="">תאריך קבוע</option>
+              <option value="calendar">בעוד X ימים</option>
+              <option value="business">בעוד X ימי עבודה</option>
+            </SelectField>
+          ) : null}
+          {choice && action.relative_unit ? (
+            <TextField
+              label={action.relative_unit === "business" ? `ימי עבודה (0 עד ${RELATIVE_DATE_MAX_DAYS})` : `ימים (0 עד ${RELATIVE_DATE_MAX_DAYS})`}
+              value={action.relative_days ?? ""}
+              onChange={(e) => onChange({ relative_days: e.target.value })}
+              dir="ltr"
+              inputMode="numeric"
+              controlSize="sm"
+              hint={
+                action.relative_unit === "business"
+                  ? "נספר מהיום שבו האוטומציה רצה, בלי ימי מנוחה וחגים של העסק. 0: היום, או יום העבודה הבא."
+                  : "נספר מהיום שבו האוטומציה רצה. 0: היום."
+              }
+            />
+          ) : choice ? (
+            <SetFieldValue key={choice.key} choice={choice} value={action.value ?? ""} n={n} lookups={lookups} onChange={(value) => onChange({ value })} />
+          ) : null}
         </div>
       );
     }
@@ -528,6 +562,10 @@ function SetFieldValue({
   );
   if (choice.key === "source_id") return list(lookups.sources.map((s) => ({ value: s.id, label: s.name })));
   if (choice.key === "task_type") return list(TASK_TYPES.map((t) => ({ value: t.value, label: t.label })), false);
+  // AUT-01 part B: the CON-10 lists, and the deal's expected close date
+  if (choice.key === "preferred_channel") return list(CHANNEL_CHOICES.map((c) => ({ value: c.value, label: c.label })));
+  if (choice.key === "preferred_locale") return list(LOCALE_CHOICES.map((c) => ({ value: c.value, label: c.label })));
+  if (choice.key === "expected_close_date") return <DateField label={label} value={value} onChange={onChange} hint="בלי תאריך: השדה יתרוקן." />;
   const field = choice.definition;
   if (!field) return null;
   const text = (props: { dir?: "ltr"; inputMode?: "decimal" | "numeric" | "tel" | "email" | "url"; type?: string; hint?: string }) => (

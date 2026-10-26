@@ -204,11 +204,17 @@ export function actionsFor(entity: Entity): ActionType[] {
 
 /**
  * AUT-01: the built-in fields a "set_field" step may write (the engine, app.run_automation_actions, accepts the
- * same list). Status, stage, owner and tags have their own actions; custom fields are "cf:<key>".
+ * same list; tests/unit/automation-set-field.test.ts reads the migration). Status, stage, owner and tags have their
+ * own actions; custom fields are "cf:<key>". Part B (owner, 18 October 2026): the preferred channel and language and
+ * the expected close date; never a name or a phone (an automation does not rewrite identity).
  */
-export const BUILTIN_SET_FIELDS: Array<{ key: "source_id" | "task_type"; label: string; entities: Entity[] }> = [
+export type BuiltinSetField = "source_id" | "task_type" | "preferred_channel" | "preferred_locale" | "expected_close_date";
+export const BUILTIN_SET_FIELDS: Array<{ key: BuiltinSetField; label: string; entities: Entity[] }> = [
   { key: "source_id", label: "מקור", entities: ["lead", "contact", "deal"] },
   { key: "task_type", label: "סוג המשימה", entities: ["task"] },
+  { key: "preferred_channel", label: "ערוץ מועדף", entities: ["lead", "contact"] },
+  { key: "preferred_locale", label: "שפה מועדפת", entities: ["lead", "contact"] },
+  { key: "expected_close_date", label: "תאריך סגירה צפוי", entities: ["deal"] },
 ];
 
 export const TASK_TYPES = [

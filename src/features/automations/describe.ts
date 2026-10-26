@@ -126,6 +126,8 @@ export const STEP_WARNINGS: Record<string, string> = {
   "the requested owner is away, the lead stays with its owner": "האחראי המבוקש נעדר, הליד נשאר אצל {name}",
   // DEAL-08 follow-up: a line of the source deal the rules no longer let in
   "some lines were not copied": "העסקה נוצרה בלי חלק מהשורות: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
+  // AUT-01 part B: a relative date the engine could not work out; the field was left as it was
+  "the relative date is invalid": "השדה לא עודכן: לא ניתן לחשב את התאריך היחסי",
 };
 
 /** The Hebrew text of a step warning; `{name}` is filled from the step's `warning_name`. */

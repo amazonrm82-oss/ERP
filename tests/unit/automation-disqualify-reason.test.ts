@@ -108,6 +108,8 @@ describe("run log warnings", () => {
       "the business-day offset is invalid",
       "the owner is away, the lead has no owner",
       "the reason no longer exists",
+      // AUT-01 part B: a set_field step's relative date
+      "the relative date is invalid",
       "the requested owner is away, the lead stays with its owner",
     ]);
     for (const warning of written) {

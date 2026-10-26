@@ -53,6 +53,9 @@ const actionSchema = z.discriminatedUnion("type", [
     type: z.literal("set_field"),
     field: z.string().min(1, { error: "יש לבחור שדה." }).max(100),
     value: z.string().max(10_000, { error: "הערך ארוך מדי." }).optional(),
+    // AUT-01 part B: a relative date on a date field ("calendar" or "business" days, 0..365 as typed)
+    relative_unit: z.enum(["calendar", "business"]).optional(),
+    relative_days: z.string().max(10, { error: "מספר הימים ארוך מדי." }).optional(),
   }),
   // AUT-02: a new deal for the record's customer; the amount in shekels as typed (empty = no amount)
   z.object({

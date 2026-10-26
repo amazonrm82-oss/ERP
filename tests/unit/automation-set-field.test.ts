@@ -1,9 +1,15 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
+import { CONTACT_CHANNELS, CONTACT_LOCALES } from "@/features/contacts/preferences";
+import { BUILTIN_SET_FIELDS } from "@/features/automations/definitions";
 
 import { fromDbRule, toDbRule } from "@/features/automations/convert";
 import type { Lookups } from "@/features/automations/queries";
 import { ruleSchema } from "@/features/automations/schema";
-import { describeSetField, setFieldChoices, setFieldDraft, setFieldValue } from "@/features/automations/set-field";
+import { describeSetField, isDateSetField, relativeOf, setFieldChoices, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "@/features/automations/set-field";
 import type { FieldDefinition, FieldType } from "@/features/custom-fields/types";
 
 // AUT-01: the builder's typed value -> the stored JSON value (the same rules as a record form), and back.
@@ -45,6 +51,7 @@ const lookups: Lookups = {
       field("mail", "email"),
     ],
     company: [field("region", "select", { options: ["צפון"] })],
+    deal: [field("kickoff", "date"), field("deal_note", "text")],
   },
 };
 
@@ -52,6 +59,8 @@ describe("set_field values (AUT-01)", () => {
   it("offers the built-in fields of the record type, then its custom fields", () => {
     expect(setFieldChoices("lead", lookups).map((c) => c.key)).toEqual([
       "source_id",
+      "preferred_channel",
+      "preferred_locale",
       "cf:note",
       "cf:size",
       "cf:budget",
@@ -159,5 +168,141 @@ describe("set_field values (AUT-01)", () => {
     // a bad value is refused when the rule is saved
     const bad = ruleSchema.parse({ name: "x", trigger: "lead:created", conditions: [], actions: [{ type: "set_field", field: "cf:tier", value: "ארד" }] });
     expect(typeof toDbRule(bad, lookups)).toBe("string");
+  });
+
+  it("part B: the preferred channel and language of leads and contacts, and the deal's expected close date", () => {
+    expect(setFieldChoices("contact", lookups).map((c) => c.key)).toEqual(["source_id", "preferred_channel", "preferred_locale"]);
+    expect(setFieldChoices("deal", lookups).map((c) => c.key)).toEqual(["source_id", "expected_close_date", "cf:kickoff", "cf:deal_note"]);
+    expect(setFieldChoices("company", lookups).map((c) => c.key)).toEqual(["cf:region"]);
+    for (const entity of ["lead", "contact"] as const) {
+      expect(setFieldValue(entity, "preferred_channel", "whatsapp", lookups)).toEqual({ value: "whatsapp" });
+      expect(setFieldValue(entity, "preferred_channel", "", lookups)).toEqual({ value: null });
+      expect(setFieldValue(entity, "preferred_channel", "fax", lookups)).toBe("יש לבחור ערוץ מהרשימה.");
+      expect(setFieldValue(entity, "preferred_locale", "am", lookups)).toEqual({ value: "am" });
+      expect(setFieldValue(entity, "preferred_locale", "", lookups)).toEqual({ value: null });
+      expect(setFieldValue(entity, "preferred_locale", "de", lookups)).toBe("יש לבחור שפה מהרשימה.");
+      expect(setFieldValue(entity, "expected_close_date", "2026-12-31", lookups)).toBe("השדה לא מתאים לסוג הרשומה.");
+    }
+    expect(setFieldValue("deal", "expected_close_date", "2026-12-31", lookups)).toEqual({ value: "2026-12-31" });
+    expect(setFieldValue("deal", "expected_close_date", "", lookups)).toEqual({ value: null });
+    expect(setFieldValue("deal", "expected_close_date", "2026-02-30", lookups)).toBe("תאריך הסגירה הצפוי לא תקין.");
+    for (const field of ["preferred_channel", "preferred_locale"]) {
+      expect(setFieldValue("deal", field, "he", lookups)).toBe("השדה לא מתאים לסוג הרשומה.");
+      expect(setFieldValue("company", field, "he", lookups)).toBe("השדה לא מתאים לסוג הרשומה.");
+      expect(setFieldValue("task", field, "he", lookups)).toBe("השדה לא מתאים לסוג הרשומה.");
+    }
+    // names and phones never
+    for (const [entity, field] of [["lead", "full_name"], ["lead", "phone"], ["contact", "first_name"], ["contact", "phone"], ["deal", "name"]] as const) {
+      expect(setFieldValue(entity, field, "x", lookups)).toBe("השדה לא מתאים לסוג הרשומה.");
+    }
+    expect(describeSetField("lead", "preferred_channel", "whatsapp", lookups)).toBe("ערוץ מועדף: וואטסאפ");
+    expect(describeSetField("contact", "preferred_locale", "ar", lookups)).toBe("שפה מועדפת: ערבית");
+    expect(describeSetField("contact", "preferred_locale", null, lookups)).toBe("שפה מועדפת: ריקון");
+    expect(describeSetField("deal", "expected_close_date", "2026-12-31", lookups)).toMatch(/31/);
+  });
+
+  it("part B: a relative date, on date fields only, 0..365 whole days", () => {
+    const r = (entity: "lead" | "deal", field: string, unit: string, days: string) => setFieldValue(entity, field, "", lookups, { unit, days });
+    expect(isDateSetField("deal", "expected_close_date", lookups)).toBe(true);
+    expect(isDateSetField("deal", "cf:kickoff", lookups)).toBe(true);
+    expect(isDateSetField("lead", "cf:meet", lookups)).toBe(true);
+    expect(isDateSetField("lead", "expected_close_date", lookups)).toBe(false);
+    expect(isDateSetField("lead", "cf:note", lookups)).toBe(false);
+    expect(r("deal", "expected_close_date", "calendar", "10")).toEqual({ value: { relative: { days: 10, unit: "calendar" } } });
+    expect(r("deal", "expected_close_date", "business", "0")).toEqual({ value: { relative: { days: 0, unit: "business" } } });
+    expect(r("deal", "cf:kickoff", "business", "365")).toEqual({ value: { relative: { days: 365, unit: "business" } } });
+    expect(r("lead", "cf:meet", "calendar", " 2 ")).toEqual({ value: { relative: { days: 2, unit: "calendar" } } });
+    for (const days of ["366", "-1", "2.5", "", "שלושה", "1e2"]) {
+      expect(r("deal", "expected_close_date", "calendar", days), days).toBe("מספר הימים: מספר שלם מ-0 עד 365.");
+    }
+    expect(r("deal", "expected_close_date", "weeks", "1")).toBe("יש לבחור איך לחשב את התאריך.");
+    expect(r("lead", "cf:note", "calendar", "1")).toBe("תאריך יחסי מתאים רק לשדה תאריך.");
+    expect(setFieldValue("lead", "preferred_channel", "", lookups, { unit: "calendar", days: "1" })).toBe("תאריך יחסי מתאים רק לשדה תאריך.");
+    // the stored shape is read back the same way, and an invalid one is not taken for a relative date
+    expect(relativeOf({ relative: { days: 3, unit: "business" } })).toEqual({ days: 3, unit: "business" });
+    for (const bad of [{ relative: { days: 400, unit: "calendar" } }, { relative: { days: 1.5, unit: "calendar" } }, { relative: { days: 1, unit: "x" } }, "2026-01-01", null]) {
+      expect(relativeOf(bad)).toBeNull();
+    }
+    expect(describeSetField("deal", "expected_close_date", { relative: { days: 3, unit: "business" } }, lookups)).toBe("תאריך סגירה צפוי: בעוד 3 ימי עבודה");
+    expect(describeSetField("deal", "expected_close_date", { relative: { days: 0, unit: "business" } }, lookups)).toBe("תאריך סגירה צפוי: ביום העבודה הקרוב");
+    expect(describeSetField("deal", "cf:kickoff", { relative: { days: 10, unit: "calendar" } }, lookups)).toBe("שדה kickoff: בעוד 10 ימים");
+    expect(describeSetField("deal", "cf:kickoff", { relative: { days: 0, unit: "calendar" } }, lookups)).toBe("שדה kickoff: היום");
+    expect(setFieldRelativeDraft("2026-01-01")).toBeNull();
+    expect(setFieldRelativeDraft({ relative: { days: 7, unit: "calendar" } })).toEqual({ relative_unit: "calendar", relative_days: "7" });
+  });
+
+  it("part B: builder -> stored -> builder for the new fields and a relative date", () => {
+    const parsed = ruleSchema.parse({
+      name: "תאריך סגירה",
+      trigger: "deal:created",
+      conditions: [],
+      actions: [
+        { type: "set_field", field: "expected_close_date", relative_unit: "business", relative_days: "5" },
+        { type: "set_field", field: "cf:kickoff", value: "2026-11-01" },
+        { type: "set_field", field: "expected_close_date" },
+      ],
+    });
+    const db = toDbRule(parsed, lookups);
+    expect(typeof db).toBe("object");
+    if (typeof db === "string") return;
+    expect(db.actions).toEqual([
+      { type: "set_field", field: "expected_close_date", value: { relative: { days: 5, unit: "business" } } },
+      { type: "set_field", field: "cf:kickoff", value: "2026-11-01" },
+      { type: "set_field", field: "expected_close_date", value: null },
+    ]);
+    const back = fromDbRule(
+      { name: db.name, entity: db.entity_type, triggerType: db.trigger_type, triggerConfig: db.trigger_config, conditions: db.conditions, actions: db.actions },
+      { fields: lookups.fields },
+    );
+    expect(back?.actions).toEqual([
+      { type: "set_field", field: "expected_close_date", value: "", relative_unit: "business", relative_days: "5" },
+      { type: "set_field", field: "cf:kickoff", value: "2026-11-01" },
+      { type: "set_field", field: "expected_close_date", value: "" },
+    ]);
+    const lead = ruleSchema.parse({
+      name: "ערוץ",
+      trigger: "lead:created",
+      conditions: [],
+      actions: [
+        { type: "set_field", field: "preferred_channel", value: "sms" },
+        { type: "set_field", field: "preferred_locale", value: "ru" },
+      ],
+    });
+    const leadDb = toDbRule(lead, lookups);
+    expect(typeof leadDb === "object" && leadDb.actions).toEqual([
+      { type: "set_field", field: "preferred_channel", value: "sms" },
+      { type: "set_field", field: "preferred_locale", value: "ru" },
+    ]);
+    // a relative date on a field that is not a date, or too many days, is refused when the rule is saved
+    const bad = ruleSchema.parse({ name: "x", trigger: "lead:created", conditions: [], actions: [{ type: "set_field", field: "cf:note", relative_unit: "calendar", relative_days: "1" }] });
+    expect(toDbRule(bad, lookups)).toBe("תאריך יחסי מתאים רק לשדה תאריך.");
+    const tooMany = ruleSchema.parse({ name: "x", trigger: "deal:created", conditions: [], actions: [{ type: "set_field", field: "expected_close_date", relative_unit: "calendar", relative_days: "400" }] });
+    expect(toDbRule(tooMany, lookups)).toBe("מספר הימים: מספר שלם מ-0 עד 365.");
+  });
+
+  it("the built-in fields and value lists equal the engine's (the latest migration that redefines run_automation_actions)", () => {
+    const dir = join(process.cwd(), "supabase", "migrations");
+    const file = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.run_automation_actions"))
+      .at(-1)!;
+    const sql = readFileSync(join(dir, file), "utf8");
+    const branch = sql.slice(sql.indexOf("elsif v_type = 'set_field' then"), sql.indexOf("elsif v_type = 'create_deal' then"));
+    const engine = [...branch.matchAll(/elsif v_field = '(\w+)' then\s+if p_entity not in \(([^)]*)\) then/g)].map((m) => ({
+      key: m[1],
+      entities: [...m[2].matchAll(/'(\w+)'/g)].map((e) => e[1]),
+    }));
+    expect(engine).toEqual(BUILTIN_SET_FIELDS.map((b) => ({ key: b.key, entities: b.entities })));
+    const listAfter = (marker: string) => {
+      const part = branch.slice(branch.indexOf(`elsif v_field = '${marker}' then`));
+      const array = part.match(/<> all \(array\[([^\]]*)\]\)/)!;
+      return [...array[1].matchAll(/'(\w+)'/g)].map((e) => e[1]);
+    };
+    expect(listAfter("preferred_channel")).toEqual([...CONTACT_CHANNELS]);
+    expect(listAfter("preferred_locale")).toEqual([...CONTACT_LOCALES]);
+    // the relative-date limits of the engine's helper
+    expect(sql).toMatch(/\(p_spec ->> 'days'\)::numeric > 365/);
+    expect(sql).toMatch(/not in \('calendar', 'business'\)/);
   });
 });

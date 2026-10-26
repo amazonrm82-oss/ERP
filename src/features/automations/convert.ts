@@ -8,7 +8,7 @@ import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft } from "./create-records";
 import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
-import { customDefinition, setFieldDraft, setFieldValue } from "./set-field";
+import { customDefinition, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
 
@@ -128,7 +128,7 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       if (!has(stages, action.stage_id)) return "השלב שנבחר כבר לא קיים.";
       actions.push({ type: "move_deal_stage", stage_id: action.stage_id });
     } else if (action.type === "set_field") {
-      const built = setFieldValue(entity, action.field, action.value ?? "", lookups);
+      const built = setFieldValue(entity, action.field, action.value ?? "", lookups, { unit: action.relative_unit, days: action.relative_days });
       if (typeof built === "string") return built;
       actions.push({ type: "set_field", field: action.field, value: built.value });
     } else if (action.type === "create_deal") {
@@ -218,7 +218,8 @@ export function fromDbRule(
         return [{ type: "move_deal_stage", stage_id: str(a.stage_id) }];
       case "set_field": {
         const field = str(a.field);
-        return [{ type: "set_field", field, value: setFieldDraft(customDefinition(trigger.entity, field, set), a.value, set.timeZone) }];
+        const relative = setFieldRelativeDraft(a.value);
+        return [{ type: "set_field", field, value: setFieldDraft(customDefinition(trigger.entity, field, set), a.value, set.timeZone), ...relative }];
       }
       case "create_deal":
         return [createDealDraft(a)];
