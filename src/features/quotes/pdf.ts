@@ -35,7 +35,17 @@ export function quotePdfFileName(numberDisplay: string | null, title: string): s
   return `${base.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150)}.pdf`;
 }
 
-export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null): PdfDocument {
+/**
+ * QUO-06 follow-up (owner, 26 October 2026, answer 3): the line at the bottom of a PDF the server made again from the stored
+ * data (a file kept before the fingerprint existed): the remake day in the business's zone, DD.MM.YYYY.
+ */
+export function remadeNote(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(at);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `נוצר מחדש ב-${part("day")}.${part("month")}.${part("year")} מהנתונים השמורים`;
+}
+
+export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, options: { remadeNote?: string | null } = {}): PdfDocument {
   const { design, business, customer, quote, lines } = data;
   const schedule = data.schedule ?? [];
   const sums = groupSubtotals(lines);
@@ -148,6 +158,8 @@ export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null):
     meta,
     blocks,
     closing: design.footerText,
+    // only a remade file carries it; a first PDF never does
+    footerNote: options.remadeNote ?? null,
     pageNote: quote.numberDisplay ? `הצעת מחיר ${quote.numberDisplay}` : null,
   };
 }

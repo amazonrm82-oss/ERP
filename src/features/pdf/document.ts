@@ -65,6 +65,8 @@ export type PdfDocument = {
   blocks: PdfBlock[];
   // a closing text after the blocks (the design's footer)
   closing?: string | null;
+  // a small line at the very bottom, after the closing (QUO-06: "נוצר מחדש ב-…" on a remade file only)
+  footerNote?: string | null;
   // printed small at the foot of every page, beside "עמוד X מתוך Y" (e.g. "אינו חשבונית מס")
   pageNote?: string | null;
 };

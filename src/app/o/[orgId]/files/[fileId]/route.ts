@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { FILES_BUCKET, opensInBrowser } from "@/features/files/types";
 import { DAMAGED_PDF_MESSAGE, matchesFingerprint, pdfHeaders } from "@/features/quotes/pdf-fingerprint";
+import { remakeLegacyQuotePdf } from "@/features/quotes/pdf-server";
+import { readQuote } from "@/features/quotes/queries";
 import { sessionCheck } from "@/lib/auth";
 import { SUPPORT_LINE } from "@/lib/support";
 import { isUuid } from "@/lib/paths";
@@ -28,14 +30,26 @@ export async function GET(request: NextRequest, { params }: Context) {
       : new NextResponse("לא נמצא", { status: 404 });
   }
   const supabase = await createClient();
-  const { data: file, error: fileError } = await supabase
-    .from("files")
-    .select("name, mime_type, storage_path, unconfirmed_since, quote_id, sha256")
-    .eq("organization_id", orgId)
-    .eq("id", fileId)
-    .maybeSingle();
+  const readFile = () =>
+    supabase
+      .from("files")
+      .select("name, mime_type, storage_path, unconfirmed_since, quote_id, sha256")
+      .eq("organization_id", orgId)
+      .eq("id", fileId)
+      .maybeSingle();
+  let { data: file, error: fileError } = await readFile();
   if (fileError) return new NextResponse("משהו השתבש. נסו שוב בעוד רגע.", { status: 500 });
   if (!file || file.unconfirmed_since !== null) return new NextResponse("לא נמצא", { status: 404 });
+  // QUO-06 follow-up (owner, 26 October 2026, answer 1 (ג)): a quote PDF kept before the fingerprint existed is made again
+  // once, when someone who may edit the quote opens it (the database decides; for anyone else it opens as before)
+  if (file.quote_id && !file.sha256) {
+    const quote = await readQuote(supabase, orgId, file.quote_id).catch(() => null);
+    if (quote && (await remakeLegacyQuotePdf(supabase, orgId, quote, session.user.id).catch(() => false))) {
+      ({ data: file, error: fileError } = await readFile());
+      if (fileError) return new NextResponse("משהו השתבש. נסו שוב בעוד רגע.", { status: 500 });
+      if (!file || file.unconfirmed_since !== null) return new NextResponse("לא נמצא", { status: 404 });
+    }
+  }
   const view = request.nextUrl.searchParams.get("view") === "1" && opensInBrowser(file.mime_type);
   // QUO-06 follow-up (owner, 26 October 2026): a quote's PDF is served only after its bytes match the SHA-256 the server
   // kept when it wrote the file; never through a signed link, so nothing else can be served in its place. A PDF kept before

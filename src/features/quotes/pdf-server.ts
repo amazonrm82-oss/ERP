@@ -6,9 +6,10 @@ import { loadPdfLogo } from "@/features/pdf/logo";
 import { renderPdf } from "@/features/pdf/render";
 import type { Database } from "@/lib/database.types";
 import { dbErrorMessage } from "@/lib/errors";
+import { TIME_ZONE } from "@/lib/app";
 
 import { getQuoteDocumentData } from "./design-server";
-import { quotePdfDocument, quotePdfFileName } from "./pdf";
+import { quotePdfDocument, quotePdfFileName, remadeNote } from "./pdf";
 import { writeQuotePdfAsServer } from "./pdf-store-server";
 import type { Quote } from "./queries";
 
@@ -26,16 +27,46 @@ export function quotePdfStorable(status: Quote["status"]): boolean {
   return status === "sent" || status === "viewed";
 }
 
-/** The stored PDF of a quote (a confirmed file), or null. Read with the user's session: whoever reads the quote. */
-export async function getQuotePdfFile(supabase: Client, orgId: string, quoteId: string): Promise<{ id: string; name: string } | null> {
+/**
+ * The stored PDF of a quote (a confirmed file), or null. Read with the user's session: whoever reads the quote.
+ * `fingerprinted` is false for a PDF kept by the old flow, before the server kept its SHA-256 (020995).
+ */
+export async function getQuotePdfFile(
+  supabase: Client,
+  orgId: string,
+  quoteId: string,
+): Promise<{ id: string; name: string; fingerprinted: boolean } | null> {
   const { data, error } = await supabase
     .from("files")
-    .select("id, name, unconfirmed_since")
+    .select("id, name, unconfirmed_since, sha256")
     .eq("organization_id", orgId)
     .eq("quote_id", quoteId)
     .maybeSingle();
   if (error) throw new Error(`quote pdf: ${error.message}`);
-  return data && data.unconfirmed_since === null ? { id: data.id, name: data.name } : null;
+  return data && data.unconfirmed_since === null ? { id: data.id, name: data.name, fingerprinted: data.sha256 !== null } : null;
+}
+
+/**
+ * QUO-06 follow-up (owner, 26 October 2026, answer 1 (ג)): a PDF kept before the fingerprint existed is made again by the
+ * server, once, when someone who may edit the quote opens it or asks to keep it. Not counted in the monthly quota; the same
+ * files row moves to the new file and the old object is deleted by the nightly cleanup (public.quote_pdf_store decides all of
+ * it). Answers true when the file now has its fingerprint. A failure leaves the old file as it was.
+ */
+export async function remakeLegacyQuotePdf(supabase: Client, orgId: string, quote: Quote, userId: string): Promise<boolean> {
+  if (quote.status === "draft") return false;
+  // the person's own session decides first (review L1 of 020995: the two-step rule holds here)
+  const allowed = await supabase.rpc("quote_pdf_remake_allowed", { p_org: orgId, p_quote: quote.id });
+  if (allowed.error || allowed.data !== true) return false;
+  const org = await supabase.from("organizations").select("name, timezone").eq("id", orgId).maybeSingle();
+  if (org.error || !org.data) return false;
+  const data = await getQuoteDocumentData(orgId, quote, org.data.name);
+  // owner, 26 October 2026 (answer 3): a remade file says so at its bottom, with the day in the business's zone
+  const note = remadeNote(new Date(), org.data.timezone || TIME_ZONE);
+  const bytes = await renderPdf(quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note }));
+  const stored = await writeQuotePdfAsServer({ orgId, quoteId: quote.id, userId, bytes, name: quotePdfFileName(quote.numberDisplay, quote.title) });
+  if (!stored.ok) return false;
+  const now = await getQuotePdfFile(supabase, orgId, quote.id);
+  return now?.fingerprinted === true;
 }
 
 /**
@@ -47,10 +78,14 @@ export async function getQuotePdfFile(supabase: Client, orgId: string, quoteId: 
  */
 export async function storeQuotePdf(supabase: Client, orgId: string, quote: Quote, userId: string): Promise<QuotePdfResult> {
   if (quote.status === "draft") return { ok: false, message: "לטיוטה אין קובץ PDF. הקובץ נשמר כשההצעה נשלחת." };
+  const existing = await getQuotePdfFile(supabase, orgId, quote.id).catch(() => null);
+  if (existing) {
+    // answer 1 (ג): a file kept by the old flow is made again once; it stays as it is when that cannot happen now
+    if (!existing.fingerprinted) await remakeLegacyQuotePdf(supabase, orgId, quote, userId).catch(() => false);
+    return { ok: true, fileId: existing.id };
+  }
   // review L3: a later PDF only while the quote is still the open offer that was sent
   if (!quotePdfStorable(quote.status)) return { ok: false, message: CLOSED };
-  const existing = await getQuotePdfFile(supabase, orgId, quote.id).catch(() => null);
-  if (existing) return { ok: true, fileId: existing.id };
 
   // the person's own session decides first (writable business, the flag, may edit the quote's deal or contact)
   const allowed = await supabase.rpc("quote_pdf_allowed", { p_org: orgId, p_quote: quote.id });

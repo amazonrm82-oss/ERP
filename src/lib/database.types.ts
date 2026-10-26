@@ -3438,6 +3438,8 @@ export type Database = {
       // QUO-06 follow-ups: the person's right (their own session); the server's write (service_role only); the customer's
       // download of the shown version's stored PDF (service_role only)
       quote_pdf_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
+      // QUO-06 follow-up (answer 1 (ג)): may the caller have a PDF kept without a fingerprint made again (their own session)
+      quote_pdf_remake_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
       quote_pdf_store: { Args: { p_org: string; p_quote: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null }; Returns: Json };
       quote_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})

@@ -297,6 +297,10 @@ export async function renderPdf(doc: PdfDocument): Promise<Uint8Array> {
     pieces.push({ height: 6, gapBefore: gap + 4, keepWithNext: true, draw: (y) => rule(y + 3, PDF_COLORS.line, 0.75) });
     textPieces(wrap(doc.closing, CONTENT, { muted: true, size: 8.5 }), 2);
   }
+  if (doc.footerNote) {
+    if (!doc.closing) pieces.push({ height: 6, gapBefore: gap + 4, keepWithNext: true, draw: (y) => rule(y + 3, PDF_COLORS.line, 0.75) });
+    textPieces(wrap(doc.footerNote, CONTENT, { muted: true, size: 8 }), 2);
+  }
 
   // ---------------------------------------------------------------- pages
   const body = PAGE.height - PAGE.marginTop - PAGE.marginBottom;

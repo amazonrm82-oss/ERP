@@ -162,6 +162,8 @@ export const ACTION_LABELS: Record<string, string> = {
   retention_purge: "מחיקה לפי מדיניות השמירה",
   // PRV-01: one lead's details erased from the log by the policy (app.lead_retention_erase renames the core's 'erase' row)
   retention: "נמחק לפי מדיניות השמירה",
+  // QUO-06 follow-up (answer 1 (ג)): the server made a quote PDF kept without a fingerprint again, once (sizes only)
+  pdf_remake: "יצירה מחדש של קובץ PDF של הצעה",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
@@ -179,6 +181,9 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "lost_reason_id"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // QUO-06 follow-up (pdf_remake)
+  old_size: "גודל קודם (בתים)",
+  new_size: "גודל חדש (בתים)",
   // PRV-02 (person_export)
   file_count: "קבצים",
   // ORD-01

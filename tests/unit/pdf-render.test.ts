@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { logoKind } from "@/features/pdf/logo";
 import { PDF_COLORS, renderPdf } from "@/features/pdf/render";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
-import { quotePdfDocument, quotePdfFileName } from "@/features/quotes/pdf";
+import { quotePdfDocument, quotePdfFileName, remadeNote } from "@/features/quotes/pdf";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
 
 import { pdfText } from "./pdf-text";
@@ -182,6 +182,21 @@ describe("the quote PDF, read back from a real file (QUO-06)", () => {
     expect(pieces).toContain(".העצהב תורוש ןיא");
     // without a logo or details the business's name is still on it
     expect(pieces).toContain('מ"עב המגודה תרבח');
+  });
+
+  it("only a remade file carries the line 'נוצר מחדש ב-…', dated in the business's zone (owner, 26 October 2026)", async () => {
+    // 22:30 UTC on 26 October 2026 is already the 27th in Israel
+    const note = remadeNote(new Date("2026-10-26T22:30:00Z"), "Asia/Jerusalem");
+    expect(note).toBe("נוצר מחדש ב-27.10.2026 מהנתונים השמורים");
+    expect(remadeNote(new Date("2026-10-26T22:30:00Z"), "UTC")).toBe("נוצר מחדש ב-26.10.2026 מהנתונים השמורים");
+    expect(quotePdfDocument(sample(3), null).footerNote).toBeNull();
+    expect(quotePdfDocument(sample(3), null, { remadeNote: note }).footerNote).toBe(note);
+    const first = allPieces(pdfText(await renderPdf(quotePdfDocument(sample(3), null)))).join(" ");
+    const remade = allPieces(pdfText(await renderPdf(quotePdfDocument(sample(3), null, { remadeNote: note })))).join(" ");
+    expect(first).not.toContain("27.10.2026");
+    expect(remade).toContain("27.10.2026");
+    expect(remade).toContain("םירומשה");
+    expect(first).not.toContain("םירומשה");
   });
 
   it("names the file after the quote's number", () => {
