@@ -12,6 +12,7 @@ afterAll(closePool);
 const LEFT_OUT: Record<string, string> = {
   audit_log: "history; the audit log screen exports it",
   automations: "configuration that points at ids; not part of SPEC 12.4 yet",
+  consent_blocklist: "CNS-06: hashes only (no address), useless outside the business's own key; the settings page finds an address",
   automation_runs: "engine log",
   forms: "configuration with public tokens",
   form_submissions: "raw inquiries; the leads they made are exported",

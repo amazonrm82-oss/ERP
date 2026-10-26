@@ -6,6 +6,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   leads: "ליד",
   // CNS-05
   import_jobs: "ייבוא",
+  // CNS-06
+  consent_blocklist: "רשימת חסימה לדיוור",
   contacts: "איש קשר",
   companies: "חברה",
   deals: "עסקה",
@@ -137,6 +139,9 @@ export const ACTION_LABELS: Record<string, string> = {
   person_export: "ייצוא כל המידע על האדם",
   // CNS-05: the importer's declaration of where a file's marketing consents came from
   import_consent: "ייבוא הסכמות לדיוור (הצהרה על המקור)",
+  // CNS-06: counts, channel and codes only (never an address)
+  consent_blocklist_add: "הוספה לרשימת החסימה לדיוור",
+  consent_blocklist_remove: "הסרה מרשימת החסימה לדיוור",
   // QUO-03: an owner or admin moved the next number of a series forward
   number_jump: "קפיצה קדימה במספור",
   // FLD-09: a deleted pipeline took the conditions based on it (app.pipeline_conditions_cleanup)

@@ -37,6 +37,10 @@ export type ChannelConsent = {
   channel: ConsentChannel;
   // the latest entry; null = nothing recorded ("לא ידוע")
   latest: (Omit<ConsentEntry, "id" | "liftMethod" | "wordingVersion"> & { currentAddress: boolean | null }) | null;
+  // CNS-06: the record's own address is blocked for marketing whatever this record's entries say: 'listed' (owners and
+  // admins: on the business's blocklist) or 'blocked' (the neutral word for everyone else; also an opt-out or erasure
+  // of the same address elsewhere). Display only: senders judge by app.consent_suppressed.
+  block: "listed" | "blocked" | null;
 };
 
 export type RecordConsents = { channels: ChannelConsent[]; history: ConsentEntry[] };
@@ -52,7 +56,7 @@ function asState(value: string): ConsentState {
  */
 export async function getRecordConsents(orgId: string, subject: ConsentSubject): Promise<RecordConsents> {
   const supabase = await createClient();
-  const [current, rows] = await Promise.all([
+  const [current, rows, blockRows] = await Promise.all([
     supabase.rpc("consent_current", { p_org: orgId, p_kind: subject.kind, p_id: subject.id }),
     supabase
       .from("consents")
@@ -63,7 +67,9 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
       .order("created_at", { ascending: false })
       .order("seq", { ascending: false })
       .limit(200),
+    supabase.rpc("consent_record_blocks", { p_org: orgId, p_kind: subject.kind, p_id: subject.id }),
   ]);
+  const blocks = must(blockRows, "consent record blocks") ?? [];
   const latest = must(current, "consent current") ?? [];
   const history = must(rows, "consents") ?? [];
   const names = await getUserNames([...latest.map((r) => r.recorded_by), ...history.map((r) => r.recorded_by)]);
@@ -72,8 +78,10 @@ export async function getRecordConsents(orgId: string, subject: ConsentSubject):
   return {
     channels: CONSENT_CHANNELS.map((channel) => {
       const row = latest.find((r) => r.channel === channel);
+      const found = blocks.find((b) => b.channel === channel)?.block;
       return {
         channel,
+        block: found === "listed" || found === "blocked" ? found : null,
         latest: row
           ? {
               channel,

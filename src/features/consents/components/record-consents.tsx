@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/format";
 
-import { CHANNEL_LABELS, LIFT_METHOD_LABELS, SOURCE_LABELS, STATE_LABELS, STATE_TONES, channelNeeds, type ConsentChannel } from "../model";
+import { BLOCK_LABELS, CHANNEL_LABELS, LIFT_METHOD_LABELS, SOURCE_LABELS, STATE_LABELS, STATE_TONES, channelNeeds, type ConsentChannel } from "../model";
 import { getRecordConsents, type ConsentSubject } from "../queries";
 import { RecordConsentButton } from "./record-consent-button";
 
@@ -36,26 +36,35 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
       />
       <CardBody className="space-y-4">
         <ul className="divide-y divide-line">
-          {channels.map(({ channel, latest }) => (
-            <li key={channel} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{CHANNEL_LABELS[channel]}</span>
-                <Badge tone={STATE_TONES[latest?.state ?? "unknown"]}>{STATE_LABELS[latest?.state ?? "unknown"]}</Badge>
-              </div>
-              {latest ? (
-                <p className="mt-1 text-sm text-ink-soft">
-                  {[latest.source ? SOURCE_LABELS[latest.source] : null, latest.recordedBy].filter(Boolean).join(" · ")}
-                  {" · "}
-                  <time dateTime={latest.createdAt}>{formatDateTime(latest.createdAt)}</time>
-                </p>
-              ) : null}
-              {latest && latest.currentAddress === false ? (
-                <p className="mt-1 text-sm text-warning">
-                  {channelNeeds(channel) === "email" ? "נרשם לכתובת אימייל אחרת מזו שברשומה היום." : "נרשם למספר טלפון אחר מזה שברשומה היום."}
-                </p>
-              ) : null}
-            </li>
-          ))}
+          {channels.map(({ channel, latest, block }) => {
+            // CNS-06: a blocked address overrides a "granted" or unknown state of the record (an opt-out shows as itself)
+            const blocked = block && (!latest || latest.state === "granted" || latest.state === "unknown") ? block : null;
+            return (
+              <li key={channel} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{CHANNEL_LABELS[channel]}</span>
+                  {blocked ? (
+                    <Badge tone="danger">{BLOCK_LABELS[blocked]}</Badge>
+                  ) : (
+                    <Badge tone={STATE_TONES[latest?.state ?? "unknown"]}>{STATE_LABELS[latest?.state ?? "unknown"]}</Badge>
+                  )}
+                </div>
+                {blocked && latest ? <p className="mt-1 text-sm text-ink-soft">המצב ברשומה: {STATE_LABELS[latest.state]}</p> : null}
+                {latest ? (
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {[latest.source ? SOURCE_LABELS[latest.source] : null, latest.recordedBy].filter(Boolean).join(" · ")}
+                    {" · "}
+                    <time dateTime={latest.createdAt}>{formatDateTime(latest.createdAt)}</time>
+                  </p>
+                ) : null}
+                {latest && latest.currentAddress === false ? (
+                  <p className="mt-1 text-sm text-warning">
+                    {channelNeeds(channel) === "email" ? "נרשם לכתובת אימייל אחרת מזו שברשומה היום." : "נרשם למספר טלפון אחר מזה שברשומה היום."}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
         {canEdit && available.length < channels.length ? (
           <p className="text-sm text-ink-soft">

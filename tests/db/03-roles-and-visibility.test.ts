@@ -688,6 +688,28 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("the blocklist: owners and admins read it, nobody writes it directly (CNS-06)", async () => {
+    const entry = await asAdmin(async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.consent_blocklist (organization_id, kind, channel, address_hash, reason) values ($1, 'email', 'all', repeat('b', 64), 'complaint') returning id",
+          [org],
+        )
+      ).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.consent_blocklist where id = $1", [entry]));
+    for (const u of [owner, admin]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [manager, m1, m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.consent_blocklist set reason = 'other' where id = $1", [entry])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.consent_blocklist where id = $1", [entry])))).code, u.email).toBe("42501");
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.consent_blocklist (organization_id, kind, channel, reason) values ($1, 'email', 'all', 'other')", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+  });
+
   it("quote templates: everyone reads them, only owners and admins write them (QUO-04)", async () => {
     const template = await asUser(admin.id, async (q) =>
       (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת תפקידים') returning id", [org])).rows[0].id,

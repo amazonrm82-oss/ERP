@@ -36,6 +36,12 @@ export const STATE_TONES: Record<ConsentState, BadgeTone> = {
   unknown: "neutral",
 };
 
+// CNS-06: the card's word when the record's own address is blocked for marketing (public.consent_record_blocks)
+export const BLOCK_LABELS = {
+  listed: "ברשימת החסימה של העסק",
+  blocked: "חסום לדיוור",
+} as const;
+
 export const SOURCE_LABELS: Record<ConsentSource, string> = {
   form: "טופס",
   manual: "רישום ידני",

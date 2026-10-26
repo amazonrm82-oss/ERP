@@ -427,6 +427,16 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "consent:method": "צריך לכתוב איך התקבלה ההסכמה.",
   "consent:no_address": "אין ברשומה טלפון או אימייל לערוץ הזה. הוסיפו אותו קודם, ואז רשמו את ההסכמה.",
   "consent:append_only": "אי אפשר לשנות רישום הסכמה קיים. אפשר לרשום מצב חדש.",
+  // CNS-06 (consents_prepare; public.consent_blocklist_add / _remove; guard consent_blocklist_guard)
+  "consent:blocklisted": "הכתובת ברשימת החסימה של העסק, ולכן אי אפשר לרשום לה הסכמה. אפשר להסיר אותה מהרשימה ב\"הגדרות > רשימת חסימה לדיוור\".",
+  "consent_blocklist:channel": "יש לבחור ערוץ מהרשימה.",
+  "consent_blocklist:reason": "יש לבחור סיבה מהרשימה.",
+  "consent_blocklist:removed_reason": "יש לבחור למה מסירים את הכתובת מהרשימה.",
+  "consent_blocklist:empty": "יש להקליד טלפון או אימייל אחד לפחות.",
+  "consent_blocklist:too_many": "אפשר להוסיף עד 500 כתובות בבת אחת. חלקו את הרשימה ונסו שוב.",
+  "consent_blocklist:max": "רשימת החסימה מלאה (100,000 כתובות). הסירו כתובות שכבר לא צריכות להיות בה.",
+  "consent_blocklist:gone": "הכתובת כבר הוסרה מהרשימה. רעננו את הדף.",
+  "consent_blocklist:append_only": "אי אפשר לשנות רישום ברשימת החסימה.",
   // CNS-05 (import_jobs_consent_check, public.import_record_consents)
   "import_consent:note": "כשמייבאים הסכמות צריך לבחור איך התקבלו ולכתוב פרטים על המקור.",
   "import_consent:entity": "הסכמות לדיוור מייבאים רק עם לידים או אנשי קשר.",

@@ -1991,6 +1991,29 @@ export type OrderDecisionRow = {
   created_at: string;
 };
 
+// CNS-06: the business's do-not-market list (migration consent_blocklist). Owners and admins read it; written only by
+// consent_blocklist_add / consent_blocklist_remove. The address is never stored; its hash is not selectable.
+export type ConsentBlocklistRow = {
+  id: string;
+  organization_id: string;
+  // "phone" | "email"
+  kind: string;
+  // BlocklistChannel (src/features/consent-blocklist/model.ts): all | email | sms | whatsapp | phone
+  channel: string;
+  // HMAC of the address with consent_hash_key (null while the key is missing); clients may not select it
+  address_hash: string | null;
+  hash_version: number;
+  // BlocklistReason
+  reason: string;
+  added_by: string | null;
+  removed_at: string | null;
+  removed_by: string | null;
+  // BlocklistRemovedReason
+  removed_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // QUO-10: a customer's views of a quote (migration quote_views). Written by public.quote_public only; read by whoever
 // reads the quote.
 export type QuoteViewRow = {
@@ -2888,6 +2911,8 @@ export type Database = {
       // ORD-05: no client writes
       order_decisions: ReadOnlyTable<OrderDecisionRow>;
       quote_views: ReadOnlyTable<QuoteViewRow>;
+      // CNS-06: written through functions only
+      consent_blocklist: ReadOnlyTable<ConsentBlocklistRow>;
       quote_payment_steps: Table<
         QuotePaymentStepRow,
         { organization_id: string; quote_id: string; position?: number; name: string; percent_bp: number; due_date?: string | null; milestone?: string | null },
@@ -3259,7 +3284,21 @@ export type Database = {
       product_sku_matches: { Args: { p_org: string; p_skus: string[] }; Returns: Array<{ id: string; sku: string }> };
       // IMP-03: live deals the caller reads whose name equals one of the given ones; security invoker
       deal_name_matches: { Args: { p_org: string; p_names: string[] }; Returns: Array<{ id: string; name: string }> };
-      // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
+      // CNS-06: the business's do-not-market list (owners and admins; definer). Addresses go in, never come out.
+      consent_blocklist_add: {
+        Args: { p_org: string; p_channel: string; p_addresses: string[]; p_reason: string };
+        Returns: { added: number; existing: number; invalid: number[] };
+      };
+      consent_blocklist_remove: { Args: { p_org: string; p_id: string; p_reason: string }; Returns: undefined };
+      consent_blocklist_find: { Args: { p_org: string; p_address: string }; Returns: Json };
+      consent_blocklist_summary: { Args: { p_org: string }; Returns: Json };
+      // CNS-06: is the record's own address blocked for marketing, per channel (definer; whoever reads the record).
+      // 'listed' (owners and admins: on the business's blocklist) or 'blocked' (everyone else, and an opt-out or erasure
+      // of the same address elsewhere in the business)
+      consent_record_blocks: {
+        Args: { p_org: string; p_kind: string; p_id: string };
+        Returns: Array<{ channel: string; block: "listed" | "blocked" }>;
+      };
       // CNS-01: the latest entry per channel of a lead or contact (security invoker)
       consent_current: {
         Args: { p_org: string; p_kind: string; p_id: string };
@@ -3287,6 +3326,7 @@ export type Database = {
         Args: { p_org: string; p_email: string };
         Returns: Array<{ id: string; name: string; domain: string; kind: "exact" | "parent" | "contacts" }>;
       };
+      // CON-01: live contacts whose further phones (E.164) or emails match; security invoker
       contact_channel_matches: {
         Args: { p_org: string; p_phones: string[]; p_emails: string[] };
         Returns: Array<{ contact_id: string; kind: "phone" | "email"; value: string }>;

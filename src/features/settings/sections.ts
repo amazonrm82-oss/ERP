@@ -22,6 +22,7 @@ import { bookingPagesPath } from "@/features/booking/paths";
 import { businessCardSettingsPath } from "@/features/business-cards/paths";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
+import { consentBlocklistPath } from "@/features/consent-blocklist/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
@@ -213,6 +214,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         ...(access.canImport ? [{ href: paths.imports(orgId), label: "ייבוא וייצוא", description: "קובץ Excel או CSV פנימה, וגיבוי מלא החוצה", icon: UploadIcon }] : []),
         ...(access.canDelete ? [{ href: paths.settingsTrash(orgId), label: "סל מחזור", description: "שחזור רשומות שנמחקו ב-30 הימים האחרונים", icon: TrashIcon }] : []),
         ...(access.admin ? [{ href: paths.settingsAudit(orgId), label: "יומן ביקורת", description: "מי שינה מה ומתי", icon: LockIcon }] : []),
+        // CNS-06: owners and admins only (addresses kept as a hash; the page searches one address)
+        ...(access.admin
+          ? [{ href: consentBlocklistPath(orgId), label: "רשימת חסימה לדיוור", description: "טלפונים ואימיילים שלעולם לא יקבלו דיוור", icon: LockIcon }]
+          : []),
       ],
     },
   ];

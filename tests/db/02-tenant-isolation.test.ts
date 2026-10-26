@@ -234,6 +234,10 @@ describe("tenant isolation", () => {
     );
     // QUO-10: the customer opened A's quote (written by the server only)
     await asAdmin((q) => q("insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]));
+    // CNS-06: a blocklist entry of A (written only by consent_blocklist_add; no client write grant)
+    await asAdmin((q) =>
+      q("insert into public.consent_blocklist (organization_id, kind, channel, address_hash, reason) values ($1, 'phone', 'sms', repeat('a', 64), 'other')", [orgA]),
+    );
     // ORD-01: a draft order on A's deal, with a line (both businesses have the plan's orders key)
     await asAdmin((q) =>
       q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = any($1::uuid[])", [[orgA, orgB]]),
@@ -418,6 +422,8 @@ describe("tenant isolation", () => {
     "quote_decisions",
     // QUO-10
     "quote_views",
+    // CNS-06
+    "consent_blocklist",
     // QUO-04
     "quote_templates",
     "quote_template_lines",
@@ -614,6 +620,8 @@ describe("tenant isolation", () => {
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
       quote_views: "view_count = view_count",
+      // no client write grant at all (consent_blocklist_add/remove write): a permission error is the expected outcome
+      consent_blocklist: "reason = reason",
       quote_templates: "name = name",
       quote_template_lines: "name = name",
       completeness_settings: "fields = fields",
@@ -751,6 +759,7 @@ describe("tenant isolation", () => {
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
+      ["insert into public.consent_blocklist (organization_id, kind, channel, reason) values ($1, 'phone', 'sms', 'other')", [orgA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
       ["insert into public.completeness_settings (organization_id, object_type, fields) values ($1, 'lead', '{phone}')", [orgA]],
@@ -873,6 +882,7 @@ describe("tenant isolation", () => {
       ["customer_credit_totals", "credit_agorot = 777", "credit_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
+      ["consent_blocklist", "removed_at = now(), removed_reason = 'other'", "removed_at is not null"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],
       ["completeness_settings", "fields = '{city}'", "fields = '{city}'"],
