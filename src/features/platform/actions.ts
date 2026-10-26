@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -8,13 +8,14 @@ import { fail, formValues, type ActionResult, type FormState } from "@/lib/actio
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { sessionCheck } from "@/lib/auth";
 import type { OrgStatus } from "@/lib/database.types";
-import { dbErrorMessage, SESSION_EXPIRED, VAT_RATE_FUTURE_ONLY } from "@/lib/errors";
+import { dbErrorMessage, SESSION_EXPIRED, SUBPROCESSOR_IN_FORCE, SUBPROCESSOR_NOTICE, VAT_RATE_FUTURE_ONLY } from "@/lib/errors";
 import { zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
 import { IDENTITY_CHECKS } from "./labels";
 import { parsePlanJson } from "./plan-json";
+import { collapseSpaces, firstNoticeDay, normalizeWebsite, SUBPROCESSORS_CACHE_TAG } from "./subprocessors";
 import { isFutureVatDay, parseVatPercent } from "./vat-rates";
 import { isCalendarDate } from "@/lib/calendar-date";
 
@@ -252,4 +253,98 @@ export async function removeVatRateAction(rateId: string): Promise<ActionResult>
   if (error) return fail(platformError(error));
   revalidatePath(paths.adminVat);
   return { ok: true };
+}
+
+type SubprocessorFields = {
+  name: string;
+  purpose: string;
+  data: string;
+  location: string | null;
+  website: string | null;
+  day: string;
+};
+
+/** ADM-01: the fields of a subprocessor form, checked before the database checks them again. */
+function subprocessorFields(formData: FormData): { ok: true; fields: SubprocessorFields } | { ok: false; message: string } {
+  const name = collapseSpaces(text(formData, "name"));
+  const purpose = collapseSpaces(text(formData, "purpose"));
+  const data = collapseSpaces(text(formData, "data_categories"));
+  const location = collapseSpaces(text(formData, "location"));
+  const website = normalizeWebsite(text(formData, "website"));
+  const day = text(formData, "effective_from");
+  if (name === "" || name.length > 120) return { ok: false, message: "יש למלא שם (עד 120 תווים)." };
+  if (purpose === "" || purpose.length > 500) return { ok: false, message: "יש למלא תפקיד (עד 500 תווים)." };
+  if (data === "" || data.length > 500) return { ok: false, message: "יש למלא איזה מידע הספק רואה (עד 500 תווים)." };
+  if (location.length > 120) return { ok: false, message: "המיקום ארוך מדי (עד 120 תווים)." };
+  if (website === undefined) return { ok: false, message: "כתובת האתר צריכה להתחיל ב-https://, בלי רווחים." };
+  if (!isCalendarDate(day)) return { ok: false, message: "יש לבחור תאריך תחילה." };
+  return { ok: true, fields: { name, purpose, data, location: location === "" ? null : location, website, day } };
+}
+
+const subprocessorArgs = (f: SubprocessorFields) => ({
+  p_name: f.name,
+  p_purpose: f.purpose,
+  p_data_categories: f.data,
+  p_location: f.location,
+  p_website: f.website,
+  p_effective_from: f.day,
+});
+
+/** ADM-01: the platform owner adds a subprocessor from a day at least 14 days ahead; business owners are told (database). */
+export async function addSubprocessorAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase) return fail(SESSION_EXPIRED);
+  const checked = subprocessorFields(formData);
+  if (!checked.ok) return fail(checked.message, { values: formValues(formData) });
+  if (checked.fields.day < firstNoticeDay(zoneDate(new Date()))) return fail(SUBPROCESSOR_NOTICE, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_add_subprocessor", subprocessorArgs(checked.fields));
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminSubprocessors);
+  updateTag(SUBPROCESSORS_CACHE_TAG);
+  revalidatePath(paths.legal("subprocessors"));
+  return { ok: true, message: "קבלן המשנה נוסף, ובעלי העסקים קיבלו הודעה." };
+}
+
+/**
+ * ADM-01: corrects an entry that has not started (a new name or day needs 14 days again and is announced again),
+ * or fills a missing location or website of one in force. The database refuses anything else.
+ */
+export async function updateSubprocessorAction(entryId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(entryId)) return fail(SESSION_EXPIRED);
+  const checked = subprocessorFields(formData);
+  if (!checked.ok) return fail(checked.message, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_update_subprocessor", { p_id: entryId, ...subprocessorArgs(checked.fields) });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminSubprocessors);
+  updateTag(SUBPROCESSORS_CACHE_TAG);
+  revalidatePath(paths.legal("subprocessors"));
+  return { ok: true, message: "נשמר." };
+}
+
+/** ADM-01: removes an entry that has not started (marked cancelled, never deleted). */
+export async function removeSubprocessorAction(entryId: string): Promise<ActionResult> {
+  const supabase = await client();
+  if (!supabase || !isUuid(entryId)) return fail(SESSION_EXPIRED);
+  const { error } = await supabase.rpc("platform_remove_subprocessor", { p_id: entryId });
+  if (error) return fail(platformError(error));
+  revalidatePath(paths.adminSubprocessors);
+  updateTag(SUBPROCESSORS_CACHE_TAG);
+  revalidatePath(paths.legal("subprocessors"));
+  return { ok: true };
+}
+
+/** ADM-01: sets, moves or clears (empty field) the future end day of an entry. */
+export async function endSubprocessorAction(entryId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(entryId)) return fail(SESSION_EXPIRED);
+  const day = text(formData, "ends_on");
+  if (day !== "" && !isCalendarDate(day)) return fail("התאריך אינו תקין.", { values: formValues(formData) });
+  if (day !== "" && day <= zoneDate(new Date())) return fail(SUBPROCESSOR_IN_FORCE, { values: formValues(formData) });
+  const { error } = await supabase.rpc("platform_end_subprocessor", { p_id: entryId, p_ends_on: day === "" ? null : day });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminSubprocessors);
+  updateTag(SUBPROCESSORS_CACHE_TAG);
+  revalidatePath(paths.legal("subprocessors"));
+  return { ok: true, message: day === "" ? "תאריך הסיום בוטל." : "תאריך הסיום נשמר." };
 }

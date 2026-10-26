@@ -9,6 +9,7 @@ export const ADMIN_NAV = [
   { href: paths.adminPlans, label: "חבילות" },
   // ADM-01
   { href: paths.adminVat, label: 'שיעורי מע"מ' },
+  { href: paths.adminSubprocessors, label: "קבלני משנה" },
   { href: paths.adminStaff, label: "צוות" },
   { href: paths.adminLog, label: "יומן" },
   { href: paths.adminDesign, label: "עיצוב" },

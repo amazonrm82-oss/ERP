@@ -97,6 +97,7 @@ export const paths = {
   adminUsers: "/admin/users",
   adminLog: "/admin/log",
   adminVat: "/admin/vat",
+  adminSubprocessors: "/admin/subprocessors",
   adminDesign: "/admin/design",
 } as const;
 

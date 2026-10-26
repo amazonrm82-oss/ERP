@@ -6,6 +6,7 @@ import type { Json, PlatformRole, PlanRow } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import type { AdminSubprocessor } from "./subprocessors";
 import type { AdminVatRate } from "./vat-rates";
 
 export type PlatformMe = { role: PlatformRole; needsMfa: boolean };
@@ -180,4 +181,27 @@ export async function listAdminVatRates(): Promise<AdminVatRate[]> {
     "vat rates",
   );
   return rows.map((row) => ({ id: row.id, effectiveFrom: row.effective_from, rateBp: row.rate_bp, note: row.note }));
+}
+
+/** ADM-01: every subprocessor entry, removed ones included (platform_list_subprocessors, all platform staff). */
+export async function listAdminSubprocessors(): Promise<AdminSubprocessor[]> {
+  const supabase = await createClient();
+  const rows = must(await supabase.rpc("platform_list_subprocessors"), "platform_list_subprocessors");
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    purpose: row.purpose,
+    dataCategories: row.data_categories,
+    location: row.location,
+    website: row.website,
+    effectiveFrom: row.effective_from,
+    endsOn: row.ends_on,
+    cancelled: row.cancelled_at !== null,
+  }));
+}
+
+/** ADM-01: how many notices an announcement would send now (platform owner only). */
+export async function subprocessorAudience(): Promise<number> {
+  const supabase = await createClient();
+  return must(await supabase.rpc("platform_subprocessor_audience"), "platform_subprocessor_audience");
 }

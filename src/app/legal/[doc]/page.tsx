@@ -9,7 +9,8 @@ import { paths } from "@/lib/paths";
 type Props = { params: Promise<{ doc: string }> };
 
 export function generateStaticParams() {
-  return LEGAL_DOCUMENTS.map((doc) => ({ doc: doc.slug }));
+  // ADM-01: the subprocessors page has its own route (src/app/legal/subprocessors), read from the database
+  return LEGAL_DOCUMENTS.filter((doc) => doc.slug !== "subprocessors").map((doc) => ({ doc: doc.slug }));
 }
 export const dynamicParams = false;
 

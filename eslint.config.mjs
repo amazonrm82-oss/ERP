@@ -68,6 +68,8 @@ const eslintConfig = defineConfig([
       // customer downloads it from the quote's link (public.quote_public_pdf)
       "src/features/quotes/pdf-store-server.ts",
       "src/features/quotes/pdf-public-server.ts",
+      // ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page (public.subprocessors_public_page)
+      "src/features/legal/subprocessors-public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

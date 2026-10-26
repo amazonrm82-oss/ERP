@@ -284,6 +284,23 @@ export type VatRateRow = {
   created_at: string;
   updated_at: string;
 };
+// ADM-01 (migration platform_subprocessors): platform table, read and written by no client directly; platform staff
+// read it through platform_list_subprocessors(), the public page through subprocessors_public_page() (service_role)
+export type SubprocessorRow = {
+  id: string;
+  name: string;
+  purpose: string;
+  data_categories: string;
+  location: string | null;
+  website: string | null;
+  effective_from: string;
+  // the first day the entry no longer applies; null = no end
+  ends_on: string | null;
+  // set when the platform owner removed the entry before its day; never shown
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
 type OrgDocumentSettingsWrite = {
   legal_form?: "individual" | "company" | "partnership" | "nonprofit" | "other" | null;
   vat_status?: "licensed" | "exempt" | "nonprofit" | "other" | null;
@@ -3023,6 +3040,7 @@ export type Database = {
       lead_routing_rules: Table<LeadRoutingRuleRow, LeadRoutingRuleWrite & { organization_id: string }, LeadRoutingRuleWrite>;
       org_bank_details: Table<OrgBankDetailsRow, OrgBankDetailsWrite & { organization_id: string }, OrgBankDetailsWrite>;
       vat_rates: Table<VatRateRow, Record<string, never>, Record<string, never>>;
+      subprocessors: Table<SubprocessorRow, Record<string, never>, Record<string, never>>;
       // PRM-01: read only; written by set_member_permissions()
       member_permissions: Table<MemberPermissionsRow, Record<string, never>, Record<string, never>>;
     };
@@ -3487,6 +3505,24 @@ export type Database = {
       platform_add_vat_rate: { Args: { p_effective_from: string; p_rate_bp: number; p_note?: string | null }; Returns: string };
       platform_update_vat_rate: { Args: { p_id: string; p_effective_from: string; p_rate_bp: number; p_note?: string | null }; Returns: string };
       platform_remove_vat_rate: { Args: { p_id: string }; Returns: undefined };
+      // ADM-01: the platform owner (aal2) manages the subprocessors list
+      platform_add_subprocessor: {
+        Args: { p_name: string; p_purpose: string; p_data_categories: string; p_location: string | null; p_website: string | null; p_effective_from: string };
+        Returns: string;
+      };
+      platform_update_subprocessor: {
+        Args: { p_id: string; p_name: string; p_purpose: string; p_data_categories: string; p_location: string | null; p_website: string | null; p_effective_from: string };
+        Returns: string;
+      };
+      platform_remove_subprocessor: { Args: { p_id: string }; Returns: undefined };
+      platform_end_subprocessor: { Args: { p_id: string; p_ends_on: string | null }; Returns: undefined };
+      // every entry, removed ones included, for all platform staff
+      platform_list_subprocessors: { Args: Record<string, never>; Returns: SubprocessorRow[] };
+      // how many notices an announcement sends now (one per business per active owner); platform owner
+      platform_subprocessor_audience: { Args: Record<string, never>; Returns: number };
+      // service_role only (the public page): { entries: [{ name, purpose, country, data_categories, effective_from, ends_on }],
+      // updated_on: YYYY-MM-DD | null }, or { refused: "rate" } above 60 reads a minute
+      subprocessors_public_page: { Args: Record<string, never>; Returns: Json };
       platform_plan_waitlist: { Args: Record<string, never>; Returns: Json };
       // CNS: hash key and paused erasures, for the panel's alert (platform owner and support)
       platform_consent_health: { Args: Record<string, never>; Returns: Json };

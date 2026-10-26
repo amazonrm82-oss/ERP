@@ -40,7 +40,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the site widget (src/features/site-widgets/public-server.ts):
  *     public.site_widget_public() and site_widget_submit() only;
  *   - the digital business card (src/features/business-cards/public-server.ts):
- *     public.business_card_public() and business_card_submit() only.
+ *     public.business_card_public() and business_card_submit() only;
+ *   - the public subprocessors page (src/features/legal/subprocessors-public-server.ts):
+ *     public.subprocessors_public_page() only, cached for an hour.
  * Never import this from code that serves a signed-in user.
  * Returns null when the key is not configured.
  */

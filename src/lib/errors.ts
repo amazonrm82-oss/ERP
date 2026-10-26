@@ -43,6 +43,11 @@ export const VAT_BEFORE_TABLE = 'תאריך המסמך מוקדם מכל שיע�
 // ADM-01: a VAT rate is set only from a day after today; one whose day has begun is locked
 export const VAT_RATE_FUTURE_ONLY = 'אפשר לקבוע שיעור מע"מ רק מיום שאחרי היום. שיעור שכבר התחיל נעול.';
 
+// ADM-01: a subprocessor already in force is locked; it is ended from a future day
+export const SUBPROCESSOR_IN_FORCE = "קבלן משנה שכבר בתוקף נעול. אפשר רק לקבוע לו תאריך סיום עתידי, או להשלים מיקום ואתר שחסרים.";
+// ADM-01: the DPA promises customers 14 days of notice
+export const SUBPROCESSOR_NOTICE = "קבלן משנה חדש נכנס לתוקף לפחות 14 יום אחרי היום, כדי שהלקוחות יקבלו הודעה מראש.";
+
 const LIMIT_MESSAGES: Record<string, string> = {
   // FXS-09: sign_agreement() accepts only the registered texts of a version; for the app this happens only while a
   // deploy and its migration are out of step, so the message asks to try again soon
@@ -235,6 +240,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // ADM-01 (migration platform_vat_rates, vat_rates_guard): a rate whose day has begun is locked
   "vat:rate_in_force": VAT_RATE_FUTURE_ONLY,
   "vat:date_taken": 'כבר יש שיעור מע"מ שמתחיל בתאריך הזה. ערכו אותו או בחרו תאריך אחר.',
+  // ADM-01 (migration platform_subprocessors, subprocessors_guard): an entry in force is locked; it ends from a future day
+  "subprocessor:in_force": SUBPROCESSOR_IN_FORCE,
+  // ADM-01: the DPA promises 14 days of notice before a new subprocessor
+  "subprocessor:notice": SUBPROCESSOR_NOTICE,
+  // ADM-01: an end day on or before the start day (guard, ahead of the table's check)
+  "subprocessor:end_before_start": "תאריך הסיום צריך להיות אחרי תאריך התחילה.",
   // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
   "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
   // PRD-04 (migration product_lists)
