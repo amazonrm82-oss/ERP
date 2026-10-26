@@ -731,6 +731,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   name must be renamed (`person_erase:deal_name`); meetings and their notices become "פגישה (לקוח נמחק)"; the only deletes live in
   `app.person_erase_delete_rows` (no grants, the pasted file); each record then goes through `audit_erase_request`. One audit entry
   `person_erase` with the reason and counts only. App: `src/features/privacy-erase/`.
+- Retention policy (PRV-01, migration 021005; owner 13, 18 and 26 October 2026; privacy, every plan, off by default; in doubt the
+  policy keeps the lead): settings in `app.lead_retention_settings`, changed only by `public.lead_retention_set` (owners/admins, writable
+  business, 6..120 months, `p_confirm` after `lead_retention_preview`, audit `retention_policy`, cancels the open round). The rule is
+  `app.lead_retention_candidates(org, cutoff, lead?)`: unconverted, not binned, not sample data, created and last contact before the
+  cutoff, no contact-type entry of any author since (private notes count HERE ONLY), no `inquiry` since, no meeting since that was not
+  cancelled, no open task, no planned meeting still ahead, not kept since (`app.lead_retention_keeps`; a restore counts as a keep).
+  pg_cron `crm-lead-retention` (hourly :20, `app.run_lead_retention`): erasures, then new rounds (14-day `system` notice to owners and
+  admins, entity `lead_retention`), then due rounds (each lead locked and judged again, then binned; a business not writable at due
+  time loses the round). After `purge_trash`, `app.lead_retention_erase` runs `app.audit_erase_core(..., null)` only when the latest
+  `delete` audit snapshot carries the policy's `binned_at`; its row is renamed to action `retention`; no do-not-contact entry; it waits
+  like `audit_erase_request` while the key is missing; one `retention_purge` count line per business and run. `public.lead_retention_keep`
+  locks the lead then its round row (the job's order). App: `src/features/lead-retention/`, `/settings/retention` and `/list`.
 - Person export (PRV-02, migration 020260; privacy, no plan key): `/o/[org]/privacy-export/[lead|contact]/[id]` (owners/admins)
   collects everything about one person with the user's session (`src/features/privacy-export/collect.ts`; conversion relatives; others'
   private notes and their files left out by `withoutOthersPrivate()`, the print rule), calls `public.log_person_export()` (definer,
