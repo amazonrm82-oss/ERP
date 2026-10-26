@@ -20,6 +20,9 @@ import {
   PRODUCT_PICKS_VALUE,
   productInput,
   productPicksValue,
+  PRODUCTS_NEEDS_NARROWING,
+  sameProductSelection,
+  selectionNeedsNarrowing,
 } from "@/features/intake/product";
 
 const A = "11111111-1111-4111-8111-111111111111";
@@ -112,6 +115,30 @@ describe("requested product on the public form", () => {
     expect(productOfferRefusal(false, true, 5000)).toBeNull();
     expect(migration).toContain("hint = 'form:products_over'");
     expect(migration).toMatch(new RegExp(`\\) > ${MAX_FORM_PRODUCTS} then`));
+  });
+
+  it("an unchanged selection is never judged again; a changed one is (owner, 26 October 2026, answer (ב))", () => {
+    const all = { product_choice: true, product_ids: null, product_category_ids: null };
+    expect(sameProductSelection(all, { ...all })).toBe(true);
+    expect(sameProductSelection(all, { ...all, product_choice: false })).toBe(false);
+    expect(sameProductSelection(all, { ...all, product_ids: [A] })).toBe(false);
+    // order of ids does not matter; null and empty are the same "no pick"
+    const picked = { product_choice: true, product_ids: [A, B], product_category_ids: null };
+    expect(sameProductSelection(picked, { ...picked, product_ids: [B, A] })).toBe(true);
+    expect(sameProductSelection(picked, { ...picked, product_category_ids: [] })).toBe(true);
+    expect(sameProductSelection(picked, { ...picked, product_ids: [A] })).toBe(false);
+    expect(sameProductSelection(picked, { ...picked, product_category_ids: [A] })).toBe(false);
+    // the mark: only while the question is asked and the stored offer is over 100
+    expect(selectionNeedsNarrowing(true, MAX_FORM_PRODUCTS)).toBe(false);
+    expect(selectionNeedsNarrowing(true, MAX_FORM_PRODUCTS + 1)).toBe(true);
+    expect(selectionNeedsNarrowing(false, 5000)).toBe(false);
+    expect(PRODUCTS_NEEDS_NARROWING).toBe("דורש צמצום");
+    // the database judges the over-100 rule only on insert or a changed selection (020930)
+    const keep = readdirSync(join(process.cwd(), "supabase/migrations"))
+      .filter((f) => f.endsWith("_form_products_keep_selection.sql"))
+      .map((f) => readFileSync(join(process.cwd(), "supabase/migrations", f), "utf8"))[0];
+    expect(keep).toContain("new.product_ids is distinct from old.product_ids");
+    expect(keep).toContain("hint = 'form:products_over'");
   });
 
   it("after a failed save the category ticks start from what was sent", () => {

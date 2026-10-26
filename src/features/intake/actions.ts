@@ -24,6 +24,11 @@ import {
   productOfferRefusal,
   PRODUCT_PICKS_VALUE,
   productPicksValue,
+  PRODUCTS_KEPT_NOTE,
+  PRODUCTS_KEPT_SAVED,
+  PRODUCTS_NARROW_VALUE,
+  sameProductSelection,
+  type ProductSelection,
 } from "./product";
 import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 import { defaultWhatsappButton, whatsappNumber } from "./whatsapp";
@@ -111,7 +116,12 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const { data: current, error: currentError } = await context.supabase.from("forms").select("kind").eq("organization_id", orgId).eq("id", formId).maybeSingle();
+  const { data: current, error: currentError } = await context.supabase
+    .from("forms")
+    .select("kind, product_choice, product_ids, product_category_ids")
+    .eq("organization_id", orgId)
+    .eq("id", formId)
+    .maybeSingle();
   if (currentError) return fail(dbErrorMessage(currentError));
   if (!current) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
@@ -157,14 +167,20 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
     }
   }
 
-  // LEAD-04 / CAP-08: the product question, only when the editor showed it (a web form of a business with products)
+  // LEAD-04 / CAP-08: the product question, only when the editor showed it (a web form of a business with products).
+  // Owner, 26 October 2026 (answer (ב)): an unchanged selection is not sent (nor judged again), and a changed one that
+  // offers more than 100 is left out: the other settings save, the stored selection stays, the field says why.
   let products: ProductPatch | Record<string, never> = {};
+  let productsKept: string | null = null;
   if (current.kind === "form" && formData.get(PRODUCT_SETTINGS_MARKER) === "1") {
-    const checked = await productSettings(context.supabase, orgId, formData);
-    if (!checked.ok) {
+    const checked = await productSettings(context.supabase, orgId, formData, current);
+    if (!checked.ok && checked.over) {
+      productsKept = checked.message;
+    } else if (!checked.ok) {
       return fail(FORM_INVALID, { values: formValues(formData), fieldErrors: { product_ids: checked.message } });
+    } else if (checked.patch) {
+      products = checked.patch;
     }
-    products = checked.patch;
   }
 
   // CAP-05: webhooks keep their WhatsApp columns as they are; with the button off
@@ -179,12 +195,19 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
     current.kind !== "form"
       ? {}
       : { channel_choice, locale_choice, ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
-  const { data, error } = await context.supabase
-    .from("forms")
-    .update({ ...settings, ...thanks, ...formOnly, ...products, ...(fields !== undefined ? { fields } : {}) })
-    .eq("organization_id", orgId)
-    .eq("id", formId)
-    .select("id");
+  const save = (patch: ProductPatch | Record<string, never>) =>
+    context.supabase
+      .from("forms")
+      .update({ ...settings, ...thanks, ...formOnly, ...patch, ...(fields !== undefined ? { fields } : {}) })
+      .eq("organization_id", orgId)
+      .eq("id", formId)
+      .select("id");
+  let { data, error } = await save(products);
+  if (error?.hint === "form:products_over" && Object.keys(products).length > 0) {
+    // the offer grew between the check and the save: the database refused the new selection; save the rest without it
+    productsKept = dbErrorMessage(error);
+    ({ data, error } = await save({}));
+  }
   if (error) {
     // LEAD-04 / CAP-08: the product question's refusals answer on its field
     if (error.hint?.startsWith("form:product")) {
@@ -192,11 +215,17 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
     }
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."), { values: formValues(formData) });
   }
-  if (data.length === 0) {
+  if (!data || data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
   }
   revalidatePath(paths.settingsIntake(orgId));
   revalidatePath(paths.settingsIntakeItem(orgId, formId));
+  if (productsKept) {
+    return fail(PRODUCTS_KEPT_SAVED, {
+      values: { ...formValues(formData), [PRODUCTS_NARROW_VALUE]: "1" },
+      fieldErrors: { product_ids: `${productsKept} ${PRODUCTS_KEPT_NOTE}` },
+    });
+  }
   return { ok: true, message: "נשמר." };
 }
 
@@ -232,7 +261,8 @@ async function productSettings(
   supabase: SupabaseClient<Database>,
   orgId: string,
   formData: FormData,
-): Promise<{ ok: true; patch: ProductPatch } | { ok: false; message: string }> {
+  stored: ProductSelection,
+): Promise<{ ok: true; patch: ProductPatch | null } | { ok: false; message: string; over?: true }> {
   const ask = checkbox.parse(formData.get("product_choice"));
   const ids = (name: string, max: number) =>
     formData
@@ -243,13 +273,15 @@ async function productSettings(
     supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("is_active", true).is("archived_at", null);
 
   if (formData.get("product_scope") !== "picked") {
+    const patch: ProductPatch = { product_choice: ask, product_ids: null, product_category_ids: null };
+    if (sameProductSelection(stored, patch)) return { ok: true, patch: null };
     if (ask) {
       const { count, error } = await offerable();
       if (error) return { ok: false, message: dbErrorMessage(error) };
       const refusal = productOfferRefusal(ask, true, count ?? 0);
-      if (refusal) return { ok: false, message: refusal };
+      if (refusal) return { ok: false, message: refusal, over: true };
     }
-    return { ok: true, patch: { product_choice: ask, product_ids: null, product_category_ids: null } };
+    return { ok: true, patch };
   }
 
   const sentProducts = ids("product_ids", MAX_FORM_PRODUCTS);
@@ -259,6 +291,15 @@ async function productSettings(
   }
   if (sentCategories.length > MAX_FORM_CATEGORIES) {
     return { ok: false, message: `אפשר לבחור עד ${MAX_FORM_CATEGORIES} קטגוריות.` };
+  }
+  // the stored pick sent back as it is (a product of it archived since, or a category deleted since, included) is unchanged
+  const sent: ProductPatch = {
+    product_choice: ask,
+    product_ids: sentProducts.length > 0 ? sentProducts : null,
+    product_category_ids: sentCategories.length > 0 ? sentCategories : null,
+  };
+  if ((sentProducts.length > 0 || sentCategories.length > 0) && sameProductSelection(stored, sent)) {
+    return { ok: true, patch: null };
   }
   let offerableProducts = new Set<string>();
   if (sentProducts.length > 0) {
@@ -285,7 +326,16 @@ async function productSettings(
     if (ask) {
       return { ok: false, message: "יש לבחור לפחות מוצר או קטגוריה אחת, או להציג את כל המוצרים." };
     }
-    return { ok: true, patch: { product_choice: false, product_ids: null, product_category_ids: null } };
+    const off: ProductPatch = { product_choice: false, product_ids: null, product_category_ids: null };
+    return { ok: true, patch: sameProductSelection(stored, off) ? null : off };
+  }
+  const patch: ProductPatch = {
+    product_choice: ask,
+    product_ids: productIds.length > 0 ? productIds : null,
+    product_category_ids: categoryIds.length > 0 ? categoryIds : null,
+  };
+  if (sameProductSelection(stored, patch)) {
+    return { ok: true, patch: null };
   }
   if (ask) {
     const covered = [...coveredCategoryIds(categoryIds, categories)];
@@ -296,14 +346,7 @@ async function productSettings(
     const { count, error } = await offerable().or(parts.join(","));
     if (error) return { ok: false, message: dbErrorMessage(error) };
     const refusal = productOfferRefusal(ask, false, count ?? 0);
-    if (refusal) return { ok: false, message: refusal };
+    if (refusal) return { ok: false, message: refusal, over: true };
   }
-  return {
-    ok: true,
-    patch: {
-      product_choice: ask,
-      product_ids: productIds.length > 0 ? productIds : null,
-      product_category_ids: categoryIds.length > 0 ? categoryIds : null,
-    },
-  };
+  return { ok: true, patch };
 }

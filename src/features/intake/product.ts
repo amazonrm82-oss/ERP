@@ -23,8 +23,46 @@ export const PRODUCTS_ALL_OVER = `יש בעסק יותר מ-${MAX_FORM_PRODUCTS}
 /** A pick whose offer is over 100 products. */
 export const PRODUCTS_PICK_OVER = `הבחירה כוללת יותר מ-${MAX_FORM_PRODUCTS} מוצרים פעילים. צמצמו את המוצרים או הקטגוריות שנבחרו.`;
 
-/** The settings screen's warning on a form whose saved choice now offers more than 100 (the business grew). */
-export const PRODUCTS_GREW_WARNING = `הבחירה בטופס הזה כוללת היום יותר מ-${MAX_FORM_PRODUCTS} מוצרים פעילים, ולכן בטופס מוצגים רק ${MAX_FORM_PRODUCTS} הראשונים לפי שם. צמצמו את הבחירה: השמירה הבאה של הטופס תחייב זאת.`;
+/** Owner, 26 October 2026 (answer (ב)): the mark on a product selection that offers more than 100 products. */
+export const PRODUCTS_NEEDS_NARROWING = "דורש צמצום";
+
+/** The settings screen's note on a form whose stored selection now offers more than 100 (the business grew). */
+export const PRODUCTS_GREW_WARNING = `הבחירה השמורה כוללת היום יותר מ-${MAX_FORM_PRODUCTS} מוצרים פעילים. עד שתצמצמו אותה, בטופס מוצגים ${MAX_FORM_PRODUCTS} הראשונים לפי שם מתוך הבחירה הזו, ושאר ההגדרות נשמרות כרגיל.`;
+
+/** A changed selection that offers more than 100 is not saved: the field's note after the refusal. */
+export const PRODUCTS_KEPT_NOTE = "הבחירה החדשה לא נשמרה, ובטופס נשארת הבחירה הקודמת עד שתצמצמו.";
+
+/** The form's message when the other settings were saved and the product selection was not. */
+export const PRODUCTS_KEPT_SAVED = "שאר ההגדרות נשמרו. בחירת המוצרים דורשת צמצום ולא נשמרה.";
+
+/** The failure state's key that marks the product selection "דורש צמצום" after such a save. */
+export const PRODUCTS_NARROW_VALUE = "product_selection__narrow";
+
+/** A form's product selection as stored in forms (product_choice, product_ids, product_category_ids). */
+export type ProductSelection = { product_choice: boolean; product_ids: readonly string[] | null; product_category_ids: readonly string[] | null };
+
+function sameIds(a: readonly string[] | null, b: readonly string[] | null): boolean {
+  const left = new Set(a ?? []);
+  const right = new Set(b ?? []);
+  return left.size === right.size && [...left].every((id) => right.has(id));
+}
+
+/**
+ * Whether the sent selection is the stored one (order of ids ignored; null = no pick). An unchanged selection is never
+ * judged again, so a form whose stored selection grew past 100 keeps saving its other settings (owner, 26 October 2026).
+ */
+export function sameProductSelection(stored: ProductSelection, sent: ProductSelection): boolean {
+  return (
+    stored.product_choice === sent.product_choice &&
+    sameIds(stored.product_ids, sent.product_ids) &&
+    sameIds(stored.product_category_ids, sent.product_category_ids)
+  );
+}
+
+/** Whether the stored selection needs narrowing: the question is asked and its offer is over 100 today. */
+export function selectionNeedsNarrowing(asked: boolean, offerCount: number): boolean {
+  return asked && offerCount > MAX_FORM_PRODUCTS;
+}
 
 export type FormCategory = { id: string; name: string; parentId: string | null };
 

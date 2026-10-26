@@ -2,6 +2,7 @@
 
 import { useActionState, useId, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Input, Label, SelectField, Textarea, TextareaField, TextField } from "@/components/ui/field";
@@ -18,6 +19,10 @@ import {
   MAX_FORM_PRODUCTS,
   PRODUCTS_ALL_OVER,
   PRODUCTS_GREW_WARNING,
+  PRODUCTS_KEPT_SAVED,
+  PRODUCTS_NARROW_VALUE,
+  PRODUCTS_NEEDS_NARROWING,
+  selectionNeedsNarrowing,
   type FormCategory,
   type FormProduct,
 } from "../product";
@@ -205,7 +210,7 @@ export function IntakeSettingsForm({
         <input type="checkbox" name="is_active" defaultChecked={values ? values.is_active === "on" : intake.isActive} className="size-4.5 accent-accent" />
         פעיל (מקבל פניות)
       </label>
-      <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
+      <FormError message={failure && (!failure.fieldErrors || failure.message === PRODUCTS_KEPT_SAVED) ? failure.message : null} />
       <FormNotice message={state?.ok ? state.message : null} />
       <SubmitButton>שמירה</SubmitButton>
     </form>
@@ -325,17 +330,22 @@ function ProductSettings({
   choices: ProductChoices;
   error?: string;
 }) {
-  const allAllowed = choices.offerable <= MAX_FORM_PRODUCTS;
   const storedScope = intake.productIds || intake.productCategoryIds ? "picked" : "all";
+  // "all" may be picked while the business has at most 100; over that, it stays selectable only as the stored choice
+  // (owner, 26 October 2026: an unchanged selection keeps saving; it is marked "דורש צמצום")
+  const allAllowed = choices.offerable <= MAX_FORM_PRODUCTS;
+  const allSelectable = allAllowed || (intake.productChoice && storedScope === "all");
   const [on, setOn] = useState(values ? values.product_choice === "on" : intake.productChoice);
-  const [scope, setScope] = useState(values?.product_scope ?? (allAllowed ? storedScope : "picked"));
+  const [scope, setScope] = useState(values?.product_scope ?? (allSelectable ? storedScope : "picked"));
   const legendId = useId();
   const errorId = useId();
   // after a failed save, the ticks the person sent; otherwise the stored picks
   const picked = initialProductPicks(values, intake.productIds);
   const pickedCategories = initialProductPicks(values, intake.productCategoryIds, CATEGORY_PICKS_VALUE);
-  // the saved choice offers more than 100 today (the business or a category grew): the form shows the first 100
-  const grew = intake.productChoice && choices.offer > MAX_FORM_PRODUCTS;
+  // the saved choice offers more than 100 today (the business or a category grew): the form shows the first 100;
+  // or a changed choice over 100 was just left out of a save
+  const grew = selectionNeedsNarrowing(intake.productChoice, choices.offer);
+  const narrow = grew || values?.[PRODUCTS_NARROW_VALUE] === "1";
   return (
     <div className="space-y-3">
       <input type="hidden" name="product_settings" value="1" />
@@ -354,10 +364,11 @@ function ProductSettings({
           </span>
         </span>
       </label>
-      {grew ? (
-        <p role="note" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning ms-7">
-          {PRODUCTS_GREW_WARNING}
-        </p>
+      {narrow ? (
+        <div role="note" className="space-y-1.5 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning ms-7">
+          <Badge tone="warning">{PRODUCTS_NEEDS_NARROWING}</Badge>
+          {grew ? <p>{PRODUCTS_GREW_WARNING}</p> : null}
+        </div>
       ) : null}
       <fieldset
         hidden={!on}
@@ -375,7 +386,7 @@ function ProductSettings({
             name="product_scope"
             value="all"
             checked={scope === "all"}
-            disabled={!allAllowed}
+            disabled={!allSelectable}
             onChange={() => setScope("all")}
             className="mt-1 size-4.5 accent-accent"
           />

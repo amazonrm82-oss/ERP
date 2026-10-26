@@ -303,8 +303,26 @@ describe("requested product on the public form (LEAD-04 / CAP-08)", () => {
     // the business grows past 100 (not refused); the public form shows the first 100 by name
     await asAdmin((q) => q("insert into public.products (organization_id, name, category_id) values ($1, 'סדרה 999', $2)", [org, bigCat]));
     expect(((await formOf(form.token))!.products as Row[]).length).toBe(100);
-    // the next save of that form while it asks for a product is refused
+    // owner, 26 October 2026 (answer (ב), 020930): the form's other settings still save, and so does a save that sends
+    // the stored selection unchanged; the public form keeps the stored selection (its first 100 by name)
+    expect(await setForm({ title: "כותרת חדשה" })).toBe(1);
+    expect(await setForm({ product_choice: true, product_ids: null, product_category_ids: null, intro: "שלום" })).toBe(1);
+    expect(((await formOf(form.token))!.products as Row[]).length).toBe(100);
+    // a NEW selection that offers more than 100 is never stored: turning the question on again (a new pick: below)
+    const stored = async () =>
+      asAdmin(async (q) => (await q<Row>("select product_choice, product_ids, product_category_ids from public.forms where id = $1", [form.id])).rows[0]);
+    expect(await setForm({ product_choice: false })).toBe(1);
     expect((await pgError(setForm({ product_choice: true }))).hint).toBe("form:products_over");
+    expect(await stored()).toEqual({ product_choice: false, product_ids: null, product_category_ids: null });
+    await asAdmin((q) => q("update public.forms set product_choice = true where id = $1", [form.id]));
+    // a new web form that asks for every product is judged on insert
+    expect(
+      (
+        await pgError(
+          asUser(owner.id, (q) => q("insert into public.forms (organization_id, name, owner_id, product_choice) values ($1, 'טופס חדש', $2, true)", [org, owner.id])),
+        )
+      ).hint,
+    ).toBe("form:products_over");
     // a pick whose offer is over 100 (a category plus products) is refused too
     const others = await asAdmin(async (q) =>
       (
@@ -321,6 +339,17 @@ describe("requested product on the public form (LEAD-04 / CAP-08)", () => {
     expect(await setForm({ product_category_ids: null, product_ids: [product, product2] })).toBe(1);
     expect(await setForm({ product_choice: false, product_ids: null })).toBe(1);
     expect((await pgError(setForm({ product_choice: true }))).hint).toBe("form:products_over");
+    // within 100 nothing changes: a narrow pick saves again and again
+    expect(await setForm({ product_choice: true, product_ids: [product, product2] })).toBe(1);
+    expect(await setForm({ product_choice: true, product_ids: [product, product2], title: "שוב" })).toBe(1);
+    // a stored narrow pick whose category later grows past 100 keeps saving unchanged, but cannot be widened
+    expect(await setForm({ product_ids: null, product_category_ids: [bigCat] })).toBe(1);
+    await asAdmin((q) =>
+      q("insert into public.products (organization_id, name, category_id) select $1, 'עוד ' || lpad(g::text, 3, '0'), $2 from generate_series(1, 100) g", [org, bigCat]),
+    );
+    expect(await setForm({ product_category_ids: [bigCat], name: "טופס באתר" })).toBe(1);
+    expect((await pgError(setForm({ product_category_ids: [bigCat], product_ids: [product] }))).hint).toBe("form:products_over");
+    await setForm({ product_choice: false, product_ids: null, product_category_ids: null });
   });
 });
 
