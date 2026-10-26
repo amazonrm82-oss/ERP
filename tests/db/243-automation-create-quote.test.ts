@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto";
 
+import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { discountedPrice } from "@/features/price-lists/price";
 import { productPriceFor } from "@/features/products/price";
 
-import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead } from "./helpers";
+import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, defaultPipeline, insertLead, TEST_DB_URL } from "./helpers";
 
 afterAll(closePool);
 
 type U = { id: string };
-type Step = { action: string; status: string; error?: string; warning?: string; warning_count?: number; attempt?: number };
+type Step = { action: string; status: string; error?: string; warning?: string; warnings?: string[]; warning_count?: number; attempt?: number };
 type Quote = {
   id: string;
   title: string;
@@ -47,7 +48,7 @@ describe("automations create a quote from a template (AUT-02)", () => {
     });
   const features = (values: Record<string, boolean>) =>
     asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(values)]));
-  const ALL = { quotes: true, products: true, price_lists: true, discounts: true };
+  const ALL = { quotes: true, products: true, price_lists: true, discounts: true, collection: true };
 
   const rule = (entity: string, actions: Array<Record<string, unknown>>, active = false) =>
     asUser(owner.id, async (q) =>
@@ -214,9 +215,11 @@ describe("automations create a quote from a template (AUT-02)", () => {
   it("a contact rule makes the quote on the contact; an empty template takes its own VAT mode only with item lines", async () => {
     const contact = await insert(org, "contacts", { first_name: "יוסי", company_id: company, owner_id: viewer.id });
     const { steps } = await runNow("contact", [{ type: "create_quote", template_id: emptyTemplate }], contact);
-    expect(steps).toEqual([{ action: "create_quote", status: "ok" }]);
+    // a viewer owns no quote, and the step says so (owner's answer of 26 October 2026)
+    const NO_OWNER = "the record owner is not usable, the quote has no owner";
+    expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: NO_OWNER, warnings: [NO_OWNER] }]);
     const [quote] = await quotesOf("contact_id", contact);
-    // a viewer owns no quote; a template with no item lines keeps the business's mode (false here)
+    // a template with no item lines keeps the business's mode (false here)
     expect(quote).toMatchObject({ deal_id: null, contact_id: contact, company_id: company, owner_id: null, prices_include_vat: false, notes: null });
     expect(await linesOf(quote.id)).toEqual([]);
   });
@@ -224,9 +227,17 @@ describe("automations create a quote from a template (AUT-02)", () => {
   it("lines the rules refuse are left out and counted (an archived product, a discount without the flag)", async () => {
     await features({ ...ALL, discounts: false });
     try {
-      const contact = await insert(org, "contacts", { first_name: "רוני" });
+      const contact = await insert(org, "contacts", { first_name: "רוני", owner_id: owner.id });
       const { steps } = await runNow("contact", [{ type: "create_quote", template_id: skipTemplate }], contact);
-      expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: "some template lines were skipped", warning_count: 2 }]);
+      expect(steps).toEqual([
+        {
+          action: "create_quote",
+          status: "ok",
+          warning: "some template lines were skipped",
+          warnings: ["some template lines were skipped"],
+          warning_count: 2,
+        },
+      ]);
       const [quote] = await quotesOf("contact_id", contact);
       expect((await linesOf(quote.id)).map((l) => [l.position, l.name])).toEqual([[1, "שורה טובה"]]);
     } finally {
@@ -310,5 +321,166 @@ describe("automations create a quote from a template (AUT-02)", () => {
     expect(await asUser(owner.id, (q) => count(q, "select 1 from public.quotes where id = $1", [quote.id]))).toBe(1);
     expect(await asUser(stranger.id, (q) => count(q, "select 1 from public.quotes where id = $1", [quote.id]))).toBe(0);
     expect(await asUser(stranger.id, (q) => count(q, "select 1 from public.quote_lines where quote_id = $1", [quote.id]))).toBe(0);
+  });
+  // Owner's answers of 26 October 2026 (migration automation_quote_owner_hold): a customer on hold gets the quote with a
+  // warning; an optional owner in the step.
+  describe("a customer on hold and the step's owner (AUT-02 follow-up)", () => {
+    const ON_HOLD = "the customer is on hold";
+    const COMPANY_ON_HOLD = "the customer's company is on hold";
+    const CHOSEN_UNUSABLE = "the chosen owner is not usable, the quote has no owner";
+    const RECORD_UNUSABLE = "the record owner is not usable, the quote has no owner";
+    const hold = (values: { contact_id?: string; company_id?: string }) => insert(org, "customer_holds", { reason: "חוב פתוח", ...values });
+    const step = (extra: Record<string, unknown> = {}) => [{ type: "create_quote", template_id: emptyTemplate, ...extra }];
+
+    it("a hold on the contact: the quote is made and the step is ok with a warning", async () => {
+      const contact = await insert(org, "contacts", { first_name: "חייב", owner_id: owner.id });
+      await hold({ contact_id: contact });
+      const { steps } = await runNow("contact", step(), contact);
+      expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: ON_HOLD, warnings: [ON_HOLD] }]);
+      expect(await quotesOf("contact_id", contact)).toHaveLength(1);
+    });
+
+    it("a hold on the contact's company: on a contact rule and on a deal with no company of its own", async () => {
+      const heldCompany = await insert(org, "companies", { name: "חברה חייבת" });
+      await hold({ company_id: heldCompany });
+      const contact = await insert(org, "contacts", { first_name: "עובד", company_id: heldCompany, owner_id: owner.id });
+      const both = await insert(org, "contacts", { first_name: "שניהם", company_id: heldCompany, owner_id: owner.id });
+      await hold({ contact_id: both });
+
+      expect((await runNow("contact", step(), contact)).steps).toEqual([
+        { action: "create_quote", status: "ok", warning: COMPANY_ON_HOLD, warnings: [COMPANY_ON_HOLD] },
+      ]);
+      // the deal names the contact only; the quote takes the contact's company, and so does the warning
+      const d = await deal("עסקה לחברה חייבת", contact, owner.id);
+      await asAdmin((q) => q("update public.deals set company_id = null where id = $1", [d]));
+      expect((await runNow("deal", step(), d)).steps).toEqual([
+        { action: "create_quote", status: "ok", warning: COMPANY_ON_HOLD, warnings: [COMPANY_ON_HOLD] },
+      ]);
+      expect((await quotesOf("deal_id", d))[0].company_id).toBe(heldCompany);
+      // both held: the contact's own hold first, then its company's
+      expect((await runNow("contact", step(), both)).steps).toEqual([
+        { action: "create_quote", status: "ok", warning: ON_HOLD, warnings: [ON_HOLD, COMPANY_ON_HOLD] },
+      ]);
+    });
+
+    it("a lifted hold, or a plan without collection, gives no warning", async () => {
+      const contact = await insert(org, "contacts", { first_name: "שילם", owner_id: owner.id });
+      const holdId = await hold({ contact_id: contact });
+      await asAdmin((q) => q("update public.customer_holds set cleared_at = now() where id = $1", [holdId]));
+      expect((await runNow("contact", step(), contact)).steps).toEqual([{ action: "create_quote", status: "ok" }]);
+
+      const held = await insert(org, "contacts", { first_name: "חייב בלי גבייה", owner_id: owner.id });
+      await hold({ contact_id: held });
+      await features({ ...ALL, collection: false });
+      try {
+        expect((await runNow("contact", step(), held)).steps).toEqual([{ action: "create_quote", status: "ok" }]);
+      } finally {
+        await features(ALL);
+      }
+    });
+
+    it("a chosen owner who is an active member owns the quote, also when the record has another owner", async () => {
+      const contact = await insert(org, "contacts", { first_name: "לאחראי נבחר", owner_id: owner.id });
+      const { steps } = await runNow("contact", step({ owner_id: member.id }), contact);
+      expect(steps).toEqual([{ action: "create_quote", status: "ok" }]);
+      expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(member.id);
+    });
+
+    it("a chosen owner who is a viewer, suspended, of another business or not an id: no owner and a warning", async () => {
+      const suspended = await addMember(org, owner.id, "member", "aq-suspended");
+      await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, suspended.id]));
+      for (const chosen of [viewer.id, suspended.id, stranger.id, randomUUID(), "not-a-uuid"]) {
+        const contact = await insert(org, "contacts", { first_name: "לא שמיש", owner_id: owner.id });
+        const { steps } = await runNow("contact", step({ owner_id: chosen }), contact);
+        expect(steps).toEqual([{ action: "create_quote", status: "ok", warning: CHOSEN_UNUSABLE, warnings: [CHOSEN_UNUSABLE] }]);
+        expect((await quotesOf("contact_id", contact))[0].owner_id).toBeNull();
+      }
+    });
+
+    it("no chosen owner: the record's owner while usable, else no owner and a warning", async () => {
+      const kept = await insert(org, "contacts", { first_name: "אחראי רשומה", owner_id: member.id });
+      expect((await runNow("contact", step(), kept)).steps).toEqual([{ action: "create_quote", status: "ok" }]);
+      expect((await quotesOf("contact_id", kept))[0].owner_id).toBe(member.id);
+
+      const ownerless = await insert(org, "contacts", { first_name: "בלי אחראי" });
+      await asAdmin((q) => q("update public.contacts set owner_id = null where id = $1", [ownerless]));
+      expect((await runNow("contact", step(), ownerless)).steps).toEqual([
+        { action: "create_quote", status: "ok", warning: RECORD_UNUSABLE, warnings: [RECORD_UNUSABLE] },
+      ]);
+      expect((await quotesOf("contact_id", ownerless))[0].owner_id).toBeNull();
+    });
+
+    it("a retry of a later failed step leaves the one quote and its warnings as they were (AUT-06)", async () => {
+      const tag = randomUUID();
+      const contact = await insert(org, "contacts", { first_name: "ניסיון חוזר חייב", owner_id: owner.id });
+      await hold({ contact_id: contact });
+      const ruleId = await rule("contact", [...step({ owner_id: viewer.id }), { type: "add_tag", tag_id: tag }], true);
+      const key = `event:aq-${randomUUID()}`;
+      const runId = await asAdmin(async (q) => {
+        await q("select app.execute_automation(a, $2, $3) from public.automations a where a.id = $1", [ruleId, contact, key]);
+        return (await q<{ id: string }>("select id from public.automation_runs where automation_id = $1 and run_key = $2", [ruleId, key])).rows[0].id;
+      });
+      await asUser(owner.id, (q) => q("insert into public.tags (id, organization_id, name) values ($1, $2, 'תגית לניסיון')", [tag, org]));
+      await asAdmin((q) => q("update public.automation_runs set next_retry_at = now() - interval '1 second' where id = $1", [runId]));
+      await asAdmin((q) => q("select app.retry_automation_runs(500)"));
+      const after = await one<{ status: string; steps: Step[] }>("select status, steps from public.automation_runs where id = $1", [runId]);
+      expect(after.status).toBe("success");
+      expect(after.steps).toEqual([
+        { action: "create_quote", status: "ok", warning: CHOSEN_UNUSABLE, warnings: [CHOSEN_UNUSABLE, ON_HOLD] },
+        { action: "add_tag", status: "ok", attempt: 2 },
+      ]);
+      expect(await quotesOf("contact_id", contact)).toHaveLength(1);
+    });
+  });
+
+  // review L1 of 020940: the session is put aside around the server write and given back as it was
+  describe("the session around a server write (AUT-02 review L1)", () => {
+    it("a manual run of [create_quote, create_task] makes the task as the person who ran it", async () => {
+      const contact = await insert(org, "contacts", { first_name: "הרצה ידנית", owner_id: member.id });
+      const id = await rule("contact", [...[{ type: "create_quote", template_id: emptyTemplate }], { type: "create_task", title: "לעקוב" }]);
+      const seen = await asUser(owner.id, async (q) => {
+        await q("select public.run_automation_now($1, $2)", [id, contact]);
+        return (await q<{ claims: string | null }>("select current_setting('request.jwt.claims', true) as claims")).rows[0].claims;
+      });
+      expect(JSON.parse(seen ?? "{}")).toMatchObject({ sub: owner.id, role: "authenticated" });
+      const steps = (await one<{ steps: Step[] }>("select steps from public.automation_runs where automation_id = $1", [id])).steps;
+      expect(steps).toEqual([{ action: "create_quote", status: "ok" }, { action: "create_task", status: "ok" }]);
+      const task = await one<{ created_by: string | null }>("select created_by from public.tasks where contact_id = $1", [contact]);
+      expect(task.created_by).toBe(owner.id);
+      // the quote is still the server's: the record's owner owns it, not the person who ran the rule
+      expect((await quotesOf("contact_id", contact))[0].owner_id).toBe(member.id);
+    });
+
+    it("claims that were never set stay unset (create_quote and create_deal's copied lines)", async () => {
+      const contact = await insert(org, "contacts", { first_name: "בלי סשן", owner_id: owner.id });
+      const source = await deal("עסקת מקור", contact, owner.id);
+      await insert(org, "deal_lines", { deal_id: source, position: 0, description: "שורה", quantity: 1, unit_price_agorot: 1000 });
+      const quoteRule = await rule("contact", [{ type: "create_quote", template_id: emptyTemplate }]);
+      const dealRule = await rule("deal", [{ type: "create_deal", pipeline_id: pipeline, copy_from_source: true }]);
+      // a connection of its own, where the settings were never defined (the pool's may have had them set before)
+      const client = new Client({ connectionString: TEST_DB_URL });
+      await client.connect();
+      try {
+        await client.query("begin");
+        const before = await client.query<{ c: string | null; s: string | null }>(
+          "select current_setting('request.jwt.claims', true) as c, current_setting('request.jwt.claim.sub', true) as s",
+        );
+        expect(before.rows[0]).toEqual({ c: null, s: null });
+        const ran = await client.query<{ q: Step[]; d: Step[]; c: string | null; s: string | null }>(
+          `select (select app.run_automation_actions(a, 'contact', $3) from public.automations a where a.id = $1) as q,
+                  (select app.run_automation_actions(a, 'deal', $4) from public.automations a where a.id = $2) as d`,
+          [quoteRule, dealRule, contact, source],
+        );
+        expect(ran.rows[0].q).toEqual([{ action: "create_quote", status: "ok" }]);
+        expect(ran.rows[0].d).toEqual([{ action: "create_deal", status: "ok" }]);
+        const after = await client.query<{ c: string | null; s: string | null }>(
+          "select current_setting('request.jwt.claims', true) as c, current_setting('request.jwt.claim.sub', true) as s",
+        );
+        expect(after.rows[0]).toEqual({ c: null, s: null });
+      } finally {
+        await client.query("rollback");
+        await client.end();
+      }
+    });
   });
 });

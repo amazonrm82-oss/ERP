@@ -187,7 +187,16 @@ export type RunItem = {
   entityType: string;
   entityId: string;
   createdAt: string;
-  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string; warningCount?: number; attempt?: number }>;
+  steps: Array<{
+    action: string | null;
+    status: string;
+    error?: string;
+    warning?: string;
+    warnings?: string[];
+    warningName?: string;
+    warningCount?: number;
+    attempt?: number;
+  }>;
   // AUT-06: retries of the failed steps
   retryCount: number;
   nextRetryAt: string | null;
@@ -217,6 +226,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
       status: String(s.status ?? ""),
       error: typeof s.error === "string" ? s.error : undefined,
       warning: typeof s.warning === "string" ? s.warning : undefined,
+      warnings: Array.isArray(s.warnings) ? s.warnings.filter((w): w is string => typeof w === "string") : undefined,
       warningName: typeof s.warning_name === "string" ? s.warning_name : undefined,
       warningCount: typeof s.warning_count === "number" ? s.warning_count : undefined,
       attempt: typeof s.attempt === "number" ? s.attempt : undefined,

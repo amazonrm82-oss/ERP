@@ -137,6 +137,11 @@ export const STEP_WARNINGS: Record<string, string> = {
   "the relative date is invalid": "השדה לא עודכן: לא ניתן לחשב את התאריך היחסי",
   // AUT-02 (rest): template lines the rules no longer let in (a product no longer offered, a feature not in the plan); {count}
   "some template lines were skipped": "הצעת המחיר נוצרה בלי {count}: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
+  // AUT-02 follow-up (owner, 26 October 2026): the quote's owner and a customer on hold (COL-05)
+  "the chosen owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: המשתמש שנבחר לא פעיל או צופה בלבד",
+  "the record owner is not usable, the quote has no owner": "הצעת המחיר נוצרה בלי אחראי: לרשומה אין אחראי פעיל",
+  "the customer is on hold": "הצעת המחיר נוצרה, אבל הלקוח מסומן \"לא למכור עד הסדרת חוב\"",
+  "the customer's company is on hold": "הצעת המחיר נוצרה, אבל החברה של הלקוח מסומנת \"לא למכור עד הסדרת חוב\"",
 };
 
 /** "שורה אחת" / "3 שורות" / "חלק מהשורות" (no count). */
@@ -156,6 +161,15 @@ export function stepWarningText(warning: string, name?: string, count?: number):
   }
   const who = name?.trim() || "האחראי הנוכחי";
   return text.replace("{name}", () => who).replace("{count}", () => linesText(count));
+}
+
+/**
+ * Every warning of a step, in Hebrew: a create_quote step lists them all in `warnings` (AUT-02 follow-up); any other step
+ * has at most one, in `warning`.
+ */
+export function stepWarningTexts(step: { warning?: string; warnings?: string[]; warningName?: string; warningCount?: number }): string[] {
+  const keys = step.warnings && step.warnings.length > 0 ? step.warnings : step.warning ? [step.warning] : [];
+  return keys.map((key) => stepWarningText(key, step.warningName, step.warningCount));
 }
 
 /** AUT-06: the most retries of a run's failed steps (the engine's app.retry_automation_run, 3 after the first attempt). */

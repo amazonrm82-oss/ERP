@@ -11,7 +11,7 @@ import { deleteAutomationAction, setAutomationActiveAction } from "@/features/au
 import { TestRunForm } from "@/features/automations/components/test-run-form";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
 import { actionsMissingReason } from "@/features/automations/convert";
-import { describeRule, quotaSkipLabel, retryLine, STEP_ERRORS, stepWarningText } from "@/features/automations/describe";
+import { describeRule, quotaSkipLabel, retryLine, STEP_ERRORS, stepWarningTexts } from "@/features/automations/describe";
 import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -167,7 +167,7 @@ export default async function AutomationPage({ params }: Props) {
                           {step.status !== "ok"
                             ? (STEP_ERRORS[step.error ?? ""] ?? step.error ?? "נכשל")
                             : step.warning
-                              ? stepWarningText(step.warning, step.warningName, step.warningCount)
+                              ? stepWarningTexts(step).join(" · ")
                               : "בוצע"}
                           {step.attempt ? ` (ניסיון ${step.attempt})` : null}
                         </li>

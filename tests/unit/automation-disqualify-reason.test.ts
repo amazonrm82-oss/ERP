@@ -101,14 +101,22 @@ describe("run log warnings", () => {
       .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.run_automation_actions"))
       .at(-1)!;
     const sql = readFileSync(join(dir, latest), "utf8");
-    const written = [...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]);
+    // a create_quote step gathers its warnings in a list (AUT-02 follow-up): v_warnings := v_warnings || '<key>'::text
+    const written = [
+      ...[...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]),
+      ...[...sql.matchAll(/v_warnings := v_warnings \|\| '((?:[^']|'')+)'::text/g)].map((m) => m[1].replaceAll("''", "'")),
+    ];
     expect([...new Set(written)].sort()).toEqual([
       "no reason is set",
       "some lines were not copied",
       "some template lines were skipped",
       "the business-day offset is invalid",
+      "the chosen owner is not usable, the quote has no owner",
+      "the customer is on hold",
+      "the customer's company is on hold",
       "the owner is away, the lead has no owner",
       "the reason no longer exists",
+      "the record owner is not usable, the quote has no owner",
       // AUT-01 part B: a set_field step's relative date
       "the relative date is invalid",
       "the requested owner is away, the lead stays with its owner",

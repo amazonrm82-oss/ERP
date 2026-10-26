@@ -127,7 +127,9 @@ export function describeCreateDeal(
 
 // AUT-02 (rest): a step that makes a draft quote from a quote template (QUO-04). The engine (app.run_automation_actions,
 // migration automation_create_quote) reads the template by its id within the rule's business when the rule runs, and checks
-// the plan's quotes flag again then.
+// the plan's quotes flag again then. Follow-up (owner, 26 October 2026, migration automation_quote_owner_hold): an optional
+// owner of the quote ("owner_id"); empty = the record's owner. The engine checks it again: an owner who is no longer an
+// active member (or is a viewer), like a record owner who is not, makes a quote with no owner and a step warning.
 
 /** The record types a "create quote" step fits: a quote is made on a deal or a contact. */
 export const CREATE_QUOTE_ENTITIES: readonly Entity[] = ["deal", "contact"];
@@ -135,16 +137,28 @@ export const CREATE_QUOTE_ENTITIES: readonly Entity[] = ["deal", "contact"];
 /** The builder's "create quote" values -> the stored action, or a Hebrew message. */
 export function createQuoteAction(
   entity: Entity,
-  input: { template_id: string },
-  lookups: { quotes?: boolean; quoteTemplates?: Array<{ id: string }> },
+  input: { template_id: string; owner_id?: string },
+  lookups: { quotes?: boolean; quoteTemplates?: Array<{ id: string }>; members: Array<{ id: string }> },
 ): Record<string, Json> | string {
   if (!CREATE_QUOTE_ENTITIES.includes(entity)) return "הצעת מחיר נוצרת רק לעסקאות ולאנשי קשר.";
   if (!lookups.quotes) return "הצעות מחיר אינן כלולות בתוכנית של העסק.";
   if (!(lookups.quoteTemplates ?? []).some((t) => t.id === input.template_id)) return "התבנית שנבחרה כבר לא קיימת.";
-  return { type: "create_quote", template_id: input.template_id };
+  // the business's active members who are not viewers (the builder's list, read on the server)
+  if (input.owner_id && !lookups.members.some((m) => m.id === input.owner_id)) return "המשתמש שנבחר כבר לא פעיל.";
+  return { type: "create_quote", template_id: input.template_id, ...(input.owner_id ? { owner_id: input.owner_id } : {}) };
+}
+
+/** A stored "create quote" action -> the builder's values. */
+export function createQuoteDraft(action: Record<string, unknown>): Record<string, string> {
+  const owner = str(action.owner_id);
+  return { type: "create_quote", template_id: str(action.template_id), ...(owner ? { owner_id: owner } : {}) };
 }
 
 /** `"<template>"` for a rule's description. */
-export function describeCreateQuote(action: Record<string, unknown>, lookups: { quoteTemplates?: Array<{ id: string; name: string }> }): string {
-  return `"${nameIn(lookups.quoteTemplates ?? [], action.template_id)}", טיוטה לאחראי על הרשומה`;
+export function describeCreateQuote(
+  action: Record<string, unknown>,
+  lookups: { quoteTemplates?: Array<{ id: string; name: string }>; members: Array<{ id: string; name: string }> },
+): string {
+  const owner = action.owner_id ? `ל${nameIn(lookups.members, action.owner_id)}` : "לאחראי על הרשומה";
+  return `"${nameIn(lookups.quoteTemplates ?? [], action.template_id)}", טיוטה ${owner}`;
 }

@@ -73,7 +73,8 @@ const actionSchema = z.discriminatedUnion("type", [
   // AUT-02: a note on the record's timeline
   z.object({ type: z.literal("create_note"), body: text(NOTE_BODY_MAX, "יש לכתוב את ההערה.") }),
   // AUT-02 (rest): a draft quote from a quote template (checked against the business's templates and plan in toDbRule)
-  z.object({ type: z.literal("create_quote"), template_id: z.guid({ error: "יש לבחור תבנית הצעת מחיר." }) }),
+  // follow-up (owner, 26 October 2026): an optional owner of the quote (empty = the record's owner)
+  z.object({ type: z.literal("create_quote"), template_id: z.guid({ error: "יש לבחור תבנית הצעת מחיר." }), owner_id: id.optional() }),
 ]);
 
 export type RuleAction = z.infer<typeof actionSchema>;

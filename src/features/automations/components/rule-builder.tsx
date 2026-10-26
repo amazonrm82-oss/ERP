@@ -55,7 +55,7 @@ function blankAction(type: ActionType): Draft {
     case "create_note":
       return { type, body: "" };
     case "create_quote":
-      return { type, template_id: "" };
+      return { type, template_id: "", owner_id: "" };
   }
 }
 
@@ -483,7 +483,18 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
       return (
         <div className="space-y-2">
           {templates.length > 0 ? (
-            <div className="sm:w-80">{pick(`תבנית הצעת מחיר (פעולה ${n})`, "template_id", templates)}</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {pick(`תבנית הצעת מחיר (פעולה ${n})`, "template_id", templates)}
+              {/* follow-up (owner, 26 October 2026): an optional owner; empty = the record's owner */}
+              <SelectField label="באחריות" value={action.owner_id ?? ""} onChange={(e) => onChange({ owner_id: e.target.value })} controlSize="sm">
+                <option value="">האחראי על הרשומה</option>
+                {lookups.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
           ) : (
             <p className="text-sm text-ink-soft">
               אין עדיין תבניות הצעת מחיר בעסק.{" "}
@@ -496,8 +507,9 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
           )}
           <p className="text-sm text-ink-soft">
             {entity === "deal" ? "ההצעה נוצרת על העסקה, עם איש הקשר והחברה שלה." : "ההצעה נוצרת על איש הקשר, עם החברה שלו."} היא נשמרת כטיוטה
-            באחריות האחראי על הרשומה, ולא נשלחת ללקוח. מוצר בלי מחיר בתבנית מקבל את המחיר של הלקוח (מחירון או מחיר המוצר); שורה שכבר
-            אי אפשר להציע לא נכנסת, ויומן ההרצות מציין זאת.
+            ולא נשלחת ללקוח. אם האחראי לא פעיל או צופה בלבד, ההצעה נוצרת בלי אחראי. מוצר בלי מחיר בתבנית מקבל את המחיר של הלקוח (מחירון
+            או מחיר המוצר); שורה שכבר אי אפשר להציע לא נכנסת. גם לקוח שמסומן &quot;לא למכור עד הסדרת חוב&quot; מקבל את ההצעה. יומן ההרצות מציין כל
+            אחד מאלה.
           </p>
         </div>
       );
