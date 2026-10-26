@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextLink } from "@/components/ui/text-link";
+import { quoteTemplatesPath } from "@/features/quotes/paths";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
@@ -17,7 +18,7 @@ import type { BuilderInitial } from "../convert";
 import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
 import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
-import { ACTION_LABELS, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
+import { ACTION_LABELS, actionOffered, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
 import { CHANNEL_CHOICES, isDateSetField, LOCALE_CHOICES, RELATIVE_DATE_MAX_DAYS, setFieldChoices, type SetFieldChoice } from "../set-field";
 
@@ -53,6 +54,8 @@ function blankAction(type: ActionType): Draft {
       return { type, name: "", pipeline_id: "", stage_id: "", amount: "", assign: "owner", user_id: "", pipeline_source: "", copy_source: "" };
     case "create_note":
       return { type, body: "" };
+    case "create_quote":
+      return { type, template_id: "" };
   }
 }
 
@@ -258,7 +261,7 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
                     value={action.type}
                     onChange={(e) => setActions((list) => list.map((a, i) => (i === index ? blankAction(e.target.value as ActionType) : a)))}
                   >
-                    {actionOptions.map((type) => (
+                    {actionOptions.filter((type) => actionOffered(type, lookups, action.type)).map((type) => (
                       <option key={type} value={type}>
                         {ACTION_LABELS[type]}
                       </option>
@@ -474,6 +477,31 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
           hint={entity === "task" ? "ההערה נכתבת על הרשומות שהמשימה מקושרת אליהן, ומסומנת כהערה מאוטומציה." : "ההערה מסומנת כהערה מאוטומציה, ואינה נחשבת פעילות או קשר עם הלקוח."}
         />
       );
+    case "create_quote": {
+      // AUT-02 (rest): a draft quote on the deal or the contact, from one of the business's quote templates
+      const templates = lookups.quoteTemplates ?? [];
+      return (
+        <div className="space-y-2">
+          {templates.length > 0 ? (
+            <div className="sm:w-80">{pick(`תבנית הצעת מחיר (פעולה ${n})`, "template_id", templates)}</div>
+          ) : (
+            <p className="text-sm text-ink-soft">
+              אין עדיין תבניות הצעת מחיר בעסק.{" "}
+              <TextLink href={quoteTemplatesPath(orgId)} target="_blank" className="font-medium">
+                לתבניות הצעת מחיר
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
+              </TextLink>{" "}
+              אחרי שמוסיפים, מרעננים את הדף ובוחרים תבנית.
+            </p>
+          )}
+          <p className="text-sm text-ink-soft">
+            {entity === "deal" ? "ההצעה נוצרת על העסקה, עם איש הקשר והחברה שלה." : "ההצעה נוצרת על איש הקשר, עם החברה שלו."} היא נשמרת כטיוטה
+            באחריות האחראי על הרשומה, ולא נשלחת ללקוח. מוצר בלי מחיר בתבנית מקבל את המחיר של הלקוח (מחירון או מחיר המוצר); שורה שכבר
+            אי אפשר להציע לא נכנסת, ויומן ההרצות מציין זאת.
+          </p>
+        </div>
+      );
+    }
     case "set_field": {
       const choices = setFieldChoices(entity, lookups);
       const choice = choices.find((item) => item.key === action.field);

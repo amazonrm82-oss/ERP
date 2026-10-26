@@ -166,7 +166,8 @@ export type ActionType =
   | "move_deal_stage"
   | "set_field"
   | "create_deal"
-  | "create_note";
+  | "create_note"
+  | "create_quote";
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
@@ -178,6 +179,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   set_field: "עדכון שדה",
   create_deal: "יצירת עסקה",
   create_note: "הוספת הערה",
+  create_quote: "יצירת הצעת מחיר מתבנית",
 };
 
 export function actionsFor(entity: Entity): ActionType[] {
@@ -185,6 +187,7 @@ export function actionsFor(entity: Entity): ActionType[] {
     "create_task",
     "create_deal",
     "create_note",
+    "create_quote",
     "notify",
     "assign_owner",
     "add_tag",
@@ -196,6 +199,8 @@ export function actionsFor(entity: Entity): ActionType[] {
     (type) =>
       // AUT-02: a lead becomes a deal by conversion
       (type !== "create_deal" || entity !== "lead") &&
+      // AUT-02: a quote is made on a deal or a contact
+      (type !== "create_quote" || entity === "deal" || entity === "contact") &&
       (type !== "add_tag" || entity !== "task") &&
       (type !== "set_lead_status" || entity === "lead") &&
       (type !== "move_deal_stage" || entity === "deal"),
@@ -209,6 +214,11 @@ export function actionsFor(entity: Entity): ActionType[] {
  * the expected close date; never a name or a phone (an automation does not rewrite identity).
  */
 export type BuiltinSetField = "source_id" | "task_type" | "preferred_channel" | "preferred_locale" | "expected_close_date";
+/** Whether the builder offers an action: a quote step only with the plan's quotes flag; a saved rule keeps its own. */
+export function actionOffered(type: ActionType, lookups: { quotes?: boolean }, current?: string): boolean {
+  return type !== "create_quote" || !!lookups.quotes || type === current;
+}
+
 export const BUILTIN_SET_FIELDS: Array<{ key: BuiltinSetField; label: string; entities: Entity[] }> = [
   { key: "source_id", label: "מקור", entities: ["lead", "contact", "deal"] },
   { key: "task_type", label: "סוג המשימה", entities: ["task"] },

@@ -167,7 +167,7 @@ export default async function AutomationPage({ params }: Props) {
                           {step.status !== "ok"
                             ? (STEP_ERRORS[step.error ?? ""] ?? step.error ?? "נכשל")
                             : step.warning
-                              ? stepWarningText(step.warning, step.warningName)
+                              ? stepWarningText(step.warning, step.warningName, step.warningCount)
                               : "בוצע"}
                           {step.attempt ? ` (ניסיון ${step.attempt})` : null}
                         </li>

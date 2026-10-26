@@ -6,7 +6,7 @@ import { conditionsFromDb, conditionsToDb, type ConditionItem } from "./conditio
 import { DEBT_OVERDUE_MAX_DAYS, FEATURE_MISSING, TRIGGERS, triggerFlags, triggerOf, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
-import { createDealAction, createDealDraft } from "./create-records";
+import { createDealAction, createDealDraft, createQuoteAction } from "./create-records";
 import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
 import { customDefinition, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "./set-field";
 
@@ -137,6 +137,10 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       actions.push(built);
     } else if (action.type === "create_note") {
       actions.push({ type: "create_note", body: action.body });
+    } else if (action.type === "create_quote") {
+      const built = createQuoteAction(entity, action, lookups);
+      if (typeof built === "string") return built;
+      actions.push(built);
     }
   }
 
@@ -225,6 +229,8 @@ export function fromDbRule(
         return [createDealDraft(a)];
       case "create_note":
         return [{ type: "create_note", body: str(a.body) }];
+      case "create_quote":
+        return [{ type: "create_quote", template_id: str(a.template_id) }];
       default:
         return [];
     }

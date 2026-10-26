@@ -124,3 +124,27 @@ export function describeCreateDeal(
   parts.push(action.assign === "user" ? `ל${nameIn(lookups.members, action.user_id)}` : "לאחראי");
   return parts.join(", ");
 }
+
+// AUT-02 (rest): a step that makes a draft quote from a quote template (QUO-04). The engine (app.run_automation_actions,
+// migration automation_create_quote) reads the template by its id within the rule's business when the rule runs, and checks
+// the plan's quotes flag again then.
+
+/** The record types a "create quote" step fits: a quote is made on a deal or a contact. */
+export const CREATE_QUOTE_ENTITIES: readonly Entity[] = ["deal", "contact"];
+
+/** The builder's "create quote" values -> the stored action, or a Hebrew message. */
+export function createQuoteAction(
+  entity: Entity,
+  input: { template_id: string },
+  lookups: { quotes?: boolean; quoteTemplates?: Array<{ id: string }> },
+): Record<string, Json> | string {
+  if (!CREATE_QUOTE_ENTITIES.includes(entity)) return "הצעת מחיר נוצרת רק לעסקאות ולאנשי קשר.";
+  if (!lookups.quotes) return "הצעות מחיר אינן כלולות בתוכנית של העסק.";
+  if (!(lookups.quoteTemplates ?? []).some((t) => t.id === input.template_id)) return "התבנית שנבחרה כבר לא קיימת.";
+  return { type: "create_quote", template_id: input.template_id };
+}
+
+/** `"<template>"` for a rule's description. */
+export function describeCreateQuote(action: Record<string, unknown>, lookups: { quoteTemplates?: Array<{ id: string; name: string }> }): string {
+  return `"${nameIn(lookups.quoteTemplates ?? [], action.template_id)}", טיוטה לאחראי על הרשומה`;
+}

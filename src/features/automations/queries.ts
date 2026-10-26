@@ -28,6 +28,8 @@ export type Lookups = {
   // AUT-04: whether the plan has quotes / documents (their triggers are offered only then)
   quotes?: boolean;
   documents?: boolean;
+  // AUT-02 (rest): the business's quote templates, for a "create quote" step (read only with the quotes flag)
+  quoteTemplates?: Array<{ id: string; name: string }>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -57,7 +59,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
-  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -73,9 +75,15 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       .order("position", { ascending: true })
       .order("created_at", { ascending: true }),
     getOrgTerms(orgId),
+    quotes
+      ? supabase.from("quote_templates").select("id, name").eq("organization_id", orgId).order("name").order("id").limit(1000)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }>, error: null }),
   ]);
   if (reasons.error) {
     return { data: null, error: reasons.error };
+  }
+  if (templates.error) {
+    return { data: null, error: templates.error };
   }
   return {
     data: {
@@ -95,6 +103,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       payments,
       quotes,
       documents,
+      quoteTemplates: templates.data ?? [],
     },
     error: null,
   };
@@ -178,7 +187,7 @@ export type RunItem = {
   entityType: string;
   entityId: string;
   createdAt: string;
-  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string; attempt?: number }>;
+  steps: Array<{ action: string | null; status: string; error?: string; warning?: string; warningName?: string; warningCount?: number; attempt?: number }>;
   // AUT-06: retries of the failed steps
   retryCount: number;
   nextRetryAt: string | null;
@@ -209,6 +218,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
       error: typeof s.error === "string" ? s.error : undefined,
       warning: typeof s.warning === "string" ? s.warning : undefined,
       warningName: typeof s.warning_name === "string" ? s.warning_name : undefined,
+      warningCount: typeof s.warning_count === "number" ? s.warning_count : undefined,
       attempt: typeof s.attempt === "number" ? s.attempt : undefined,
     })),
     retryCount: row.retry_count ?? 0,

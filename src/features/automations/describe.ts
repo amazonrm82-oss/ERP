@@ -1,7 +1,7 @@
 import { ACTION_LABELS, triggerOf, type ActionType, type Entity } from "./definitions";
 import type { Lookups } from "./queries";
 import { describeConditions } from "./conditions";
-import { describeCreateDeal } from "./create-records";
+import { describeCreateDeal, describeCreateQuote } from "./create-records";
 import { describeDateTrigger } from "./date-trigger";
 import { describeSetField } from "./set-field";
 
@@ -78,6 +78,8 @@ export function describeRule(
         return `${label}: ${describeCreateDeal(a, lookups)}`;
       case "create_note":
         return `${label}: "${String(a.body ?? "")}"`;
+      case "create_quote":
+        return `${label}: ${describeCreateQuote(a, lookups)}`;
       default:
         return label;
     }
@@ -113,6 +115,11 @@ export const STEP_ERRORS: Record<string, string> = {
   "the plan record limit is reached": "הגעתם למספר הרשומות שהחבילה מאפשרת",
   "the note is empty": "ההערה ריקה",
   "the task is not linked to a record": "המשימה לא מקושרת לרשומה פעילה",
+  // AUT-02 (rest): a create_quote step
+  "a quote is made on a deal or a contact": "הצעת מחיר נוצרת רק לעסקה או לאיש קשר",
+  "the record is in the recycle bin": "הרשומה בסל המחזור",
+  "quotes are not in the plan": "הצעות מחיר אינן כלולות בתוכנית של העסק",
+  "the quote template no longer exists": "תבנית הצעת המחיר נמחקה",
 };
 
 /** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */
@@ -128,16 +135,27 @@ export const STEP_WARNINGS: Record<string, string> = {
   "some lines were not copied": "העסקה נוצרה בלי חלק מהשורות: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
   // AUT-01 part B: a relative date the engine could not work out; the field was left as it was
   "the relative date is invalid": "השדה לא עודכן: לא ניתן לחשב את התאריך היחסי",
+  // AUT-02 (rest): template lines the rules no longer let in (a product no longer offered, a feature not in the plan); {count}
+  "some template lines were skipped": "הצעת המחיר נוצרה בלי {count}: מוצר שכבר לא מוצע או תכונה שאינה בחבילה",
 };
 
-/** The Hebrew text of a step warning; `{name}` is filled from the step's `warning_name`. */
-export function stepWarningText(warning: string, name?: string): string {
+/** "שורה אחת" / "3 שורות" / "חלק מהשורות" (no count). */
+function linesText(count?: number): string {
+  if (count === undefined || !Number.isInteger(count) || count < 1) return "חלק מהשורות";
+  return count === 1 ? "שורה אחת" : `${count} שורות`;
+}
+
+/**
+ * The Hebrew text of a step warning; `{name}` is filled from the step's `warning_name`, `{count}` from its
+ * `warning_count` (AUT-02: template lines left out).
+ */
+export function stepWarningText(warning: string, name?: string, count?: number): string {
   const text = STEP_WARNINGS[warning];
   if (!text) {
     return warning;
   }
   const who = name?.trim() || "האחראי הנוכחי";
-  return text.replace("{name}", () => who);
+  return text.replace("{name}", () => who).replace("{count}", () => linesText(count));
 }
 
 /** AUT-06: the most retries of a run's failed steps (the engine's app.retry_automation_run, 3 after the first attempt). */
