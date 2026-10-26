@@ -716,7 +716,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
   team on the lead (deliberate). `public.intake_submit` and `public.intake_form` were last redefined in
-  020905 (`app.run_automation_actions` in 020610); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
+  020905 (`app.run_automation_actions` in 020920); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
   category includes its sub-categories) narrow the offer; both null = every offerable product (column grants). The offer is
@@ -1321,11 +1321,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   process, its recurring revenue for the next period (term rounded to whole months) and its lines, copied as the server (the JWT claims
   are cleared around the copy and restored).
   Since 020900 (AUT-01 part B, owner 18 October 2026) set_field also writes `preferred_channel` / `preferred_locale` (leads, contacts;
-  the CON-10 lists; a written channel gets source 'manual', the same channel keeps its source) and `expected_close_date` (deals),
+  the CON-10 lists; since 020920 (owner 26 October 2026, option ג) a written channel keeps the record's previous source, clearing clears it) and `expected_close_date` (deals),
   never names or phones; date fields take {"relative": {"days": 0..365, "unit": "calendar"|"business"}} worked out at run time in the
   business's zone (`app.automation_relative_date`, no grants; business days by `app.add_business_days`); an invalid one leaves the
   field and logs ok with the warning 'the relative date is invalid'. A date_reached rule whose own step moves its trigger date can
-  fire again on each new date, and an AUT-06 retry then sees `event_changed`. `app.run_automation_actions` was last redefined in 020900.
+  fire again on each new date, and an AUT-06 retry then sees `event_changed`. `app.run_automation_actions` was last redefined in 020920.
 - Automation conditions (AUT-05, migration 020785; owner 18 and 25 October 2026): `automations.conditions` items are a leaf
   {field, op, value?, on?} (`on`: contact|company|deal|lead = the record the rule's record's `<on>_id` points at), an "or" group
   {any: [2..10 leaves]}, working hours {kind: hours, value: in|out} or a weekday {kind: weekday, days: [0..6]}; at most 10 items and
