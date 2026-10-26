@@ -24,6 +24,9 @@ const KINDS = [
   { table: "tasks", label: "משימות" },
   // transfer_records moves the meetings the person organizes (owner_id) too
   { table: "meetings", label: "פגישות" },
+  // and the quotes and orders the person owns, in every status (shown only when there are any)
+  { table: "quotes", label: "הצעות מחיר", optional: true },
+  { table: "orders", label: "הזמנות", optional: true },
 ] as const;
 
 export default async function TransferRecordsPage({ params }: Props) {
@@ -60,14 +63,14 @@ export default async function TransferRecordsPage({ params }: Props) {
     <>
       <PageHeader
         title={`העברת הרשומות של ${person.name}`}
-        description={`כל מה שבבעלות ${person.name} עובר למשתמש אחר: לידים, אנשי קשר, חברות ועסקאות (גם בסל המחזור), משימות ופגישות.`}
+        description={`כל מה שבבעלות ${person.name} עובר למשתמש אחר: לידים, אנשי קשר, חברות ועסקאות (גם בסל המחזור), משימות, פגישות, הצעות מחיר והזמנות.`}
         back={back}
       />
       <Card className="max-w-xl">
         <CardHeader title={total === 0 ? "אין רשומות להעביר" : `${formatNumber(total)} רשומות`} />
         <CardBody className="space-y-4">
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-md sm:grid-cols-3">
-            {counts.map((c) => (
+            {counts.filter((c) => !("optional" in c) || c.count > 0).map((c) => (
               <li key={c.table}>
                 {c.label}: <span className="font-semibold">{formatNumber(c.count)}</span>
               </li>

@@ -457,6 +457,6 @@ export async function transferRecordsAction(orgId: string, fromUserId: string, _
   revalidatePath(paths.settingsUsers(orgId));
   return {
     ok: true,
-    message: `הועברו ${moved.leads ?? 0} לידים, ${moved.contacts ?? 0} אנשי קשר, ${moved.companies ?? 0} חברות, ${moved.deals ?? 0} עסקאות, ${moved.tasks ?? 0} משימות ו-${moved.meetings ?? 0} פגישות.`,
+    message: `הועברו ${moved.leads ?? 0} לידים, ${moved.contacts ?? 0} אנשי קשר, ${moved.companies ?? 0} חברות, ${moved.deals ?? 0} עסקאות, ${moved.tasks ?? 0} משימות, ${moved.meetings ?? 0} פגישות, ${moved.quotes ?? 0} הצעות מחיר ו-${moved.orders ?? 0} הזמנות.`,
   };
 }

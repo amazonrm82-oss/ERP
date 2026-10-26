@@ -217,13 +217,14 @@ export const NOTIFICATION_PATTERNS: readonly Pattern[] = [
     literals: ["ליד", "איש קשר"],
   },
   {
-    // public.transfer_records: the counts of a handover
+    // public.transfer_records: the counts of a handover. Since 020875 quotes and orders move too; a notice stored before
+    // it ends "משימות ו-N פגישות." and still renders (the record words are all in the head)
     id: "transfer_body",
     field: "body",
     types: ["assigned"],
-    re: /^(\d+) לידים, (\d+) אנשי קשר, (\d+) חברות, (\d+) עסקאות, (\d+) משימות ו-(\d+) פגישות\.$/,
-    render: (m, t) => `${m[1]} ${t.lead.plural}, ${m[2]} ${t.contact.plural}, ${m[3]} חברות, ${m[4]} ${t.deal.plural}, ${m[5]} משימות ו-${m[6]} פגישות.`,
-    literals: ["%s לידים, %s אנשי קשר, %s חברות, %s עסקאות, %s משימות ו-%s פגישות."],
+    re: /^(\d+) לידים, (\d+) אנשי קשר, (\d+) חברות, (\d+) עסקאות, (\d+) משימות( ו-\d+ פגישות\.|, \d+ פגישות, \d+ הצעות מחיר ו-\d+ הזמנות\.)$/,
+    render: (m, t) => `${m[1]} ${t.lead.plural}, ${m[2]} ${t.contact.plural}, ${m[3]} חברות, ${m[4]} ${t.deal.plural}, ${m[5]} משימות${m[6]}`,
+    literals: ["%s לידים, %s אנשי קשר, %s חברות, %s עסקאות, %s משימות, %s פגישות, %s הצעות מחיר ו-%s הזמנות."],
   },
   ...QUOTE_DEAL_NOTES.map(
     (note, index): Pattern => ({
