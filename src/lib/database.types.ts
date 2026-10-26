@@ -1049,6 +1049,8 @@ export type ImportJobRow = {
   consent_note: string | null;
   // CNS-06: consents of the import kept out because the address is blocked or opted out (server only)
   consents_locked: number;
+  // CNS-06: false on jobs made before consents_locked was counted (20261006021025): unknown, not 0 (server only)
+  consents_locked_counted: boolean;
 };
 
 export type SupportAccessGrantRow = {

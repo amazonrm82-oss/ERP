@@ -5,7 +5,7 @@ import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { UploadIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
-import { consentsLockedText } from "@/features/imports/consent";
+import { importConsentsLockedLine } from "@/features/imports/consent";
 import { importEntityLabel } from "@/features/imports/fields";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { UndoImportButton } from "@/features/imports/components/undo-import-button";
@@ -75,8 +75,8 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
                       <p className="mt-0.5 text-sm">
                         נוצרו {formatNumber(job.created_count)}, עודכנו {formatNumber(job.updated_count)}, דולגו {formatNumber(job.skipped_count)}, נכשלו {formatNumber(job.failed_count)} מתוך {formatNumber(job.total_rows)}
                       </p>
-                      {/* CNS-06 answer 3: kept on the job by public.import_record_consents */}
-                      {job.consents_locked > 0 ? <p className="mt-0.5 text-sm">{consentsLockedText(job.consents_locked)}</p> : null}
+                      {/* CNS-06 answer 3: kept on the job by public.import_record_consents; an older job says it was not counted */}
+                      {importConsentsLockedLine(job) ? <p className="mt-0.5 text-sm">{importConsentsLockedLine(job)}</p> : null}
                     </div>
                     {undoable ? (
                       <UndoImportButton

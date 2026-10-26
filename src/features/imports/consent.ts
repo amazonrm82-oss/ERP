@@ -130,6 +130,18 @@ export function consentsLockedText(count: number | null | undefined): string {
     : `${formatNumber(count)} כתובות חסומות או שהוסרו: לא נרשמה הסכמה.`;
 }
 
+export const CONSENTS_LOCKED_NOT_COUNTED = "כתובות חסומות או שהוסרו: לא נספר בייבוא הזה.";
+
+/**
+ * CNS-06 (owner, 26 October 2026): the import history's line for blocked addresses. A count above 0 is always shown. A job
+ * made before the count existed (`consents_locked_counted` false) that mapped consent columns and shows 0 says it was not
+ * counted, never "0"; nothing otherwise.
+ */
+export function importConsentsLockedLine(job: { consents_locked: number; consents_locked_counted: boolean; consent_method: string | null }): string {
+  if (job.consents_locked > 0) return consentsLockedText(job.consents_locked);
+  return !job.consents_locked_counted && job.consent_method ? CONSENTS_LOCKED_NOT_COUNTED : "";
+}
+
 /** The row's warning for a consent the database did not write; null when it was written. */
 export function consentResultWarning(channel: ImportConsentChannel, result: ConsentResult): string | null {
   if (result === "written") return null;

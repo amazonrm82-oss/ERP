@@ -9,6 +9,8 @@ import {
   consentDeclarationSchema,
   consentResultWarning,
   consentsLockedText,
+  CONSENTS_LOCKED_NOT_COUNTED,
+  importConsentsLockedLine,
   consentsUndoneText,
   IMPORT_CONSENT_METHOD_LABELS,
   IMPORT_CONSENT_METHODS,
@@ -259,5 +261,30 @@ describe("the import report's line for blocked addresses (CNS-06, owner, 26 Octo
     expect(lockedSql).toMatch(/add column if not exists consents_locked integer not null default 0/);
     expect(lockedSql).toMatch(/set consents_locked = j\.consents_locked \+ v_locked/);
     expect(lockedSql).not.toMatch(/grant update[^;]*consents_locked/);
+  });
+});
+
+describe("an import that ran before the blocked-addresses count (CNS-06, owner, 26 October 2026)", () => {
+  it("says it was not counted when it mapped consent columns and shows 0; any count above 0 is shown", () => {
+    const old = { consents_locked: 0, consents_locked_counted: false };
+    expect(importConsentsLockedLine({ ...old, consent_method: "website_form" })).toBe(CONSENTS_LOCKED_NOT_COUNTED);
+    expect(CONSENTS_LOCKED_NOT_COUNTED).toContain("לא נספר בייבוא הזה");
+    // no consent columns: nothing to count, nothing to say
+    expect(importConsentsLockedLine({ ...old, consent_method: null })).toBe("");
+    expect(importConsentsLockedLine({ consents_locked: 0, consents_locked_counted: true, consent_method: "website_form" })).toBe("");
+    expect(importConsentsLockedLine({ consents_locked: 3, consents_locked_counted: true, consent_method: "website_form" })).toBe(consentsLockedText(3));
+    // a count above 0 is shown whatever the flag says
+    expect(importConsentsLockedLine({ consents_locked: 2, consents_locked_counted: false, consent_method: "website_form" })).toBe(consentsLockedText(2));
+    expect(importConsentsLockedLine({ consents_locked: 1, consents_locked_counted: false, consent_method: null })).toBe(consentsLockedText(1));
+  });
+
+  it("marks old jobs by the column's default only: no row is rewritten, and the client never writes it", () => {
+    const file = readdirSync(dir).find((f) => f.endsWith("_import_consent_locked_counted.sql"));
+    expect(file).toBeDefined();
+    const sql = readFileSync(join(dir, file as string), "utf8");
+    expect(sql).toMatch(/add column if not exists consents_locked_counted boolean not null default false/);
+    expect(sql).toMatch(/alter column consents_locked_counted set default true/);
+    expect(sql).not.toMatch(/^\s*update\b/im);
+    expect(sql).not.toMatch(/^\s*grant[^;]*consents_locked_counted/im);
   });
 });
