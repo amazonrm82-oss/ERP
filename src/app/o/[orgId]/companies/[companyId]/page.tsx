@@ -1,4 +1,5 @@
 import { FollowButton } from "@/features/followers/components/follow-button";
+import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -103,6 +104,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <>
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "company", id: company.id }} state={follow} />
+            {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="company" recordId={company.id} /> : null}
           </>
         }
       />

@@ -1,4 +1,5 @@
 import { getOrgTerms } from "@/features/terminology/queries";
+import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { byGender } from "@/features/terminology/terms";
 import { RecordConsents } from "@/features/consents/components/record-consents";
 import { FollowButton } from "@/features/followers/components/follow-button";
@@ -143,6 +144,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <>
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "contact", id: contact.id }} state={follow} />
+            {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="contact" recordId={contact.id} /> : null}
           </>
         }
       />

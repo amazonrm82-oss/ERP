@@ -3,6 +3,8 @@ import type { Lookups } from "./queries";
 import { describeConditions } from "./conditions";
 import { describeCreateDeal, describeCreateQuote } from "./create-records";
 import { describeDateTrigger } from "./date-trigger";
+import { describeFieldTrigger } from "./field-trigger";
+import { describeScheduleTrigger } from "./schedule-trigger";
 import { describeSetField } from "./set-field";
 
 type Json = Record<string, unknown>;
@@ -34,6 +36,16 @@ export function describeRule(
   }
   if (trigger?.date) {
     when += `: ${describeDateTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
+  }
+  // AUT-03
+  if (trigger?.anyField) {
+    when += `: ${describeFieldTrigger(trigger.entity, rule.triggerConfig, lookups)}`;
+  }
+  if (trigger?.form) {
+    when += rule.triggerConfig.form_id ? `: ${nameIn(lookups.forms ?? [], rule.triggerConfig.form_id)}` : ": כל טופס";
+  }
+  if (trigger?.schedule) {
+    when += `: ${describeScheduleTrigger(rule.triggerConfig)}`;
   }
 
   // AUT-05: "or" groups, linked records and time conditions
@@ -120,6 +132,8 @@ export const STEP_ERRORS: Record<string, string> = {
   "the record is in the recycle bin": "הרשומה בסל המחזור",
   "quotes are not in the plan": "הצעות מחיר אינן כלולות בתוכנית של העסק",
   "the quote template no longer exists": "תבנית הצעת המחיר נמחקה",
+  // AUT-03: a scheduled run on one record raised; the record is skipped for that scheduled time
+  "the run stopped with an error": "ההרצה נעצרה בשגיאה ודולגה במועד הזה",
 };
 
 /** A step that ran but with something missing (RVW-9: a "not relevant" move without a reason). */

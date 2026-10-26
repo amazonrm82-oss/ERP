@@ -112,6 +112,11 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
     decisions: { rich_text: "handled", duration: "handled", status: "handled", ...B_ADDRESS_ONLY },
     note: "part B: an automation never sets a record link or a file (automationSettable; the database refuses it in a run, *_cf_zz_automation_guard)",
   },
+  "src/features/automations/field-trigger.ts": {
+    what: "\"a field changed\" trigger (AUT-03)",
+    decisions: ALL_HANDLED,
+    note: "every type may be watched for any change; a value to wait for only on select, status, checkbox and user fields",
+  },
   "src/features/automations/components/rule-builder.tsx": {
     what: "set_field input (AUT-01)",
     decisions: { rich_text: "handled", duration: "handled", status: "handled", ...B_ADDRESS_ONLY },

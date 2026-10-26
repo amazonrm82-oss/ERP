@@ -25,7 +25,11 @@ export type TriggerType =
   | "meeting_cancelled"
   | "meeting_no_show"
   // AUT-04 follow-up: a tax invoice or proforma passed its due date with a balance left
-  | "debt_overdue";
+  | "debt_overdue"
+  // AUT-03 (rest): a public form created or matched the record; a fixed schedule; the card's manual button
+  | "form_submitted"
+  | "schedule"
+  | "manual";
 
 /** AUT-04: the plan flags a trigger may need (app.automation_trigger_feature). */
 export type TriggerFeature = "payments" | "quotes" | "documents";
@@ -45,6 +49,14 @@ export type TriggerOption = {
   minAmount?: true;
   // AUT-04 follow-up: days after the due date (stored as trigger_config.days_overdue, 0..365)
   overdue?: true;
+  // AUT-03: field_changed on any field chosen in the builder (built-in or custom), optionally to a value
+  anyField?: true;
+  // AUT-03: an optional form (trigger_config.form_id)
+  form?: true;
+  // AUT-03: a fixed schedule (trigger_config {frequency, time, days?})
+  schedule?: true;
+  // AUT-03: run from the record's card by a person
+  manual?: true;
 };
 
 export const TRIGGERS: TriggerOption[] = [
@@ -105,6 +117,25 @@ export const TRIGGERS: TriggerOption[] = [
   // AUT-04 follow-up: a tax invoice or proforma of the deal / contact is past its due date with a balance left
   { key: "deal:debt_overdue", label: "חוב בעסקה עבר את מועדו", entity: "deal", type: "debt_overdue", overdue: true },
   { key: "contact:debt_overdue", label: "חוב של איש קשר עבר את מועדו", entity: "contact", type: "debt_overdue", overdue: true },
+  // AUT-03 (rest): any field of the record changed (status and stage keep their own triggers above)
+  { key: "lead:field", label: "שדה בליד השתנה", entity: "lead", type: "field_changed", anyField: true },
+  { key: "contact:field", label: "שדה באיש קשר השתנה", entity: "contact", type: "field_changed", anyField: true },
+  { key: "company:field", label: "שדה בחברה השתנה", entity: "company", type: "field_changed", anyField: true },
+  { key: "deal:field", label: "שדה בעסקה השתנה", entity: "deal", type: "field_changed", anyField: true },
+  // AUT-03: a public form created the lead or contact, or a repeat inquiry matched it
+  { key: "lead:form", label: "נשלח טופס (ליד)", entity: "lead", type: "form_submitted", form: true },
+  { key: "contact:form", label: "נשלח טופס (איש קשר)", entity: "contact", type: "form_submitted", form: true },
+  // AUT-03: a fixed schedule over the records the conditions match
+  { key: "lead:schedule", label: "לפי לוח זמנים: לידים", entity: "lead", type: "schedule", schedule: true },
+  { key: "contact:schedule", label: "לפי לוח זמנים: אנשי קשר", entity: "contact", type: "schedule", schedule: true },
+  { key: "company:schedule", label: "לפי לוח זמנים: חברות", entity: "company", type: "schedule", schedule: true },
+  { key: "deal:schedule", label: "לפי לוח זמנים: עסקאות פתוחות", entity: "deal", type: "schedule", schedule: true },
+  { key: "task:schedule", label: "לפי לוח זמנים: משימות פתוחות", entity: "task", type: "schedule", schedule: true },
+  // AUT-03: a person runs the rule from the record's card
+  { key: "lead:manual", label: "כפתור בכרטיס הליד", entity: "lead", type: "manual", manual: true },
+  { key: "contact:manual", label: "כפתור בכרטיס איש הקשר", entity: "contact", type: "manual", manual: true },
+  { key: "company:manual", label: "כפתור בכרטיס החברה", entity: "company", type: "manual", manual: true },
+  { key: "deal:manual", label: "כפתור בכרטיס העסקה", entity: "deal", type: "manual", manual: true },
 ];
 
 /** The most days after the due date a debt rule may wait (app.scheduled_debt_overdue). */
@@ -234,6 +265,11 @@ export const TASK_TYPES = [
   { value: "follow_up", label: "מעקב" },
 ] as const;
 
+/**
+ * The builder's trigger of a stored rule. A field_changed rule on status or stage reads as its own trigger; any other
+ * field reads as "a field changed" (AUT-03).
+ */
 export function triggerOf(entity: string, type: string, config: Record<string, unknown>): TriggerOption | undefined {
-  return TRIGGERS.find((t) => t.entity === entity && t.type === type && (!t.field || t.field === config.field));
+  const same = TRIGGERS.filter((t) => t.entity === entity && t.type === type);
+  return same.find((t) => t.field && t.field === config.field) ?? same.find((t) => !t.field);
 }

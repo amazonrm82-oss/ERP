@@ -1,4 +1,5 @@
 import { RecordConsents } from "@/features/consents/components/record-consents";
+import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -125,6 +126,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
             <Badge tone={statusTone(status)}>{status?.name ?? "ללא סטטוס"}</Badge>
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "lead", id: lead.id }} state={follow} />
+            {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="lead" recordId={lead.id} /> : null}
           </>
         }
       />

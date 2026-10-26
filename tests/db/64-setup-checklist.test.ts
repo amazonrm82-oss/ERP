@@ -578,6 +578,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the QUO-06 follow-ups redefine public.quote_public() of _quote_link_expired_lists.sql last, and alter the files insert
       // policy and the storage policy record_files_insert after _quote_pdfs.sql (only the server writes a quote's PDF)
       "_quote_pdf_server.sql",
+      // AUT-03 redefines app.emit_event() of the lead score and public.intake_submit() of _consent_awaiting_confirmation.sql
+      // last (custom field keys in the changed list; the "form submitted" event)
+      "_automation_more_triggers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

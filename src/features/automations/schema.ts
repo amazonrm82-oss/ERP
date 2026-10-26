@@ -90,6 +90,14 @@ export const ruleSchema = z
     trigger_field: z.string().max(100).optional(),
     trigger_direction: z.enum(DATE_DIRECTIONS).optional(),
     trigger_days: z.coerce.number({ error: "יש להזין מספר ימים." }).int({ error: "יש להזין מספר ימים שלם." }).min(0).max(DATE_TRIGGER_MAX_DAYS, { error: `עד ${DATE_TRIGGER_MAX_DAYS} ימים.` }).optional(),
+    // AUT-03: "a field changed": the value to wait for (empty = any change; trigger_field names the field)
+    trigger_value: z.string().max(200, { error: "הערך ארוך מדי." }).optional(),
+    // AUT-03: "form submitted": one form (empty = any form)
+    trigger_form_id: id.optional(),
+    // AUT-03: "fixed schedule": daily or weekly, at HH:MM, on weekdays 0..6 (checked in toDbRule)
+    trigger_frequency: z.enum(["daily", "weekly"]).optional(),
+    trigger_time: z.string().max(5).optional(),
+    trigger_weekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
     // PAY-07: the minimum payment in shekels as typed (checked in toDbRule)
     trigger_min: z.string().max(30, { error: "הסכום ארוך מדי." }).optional(),
     // AUT-05: a condition, or an "or" group of conditions; a condition may test a linked record or the time

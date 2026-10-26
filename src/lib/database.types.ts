@@ -3507,6 +3507,9 @@ export type Database = {
         // { status, steps }
         Returns: Json;
       };
+      // AUT-03: the card's manual rules ([{id, name}]) and running one ({ok, status} | {ok: false, reason})
+      manual_automations: { Args: { p_org: string; p_entity: string; p_record: string }; Returns: Json };
+      run_manual_automation: { Args: { p_org: string; p_automation: string; p_record: string }; Returns: Json };
       convert_lead: {
         Args: {
           p_lead_id: string;

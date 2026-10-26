@@ -1,4 +1,5 @@
 import { getOrgTerms } from "@/features/terminology/queries";
+import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { byGender } from "@/features/terminology/terms";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
@@ -187,6 +188,7 @@ export default async function DealPage({ params, searchParams }: Props) {
             <Badge tone={status.tone}>{status.label}</Badge>
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "deal", id: deal.id }} state={follow} />
+            {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="deal" recordId={deal.id} /> : null}
           </>
         }
       />

@@ -17,6 +17,8 @@ import { createAutomationAction, updateAutomationAction } from "../actions";
 import type { BuilderInitial } from "../convert";
 import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../create-records";
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
+import { watchChoices, watchValues } from "../field-trigger";
+import { SCHEDULE_MINUTES, WEEKDAYS } from "../schedule-trigger";
 import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
 import { ACTION_LABELS, actionOffered, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
@@ -92,6 +94,13 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
   const [overdueDays, setOverdueDays] = useState(initial?.triggerDays ?? "0");
   // PAY-07: the minimum payment in shekels ("" = any amount)
   const [triggerMin, setTriggerMin] = useState(initial?.triggerMin ?? "");
+  // AUT-03: "a field changed" (the field shares dateField's state: one of the two triggers at a time), a form, a schedule
+  const [watchValue, setWatchValue] = useState(initial?.triggerValue ?? "");
+  const [formId, setFormId] = useState(initial?.triggerFormId ?? "");
+  const [frequency, setFrequency] = useState(initial?.triggerFrequency ?? "daily");
+  const [hour, setHour] = useState(initial?.triggerHour ?? "09");
+  const [minute, setMinute] = useState(initial?.triggerMinute ?? "00");
+  const [weekdays, setWeekdays] = useState<number[]>(initial?.triggerWeekdays ?? [0, 1, 2, 3, 4]);
   const [conditions, setConditions] = useState<ConditionItem[]>(initial?.conditions ?? []);
   const [actions, setActions] = useState<Draft[]>(
     initial?.actions.length ? initial.actions.map((a) => ({ ...blankAction(a.type as ActionType), ...a })) : [blankAction("create_task")],
@@ -110,8 +119,9 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
     setTriggerTo("");
     setTriggerNumber(next.number ? String(next.number.default) : "");
     setTriggerMin("");
-    // a date field of another record type is picked again
-    if (next.entity !== entity) setDateField("");
+    setWatchValue("");
+    // a date field (or a watched field) of another trigger or record type is picked again
+    if (next.entity !== entity || next.date !== trigger.date || next.anyField !== trigger.anyField) setDateField("");
     // drop what does not fit the new record type
     setConditions((list) => fitConditions(list, next.entity));
     setActions((list) => {
@@ -136,6 +146,11 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
       : {}),
     ...(trigger.minAmount && triggerMin.trim() ? { trigger_min: triggerMin } : {}),
     ...(trigger.overdue ? { trigger_days: overdueDays.trim() || "0" } : {}),
+    ...(trigger.anyField ? { trigger_field: dateField, ...(watchValue ? { trigger_value: watchValue } : {}) } : {}),
+    ...(trigger.form && formId ? { trigger_form_id: formId } : {}),
+    ...(trigger.schedule
+      ? { trigger_frequency: frequency, trigger_time: `${hour}:${minute}`, ...(frequency === "weekly" ? { trigger_weekdays: weekdays } : {}) }
+      : {}),
     conditions: conditionsPayload(conditions),
     actions: actions.map(clean),
   });
@@ -207,6 +222,102 @@ export function RuleBuilder({ orgId, lookups, edit }: Props) {
                   : "רץ כשנרשם תשלום שמשויך לאיש הקשר, גם כשהוא רשום על עסקה (נרשם או אושר). תשלום שמשתנה אחר כך לא מפעיל שוב."}
               </p>
             </div>
+          ) : null}
+          {trigger.anyField ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SelectField
+                label="איזה שדה"
+                value={dateField}
+                onChange={(e) => {
+                  setDateField(e.target.value);
+                  setWatchValue("");
+                }}
+              >
+                <option value="">בחירת שדה</option>
+                {watchChoices(entity, lookups).map((choice) => (
+                  <option key={choice.key} value={choice.key}>
+                    {choice.label}
+                  </option>
+                ))}
+              </SelectField>
+              {dateField && watchValues(entity, dateField, lookups).length > 0 ? (
+                <SelectField label="לערך" value={watchValue} onChange={(e) => setWatchValue(e.target.value)}>
+                  <option value="">כל שינוי</option>
+                  {watchValues(entity, dateField, lookups).map((choice) => (
+                    <option key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </SelectField>
+              ) : null}
+              <p className="text-sm text-ink-soft sm:col-span-2">
+                רץ פעם אחת לכל שינוי של השדה. שינוי שאוטומציה עשתה, או רשומה שנוצרה בייבוא, לא מפעילים אותו.
+              </p>
+            </div>
+          ) : null}
+          {trigger.form ? (
+            <div className="space-y-1">
+              <SelectField label="איזה טופס" value={formId} onChange={(e) => setFormId(e.target.value)}>
+                <option value="">כל טופס</option>
+                {(lookups.forms ?? []).map((form) => (
+                  <option key={form.id} value={form.id}>
+                    {form.name}
+                  </option>
+                ))}
+              </SelectField>
+              <p className="text-sm text-ink-soft">
+                רץ כשטופס ציבורי יוצר רשומה חדשה, וגם כשפנייה חוזרת מצורפת לרשומה קיימת. &quot;כל טופס&quot; כולל גם כרטיס ביקור ווידג׳ט באתר.
+              </p>
+            </div>
+          ) : null}
+          {trigger.schedule ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SelectField label="כל כמה זמן" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+                  <option value="daily">כל יום</option>
+                  <option value="weekly">בימים מסוימים בשבוע</option>
+                </SelectField>
+                <SelectField label="שעה" value={hour} onChange={(e) => setHour(e.target.value)} dir="ltr">
+                  {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="דקות" value={minute} onChange={(e) => setMinute(e.target.value)} dir="ltr">
+                  {SCHEDULE_MINUTES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+              {frequency === "weekly" ? (
+                <fieldset>
+                  <legend className="mb-1 text-sm font-medium">באילו ימים</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {WEEKDAYS.map((day) => (
+                      <Checkbox
+                        key={day.value}
+                        label={day.label}
+                        checked={weekdays.includes(day.value)}
+                        onChange={(e) =>
+                          setWeekdays((list) => (e.target.checked ? [...list, day.value] : list.filter((d) => d !== day.value)))
+                        }
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              <p className="text-sm text-ink-soft">
+                בכל מועד האוטומציה רצה פעם אחת על כל רשומה שעומדת בתנאים (לפי שעון העסק). כדאי להוסיף תנאים, אחרת היא תרוץ על כל הרשומות. כשיש הרבה רשומות ההרצות מתחלקות על פני כמה רבעי שעה, עד 24 שעות אחרי המועד.
+              </p>
+            </div>
+          ) : null}
+          {trigger.manual ? (
+            <p className="text-sm text-ink-soft">
+              כפתור &quot;הפעלת אוטומציה&quot; מופיע בכרטיס הרשומה למי שרשאי לערוך אותה. ההפעלה בודקת את התנאים ונספרת במכסת ההרצות החודשית.
+            </p>
           ) : null}
           {trigger.date ? (
             <div className="grid gap-3 sm:grid-cols-3">

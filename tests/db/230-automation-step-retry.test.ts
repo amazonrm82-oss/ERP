@@ -587,13 +587,13 @@ describe("the event check before a retry, per trigger type (AUT-06, answer ב)",
   it("a trigger type without a decision keeps no facts and is never retried", async () => {
     const lead = await insertLead(owner.id, org, { full_name: "ליד לסוג לא מוכר" });
     const facts = await asAdmin((q) =>
-      one<{ f: unknown }>(q, "select app.automation_run_facts('form_submitted', '{}', 'lead', $1, $2, 'event:1') as f", [org, lead]),
+      one<{ f: unknown }>(q, "select app.automation_run_facts('webhook_received', '{}', 'lead', $1, $2, 'event:1') as f", [org, lead]),
     );
     expect(facts.f).toBeNull();
     const holds = await asAdmin((q) =>
       one<{ h: boolean }>(
         q,
-        "select app.automation_event_still_holds('form_submitted', '{}', 'lead', $1, $2, (select to_jsonb(l) from public.leads l where l.id = $2), '{}') as h",
+        "select app.automation_event_still_holds('webhook_received', '{}', 'lead', $1, $2, (select to_jsonb(l) from public.leads l where l.id = $2), '{}') as h",
         [org, lead],
       ),
     );

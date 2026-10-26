@@ -30,6 +30,8 @@ export type Lookups = {
   documents?: boolean;
   // AUT-02 (rest): the business's quote templates, for a "create quote" step (read only with the quotes flag)
   quoteTemplates?: Array<{ id: string; name: string }>;
+  // AUT-03: the business's public forms, for an optional form on a "form submitted" trigger
+  forms?: Array<{ id: string; name: string }>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -59,7 +61,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
-  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates, forms] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -78,12 +80,17 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
     quotes
       ? supabase.from("quote_templates").select("id, name").eq("organization_id", orgId).order("name").order("id").limit(1000)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }>, error: null }),
+    // AUT-03: web forms only (a business card's or a site widget's form is not picked by name)
+    supabase.from("forms").select("id, name").eq("organization_id", orgId).eq("kind", "form").order("name").order("id").limit(1000),
   ]);
   if (reasons.error) {
     return { data: null, error: reasons.error };
   }
   if (templates.error) {
     return { data: null, error: templates.error };
+  }
+  if (forms.error) {
+    return { data: null, error: forms.error };
   }
   return {
     data: {
@@ -104,6 +111,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       quotes,
       documents,
       quoteTemplates: templates.data ?? [],
+      forms: forms.data ?? [],
     },
     error: null,
   };

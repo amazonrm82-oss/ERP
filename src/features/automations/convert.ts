@@ -8,6 +8,8 @@ import type { Lookups } from "./queries";
 import type { Rule } from "./schema";
 import { createDealAction, createDealDraft, createQuoteAction, createQuoteDraft } from "./create-records";
 import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
+import { fieldTriggerConfig } from "./field-trigger";
+import { scheduleTriggerConfig, scheduleTriggerDraft } from "./schedule-trigger";
 import { customDefinition, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
@@ -24,7 +26,7 @@ export type DbRule = {
   name: string;
   entity_type: Entity;
   trigger_type: string;
-  trigger_config: Record<string, string | number>;
+  trigger_config: Record<string, string | number | number[]>;
   conditions: Array<Record<string, Json>>;
   // AUT-01: a set_field step keeps the field's JSON value
   actions: Array<Record<string, Json>>;
@@ -41,7 +43,7 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
   const has = (list: Array<{ id: string }>, id: string | undefined) => !id || list.some((item) => item.id === id);
   const stages = lookups.pipelines.flatMap((p) => p.stages);
 
-  const trigger_config: Record<string, string | number> = {};
+  const trigger_config: DbRule["trigger_config"] = {};
   if (trigger.field) {
     trigger_config.field = trigger.field;
     if (rule.trigger_to) {
@@ -52,6 +54,23 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
   }
   if (trigger.number) {
     trigger_config[trigger.number.key] = rule.trigger_number ?? trigger.number.default;
+  }
+  // AUT-03: any field of the record, optionally to a value
+  if (trigger.anyField) {
+    const config = fieldTriggerConfig(entity, { field: rule.trigger_field, to: rule.trigger_value }, lookups);
+    if (typeof config === "string") return config;
+    Object.assign(trigger_config, config);
+  }
+  // AUT-03: one form, or any
+  if (trigger.form && rule.trigger_form_id) {
+    if (!has(lookups.forms ?? [], rule.trigger_form_id)) return "הטופס שנבחר כבר לא קיים.";
+    trigger_config.form_id = rule.trigger_form_id;
+  }
+  // AUT-03: a fixed schedule
+  if (trigger.schedule) {
+    const config = scheduleTriggerConfig({ frequency: rule.trigger_frequency, time: rule.trigger_time, days: rule.trigger_weekdays });
+    if (typeof config === "string") return config;
+    Object.assign(trigger_config, config);
   }
   if (trigger.date) {
     const config = dateTriggerConfig(entity, { field: rule.trigger_field, days: rule.trigger_days, direction: rule.trigger_direction }, lookups);
@@ -159,6 +178,13 @@ export type BuilderInitial = {
   triggerDirection?: string;
   // PAY-07: the minimum payment in shekels ("" = any amount)
   triggerMin?: string;
+  // AUT-03: "a field changed" value (triggerField names the field), a form, a schedule
+  triggerValue?: string;
+  triggerFormId?: string;
+  triggerFrequency?: string;
+  triggerHour?: string;
+  triggerMinute?: string;
+  triggerWeekdays?: number[];
   conditions: ConditionItem[];
   actions: Array<Record<string, string>>;
 };
@@ -236,12 +262,18 @@ export function fromDbRule(
     }
   });
   const date = trigger.date ? dateTriggerDraft(rule.triggerConfig) : null;
+  const schedule = trigger.schedule ? scheduleTriggerDraft(rule.triggerConfig) : null;
   return {
     name: rule.name,
     trigger: trigger.key,
-    triggerTo: str(rule.triggerConfig.to),
+    triggerTo: trigger.field ? str(rule.triggerConfig.to) : "",
     triggerNumber: trigger.number ? str(rule.triggerConfig[trigger.number.key] ?? trigger.number.default) : "",
     ...(date ? { triggerField: date.field, triggerDays: date.days, triggerDirection: date.direction } : {}),
+    ...(trigger.anyField ? { triggerField: str(rule.triggerConfig.field), triggerValue: str(rule.triggerConfig.to) } : {}),
+    ...(trigger.form ? { triggerFormId: str(rule.triggerConfig.form_id) } : {}),
+    ...(schedule
+      ? { triggerFrequency: schedule.frequency, triggerHour: schedule.hour, triggerMinute: schedule.minute, triggerWeekdays: schedule.days }
+      : {}),
     ...(trigger.overdue ? { triggerDays: typeof rule.triggerConfig.days_overdue === "number" ? String(rule.triggerConfig.days_overdue) : "0" } : {}),
     ...(trigger.minAmount
       ? { triggerMin: typeof rule.triggerConfig.min_agorot === "number" ? String(rule.triggerConfig.min_agorot / 100) : "" }
