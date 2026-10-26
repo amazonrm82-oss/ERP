@@ -1,4 +1,5 @@
 import { calendarPath } from "@/features/calendar/range";
+import { retentionListPath } from "@/features/lead-retention/paths";
 import { orderPath } from "@/features/orders/paths";
 import { quotePath } from "@/features/quotes/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -42,6 +43,12 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // notice opens the users list, which every member may see; owners and admins go on from there to the hours page
     case "member_leaves":
       return paths.settingsUsers(orgId);
+    // PRV-01: a retention round (its id); the list page shows the open round, or says there is none
+    case "lead_retention":
+      return retentionListPath(orgId);
+    // PRV-01: the round moved its leads to the recycle bin, where they can be restored
+    case "lead_retention_binned":
+      return paths.settingsTrash(orgId);
     default:
       return null;
   }

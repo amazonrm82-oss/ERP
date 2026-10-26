@@ -3298,6 +3298,12 @@ export type Database = {
       consent_blocklist_remove: { Args: { p_org: string; p_id: string; p_reason: string }; Returns: undefined };
       consent_blocklist_find: { Args: { p_org: string; p_address: string }; Returns: Json };
       consent_blocklist_summary: { Args: { p_org: string }; Returns: Json };
+      // PRV-01: the lead retention policy (definer; owners and admins of the business; set and keep need a writable one)
+      lead_retention_preview: { Args: { p_org: string; p_months: number }; Returns: Json };
+      lead_retention_status: { Args: { p_org: string }; Returns: Json };
+      lead_retention_round_leads: { Args: { p_org: string; p_offset?: number }; Returns: Json };
+      lead_retention_set: { Args: { p_org: string; p_enabled: boolean; p_months: number | null; p_confirm: boolean }; Returns: Json };
+      lead_retention_keep: { Args: { p_org: string; p_lead: string }; Returns: undefined };
       // CNS-06: is the record's own address blocked for marketing, per channel (definer; whoever reads the record).
       // 'listed' (owners and admins: on the business's blocklist) or 'blocked' (everyone else, and an opt-out or erasure
       // of the same address elsewhere in the business)

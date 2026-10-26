@@ -431,6 +431,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // CNS-06 (consents_prepare; public.consent_blocklist_add / _remove; guard consent_blocklist_guard)
   "consent:blocklisted": "הכתובת ברשימת החסימה של העסק, ולכן אי אפשר לרשום לה הסכמה. אפשר להסיר אותה מהרשימה ב\"הגדרות > רשימת חסימה לדיוור\".",
   "consent_blocklist:channel": "יש לבחור ערוץ מהרשימה.",
+  // PRV-01 (public.lead_retention_preview / _set / _keep)
+  "retention:months": "מספר החודשים צריך להיות בין 6 ל-120.",
+  "retention:confirm": "קודם בודקים כמה רשומות יושפעו, ואז מאשרים.",
+  "retention:not_listed": "הרשומה כבר לא ברשימה של הסבב הזה. אם היא כבר הועברה לסל המחזור, אפשר לשחזר אותה משם.",
   "consent_blocklist:reason": "יש לבחור סיבה מהרשימה.",
   "consent_blocklist:removed_reason": "יש לבחור למה מסירים את הכתובת מהרשימה.",
   "consent_blocklist:empty": "יש להקליד טלפון או אימייל אחד לפחות.",

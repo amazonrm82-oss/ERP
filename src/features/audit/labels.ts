@@ -122,6 +122,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   full_export: "כל נתוני העסק",
   // RVW-50: PRV-03 writes its one entry with entity_type 'person_erase' (no record id: the records are gone)
   person_erase: "אדם שנמחק",
+  // PRV-01: the policy itself (no record id)
+  lead_retention: "מדיניות שמירה",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -154,6 +156,12 @@ export const ACTION_LABELS: Record<string, string> = {
   person_erase: "מחיקת אדם מכל מקום (בקשת פרטיות)",
   quote_link: "קישור ללקוח להצעה",
   order_link: "קישור ללקוח להזמנה",
+  // PRV-01: turning the retention policy on, off or changing its months; "keep" on one lead; the count the policy erased
+  retention_policy: "מדיניות שמירה",
+  retention_keep: "השארה ברשימת מדיניות השמירה",
+  retention_purge: "מחיקה לפי מדיניות השמירה",
+  // PRV-01: one lead's details erased from the log by the policy (app.lead_retention_erase renames the core's 'erase' row)
+  retention: "נמחק לפי מדיניות השמירה",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

@@ -7,6 +7,7 @@ import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
+import { getOrgTerms } from "@/features/terminology/queries";
 import { auditEntryNote } from "./condition-removal";
 
 export type AuditChange = { field: string; old: Json; new: Json };
@@ -106,7 +107,8 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
   const { data, error } = await query;
   if (error) throw new Error(`audit query failed: ${error.message}`);
   const rows = data.slice(0, AUDIT_PAGE);
-  const names = await getUserNames(rows.map((r) => r.actor_id));
+  // PRV-01: a note that counts leads says it in the business's words
+  const [names, terms] = await Promise.all([getUserNames(rows.map((r) => r.actor_id)), getOrgTerms(orgId)]);
   return {
     items: rows.map((r) => ({
       id: r.id,
@@ -117,7 +119,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
       entityId: r.entity_id,
       changes: toChanges(r.action, r.changes),
     erased: isErased(r.changes),
-      note: auditEntryNote(r.action, r.changes),
+      note: auditEntryNote(r.action, r.changes, terms),
     automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
     })),
     more: data.length > AUDIT_PAGE,

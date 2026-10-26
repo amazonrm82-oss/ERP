@@ -86,6 +86,34 @@ const CASES: Case[] = [
     feminine: "3 פניות מחכות לכם בעסק. כדי לראות אותן, חדשו את המנוי.",
   },
   {
+    pattern: "retention_round_one",
+    field: "title",
+    row: row("system", "מדיניות השמירה: ליד אחד יעבור לסל המחזור בעוד 14 יום"),
+    masculine: "מדיניות השמירה: מתעניין אחד יעבור לסל המחזור בעוד 14 יום",
+    feminine: "מדיניות השמירה: פנייה אחת תעבור לסל המחזור בעוד 14 יום",
+  },
+  {
+    pattern: "retention_round_many",
+    field: "title",
+    row: row("system", "מדיניות השמירה: 6 לידים יעברו לסל המחזור בעוד 14 יום"),
+    masculine: "מדיניות השמירה: 6 מתעניינים יעברו לסל המחזור בעוד 14 יום",
+    feminine: "מדיניות השמירה: 6 פניות יעברו לסל המחזור בעוד 14 יום",
+  },
+  {
+    pattern: "retention_binned_one",
+    field: "title",
+    row: row("system", "מדיניות השמירה העבירה ליד אחד לסל המחזור"),
+    masculine: "מדיניות השמירה העבירה מתעניין אחד לסל המחזור",
+    feminine: "מדיניות השמירה העבירה פנייה אחת לסל המחזור",
+  },
+  {
+    pattern: "retention_binned_many",
+    field: "title",
+    row: row("system", "מדיניות השמירה העבירה 4 לידים לסל המחזור"),
+    masculine: "מדיניות השמירה העבירה 4 מתעניינים לסל המחזור",
+    feminine: "מדיניות השמירה העבירה 4 פניות לסל המחזור",
+  },
+  {
     pattern: "deputy_body",
     field: "body",
     row: row("system", "ממלא מקום בהיעדרות: דנה", `${deputy}. ממלא המקום רואה בזמן הזה את הרשומות של המשימות הפתוחות והלידים שלא נענו.`),
@@ -190,7 +218,9 @@ describe("notifications in the business's words (FLD-10 part three)", () => {
 // text helper), and every title of the notify_assignment triggers, must be one the renderer knows, or be listed as not a
 // notification text. A text changed in SQL then fails here instead of silently staying in today's words.
 const MIGRATIONS = join(process.cwd(), "supabase/migrations");
-const TEXT_HELPERS = ["app.follow_title", "app.follow_record", "app.mention_subject", "app.leads_waiting_text", "app.quote_accept_deal"];
+const TEXT_HELPERS = ["app.follow_title", "app.follow_record", "app.mention_subject", "app.leads_waiting_text", "app.quote_accept_deal",
+  // PRV-01: writes its notices through app.lead_retention_notify
+  "app.run_lead_retention"];
 // the record words (the end customer, "לקוח", stays as it is: owner, 20 October 2026)
 const RECORD_WORD = /ליד|איש קשר|אנשי קשר|עסקה|עסקאות/;
 

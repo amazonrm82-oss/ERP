@@ -25,6 +25,7 @@ import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
 import { consentBlocklistPath } from "@/features/consent-blocklist/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
+import { retentionSettingsPath } from "@/features/lead-retention/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
@@ -217,6 +218,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // CNS-06: owners and admins only (addresses kept as a hash; the page searches one address)
         ...(access.admin
           ? [{ href: consentBlocklistPath(orgId), label: "רשימת חסימה לדיוור", description: "טלפונים ואימיילים שלעולם לא יקבלו דיוור", icon: LockIcon }]
+          : []),
+        // PRV-01: owners and admins only (privacy, every plan)
+        ...(access.admin
+          ? [{ href: retentionSettingsPath(orgId), label: "מדיניות שמירה", description: "רשומות בלי קשר חודשים ארוכים עוברות לסל המחזור, עם רשימה מראש", icon: TrashIcon }]
           : []),
       ],
     },

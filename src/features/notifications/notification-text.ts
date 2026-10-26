@@ -198,6 +198,42 @@ export const NOTIFICATION_PATTERNS: readonly Pattern[] = [
     literals: [" לידים מחכים לכם ב"],
   },
   {
+    // app.run_lead_retention (PRV-01): a new round, one lead
+    id: "retention_round_one",
+    field: "title",
+    types: ["system"],
+    re: /^מדיניות השמירה: ליד אחד יעבור לסל המחזור בעוד 14 יום$/,
+    render: (_m, t) => `מדיניות השמירה: ${t.lead.singular} ${g(t.lead, "אחד יעבור", "אחת תעבור")} לסל המחזור בעוד 14 יום`,
+    literals: ["מדיניות השמירה: ליד אחד יעבור לסל המחזור בעוד 14 יום"],
+  },
+  {
+    // app.run_lead_retention (PRV-01): a new round, several
+    id: "retention_round_many",
+    field: "title",
+    types: ["system"],
+    re: /^מדיניות השמירה: (\d+) לידים יעברו לסל המחזור בעוד 14 יום$/,
+    render: (m, t) => `מדיניות השמירה: ${m[1]} ${t.lead.plural} יעברו לסל המחזור בעוד 14 יום`,
+    literals: [" לידים יעברו לסל המחזור בעוד 14 יום"],
+  },
+  {
+    // app.run_lead_retention (PRV-01): the round moved its leads to the bin, one
+    id: "retention_binned_one",
+    field: "title",
+    types: ["system"],
+    re: /^מדיניות השמירה העבירה ליד אחד לסל המחזור$/,
+    render: (_m, t) => `מדיניות השמירה העבירה ${t.lead.singular} ${g(t.lead, "אחד", "אחת")} לסל המחזור`,
+    literals: ["מדיניות השמירה העבירה ליד אחד לסל המחזור"],
+  },
+  {
+    // app.run_lead_retention (PRV-01): the round moved its leads to the bin, several
+    id: "retention_binned_many",
+    field: "title",
+    types: ["system"],
+    re: /^מדיניות השמירה העבירה (\d+) לידים לסל המחזור$/,
+    render: (m, t) => `מדיניות השמירה העבירה ${m[1]} ${t.lead.plural} לסל המחזור`,
+    literals: [" לידים לסל המחזור"],
+  },
+  {
     // app.member_leaves_deputy_notice (HEB-08)
     id: "deputy_body",
     field: "body",
