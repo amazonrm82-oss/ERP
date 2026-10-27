@@ -20,6 +20,14 @@ type Options = {
   publicForm: boolean;
 };
 
+/**
+ * A public page that may be framed by customers' sites: every /f/ page except the QR scan route, whose page before an
+ * external link (BIZ-03) carries the business's name on our domain and must never sit inside another site.
+ */
+export function isEmbeddablePublicPath(pathname: string): boolean {
+  return pathname.startsWith("/f/") && !pathname.startsWith("/f/q/");
+}
+
 export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }: Options): string {
   const supabase = supabaseUrl ? new URL(supabaseUrl) : null;
   const connect = ["'self'"];

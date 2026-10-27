@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isTransientAuthError, logSessionCheckThrow } from "@/lib/auth-transient";
 import { PATH_HEADER } from "@/features/theme/theme";
-import { contentSecurityPolicy, makeNonce } from "@/lib/csp";
+import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
 import { safeNextPath } from "@/lib/paths";
@@ -52,7 +52,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     nonce: makeNonce(),
     supabaseUrl: env?.url ?? null,
     isDev: process.env.NODE_ENV === "development",
-    publicForm: request.nextUrl.pathname.startsWith("/f/"),
+    publicForm: isEmbeddablePublicPath(request.nextUrl.pathname),
   });
   // the request as the page sees it: the current cookies, plus the policy
   const next = () => {

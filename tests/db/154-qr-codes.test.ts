@@ -645,6 +645,8 @@ describe("QR codes: the page before a link and the platform's switch (BIZ-03)", 
     expect(await logs("qr_external.block")).toBe(before.block + 1);
     // visitors and the server key cannot call it
     expect((await pgError(asAnon((q) => q("select public.platform_set_qr_external_block($1, true, 'x')", [org])))).code).toBe("42501");
+    expect((await pgError(asService((q) => q("select public.platform_set_qr_external_block($1, true, 'x')", [org])))).code).toBe("42501");
+    expect(await logs("qr_external.block")).toBe(before.block + 1);
   });
 
   it("a member reads one boolean for their own business; anyone else gets nothing; nobody reads the table", async () => {

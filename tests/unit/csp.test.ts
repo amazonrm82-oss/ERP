@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentSecurityPolicy, makeNonce } from "@/lib/csp";
+import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
 
 describe("content security policy (FXS-05)", () => {
   const base = { nonce: "abc", supabaseUrl: "https://ref.supabase.co", isDev: false, publicForm: false };
@@ -32,6 +32,13 @@ describe("content security policy (FXS-05)", () => {
   it("the app is never framed; the public form may be embedded anywhere", () => {
     expect(contentSecurityPolicy(base)).toContain("frame-ancestors 'none'");
     expect(contentSecurityPolicy({ ...base, publicForm: true })).toContain("frame-ancestors *");
+  });
+
+  it("the QR scan route is never embeddable, every other public page is (BIZ-03 review)", () => {
+    expect(isEmbeddablePublicPath("/f/abc")).toBe(true);
+    expect(isEmbeddablePublicPath("/f/book/abc")).toBe(true);
+    expect(isEmbeddablePublicPath("/f/q/abc")).toBe(false);
+    expect(isEmbeddablePublicPath("/o/x")).toBe(false);
   });
 
   it("development keeps eval for React's error stacks", () => {

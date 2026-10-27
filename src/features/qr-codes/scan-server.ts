@@ -31,12 +31,12 @@ const NOT_FOUND_PAGE = `<!doctype html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>הקוד אינו פעיל</title></head>
 <body style="font-family: system-ui, sans-serif; margin: 0; padding: 2rem 1rem; text-align: center; line-height: 1.6">
 <h1 style="font-size: 1.25rem">הקוד הזה אינו פעיל</h1>
-<p>הקישור שבקוד לא נמצא, או שהעסק כיבה אותו.</p>
+<p>הקישור שבקוד לא נמצא.</p>
 </body>
 </html>`;
 
 const UNAVAILABLE_PAGE = NOT_FOUND_PAGE.replace("הקוד הזה אינו פעיל", "הקוד אינו זמין כרגע").replace(
-  "הקישור שבקוד לא נמצא, או שהעסק כיבה אותו.",
+  "הקישור שבקוד לא נמצא.",
   "נסו שוב בעוד כמה דקות.",
 );
 
@@ -59,6 +59,8 @@ export function qrTargetResponse(target: QrScanTarget, nonce?: string): Response
       "Cache-Control": "no-store",
       "X-Robots-Tag": "noindex, nofollow",
       "Referrer-Policy": "no-referrer",
+      // never inside another site's frame: the page names the business on our domain (the proxy's policy says the same)
+      "X-Frame-Options": "DENY",
     },
   });
 }

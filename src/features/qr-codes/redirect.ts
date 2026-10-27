@@ -61,13 +61,19 @@ export type QrExternal = {
 
 export type QrScanTarget = { kind: "redirect"; location: string } | ({ kind: "external" } & QrExternal);
 
-/** The host of a link that passed qrTargetUrlOk, and its decoded form when any label is punycode. */
+// a decoded label shown beside the punycode only when it is plain ASCII or Hebrew letters (with digits and hyphens): a name
+// mixing scripts, or in a script whose letters look like Latin ones (Cyrillic "аррӏе"), is exactly the look-alike the page
+// warns about, so it stays in the ASCII form browsers show for it too
+const SHOWN_LABEL = /^(?:[a-z0-9-]+|[\p{Script=Hebrew}0-9-]+)$/u;
+
+/** The host of a link that passed qrTargetUrlOk, and its decoded form when a label is punycode and every label is safe to show. */
 export function qrLinkHost(url: string): { host: string; hostUnicode: string | null } {
   const host = url.slice("https://".length).split(/[/?#]/, 1)[0].toLowerCase();
   const name = host.replace(/:[0-9]+$/, "");
   if (!name.split(".").some((label) => label.startsWith("xn--"))) return { host, hostUnicode: null };
   const decoded = domainToUnicode(name);
-  return { host, hostUnicode: decoded && decoded !== name ? decoded + host.slice(name.length) : null };
+  if (!decoded || decoded === name || !decoded.split(".").every((label) => SHOWN_LABEL.test(label))) return { host, hostUnicode: null };
+  return { host, hostUnicode: decoded + host.slice(name.length) };
 }
 
 /**

@@ -17,8 +17,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // The app itself must never be framed by another site (clickjacking).
-        source: "/((?!f/).*)",
+        // The app itself must never be framed by another site (clickjacking); nor the QR scan route, whose page
+        // before an external link (BIZ-03) names the business on our domain.
+        source: "/((?!f/(?!q/)).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Frame-Options", value: "DENY" },
@@ -27,8 +28,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Public lead forms are made to be embedded in customers' websites.
-        source: "/f/:path*",
+        // Public lead forms are made to be embedded in customers' websites (every /f/ page but the QR scan route).
+        source: "/f/((?!q/).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
           { key: "Referrer-Policy", value: "no-referrer" },

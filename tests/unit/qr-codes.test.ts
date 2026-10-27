@@ -172,6 +172,13 @@ describe("the page before an external link (BIZ-03, owner 27 October 2026)", () 
     expect(qrLinkHost("https://xn--4dbrk0ce.co.il/a")).toEqual({ host: "xn--4dbrk0ce.co.il", hostUnicode: "ישראל.co.il" });
     expect(qrLinkHost("https://xn--4dbrk0ce.co.il:444")).toEqual({ host: "xn--4dbrk0ce.co.il:444", hostUnicode: "ישראל.co.il:444" });
     expect(qrLinkHost("https://a.io?q")).toEqual({ host: "a.io", hostUnicode: null });
+    // a look-alike in another script, or a label mixing scripts, stays in its ASCII form (review of 27 October 2026)
+    const cyrillic = new URL("https://аррӏе.com/").hostname;
+    expect(cyrillic.startsWith("xn--")).toBe(true);
+    expect(qrLinkHost(`https://${cyrillic}/`)).toEqual({ host: cyrillic, hostUnicode: null });
+    const mixed = new URL("https://pаypal.com/").hostname; // Latin with one Cyrillic letter
+    expect(qrLinkHost(`https://${mixed}/`)).toEqual({ host: mixed, hostUnicode: null });
+    expect(qrInterstitialHtml(external({ url: `https://${cyrillic}/`, campaign: "", business: "עסק" }))).not.toContain("аррӏе");
     const html = qrInterstitialHtml(external({ url: "https://xn--4dbrk0ce.co.il/", campaign: "", business: "עסק" }));
     expect(html).toContain('xn--4dbrk0ce.co.il</bdi> (<bdi dir="auto">ישראל.co.il</bdi>)');
   });
