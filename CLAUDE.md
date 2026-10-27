@@ -1713,6 +1713,9 @@ that back.
   as the character itself. Prefer no `\u` escapes in SQL (use `chr()` or `U&'…'`); after every apply compare
   `md5(pg_get_functiondef(...))` of the new functions with the local test database, and if they differ, re-apply the same
   file (statements are safe to run twice) with the transport fixed, never a hand edit.
+- Re-running a migration file (the connector fix above, or by hand): first check that no LATER file revokes a grant or replaces a
+  policy or function this file gives (RVW-55: re-running 020955 after 020995 would give a person the quote-PDF insert back). If one
+  does, re-run that later file right after it, or do not re-run.
 - Changing a function's signature without `drop` (RPT-02, migration 0180): a `do` block that runs only while the old signature
   exists renames it (`<name>_<migration>_retired`), moves it into schema `app` and revokes every grant (service_role included),
   then `create or replace` makes the new signature (one function with defaults, never two overloads: test 07 keys functions by

@@ -34,13 +34,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # FXS-06: known vulnerabilities in what the app ships fail the build
-      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run test:db
       - run: npm run build
+      # FXS-06: known vulnerabilities in what the app ships fail the build (and so block promote);
+      # RVW-53: run last, so an advisory never hides the real checks above
+      - run: npm audit --omit=dev --audit-level=high
 
   # GATE-01: the live site is built from the `production` branch, which moves
   # only here, after every check above passed on this commit of main. A plain
