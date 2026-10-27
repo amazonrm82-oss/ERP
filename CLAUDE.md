@@ -480,6 +480,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `src/features/whatsapp/templates.ts` mirrors it (unit test). The record WhatsApp button (`whatsappLog` on `ContactActions`)
   fills a template with `fillTemplate()`, opens wa.me and logs a `whatsapp` activity (`metadata.via = 'link'`, mention
   tokens flattened) with the user's session. GAP-03 reuses `fillTemplate` and the `meeting_reminder` template, which may be gone.
+- What's next (AIX-03 wave 2, no migration): a card at the top of My day (`src/features/home/next-actions.ts`, pure, unit-tested;
+  `components/next-actions-card.tsx`) orders up to 10 actions with a Hebrew reason each, by fixed rules: meeting under way or within
+  60 minutes, overdue call task, own unanswered lead (SPD-02 rule), viewed undecided quote, overdue task, call later today, unviewed
+  quote ending today/tomorrow, other task today, deal without next step. Reads only what My day reads, with the user's session.
 - Tomorrow's reminders (GAP-03, no migration): `/o/[org]/calendar/tomorrow` (`src/features/calendar/tomorrow*.ts`) lists the
   user's meetings of tomorrow via `listCalendarItems` and their contact (else lead), read with the user's session; the WA-01
   button opens with the `meeting_reminder` template preselected (`preselectId`) and fills {תאריך}/{שעה}.
