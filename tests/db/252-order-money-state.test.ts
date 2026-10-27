@@ -6,8 +6,9 @@ afterAll(closePool);
 
 type U = { id: string };
 
-// The read rules the definer shortcut app.order_money_facts / app.order_money_same_parent assumes (orders 020570, documents
-// 021076, payments 020635): the deal, else the contact, else (orders, documents) the company, else the role. The test
+// The read rules the definer shortcut app.order_money_facts / app.order_money_same_parent assumes: orders 020570, documents
+// 021076 and payments 020635 read the deal, else the contact, else (orders, documents) the company, else the role;
+// payment_allocations 020790 and opening_credit_allocations 021077 read the document or the other side. The test
 // recreates each as a policy on a temporary copy of its table and compares the server's own rendering of both, so a change
 // to a real policy fails here and the shortcut must be reviewed again.
 const ROLE_RULE = "coalesce(app.role_in(organization_id) = any (array['owner', 'admin', 'manager']::public.membership_role[]), false)";
@@ -31,6 +32,15 @@ const EXPECTED_READ_RULES: Record<string, string> = {
                 when payments.contact_id is not null
                 then exists (select 1 from public.contacts c where c.organization_id = payments.organization_id and c.id = payments.contact_id)
                 else ${ROLE_RULE} end`,
+  // the shortcut's allocations (A) and opening credits (C) are read through these: the document OR the other side
+  payment_allocations: `exists (select 1 from public.accounting_documents d
+                         where d.organization_id = payment_allocations.organization_id and d.id = payment_allocations.document_id)
+                or exists (select 1 from public.payments p
+                            where p.organization_id = payment_allocations.organization_id and p.id = payment_allocations.payment_id)`,
+  opening_credit_allocations: `exists (select 1 from public.accounting_documents d
+                         where d.organization_id = opening_credit_allocations.organization_id and d.id = opening_credit_allocations.document_id)
+                or exists (select 1 from public.accounting_documents c
+                            where c.organization_id = opening_credit_allocations.organization_id and c.id = opening_credit_allocations.credit_document_id)`,
 };
 type Step = { id: string; amount: number; billed: number | null; paid: number | null };
 type Money = {
@@ -426,7 +436,7 @@ describe("order billing and payment status (ORD-02, ORD-04)", () => {
         await q<{ t: string; name: string; cmd: string; permissive: boolean }>(
           `select c.relname as t, p.polname as name, p.polcmd::text as cmd, p.polpermissive as permissive
              from pg_policy p join pg_class c on c.oid = p.polrelid join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relname in ('orders', 'accounting_documents', 'payments')
+            where n.nspname = 'public' and c.relname in ('orders', 'accounting_documents', 'payments', 'payment_allocations', 'opening_credit_allocations')
               and (p.polcmd in ('r', '*') or not p.polpermissive)
             order by 1, 2`,
         )
@@ -434,7 +444,9 @@ describe("order billing and payment status (ORD-02, ORD-04)", () => {
     );
     expect(policies).toEqual([
       { t: "accounting_documents", name: "accounting_documents_select", cmd: "r", permissive: true },
+      { t: "opening_credit_allocations", name: "opening_credit_allocations_select", cmd: "r", permissive: true },
       { t: "orders", name: "orders_select", cmd: "r", permissive: true },
+      { t: "payment_allocations", name: "payment_allocations_select", cmd: "r", permissive: true },
       { t: "payments", name: "payments_select", cmd: "r", permissive: true },
     ]);
     // each real read rule equals the expected text, both rendered by this server (pg_get_expr) in the same session; the
