@@ -616,6 +616,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the GAP-12 answers redefine public.opening_balance_set() of _opening_balance.sql and public.money_apply_credit() of
       // _opening_credit.sql last (no replace while allocated; credit oldest first across both sources)
       "_opening_balance_answers.sql",
+      // TAX-02 redefines public.quote_public() of _quote_pdf_server.sql and public.order_public() of _order_links.sql last
+      // (the stored bank details)
+      "_quote_bank_details.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

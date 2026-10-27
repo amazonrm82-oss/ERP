@@ -6,6 +6,7 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 
 import type { QuoteDocumentData } from "../design-server";
 import type { QuoteLine } from "../queries";
+import { BankSection } from "./bank-section";
 import { ScheduleSection } from "./schedule-section";
 import { noVatText } from "../schema";
 import { groupSubtotals, isCounted } from "../totals";
@@ -241,6 +242,9 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
 
         {/* GAP-09: the payment schedule, each step with its share of the total */}
         <ScheduleSection rows={schedule} id="quote-schedule" />
+
+        {/* TAX-02: the bank details stored when the quote was sent, while the design shows them */}
+        <BankSection bank={design.showBankDetails ? quote.bankDetails : null} id="quote-bank" />
 
         {quote.notes ? (
           <section aria-label="הערות" className="space-y-1" data-print-keep="">

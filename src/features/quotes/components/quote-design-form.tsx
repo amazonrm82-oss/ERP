@@ -42,7 +42,7 @@ export function QuoteDesignForm({ orgId, design, brandColor }: Props) {
         rows={3}
         maxLength={QUOTE_FOOTER_MAX}
         defaultValue={failure?.values?.footer_text ?? design.footerText ?? ""}
-        hint="מופיעה בסוף ההצעה. למשל פרטי חשבון להעברה או תודה. רשות."
+        hint="מופיעה בסוף ההצעה. למשל תודה או תנאים כלליים. רשות."
         error={errors.footer_text}
       />
       <fieldset className="space-y-3">
@@ -53,6 +53,12 @@ export function QuoteDesignForm({ orgId, design, brandColor }: Props) {
           label="פרטי העסק"
           defaultChecked={design.showBusinessDetails}
           hint="השם הרשום, מספר העוסק, הכתובת, הטלפון והאימייל, כפי שנקבעו ב&quot;מע&quot;מ ופרטים למסמכים&quot;."
+        />
+        <Checkbox
+          name="show_bank_details"
+          label="פרטים להעברה בנקאית"
+          defaultChecked={design.showBankDetails}
+          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהיו כשההצעה נשלחה או כשההזמנה קיבלה מספר. מופיעים בסוף המסמך."
         />
       </fieldset>
       <fieldset className="space-y-3">

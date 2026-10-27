@@ -7,6 +7,7 @@ import { BILLING_LABELS } from "@/features/products/schema";
 import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 
+import { BANK_HEADING, bankRows, type DocumentBank } from "./bank";
 import type { QuoteDocumentData } from "./design-server";
 import type { QuoteLine } from "./queries";
 import { percentText } from "./schedule";
@@ -43,6 +44,13 @@ export function remadeNote(at: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(at);
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `נוצר מחדש ב-${part("day")}.${part("month")}.${part("year")} מהנתונים השמורים`;
+}
+
+/** TAX-02: the bank block of a PDF, one row a line; numbers kept left to right. */
+export function bankPdfText(bank: DocumentBank): string {
+  return bankRows(bank)
+    .map((row) => `${row.label}: ${row.number ? ltr(row.value) : row.value}`)
+    .join("\n");
 }
 
 export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, options: { remadeNote?: string | null } = {}): PdfDocument {
@@ -146,6 +154,9 @@ export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, 
       })),
     });
   }
+  // TAX-02: the bank details stored when the quote was sent, while the design shows them
+  const bank = design.showBankDetails ? quote.bankDetails : null;
+  if (bank) blocks.push({ kind: "section", title: BANK_HEADING, text: bankPdfText(bank) });
   if (quote.notes) blocks.push({ kind: "section", title: "הערות", text: quote.notes });
   if (quote.terms) blocks.push({ kind: "section", title: "תנאים", text: quote.terms });
 

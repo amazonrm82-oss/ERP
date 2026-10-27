@@ -82,6 +82,7 @@ function sample(lineCount: number): QuoteDocumentData {
     customerName: null,
     customerContactName: null,
     customerDeletedAt: null,
+    bankDetails: { bankName: "בנק לאומי", branch: "800", account: "12345678", accountName: "חברת הדוגמה בע\"מ" },
     dealId: null,
     contactId: null,
     companyId: null,
@@ -104,7 +105,7 @@ function sample(lineCount: number): QuoteDocumentData {
     createdAt: "2026-10-26",
   };
   return {
-    design: { headerText: "הצעה זו בתוקף ל-30 יום.", footerText: "חברת הדוגמה בע\"מ · מחויבים לשירות", showLogo: true, showBusinessDetails: true, accentColor: null },
+    design: { headerText: "הצעה זו בתוקף ל-30 יום.", footerText: "חברת הדוגמה בע\"מ · מחויבים לשירות", showLogo: true, showBusinessDetails: true, showBankDetails: true, accentColor: null },
     color: "#ffcc00",
     logoUrl: null,
     business: { name: 'חברת הדוגמה בע"מ', taxId: "512345678", address: "רחוב הרצל 10, תל אביב", phone: "+972-3-555-1234", email: "office@example.co.il" },
@@ -163,6 +164,9 @@ describe("the quote PDF, read back from a real file (QUO-06)", () => {
     // the payment schedule, the notes and the terms
     expect(pieces).toContain("םימולשת חול");
     expect(pieces).toContain("30%");
+    // TAX-02: the bank details stored on the quote, the account number left to right
+    expect(pieces).toContain("תיאקנב הרבעהל םיטרפ");
+    expect(pieces).toContain("12345678 :ןובשח רפסמ");
     // a phone and an email typed into Hebrew text keep their own order
     expect(lines.some((l) => l.includes(".office@example.co.il וא 03-5551234 :תולאשל"))).toBe(true);
     // every page says which page it is

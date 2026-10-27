@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { BILLINGS } from "@/features/products/schema";
 
+import { bankFromSnapshot } from "./bank";
 import { quoteColor, type DocumentCustomer, type QuoteDesign } from "./design";
 import type { DocumentBusiness } from "./design-server";
 import type { Quote, QuoteLine } from "./queries";
@@ -77,6 +78,8 @@ const answerSchema = z.object({
     footer_text: text,
     show_logo: z.boolean(),
     show_business_details: z.boolean(),
+    // TAX-02 (absent before 021087)
+    show_bank_details: z.boolean().optional(),
     accent_color: text,
   }),
   brand: z.object({ logo: text, color: text }),
@@ -92,6 +95,8 @@ const answerSchema = z.object({
   addenda: z.array(z.object({ number: text, title: z.string(), total_agorot: money })).optional(),
   // QUO-06 follow-up: the version shown has a stored, fingerprinted PDF the customer may download
   pdf: z.boolean().optional(),
+  // TAX-02: the bank details stored when the quote was sent, only while the design shows them (absent before 021087)
+  bank: z.unknown().optional(),
   // GAP-09: the payment schedule, each step's share of the total worked out by the database
   schedule: z.array(
     z.object({
@@ -132,12 +137,13 @@ export type PublicQuote = {
 export function publicQuoteFrom(raw: unknown): PublicQuote | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, accepted_on, addendum, addenda, pdf } = parsed.data;
+  const { quote: q, customer, lines, business, design, brand, built_with, schedule, replaced, draft_version, accepted_on, addendum, addenda, pdf, bank } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
     showLogo: design.show_logo,
     showBusinessDetails: design.show_business_details,
+    showBankDetails: design.show_bank_details ?? true,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");
@@ -182,6 +188,7 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
       customerName: customer.name,
       customerContactName: customer.contact,
       customerDeletedAt: null,
+      bankDetails: bankFromSnapshot(bank),
     },
     lines: lines.map((line, index) => ({
       // the answer holds no ids: a key per line, for the page only

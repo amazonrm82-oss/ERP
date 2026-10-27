@@ -15,6 +15,7 @@ import { PAGE_SIZE } from "@/lib/search";
 import type { Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 
+import { bankFromSnapshot, type DocumentBank } from "./bank";
 import { quoteAcceptDealOf, type QuoteAcceptDeal } from "./accept-deal";
 import { QUOTE_DEFAULT_SORT, QUOTE_SORT_COLUMNS, type QuoteSortKey } from "./list";
 import { withoutSuperseded } from "./addenda";
@@ -62,6 +63,8 @@ export type Quote = {
   // QUO-11: cancelled after the customer accepted, and why
   cancelledFrom: string | null;
   cancelReason: string | null;
+  // TAX-02: the business's bank details as stored when it was sent (null on a draft and on a quote sent before)
+  bankDetails: DocumentBank | null;
 };
 
 export type QuoteLine = {
@@ -87,7 +90,7 @@ export type QuoteLine = {
 };
 
 const QUOTE_COLUMNS =
-  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id, addendum_of, cancelled_from, cancel_reason";
+  "id, title, status, deal_id, contact_id, company_id, owner_id, quote_date, valid_until, prices_include_vat, no_vat_reason, no_vat_note, discount_bp, discount_agorot, notes, terms, vat_rate_bp, subtotal_agorot, discount_total_agorot, net_total_agorot, vat_agorot, total_agorot, created_at, number_display, sent_at, customer_name, customer_contact_name, customer_deleted_at, previous_id, addendum_of, cancelled_from, cancel_reason, bank_details";
 
 type QuoteDbRow = Database["public"]["Tables"]["quotes"]["Row"];
 type LineDbRow = Database["public"]["Tables"]["quote_lines"]["Row"];
@@ -127,6 +130,7 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
     addendumOf: row.addendum_of,
     cancelledFrom: row.cancelled_from,
     cancelReason: row.cancel_reason,
+    bankDetails: bankFromSnapshot(row.bank_details),
   };
 }
 

@@ -159,3 +159,20 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(statusQuoteFrom({ expired: { number: "QT-7" } })).toBeNull();
   });
 });
+
+describe("bank details on the customer's quote page (TAX-02)", () => {
+  it("reads `bank` into the quote and the document shows it; absent (older answers) or null is none", () => {
+    expect(publicQuoteFrom(answer())!.quote.bankDetails).toBeNull();
+    expect(publicQuoteFrom(answer({ bank: null }))!.quote.bankDetails).toBeNull();
+    const page = publicQuoteFrom(
+      answer({
+        design: { ...answer().design, show_bank_details: true },
+        bank: { bank_name: "בנק הפועלים", bank_branch: "123", bank_account: "12345678", bank_account_name: "העסק הרשום" },
+      }),
+    )!;
+    expect(page.quote.bankDetails).toEqual({ bankName: "בנק הפועלים", branch: "123", account: "12345678", accountName: "העסק הרשום" });
+    const html = renderToStaticMarkup(createElement(QuoteDocument, { data: { ...page, logoUrl: null } }));
+    expect(html).toContain("פרטים להעברה בנקאית");
+    expect(html).toContain("12345678");
+  });
+});

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { customerPriceList } from "@/features/deal-lines/queries";
+import { bankFromSnapshot, type DocumentBank } from "@/features/quotes/bank";
 import type { QuoteDecision } from "@/features/quotes/queries";
 import type { ScheduleStep } from "@/features/quotes/schedule";
 import { conversionRateBp, type NamedPriceList } from "@/features/deal-lines/pricing";
@@ -52,6 +53,8 @@ export type Order = {
   cancelledAt: string | null;
   customerDeletedAt: string | null;
   createdAt: string;
+  // TAX-02: the business's bank details as stored when the order got its number (null on a draft and on older orders)
+  bankDetails: DocumentBank | null;
 };
 
 export type OrderLine = {
@@ -103,6 +106,7 @@ function toOrder(row: OrderRow): Order {
     cancelledAt: row.cancelled_at,
     customerDeletedAt: row.customer_deleted_at,
     createdAt: row.created_at,
+    bankDetails: bankFromSnapshot(row.bank_details),
   };
 }
 

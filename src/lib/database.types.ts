@@ -1654,6 +1654,8 @@ export type QuoteDesignDbRow = {
   footer_text: string | null;
   show_logo: boolean;
   show_business_details: boolean;
+  // TAX-02: show the bank details stored on a sent quote / numbered order
+  show_bank_details: boolean;
   accent_color: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1665,6 +1667,7 @@ type QuoteDesignWrite = {
   footer_text?: string | null;
   show_logo?: boolean;
   show_business_details?: boolean;
+  show_bank_details?: boolean;
   accent_color?: string | null;
 };
 
@@ -1761,6 +1764,8 @@ export type QuoteRow = {
   // QUO-11 (owner, 19 October 2026): an accepted quote cancelled by an owner or admin, with the reason (server-only)
   cancelled_from: string | null;
   cancel_reason: string | null;
+  // TAX-02: app.document_bank_snapshot() taken when the quote was sent (server-only, never changed afterwards)
+  bank_details: Json | null;
   currency: string;
   created_by: string | null;
   created_at: string;
@@ -1806,6 +1811,8 @@ export type OrderRow = {
   former_contact_id: string | null;
   former_company_id: string | null;
   customer_deleted_at: string | null;
+  // TAX-02: app.document_bank_snapshot() taken when the order got its number (server-only, never changed afterwards)
+  bank_details: Json | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

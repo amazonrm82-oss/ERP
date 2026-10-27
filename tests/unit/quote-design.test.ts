@@ -6,6 +6,8 @@ import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
 import { DEFAULT_QUOTE_DESIGN, designFromRow, quoteColor, quoteDesignSchema, sentCustomer } from "@/features/quotes/design";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
+import { BANK_HEADING, bankFromSnapshot, bankRows } from "@/features/quotes/bank";
+import { quotePdfDocument } from "@/features/quotes/pdf";
 
 const form = (values: Record<string, string>) => ({ header_text: "", footer_text: "", color_mode: "brand", ...values });
 
@@ -16,12 +18,12 @@ describe("quote design rules (QUO-05)", () => {
     expect(quoteColor({ ...DEFAULT_QUOTE_DESIGN, accentColor: "#aabbcc" }, "#112233")).toBe("#aabbcc");
     expect(quoteColor(DEFAULT_QUOTE_DESIGN, null)).toBeNull();
     // a stored value that is not a colour is ignored
-    expect(designFromRow({ header_text: null, footer_text: null, show_logo: true, show_business_details: false, accent_color: "red" }).accentColor).toBeNull();
+    expect(designFromRow({ header_text: null, footer_text: null, show_logo: true, show_business_details: false, show_bank_details: true, accent_color: "red" }).accentColor).toBeNull();
   });
 
   it("the form: unchecked boxes are off, the business colour clears the own one, an own colour must be a colour", () => {
     const off = quoteDesignSchema.safeParse(form({ header_text: "  שלום  " }));
-    expect(off.success && off.data).toEqual({ header_text: "שלום", footer_text: null, show_logo: false, show_business_details: false, accent_color: null });
+    expect(off.success && off.data).toEqual({ header_text: "שלום", footer_text: null, show_logo: false, show_business_details: false, show_bank_details: false, accent_color: null });
     const own = quoteDesignSchema.safeParse(form({ color_mode: "own", accent_color: "#ABC", show_logo: "on", show_business_details: "on" }));
     expect(own.success && own.data).toMatchObject({ show_logo: true, show_business_details: true, accent_color: "#aabbcc" });
     expect(quoteDesignSchema.safeParse(form({ color_mode: "own", accent_color: "כחול" })).success).toBe(false);
@@ -43,6 +45,7 @@ const quote = (extra: Partial<Quote> = {}): Quote => ({
   customerName: null,
   customerContactName: null,
   customerDeletedAt: null,
+  bankDetails: null,
   dealId: null,
   contactId: null,
   companyId: null,
@@ -170,3 +173,44 @@ describe("the customer on a sent quote (QUO-07)", () => {
   });
 });
 
+
+// TAX-02: the bank details stored on a sent quote, shown while the design shows them; never the live settings
+describe("bank details on a quote (TAX-02)", () => {
+  const bank = { bankName: "בנק הפועלים", branch: "123", account: "12345678", accountName: "העסק הרשום" };
+
+  it("reads a stored snapshot; one without an account is none", () => {
+    expect(bankFromSnapshot({ bank_name: "בנק הפועלים", bank_branch: "123", bank_account: "12345678", bank_account_name: "העסק הרשום" })).toEqual(bank);
+    expect(bankFromSnapshot({ bank_name: "בנק", bank_branch: "1", bank_account: null, bank_account_name: null })).toBeNull();
+    expect(bankFromSnapshot(null)).toBeNull();
+    expect(bankFromSnapshot("12345678")).toBeNull();
+    expect(bankFromSnapshot({ bank_account: 12345678 })).toBeNull();
+    expect(bankRows({ ...bank, accountName: null }).map((r) => r.label)).toEqual(["בנק", "סניף", "מספר חשבון"]);
+  });
+
+  it("the document shows the stored block, numbers left to right, and hides it when the design says so", () => {
+    const html = renderToStaticMarkup(createElement(QuoteDocument, { data: data({ quote: quote({ status: "sent", bankDetails: bank }) }) }));
+    expect(html).toContain(BANK_HEADING);
+    expect(html).toContain('<span dir="ltr" class="tabular-nums">12345678</span>');
+    expect(html).toContain("העסק הרשום");
+    const hidden = renderToStaticMarkup(
+      createElement(QuoteDocument, { data: data({ design: { ...DEFAULT_QUOTE_DESIGN, showBankDetails: false }, quote: quote({ status: "sent", bankDetails: bank }) }) }),
+    );
+    expect(hidden).not.toContain(BANK_HEADING);
+    expect(hidden).not.toContain("12345678");
+    // a draft (or a quote sent before) has no snapshot and shows no block
+    expect(renderToStaticMarkup(createElement(QuoteDocument, { data: data() }))).not.toContain(BANK_HEADING);
+  });
+
+  it("the PDF carries the same block, only while the design shows it", () => {
+    const sections = (d: QuoteDocumentData) => quotePdfDocument(d, null).blocks.filter((b) => b.kind === "section");
+    const shown = sections(data({ quote: quote({ status: "sent", bankDetails: bank }) }));
+    expect(shown[0]).toEqual({ kind: "section", title: BANK_HEADING, text: "בנק: בנק הפועלים\nסניף: ‎123‎\nמספר חשבון: ‎12345678‎\nעל שם: העסק הרשום" });
+    expect(sections(data({ design: { ...DEFAULT_QUOTE_DESIGN, showBankDetails: false }, quote: quote({ status: "sent", bankDetails: bank }) }))).toEqual([]);
+    expect(sections(data())).toEqual([]);
+  });
+
+  it("the design form's box: unchecked is off, checked is on", () => {
+    expect(quoteDesignSchema.safeParse(form({ show_bank_details: "on" })).data).toMatchObject({ show_bank_details: true });
+    expect(DEFAULT_QUOTE_DESIGN.showBankDetails).toBe(true);
+  });
+});

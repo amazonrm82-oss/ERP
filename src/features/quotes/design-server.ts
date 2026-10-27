@@ -20,7 +20,7 @@ export const getQuoteDesign = cache(async (orgId: string): Promise<QuoteDesign> 
   const row = must(
     await supabase
       .from("quote_designs")
-      .select("header_text, footer_text, show_logo, show_business_details, accent_color")
+      .select("header_text, footer_text, show_logo, show_business_details, show_bank_details, accent_color")
       .eq("organization_id", orgId)
       .maybeSingle(),
     "quote design",
@@ -160,6 +160,8 @@ export async function getSampleDocumentData(orgId: string, displayName: string):
       previousId: null,
       cancelledFrom: null,
       cancelReason: null,
+      // a made-up account, so the settings preview shows where the block sits
+      bankDetails: { bankName: "בנק לדוגמה", branch: "123", account: "123456", accountName: "העסק לדוגמה" },
       addendumOf: null,
       title: "הצעת מחיר לדוגמה",
       status: "sent",

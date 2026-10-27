@@ -34,6 +34,7 @@ const order: Order = {
   confirmedAt: "2026-10-19T10:00:00Z",
   cancelledAt: null,
   customerDeletedAt: null,
+  bankDetails: null,
   createdAt: "2026-10-19T10:00:00Z",
 };
 
@@ -57,7 +58,7 @@ const line: OrderLine = {
 };
 
 const data: OrderDocumentData = {
-  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, accentColor: null },
+  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, showBankDetails: true, accentColor: null },
   color: null,
   logoUrl: null,
   business: { name: "העסק", taxId: "515555555", address: null, phone: null, email: null },
@@ -104,5 +105,20 @@ describe("order confirmation (ORD-05)", () => {
   it("a draft prints without a number", () => {
     const html = renderToStaticMarkup(createElement(OrderDocument, { data: { ...data, order: { ...order, status: "draft", numberDisplay: null } } }));
     expect(html).toContain("טיוטה, עוד ללא מספר");
+  });
+});
+
+// TAX-02: the bank details stored when the order got its number, while the design shows them
+describe("bank details on an order confirmation (TAX-02)", () => {
+  const bank = { bankName: "בנק לאומי", branch: "800", account: "87654321", accountName: null };
+  it("shows the stored block and hides it when the design says so or there is none", () => {
+    expect(renderToStaticMarkup(createElement(OrderDocument, { data }))).not.toContain("פרטים להעברה בנקאית");
+    const html = renderToStaticMarkup(createElement(OrderDocument, { data: { ...data, order: { ...order, bankDetails: bank } } }));
+    expect(html).toContain("פרטים להעברה בנקאית");
+    expect(html).toContain("87654321");
+    const hidden = renderToStaticMarkup(
+      createElement(OrderDocument, { data: { ...data, design: { ...data.design, showBankDetails: false }, order: { ...order, bankDetails: bank } } }),
+    );
+    expect(hidden).not.toContain("87654321");
   });
 });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { BILLINGS } from "@/features/products/schema";
+import { bankFromSnapshot } from "@/features/quotes/bank";
 import { quoteColor, type DocumentCustomer, type QuoteDesign } from "@/features/quotes/design";
 import type { DocumentBusiness } from "@/features/quotes/design-server";
 import type { ScheduleRow } from "@/features/quotes/schedule";
@@ -59,11 +60,13 @@ const answerSchema = z.object({
   ),
   schedule: z.array(z.object({ name: z.string(), percent_bp: z.number().int(), due_date: text, milestone: text, amount_agorot: money })),
   business: z.object({ name: z.string(), tax_id: text, address_line: text, city: text, postal_code: text, phone: text, email: text }),
-  design: z.object({ header_text: text, footer_text: text, show_logo: z.boolean(), show_business_details: z.boolean(), accent_color: text }),
+  design: z.object({ header_text: text, footer_text: text, show_logo: z.boolean(), show_business_details: z.boolean(), show_bank_details: z.boolean().optional(), accent_color: text }),
   brand: z.object({ logo: text, color: text }),
   built_with: z.boolean(),
   decision: z.object({ decision: z.enum(["accepted", "rejected"]), decided_at: z.string() }).nullable(),
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  // TAX-02: the bank details stored when the order was numbered, only while the design shows them (absent before 021087)
+  bank: z.unknown().optional(),
 });
 
 export type PublicOrder = {
@@ -86,12 +89,13 @@ export type PublicOrder = {
 export function publicOrderFrom(raw: unknown): PublicOrder | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { order: o, customer, lines, schedule, business, design, brand, built_with, decision, fingerprint } = parsed.data;
+  const { order: o, customer, lines, schedule, business, design, brand, built_with, decision, fingerprint, bank } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
     showLogo: design.show_logo,
     showBusinessDetails: design.show_business_details,
+    showBankDetails: design.show_bank_details ?? true,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");
@@ -132,6 +136,7 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
       cancelledAt: null,
       customerDeletedAt: null,
       createdAt: o.order_date,
+      bankDetails: bankFromSnapshot(bank),
     },
     lines: lines.map((line, index) => ({
       // the answer holds no ids: a key per line, for the page only

@@ -18,6 +18,8 @@ export type QuoteDesign = {
   footerText: string | null;
   showLogo: boolean;
   showBusinessDetails: boolean;
+  // TAX-02: the bank details stored on the document when it was sent (or an order numbered)
+  showBankDetails: boolean;
   // '#rrggbb' for quotes only; null = the business colour
   accentColor: string | null;
 };
@@ -27,6 +29,7 @@ export const DEFAULT_QUOTE_DESIGN: QuoteDesign = {
   footerText: null,
   showLogo: true,
   showBusinessDetails: true,
+  showBankDetails: true,
   accentColor: null,
 };
 
@@ -35,6 +38,7 @@ export type QuoteDesignRow = {
   footer_text: string | null;
   show_logo: boolean;
   show_business_details: boolean;
+  show_bank_details: boolean;
   accent_color: string | null;
 };
 
@@ -45,6 +49,7 @@ export function designFromRow(row: QuoteDesignRow | null): QuoteDesign {
     footerText: row.footer_text,
     showLogo: row.show_logo,
     showBusinessDetails: row.show_business_details,
+    showBankDetails: row.show_bank_details,
     accentColor: isHexColor(row.accent_color) ? row.accent_color : null,
   };
 }
@@ -62,6 +67,7 @@ export const quoteDesignSchema = z
     footer_text: optionalText(QUOTE_FOOTER_MAX, `הכותרת התחתונה ארוכה מדי (עד ${QUOTE_FOOTER_MAX} תווים).`),
     show_logo: z.unknown().optional(),
     show_business_details: z.unknown().optional(),
+    show_bank_details: z.unknown().optional(),
     color_mode: z.preprocess((value) => (typeof value === "string" ? value : "brand"), z.enum(COLOR_MODES, { error: "יש לבחור צבע." })),
     accent_color: z.unknown().optional(),
   })
@@ -79,11 +85,12 @@ export const quoteDesignSchema = z
       footer_text: value.footer_text,
       show_logo: value.show_logo === "on",
       show_business_details: value.show_business_details === "on",
+      show_bank_details: value.show_bank_details === "on",
       accent_color: accentColor,
     } satisfies QuoteDesignRow;
   });
 
-export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "color_mode", "accent_color"] as const;
+export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "show_bank_details", "color_mode", "accent_color"] as const;
 
 export type DocumentCustomer = {
   // the name for invoices, else the company, else the contact

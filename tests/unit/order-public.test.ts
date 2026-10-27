@@ -86,3 +86,17 @@ describe("the customer's order page (ORD-05)", () => {
     expect(ORDER_ACCEPT_WORDING_VERSION).toMatch(/^[a-z0-9-]{1,40}$/);
   });
 });
+
+describe("bank details on the customer's order page (TAX-02)", () => {
+  it("reads `bank` into the order; absent (older answers) or null is none", () => {
+    expect(publicOrderFrom(answer)!.order.bankDetails).toBeNull();
+    expect(publicOrderFrom(answer)!.design.showBankDetails).toBe(true);
+    const page = publicOrderFrom({
+      ...answer,
+      design: { ...answer.design, show_bank_details: true },
+      bank: { bank_name: "בנק", bank_branch: "12", bank_account: "1234567", bank_account_name: null },
+    })!;
+    expect(page.order.bankDetails).toEqual({ bankName: "בנק", branch: "12", account: "1234567", accountName: null });
+    expect(publicOrderFrom({ ...answer, design: { ...answer.design, show_bank_details: false }, bank: null })!.design.showBankDetails).toBe(false);
+  });
+});

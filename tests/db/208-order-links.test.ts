@@ -152,7 +152,7 @@ describe("the customer's link to an order (ORD-05)", () => {
     const { order, contact } = await newOrder(member, org, "רון");
     const token = await create(member, org, order);
     const p = await page(token);
-    expect(Object.keys(p).sort()).toEqual(["brand", "built_with", "business", "customer", "decision", "design", "fingerprint", "lines", "order", "schedule"]);
+    expect(Object.keys(p).sort()).toEqual(["bank", "brand", "built_with", "business", "customer", "decision", "design", "fingerprint", "lines", "order", "schedule"]);
     expect(Object.keys(p.order).sort()).toEqual(
       [
         "currency",
