@@ -763,6 +763,30 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   metadata rebuilt in SQL; hints `whatsapp_import:*`). The file is not stored. `app.search_notes` finds `import_note` and
   `app.import_record_worked` leaves out only the job's own notes (null-safe); both last redefined in 021070. The advisor's
   `authenticated_security_definer_function_executable` on `whatsapp_chat_import` is expected.
+- Opening balances (GAP-12 continued, migrations 021076-021078; owner 26 October 2026, interim lead decisions on replace,
+  credit order and undo in DECISIONS.md): document type `opening_balance` on `accounting_documents` ("יתרת פתיחה מתאריך <date>",
+  no number: `number` nullable only for it, `accounting_documents_number_shape`), SIGNED amount (positive = debt like a tax
+  invoice: payments, balance, typed due date, overdue, debt_overdue for contact rules only; negative = customer credit), on a
+  contact or a company (`company_id`, opening balances only, `accounting_documents_company_shape|opening_shape`; reading follows
+  the company), never a deal or an order. Owners/admins only (hint `document:opening_admin`); one active per customer, replaced
+  only through `public.opening_balance_set(org, contact|company, amount, date, due, job)` (definer; cancels the old one
+  "הוחלפה בייבוא" / "הוחלפה ביתרה חדשה", releasing its allocations; advisor finding expected). No due date from terms; no
+  document_recorded automation (WHEN on `accounting_documents_emit_recorded`). A company's balance takes payments of its contacts
+  and deals (`app.money_in_company`). Credit (021077): `public.opening_credit_allocations` (shaped like payment_allocations,
+  never deleted, owners/admins undo; `app.opening_credit_allocations_check`, lock order credit, document, proforma) counted by
+  `money_allocation_state` (`credit` per document), the ledger's credit_balance, `money_customer_credit` (`documents`),
+  `money_apply_credit` (payments first, then opening credits oldest first) and the credit column totals
+  (`app.opening_credit_doc_sync`, deferred, under PAY-03's business lock; `app.opening_credit_companies` remembers the company a
+  total sat on so a purge or merge refreshes it). Import undo (021078): `accounting_documents.import_job_id` (server only);
+  `app.import_opening_cancel` (owners/admins only; else 0) cancels the job's active balances on records this undo binned
+  (`deleted_at = now()`) through the narrow `app.document_server = 'undo'` branch, "בוטל עם ביטול הייבוא"; a replaced one is not
+  restored. `app.import_record_worked`, `public.undo_import`, `public.undo_own_import` were last redefined in 021078 (keep WAB-07's
+  null-safe notes line and the opening-balance exclusions); `app.audit_erase_core` (companies reach their balances),
+  `app.accounting_documents_check`, `app.payment_allocations_check` (021077), `public.money_allocation_state` (021077),
+  `public.customer_ledger` (021077), `public.money_allocation_candidates`, `app.scheduled_debt_overdue`,
+  `app.export_choice_values` and `public.sort_customer(accounting_documents)` (company name) were last redefined in 021076/021077.
+  Follow-ups: debt_overdue for company rules; `app.sample_untouched` does not know opening balances; a balance on a record that
+  was in the bin before the undo stays active; no screen to undo an offset; an erased company's balance file reads "מסמך .pdf".
 - Source attribution (SEG-02 + DQL-04, migration 021060; owner 18 and 26 October 2026): the first source is what the record holds
   (`source_id`, `campaign`, `utm`; contacts got server-kept `campaign`/`utm`); the last source is server-only `last_source_id`,
   `last_campaign`, `last_utm`, `last_source_at` on leads and contacts, moved only by an automatic inquiry: a lead made by intake
