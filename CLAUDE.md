@@ -287,6 +287,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   purged first, hint `erase:exists`) sets `changes = {"erased": true}` on the record's audit entries and
   on those of its deleted tasks/files, empties merge snapshots and unlinked form submissions, and logs
   action `erase`. `audit_erase_candidates()` is security invoker. Purging a lead empties its submissions.
+- Business time zone (RVW-58, migration 021082): trigger `organizations_timezone_check` (invoker) refuses a new or changed
+  `organizations.timezone` that is not in `pg_timezone_names` or not of the shape `app.intake_zone` accepts (hint `org:timezone`);
+  stored rows are not judged again. `app.payments_advance` (PAY-03 advances) was last redefined in 021080 (RVW-54, never NULL).
 - Org context (migration 0028): `public.org_context(org)` (security invoker) returns org, membership,
   subscription + plan name, profile name and signed agreement version in one call; `getOrgContext()`
   uses it. A part the caller may not see comes back null, exactly like the separate queries did.
@@ -835,6 +838,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `delete` audit snapshot carries the policy's `binned_at`; its row is renamed to action `retention`; no do-not-contact entry; it waits
   like `audit_erase_request` while the key is missing; one `retention_purge` count line per business and run. `public.lead_retention_keep`
   locks the lead then its round row (the job's order). App: `src/features/lead-retention/`, `/settings/retention` and `/list`.
+  Since 021081 (RVW-57) the rule also skips a lead with an audit `restore` entry since the cutoff, whoever restored it;
+  `app.lead_retention_candidates` was last redefined there.
 - Person export (PRV-02, migration 020260; privacy, no plan key): `/o/[org]/privacy-export/[lead|contact]/[id]` (owners/admins)
   collects everything about one person with the user's session (`src/features/privacy-export/collect.ts`; conversion relatives; others'
   private notes and their files left out by `withoutOthersPrivate()`, the print rule), calls `public.log_person_export()` (definer,
