@@ -279,7 +279,10 @@ function DueDateForm({ orgId, subject, documentId, dueDate, onDone }: { orgId: s
   );
 }
 
-/** GAP-12 (owner's answer (2) א): offsets the customer's credit (payments, then opening credits) against this open document. */
+/**
+ * GAP-12 (owner's answer (2) ג of 27 October 2026): offsets the customer's credit against this open document: the advances of
+ * its order first, then payments and opening credits together, oldest first.
+ */
 export function ApplyCreditButton({ orgId, subject, documentId, label }: { orgId: string; subject: Subject; documentId: string; label: string }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);

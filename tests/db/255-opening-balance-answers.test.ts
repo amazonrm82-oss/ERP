@@ -72,7 +72,15 @@ describe("opening balance answers (GAP-12 follow-up)", () => {
     org = await createOrg(owner.id, "עסק התשובות");
     admin = await addMember(org, owner.id, "admin", "oba-admin");
     await asAdmin((q) =>
-      q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ documents: true, payments: true, balances: true })]),
+      q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ documents: true, payments: true, balances: true, orders: true })]),
+    );
+    // a numbered order needs the business's VAT status
+    await asAdmin((q) =>
+      q(
+        `insert into public.org_document_settings (organization_id, vat_status, prices_include_vat) values ($1, 'licensed', false)
+         on conflict (organization_id) do update set vat_status = 'licensed', prices_include_vat = false`,
+        [org],
+      ),
     );
   });
 
@@ -178,5 +186,39 @@ describe("opening balance answers (GAP-12 follow-up)", () => {
     const r2 = await apply(await invoice(c2, 10000), 600);
     expect(r2.payments).toEqual([]);
     expect(r2.documents).toEqual([{ document_id: older, amount: 600 }]);
+  });
+
+  it("(2) ג the advance of the document's order still comes first, before an older opening credit", async () => {
+    const c = await contact();
+    const order = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, c])).id);
+    await run(owner, (q) => q("insert into public.order_lines (organization_id, order_id, name, unit_price_agorot, quantity) values ($1, $2, 'עבודה', 10000, 1)", [org, order]));
+    await run(owner, (q) => q("select public.order_confirm($1, $2)", [org, order]));
+    const opening = await setOb({ contact: c }, -1000, "2026-01-01");
+    const adv = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method, is_advance, advance_order_id) values ($1, $2, 1000, '2026-09-01', 'transfer', true, $3) returning id",
+          [org, c, order],
+        )
+      ).id,
+    );
+    const inv = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, contact_id, order_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, $3, 'tax_invoice', $4, '2026-10-01', 5000) returning id",
+          [org, c, order, `OBA-${++n}`],
+        )
+      ).id,
+    );
+    // a cap smaller than either source: the advance takes it all, the older opening credit nothing
+    const r = await apply(inv, 600);
+    expect(r.payments).toEqual([{ payment_id: adv, amount: 600 }]);
+    expect(r.documents).toEqual([]);
+    // then the rest of the advance, then the opening credit
+    const r2 = await apply(inv, 900);
+    expect(r2.payments).toEqual([{ payment_id: adv, amount: 400 }]);
+    expect(r2.documents).toEqual([{ document_id: opening, amount: 500 }]);
   });
 });
