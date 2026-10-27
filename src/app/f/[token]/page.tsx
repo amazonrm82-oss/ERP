@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
@@ -8,19 +9,35 @@ import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
 import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
-
-export const metadata: Metadata = { title: "טופס פנייה", robots: { index: false, follow: false } };
+import { genericPreview, linkPreviewMetadata, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
   params: Promise<{ token: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+// WAB-05: the link's preview and the page share ONE read per request
+const loadForm = cache((token: string) => getPublicForm(token));
+
+/**
+ * WAB-05: the link's preview: the form's own title and intro (written by the business) and its logo. intake_form() does
+ * not return the business's name, so it is in the preview only when the form's title carries it.
+ */
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const form = await loadForm((await params).token);
+  const t = PREVIEW_TEXTS.form;
+  if (form === null || form === "inactive" || form === "not-configured") return genericPreview(t.what, t.description);
+  return linkPreviewMetadata(
+    { title: form.title || t.what, description: form.intro ?? t.description, business: null, logoUrl: logoPublicUrl(form.brand.logoPath) },
+    { absoluteTitle: true },
+  );
+}
+
 // Public, no sign-in. `?embed=1` drops the page frame for use inside an iframe.
 export default async function PublicFormPage({ params, searchParams }: Props) {
   const { token } = await params;
   const embed = (await searchParams).embed === "1";
-  const form = await getPublicForm(token);
+  const form = await loadForm(token);
   const found = form !== null && form !== "not-configured" && form !== "inactive" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;
 

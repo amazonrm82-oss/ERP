@@ -2,6 +2,7 @@ import "@/features/print/print.css";
 
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { cache } from "react";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { OrgLogo } from "@/features/branding/components/org-logo";
@@ -14,11 +15,24 @@ import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { formatDate } from "@/lib/format";
-
-// as the quote page (QUO-14): not for search engines, and the secret address never leaves in a Referer header
-export const metadata: Metadata = { title: "אישור הזמנה", robots: { index: false, follow: false }, referrer: "no-referrer" };
+import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
+
+// WAB-05: the link's preview and the page share ONE read per request (order_public counts a view per link and sender)
+const loadOrder = cache(async (token: string) => getPublicOrder(token, clientIp(await headers())));
+
+/**
+ * WAB-05: the link's preview: "אישור הזמנה מאת <business>" and the logo, nothing about the customer or the prices. As the
+ * quote page (QUO-14): not for search engines, and the secret address never leaves in a Referer header.
+ */
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const page = await loadOrder((await params).token);
+  const t = PREVIEW_TEXTS.order;
+  if (typeof page === "string") return { ...genericPreview(t.what, t.description), referrer: "no-referrer" };
+  const business = "statusPage" in page ? page.business : page.business.name;
+  return businessPreview({ ...t, business, logoUrl: logoPublicUrl(page.logoPath) }, { referrer: "no-referrer" });
+}
 
 const MESSAGES = {
   "not-found": "ההזמנה לא נמצאה, או שהקישור כבר לא בתוקף. לקבלת קישור חדש פנו לעסק ששלח אותו.",
@@ -33,7 +47,7 @@ const MESSAGES = {
  */
 export default async function PublicOrderPage({ params }: Props) {
   const { token } = await params;
-  const page = await getPublicOrder(token, clientIp(await headers()));
+  const page = await loadOrder(token);
 
   if (typeof page === "string") {
     return (

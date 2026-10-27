@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { cache } from "react";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
@@ -17,13 +18,23 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
-
-export const metadata: Metadata = { title: "הפגישה שלי", robots: { index: false, follow: false } };
+import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
   params: Promise<{ token: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+// WAB-05: the link's preview and the page share ONE read per request (booking_manage_public counts a view per sender)
+const loadManage = cache(async (token: string, from: string | null) => getBookingManage(token, from, clientIp(await headers())));
+
+/** WAB-05: the link's preview: "הפגישה שלך אצל <business>" and the logo; never the meeting's time or the customer. */
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const page = await loadManage((await params).token, fromParam((await searchParams).from));
+  const t = PREVIEW_TEXTS.manage;
+  if (typeof page === "string") return genericPreview(t.what, t.description);
+  return businessPreview({ ...t, business: page.business, logoUrl: logoPublicUrl(page.brand.logoPath) });
+}
 
 const MESSAGES = {
   "not-found": "הקישור לא נמצא או שכבר אינו פעיל.",
@@ -49,7 +60,7 @@ function noticeText(hours: number): string {
 export default async function BookingManagePage({ params, searchParams }: Props) {
   const { token } = await params;
   const query = await searchParams;
-  const page = await getBookingManage(token, fromParam(query.from), clientIp(await headers()));
+  const page = await loadManage(token, fromParam(query.from));
 
   if (typeof page === "string") {
     return (

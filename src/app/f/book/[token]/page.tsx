@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { cache } from "react";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
@@ -17,13 +18,24 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
-
-export const metadata: Metadata = { title: "קביעת תור", robots: { index: false, follow: false } };
+import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
   params: Promise<{ token: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+// WAB-05: the link's preview and the page share ONE read per request (booking_page_public counts a view per sender)
+const loadBooking = cache(async (token: string, from: string | null) => getPublicBooking(token, from, clientIp(await headers())));
+
+/** WAB-05: the link's preview: "קביעת תור אצל <business>", the page's title and meeting, and the logo. */
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const page = await loadBooking((await params).token, fromParam((await searchParams).from));
+  const t = PREVIEW_TEXTS.booking;
+  if (typeof page === "string") return genericPreview(t.what, t.description);
+  const what = [page.title, page.meeting.name !== page.title ? page.meeting.name : null, `${page.meeting.durationMinutes} דקות`].filter(Boolean).join(" · ");
+  return businessPreview({ ...t, business: page.business, logoUrl: logoPublicUrl(page.brand.logoPath), description: `${what}. ${t.description}` });
+}
 
 const MESSAGES = {
   "not-found": "הדף לא נמצא או שאינו פעיל.",
@@ -36,7 +48,7 @@ const MESSAGES = {
 export default async function PublicBookingPage({ params, searchParams }: Props) {
   const { token } = await params;
   const query = await searchParams;
-  const page = await getPublicBooking(token, fromParam(query.from), clientIp(await headers()));
+  const page = await loadBooking(token, fromParam(query.from));
 
   if (typeof page === "string") {
     return (

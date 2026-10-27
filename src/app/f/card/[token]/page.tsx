@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { cache } from "react";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
@@ -12,10 +13,22 @@ import { PublicCardForm } from "@/features/business-cards/components/public-card
 import { cardVCardPath } from "@/features/business-cards/paths";
 import { getPublicCard } from "@/features/business-cards/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
-
-export const metadata: Metadata = { title: "כרטיס ביקור", robots: { index: false, follow: false } };
+import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
+
+// WAB-05: the link's preview and the page share ONE read per request (business_card_public counts a view per sender)
+const loadCard = cache(async (token: string) => getPublicCard(token, clientIp(await headers())));
+
+/** WAB-05: the link's preview: the rep's public name and the business, with the business's logo. */
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const card = await loadCard((await params).token);
+  const t = PREVIEW_TEXTS.card;
+  if (typeof card === "string") return genericPreview(t.what, t.description);
+  // the name is what the rep marked public on the card (else the business's name, BIZ-02); never a customer's
+  const who = card.name.trim() && card.name.trim() !== card.business.trim() ? `${card.name.trim()} · ${card.business}` : card.business;
+  return businessPreview({ what: t.what, joiner: t.joiner, business: who, siteName: card.business, logoUrl: logoPublicUrl(card.brand.logoPath), description: card.jobTitle ? `${card.jobTitle} · ${t.description}` : t.description });
+}
 
 const MESSAGES = {
   "not-found": "הכרטיס לא נמצא או שאינו פעיל.",
@@ -26,7 +39,7 @@ const MESSAGES = {
 /** BIZ-02: a rep's public business card. No sign-in, no cookies; only what the rep marked public. */
 export default async function PublicCardPage({ params }: Props) {
   const { token } = await params;
-  const card = await getPublicCard(token, clientIp(await headers()));
+  const card = await loadCard(token);
 
   if (typeof card === "string") {
     return (

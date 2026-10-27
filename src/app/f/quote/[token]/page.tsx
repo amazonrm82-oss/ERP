@@ -1,6 +1,7 @@
 import "@/features/print/print.css";
 
 import type { Metadata } from "next";
+import { cache } from "react";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
@@ -13,11 +14,25 @@ import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
 import { formatDate, formatMoney } from "@/lib/format";
-
-// QUO-14: the page is not for search engines; and its secret address never leaves in a Referer header
-export const metadata: Metadata = { title: "הצעת מחיר", robots: { index: false, follow: false }, referrer: "no-referrer" };
+import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
+
+// WAB-05: the link's preview and the page share ONE read per request (quote_public counts a view and its first view tells
+// the quote's owner), so both go through this cache() of React's request scope
+const loadQuote = cache((token: string) => getPublicQuote(token));
+
+/**
+ * WAB-05: the preview a messaging app draws for the link: "הצעת מחיר מאת <business>" and the logo, nothing about the
+ * customer or the prices. QUO-14: the page is not for search engines; and its secret address never leaves in a Referer header.
+ */
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const page = await loadQuote((await params).token);
+  const t = PREVIEW_TEXTS.quote;
+  if (typeof page === "string") return { ...genericPreview(t.what, t.description), referrer: "no-referrer" };
+  const business = "statusPage" in page ? page.business : page.business.name;
+  return businessPreview({ ...t, business, logoUrl: logoPublicUrl(page.logoPath) }, { referrer: "no-referrer" });
+}
 
 const MESSAGES = {
   "not-found": "ההצעה לא נמצאה, או שהקישור כבר לא בתוקף. לקבלת קישור חדש פנו לעסק ששלח אותו.",
@@ -32,7 +47,7 @@ const MESSAGES = {
  */
 export default async function PublicQuotePage({ params }: Props) {
   const { token } = await params;
-  const page = await getPublicQuote(token);
+  const page = await loadQuote(token);
 
   if (typeof page === "string") {
     return (
