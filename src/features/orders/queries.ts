@@ -15,6 +15,7 @@ import { must } from "@/lib/db-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
+import { parseOrderMoney, type BillingState, type OrderMoney, type PaymentState } from "./money";
 import { isOrderSource, isOrderStatus, type OrderSource, type OrderStatus } from "./schema";
 
 // ORD-01: every read goes with the user's session; RLS shows an order to whoever reads its deal, else its contact, else
@@ -252,6 +253,9 @@ export type OrderListFilters = {
   ownerId: string | null;
   from: string | null;
   to: string | null;
+  // ORD-02: the computed billing and payment states (public.billing_state / payment_state on orders)
+  billing: BillingState | null;
+  payment: PaymentState | null;
   page: number;
 };
 
@@ -265,9 +269,23 @@ export async function listOrders(orgId: string, filters: OrderListFilters): Prom
   if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
   if (filters.from) query = query.gte("order_date", filters.from);
   if (filters.to) query = query.lte("order_date", filters.to);
+  // computed fields (security invoker): RLS decides which documents and payments count; a partial view is 'unknown'
+  if (filters.billing) query = query.filter("billing_state", "eq", filters.billing);
+  if (filters.payment) query = query.filter("payment_state", "eq", filters.payment);
   const rows = must(await query.order("created_at", { ascending: false }).order("id").range(from, from + PAGE_SIZE), "orders");
   const page = await withCustomers(supabase, orgId, rows.slice(0, PAGE_SIZE));
   return { orders: page, hasMore: rows.length > PAGE_SIZE };
+}
+
+/**
+ * ORD-02 / ORD-04: billing and payment of the given orders, with the user's session (public.order_money_state, invoker: RLS
+ * decides which documents and payments count; an order whose rows the user does not all read comes back `partial`).
+ */
+export async function getOrderMoney(orgId: string, orderIds: string[]): Promise<Map<string, OrderMoney>> {
+  if (orderIds.length === 0) return new Map();
+  const supabase = await createClient();
+  const data = must(await supabase.rpc("order_money_state", { p_org: orgId, p_orders: orderIds }), "order money state");
+  return parseOrderMoney(data);
 }
 
 /** The orders of a deal, a contact or a company (record cards). */

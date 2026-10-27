@@ -2,6 +2,7 @@ import { isCalendarDate } from "@/lib/calendar-date";
 import { isUuid } from "@/lib/paths";
 import { parsePage } from "@/lib/search";
 
+import { BILLING_STATES, moneyFilterValue, PAYMENT_STATES } from "./money";
 import { ordersPath } from "./paths";
 import type { OrderListFilters } from "./queries";
 import { isOrderSource, isOrderStatus } from "./schema";
@@ -26,12 +27,14 @@ export function orderListFilters(params: Record<string, string | string[] | unde
     ownerId: owner && isUuid(owner) ? owner : null,
     from: from || null,
     to: to || null,
+    billing: moneyFilterValue(one(params.billing), BILLING_STATES),
+    payment: moneyFilterValue(one(params.payment), PAYMENT_STATES),
     page: parsePage(params.page),
   };
 }
 
 export function isFiltered(filters: OrderListFilters): boolean {
-  return filters.status !== null || filters.source !== null || filters.ownerId !== null || filters.from !== null || filters.to !== null;
+  return filters.status !== null || filters.source !== null || filters.ownerId !== null || filters.from !== null || filters.to !== null || filters.billing !== null || filters.payment !== null;
 }
 
 export function orderListHref(orgId: string, filters: OrderListFilters, page = filters.page): string {
@@ -41,6 +44,8 @@ export function orderListHref(orgId: string, filters: OrderListFilters, page = f
   if (filters.ownerId) query.set("owner", filters.ownerId);
   if (filters.from) query.set("from", filters.from);
   if (filters.to) query.set("to", filters.to);
+  if (filters.billing) query.set("billing", filters.billing);
+  if (filters.payment) query.set("payment", filters.payment);
   if (page > 1) query.set("page", String(page));
   const text = query.toString();
   return text ? `${ordersPath(orgId)}?${text}` : ordersPath(orgId);

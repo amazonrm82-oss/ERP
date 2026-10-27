@@ -13,6 +13,8 @@ describe("orders list filters (ORD-06)", () => {
       ownerId: OWNER,
       from: "2026-10-01",
       to: "2026-10-31",
+      billing: null,
+      payment: null,
       page: 2,
     });
     expect(orderListFilters({ status: "paid", source: "x", owner: "not-a-uuid", from: "2026-13-01" })).toEqual({
@@ -21,6 +23,8 @@ describe("orders list filters (ORD-06)", () => {
       ownerId: null,
       from: null,
       to: null,
+      billing: null,
+      payment: null,
       page: 1,
     });
   });
@@ -36,5 +40,14 @@ describe("orders list filters (ORD-06)", () => {
     expect(orderListHref("org", f, 3)).toBe(`/o/org/orders?status=new&owner=${OWNER}&page=3`);
     expect(orderListHref("org", orderListFilters({}))).toBe("/o/org/orders");
     expect(isFiltered(orderListFilters({}))).toBe(false);
+  });
+
+  it("reads the billing and payment filters (ORD-02) and keeps them in the address", () => {
+    const f = orderListFilters({ billing: "partly_billed", payment: "unpaid" });
+    expect([f.billing, f.payment]).toEqual(["partly_billed", "unpaid"]);
+    expect(isFiltered(f)).toBe(true);
+    expect(orderListHref("org", f)).toBe("/o/org/orders?billing=partly_billed&payment=unpaid");
+    const bad = orderListFilters({ billing: "unknown", payment: "billed" });
+    expect([bad.billing, bad.payment]).toEqual([null, null]);
   });
 });

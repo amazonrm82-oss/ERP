@@ -3250,6 +3250,11 @@ export type Database = {
       sort_recorder: { Args: Record<string, never>; Returns: string | null };
       // PAY-02: each document's paid amount, balance and state and each payment's allocated amount and credit (invoker)
       money_allocation_state: { Args: { p_org: string; p_documents: string[]; p_payments: string[] }; Returns: Json };
+      // ORD-02 / ORD-04: per order the billed, paid and requested amounts, the two states and each schedule step's coverage (invoker)
+      order_money_state: { Args: { p_org: string; p_orders: string[] }; Returns: Json };
+      // ORD-02: computed fields on orders for the list filter (`billing_state=eq.partly_billed`), not called as RPCs
+      billing_state: { Args: Record<string, never>; Returns: string | null };
+      payment_state: { Args: Record<string, never>; Returns: string | null };
       // PAY-02: what the allocation window offers for a payment or a document (invoker)
       money_allocation_candidates: { Args: { p_org: string; p_payment: string | null; p_document: string | null }; Returns: Json };
       // PAY-03: the credit a document recorded on this deal / contact / company could use (invoker)

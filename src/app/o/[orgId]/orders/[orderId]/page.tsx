@@ -13,7 +13,8 @@ import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
 import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
 import { ButtonLink } from "@/components/ui/button";
-import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
+import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderMoney, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
+import { OrderMoneyCard } from "@/features/orders/components/order-money-card";
 import { OrderLinkCard } from "@/features/orders/components/order-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
@@ -57,7 +58,7 @@ export default async function OrderPage({ params }: Props) {
       : order.companyId
         ? supabase.from("companies").select("owner_id, deleted_at").eq("organization_id", orgId).eq("id", order.companyId).maybeSingle()
         : null;
-  const [lines, parties, parent, schedule, linkStatus, decision, terms] = await Promise.all([
+  const [lines, parties, parent, schedule, linkStatus, decision, terms, money, hasDocuments, hasPayments] = await Promise.all([
     listOrderLines(orgId, order.id),
     getOrderParties(orgId, order),
     parentQuery,
@@ -67,6 +68,10 @@ export default async function OrderPage({ params }: Props) {
     order.status === "draft" ? Promise.resolve(null) : getOrderDecision(orgId, order.id),
     // RVW-49: the business's own words (FLD-10)
     getOrgTerms(orgId),
+    // ORD-02 / ORD-04: billed and paid, overall and per schedule step (a numbered order only; RLS decides what counts)
+    order.status === "draft" ? Promise.resolve(null) : getOrderMoney(orgId, [order.id]).then((map) => map.get(order.id) ?? null),
+    orgHasFeature(orgId, "documents"),
+    orgHasFeature(orgId, "payments"),
   ]);
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
@@ -290,6 +295,7 @@ export default async function OrderPage({ params }: Props) {
 
         {/* ORD-04: the payment schedule (a quote's order carries the accepted quote's, locked); built while a draft */}
         <PaymentScheduleCard orgId={orgId} ownerId={order.id} kind="order" steps={schedule} totalAgorot={order.totalAgorot} canEdit={mayEdit && editing.lines} />
+        {money && (hasDocuments || hasPayments) ? <OrderMoneyCard money={money} schedule={schedule} billing={hasDocuments} payments={hasPayments} /> : null}
         {/* ORD-06 part two: the order's documents and payments (a numbered order only; each card shows with its plan key) */}
         {order.status !== "draft" ? (
           <>

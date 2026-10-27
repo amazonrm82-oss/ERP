@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoney } from "@/lib/format";
 
+import { BILLING_STATE_LABELS, moneyStateTone, PAYMENT_STATE_LABELS, type OrderMoney } from "../money";
 import { orderPath } from "../paths";
 import type { OrderSummary } from "../queries";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "../schema";
@@ -17,8 +18,10 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return <Badge tone={TONES[status] ?? "neutral"}>{ORDER_STATUS_LABELS[status]}</Badge>;
 }
 
-/** One line per order: number (or "טיוטה"), customer, dates, status and total. */
-export function OrderListItems({ orgId, orders, showCustomer = true }: { orgId: string; orders: OrderSummary[]; showCustomer?: boolean }) {
+type MoneyBadges = { states: Map<string, OrderMoney>; billing: boolean; payments: boolean };
+
+/** One line per order: number (or "טיוטה"), customer, dates, status and total; with `money`, its billing and payment states. */
+export function OrderListItems({ orgId, orders, showCustomer = true, money }: { orgId: string; orders: OrderSummary[]; showCustomer?: boolean; money?: MoneyBadges }) {
   return (
     <>
       {orders.map((order) => (
@@ -44,12 +47,24 @@ export function OrderListItems({ orgId, orders, showCustomer = true }: { orgId: 
               {order.deliveryDate ? ` · אספקה ${formatDate(order.deliveryDate)}` : ""}
             </p>
           </div>
-          <span className="flex items-center gap-2 text-sm">
+          <span className="flex flex-wrap items-center gap-2 text-sm">
             <OrderStatusBadge status={order.status} />
+            {money ? <OrderMoneyBadges state={money.states.get(order.id)} billing={money.billing} payments={money.payments} /> : null}
             <span className="font-medium whitespace-nowrap tabular-nums">{formatMoney(order.totalAgorot)}</span>
           </span>
         </li>
       ))}
+    </>
+  );
+}
+
+/** ORD-02: the order's billing and payment states (none for a draft). */
+function OrderMoneyBadges({ state, billing, payments }: { state: OrderMoney | undefined; billing: boolean; payments: boolean }) {
+  if (!state) return null;
+  return (
+    <>
+      {billing && state.billingState ? <Badge tone={moneyStateTone(state.billingState)}>{BILLING_STATE_LABELS[state.billingState]}</Badge> : null}
+      {payments && state.paymentState ? <Badge tone={moneyStateTone(state.paymentState)}>{PAYMENT_STATE_LABELS[state.paymentState]}</Badge> : null}
     </>
   );
 }
