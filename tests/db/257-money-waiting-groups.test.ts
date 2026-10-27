@@ -422,6 +422,26 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
       await setStatus("licensed");
     }
     expect(charging.vat).toEqual({ mode: "included", rate_bp: rate });
+
+    // a deal priced by lines that include VAT holds its amount before VAT (app.deal_lines_sums): VAT is added once
+    await asUser(owner.id, (q) => q("update public.org_document_settings set prices_include_vat = true where organization_id = $1", [org]));
+    try {
+      const gross = await deal(m1, "שורות כולל מע\"מ");
+      await asUser(m1.id, (q) =>
+        q("insert into public.deal_lines (organization_id, deal_id, description, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, $3)", [
+          org,
+          gross,
+          withVat(10000, rate),
+        ]),
+      );
+      expect(await asAdmin(async (q) => Number((await q<{ a: string }>("select amount_agorot as a from public.deals where id = $1", [gross])).rows[0].a))).toBe(10000);
+      await makeStuck(gross);
+      const m = await money(owner);
+      expect((m.deals.find((d) => d.id === gross) as unknown as { amount_agorot: number }).amount_agorot).toBe(withVat(10000, rate));
+      await asAdmin((q) => q("update public.deals set deleted_at = now() where id = $1", [gross]));
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_document_settings set prices_include_vat = false where organization_id = $1", [org]));
+    }
     expect(charging.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(withVat(5000, rate));
   });
 

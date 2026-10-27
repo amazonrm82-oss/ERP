@@ -22,11 +22,15 @@
 --   Each deal once (18.6): a deal with such an open quote is counted in quotes only, and leaves stuck, overdue
 --   and renewals, but only in a view where that quote is counted: with p_owner, a quote of someone else does not
 --   hide the deal from its owner's stuck and overdue (lead's decision, review of 27 October 2026).
--- * stuck / overdue: the cleanup's deals (public.report_pipeline_cleanup, MNY-05) less the deals counted in
---   quotes. The amounts are summed per deal with VAT, so they are read from the shared stuck rule
---   app.deal_attention_rows (the rule report_pipeline_cleanup keeps in step, test 93) plus the cleanup's overdue
---   rule (expected close date before today, not postponed, not stuck); keep both in step with
---   report_pipeline_cleanup. The listed deals are the cleanup's rows (at most 300) with amount_agorot converted.
+-- * stuck / overdue: the deals of the weekly cleanup (public.report_pipeline_cleanup, MNY-05) less the deals
+--   counted in quotes, built in ONE pass (review of 27 October 2026: calling the cleanup as well tripled the cost):
+--   the shared stuck rule app.deal_attention_rows (the rule report_pipeline_cleanup keeps in step) plus the
+--   cleanup's overdue rule (expected close date before today, not postponed), with the cleanup's row fields, its
+--   order (no activity first, longest in stage, largest amount, id) and its cap of 300 rows; amounts summed per
+--   deal with VAT. Keep it in step with report_pipeline_cleanup: test 93 compares the two (counts, rows and, with
+--   no VAT, the totals). `today` is worked out as the cleanup does.
+--   A deal's amount is before VAT whatever its lines' mode (app.deal_lines_sums takes net_total_agorot), so VAT is
+--   added once.
 -- * debts (part "owed"; plan flags `documents` and `payments` AND app.can_record_payments(org): owners, admins,
 --   managers or the record_payments permission (owner, answer (4) ב); else null): active tax invoices,
 --   proformas and positive opening balances whose due_date is before the business's today and that still have a
@@ -71,9 +75,7 @@ returns jsonb
 language sql stable
 set search_path = ''
 as $$
-  with cleanup as (
-    select public.report_pipeline_cleanup(p_org, p_owner) as c
-  ), cur as (
+  with cur as (
     select (now() at time zone coalesce(o.timezone, 'Asia/Jerusalem'))::date as today
       from public.organizations o
      where o.id = p_org
@@ -139,14 +141,21 @@ as $$
     -- only the quotes this view counts hide their deals
     select distinct deal_id from q_rows where deal_id is not null
   ),
-  -- the cleanup's stuck and overdue deals, each with its amount, less the deals counted in quotes
+  -- the cleanup's stuck and overdue deals in one pass, less the deals counted in quotes
   att as (
-    select a.id, app.money_with_vat(a.amount_agorot, (select rate from vat)) as amount, a.stuck,
-           (not a.stuck and d.expected_close_date is not null and d.expected_close_date < (select today from cur)
-            and (d.snoozed_until is null or d.snoozed_until <= (select today from cur))) as overdue
-      from app.deal_attention_rows(p_org, null, p_owner, 14, null) a
-      join public.deals d on d.organization_id = p_org and d.id = a.id
-     where a.id not in (select deal_id from q_deals)
+    select x.*, app.money_with_vat(x.amount_agorot, (select rate from vat)) as amount
+      from (
+        select a.id, a.name, a.owner_id, a.pipeline_id, d.stage_id, a.stage_name, s.position as stage_position,
+               a.amount_agorot, d.contact_id, d.expected_close_date, a.days_in_stage, a.limit_days, a.last_activity_at,
+               a.idle_days, a.stuck,
+               (d.expected_close_date is not null and d.expected_close_date < (select today from cur)
+                and (d.snoozed_until is null or d.snoozed_until <= (select today from cur))) as overdue
+          from app.deal_attention_rows(p_org, null, p_owner, 14, null) a
+          join public.deals d on d.organization_id = p_org and d.id = a.id
+          join public.stages s on s.organization_id = d.organization_id and s.id = d.stage_id
+      ) x
+     where (x.stuck or x.overdue)
+       and x.id not in (select deal_id from q_deals)
   ),
   -- recurring deals renewing in the next 30 days
   r_rows as (
@@ -160,7 +169,7 @@ as $$
        and not exists (select 1 from public.deals f
                         where f.organization_id = d.organization_id and f.previous_deal_id = d.id and f.deleted_at is null)
        and d.id not in (select deal_id from q_deals)
-       and d.id not in (select id from att where stuck or overdue)
+       and d.id not in (select id from att)
   ),
   -- overdue debts
   debt_docs as (
@@ -201,17 +210,22 @@ as $$
      where s.balance > 0
   )
   select jsonb_build_object(
-    'today', c -> 'today',
+    'today', (select today from cur),
     'vat', (select jsonb_build_object('mode', v.mode, 'rate_bp', v.rate) from vat v),
-    'to_close', (select jsonb_build_object('deals', count(*), 'amount', coalesce(sum(amount), 0)) from att where stuck or overdue),
+    'to_close', (select jsonb_build_object('deals', count(*), 'amount', coalesce(sum(amount), 0)) from att),
     'stuck', (select jsonb_build_object('deals', count(*), 'amount', coalesce(sum(amount), 0)) from att where stuck),
-    'overdue', (select jsonb_build_object('deals', count(*), 'amount', coalesce(sum(amount), 0)) from att where overdue),
+    'overdue', (select jsonb_build_object('deals', count(*), 'amount', coalesce(sum(amount), 0)) from att where overdue and not stuck),
     'deals', coalesce((
-      select jsonb_agg(jsonb_set(e, '{amount_agorot}',
-                                 coalesce(to_jsonb(app.money_with_vat((e ->> 'amount_agorot')::bigint, (select rate from vat))), 'null'::jsonb))
-                       order by o)
-        from jsonb_array_elements(c -> 'deals') with ordinality t(e, o)
-       where (e ->> 'id')::uuid not in (select deal_id from q_deals)), '[]'::jsonb),
+      select jsonb_agg(jsonb_build_object(
+               'id', z.id, 'name', z.name, 'owner_id', z.owner_id, 'pipeline_id', z.pipeline_id, 'stage_id', z.stage_id,
+               'stage_name', z.stage_name, 'stage_position', z.stage_position, 'amount_agorot', z.amount,
+               'contact_id', z.contact_id, 'expected_close_date', z.expected_close_date, 'days_in_stage', z.days_in_stage,
+               'limit_days', z.limit_days, 'last_activity_at', z.last_activity_at, 'idle_days', z.idle_days,
+               'stuck', z.stuck, 'overdue', z.overdue)
+               order by z.last_activity_at asc nulls first, z.days_in_stage desc, z.amount_agorot desc, z.id)
+        from (select * from att
+               order by last_activity_at asc nulls first, days_in_stage desc, amount_agorot desc, id
+               limit 300) z), '[]'::jsonb),
     'estimate', (
       select jsonb_build_object(
                'leads', (select count(*) from l),
@@ -255,8 +269,7 @@ as $$
                  'amount_agorot', z.amount, 'renewal_date', z.renewal_date, 'contact_id', z.contact_id)
                  order by z.renewal_date, z.id)
           from (select * from r_rows order by renewal_date, id limit 300) z), '[]'::jsonb)))
-    from cleanup
-   where c is not null;
+    from cur;
 $$;
 
 revoke all on function public.report_money_waiting(uuid, uuid) from public, anon;

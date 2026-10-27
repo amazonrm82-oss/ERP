@@ -27,8 +27,8 @@ describe("money waiting (MNY-01)", () => {
     const summary = moneySummary(withEstimate);
     const toClose = data.to_close.amount + data.quotes!.amount + data.renewals.amount;
     expect(summary.parts).toEqual([
-      { part: "owed", amount: data.debts!.amount },
-      { part: "to_close", amount: toClose },
+      { part: "owed", amount: data.debts!.amount, mark: 'כולל מע"מ' },
+      { part: "to_close", amount: toClose, mark: 'כולל מע"מ' },
     ]);
     expect(summary.total).toBe(data.debts!.amount + toClose);
     expect(summary.estimate).toMatchObject({
@@ -68,7 +68,7 @@ describe("money waiting (MNY-01)", () => {
     const summary = moneySummary({ ...data, quotes: null, debts: null });
     expect(summary.groups.quotes).toBeNull();
     expect(summary.groups.debts).toBeNull();
-    expect(summary.parts).toEqual([{ part: "to_close", amount: data.to_close.amount + data.renewals.amount }]);
+    expect(summary.parts).toEqual([{ part: "to_close", amount: data.to_close.amount + data.renewals.amount, mark: 'כולל מע"מ' }]);
     expect(summary.total).toBe(data.to_close.amount + data.renewals.amount);
     expect(shownGroups(summary).map((g) => g.key)).toEqual(["stuck", "overdue", "renewals", "unhandled_leads"]);
   });
@@ -113,5 +113,23 @@ describe("money waiting (MNY-01)", () => {
     // debts are documents' balances, always with VAT
     expect(groupVatMark("debts", "unknown")).toBe('כולל מע"מ');
     expect(groupVatMark("debts", "none")).toBeNull();
+  });
+
+  it("VAT status not set: debts (with VAT) and the rest (before VAT) side by side, no grand total", () => {
+    const data = sample();
+    const unknown = { ...data, vat: { mode: "unknown" as const, rate_bp: null } };
+    const summary = moneySummary(unknown);
+    expect(summary.total).toBeNull();
+    expect(summary.parts.map((p) => [p.part, p.mark])).toEqual([
+      ["owed", 'כולל מע"מ'],
+      ["to_close", 'לפני מע"מ'],
+    ]);
+    // without the debts group nothing is mixed: one part, and the total is that part
+    const alone = moneySummary({ ...unknown, debts: null });
+    expect(alone.total).toBe(alone.parts[0].amount);
+    // a business without VAT adds everything up, no mark
+    const none = moneySummary({ ...data, vat: { mode: "none" as const, rate_bp: 0 } });
+    expect(none.total).toBe(none.parts.reduce((sum, p) => sum + p.amount, 0));
+    expect(none.parts.every((p) => p.mark === null)).toBe(true);
   });
 });

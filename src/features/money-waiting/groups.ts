@@ -95,10 +95,11 @@ export function groupVatMark(key: MoneyGroupKey, mode: MoneyVatMode): string | n
 
 export type MoneySummary = {
   vat: MoneyVatMode;
-  // the main number: owed + to close (the estimate is never in it)
-  total: number;
-  // the parts that exist for this business ("owed" only while the debts group is shown)
-  parts: Array<{ part: Exclude<MoneyPart, "estimate">; amount: number }>;
+  // the main number: owed + to close (the estimate is never in it). null: the parts are not added up, because
+  // the debts are with VAT and the rest before VAT (VAT status not set; lead's decision): shown side by side
+  total: number | null;
+  // the parts that exist for this business ("owed" only while the debts group is shown), each with its VAT mark
+  parts: Array<{ part: Exclude<MoneyPart, "estimate">; amount: number; mark: string | null }>;
   // null: the group's module is not in the business's plan, so the screen does not show it
   groups: Record<MoneyGroupKey, { count: number; amount: number | null } | null>;
   // the estimate, never inside total; null amount: not enough won deals for an average
@@ -109,11 +110,14 @@ export type MoneySummary = {
 export function moneySummary(data: Money): MoneySummary {
   const toClose = data.to_close.amount + (data.quotes?.amount ?? 0) + data.renewals.amount;
   const parts: MoneySummary["parts"] = [];
-  if (data.debts) parts.push({ part: "owed", amount: data.debts.amount });
-  parts.push({ part: "to_close", amount: toClose });
+  const mode = data.vat.mode;
+  if (data.debts) parts.push({ part: "owed", amount: data.debts.amount, mark: groupVatMark("debts", mode) });
+  parts.push({ part: "to_close", amount: toClose, mark: groupVatMark("quotes", mode) });
+  // with VAT on one side and before VAT on the other, a sum would mean nothing
+  const mixed = mode === "unknown" && parts.length > 1;
   return {
-    vat: data.vat.mode,
-    total: parts.reduce((sum, part) => sum + part.amount, 0),
+    vat: mode,
+    total: mixed ? null : parts.reduce((sum, part) => sum + part.amount, 0),
     parts,
     groups: {
       debts: data.debts ? { count: data.debts.count, amount: data.debts.amount } : null,

@@ -71,15 +71,33 @@ export function MoneyView({ orgId, money, owner, dealAction, leadAction, recordA
         <h2 id="money-total-title" className="text-md text-ink-soft">
           כמה כסף מחכה לכם
         </h2>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(summary.total)}</p>
-        {vatMark(summary.vat) ? <p className="text-sm text-ink-soft">{vatMark(summary.vat)}</p> : null}
-        <ul className="mt-2 space-y-0.5 text-sm text-ink-soft">
-          {summary.parts.map((part) => (
-            <li key={part.part}>
-              {MONEY_PART_LABELS[part.part]}: <span className="tabular-nums">{formatMoney(part.amount)}</span>
-            </li>
-          ))}
-        </ul>
+        {summary.total === null ? (
+          // VAT status not set: the debts (with VAT) and the rest (before VAT) side by side, never added up
+          <>
+            <ul className="mt-1 grid gap-3 sm:grid-cols-2">
+              {summary.parts.map((part) => (
+                <li key={part.part}>
+                  <p className="text-sm text-ink-soft">{MONEY_PART_LABELS[part.part]}</p>
+                  <p className="text-xl font-semibold tabular-nums">{formatMoney(part.amount)}</p>
+                  {part.mark ? <p className="text-sm text-ink-soft">{part.mark}</p> : null}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm text-ink-soft">{vatMark(summary.vat)}</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(summary.total)}</p>
+            {vatMark(summary.vat) ? <p className="text-sm text-ink-soft">{vatMark(summary.vat)}</p> : null}
+            <ul className="mt-2 space-y-0.5 text-sm text-ink-soft">
+              {summary.parts.map((part) => (
+                <li key={part.part}>
+                  {MONEY_PART_LABELS[part.part]}: <span className="tabular-nums">{formatMoney(part.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         <p className="mt-3 border-t border-line pt-3 text-sm">
           <span className="font-medium">{MONEY_PART_LABELS.estimate}, לא נכללת בסכום: </span>
           {summary.estimate.leads === 0 ? (

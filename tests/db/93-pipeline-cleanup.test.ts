@@ -110,6 +110,23 @@ describe("weekly pipeline cleanup (MNY-05)", () => {
     expect(c.deals.filter((d) => d.stuck).map((d) => d.id).sort()).toEqual(report.filter((d) => d.stuck).map((d) => d.id).sort());
   });
 
+  // MNY-01: the money screen builds the same deals in one pass of its own (VAT status not set: amounts as they are)
+  it("the money screen lists the same deals, in the same order, with the same totals and per owner", async () => {
+    for (const args of [[], [m1.id], [m2.id]]) {
+      const [c, money] = await Promise.all([
+        cleanup(owner.id, args),
+        asUser(owner.id, async (q) => {
+          const params = [org, ...args];
+          return (await q<{ r: Cleanup }>(`select public.report_money_waiting(${params.map((_, i) => `$${i + 1}`).join(", ")}) as r`, params)).rows[0].r;
+        }),
+      ]);
+      expect(money.deals).toEqual(c.deals);
+      expect(money.stuck).toEqual(c.stuck);
+      expect(money.overdue).toEqual(c.overdue);
+      expect(money.today).toBe(c.today);
+    }
+  });
+
   it("deals without activity come first", async () => {
     const c = await cleanup(owner.id);
     expect(c.deals[c.deals.length - 1].name).toBe("stuck default");
@@ -231,6 +248,32 @@ describe("pipeline cleanup in the organization's time zone (MNY-05)", () => {
       expect(money.overdue).toEqual(cleanupResult.overdue);
       // and the stuck report agrees on the postponement
       expect(stuck.find((d) => d.id === zone.stuckId)).toMatchObject(inKiritimati ? { stuck: true } : { stuck: false, postponed: true });
+    }
+  });
+
+  // MNY-01 (review of 27 October 2026): the money screen builds its stuck and overdue deals in one pass of its own;
+  // with no VAT to add (an exempt business) its totals and its rows equal the cleanup's
+  it("the money screen's stuck and overdue deals equal the cleanup's: counts, rows and, with no VAT, totals", async () => {
+    for (const zone of zones) {
+      await asUser(zone.owner.id, (q) =>
+        q(
+          "insert into public.org_document_settings (organization_id, vat_status) values ($1, 'exempt') on conflict (organization_id) do update set vat_status = 'exempt'",
+          [zone.org],
+        ),
+      );
+      try {
+        const [cleanupResult, money] = await asUser(zone.owner.id, async (q) => [
+          (await q<{ r: Cleanup }>("select public.report_pipeline_cleanup($1) as r", [zone.org])).rows[0].r,
+          (await q<{ r: Cleanup & { vat: { mode: string } } }>("select public.report_money_waiting($1) as r", [zone.org])).rows[0].r,
+        ] as const);
+        expect(money.vat.mode).toBe("none");
+        expect(money.today).toBe(cleanupResult.today);
+        expect(money.stuck).toEqual(cleanupResult.stuck);
+        expect(money.overdue).toEqual(cleanupResult.overdue);
+        expect(money.deals).toEqual(cleanupResult.deals);
+      } finally {
+        await asUser(zone.owner.id, (q) => q("update public.org_document_settings set vat_status = null where organization_id = $1", [zone.org]));
+      }
     }
   });
 });
