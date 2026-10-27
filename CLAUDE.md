@@ -800,7 +800,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   and deals (`app.money_in_company`). Credit (021077): `public.opening_credit_allocations` (shaped like payment_allocations,
   never deleted, owners/admins undo; `app.opening_credit_allocations_check`, lock order credit, document, proforma) counted by
   `money_allocation_state` (`credit` per document), the ledger's credit_balance, `money_customer_credit` (`documents`),
-  `money_apply_credit` (payments first, then opening credits oldest first) and the credit column totals
+  `money_apply_credit` (the document's order or quote advances first, then payments and opening credits together, oldest date first, then created_at, id; 021085) and the credit column totals
   (`app.opening_credit_doc_sync`, deferred, under PAY-03's business lock; `app.opening_credit_companies` remembers the company a
   total sat on so a purge or merge refreshes it). Import undo (021078): `accounting_documents.import_job_id` (server only);
   `app.import_opening_cancel` (owners/admins only; else 0) cancels the job's active balances on records this undo binned
@@ -810,6 +810,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.accounting_documents_check`, `app.payment_allocations_check` (021077), `public.money_allocation_state` (021077),
   `public.customer_ledger` (021077), `public.money_allocation_candidates`, `app.scheduled_debt_overdue`,
   `app.export_choice_values` and `public.sort_customer(accounting_documents)` (company name) were last redefined in 021076/021077.
+  Since 021085 (owner 27 October 2026, answers (1) ג and (2) ג) `public.opening_balance_set` refuses to replace a balance while it has a
+  counted payment allocation or opening-credit offset (either direction; hint `opening_balance:allocated`; the import reports that
+  row's balance as skipped and keeps the row); `opening_balance_set` and `money_apply_credit` were last redefined there.
   Follow-ups: debt_overdue for company rules; `app.sample_untouched` does not know opening balances; a balance on a record that
   was in the bin before the undo stays active; no screen to undo an offset; an erased company's balance file reads "מסמך .pdf".
 - Source attribution (SEG-02 + DQL-04, migration 021060; owner 18 and 26 October 2026): the first source is what the record holds
