@@ -1,9 +1,19 @@
 import type { NextConfig } from "next";
+// Next's own list of bots that get the metadata in <head> before the body (no streamed metadata)
+import { HTML_LIMITED_BOT_UA_RE } from "next/dist/shared/lib/router/utils/html-bots";
+
+/**
+ * WAB-05 (review L3): Next's default list plus the two preview fetchers of src/lib/preview-bots.ts it lacks, so their
+ * link preview reads the Open Graph tags in <head> instead of a streamed tail. Setting the option replaces the default list,
+ * so the default is kept whole (unit test `next-config-bots`).
+ */
+export const HTML_LIMITED_BOTS = new RegExp(`${HTML_LIMITED_BOT_UA_RE.source}|TelegramBot|Facebot`, "i");
 
 const nextConfig: NextConfig = {
   // The dev-only "N" badge sits in the bottom corner, over the phone bottom bar
   // (and the e2e clicks there). Errors are still shown in development.
   devIndicators: false,
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   async headers() {
     return [
       {

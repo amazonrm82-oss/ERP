@@ -26,7 +26,7 @@ describe("link previews for preview bots (WAB-05)", () => {
   let org: string, otherOrg: string;
   const tokens = {} as Record<Kind, string>;
   let otherCardToken: string;
-  let quoteId: string, orderId: string, bookingPageId: string, cardId: string;
+  let quoteId: string, orderId: string, bookingPageId: string, cardId: string, typeId: string;
 
   // a fresh sender per call unless named, so the per-sender limit never trips the other tests
   let senderSeq = 0;
@@ -36,6 +36,8 @@ describe("link previews for preview bots (WAB-05)", () => {
   const setStatus = (orgId: string, status: string) => asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, orgId]));
 
   beforeAll(async () => {
+    // the total a minute outlives a run: start from zero
+    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
     owner = await createUser("lp-owner");
     org = await createOrg(owner.id, DISPLAY);
     rep = await addMember(org, owner.id, "member", "lp-rep");
@@ -101,6 +103,7 @@ describe("link previews for preview bots (WAB-05)", () => {
     const type = await asUser(owner.id, async (q) =>
       (await one<{ id: string }>(q, "insert into public.meeting_types (organization_id, name, duration_minutes) values ($1, 'ייעוץ', 60) returning id", [org])).id,
     );
+    typeId = type;
     const page = await asUser(rep.id, async (q) =>
       one<{ id: string; token: string }>(
         q,
@@ -278,15 +281,21 @@ describe("link previews for preview bots (WAB-05)", () => {
   });
 
   it("limits each sender, and all previews together", async () => {
+    // the total a minute is shared by the whole file (and an earlier run in the same minute): start from zero
+    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
     const sender = `limited-${process.pid}`;
     const limit = await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.link_preview_sender_limit() as n")).n));
     expect(limit).toBe(30);
     for (let i = 0; i < limit; i++) expect(await preview("card", tokens.card, sender)).toMatchObject({ business: DISPLAY });
     expect(await preview("card", tokens.card, sender)).toEqual({ refused: "rate" });
-    // an unknown token is counted too (a bot guessing tokens is limited)
-    expect(await preview("quote", "y".repeat(64), sender)).toEqual({ refused: "rate" });
-    // another sender is not
+    // the limit is per sender AND link (review L2, as app.order_link_sender): the same sender on another link is not limited,
+    // nor is another sender on this link
+    expect(await preview("form", tokens.form, sender)).toMatchObject({ business: DISPLAY });
     expect(await preview("card", tokens.card, `${sender}-other`)).toMatchObject({ business: DISPLAY });
+    // an unknown token is counted too, before it is looked up
+    const unknown = "y".repeat(64);
+    for (let i = 0; i < limit; i++) expect(await preview("quote", unknown, sender)).toEqual({ not_found: true });
+    expect(await preview("quote", unknown, sender)).toEqual({ refused: "rate" });
     // no hash is kept: only a bucket number and a count
     const cols = await asAdmin(async (q) =>
       (await q<{ column_name: string }>("select column_name from information_schema.columns where table_schema = 'app' and table_name = 'link_preview_sender_counts' order by column_name")).rows.map((r) => r.column_name),
@@ -304,5 +313,165 @@ describe("link previews for preview bots (WAB-05)", () => {
       await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
     }
     expect(await preview("card", tokens.card, null)).toMatchObject({ business: DISPLAY });
+  });
+
+  // --- review M1: the preview's not-found rule equals each page's own answer, case by case ---------------------------------
+
+  const FEATURES = '{"quotes": true, "orders": true, "booking_page": true, "business_card": true}';
+  const PAGE_SQL: Record<Kind, string> = {
+    form: "select public.intake_form($1) as r",
+    quote: "select public.quote_public($1) as r",
+    order: "select public.order_public($1, null) as r",
+    booking: "select public.booking_page_public($1, null, null) as r",
+    booking_manage: "select public.booking_manage_public($1, null, null) as r",
+    card: "select public.business_card_public($1, null) as r",
+  };
+  type Seen = "not_found" | "shows";
+  /** the page function's own answer: P0002, null, {inactive} and {unavailable} show no business */
+  const pageAnswer = async (kind: Kind, token: string): Promise<Seen> => {
+    try {
+      const r = await asService(async (q) => (await q<{ r: Preview | null }>(PAGE_SQL[kind], [token])).rows[0].r);
+      if (r === null || r.inactive === true || r.unavailable === true) return "not_found";
+      if (r.rate_limited === true) throw new Error(`${kind}: the page was rate limited, the test is not valid`);
+      return "shows";
+    } catch (e) {
+      if ((e as { code?: string }).code === "P0002") return "not_found";
+      throw e;
+    }
+  };
+  const previewAnswer = async (kind: Kind, token: string): Promise<Seen> => {
+    const p = await preview(kind, token);
+    if (p.refused) throw new Error(`${kind}: the preview was rate limited, the test is not valid`);
+    return p.not_found === true ? "not_found" : "shows";
+  };
+  /** both answers agree, and are the expected one */
+  const agree = async (label: string, kind: Kind, token: string, expected: Seen) => {
+    const page = await pageAnswer(kind, token);
+    const pv = await previewAnswer(kind, token);
+    expect({ label, page, preview: pv }).toEqual({ label, page: expected, preview: expected });
+  };
+  const replica = (sql: string, params: unknown[]) =>
+    asAdmin(async (q) => {
+      // past the triggers: the case is set up directly, then put back
+      await q("set local session_replication_role = replica");
+      await q(sql, params);
+    });
+
+  it("agrees with every page's own answer, case by case (review M1)", async () => {
+    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
+    for (const kind of Object.keys(tokens) as Kind[]) await agree(`${kind}: as it is`, kind, tokens[kind], "shows");
+
+    // a deleted customer, on a quote and on an order
+    await replica("update public.quotes set customer_deleted_at = now() where id = $1", [quoteId]);
+    await agree("quote: customer deleted", "quote", tokens.quote, "not_found");
+    await replica("update public.quotes set customer_deleted_at = null where id = $1", [quoteId]);
+    await replica("update public.orders set customer_deleted_at = now() where id = $1", [orderId]);
+    await agree("order: customer deleted", "order", tokens.order, "not_found");
+    await replica("update public.orders set customer_deleted_at = null where id = $1", [orderId]);
+
+    // a draft quote and order
+    const quoteStatus = await asAdmin(async (q) => (await one<{ s: string }>(q, "select status as s from public.quotes where id = $1", [quoteId])).s);
+    await replica("update public.quotes set status = 'draft' where id = $1", [quoteId]);
+    await agree("quote: draft", "quote", tokens.quote, "not_found");
+    await replica("update public.quotes set status = $2 where id = $1", [quoteId, quoteStatus]);
+    // a draft has no number (orders_numbered)
+    const was = await asAdmin(async (q) => one<{ s: string; n: string }>(q, "select status as s, number::text as n from public.orders where id = $1", [orderId]));
+    await replica("update public.orders set status = 'draft', number = null where id = $1", [orderId]);
+    await agree("order: draft", "order", tokens.order, "not_found");
+    await replica("update public.orders set status = $2, number = $3::bigint where id = $1", [orderId, was.s, was.n]);
+    await agree("quote: back", "quote", tokens.quote, "shows");
+    await agree("order: back", "order", tokens.order, "shows");
+
+    // the rep of the card and the booking page suspended, then made a viewer
+    for (const [label, change, back] of [
+      ["suspended", "status = 'suspended'", "status = 'active'"],
+      // a viewer holds a view seat (memberships_viewer_seat)
+      ["a viewer", "role = 'viewer', seat_type = 'view'", "role = 'member', seat_type = 'full'"],
+    ] as const) {
+      await replica(`update public.memberships set ${change} where organization_id = $1 and user_id = $2`, [org, rep.id]);
+      await agree(`card: rep ${label}`, "card", tokens.card, "not_found");
+      await agree(`booking: rep ${label}`, "booking", tokens.booking, "not_found");
+      await replica(`update public.memberships set ${back} where organization_id = $1 and user_id = $2`, [org, rep.id]);
+    }
+    await agree("card: rep back", "card", tokens.card, "shows");
+
+    // the booking rep without working hours (neither their own nor the business's)
+    await asAdmin((q) => q("update public.org_calendar_settings set working_hours = null where organization_id = $1", [org]));
+    await agree("booking: no working hours", "booking", tokens.booking, "not_found");
+    await asAdmin((q) => q("update public.org_calendar_settings set working_hours = $2 where organization_id = $1", [org, JSON.stringify(ALL_WEEK)]));
+
+    // an inactive meeting type closes the booking page, not the personal link of a meeting already booked
+    await asAdmin((q) => q("update public.meeting_types set is_active = false where id = $1", [typeId]));
+    await agree("booking: meeting type inactive", "booking", tokens.booking, "not_found");
+    await agree("booking_manage: meeting type inactive", "booking_manage", tokens.booking_manage, "shows");
+    await asAdmin((q) => q("update public.meeting_types set is_active = true where id = $1", [typeId]));
+    await agree("booking: back", "booking", tokens.booking, "shows");
+
+    // a card's form and a site widget's form are not web forms
+    const cardFormToken = await asAdmin(async (q) => (await one<{ t: string }>(q, "select token as t from public.forms where business_card_id = $1", [cardId])).t);
+    await agree("form: a card's form token", "form", cardFormToken, "not_found");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, FEATURES.replace("}", ', "site_widget": true}')]));
+    const widgetFormToken = await asAdmin(async (q) => {
+      const w = (await one<{ id: string }>(q, "insert into public.site_widgets (organization_id, name) values ($1, 'האתר') returning id", [org])).id;
+      return (await one<{ t: string }>(q, "select token as t from public.forms where site_widget_id = $1", [w])).t;
+    });
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, FEATURES]));
+    await agree("form: a widget's form token", "form", widgetFormToken, "not_found");
+
+    // a quote whose shown version (the newest sent one) lost its customer, while the linked quote did not
+    const version = await asUser(owner.id, async (q) => {
+      const v = (await one<{ v: string }>(q, "select public.quote_new_version($1, $2) as v", [org, quoteId])).v;
+      await q("select public.quote_send($1, $2)", [org, v]);
+      return v;
+    });
+    await agree("quote: a newer sent version", "quote", tokens.quote, "shows");
+    await replica("update public.quotes set customer_deleted_at = now() where id = $1", [version]);
+    await agree("quote: the shown version's customer deleted", "quote", tokens.quote, "not_found");
+    await replica("update public.quotes set customer_deleted_at = null where id = $1", [version]);
+
+    // the personal link of a meeting that was purged
+    const second = await asService(async (q) =>
+      (
+        await one<{ r: Preview }>(q, "select public.booking_submit($1, $2, $3, null) as r", [
+          tokens.booking,
+          at(dayAhead(6), "11:00"),
+          JSON.stringify({ full_name: "לקוח שני", phone: "0501110002" }),
+        ])
+      ).r,
+    );
+    expect(second.status).toBe("booked");
+    const manageToken = second.manage_token as string;
+    await agree("booking_manage: a second booking", "booking_manage", manageToken, "shows");
+    await asAdmin((q) =>
+      q(
+        `delete from public.meetings m using app.booking_manage_links l
+          where l.token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex') and m.organization_id = l.organization_id and m.id = l.meeting_id`,
+        [manageToken],
+      ),
+    );
+    await agree("booking_manage: meeting purged", "booking_manage", manageToken, "not_found");
+  });
+
+  // Each page function's body as reviewed with this preview rule (the pattern of test 120's REVIEWED_BODY_MD5). A redefinition
+  // of one of them changes its md5 and fails here: check that public.link_preview_public still answers not found exactly when
+  // that page shows no business (the matrix above), then update the value.
+  const REVIEWED_PAGE_BODY_MD5: Record<string, string> = {
+    "public.intake_form(text)": "8b5e831bae31f9e3ac0219716823bfdf",
+    "public.quote_public(text)": "ab198e8177aa451db1d3c63b696bef16",
+    "public.order_public(text,text)": "022b8411b93934e5055331575511b7f8",
+    "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
+    "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
+    "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",
+  };
+
+  it("the page functions are the ones its rule was checked against (review M1)", async () => {
+    const bodies = await asAdmin(async (q) => {
+      const out: Record<string, string> = {};
+      for (const fn of Object.keys(REVIEWED_PAGE_BODY_MD5)) {
+        out[fn] = (await one<{ h: string }>(q, "select md5(p.prosrc) as h from pg_proc p where p.oid = $1::regprocedure", [fn])).h;
+      }
+      return out;
+    });
+    expect(bodies).toEqual(REVIEWED_PAGE_BODY_MD5);
   });
 });

@@ -14,24 +14,34 @@
 -- logo = the logo object's name in the public bucket org-logos, and for a quote or an order only while its design shows the
 -- logo (as the page). Never a number, an amount, a title, a time, a customer's or a meeting's detail.
 --
--- The only write is its own rate-limit counters (counted first, before the token is looked up, so a bot guessing tokens is
--- limited too):
---   app.link_preview_reads        one row: at most app.link_preview_reads_per_minute() (300) previews a minute in total;
---   app.link_preview_sender_counts 1,024 reused buckets keyed by the server's keyed IP hash (FXS-11, scope 'preview'): at most
---                                 app.link_preview_sender_limit() (30) per sender in 10 minutes. Only the bucket number is
---                                 kept, never the hash, so there is nothing for a cleanup job to clear (as
---                                 app.booking_view_counts). A call without a hash (no secret set) meets the global limit only.
+-- The only write is its own rate-limit counters (counted first, before the token is looked up):
+--   app.link_preview_reads         one row: at most app.link_preview_reads_per_minute() (300) previews a minute in total, for
+--                                  every business together. Known limit (review L2, accepted): a flood of previews from
+--                                  anywhere refuses everyone's previews for the rest of that minute; the page itself is not
+--                                  affected (a refused preview is the page's generic preview, and a person gets the page).
+--   app.link_preview_sender_counts 1,024 reused buckets keyed by app.link_preview_sender(kind, token, keyed IP hash) (FXS-11,
+--                                  scope 'preview'), so a sender is limited per link, as app.order_link_sender scopes order
+--                                  views (review L2): at most app.link_preview_sender_limit() (30) per sender and link in 10
+--                                  minutes. Only the bucket number is kept, never the hash, so there is nothing for a cleanup
+--                                  job to clear (as app.booking_view_counts). A call without a hash (no secret set) meets the
+--                                  global limit only.
 --
--- "Usable" is decided by each page's own rule, through its existing helper where one exists:
---   quote          app.quote_link_usable on the link's quote, and the shown version (app.quote_shown_version) with its customer
---                  not deleted: quote_public's two not-found checks (copied: the second one; test 253-link-preview-bots pins equality);
+-- What it shows (review L1, accepted): the owner approved the business's display name and logo in the preview of all six pages
+-- (27 October 2026, answer (1) ב); a card adds only the name business_card_public already shows on the public card.
+--
+-- "Usable" is decided by each page's own rule. Where an app.* helper holds the rule it is called; where the rule sits inside the
+-- page's own function it is restated here, and test 253-link-preview-bots pins both sides: a matrix compares this function's
+-- not_found with the page function's own answer (P0002, null, {inactive}, {unavailable}) case by case, and the md5 of each page
+-- function's body is pinned, so redefining one of them fails the test until this rule is checked again.
+--   quote          the token's hash in app.quote_links, app.quote_link_usable on the link's quote, and the shown version
+--                  (app.quote_shown_version) with its customer not deleted: quote_public's two not-found checks (restated);
 --   order          app.order_link_usable (order_public's not-found rule);
---   booking        app.booking_page_state = 'open' and no closure (booking_page_public answers unavailable otherwise, which shows
---                  no business; copied, test 253-link-preview-bots pins equality);
---   booking_manage app.booking_manage_link, the meeting found, public pages open and the business writable
---                  (booking_manage_public's rule; copied, test 253-link-preview-bots pins equality);
+--   booking        app.booking_page_state = 'open' and no closure: booking_page_public answers {unavailable} otherwise, a
+--                  page with no business on it (restated);
+--   booking_manage app.booking_manage_link, the meeting found, public pages open and the business writable:
+--                  booking_manage_public's not-found and {unavailable} (restated);
 --   card           app.business_card_open (business_card_public's rule);
---   form           a form of kind 'form', active, public pages open (intake_form's rule; copied, test 253-link-preview-bots pins equality).
+--   form           a form of kind 'form', active, public pages open: intake_form's null and {inactive} (restated).
 
 create table if not exists app.link_preview_reads (
   id      integer primary key constraint link_preview_reads_one check (id = 1),
@@ -60,6 +70,17 @@ language sql immutable
 set search_path = ''
 as $$ select 30 $$;
 revoke all on function app.link_preview_sender_limit() from public, anon, authenticated, service_role;
+
+-- The sender of one preview, scoped to the link (review L2; the shape of app.order_link_sender): one visitor is a different
+-- sender on every link
+create or replace function app.link_preview_sender(p_kind text, p_token text, p_hash text) returns text
+language sql immutable
+set search_path = ''
+as $$
+  select case when p_hash is null then null
+              else encode(sha256(convert_to('preview:' || coalesce(p_kind, '') || ':' || coalesce(p_token, '') || ':' || p_hash, 'UTF8')), 'hex') end
+$$;
+revoke all on function app.link_preview_sender(text, text, text) from public, anon, authenticated, service_role;
 
 create or replace function public.link_preview_public(p_kind text, p_token text, p_ip_hash text default null) returns jsonb
 language plpgsql volatile security definer
@@ -100,7 +121,7 @@ begin
     return jsonb_build_object('refused', 'rate');
   end if;
   if p_ip_hash is not null then
-    v_bucket := ((hashtextextended(p_ip_hash, 0) % 1024) + 1024) % 1024;
+    v_bucket := ((hashtextextended(app.link_preview_sender(p_kind, p_token, p_ip_hash), 0) % 1024) + 1024) % 1024;
     insert into app.link_preview_sender_counts as vc (bucket, window_start, views)
     values (v_bucket, now(), 1)
     on conflict (bucket) do update
