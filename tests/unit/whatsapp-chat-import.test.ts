@@ -175,7 +175,8 @@ describe("parseWhatsappChat: refusals and limits", () => {
   it("parses many lines of spaces and marks quickly", () => {
     const line = "31/12/2024, " + " ".repeat(60) + LRM.repeat(60) + "\n";
     const { ms } = fast("31/12/2024, 22:15 - A: x\n" + line.repeat(5000));
-    expect(ms).toBeLessThan(200);
+    // loose bound (it reached 236 ms under load); a quadratic pattern takes seconds here
+    expect(ms).toBeLessThan(500);
   });
 
   it("still reads a header with marks inside it", () => {
@@ -248,6 +249,24 @@ describe("chatEntry", () => {
     expect(entry.metadata.participants).toHaveLength(20);
     expect(entry.metadata.participant_count).toBe(26);
     expect(entry.body).toContain("ועוד 6.");
+  });
+
+  it("lists the participants of 20,000 distinct authors in linear time, in order of first appearance (RVW-60)", () => {
+    const messages = Array.from({ length: CHAT_MAX_MESSAGES }, (_, i) => ({
+      date: "2025-03-01",
+      time: "10:00:00",
+      author: `כותב ${i}`,
+      text: "שלום",
+      media: false,
+    }));
+    // a repeated author keeps its first place
+    messages[CHAT_MAX_MESSAGES - 1] = { ...messages[CHAT_MAX_MESSAGES - 1], author: "כותב 3" };
+    const started = performance.now();
+    const entry = chatEntry({ messages, systemLines: 0 }, "Asia/Jerusalem", now);
+    // the old includes() loop alone took about 1.2 s here, and a new time-zone formatter per message about 6 s
+    expect(performance.now() - started).toBeLessThan(2500);
+    expect(entry.metadata.participant_count).toBe(CHAT_MAX_MESSAGES - 1);
+    expect(entry.metadata.participants).toEqual(Array.from({ length: 20 }, (_, i) => `כותב ${i}`));
   });
 
   it("marks the entry for the timeline and the contact rules", () => {

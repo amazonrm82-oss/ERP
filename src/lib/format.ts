@@ -67,9 +67,22 @@ export function telUrl(phoneE164: string | null | undefined, phone: string | nul
 
 // --- Dates in the organization's time zone -----------------------------------
 
+// One formatter per zone: building an Intl.DateTimeFormat costs far more than using one (RVW-60: two per message made a
+// 20,000-message chat import take seconds). Formatters are immutable; a zone that throws is never stored.
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function offsetFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = offsetFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" });
+    if (offsetFormatters.size < 100) offsetFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 /** Offset of the zone from UTC at the given instant, in minutes (Jerusalem in summer: 180). */
 function zoneOffsetMinutes(at: Date, timeZone: string): number {
-  const part = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
+  const part = offsetFormatter(timeZone)
     .formatToParts(at)
     .find((p) => p.type === "timeZoneName")?.value;
   const match = part?.match(/GMT([+-])(\d{2}):(\d{2})/);

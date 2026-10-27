@@ -280,10 +280,8 @@ export function chatEntry(chat: ParsedChat, timeZone: string, now: Date): ChatEn
   const firstAt = clamp(sorted[0]);
   const lastAt = clamp(sorted[sorted.length - 1]);
 
-  const participants: string[] = [];
-  for (const message of messages) {
-    if (!participants.includes(message.author)) participants.push(message.author);
-  }
+  // first appearance order; a Set keeps it linear (RVW-60: includes() in a loop was quadratic in the authors)
+  const participants = [...new Set(messages.map((message) => message.author))];
   const mediaCount = messages.filter((message) => message.media).length;
 
   const shownNames = participants.slice(0, CHAT_PARTICIPANTS_MAX);
