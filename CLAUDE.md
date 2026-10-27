@@ -427,7 +427,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Platform emergency switch: `app.qr_external_blocks` (no grants), `public.platform_set_qr_external_block(org, blocked, reason)`
   (owner/support, aal2, logged `qr_external.block|unblock`), `platform_qr_external_block(org)` for the admin card,
   `qr_external_blocked(org)` (a member's boolean, the settings screen says so); while on, a link answers not found and is not counted;
-  internal targets are untouched and creating or editing a link code stays allowed (open question).
+  internal targets are untouched and creating or editing a link code stays allowed (open question); the advisor's findings on the three
+  new public functions and on `app.qr_external_blocks` are expected (the `platform_*` and schema-app patterns).
   Follow-up: the owner's "one source 'קוד QR'" (answer (1)) is still campaign tagging only; no lead source row yet.
 - Site widget (SPD-07, migration 020305; flag `site_widget`, quota `max_site_widgets`): `public.site_widgets` (owners/admins of a writable
   org; outsider guard first in `app.site_widgets_check`; lead owner an active non-viewer, hint `site_widget:owner`). Each widget owns a

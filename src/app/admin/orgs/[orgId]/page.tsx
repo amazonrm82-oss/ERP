@@ -104,36 +104,6 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
           </CardBody>
         </Card>
 
-        {/* BIZ-03 (owner, 27 October 2026, answer (ה)): the emergency switch for the business's external QR links */}
-        <Card aria-labelledby="qr-external">
-          <CardHeader id="qr-external" title="קישורים חיצוניים בקודי QR" />
-          <CardBody className="space-y-3">
-            {qrBlock.blocked ? (
-              <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
-                כבויים{qrBlock.changedAt ? ` מאז ${formatDateTime(qrBlock.changedAt)}` : ""}
-                {qrBlock.reason ? `. סיבה: ${qrBlock.reason}` : ""}. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל.
-              </p>
-            ) : (
-              <p className="text-md">פעילים. קוד שפותח קישור חיצוני מראה קודם דף מעבר עם שם האתר ושם העסק.</p>
-            )}
-            {canDo(me.role, ["support"]) ? (
-              <PlatformForm
-                action={setQrExternalBlockAction.bind(null, orgId, !qrBlock.blocked)}
-                submitLabel={qrBlock.blocked ? "החזרת הקישורים החיצוניים" : "כיבוי הקישורים החיצוניים"}
-              >
-                <p className="text-sm text-ink-soft">
-                  {qrBlock.blocked
-                    ? "הקודים של העסק שפותחים קישור חיצוני יחזרו לעבוד מיד."
-                    : "לשימוש לרעה בלבד, למשל הפניה לאתר מתחזה. קודים שפותחים טופס, דף קביעת תור או כרטיס ביקור ממשיכים לעבוד."}
-                </p>
-                {REASON}
-              </PlatformForm>
-            ) : (
-              <p className="text-sm text-ink-soft">את המתג מפעילים תפקידי תמיכה ובעלים.</p>
-            )}
-          </CardBody>
-        </Card>
-
         {canDo(me.role, ["finance"]) ? (
           <Card aria-labelledby="subscription">
             <CardHeader id="subscription" title="חבילה, מושבים וניסיון" />
@@ -195,6 +165,36 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
             </CardBody>
           </Card>
         ) : null}
+
+        {/* BIZ-03 (owner, 27 October 2026, answer (ה)): the emergency switch for the business's external QR links */}
+        <Card aria-labelledby="qr-external">
+          <CardHeader id="qr-external" title="קישורים חיצוניים בקודי QR" />
+          <CardBody className="space-y-3">
+            {qrBlock.blocked ? (
+              <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
+                כבויים{qrBlock.changedAt ? ` מאז ${formatDateTime(qrBlock.changedAt)}` : ""}
+                {qrBlock.reason ? `. סיבה: ${qrBlock.reason}` : ""}. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל.
+              </p>
+            ) : (
+              <p className="text-md">פעילים. קוד שפותח קישור חיצוני מראה קודם דף מעבר עם שם האתר ושם העסק.</p>
+            )}
+            {canDo(me.role, ["support"]) ? (
+              <PlatformForm
+                action={setQrExternalBlockAction.bind(null, orgId, !qrBlock.blocked)}
+                submitLabel={qrBlock.blocked ? "החזרת הקישורים החיצוניים" : "כיבוי הקישורים החיצוניים"}
+              >
+                <p className="text-sm text-ink-soft">
+                  {qrBlock.blocked
+                    ? "הקודים של העסק שפותחים קישור חיצוני יחזרו לעבוד מיד."
+                    : "לשימוש לרעה בלבד, למשל הפניה לאתר מתחזה. קודים שפותחים טופס, דף קביעת תור או כרטיס ביקור ממשיכים לעבוד."}
+                </p>
+                {REASON}
+              </PlatformForm>
+            ) : (
+              <p className="text-sm text-ink-soft">את המתג מפעילים תפקידי תמיכה ובעלים.</p>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       <Card aria-labelledby="org-log" className="mt-5">
