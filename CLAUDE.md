@@ -1237,7 +1237,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   payment becomes failed/refunded/cancelled or the document is cancelled; a release is final). Allocating needs
   `app.can_record_payments`, a writable business and both flags `payments` and `documents`; changing or undoing: owners/admins. Definer
   trigger `app.payment_allocations_check` (outsider guard first): tax invoice or proforma only, recorded/confirmed payment, active
-  document, same customer (`app.money_same_customer`: same deal, contact, or company via the contact's or the deal's company; mirrored
+  document, same customer (`app.money_same_customer`, never NULL since 021075: same deal, contact, or company via the contact's or the deal's company; mirrored
   inline in `public.money_allocation_candidates`, keep in step), never over the payment or the document (hints `allocation:*`). Lock
   order payment, document, proforma (an admin's change racing a cancel can deadlock: 40P01, retry). Release triggers are plain
   "after update" with an early return (a status derived by a BEFORE trigger is caught). `accounting_documents.proforma_id`: an active
