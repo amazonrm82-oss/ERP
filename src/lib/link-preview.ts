@@ -83,7 +83,7 @@ export function businessPreview(
 // The texts of each page (Hebrew, short; none names the customer or says anything about their deal) -----------------
 
 export const PREVIEW_TEXTS = {
-  form: { what: "טופס פנייה", description: "משאירים פרטים בקישור, והעסק חוזר אליכם. בלי הרשמה ובלי אפליקציה." },
+  form: { what: "טופס פנייה", joiner: "של", description: "משאירים פרטים בקישור, והעסק חוזר אליכם. בלי הרשמה ובלי אפליקציה." },
   quote: { what: "הצעת מחיר", joiner: "מאת", description: "צפייה בהצעת המחיר בקישור, בלי הרשמה ובלי אפליקציה." },
   order: { what: "אישור הזמנה", joiner: "מאת", description: "צפייה בפרטי ההזמנה בקישור, בלי הרשמה ובלי אפליקציה." },
   booking: { what: "קביעת תור", joiner: "אצל", description: "בוחרים זמן פנוי וקובעים בקישור, בלי הרשמה ובלי אפליקציה." },

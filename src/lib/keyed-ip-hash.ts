@@ -8,7 +8,7 @@ import { createHmac } from "node:crypto";
 // to a plain hash. Changing the secret only restarts the rate-limit windows.
 
 /** Each public page hashes in its own scope, so one visitor is a different value on each kind of page. */
-export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote";
+export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview";
 
 const missingLogged = new Set<string>();
 

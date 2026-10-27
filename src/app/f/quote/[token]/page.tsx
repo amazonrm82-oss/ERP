@@ -14,6 +14,9 @@ import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
 import { formatDate, formatMoney } from "@/lib/format";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
@@ -27,6 +30,9 @@ const loadQuote = cache((token: string) => getPublicQuote(token));
  * customer or the prices. QUO-14: the page is not for search engines; and its secret address never leaves in a Referer header.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("quote", await loadBotPreview("quote", (await params).token));
   const page = await loadQuote((await params).token);
   const t = PREVIEW_TEXTS.quote;
   if (typeof page === "string") return { ...genericPreview(t.what, t.description), referrer: "no-referrer" };
@@ -47,6 +53,8 @@ const MESSAGES = {
  */
 export default async function PublicQuotePage({ params }: Props) {
   const { token } = await params;
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="quote" state={await loadBotPreview("quote", token)} />;
   const page = await loadQuote(token);
 
   if (typeof page === "string") {

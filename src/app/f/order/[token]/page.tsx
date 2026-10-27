@@ -15,6 +15,9 @@ import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { formatDate } from "@/lib/format";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
@@ -27,6 +30,9 @@ const loadOrder = cache(async (token: string) => getPublicOrder(token, clientIp(
  * quote page (QUO-14): not for search engines, and the secret address never leaves in a Referer header.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("order", await loadBotPreview("order", (await params).token));
   const page = await loadOrder((await params).token);
   const t = PREVIEW_TEXTS.order;
   if (typeof page === "string") return { ...genericPreview(t.what, t.description), referrer: "no-referrer" };
@@ -47,6 +53,8 @@ const MESSAGES = {
  */
 export default async function PublicOrderPage({ params }: Props) {
   const { token } = await params;
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="order" state={await loadBotPreview("order", token)} />;
   const page = await loadOrder(token);
 
   if (typeof page === "string") {

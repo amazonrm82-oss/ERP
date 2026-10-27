@@ -9,6 +9,9 @@ import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
 import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
 import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { genericPreview, linkPreviewMetadata, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
@@ -24,6 +27,9 @@ const loadForm = cache((token: string) => getPublicForm(token));
  * not return the business's name, so it is in the preview only when the form's title carries it.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("form", await loadBotPreview("form", (await params).token));
   const form = await loadForm((await params).token);
   const t = PREVIEW_TEXTS.form;
   if (form === null || form === "inactive" || form === "not-configured") return genericPreview(t.what, t.description);
@@ -37,6 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicFormPage({ params, searchParams }: Props) {
   const { token } = await params;
   const embed = (await searchParams).embed === "1";
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="form" state={await loadBotPreview("form", token)} />;
   const form = await loadForm(token);
   const found = form !== null && form !== "not-configured" && form !== "inactive" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;

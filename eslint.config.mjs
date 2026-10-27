@@ -58,6 +58,8 @@ const eslintConfig = defineConfig([
       "src/features/business-cards/public-server.ts",
       // QUO-08: the customer's quote page, approved public secret-link pattern (owner, 8 October 2026)
       "src/features/quotes/public-server.ts",
+      // WAB-05: link previews for listed preview bots, approved public secret-link pattern (owner, 27 October 2026)
+      "src/features/link-preview/preview-server.ts",
       // BIZ-03: the QR scan counter, approved public secret-link pattern (owner, 13 October 2026)
       "src/features/qr-codes/scan-server.ts",
       // SPD-07: the site widget's script and short form, approved public secret-link pattern (owner, 13 October 2026)

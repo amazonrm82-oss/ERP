@@ -110,8 +110,11 @@ vi.mock("@/lib/env", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/env")>();
   return { ...actual, getSupabaseEnv: () => ({ url: SUPABASE, anonKey: "anon" }) };
 });
+// a person's browser unless a test names a preview bot (WAB-05 follow-up)
+const HUMAN_UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
+let userAgent = HUMAN_UA;
 vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.9", "user-agent": "WhatsApp/2.24" }),
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.9", "user-agent": userAgent }),
   cookies: async () => ({ get: () => undefined }),
 }));
 
@@ -135,6 +138,7 @@ describe("the page and its preview read once per request (WAB-05)", () => {
   beforeEach(() => {
     calls.length = 0;
     requestMemo.clear();
+    userAgent = HUMAN_UA;
     for (const key of Object.keys(replies)) delete replies[key];
   });
 
@@ -227,5 +231,76 @@ describe("the page and its preview read once per request (WAB-05)", () => {
     replies.intake_form = { data: { inactive: true }, error: null };
     await render((await import("@/app/f/[token]/page")) as unknown as PageModule);
     expect(calls).toEqual(["intake_form"]);
+  });
+});
+
+// --- preview bots (WAB-05 follow-up, owner 27 October 2026, answers (1) ב and (2) ב) -----------------------------------------
+
+const PAGES: Array<{ kind: string; path: string; read: string; token: string; title: string }> = [
+  { kind: "form", path: "@/app/f/[token]/page", read: "intake_form", token: TOKEN32, title: "טופס פנייה של נגריית הצפון" },
+  { kind: "quote", path: "@/app/f/quote/[token]/page", read: "quote_public", token: TOKEN64, title: "הצעת מחיר מאת נגריית הצפון" },
+  { kind: "order", path: "@/app/f/order/[token]/page", read: "order_public", token: TOKEN64, title: "אישור הזמנה מאת נגריית הצפון" },
+  { kind: "booking", path: "@/app/f/book/[token]/page", read: "booking_page_public", token: TOKEN32, title: "קביעת תור אצל נגריית הצפון" },
+  { kind: "booking_manage", path: "@/app/f/book/manage/[token]/page", read: "booking_manage_public", token: TOKEN64, title: "הפגישה שלך אצל נגריית הצפון" },
+  { kind: "card", path: "@/app/f/card/[token]/page", read: "business_card_public", token: TOKEN32, title: "כרטיס ביקור של דנה לוי · נגריית הצפון" },
+];
+const pageModules: Record<string, () => Promise<unknown>> = {
+  "@/app/f/[token]/page": () => import("@/app/f/[token]/page"),
+  "@/app/f/quote/[token]/page": () => import("@/app/f/quote/[token]/page"),
+  "@/app/f/order/[token]/page": () => import("@/app/f/order/[token]/page"),
+  "@/app/f/book/[token]/page": () => import("@/app/f/book/[token]/page"),
+  "@/app/f/book/manage/[token]/page": () => import("@/app/f/book/manage/[token]/page"),
+  "@/app/f/card/[token]/page": () => import("@/app/f/card/[token]/page"),
+};
+
+describe("a listed preview bot gets the preview only (WAB-05)", () => {
+  beforeEach(() => {
+    calls.length = 0;
+    requestMemo.clear();
+    userAgent = "WhatsApp/2.24.21.80 A";
+    for (const key of Object.keys(replies)) delete replies[key];
+  });
+
+  for (const page of PAGES) {
+    it(`${page.kind}: never calls ${page.read}; one link_preview_public read; the display name and logo`, async () => {
+      replies.link_preview_public = {
+        data: { kind: page.kind, business: "נגריית הצפון", logo: LOGO, ...(page.kind === "card" ? { rep: "דנה לוי" } : {}) },
+        error: null,
+      };
+      const m = await render((await pageModules[page.path]()) as PageModule, {}, page.token);
+      expect(calls).toEqual(["link_preview_public"]);
+      expect(calls).not.toContain(page.read);
+      expect(m.title).toEqual({ absolute: page.title });
+      expect(m.openGraph).toMatchObject({ title: page.title, siteName: "נגריית הצפון", images: [{ url: LOGO_URL }] });
+      expect(m.robots).toEqual({ index: false, follow: false });
+      if (page.kind === "quote" || page.kind === "order") expect(m.referrer).toBe("no-referrer");
+    });
+  }
+
+  it("a link that is not found, or a refused read, gets the generic preview and still never runs the page", async () => {
+    for (const reply of [{ not_found: true }, { refused: "rate" }]) {
+      calls.length = 0;
+      requestMemo.clear();
+      replies.link_preview_public = { data: reply, error: null };
+      const m = await render((await import("@/app/f/quote/[token]/page")) as unknown as PageModule, {}, TOKEN64);
+      expect(calls).toEqual(["link_preview_public"]);
+      expect(m.title).toBe("הצעת מחיר");
+      expect(m.openGraph).not.toHaveProperty("siteName");
+    }
+  });
+
+  it("the page's body is one line, from the same read", async () => {
+    replies.link_preview_public = { data: { kind: "quote", business: "נגריית הצפון", logo: null }, error: null };
+    const mod = (await import("@/app/f/quote/[token]/page")) as unknown as PageModule;
+    const props = { params: Promise.resolve({ token: TOKEN64 }), searchParams: Promise.resolve({}) } as never;
+    const body = await mod.default(props);
+    expect(calls).toEqual(["link_preview_public"]);
+    expect(flat((body as { props: unknown }).props)).toContain('"kind":"quote"');
+  });
+
+  it("a bot that is not on the list gets the normal page", async () => {
+    userAgent = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+    await render((await import("@/app/f/quote/[token]/page")) as unknown as PageModule, {}, TOKEN64);
+    expect(calls).toEqual(["quote_public"]);
   });
 });

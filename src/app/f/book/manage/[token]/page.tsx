@@ -18,6 +18,9 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
@@ -30,6 +33,9 @@ const loadManage = cache(async (token: string, from: string | null) => getBookin
 
 /** WAB-05: the link's preview: "הפגישה שלך אצל <business>" and the logo; never the meeting's time or the customer. */
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("booking_manage", await loadBotPreview("booking_manage", (await params).token));
   const page = await loadManage((await params).token, fromParam((await searchParams).from));
   const t = PREVIEW_TEXTS.manage;
   if (typeof page === "string") return genericPreview(t.what, t.description);
@@ -59,6 +65,8 @@ function noticeText(hours: number): string {
  */
 export default async function BookingManagePage({ params, searchParams }: Props) {
   const { token } = await params;
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="booking_manage" state={await loadBotPreview("booking_manage", token)} />;
   const query = await searchParams;
   const page = await loadManage(token, fromParam(query.from));
 

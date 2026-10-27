@@ -13,6 +13,9 @@ import { PublicCardForm } from "@/features/business-cards/components/public-card
 import { cardVCardPath } from "@/features/business-cards/paths";
 import { getPublicCard } from "@/features/business-cards/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = { params: Promise<{ token: string }> };
@@ -22,6 +25,9 @@ const loadCard = cache(async (token: string) => getPublicCard(token, clientIp(aw
 
 /** WAB-05: the link's preview: the rep's public name and the business, with the business's logo. */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("card", await loadBotPreview("card", (await params).token));
   const card = await loadCard((await params).token);
   const t = PREVIEW_TEXTS.card;
   if (typeof card === "string") return genericPreview(t.what, t.description);
@@ -39,6 +45,8 @@ const MESSAGES = {
 /** BIZ-02: a rep's public business card. No sign-in, no cookies; only what the rep marked public. */
 export default async function PublicCardPage({ params }: Props) {
   const { token } = await params;
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="card" state={await loadBotPreview("card", token)} />;
   const card = await loadCard(token);
 
   if (typeof card === "string") {

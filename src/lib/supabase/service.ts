@@ -50,6 +50,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *     downloads only the path it answers, compared with its SHA-256;
  *   - the public subprocessors page (src/features/legal/subprocessors-public-server.ts,
  *     page /legal/subprocessors): public.subprocessors_public_page() only, cached for an hour;
+ *   - link previews for preview bots on the closed list of src/lib/preview-bots.ts
+ *     (src/features/link-preview/preview-server.ts): public.link_preview_public()
+ *     only (the business's display name and logo; no view counted, nothing changed);
  * - the server's write of a quote's PDF (src/features/quotes/pdf-store-server.ts),
  *   the one use inside a signed-in user's request (QUO-06 answer 3): called from
  *   pdf-server.ts (a Server Action and the staff file route) only after

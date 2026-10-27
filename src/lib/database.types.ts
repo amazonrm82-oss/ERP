@@ -3533,6 +3533,7 @@ export type Database = {
       order_link_create: { Args: { p_org: string; p_order: string }; Returns: string };
       order_link_revoke: { Args: { p_org: string; p_order: string }; Returns: boolean };
       order_link_status: { Args: { p_org: string; p_order: string }; Returns: Json };
+      link_preview_public: { Args: { p_kind: string; p_token: string; p_ip_hash?: string | null }; Returns: Json };
       order_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       order_public_decide: {
         Args: {

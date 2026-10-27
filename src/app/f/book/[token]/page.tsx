@@ -18,6 +18,9 @@ import { BuiltWithLine } from "@/features/built-with/components/built-with-line"
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
+import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
+import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
+import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 
 type Props = {
@@ -30,6 +33,9 @@ const loadBooking = cache(async (token: string, from: string | null) => getPubli
 
 /** WAB-05: the link's preview: "קביעת תור אצל <business>", the page's title and meeting, and the logo. */
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  // WAB-05 follow-up (owner, 27 October 2026): a listed preview bot gets the business's display name and logo only; the page's
+  // own read (which counts a view) never runs for it
+  if (await isPreviewBotRequest()) return botPreviewMetadata("booking", await loadBotPreview("booking", (await params).token));
   const page = await loadBooking((await params).token, fromParam((await searchParams).from));
   const t = PREVIEW_TEXTS.booking;
   if (typeof page === "string") return genericPreview(t.what, t.description);
@@ -47,6 +53,8 @@ const MESSAGES = {
 /** CAL-10: the public booking page. No sign-in, no cookies; `?from=` is the week shown, `?at=` the picked time. */
 export default async function PublicBookingPage({ params, searchParams }: Props) {
   const { token } = await params;
+  // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
+  if (await isPreviewBotRequest()) return <BotPreviewPage kind="booking" state={await loadBotPreview("booking", token)} />;
   const query = await searchParams;
   const page = await loadBooking(token, fromParam(query.from));
 
