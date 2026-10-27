@@ -755,6 +755,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.import_record_worked` ignores the job's own notes (all six last redefined in 021050; keep the condition). Owners/admins
   remove a wrong one from the timeline. Since 021055 `import_jobs.consents_locked_counted` (server only, false on jobs made
   before the CNS-06 count) shows "לא נספר בייבוא הזה" when a consent-mapped job shows 0.
+  Since 021070 (WAB-07, owner 26-27 October 2026: never contact, every plan) an exported WhatsApp chat (.txt, or the text entry of
+  the .zip read in the browser with fflate) is parsed by `src/features/whatsapp/chat-import.ts` (pure; header read from an 80-character
+  mark-free prefix, no overlapping regex classes: keep it linear, unit tests carry timing bounds) and written as one `import_note`
+  with `metadata.kind = 'whatsapp_import'` by `public.whatsapp_chat_import` (definer, authenticated: `app.can_edit_record` + writable,
+  live lead/contact/deal; body 1..10,000, no mention tokens, occurred_at 1990..now + 1 minute stored as least(.., now()), closed
+  metadata rebuilt in SQL; hints `whatsapp_import:*`). The file is not stored. `app.search_notes` finds `import_note` and
+  `app.import_record_worked` leaves out only the job's own notes (null-safe); both last redefined in 021070.
 - Source attribution (SEG-02 + DQL-04, migration 021060; owner 18 and 26 October 2026): the first source is what the record holds
   (`source_id`, `campaign`, `utm`; contacts got server-kept `campaign`/`utm`); the last source is server-only `last_source_id`,
   `last_campaign`, `last_utm`, `last_source_at` on leads and contacts, moved only by an automatic inquiry: a lead made by intake
