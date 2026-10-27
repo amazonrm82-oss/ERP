@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-picker";
@@ -14,8 +14,8 @@ import { applyCreditLabel } from "@/features/allocations/credit";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import type { FormState } from "@/lib/action-result";
 
-import { cancelDocumentAction, recordDocumentAction, setDocumentDueDateAction } from "../actions";
-import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES, isDocumentType, takesDueDate } from "../schema";
+import { applyCreditAction, cancelDocumentAction, recordDocumentAction, setDocumentDueDateAction } from "../actions";
+import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, isDocumentType, isOpeningBalance, parseSignedAgorot, recordableTypes, takesDueDate } from "../schema";
 
 type Subject = MoneySubject;
 
@@ -24,6 +24,7 @@ function RecordForm({
   subject,
   today,
   credit,
+  canOpening,
   onDone,
   onCancel,
 }: {
@@ -31,6 +32,7 @@ function RecordForm({
   subject: Subject;
   today: string;
   credit: number;
+  canOpening: boolean;
   onDone: (message: string | null) => void;
   onCancel: () => void;
 }) {
@@ -44,40 +46,72 @@ function RecordForm({
   const errors = failure?.fieldErrors ?? {};
   const values = failure?.values;
   const [docType, setDocType] = useState(values?.doc_type ?? "");
+  // GAP-12: an opening balance has no number, may be negative (a credit), and is dated by the day it stands on
+  const opening = isDocumentType(docType) && isOpeningBalance(docType);
+  // GAP-12: a negative opening balance is a credit: no due date and no credit to apply (unknown while the amount is not valid)
+  const [amountText, setAmountText] = useState(values?.amount ?? "");
+  const amount = parseSignedAgorot(amountText) ?? undefined;
+  const hasBalance = isDocumentType(docType) && takesDueDate(docType, amount);
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <SelectField label="סוג המסמך" name="doc_type" required value={docType} onChange={(event) => setDocType(event.target.value)} error={errors.doc_type}>
         <option value="">בחירה</option>
-        {DOCUMENT_TYPES.map((type) => (
+        {recordableTypes(canOpening).map((type) => (
           <option key={type} value={type}>
             {DOCUMENT_TYPE_LABELS[type]}
           </option>
         ))}
       </SelectField>
+      {opening ? (
+        <p className="text-sm text-ink-soft">
+          יתרת הלקוח מהמערכת הקודמת, בלי מספר מסמך. ללקוח יש יתרת פתיחה אחת: יתרה שכבר רשומה תבוטל ותוחלף בזו, ותשלומים וקיזוזים שהיו משויכים אליה ישתחררו. רק בעלים ומנהלי מערכת רושמים, משנים ומבטלים אותה.
+        </p>
+      ) : (
+        <TextField
+          label="מספר המסמך"
+          name="number"
+          required
+          dir="ltr"
+          maxLength={DOCUMENT_NUMBER_MAX}
+          defaultValue={values?.number ?? ""}
+          hint="כפי שהוא מופיע על המסמך."
+          error={errors.number}
+        />
+      )}
+      <DateField
+        label={opening ? "היתרה נכונה לתאריך" : "תאריך המסמך"}
+        name="doc_date"
+        required
+        defaultValue={values?.doc_date ?? today}
+        error={errors.doc_date}
+      />
       <TextField
-        label="מספר המסמך"
-        name="number"
+        label="סכום (₪)"
+        name="amount"
         required
         dir="ltr"
-        maxLength={DOCUMENT_NUMBER_MAX}
-        defaultValue={values?.number ?? ""}
-        hint="כפי שהוא מופיע על המסמך."
-        error={errors.number}
+        inputMode={opening ? "text" : "decimal"}
+        defaultValue={values?.amount ?? ""}
+        onChange={(event) => setAmountText(event.target.value)}
+        hint={opening ? "חוב של הלקוח: סכום חיובי. זכות של הלקוח: סכום עם מינוס, למשל \u200e-500." : "הסכום הכולל שעל המסמך."}
+        error={errors.amount}
       />
-      <DateField label="תאריך המסמך" name="doc_date" required defaultValue={values?.doc_date ?? today} error={errors.doc_date} />
-      <TextField label="סכום (₪)" name="amount" required dir="ltr" inputMode="decimal" defaultValue={values?.amount ?? ""} hint='הסכום הכולל שעל המסמך.' error={errors.amount} />
-      {isDocumentType(docType) && takesDueDate(docType) ? (
+      {hasBalance ? (
         <DateField
           label="מועד תשלום (רשות)"
           name="due_date"
           defaultValue={values?.due_date ?? ""}
-          hint="ריק = לפי תנאי התשלום של הלקוח. אפשר לשנות אחר כך בכרטיס."
+          hint={
+            opening
+              ? "רק לחוב. ריק = בלי מועד (לא לפי תנאי התשלום). מועד שכבר עבר מסמן את החוב באיחור."
+              : "ריק = לפי תנאי התשלום של הלקוח. אפשר לשנות אחר כך בכרטיס."
+          }
           error={errors.due_date}
         />
       ) : null}
-      {credit > 0 && isDocumentType(docType) && takesDueDate(docType) ? (
+      {credit > 0 && hasBalance ? (
         // PAY-03: the customer's credit is allocated to the new document, oldest payment first, up to its amount
         <Checkbox
           name="apply_credit"
@@ -97,7 +131,20 @@ function RecordForm({
 }
 
 /** DOC-01: "רישום מסמך" and its form, for whoever may record documents. */
-export function RecordDocumentButton({ orgId, subject, today, credit = 0 }: { orgId: string; subject: Subject; today: string; credit?: number }) {
+export function RecordDocumentButton({
+  orgId,
+  subject,
+  today,
+  credit = 0,
+  canOpening = false,
+}: {
+  orgId: string;
+  subject: Subject;
+  today: string;
+  credit?: number;
+  // GAP-12: owners and admins also record an opening balance
+  canOpening?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   // PAY-03: what the last save said (the credit it allocated), shown beside the button after the window closes
   const [notice, setNotice] = useState<string | null>(null);
@@ -126,6 +173,7 @@ export function RecordDocumentButton({ orgId, subject, today, credit = 0 }: { or
             subject={subject}
             today={today}
             credit={credit}
+            canOpening={canOpening}
             onDone={(message) => {
               setOpen(false);
               setNotice(message && message !== "המסמך נרשם." ? message : null);
@@ -228,5 +276,34 @@ function DueDateForm({ orgId, subject, documentId, dueDate, onDone }: { orgId: s
         </Button>
       </div>
     </form>
+  );
+}
+
+/** GAP-12 (owner's answer (2) א): offsets the customer's credit (payments, then opening credits) against this open document. */
+export function ApplyCreditButton({ orgId, subject, documentId, label }: { orgId: string; subject: Subject; documentId: string; label: string }) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {message ? (
+        <span role="status" className="text-sm text-ink-soft">
+          {message}
+        </span>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        aria-label={`קיזוז מיתרת הזכות: ${label}`}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await applyCreditAction(orgId, subject, documentId);
+            setMessage(result?.ok ? (result.message ?? null) : (result?.message ?? "הקיזוז לא הצליח."));
+          })
+        }
+      >
+        {pending ? "מקזזים…" : "קיזוז מיתרת הזכות"}
+      </Button>
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DOCUMENT_TYPE_LABELS, isDocumentType } from "@/features/documents/schema";
+import { DOCUMENT_TYPE_LABELS, documentTitle, isDocumentType, isOpeningBalance } from "@/features/documents/schema";
 import { isPaymentMethod, isPaymentStatus, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from "@/features/payments/schema";
 import { isCalendarDate } from "@/lib/calendar-date";
 
@@ -90,6 +90,8 @@ export function ledgerPeriod(today: string, from?: string | null, to?: string | 
 /** What a line is, in words: the document's type and number, or the payment's method and reference. */
 export function lineTitle(line: LedgerLine): string {
   if (line.kind === "document") {
+    // GAP-12: an opening balance has no number; it is named by its date
+    if (isDocumentType(line.type) && isOpeningBalance(line.type)) return documentTitle({ docType: line.type, number: null, docDate: line.date });
     const type = isDocumentType(line.type) ? DOCUMENT_TYPE_LABELS[line.type] : line.type;
     return line.label ? `${type} ${line.label}` : type;
   }

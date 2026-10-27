@@ -1,4 +1,4 @@
-import { DOCUMENT_TYPE_LABELS } from "@/features/documents/schema";
+import { documentTitle } from "@/features/documents/schema";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import { PAYMENT_METHOD_LABELS } from "@/features/payments/schema";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -24,7 +24,7 @@ export function AllocationRows({ orgId, page, side, allocations, canChange }: Pr
         const other =
           side === "payment"
             ? a.document
-              ? `${DOCUMENT_TYPE_LABELS[a.document.docType]} ${a.document.number}`
+              ? documentTitle(a.document)
               : "מסמך"
             : a.payment
               ? `תשלום ${formatMoney(a.payment.amountAgorot)} ב${PAYMENT_METHOD_LABELS[a.payment.method]} מ-${formatDate(`${a.payment.paidOn}T12:00:00Z`)}`

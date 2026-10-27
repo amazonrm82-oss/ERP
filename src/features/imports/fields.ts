@@ -5,6 +5,7 @@ import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
 import { CONSENT_TARGETS } from "./consent";
 import { HISTORY_TARGETS } from "./history";
+import { OPENING_TARGETS } from "./opening-balance";
 
 export const IMPORT_ENTITIES = [
   { value: "lead", label: "לידים" },
@@ -121,6 +122,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     ...CONSENT_TARGETS,
     // GAP-12
     ...HISTORY_TARGETS,
+    // GAP-12: the opening balance (owners and admins only)
+    ...OPENING_TARGETS,
   ],
   company: [
     { key: "name", label: "שם החברה", synonyms: [...COMPANY, "שם"] },
@@ -134,6 +137,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
     // GAP-12
     ...HISTORY_TARGETS,
+    // GAP-12: the opening balance (owners and admins only)
+    ...OPENING_TARGETS,
   ],
   // PRD-05: the same headers the product export writes, so an exported file imports back
   product: [

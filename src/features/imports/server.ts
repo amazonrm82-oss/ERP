@@ -32,6 +32,7 @@ import {
 } from "./consent";
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
+import { importOpening, OPENING_FAILED, OPENING_ROW_SKIPPED, type ImportOpening } from "./opening-balance";
 import { importNote, NOTE_FAILED, NOTE_ROW_SKIPPED, ORIGINAL_DATE_ON_UPDATE, originalCreatedOn, type ImportNote } from "./history";
 import { orgTimeZone } from "./link-lookups";
 
@@ -187,6 +188,8 @@ type Prepared = {
   consents: Array<{ channel: ImportConsentChannel; state: "granted" | "denied" }>;
   // GAP-12: the row's note for the timeline
   note: ImportNote | null;
+  // GAP-12: the customer's opening balance (contacts and companies; owners and admins)
+  opening: ImportOpening | null;
 };
 
 const joinWarnings = (...parts: Array<string | null | undefined>) => parts.filter(Boolean).join(" ") || null;
@@ -314,7 +317,12 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
   const original = originalCreatedOn(raw.original_created_on, today);
   if (original.date) values.original_created_on = original.date;
   const noted = importNote(raw.import_note, raw.import_note_date, today);
-  warning = joinWarnings(warning, original.warning, noted.warning);
+  // GAP-12: the opening balance (contacts and companies only; the mapping is limited to owners and admins)
+  const opened =
+    ctx.entity === "contact" || ctx.entity === "company"
+      ? importOpening(raw.opening_balance, raw.opening_balance_date, raw.opening_balance_due, today)
+      : { opening: null, warning: null };
+  warning = joinWarnings(warning, original.warning, noted.warning, opened.warning);
 
   const mappedFields = ctx.definitions.filter((d) => ctx.mapping.includes(`${CUSTOM_PREFIX}${d.key}`));
   if (mappedFields.length > 0) {
@@ -357,6 +365,7 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     warning,
     consents,
     note: noted.note,
+    opening: opened.opening,
   };
 }
 
@@ -553,6 +562,8 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   const consentWork: ConsentWork[] = [];
   // GAP-12: rows written whose note goes to the timeline at the end of the chunk
   const noteWork: NoteWork[] = [];
+  // GAP-12: rows written whose opening balance replaces the customer's at the end of the chunk
+  const openingWork: OpeningWork[] = [];
   const seen: Prepared[] = [];
   for (const row of prepared) {
     // a repeat of an earlier row in the same chunk counts as a duplicate too
@@ -568,6 +579,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
       const dropped = row.consents.length - denied.length;
       if (dropped > 0 && ctx.consentDeclared !== false) outcome.warning = joinWarnings(outcome.warning, CONSENT_ROW_SKIPPED) ?? undefined;
       if (row.note) outcome.warning = joinWarnings(outcome.warning, NOTE_ROW_SKIPPED) ?? undefined;
+      if (row.opening) outcome.warning = joinWarnings(outcome.warning, OPENING_ROW_SKIPPED) ?? undefined;
       if (denied.length > 0 && match && jobId) consentWork.push({ outcome, row, recordId: match.id, consents: denied });
     } else if (match && ctx.mode === "update") {
       const ambiguous = ctx.entity === "company" ? ambiguousTaxId(existing, row, countries) : null;
@@ -636,6 +648,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
         outcomes.push(outcome);
         consentWork.push({ outcome, row, recordId: match.id, consents: row.consents });
         if (row.note) noteWork.push({ outcome, recordId: match.id, note: row.note });
+        if (row.opening) openingWork.push({ outcome, recordId: match.id, opening: row.opening });
       }
     } else {
       // a new company without a country in the file gets the default, Israel
@@ -668,6 +681,7 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
     outcomes.push(outcome);
     const newId = newIds.get(row.row);
     if (row.note && newId) noteWork.push({ outcome, recordId: newId, note: row.note });
+    if (row.opening && newId) openingWork.push({ outcome, recordId: newId, opening: row.opening });
     if (id) consentWork.push({ outcome, row, recordId: id, consents: row.consents });
     // a new record that could not be told apart: its consents are not guessed onto another one
     else if (wantIds && row.consents.length > 0) outcome.warning = joinWarnings(outcome.warning, CONSENTS_FAILED) ?? undefined;
@@ -703,7 +717,31 @@ async function writeChunk(ctx: ImportContext, look: Lookups, prepared: Prepared[
   }
   await recordConsents(ctx, jobId, consentWork);
   await recordNotes(ctx, jobId, noteWork);
+  await recordOpenings(ctx, jobId, openingWork);
   return outcomes.sort((a, b) => a.row - b.row);
+}
+
+type OpeningWork = { outcome: RowOutcome; recordId: string; opening: ImportOpening };
+
+/**
+ * GAP-12: the written rows' opening balances, one call each to public.opening_balance_set with the job (the database checks
+ * that the caller is an owner or admin and that the job is their own running import of this kind, cancels the customer's
+ * active opening balance as "הוחלפה בייבוא" and records the new one). A balance not written leaves its row imported, with a
+ * warning.
+ */
+async function recordOpenings(ctx: ImportContext, jobId: string, work: OpeningWork[]): Promise<void> {
+  for (const w of work) {
+    const { error } = await ctx.supabase.rpc("opening_balance_set", {
+      p_org: ctx.orgId,
+      p_contact: ctx.entity === "contact" ? w.recordId : null,
+      p_company: ctx.entity === "company" ? w.recordId : null,
+      p_amount: w.opening.amountAgorot,
+      p_date: w.opening.date,
+      p_due: w.opening.due,
+      p_job: jobId,
+    });
+    if (error) w.outcome.warning = joinWarnings(w.outcome.warning, OPENING_FAILED) ?? undefined;
+  }
 }
 
 type NoteWork = { outcome: RowOutcome; recordId: string; note: ImportNote };

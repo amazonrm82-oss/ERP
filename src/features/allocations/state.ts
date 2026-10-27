@@ -18,19 +18,21 @@ const stateSchema = z.object({
       balance: money,
       state: z.enum(DOCUMENT_PAYMENT_STATES),
       invoice_number: z.string().nullable(),
+      // GAP-12: what a negative opening balance still holds (0 for any other document)
+      credit: money.optional().default(0),
     }),
   ),
   payments: z.array(z.object({ id: z.string(), allocated: money, credit: money })),
 });
 
-export type DocumentMoneyState = { paid: number; balance: number; state: DocumentPaymentState; invoiceNumber: string | null };
+export type DocumentMoneyState = { paid: number; balance: number; state: DocumentPaymentState; invoiceNumber: string | null; credit?: number };
 export type PaymentMoneyState = { allocated: number; credit: number };
 
 /** The answer of public.money_allocation_state, by id; a shape it does not know throws (FXC-12). */
 export function parseMoneyState(raw: unknown): { documents: Map<string, DocumentMoneyState>; payments: Map<string, PaymentMoneyState> } {
   const parsed = stateSchema.parse(raw);
   return {
-    documents: new Map(parsed.documents.map((d) => [d.id, { paid: d.paid, balance: d.balance, state: d.state, invoiceNumber: d.invoice_number }])),
+    documents: new Map(parsed.documents.map((d) => [d.id, { paid: d.paid, balance: d.balance, state: d.state, invoiceNumber: d.invoice_number, credit: d.credit }])),
     payments: new Map(parsed.payments.map((p) => [p.id, { allocated: p.allocated, credit: p.credit }])),
   };
 }
@@ -58,7 +60,8 @@ export function takesPayments(state: DocumentMoneyState | undefined): boolean {
 }
 
 const candidatesSchema = z.object({
-  documents: z.array(z.object({ id: z.string(), doc_type: z.string(), number: z.string(), doc_date: z.string(), amount: money, balance: money })),
+  // GAP-12: an opening balance has no number
+  documents: z.array(z.object({ id: z.string(), doc_type: z.string(), number: z.string().nullable(), doc_date: z.string(), amount: money, balance: money })),
   payments: z.array(z.object({ id: z.string(), paid_on: z.string(), method: z.string(), amount: money, credit: money })),
   proformas: z.array(z.object({ id: z.string(), number: z.string(), doc_date: z.string(), amount: money })),
 });

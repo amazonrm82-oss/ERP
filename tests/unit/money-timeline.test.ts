@@ -9,11 +9,17 @@ import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schem
 // DOC-04: the timeline entry names the document type in Hebrew; app.document_type_label (migration money_timeline) mirrors the
 // screen's labels, and the guard's list of kinds is the screen's list.
 const dir = path.join(process.cwd(), "supabase/migrations");
-const migration = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_money_timeline.sql"))!), "utf8");
 
 describe("documents and payments on the timeline (DOC-04)", () => {
   it("app.document_type_label equals DOCUMENT_TYPE_LABELS", () => {
-    const fn = migration.slice(migration.indexOf("function app.document_type_label"));
+    // its latest redefinition (GAP-12 added the opening balance)
+    const latest = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .filter((sql) => sql.includes("function app.document_type_label"))
+      .at(-1)!;
+    const fn = latest.slice(latest.indexOf("function app.document_type_label"));
     const body = fn.slice(0, fn.indexOf("$$;"));
     const pairs = Object.fromEntries([...body.matchAll(/when '([a-z_]+)' then '((?:[^']|'')*)'/g)].map((m) => [m[1], m[2].replace(/''/g, "'")]));
     expect(pairs).toEqual(Object.fromEntries(DOCUMENT_TYPES.map((t) => [t, DOCUMENT_TYPE_LABELS[t]])));

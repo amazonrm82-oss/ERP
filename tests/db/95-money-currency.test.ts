@@ -177,6 +177,17 @@ describe("currency next to every amount", () => {
         ).rows[0].id;
         await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [org, payment, document]);
       },
+      // GAP-12 (triggers are off here: the row is the server's)
+      opening_credit_allocations: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לקיזוז') returning id", [org])).rows[0].id;
+        const credit = (
+          await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, amount_agorot) values ($1, $2, 'opening_balance', -1000) returning id", [org, contact])
+        ).rows[0].id;
+        const document = (
+          await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'CUR-OC', 1000) returning id", [org, contact])
+        ).rows[0].id;
+        await q("insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [org, credit, document]);
+      },
       // PAY-03 (triggers are off here: the rows are the server's)
       payment_credit_companies: async (q) => {
         const company = (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברה ליתרה') returning id", [org])).rows[0].id;

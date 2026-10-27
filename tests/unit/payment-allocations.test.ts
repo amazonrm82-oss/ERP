@@ -10,7 +10,8 @@ describe("payment allocations on screen (PAY-02)", () => {
       documents: [{ id: "d1", paid: "4000", balance: 6000, state: "partial", invoice_number: null }],
       payments: [{ id: "p1", allocated: 4000, credit: "1000" }],
     });
-    expect(state.documents.get("d1")).toEqual({ paid: 4000, balance: 6000, state: "partial", invoiceNumber: null });
+    // GAP-12: `credit` (a negative opening balance's credit left) reads as 0 when the answer has none
+    expect(state.documents.get("d1")).toEqual({ paid: 4000, balance: 6000, state: "partial", invoiceNumber: null, credit: 0 });
     expect(state.payments.get("p1")).toEqual({ allocated: 4000, credit: 1000 });
     expect(() => parseMoneyState({ documents: [{ id: "d1", paid: 0, balance: 0, state: "owed", invoice_number: null }], payments: [] })).toThrow();
   });

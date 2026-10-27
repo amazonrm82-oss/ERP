@@ -504,6 +504,47 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(admin.id, (q) => q("delete from public.payment_allocations where id = $1", [byManager])))).code).toBe("42501");
   });
 
+  it("opening credit offsets follow their documents; recorders offset, only owners and admins change or undo, nobody deletes (GAP-12)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח עם זכות') returning id", [org])).rows[0].id,
+    );
+    const { credit, invoice } = await asUser(owner.id, async (q) => ({
+      credit: (await q<{ id: string }>("select public.opening_balance_set($1, $2, null, -1000, '2026-01-01') as id", [org, contact])).rows[0].id,
+      invoice: (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'R03-OC', 1000) returning id", [
+          org,
+          contact,
+        ])
+      ).rows[0].id,
+    }));
+    const offset = (u: U, amount: number) =>
+      asUser(u.id, async (q) =>
+        (
+          await q<{ id: string }>("insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, $4) returning id", [
+            org,
+            credit,
+            invoice,
+            amount,
+          ])
+        ).rows[0].id,
+      );
+    const byManager = await offset(manager, 100);
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.opening_credit_allocations where id = $1", [byManager]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    expect((await pgError(offset(m1, 1))).code).toBe("42501");
+    expect(await asUser(m1.id, async (q) => (await q("update public.opening_credit_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.opening_credit_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    expect(await asUser(manager.id, async (q) => (await q("update public.opening_credit_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(0);
+    expect(await asUser(manager.id, async (q) => (await q("update public.opening_credit_allocations set removed_at = now() where id = $1", [byManager])).rowCount)).toBe(0);
+    expect(await asUser(admin.id, async (q) => (await q("update public.opening_credit_allocations set amount_agorot = 50 where id = $1", [byManager])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("update public.opening_credit_allocations set removed_at = now() where id = $1", [byManager])).rowCount)).toBe(1);
+    expect((await pgError(asUser(admin.id, (q) => q("delete from public.opening_credit_allocations where id = $1", [byManager])))).code).toBe("42501");
+  });
+
   it("the server's company credit rows follow their payment; nobody writes them (PAY-03)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

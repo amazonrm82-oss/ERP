@@ -13,6 +13,8 @@ import {
   DOCUMENT_DEFAULT_SORT,
   DOCUMENT_LIST_STATUS_LABELS,
   DOCUMENT_LIST_STATUSES,
+  DOCUMENT_TOTAL_KEYS,
+  DOCUMENT_TOTAL_LABELS,
   documentListFilters,
   documentListHref,
   documentSortStartsAscending,
@@ -103,9 +105,10 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
   const kept: Record<string, string> = Object.fromEntries(
     Object.entries({ type: filters.type ?? "", status: filters.status ?? "", from: filters.from ?? "", to: filters.to ?? "" }).filter(([, value]) => value !== ""),
   );
-  const totalLines = DOCUMENT_TYPES.flatMap((type) => {
-    const total = totals.totals.get(type);
-    return total ? [{ type, ...total }] : [];
+  // GAP-12: an opening balance's debts and credits are two lines, never netted
+  const totalLines = DOCUMENT_TOTAL_KEYS.flatMap((key) => {
+    const total = totals.totals.get(key);
+    return total ? [{ key, ...total }] : [];
   });
 
   return (
@@ -186,14 +189,14 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
           </h2>
           <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
             {totalLines.map((line) => (
-              <li key={line.type}>
-                {DOCUMENT_TYPE_LABELS[line.type]}: <span className="font-medium tabular-nums">{formatMoney(line.agorot)}</span>{" "}
+              <li key={line.key}>
+                {DOCUMENT_TOTAL_LABELS[line.key]}: <span className="font-medium tabular-nums">{formatMoney(line.agorot)}</span>{" "}
                 <span className="text-ink-soft">({line.count === 1 ? "מסמך אחד" : `${line.count.toLocaleString("he-IL")} מסמכים`})</span>
               </li>
             ))}
           </ul>
           <p className="mt-2 text-sm text-ink-soft">
-            רק מסמכים בתוקף. כל סוג בנפרד: חשבונית זיכוי לא מקוזזת מהחשבוניות.
+            רק מסמכים בתוקף. כל סוג בנפרד: חשבונית זיכוי לא מקוזזת מהחשבוניות, ויתרות פתיחה של חוב ושל זכות מוצגות בנפרד.
             {totals.complete ? "" : ` הסיכום לפי ${DOCUMENT_TOTALS_LIMIT.toLocaleString("he-IL")} המסמכים הראשונים; צמצמו בסינון לסיכום מלא.`}
           </p>
         </section>

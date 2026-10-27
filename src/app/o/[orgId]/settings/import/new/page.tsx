@@ -8,6 +8,7 @@ import { ImportWizard } from "@/features/imports/components/import-wizard";
 import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -27,13 +28,15 @@ export default async function NewImportPage({ params, searchParams }: Props) {
     notFound();
   }
   const catalog = canEditCatalog(role, granted);
-  const [lead, contact, company, deal, terms] = await Promise.all([
+  const [lead, contact, company, deal, terms, documents] = await Promise.all([
     listFieldDefinitions(orgId, "lead"),
     listFieldDefinitions(orgId, "contact"),
     listFieldDefinitions(orgId, "company"),
     listFieldDefinitions(orgId, "deal"),
     // FLD-10: the business's words for leads, contacts and deals
     getOrgTerms(orgId),
+    // GAP-12: the opening balance column needs the documents key
+    orgHasFeature(orgId, "documents"),
   ]);
   const short = (defs: typeof lead) => defs.map((d) => ({ key: d.key, label: d.label }));
 
@@ -45,6 +48,7 @@ export default async function NewImportPage({ params, searchParams }: Props) {
         customFields={{ lead: short(lead), contact: short(contact), company: short(company), deal: short(deal), task: [], product: [] }}
         canCreateFields={isAdminRole(role)}
         canImportProducts={catalog}
+        canOpeningBalance={documents && isAdminRole(role)}
         initialEntity={initialEntity === "product" && !catalog ? "lead" : initialEntity}
         terms={terms}
       />

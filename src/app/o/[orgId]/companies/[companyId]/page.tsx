@@ -33,6 +33,7 @@ import { RelatedDealsCard } from "@/features/deals/components/related-deals-card
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
+import { CompanyOpeningCard } from "@/features/documents/components/company-opening-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { listRelatedDeals } from "@/features/deals/queries";
@@ -209,6 +210,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
           {/* PAY-03: the company's credit balance */}
           <CompanyCreditCard orgId={orgId} companyId={company.id} />
+          {/* GAP-12: the company's opening balance */}
+          <CompanyOpeningCard orgId={orgId} companyId={company.id} />
           {/* BAL-01: the company's ledger (its contacts' and deals' documents and payments) */}
           <LedgerCard
             orgId={orgId}

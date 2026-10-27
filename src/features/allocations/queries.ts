@@ -117,7 +117,7 @@ export type Allocation = {
   removedAt: string | null;
   removedBy: string | null;
   // the other side, when the user reads it
-  document: { docType: DocumentType; number: string } | null;
+  document: { docType: DocumentType; number: string | null; docDate: string } | null;
   payment: { paidOn: string; method: PaymentMethod; amountAgorot: number } | null;
 };
 
@@ -137,13 +137,13 @@ export async function listAllocations(orgId: string, by: { payments?: string[]; 
   const payIds = [...new Set(rows.map((r) => r.payment_id))];
   const [docRows, payRows] = await Promise.all([
     docIds.length > 0
-      ? supabase.from("accounting_documents").select("id, doc_type, number").eq("organization_id", orgId).in("id", docIds)
-      : Promise.resolve({ data: [] as { id: string; doc_type: string; number: string }[], error: null }),
+      ? supabase.from("accounting_documents").select("id, doc_type, number, doc_date").eq("organization_id", orgId).in("id", docIds)
+      : Promise.resolve({ data: [] as { id: string; doc_type: string; number: string | null; doc_date: string }[], error: null }),
     payIds.length > 0
       ? supabase.from("payments").select("id, paid_on, method, amount_agorot").eq("organization_id", orgId).in("id", payIds)
       : Promise.resolve({ data: [] as { id: string; paid_on: string; method: string; amount_agorot: number }[], error: null }),
   ]);
-  const docsById = new Map(must(docRows, "allocation documents").flatMap((d) => (isDocumentType(d.doc_type) ? [[d.id, { docType: d.doc_type, number: d.number }] as const] : [])));
+  const docsById = new Map(must(docRows, "allocation documents").flatMap((d) => (isDocumentType(d.doc_type) ? [[d.id, { docType: d.doc_type, number: d.number, docDate: d.doc_date }] as const] : [])));
   const paysById = new Map(
     must(payRows, "allocation payments").flatMap((p) =>
       isPaymentMethod(p.method) ? [[p.id, { paidOn: p.paid_on, method: p.method, amountAgorot: Number(p.amount_agorot) }] as const] : [],
@@ -163,4 +163,55 @@ export async function listAllocations(orgId: string, by: { payments?: string[]; 
       payment: paysById.get(r.payment_id) ?? null,
     }))
     .sort((a, b) => Number(b.counted) - Number(a.counted));
+}
+
+type DocRef = { docType: DocumentType; number: string | null; docDate: string };
+
+export type CreditOffset = {
+  id: string;
+  creditDocumentId: string;
+  documentId: string;
+  amountAgorot: number;
+  counted: boolean;
+  released: boolean;
+  // both sides, when the user reads them
+  credit: DocRef | null;
+  document: DocRef | null;
+};
+
+/**
+ * GAP-12 (owner's answer (2) א): the offsets of negative opening balances against documents, for these documents on either
+ * side (at most 500), read with the user's session (RLS: whoever reads either document), with both sides' titles.
+ */
+export async function listCreditOffsets(orgId: string, documents: string[]): Promise<CreditOffset[]> {
+  if (documents.length === 0) return [];
+  const supabase = await createClient();
+  const list = documents.join(",");
+  const rows = must(
+    await supabase
+      .from("opening_credit_allocations")
+      .select("id, credit_document_id, document_id, amount_agorot, released_at, removed_at, created_at")
+      .eq("organization_id", orgId)
+      .or(`credit_document_id.in.(${list}),document_id.in.(${list})`)
+      .order("created_at")
+      .order("id")
+      .limit(500),
+    "credit offsets",
+  );
+  const ids = [...new Set(rows.flatMap((r) => [r.credit_document_id, r.document_id]))];
+  const refs =
+    ids.length > 0
+      ? must(await supabase.from("accounting_documents").select("id, doc_type, number, doc_date").eq("organization_id", orgId).in("id", ids), "credit offset documents")
+      : [];
+  const byId = new Map<string, DocRef>(refs.flatMap((d) => (isDocumentType(d.doc_type) ? [[d.id, { docType: d.doc_type, number: d.number, docDate: d.doc_date }] as const] : [])));
+  return rows.map((r) => ({
+    id: r.id,
+    creditDocumentId: r.credit_document_id,
+    documentId: r.document_id,
+    amountAgorot: Number(r.amount_agorot),
+    counted: r.released_at === null && r.removed_at === null,
+    released: r.released_at !== null,
+    credit: byId.get(r.credit_document_id) ?? null,
+    document: byId.get(r.document_id) ?? null,
+  }));
 }

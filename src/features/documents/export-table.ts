@@ -16,7 +16,8 @@ type DocumentForExport = Pick<DocumentListItem, "docType" | "number" | "customer
 export function documentExportRows(documents: DocumentForExport[], recorderNames: Map<string, string>, timeZone: string): string[][] {
   return documents.map((doc) => [
     DOCUMENT_TYPE_LABELS[doc.docType],
-    doc.number,
+    // GAP-12: an opening balance has no number
+    doc.number ?? "",
     doc.customer ?? "",
     doc.docDate,
     plainShekels(doc.amountAgorot),

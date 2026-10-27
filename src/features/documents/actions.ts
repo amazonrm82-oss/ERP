@@ -7,18 +7,20 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
+import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 import { moneyRowParents } from "@/features/payments/deal-contact";
-import { parseAppliedCredit, recordedMessage, type AppliedCredit } from "@/features/allocations/credit";
+import { appliedCreditMessage, parseAppliedCredit, recordedMessage, type AppliedCredit } from "@/features/allocations/credit";
 import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
-import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema, takesDueDate } from "./schema";
+import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema, isOpeningBalance, takesDueDate } from "./schema";
 
 // DOC-01: recording and cancelling an external accounting document, with the user's session. RLS and the table's trigger
 // decide: owners, admins and managers, or the personal key `documents`; a deal or contact the user reads; the same type and
 // number once per business; a record is never deleted, only cancelled with a reason.
 
 const CANNOT = "אין לכם הרשאה לרשום מסמכים כאן. רושמים בעלים, מנהלי מערכת, מנהלי צוות ומי שקיבל הרשאת רישום מסמכים.";
+const OPENING_ON_CONTACT = "יתרת פתיחה רושמים בכרטיס של איש הקשר או של החברה.";
 const writeError = (error: { code?: string; message?: string; hint?: string }) => (error.code === "42501" ? CANNOT : dbErrorMessage(error));
 
 const subjectSchema = z.object({ kind: z.enum(MONEY_SUBJECT_KINDS), id: z.guid() });
@@ -36,6 +38,21 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
   if (!context.ok) return context;
   const parsed = documentSchema.safeParse(pick(formData, DOCUMENT_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
+  // GAP-12 (owner's answer (3) ב): an opening balance is a contact's, and replaces the contact's active one in one call
+  if (isOpeningBalance(parsed.data.doc_type)) {
+    if (subject.kind !== "contact") return fail(OPENING_ON_CONTACT, { values: formValues(formData) });
+    const { error } = await context.supabase.rpc("opening_balance_set", {
+      p_org: orgId,
+      p_contact: subject.id,
+      p_company: null,
+      p_amount: parsed.data.amount,
+      p_date: parsed.data.doc_date,
+      p_due: parsed.data.due_date,
+    });
+    if (error) return fail(writeError(error), { values: formValues(formData) });
+    revalidatePath(pageOf(orgId, subject));
+    return { ok: true, message: "יתרת הפתיחה נרשמה." };
+  }
   // ORD-06 part two: on an order, the document hangs on the order's own deal or contact and names the order
   const parents = await moneyRowParents(context.supabase, orgId, subject);
   if ("error" in parents) return fail(dbErrorMessage(parents.error), { values: formValues(formData) });
@@ -59,7 +76,7 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
   // (the allocation rules and RLS decide). The document stays recorded whatever happens here.
   let applied: AppliedCredit | null = null;
   let creditFailed = false;
-  if (formData.get("apply_credit") === "on" && takesDueDate(parsed.data.doc_type)) {
+  if (formData.get("apply_credit") === "on" && takesDueDate(parsed.data.doc_type, parsed.data.amount)) {
     const result = await context.supabase.rpc("money_apply_credit", { p_org: orgId, p_document: created.id });
     if (result.error) creditFailed = true;
     else applied = parseAppliedCredit(result.data);
@@ -104,4 +121,73 @@ export async function setDocumentDueDateAction(orgId: string, subject: Subject, 
   if (data.length === 0) return fail(CANNOT, { values: formValues(formData) });
   revalidatePath(pageOf(orgId, subject));
   return ok();
+}
+
+// ----------------------------------------------------------------------------
+// GAP-12 (owner's answers (1) א, (3) ב): a company's opening balance, on the company's card (owners and admins)
+// ----------------------------------------------------------------------------
+
+const openingSchema = z.object({
+  amount: z.string(),
+  doc_date: z.string(),
+  due_date: z.string(),
+});
+
+/** Records or replaces the company's opening balance (the active one is cancelled "הוחלפה ביתרה חדשה"). */
+export async function setCompanyOpeningBalanceAction(orgId: string, companyId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, companyId);
+  if (!context.ok) return context;
+  const raw = openingSchema.safeParse({
+    amount: String(formData.get("amount") ?? ""),
+    doc_date: String(formData.get("doc_date") ?? ""),
+    due_date: String(formData.get("due_date") ?? ""),
+  });
+  if (!raw.success) return fail(INVALID_ARGS);
+  const parsed = documentSchema.safeParse({ doc_type: "opening_balance", number: "", ...raw.data });
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const { error } = await context.supabase.rpc("opening_balance_set", {
+    p_org: orgId,
+    p_contact: null,
+    p_company: companyId,
+    p_amount: parsed.data.amount,
+    p_date: parsed.data.doc_date,
+    p_due: parsed.data.due_date,
+  });
+  if (error) return fail(writeError(error), { values: formValues(formData) });
+  revalidatePath(paths.company(orgId, companyId));
+  return { ok: true, message: "יתרת הפתיחה נרשמה." };
+}
+
+/** Cancels one of the company's opening balances, with a reason. */
+export async function cancelCompanyOpeningBalanceAction(orgId: string, companyId: string, documentId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, companyId, documentId);
+  if (!context.ok) return context;
+  const reason = z.object({ reason: cancelReasonSchema }).safeParse({ reason: formData.get("reason") ?? "" });
+  if (!reason.success) return invalid(reason.error, formData);
+  const { data, error } = await context.supabase
+    .from("accounting_documents")
+    .update({ status: "cancelled", cancel_reason: reason.data.reason })
+    .eq("organization_id", orgId)
+    .eq("company_id", companyId)
+    .eq("id", documentId)
+    .select("id");
+  if (error) return fail(writeError(error), { values: formValues(formData) });
+  if (data.length === 0) return fail(CANNOT, { values: formValues(formData) });
+  revalidatePath(paths.company(orgId, companyId));
+  return ok();
+}
+
+/**
+ * GAP-12 (owner's answer (2) א): offsets the customer's credit (unallocated payments, then negative opening balances) against
+ * an open document that takes payments, with the user's session (public.money_apply_credit; the allocation rules decide).
+ */
+export async function applyCreditAction(orgId: string, subject: Subject, documentId: string): Promise<FormState> {
+  if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);
+  const context = await actionContext(orgId, subject.id, documentId);
+  if (!context.ok) return context;
+  const result = await context.supabase.rpc("money_apply_credit", { p_org: orgId, p_document: documentId });
+  if (result.error) return fail(writeError(result.error));
+  const applied = parseAppliedCredit(result.data);
+  revalidatePath(pageOf(orgId, subject));
+  return { ok: true, message: applied.allocated > 0 ? appliedCreditMessage(applied.allocated) : "אין יתרת זכות לקזז." };
 }

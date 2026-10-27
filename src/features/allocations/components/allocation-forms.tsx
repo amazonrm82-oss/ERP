@@ -9,7 +9,7 @@ import { FormError } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { agorotInput } from "@/features/deals/recurring";
 import type { MoneySubject } from "@/features/payments/money-subject";
-import { DOCUMENT_TYPE_LABELS, isDocumentType } from "@/features/documents/schema";
+import { documentTitle, isDocumentType } from "@/features/documents/schema";
 import { isPaymentMethod, PAYMENT_METHOD_LABELS } from "@/features/payments/schema";
 import { formatDate, formatMoney, parseMoneyToAgorot } from "@/lib/format";
 
@@ -42,7 +42,11 @@ function optionsOf(from: From, candidates: AllocationCandidates): AllocationOpti
   if (from.kind === "payment") {
     return candidates.documents.map((d) => ({
       id: d.id,
-      label: `${isDocumentType(d.doc_type) ? DOCUMENT_TYPE_LABELS[d.doc_type] : "מסמך"} ${d.number} מ-${dateLabel(d.doc_date)}`,
+      label: isDocumentType(d.doc_type)
+        ? d.doc_type === "opening_balance"
+          ? documentTitle({ docType: d.doc_type, number: d.number, docDate: d.doc_date })
+          : `${documentTitle({ docType: d.doc_type, number: d.number, docDate: d.doc_date })} מ-${dateLabel(d.doc_date)}`
+        : `מסמך ${d.number ?? ""} מ-${dateLabel(d.doc_date)}`,
       room: d.balance,
     }));
   }

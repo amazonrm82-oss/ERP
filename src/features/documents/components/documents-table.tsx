@@ -9,7 +9,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import type { DocumentListItem } from "../queries";
-import { DOCUMENT_TYPE_LABELS } from "../schema";
+import { DOCUMENT_TYPE_LABELS, documentTitle, isOpeningBalance } from "../schema";
 
 type Props = {
   orgId: string;
@@ -23,13 +23,21 @@ type Props = {
   exportPath: string | null;
 };
 
-/** Where a document is shown: the card of its deal, else of its contact; null when both were deleted. */
-export function documentHome(orgId: string, doc: Pick<DocumentListItem, "dealId" | "contactId">): string | null {
-  return doc.dealId ? paths.deal(orgId, doc.dealId) : doc.contactId ? paths.contact(orgId, doc.contactId) : null;
+/** Where a document is shown: the card of its deal, else of its contact, else (GAP-12) of its company; null when none is left. */
+export function documentHome(orgId: string, doc: Pick<DocumentListItem, "dealId" | "contactId" | "companyId">): string | null {
+  return doc.dealId
+    ? paths.deal(orgId, doc.dealId)
+    : doc.contactId
+      ? paths.contact(orgId, doc.contactId)
+      : doc.companyId
+        ? paths.company(orgId, doc.companyId)
+        : null;
 }
 
 /** A document's type and number, as the first column and the mobile list show them. */
-export function DocumentName({ doc }: { doc: Pick<DocumentListItem, "docType" | "number"> }) {
+export function DocumentName({ doc }: { doc: Pick<DocumentListItem, "docType" | "number" | "docDate"> }) {
+  // GAP-12: an opening balance has no number; it is named by its date
+  if (isOpeningBalance(doc.docType)) return <>{documentTitle(doc)}</>;
   return (
     <>
       {DOCUMENT_TYPE_LABELS[doc.docType]}{" "}
@@ -73,7 +81,7 @@ export function DocumentsTable({ orgId, documents, columns, catalog, recorderNam
           const home = documentHome(orgId, doc);
           return (
             <div className="flex items-start gap-2">
-              <RowCheck id={doc.id} label={`${DOCUMENT_TYPE_LABELS[doc.docType]} ${doc.number}`} />
+              <RowCheck id={doc.id} label={documentTitle(doc)} />
               {home ? (
                 <Link href={home} className="min-w-0 font-medium text-accent-strong underline-offset-4 hover:underline">
                   <DocumentName doc={doc} />

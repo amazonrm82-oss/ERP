@@ -12,7 +12,7 @@ import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
-import { DOCUMENT_DEFAULT_SORT, DOCUMENT_SORT_COLUMNS, documentTotalsByType, type DocumentListFilters } from "./list";
+import { DOCUMENT_DEFAULT_SORT, DOCUMENT_SORT_COLUMNS, documentTotalsByType, type DocumentListFilters, type DocumentTotalKey } from "./list";
 import { isDocumentType, type DocumentType } from "./schema";
 
 // DOC-01: the accounting documents recorded on a deal or a contact, read with the user's session (RLS: whoever reads the
@@ -21,7 +21,8 @@ import { isDocumentType, type DocumentType } from "./schema";
 export type AccountingDocument = {
   id: string;
   docType: DocumentType;
-  number: string;
+  // GAP-12: null on an opening balance
+  number: string | null;
   docDate: string;
   amountAgorot: number;
   // PAY-02: on a tax invoice, the proforma it bills
@@ -38,10 +39,14 @@ export type AccountingDocument = {
 
 export type DocumentsSubject = MoneySubject;
 
-/** Whether the documents capability is in the plan, and whether the user may record (owners, admins, managers, the key). */
-export const getDocumentsAccess = cache(async (orgId: string): Promise<{ inPlan: boolean; canRecord: boolean }> => {
+/**
+ * Whether the documents capability is in the plan, whether the user may record (owners, admins, managers, the key), and
+ * whether they may record and change an opening balance (GAP-12: owners and admins only).
+ */
+export const getDocumentsAccess = cache(async (orgId: string): Promise<{ inPlan: boolean; canRecord: boolean; canOpening: boolean }> => {
   const [inPlan, context, granted] = await Promise.all([orgHasFeature(orgId, "documents"), getOrgContext(orgId), getMyPermissions(orgId)]);
-  return { inPlan, canRecord: inPlan && context.canWrite && canRecordDocuments(context.role, granted) };
+  const canRecord = inPlan && context.canWrite && canRecordDocuments(context.role, granted);
+  return { inPlan, canRecord, canOpening: canRecord && (context.role === "owner" || context.role === "admin") };
 });
 
 /** The record's documents, newest first (at most 100), with the names of who recorded or cancelled them. */
@@ -91,7 +96,8 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
 export type DocumentListItem = {
   id: string;
   docType: DocumentType;
-  number: string;
+  // GAP-12: null on an opening balance
+  number: string | null;
   docDate: string;
   amountAgorot: number;
   cancelled: boolean;
@@ -99,7 +105,9 @@ export type DocumentListItem = {
   createdAt: string;
   dealId: string | null;
   contactId: string | null;
-  // the rule of public.sort_customer(accounting_documents): the contact's name, else the deal's
+  // GAP-12: a company's opening balance
+  companyId: string | null;
+  // the rule of public.sort_customer(accounting_documents): the contact's name, else the deal's, else the company's
   customer: string | null;
 };
 
@@ -114,7 +122,7 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
   const offset = filters.chunk?.from ?? (filters.page - 1) * PAGE_SIZE;
   let query = supabase
     .from("accounting_documents")
-    .select("id, doc_type, number, doc_date, amount_agorot, status, created_by, created_at, deal_id, contact_id")
+    .select("id, doc_type, number, doc_date, amount_agorot, status, created_by, created_at, deal_id, contact_id, company_id")
     .eq("organization_id", orgId);
   if (filters.ids) {
     query = query.in("id", filters.ids);
@@ -152,6 +160,7 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
               createdAt: row.created_at,
               dealId: row.deal_id,
               contactId: row.contact_id,
+              companyId: row.company_id,
               customer: customers(row),
             },
           ]
@@ -170,7 +179,7 @@ export const DOCUMENT_TOTALS_LIMIT = 20_000;
 export async function listDocumentTotals(
   orgId: string,
   filters: DocumentListFilters,
-): Promise<{ totals: Map<DocumentType, { count: number; agorot: number }>; complete: boolean }> {
+): Promise<{ totals: Map<DocumentTotalKey, { count: number; agorot: number }>; complete: boolean }> {
   const supabase = await createClient();
   const { rows, complete } = await readAllPages(
     async (from, to) => {
@@ -193,14 +202,17 @@ export async function listDocumentTotals(
 }
 
 /**
- * The names of the contacts and deals of a page of rows (RLS: only those the user reads): the contact's, else the deal's
- * (the rule of public.sort_customer on accounting_documents and payments). Shared with the payments list.
+ * The names of the contacts and deals of a page of rows (RLS: only those the user reads): the contact's, else the deal's,
+ * else (GAP-12, a company's opening balance) the company's (the rule of public.sort_customer on accounting_documents and
+ * payments). Shared with the payments list.
  */
-export async function customerNames(orgId: string, rows: readonly { deal_id: string | null; contact_id: string | null }[]) {
+type CustomerRow = { deal_id: string | null; contact_id: string | null; company_id?: string | null };
+export async function customerNames(orgId: string, rows: readonly CustomerRow[]) {
   const supabase = await createClient();
   const contactIds = [...new Set(rows.flatMap((row) => (row.contact_id ? [row.contact_id] : [])))];
   const dealIds = [...new Set(rows.flatMap((row) => (row.deal_id ? [row.deal_id] : [])))];
-  const [contacts, deals] = await Promise.all([
+  const companyIds = [...new Set(rows.flatMap((row) => (row.company_id ? [row.company_id] : [])))];
+  const [contacts, deals, companies] = await Promise.all([
     contactIds.length > 0
       ? readAllPagesByIds(contactIds, async (slice, from, to) =>
           must(await supabase.from("contacts").select("id, full_name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "list contacts"),
@@ -211,9 +223,52 @@ export async function customerNames(orgId: string, rows: readonly { deal_id: str
           must(await supabase.from("deals").select("id, name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "list deals"),
         )
       : [],
+    companyIds.length > 0
+      ? readAllPagesByIds(companyIds, async (slice, from, to) =>
+          must(await supabase.from("companies").select("id, name").eq("organization_id", orgId).in("id", slice).order("id").range(from, to), "list companies"),
+        )
+      : [],
   ]);
   const contactNames = new Map(contacts.map((row) => [row.id, row.full_name]));
   const dealNames = new Map(deals.map((row) => [row.id, row.name]));
-  return (row: { deal_id: string | null; contact_id: string | null }) =>
-    (row.contact_id ? contactNames.get(row.contact_id) : undefined) ?? (row.deal_id ? dealNames.get(row.deal_id) : undefined) ?? null;
+  const companyNames = new Map(companies.map((row) => [row.id, row.name]));
+  return (row: CustomerRow) =>
+    (row.contact_id ? contactNames.get(row.contact_id) : undefined) ??
+    (row.deal_id ? dealNames.get(row.deal_id) : undefined) ??
+    (row.company_id ? companyNames.get(row.company_id) : undefined) ??
+    null;
+}
+
+/** GAP-12: a company's opening balances, newest first (at most 20), with who recorded or cancelled them. */
+export async function listCompanyOpeningBalances(orgId: string, companyId: string): Promise<{ documents: AccountingDocument[]; names: Map<string, string> }> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("accounting_documents")
+      .select("id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
+      .eq("organization_id", orgId)
+      .eq("company_id", companyId)
+      .eq("doc_type", "opening_balance")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .limit(20),
+    "company opening balances",
+  );
+  const documents: AccountingDocument[] = rows.map((row) => ({
+    id: row.id,
+    docType: "opening_balance",
+    number: row.number,
+    docDate: row.doc_date,
+    amountAgorot: Number(row.amount_agorot),
+    proformaId: row.proforma_id,
+    dueDate: row.due_date,
+    cancelled: row.status === "cancelled",
+    cancelReason: row.cancel_reason,
+    cancelledAt: row.cancelled_at,
+    cancelledBy: row.cancelled_by,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  }));
+  const names = await getUserNames(documents.flatMap((d) => [d.createdBy, d.cancelledBy]));
+  return { documents, names };
 }

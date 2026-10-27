@@ -175,7 +175,7 @@ describe("customer credit (PAY-03)", () => {
     // a paid invoice, a receipt, a document the caller may not use: nothing more
     expect(Number((await apply(manager, invoice)).allocated)).toBe(0);
     const receipt = await doc("receipt", 1000, { contact: a });
-    expect(await apply(manager, receipt)).toEqual({ allocated: 0, payments: [] });
+    expect(await apply(manager, receipt)).toEqual({ allocated: 0, payments: [], documents: [] });
     // a cap
     const proforma = await doc("proforma", 25000, { contact: a });
     expect(Number((await apply(owner, proforma, 5000)).allocated)).toBe(5000);
@@ -210,7 +210,7 @@ describe("customer credit (PAY-03)", () => {
         total: 0,
         count: 0,
       });
-      expect(await run(outsider, async (q) => (await one<{ a: Applied }>(q, "select public.money_apply_credit($1, $2) as a", [org, invoice])).a)).toEqual({ allocated: 0, payments: [] });
+      expect(await run(outsider, async (q) => (await one<{ a: Applied }>(q, "select public.money_apply_credit($1, $2) as a", [org, invoice])).a)).toEqual({ allocated: 0, payments: [], documents: [] });
       expect(await asAdmin(async (q) => (await q("select 1 from public.payment_allocations where document_id = $1", [invoice])).rowCount)).toBe(0);
     } finally {
       await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));

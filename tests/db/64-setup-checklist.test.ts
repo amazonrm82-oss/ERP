@@ -601,6 +601,16 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_whatsapp_chat_import.sql",
       // the PAY-02 fix redefines app.money_same_customer() of _payment_allocations.sql last (never NULL)
       "_money_same_customer_null.sql",
+      // GAP-12 (opening balance) redefines the document checks, the allocation rules and the timeline functions of
+      // _accounting_documents.sql, _money_timeline.sql, _payment_allocations.sql, _document_due_date.sql and
+      // _credit_advances_list.sql last (the opening balance type)
+      "_opening_balance.sql",
+      // GAP-12 (opening credit) redefines the money state, the allocation check, the ledger and PAY-03's credit functions of
+      // _opening_balance.sql and _credit_advances_list.sql last (an opening credit is customer credit)
+      "_opening_credit.sql",
+      // GAP-12 (import undo) redefines app.import_record_worked() of _whatsapp_chat_import.sql and public.undo_import() /
+      // undo_own_import() of _import_consent_undo.sql last (an import's own opening balances)
+      "_opening_import_undo.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

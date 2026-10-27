@@ -276,6 +276,21 @@ describe("tenant isolation", () => {
         ])
       ).rows[0].id;
       await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [orgA, ids.paymentA, ids.invoiceA]);
+      // GAP-12: a negative opening balance of A's contact, offset against a tax invoice of the contact
+      ids.openingCreditA = (
+        await q<{ id: string }>("select public.opening_balance_set($1, $2, null, -800, '2026-01-01') as id", [orgA, ids.contactA])
+      ).rows[0].id;
+      ids.contactInvoiceA = (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'A-INV-C', 1000) returning id", [
+          orgA,
+          ids.contactA,
+        ])
+      ).rows[0].id;
+      await q("insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 300)", [
+        orgA,
+        ids.openingCreditA,
+        ids.contactInvoiceA,
+      ]);
       // COL-05
       await q("insert into public.customer_holds (organization_id, contact_id, reason) values ($1, $2, 'חוב פתוח')", [orgA, ids.contactA]);
     });
@@ -415,6 +430,8 @@ describe("tenant isolation", () => {
     "accounting_documents",
     // PAY-02
     "payment_allocations",
+    // GAP-12
+    "opening_credit_allocations",
     // PAY-03
     "payment_credit_companies",
     "customer_credit_totals",
@@ -616,6 +633,8 @@ describe("tenant isolation", () => {
       accounting_documents: "cancel_reason = cancel_reason",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
       payment_allocations: "amount_agorot = amount_agorot",
+      // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
+      opening_credit_allocations: "amount_agorot = amount_agorot",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
@@ -757,6 +776,7 @@ describe("tenant isolation", () => {
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
       ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
+      ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.consent_blocklist (organization_id, kind, channel, reason) values ($1, 'phone', 'sms', 'other')", [orgA]],
@@ -878,6 +898,7 @@ describe("tenant isolation", () => {
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
       ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],
+      ["opening_credit_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_credit_companies", "credit_agorot = 777", "credit_agorot = 777"],
       ["customer_credit_totals", "credit_agorot = 777", "credit_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
@@ -1176,6 +1197,13 @@ describe("tenant isolation", () => {
     );
     // RLS, the composite FK or the trigger's "same business" refusal (which answers the same whether the row exists or not)
     expect(["42501", "23503", "P0001"]).toContain(viaAllocation.code);
+    // GAP-12: B's offset cannot name A's opening credit or A's invoice
+    const viaOffset = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgB, ids.openingCreditA, ids.contactInvoiceA]),
+      ),
+    );
+    expect(["42501", "23503", "P0001"]).toContain(viaOffset.code);
     const viaProforma = await pgError(
       asUser(b.id, (q) =>
         q("insert into public.accounting_documents (organization_id, deal_id, proforma_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'tax_invoice', 'B-PRO', 1)", [orgB, dealB, ids.invoiceA]),

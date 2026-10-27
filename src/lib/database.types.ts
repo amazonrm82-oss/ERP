@@ -1958,11 +1958,17 @@ export type AccountingDocumentRow = {
   order_id: string | null;
   // PAY-02: on a tax invoice, the proforma it bills (set once)
   proforma_id: string | null;
+  // GAP-12: a company's opening balance (only that type; set on insert only)
+  company_id: string | null;
+  // GAP-12: the import that recorded this opening balance (server only)
+  import_job_id: string | null;
   // PAY-02 answer 7: on a tax invoice or a proforma, when it should be paid (filled from the customer's terms)
   due_date: string | null;
   doc_type: string;
-  number: string;
+  // GAP-12: null on an opening balance (no running number), set on every other type
+  number: string | null;
   doc_date: string;
+  // GAP-12: signed on an opening balance (negative = a credit), 0 and up on every other type
   amount_agorot: number;
   currency: string;
   status: string;
@@ -1980,6 +1986,23 @@ export type PaymentAllocationRow = {
   id: string;
   organization_id: string;
   payment_id: string;
+  document_id: string;
+  amount_agorot: number;
+  currency: string;
+  released_at: string | null;
+  removed_at: string | null;
+  removed_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// GAP-12: a share of a negative opening balance (a customer's credit) offset against a document of the same customer
+// (migration opening_credit). Never deleted: undone by an owner or admin (removed_at), released by the server (released_at).
+export type OpeningCreditAllocationRow = {
+  id: string;
+  organization_id: string;
+  credit_document_id: string;
   document_id: string;
   amount_agorot: number;
   currency: string;
@@ -2926,9 +2949,10 @@ export type Database = {
           contact_id?: string | null;
           order_id?: string | null;
           proforma_id?: string | null;
+          company_id?: string | null;
           due_date?: string | null;
           doc_type: string;
-          number: string;
+          number?: string | null;
           doc_date?: string;
           amount_agorot: number;
           currency?: string;
@@ -2939,6 +2963,12 @@ export type Database = {
       payment_allocations: Table<
         PaymentAllocationRow,
         { organization_id: string; payment_id: string; document_id: string; amount_agorot: number; currency?: string },
+        { amount_agorot?: number; removed_at?: string | null }
+      >;
+      // GAP-12: column grants; recorders offset, owners and admins change the amount or undo (no delete)
+      opening_credit_allocations: Table<
+        OpeningCreditAllocationRow,
+        { organization_id: string; credit_document_id: string; document_id: string; amount_agorot: number; currency?: string },
         { amount_agorot?: number; removed_at?: string | null }
       >;
       // ORD-04: column grants; the order is fixed once inserted
@@ -3226,6 +3256,19 @@ export type Database = {
       money_customer_credit: { Args: { p_org: string; p_deal: string | null; p_contact: string | null; p_company: string | null }; Returns: Json };
       // PAY-03: allocates the same customer's credit to a document, oldest payment first (invoker)
       money_apply_credit: { Args: { p_org: string; p_document: string; p_max?: number | null }; Returns: Json };
+      // GAP-12: records or replaces a contact's or company's opening balance (owners and admins); answers the new id
+      opening_balance_set: {
+        Args: {
+          p_org: string;
+          p_contact: string | null;
+          p_company: string | null;
+          p_amount: number;
+          p_date: string;
+          p_due?: string | null;
+          p_job?: string | null;
+        };
+        Returns: string;
+      };
       // PAY-03: a payment's credit (computed field, one rule)
       payment_credit: { Args: Record<string, never>; Returns: number };
       // PAY-03: computed fields on contacts and companies for the "יתרת זכות" column and filter (owners and admins; null / false for others)

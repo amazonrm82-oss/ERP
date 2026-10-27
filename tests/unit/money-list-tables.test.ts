@@ -59,6 +59,15 @@ describe("the documents list", () => {
     expect(Object.fromEntries(totals)).toEqual({ tax_invoice: { count: 2, agorot: 150_000 }, credit_invoice: { count: 1, agorot: 30_000 } });
   });
 
+  it("GAP-12: opening debts and opening credits are two lines, never netted", () => {
+    const totals = documentTotalsByType([
+      { docType: "opening_balance", amountAgorot: 100_000, cancelled: false },
+      { docType: "opening_balance", amountAgorot: -100_000, cancelled: false },
+      { docType: "opening_balance", amountAgorot: -5_000, cancelled: false },
+    ]);
+    expect(Object.fromEntries(totals)).toEqual({ opening_debt: { count: 1, agorot: 100_000 }, opening_credit: { count: 2, agorot: 105_000 } });
+  });
+
   it("exports one row per document in the header's order", () => {
     const rows = documentExportRows(
       [

@@ -13,10 +13,12 @@ const creditSchema = z.object({
   total: money,
   count: money,
   payments: z.array(z.object({ id: z.string(), paid_on: z.string(), method: z.string(), amount: money, credit: money })),
+  // GAP-12: the customer's negative opening balances, with what each still holds (in `total` too)
+  documents: z.array(z.object({ id: z.string(), doc_date: z.string(), credit: money })).optional().default([]),
 });
 export type CustomerCredit = z.infer<typeof creditSchema>;
 
-export const NO_CREDIT: CustomerCredit = { total: 0, count: 0, payments: [] };
+export const NO_CREDIT: CustomerCredit = { total: 0, count: 0, payments: [], documents: [] };
 
 /** The answer of public.money_customer_credit; a shape it does not know throws (FXC-12). */
 export function parseCustomerCredit(raw: unknown): CustomerCredit {
@@ -26,6 +28,8 @@ export function parseCustomerCredit(raw: unknown): CustomerCredit {
 const appliedSchema = z.object({
   allocated: money,
   payments: z.array(z.object({ payment_id: z.string(), amount: money })),
+  // GAP-12: the opening credits offset
+  documents: z.array(z.object({ document_id: z.string(), amount: money })).optional().default([]),
 });
 export type AppliedCredit = z.infer<typeof appliedSchema>;
 
@@ -35,10 +39,13 @@ export function parseAppliedCredit(raw: unknown): AppliedCredit {
 }
 
 /** The line on a payments card: how much credit the customer holds, and in how many payments. */
-export function creditLine(credit: CustomerCredit): string | null {
+export function creditLine(credit: Omit<CustomerCredit, "documents"> & { documents?: CustomerCredit["documents"] }): string | null {
   if (credit.total <= 0) return null;
+  // GAP-12: an opening credit is part of the total
+  const opening = (credit.documents ?? []).some((d) => d.credit > 0);
+  if (credit.count === 0 && opening) return `ללקוח יתרת זכות של ${formatMoney(credit.total)} מיתרת הפתיחה, שעוד לא קוזזה.`;
   const from = credit.count === 1 ? "מתשלום אחד" : `מ-${credit.count} תשלומים`;
-  return `ללקוח יתרת זכות של ${formatMoney(credit.total)} ${from} שעוד לא שויכו למסמך.`;
+  return `ללקוח יתרת זכות של ${formatMoney(credit.total)} ${from}${opening ? " ומיתרת הפתיחה" : ""} שעוד לא שויכו למסמך.`;
 }
 
 /** The checkbox on the document form. */
@@ -47,8 +54,13 @@ export function applyCreditLabel(total: number): string {
 }
 
 /** What the document form says after saving. */
-export function recordedMessage(applied: AppliedCredit | null, failed: boolean): string {
+export function recordedMessage(applied: Omit<AppliedCredit, "documents"> | null, failed: boolean): string {
   if (failed) return "המסמך נרשם, אבל הקיזוז מיתרת הזכות לא הצליח. אפשר לשייך תשלום מהמסמך.";
   if (!applied || applied.allocated <= 0) return "המסמך נרשם.";
   return `המסמך נרשם, וקוזזו ${formatMoney(applied.allocated)} מיתרת הזכות של הלקוח.`;
+}
+
+/** GAP-12: what the card says after offsetting credit against an existing document. */
+export function appliedCreditMessage(allocated: number): string {
+  return `קוזזו ${formatMoney(allocated)} מיתרת הזכות של הלקוח.`;
 }

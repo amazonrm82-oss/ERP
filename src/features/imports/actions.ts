@@ -24,6 +24,7 @@ import {
 } from "./fields";
 import { consentDeclarationSchema, consentsUndoneText, mapsConsent } from "./consent";
 import { DealImportStopped, loadDealLookups, processDealChunk, type DealImportContext } from "./deal-server";
+import { mapsOpeningBalance, OPENING_ADMINS_ONLY, openingsUndoneText } from "./opening-balance";
 import { loadProductLookups, processProductChunk, ProductImportStopped, type ProductImportContext } from "./product-server";
 import { loadTaskLookups, processTaskChunk, TaskImportStopped, type TaskImportContext } from "./task-server";
 import { ImportStopped, loadLookups, processChunk, type ImportContext, type RowOutcome } from "./server";
@@ -142,6 +143,11 @@ async function importContext(orgId: string, entity: RecordImportEntity, mode: Du
   }
   if (!mapping.some(Boolean)) {
     return fail("יש לבחור לפחות עמודה אחת לייבוא.");
+  }
+  // GAP-12: an opening balance column is for owners and admins only (public.opening_balance_set refuses anyone else too)
+  if (mapsOpeningBalance(mapping)) {
+    const role = await myRole(context.supabase, orgId, context.user.id);
+    if (role !== "owner" && role !== "admin") return fail(OPENING_ADMINS_ONLY);
   }
   const ctx: ImportContext = { supabase: context.supabase, orgId, userId: context.user.id, entity, mode, mapping, definitions };
   return { ok: true as const, ctx };
@@ -431,12 +437,12 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   if (entity !== "product" && (await myRole(context.supabase, orgId, context.user.id)) === "member") {
     const { data, error } = await context.supabase.rpc("undo_own_import", { p_org: orgId, p_job: jobId });
     if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל את הייבוא."));
-    const result = data as { done?: number; kept?: number; consents?: number } | null;
+    const result = data as { done?: number; kept?: number; consents?: number; opening_balances?: number } | null;
     const kept = result?.kept ?? 0;
     revalidatePath(paths.imports(orgId));
     revalidatePath(paths.org(orgId), "layout");
     const message = kept > 0 ? `הייבוא בוטל. לא בוטלו: ${kept}, כי שונו אחרי הייבוא.` : "הייבוא בוטל.";
-    return { ok: true, message: `${message}${consentsUndoneText(result?.consents)}` };
+    return { ok: true, message: `${message}${consentsUndoneText(result?.consents)}${openingsUndoneText(result?.opening_balances)}` };
   }
   if (entity === "product") {
     const removeError = await removeImportedProducts(context.supabase, orgId, jobId);
@@ -465,6 +471,7 @@ export async function undoImportAction(orgId: string, jobId: string): Promise<Ac
   }
   revalidatePath(paths.imports(orgId));
   revalidatePath(paths.org(orgId), "layout");
-  const consents = (undone as { consents?: number } | null)?.consents;
-  return consents ? { ok: true, message: `הייבוא בוטל.${consentsUndoneText(consents)}` } : ok();
+  const counts = undone as { consents?: number; opening_balances?: number } | null;
+  const extra = `${consentsUndoneText(counts?.consents)}${openingsUndoneText(counts?.opening_balances)}`;
+  return extra ? { ok: true, message: `הייבוא בוטל.${extra}` } : ok();
 }

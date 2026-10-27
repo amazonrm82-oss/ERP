@@ -24,12 +24,13 @@ type StuckRow = {
 
 // DEAL-02 gap: report_stuck_deals now reads the shared rule; re-running 0129 is followed by the file that redefines it
 // GAP-12 redefines app.deal_attention_rows() of _deal_attention.sql last (import notes are not a deal's last activity)
-// WAB-07 redefines app.import_record_worked() of _import_history.sql last (an imported chat is work on the record)
+// WAB-07 redefines app.import_record_worked() of _import_history.sql, and GAP-12 (opening balance) redefines it last
 const RERUN = [
   "20261006012900_deal_stage_entered.sql",
   migrationFile("_deal_attention.sql"),
   migrationFile("_import_history.sql"),
   migrationFile("_whatsapp_chat_import.sql"),
+  migrationFile("_opening_import_undo.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

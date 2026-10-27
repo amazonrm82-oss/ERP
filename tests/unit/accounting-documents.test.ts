@@ -3,17 +3,27 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { cancelReasonSchema, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES, documentSchema } from "@/features/documents/schema";
+import {
+  cancelReasonSchema,
+  DOCUMENT_TYPE_LABELS,
+  DOCUMENT_TYPES,
+  documentSchema,
+  documentTitle,
+  parseSignedAgorot,
+  recordableTypes,
+  takesDueDate,
+} from "@/features/documents/schema";
 import { canRecordDocuments } from "@/features/permissions/keys";
 
 // DOC-01: the form's rules mirror public.accounting_documents (migration accounting_documents).
 
 const dir = path.join(process.cwd(), "supabase/migrations");
-const migration = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_accounting_documents.sql"))!), "utf8");
+// GAP-12: the type list is last set by the opening balance migration
+const migration = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith("_opening_balance.sql"))!), "utf8");
 
 describe("accounting documents (DOC-01)", () => {
   it("the closed list of types equals the table's check, with the owner's Hebrew names", () => {
-    const listed = /doc_type\s+text not null check \(doc_type in \(([^)]*)\)\)/.exec(migration)?.[1] ?? "";
+    const listed = /accounting_documents_doc_type_check\s+check \(doc_type in \(([^)]*)\)\)/.exec(migration)?.[1] ?? "";
     expect([...listed.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([...DOCUMENT_TYPES]);
     expect(DOCUMENT_TYPE_LABELS).toEqual({
       tax_invoice: "חשבונית מס",
@@ -21,6 +31,7 @@ describe("accounting documents (DOC-01)", () => {
       receipt: "קבלה",
       credit_invoice: "חשבונית זיכוי",
       proforma: "חשבונית עסקה",
+      opening_balance: "יתרת פתיחה",
     });
   });
 
@@ -39,6 +50,38 @@ describe("accounting documents (DOC-01)", () => {
     expect(documentSchema.safeParse({ doc_type: "receipt", number: "1", doc_date: "2026-02-30", amount: "1" }).success).toBe(false);
     expect(documentSchema.safeParse({ doc_type: "receipt", number: "1", doc_date: "2026-10-20", amount: "" }).success).toBe(false);
     expect(documentSchema.safeParse({ doc_type: "receipt", number: "1", doc_date: "2026-10-20", amount: "-5" }).success).toBe(false);
+  });
+
+  it("GAP-12: an opening balance has no number, a signed amount that is not 0, and a due date only as a debt", () => {
+    expect(documentSchema.parse({ doc_type: "opening_balance", number: "7", doc_date: "2026-01-01", amount: "-1,250.50" })).toEqual({
+      doc_type: "opening_balance",
+      number: null,
+      doc_date: "2026-01-01",
+      amount: -125050,
+      due_date: null,
+    });
+    expect(documentSchema.parse({ doc_type: "opening_balance", number: "", doc_date: "2026-01-01", amount: "800", due_date: "2026-02-01" }).due_date).toBe(
+      "2026-02-01",
+    );
+    expect(documentSchema.safeParse({ doc_type: "opening_balance", number: "", doc_date: "2026-01-01", amount: "0" }).success).toBe(false);
+    expect(documentSchema.safeParse({ doc_type: "opening_balance", number: "", doc_date: "2026-01-01", amount: "-5", due_date: "2026-02-01" }).success).toBe(false);
+    // a number is still required on every other type, and only an opening balance is negative
+    expect(documentSchema.safeParse({ doc_type: "tax_invoice", number: "", doc_date: "2026-01-01", amount: "5" }).success).toBe(false);
+    expect(documentSchema.safeParse({ doc_type: "credit_invoice", number: "1", doc_date: "2026-01-01", amount: "-5" }).success).toBe(false);
+    expect(parseSignedAgorot("\u2212300")).toBe(-30000);
+    expect(parseSignedAgorot("--3")).toBeNull();
+    expect(takesDueDate("opening_balance", 100)).toBe(true);
+    expect(takesDueDate("opening_balance", -100)).toBe(false);
+    expect(takesDueDate("receipt")).toBe(false);
+    expect(recordableTypes(false)).not.toContain("opening_balance");
+    expect(recordableTypes(true)).toContain("opening_balance");
+    expect(documentTitle({ docType: "tax_invoice", number: "1001", docDate: "2026-01-01" })).toBe("חשבונית מס 1001");
+    expect(documentTitle({ docType: "opening_balance", number: null, docDate: "2026-01-01" })).toMatch(/^יתרת פתיחה מתאריך .*2026$/);
+  });
+
+  it("GAP-12: the table's amount and number rules for an opening balance", () => {
+    expect(migration).toMatch(/doc_type = 'opening_balance' and amount_agorot between -1000000000000 and 1000000000000 and amount_agorot <> 0/);
+    expect(migration).toMatch(/check \(\(doc_type = 'opening_balance'\) = \(number is null\)\)/);
   });
 
   it("a cancellation needs a reason up to 500", () => {

@@ -3,7 +3,7 @@ import { parsePage } from "@/lib/search";
 import { parseSort, sortValue, type Sort } from "@/lib/sort";
 
 import { documentsPath } from "./paths";
-import { isDocumentType, type DocumentType } from "./schema";
+import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES, isDocumentType, isOpeningBalance, type DocumentType } from "./schema";
 
 // LST-09: the business-wide list of accounting documents (DOC-01): its own selects, its sort and its address. Anything in
 // the address that is not valid is left out, never trusted.
@@ -87,12 +87,35 @@ export function documentListHref(orgId: string, filters: DocumentListFilters, pa
  * Owner, 21 October 2026: the list's totals are per document type and never netted (a credit invoice is its own line, not
  * taken off the invoices). Only documents in force count; a cancelled one counts nowhere.
  */
-export function documentTotalsByType(rows: readonly { docType: DocumentType; amountAgorot: number; cancelled: boolean }[]): Map<DocumentType, { count: number; agorot: number }> {
-  const totals = new Map<DocumentType, { count: number; agorot: number }>();
+export function documentTotalsByType(rows: readonly { docType: DocumentType; amountAgorot: number; cancelled: boolean }[]): Map<DocumentTotalKey, { count: number; agorot: number }> {
+  const totals = new Map<DocumentTotalKey, { count: number; agorot: number }>();
   for (const row of rows) {
     if (row.cancelled) continue;
-    const current = totals.get(row.docType) ?? { count: 0, agorot: 0 };
-    totals.set(row.docType, { count: current.count + 1, agorot: current.agorot + row.amountAgorot });
+    const key = documentTotalKey(row.docType, row.amountAgorot);
+    const current = totals.get(key) ?? { count: 0, agorot: 0 };
+    // an opening credit is counted by its size on its own line
+    totals.set(key, { count: current.count + 1, agorot: current.agorot + Math.abs(row.amountAgorot) });
   }
   return totals;
+}
+
+/**
+ * GAP-12: the totals' lines. An opening balance is never netted either: its debts and its credits are two lines; every
+ * other type is one line.
+ */
+export type DocumentTotalKey = Exclude<DocumentType, "opening_balance"> | "opening_debt" | "opening_credit";
+export const DOCUMENT_TOTAL_KEYS: readonly DocumentTotalKey[] = DOCUMENT_TYPES.flatMap((type): DocumentTotalKey[] =>
+  isOpeningBalance(type) ? ["opening_debt", "opening_credit"] : [type as Exclude<DocumentType, "opening_balance">],
+);
+export const DOCUMENT_TOTAL_LABELS: Record<DocumentTotalKey, string> = {
+  ...(Object.fromEntries(DOCUMENT_TYPES.filter((type) => !isOpeningBalance(type)).map((type) => [type, DOCUMENT_TYPE_LABELS[type]])) as Record<
+    Exclude<DocumentType, "opening_balance">,
+    string
+  >),
+  opening_debt: "יתרת פתיחה (חוב)",
+  opening_credit: "יתרת פתיחה (זכות)",
+};
+export function documentTotalKey(type: DocumentType, amountAgorot: number): DocumentTotalKey {
+  if (isOpeningBalance(type)) return amountAgorot < 0 ? "opening_credit" : "opening_debt";
+  return type as Exclude<DocumentType, "opening_balance">;
 }

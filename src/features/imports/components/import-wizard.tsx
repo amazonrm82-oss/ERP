@@ -45,6 +45,7 @@ import {
   mapsConsent,
 } from "../consent";
 import { HISTORY_HINTS, mapsHistory } from "../history";
+import { mapsOpeningBalance, OPENING_HINTS, OPENING_KEYS } from "../opening-balance";
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
 import { NewFieldForm } from "./new-field-form";
@@ -58,6 +59,8 @@ type Props = {
   customFields: Record<ImportEntityKey, CustomField[]>;
   canCreateFields: boolean;
   canImportProducts: boolean;
+  // GAP-12: owners and admins of a business with documents import an opening balance column
+  canOpeningBalance?: boolean;
   initialEntity?: ImportEntityKey;
   terms?: OrgTerms;
 };
@@ -127,7 +130,15 @@ const OUTCOME_LABEL: Record<RowOutcome["status"], string> = {
   failed: "שגיאה",
 };
 
-export function ImportWizard({ orgId, customFields: initialFields, canCreateFields, canImportProducts, initialEntity = "lead", terms = DEFAULT_TERMS }: Props) {
+export function ImportWizard({
+  orgId,
+  customFields: initialFields,
+  canCreateFields,
+  canImportProducts,
+  canOpeningBalance = false,
+  initialEntity = "lead",
+  terms = DEFAULT_TERMS,
+}: Props) {
   const [customFields, setCustomFields] = useState(initialFields);
   // the column whose "new field" form is open
   const [newFieldFor, setNewFieldFor] = useState<number | null>(null);
@@ -152,7 +163,7 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
   const fileId = useId();
 
   const targets = [
-    ...IMPORT_TARGETS[entity],
+    ...IMPORT_TARGETS[entity].filter((t) => canOpeningBalance || !OPENING_KEYS.has(t.key)),
     ...customFields[entity].map((f) => ({ key: `${CUSTOM_PREFIX}${f.key}`, label: `${f.label} (שדה מותאם)`, synonyms: [f.label] })),
   ];
 
@@ -471,6 +482,14 @@ export function ImportWizard({ orgId, customFields: initialFields, canCreateFiel
             <div className="space-y-1 rounded-lg border border-line bg-surface p-4 text-sm text-ink-soft sm:p-5">
               <p className="font-medium text-ink">היסטוריה מהמערכת הקודמת</p>
               {HISTORY_HINTS.map((hint) => (
+                <p key={hint}>{hint}</p>
+              ))}
+            </div>
+          ) : null}
+          {mapsOpeningBalance(mapping) ? (
+            <div className="space-y-1 rounded-lg border border-line bg-surface p-4 text-sm text-ink-soft sm:p-5">
+              <p className="font-medium text-ink">יתרת פתיחה</p>
+              {OPENING_HINTS.map((hint) => (
                 <p key={hint}>{hint}</p>
               ))}
             </div>
