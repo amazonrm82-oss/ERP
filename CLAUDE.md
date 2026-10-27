@@ -1857,6 +1857,15 @@ that back.
   column grant). Cookie `mx-theme` holds a per-device copy for the first paint (`src/features/theme/`); the root layout reads it, the
   business layout syncs it from the profile softly (a failed read never breaks the page). Public customer pages are always light: the
   proxy (`src/lib/supabase/proxy.ts`) sets request header `x-crm-path`, and the root layout pins light on the public prefixes.
+- Share to the app (WAB-06, no migration; Android Chrome only): the manifest's one `share_target` POSTs title/text/url and one
+  image (ALLOWED_TYPES images) to `/app/share/receive`. `public/sw.js` catches it, keeps one share in cache `share-v1` (the one
+  exception to "nothing is cached"; 24 hours, pruned on load and activate; given to the first signed-in person who opens it,
+  by SHA-256 of the user id) and opens `/app/share?s=<id>` (business by `mx-last-org`, else a picker) then `/o/[org]/share`.
+  Without the worker the server route reads nothing and asks to share again: shared text never goes into an address.
+  "ליד חדש" opens `LeadForm` with `prefill` (counts as unsaved); "הערה לרשומה" picks a record through `search_records` and saves a
+  note with the user's session, the image through the normal upload path. Sign-out (`SignOutButton`, `mfa-gate`) clears
+  `share-v1` (`src/features/share/device.ts`). The worker refuses a share POST whose `Sec-Fetch-Site` is cross-site (check on a
+  device). Follow-up: a signed-out fallback POST is re-sent by the proxy's 307 to /login (shared ground).
 - App shortcuts (USR-08, no migration): four manifest shortcuts go to `/app/go/[target]` (`src/features/shortcuts/shortcuts.ts`),
   which opens the target in the business named by cookie `mx-last-org` (set by `RememberOrg` in the business layout), else `/app`.
 - Unsaved changes (REC-11): put `<FormGuard state={state} />` inside a record form (`src/components/ui/unsaved-changes.tsx`,
