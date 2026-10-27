@@ -57,7 +57,7 @@
 -- ----------------------------------------------------------------------------
 -- Whether a document or payment (deal, contact, company) is read by the same rule as its order (deal, contact, company).
 -- The select policies of orders, accounting_documents and payments all read: the deal, else the contact, else (orders and
--- documents) the company, else the role (owners, admins, managers); test 252 pins their text, so a change there makes this
+-- documents) the company, else the role (owners, admins, managers); test 254 pins their text, so a change there makes this
 -- function be looked at again. Same rule = the order's deal; else its contact on a row with no deal; else, for an order
 -- with no parent at all, a row with none. An order read through its company never matches: its rows are always checked.
 create or replace function app.order_money_same_parent(p_deal uuid, p_contact uuid, p_company uuid,
