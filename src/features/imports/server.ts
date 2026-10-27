@@ -32,7 +32,7 @@ import {
 } from "./consent";
 import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
-import { importOpening, OPENING_FAILED, OPENING_ROW_SKIPPED, type ImportOpening } from "./opening-balance";
+import { importOpening, OPENING_ROW_SKIPPED, openingFailure, type ImportOpening } from "./opening-balance";
 import { importNote, NOTE_FAILED, NOTE_ROW_SKIPPED, ORIGINAL_DATE_ON_UPDATE, originalCreatedOn, type ImportNote } from "./history";
 import { orgTimeZone } from "./link-lookups";
 
@@ -727,7 +727,7 @@ type OpeningWork = { outcome: RowOutcome; recordId: string; opening: ImportOpeni
  * GAP-12: the written rows' opening balances, one call each to public.opening_balance_set with the job (the database checks
  * that the caller is an owner or admin and that the job is their own running import of this kind, cancels the customer's
  * active opening balance as "הוחלפה בייבוא" and records the new one). A balance not written leaves its row imported, with a
- * warning.
+ * warning; a balance refused because the old one holds allocations (opening_balance:allocated) is named as skipped.
  */
 async function recordOpenings(ctx: ImportContext, jobId: string, work: OpeningWork[]): Promise<void> {
   for (const w of work) {
@@ -740,7 +740,8 @@ async function recordOpenings(ctx: ImportContext, jobId: string, work: OpeningWo
       p_due: w.opening.due,
       p_job: jobId,
     });
-    if (error) w.outcome.warning = joinWarnings(w.outcome.warning, OPENING_FAILED) ?? undefined;
+    // a balance that holds allocations is skipped with its reason (owner, 27 October 2026); the row itself stays written
+    if (error) w.outcome.warning = joinWarnings(w.outcome.warning, openingFailure(error)) ?? undefined;
   }
 }
 

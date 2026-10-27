@@ -114,7 +114,7 @@ describe("opening credit (GAP-12)", () => {
     expect((await pgError(offset(owner, credit3, debt2, 100))).hint).toBe("allocation:customer");
   });
 
-  it("released when the credit is replaced or the document cancelled; undone only by owners and admins; never deleted", async () => {
+  it("released when the credit is cancelled (never replaced while offset); undone only by owners and admins; never deleted", async () => {
     const c = await contact();
     const credit = await setOb({ contact: c }, -1000);
     const inv = await invoice(c, 1000);
@@ -125,8 +125,10 @@ describe("opening credit (GAP-12)", () => {
     expect((await pgError(run(admin, (q) => q("delete from public.opening_credit_allocations where id = $1", [id])))).code).toBe("42501");
     // a member who may not record payments: RLS
     expect((await pgError(offset(member, credit, inv, 1))).code).toBe("42501");
-    // replacing the opening balance cancels it and releases its offsets
-    await setOb({ contact: c }, -200);
+    // owner's answer (1) ג of 27 October 2026: it is not replaced while it holds an offset (test 255) ...
+    expect((await pgError(setOb({ contact: c }, -200))).hint).toBe("opening_balance:allocated");
+    // ... cancelling it by hand releases its offsets
+    await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בדיקה' where id = $1", [credit]));
     expect(await asAdmin((q) => count(q, "select 1 from public.opening_credit_allocations where id = $1 and released_at is not null", [id]))).toBe(1);
     expect(await state(inv)).toMatchObject({ state: "unpaid", balance: 1000 });
   });

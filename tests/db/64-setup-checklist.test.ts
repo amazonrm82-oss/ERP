@@ -613,6 +613,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_opening_import_undo.sql",
       // RVW-54 redefines app.payments_advance() of _credit_advances_list.sql last (the same-customer test is never NULL)
       "_payments_advance_null.sql",
+      // the GAP-12 answers redefine public.opening_balance_set() of _opening_balance.sql and public.money_apply_credit() of
+      // _opening_credit.sql last (no replace while allocated; credit oldest first across both sources)
+      "_opening_balance_answers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

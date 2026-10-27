@@ -133,7 +133,8 @@ const openingSchema = z.object({
   due_date: z.string(),
 });
 
-/** Records or replaces the company's opening balance (the active one is cancelled "הוחלפה ביתרה חדשה"). */
+/** Records or replaces the company's opening balance (the active one is cancelled "הוחלפה ביתרה חדשה"; refused while it holds
+ * allocations, hint opening_balance:allocated, shown by the form). */
 export async function setCompanyOpeningBalanceAction(orgId: string, companyId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const context = await actionContext(orgId, companyId);
   if (!context.ok) return context;
@@ -178,7 +179,8 @@ export async function cancelCompanyOpeningBalanceAction(orgId: string, companyId
 }
 
 /**
- * GAP-12 (owner's answer (2) א): offsets the customer's credit (unallocated payments, then negative opening balances) against
+ * GAP-12 (owner's answer (2) א): offsets the customer's credit (the order's advances first, then unallocated payments and negative opening balances
+ * together, oldest first: owner's answer (2) ג of 27 October 2026) against
  * an open document that takes payments, with the user's session (public.money_apply_credit; the allocation rules decide).
  */
 export async function applyCreditAction(orgId: string, subject: Subject, documentId: string): Promise<FormState> {

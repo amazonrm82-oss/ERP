@@ -15,7 +15,7 @@ import type { FormState } from "@/lib/action-result";
 import { cancelCompanyOpeningBalanceAction, setCompanyOpeningBalanceAction } from "../actions";
 import { CANCEL_REASON_MAX, parseSignedAgorot } from "../schema";
 
-// GAP-12: the company card's opening balance: record or replace (the active one is cancelled), and cancel. Owners and admins.
+// GAP-12: the company card's opening balance: record or replace (the active one is cancelled; refused while it holds allocations), and cancel. Owners and admins.
 
 function OpeningForm({ orgId, companyId, today, replaces, onDone }: { orgId: string; companyId: string; today: string; replaces: boolean; onDone: () => void }) {
   const action = setCompanyOpeningBalanceAction.bind(null, orgId, companyId);
@@ -35,7 +35,7 @@ function OpeningForm({ orgId, companyId, today, replaces, onDone }: { orgId: str
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <p className="text-sm text-ink-soft">
         יתרת החברה מהמערכת הקודמת, בלי מספר מסמך.
-        {replaces ? " יתרת הפתיחה שכבר רשומה תבוטל ותוחלף בזו, ותשלומים וקיזוזים שהיו משויכים אליה ישתחררו." : ""}
+        {replaces ? " יתרת הפתיחה שכבר רשומה תבוטל ותוחלף בזו. אם יש לה תשלומים או קיזוזים משויכים, קודם בטלו את השיוכים." : ""}
       </p>
       <TextField
         label="סכום (₪)"

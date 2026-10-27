@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { IMPORT_TARGETS } from "@/features/imports/fields";
-import { importOpening, mapsOpeningBalance, OPENING_KEYS, openingsUndoneText } from "@/features/imports/opening-balance";
+import { importOpening, mapsOpeningBalance, OPENING_ALLOCATED, OPENING_FAILED, OPENING_KEYS, openingFailure, openingsUndoneText } from "@/features/imports/opening-balance";
 
 // GAP-12 (owner, 26 October 2026, answers (1) א, (3) ב, (4) ג): the opening balance column of a contacts or companies import.
 describe("import: opening balance (GAP-12)", () => {
@@ -36,5 +36,12 @@ describe("import: opening balance (GAP-12)", () => {
     expect(openingsUndoneText(0)).toBe("");
     expect(openingsUndoneText(1)).toContain("יתרת הפתיחה");
     expect(openingsUndoneText(3)).toContain("3 יתרות הפתיחה");
+  });
+
+  it("names a balance not replaced because it holds allocations (owner, 27 October 2026, answer (1) ג); anything else is a failure", () => {
+    expect(openingFailure({ code: "P0001", hint: "opening_balance:allocated" })).toBe(OPENING_ALLOCATED);
+    expect(OPENING_ALLOCATED).toContain("דולגה");
+    expect(openingFailure({ code: "P0001", hint: "document:opening_job" })).toBe(OPENING_FAILED);
+    expect(openingFailure({ code: "42501" })).toBe(OPENING_FAILED);
   });
 });
