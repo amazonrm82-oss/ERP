@@ -18,7 +18,7 @@ import { uploadFiles } from "@/features/files/upload-client";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import type { LeadSourceOption, LeadStatusOption } from "@/features/leads/queries";
 import type { RecordType } from "@/features/record-type-options/schema";
-import type { OrgTerms, TermForms } from "@/features/terminology/terms";
+import { withPrefixThe, type OrgTerms, type TermForms } from "@/features/terminology/terms";
 import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 
@@ -397,7 +397,7 @@ function AfterSaveCard({
       <Card>
         <CardBody>
           <p role="status" className="text-md">
-            {recordSavedLine(after.term)} שומרים עליו את מה ששיתפתם…
+            {recordSavedLine(after.term)} שומרים גם את מה ששיתפתם…
           </p>
         </CardBody>
       </Card>
@@ -407,14 +407,14 @@ function AfterSaveCard({
     <Card>
       <CardBody className="space-y-3">
         <FormNotice message={recordSavedLine(after.term)} />
-        <p className="text-md">מה ששיתפתם לא נשמר עליו במלואו. השיתוף נשאר במכשיר הזה, ואפשר לנסות שוב.</p>
+        <p className="text-md">מה ששיתפתם לא נשמר במלואו. השיתוף נשאר במכשיר הזה, ואפשר לנסות שוב.</p>
         {after.problems.map((problem) => (
           <FormError key={problem} message={problem} />
         ))}
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => onRetry({ pick: after.pick, body: after.body, image: after.image })}>לנסות שוב כהערה</Button>
           <ButtonLink href={after.href} variant="secondary">
-            ל{after.term.theSingular}
+            {withPrefixThe("ל", after.term)}
           </ButtonLink>
         </div>
       </CardBody>
