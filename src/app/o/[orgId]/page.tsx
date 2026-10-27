@@ -12,6 +12,10 @@ import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { idleText, meetingSpanText, quoteEndsSoonText, quoteWaitText, teamTaskDue, teamTasksMoreText } from "@/features/home/my-day";
 import { TeamTasksList } from "@/features/home/components/team-tasks-list";
+import { NextActionsCard } from "@/features/home/components/next-actions-card";
+import { nextActions } from "@/features/home/next-actions";
+import { getWaitingLeads } from "@/features/leads/waiting";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { quotePath, quotesPath } from "@/features/quotes/paths";
 import { getMyDay, getMyTeamTasks } from "@/features/home/queries";
 import { GoalProgressList } from "@/features/goals/components/goal-progress-list";
@@ -60,7 +64,7 @@ export default async function HomePage({ params }: Props) {
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
-  const [day, setupStep, goals, modules, teamTasks] = await Promise.all([
+  const [day, setupStep, goals, modules, teamTasks, terms] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
     setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
     // GOL-03: the person's own goals whose period holds today; no goal, no card
@@ -69,7 +73,23 @@ export default async function HomePage({ params }: Props) {
     getOrgModules(orgId),
     // TASK-07 follow-up: open team tasks nobody took yet, of the person's own teams (a viewer gets none)
     getMyTeamTasks(orgId, user.id, role),
+    // AIX-03: the business's words in the reasons
+    getOrgTerms(orgId),
   ]);
+  // AIX-03: the person's own leads nobody answered yet (SPD-02's rule); none while leads are switched off
+  const waitingLeads = modules.leads ? await getWaitingLeads(orgId, user.id) : { leads: [], truncated: false };
+  const next = nextActions({
+    orgId,
+    now: new Date(),
+    today: day.today,
+    timeZone: org.timeZone,
+    terms,
+    tasks: day.tasks,
+    waitingLeads: waitingLeads.leads,
+    meetings: day.meetings,
+    quotes: day.waitingQuotesAll,
+    dealsWithoutNextStep: day.dealsWithoutNextStep.deals,
+  });
   const checklist = setupOwner && !setupStep ? await getSetupChecklist(orgId, user.id) : null;
   // MNY-05: once a week, on the business's first working day of the week, the cleanup with a count
   // (a rep counts their own deals, others everything they see); nothing to decide, no card
@@ -155,6 +175,9 @@ export default async function HomePage({ params }: Props) {
           </CardBody>
         </Card>
       ) : null}
+
+      {/* AIX-03: the order to work in, with a reason each; the lists below stay as they are */}
+      <NextActionsCard next={next} />
 
       <ul aria-label="סיכום" className={cn("mb-5 grid gap-2 sm:gap-3", summary.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
         {summary.map((item) => (

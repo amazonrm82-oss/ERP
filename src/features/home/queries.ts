@@ -20,7 +20,16 @@ import {
 import { parseReportData } from "@/features/reports/schemas";
 
 // related: the record the task belongs to, when it has one (FXU-01)
-export type MyTask = { id: string; title: string; dueAt: string | null; isOverdue: boolean; related: RelatedRecord | null };
+export type MyTask = {
+  id: string;
+  title: string;
+  dueAt: string | null;
+  isOverdue: boolean;
+  related: RelatedRecord | null;
+  // AIX-03: a call task is a promised call; its lead (whatever record `related` shows) is not listed as waiting
+  taskType: string;
+  leadId: string | null;
+};
 export type MyNewLead = {
   id: string;
   fullName: string | null;
@@ -47,6 +56,8 @@ export type MyDay = {
   // TASK-09: the user's sent or viewed quotes still within their validity, oldest sent first
   waitingQuotes: WaitingQuoteRow[];
   waitingQuotesCount: number;
+  // AIX-03: every waiting quote read (not only the card's few), with the customer's last view of the viewed ones
+  waitingQuotesAll: Array<WaitingQuoteRow & { lastViewedAt: string | null }>;
 };
 
 const TASK_LIMIT = 50;
@@ -78,7 +89,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
   const [tasks, leads, deals, calendar, stuck, quotes] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, due_at, lead_id, contact_id, company_id, deal_id")
+      .select("id, title, due_at, task_type, lead_id, contact_id, company_id, deal_id")
       .eq("organization_id", orgId)
       .eq("owner_id", userId)
       .eq("status", "open")
@@ -162,6 +173,15 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     })),
     superseded,
   );
+  // AIX-03: when the customer last opened each viewed quote (quote_views follows the quote's RLS)
+  const viewedIds = waiting.filter((quote) => quote.status === "viewed").map((quote) => quote.id);
+  const views = viewedIds.length
+    ? must(
+        await supabase.from("quote_views").select("quote_id, last_viewed_at").eq("organization_id", orgId).in("quote_id", viewedIds),
+        "quote views",
+      )
+    : [];
+  const lastViewed = new Map(views.map((row) => [row.quote_id, row.last_viewed_at]));
 
   const related = await relatedRecords(orgId, tasks.data);
   return {
@@ -173,6 +193,8 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
       // compared as numbers: PostgREST writes "+00:00", toISOString() writes "Z"
       isOverdue: task.due_at !== null && Date.parse(task.due_at) < Date.parse(startOfToday),
       related: related(task),
+      taskType: task.task_type,
+      leadId: task.lead_id,
     })),
     newLeads: (leads.data ?? []).map((lead) => ({
       id: lead.id,
@@ -191,6 +213,7 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
     meetingsTruncated: calendar.truncated,
     dealsWithoutNextStep: dealsWithoutNextStep(stuckRows, NO_NEXT_STEP_SHOWN),
     waitingQuotes: waiting.slice(0, WAITING_QUOTES_SHOWN),
+    waitingQuotesAll: waiting.map((quote) => ({ ...quote, lastViewedAt: lastViewed.get(quote.id) ?? null })),
     // the count is exact while the read held them all; beyond that it is the database's count less what was seen replaced
     waitingQuotesCount: Math.max(waiting.length, (quotes.count ?? quoteRows.length) - superseded.size),
   };
