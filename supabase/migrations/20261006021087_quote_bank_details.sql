@@ -12,6 +12,8 @@
 --                              afterwards, for every writer. A draft has none, so a new version (quote_new_version) or a
 --                              duplicate (quote_duplicate) gets a fresh snapshot when it is sent, never a copy. A quote
 --                              sent before this migration keeps none. quote_send itself is unchanged.
+--                              Taken only while the design's switch for that document type is on at that moment (review
+--                              M1): with it off, no account number is stored, so no answer can expose one.
 -- public.orders.bank_details   the same for an order, taken when the order gets its number (order_confirm, or an
 --                              order made numbered by order_from_quote / order_from_deal), by orders_zz_bank_details.
 -- public.quote_designs.show_bank_details_quote / show_bank_details_order   boolean not null default true each (owner,
@@ -23,7 +25,8 @@
 -- (quote_public) or `design.show_bank_details_order` (order_public) to the full answer; their
 -- not-found rules, rate limits and status pages are unchanged (test 253 pins their md5).
 --
--- Redefined: app.audit_row (latest body 020020) only to add 'bank_details' to its ignored columns, so the snapshot (the full
+-- Redefined: app.audit_row (latest body 020020) only to add 'bank_details' to its ignored columns and strip it from a
+-- deleted row's entry, so the snapshot (the full
 -- account number) never enters audit_log (owner: bank details are logged without the full number).
 --
 -- Bank details are the business's, not a person's: no erasure work.
@@ -51,12 +54,15 @@ language plpgsql security definer
 set search_path = ''
 as $$
 begin
-  if tg_op = 'INSERT' then
-    -- a new quote is a draft (quotes_check sets it for a person; versions and duplicates are drafts too)
-    new.bank_details := case when new.status <> 'draft' then app.document_bank_snapshot(new.organization_id) end;
-  elsif old.status = 'draft' and new.status <> 'draft' then
-    -- the moment it is sent and numbered
-    new.bank_details := app.document_bank_snapshot(new.organization_id);
+  if (tg_op = 'INSERT' and new.status <> 'draft') or (tg_op = 'UPDATE' and old.status = 'draft' and new.status <> 'draft') then
+    -- the moment it is sent and numbered (a new quote is a draft: quotes_check sets it for a person; versions and
+    -- duplicates are drafts too). Only while the design shows bank details on quotes (no row = on): a business that
+    -- chose not to print them never has its account number stored on the quote, so no answer can expose it.
+    new.bank_details := case when coalesce((select d.show_bank_details_quote from public.quote_designs d
+                                             where d.organization_id = new.organization_id), true)
+                             then app.document_bank_snapshot(new.organization_id) end;
+  elsif tg_op = 'INSERT' then
+    new.bank_details := null;
   else
     new.bank_details := old.bank_details;
   end if;
@@ -73,12 +79,15 @@ language plpgsql security definer
 set search_path = ''
 as $$
 begin
-  if tg_op = 'INSERT' then
-    -- a manual draft has no number; order_from_quote / order_from_deal make it numbered
-    new.bank_details := case when new.number is not null then app.document_bank_snapshot(new.organization_id) end;
-  elsif old.number is null and new.number is not null then
-    -- order_confirm numbers a draft
-    new.bank_details := app.document_bank_snapshot(new.organization_id);
+  if (tg_op = 'INSERT' and new.number is not null) or (tg_op = 'UPDATE' and old.number is null and new.number is not null) then
+    -- the moment it gets its number (order_confirm numbers a draft; order_from_quote / order_from_deal insert it
+    -- numbered), only while the design shows bank details on order confirmations (no row = on)
+    new.bank_details := case when coalesce((select d.show_bank_details_order from public.quote_designs d
+                                             where d.organization_id = new.organization_id), true)
+                             then app.document_bank_snapshot(new.organization_id) end;
+  elsif tg_op = 'INSERT' then
+    -- a manual draft has no number
+    new.bank_details := null;
   else
     new.bank_details := old.bank_details;
   end if;
@@ -513,7 +522,8 @@ begin
       return null;
     end if;
     v_action := 'delete';
-    v_changes := v_old;
+    -- TAX-02: the bank snapshot (the full account number) never enters the log, a deleted row's included
+    v_changes := v_old - 'bank_details';
   else
     for v_key in select jsonb_object_keys(v_new) loop
       if v_key <> all (v_ignored) and (v_new -> v_key) is distinct from (v_old -> v_key) then

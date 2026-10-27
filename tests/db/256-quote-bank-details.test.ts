@@ -20,6 +20,7 @@ describe("bank details on quotes and orders (TAX-02)", () => {
   let org: string, otherOrg: string;
   let pipe: { pipelineId: string; stageId: string };
   let otherPipe: { pipelineId: string; stageId: string };
+  let wonStage: string;
 
   const run = <T,>(u: U, fn: (q: Query) => Promise<T>) => asUser(u.id, fn);
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
@@ -53,6 +54,8 @@ describe("bank details on quotes and orders (TAX-02)", () => {
   const link = (u: U, orgId: string, quote: string) => run(u, async (q) => (await one<{ t: string }>(q, "select public.quote_link_create($1, $2) as t", [orgId, quote])).t);
   const publicQuote = (token: string) =>
     asService(async (q) => (await one<{ p: Record<string, unknown> & { design: Record<string, unknown> } }>(q, "select public.quote_public($1) as p", [token])).p);
+  const orderBank = (order: string) =>
+    asAdmin(async (q) => (await one<{ b: Bank | null }>(q, "select bank_details as b from public.orders where id = $1", [order]))?.b ?? null);
   const setDesign = (u: U, orgId: string, kind: "quote" | "order", show: boolean) =>
     run(u, (q) =>
       q(
@@ -86,6 +89,7 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     }
     const p = await defaultPipeline(org);
     pipe = { pipelineId: p.pipelineId, stageId: p.stages[0].id };
+    wonStage = p.stages.find((st) => st.kind === "won")!.id;
     const op = await defaultPipeline(otherOrg);
     otherPipe = { pipelineId: op.pipelineId, stageId: op.stages[0].id };
     await setBank(owner, org, "12345678", "העסק שלנו");
@@ -222,13 +226,12 @@ describe("bank details on quotes and orders (TAX-02)", () => {
       await q("insert into public.order_lines (organization_id, order_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
       return id;
     });
-    const orderBank = () => asAdmin(async (q) => (await one<{ b: Bank | null }>(q, "select bank_details as b from public.orders where id = $1", [order])).b);
-    expect(await orderBank()).toBeNull();
+    expect(await orderBank(order)).toBeNull();
     expect((await pgError(run(member, (q) => q("update public.orders set bank_details = '{}'::jsonb where id = $1", [order])))).code).toBe("42501");
     await run(member, (q) => q("select public.order_confirm($1, $2)", [org, order]));
-    expect((await orderBank())?.bank_account).toBe("12345678");
+    expect((await orderBank(order))?.bank_account).toBe("12345678");
     await setBank(owner, org, "11112222", "אחר");
-    expect((await orderBank())?.bank_account).toBe("12345678");
+    expect((await orderBank(order))?.bank_account).toBe("12345678");
     // the member and a viewer read it on the order; a colleague who may not read the order does not
     for (const u of [member, viewer]) {
       const r = await run(u, (q) => q<{ b: Bank }>("select bank_details as b from public.orders where id = $1", [order]));
@@ -289,5 +292,130 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     );
     expect(anywhere).toEqual([]);
     await setBank(owner, org, "12345678", "העסק שלנו");
+  });
+
+  // review M1: nothing is stored while the design hides the block for that document type
+  it("a quote sent or an order numbered while its switch is off stores no snapshot; with it on, it does", async () => {
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ orders: true })]));
+    await setBank(owner, org, "27182818", "העסק שלנו");
+    await setDesign(owner, org, "quote", false);
+    const off = await newQuote(member, org, pipe);
+    await send(member, org, off);
+    expect(await stored(off)).toBeNull();
+    // switching it on later does not fill a quote already sent
+    await setDesign(owner, org, "quote", true);
+    await asAdmin((q) => q("update public.quotes set title = 'שונה' where id = $1", [off]));
+    expect(await stored(off)).toBeNull();
+    const on = await newQuote(member, org, pipe);
+    await send(member, org, on);
+    expect((await stored(on))?.bank_account).toBe("27182818");
+
+    const draftOrder = () =>
+      run(member, async (q) => {
+        const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח מתג', $2) returning id", [org, member.id])).id;
+        const id = (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id;
+        await q("insert into public.order_lines (organization_id, order_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+        return id;
+      });
+    const confirm = (id: string) => run(member, (q) => q("select public.order_confirm($1, $2)", [org, id]));
+    // the quote switch off does not stop an order's snapshot, and the order switch off stops it
+    await setDesign(owner, org, "quote", false);
+    const orderOn = await draftOrder();
+    await confirm(orderOn);
+    expect((await orderBank(orderOn))?.bank_account).toBe("27182818");
+    await setDesign(owner, org, "quote", true);
+    await setDesign(owner, org, "order", false);
+    const orderOff = await draftOrder();
+    await confirm(orderOff);
+    expect(await orderBank(orderOff)).toBeNull();
+    await setDesign(owner, org, "order", true);
+    // and the order switch off does not stop a quote's
+    await setDesign(owner, org, "order", false);
+    const quoteOn = await newQuote(member, org, pipe);
+    await send(member, org, quoteOn);
+    expect((await stored(quoteOn))?.bank_account).toBe("27182818");
+    await setDesign(owner, org, "order", true);
+    await setBank(owner, org, "12345678", "העסק שלנו");
+  });
+
+  // review INFO 7
+  it("an order from an accepted quote or a won deal takes its own fresh snapshot; a server write to it is put back", async () => {
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ orders: true })]));
+    await setBank(owner, org, "11111111", "העסק שלנו");
+    const quote = await newQuote(member, org, pipe);
+    await send(member, org, quote);
+    await asAdmin((q) => q("update public.quotes set status = 'accepted' where id = $1", [quote]));
+    await setBank(owner, org, "22222222", "העסק שלנו");
+    const fromQuote = await run(member, async (q) => (await one<{ id: string }>(q, "select public.order_from_quote($1, $2) as id", [org, quote])).id);
+    expect((await orderBank(fromQuote))?.bank_account).toBe("22222222");
+    expect((await stored(quote))?.bank_account).toBe("11111111");
+
+    const deal = await run(member, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'לקוח עסקה') returning id", [org])).id;
+      const id = (
+        await one<{ id: string }>(q, "insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id) values ($1, 'עסקה', $2, $3, $4) returning id", [
+          org,
+          pipe.pipelineId,
+          pipe.stageId,
+          contact,
+        ])
+      ).id;
+      await q("insert into public.deal_lines (organization_id, deal_id, description, unit_price_agorot, quantity) values ($1, $2, 'שירות', 10000, 1)", [org, id]);
+      await q("update public.deals set stage_id = $2 where id = $1", [id, wonStage]);
+      return id;
+    });
+    const fromDeal = await run(member, async (q) => (await one<{ id: string }>(q, "select public.order_from_deal($1, $2) as id", [org, deal])).id);
+    expect((await orderBank(fromDeal))?.bank_account).toBe("22222222");
+
+    await asAdmin((q) => q("update public.orders set bank_details = '{\"bank_account\": \"1\"}'::jsonb, notes = 'שונה' where id = $1", [fromDeal]));
+    expect((await orderBank(fromDeal))?.bank_account).toBe("22222222");
+    await asAdmin((q) => q("update public.orders set bank_details = null where id = $1", [fromDeal]));
+    expect((await orderBank(fromDeal))?.bank_account).toBe("22222222");
+    await setBank(owner, org, "12345678", "העסק שלנו");
+  });
+
+  it("a handover keeps the snapshots; a purge and an erasure keep the quote's and leave the number out of the audit log", async () => {
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ orders: true })]));
+    await setBank(owner, org, "33333333", "העסק שלנו");
+    const quote = await newQuote(member, org, pipe);
+    await send(member, org, quote);
+    const order = await run(member, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח העברה', $2) returning id", [org, member.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id;
+      await q("insert into public.order_lines (organization_id, order_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+      await q("select public.order_confirm($1, $2)", [org, id]);
+      return id;
+    });
+    await run(owner, (q) => q("select public.transfer_records($1, $2, $3)", [org, member.id, other.id]));
+    const owners = await asAdmin(async (q) =>
+      one<{ q: string; o: string }>(q, "select (select owner_id from public.quotes where id = $1) as q, (select owner_id from public.orders where id = $2) as o", [quote, order]),
+    );
+    expect(owners).toEqual({ q: other.id, o: other.id });
+    expect((await stored(quote))?.bank_account).toBe("33333333");
+    expect((await orderBank(order))?.bank_account).toBe("33333333");
+
+    // a quote on a contact only, purged and erased: the quote is kept with its snapshot
+    const kept = await run(other, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'ישראל לפרטיות', $2) returning id", [org, other.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, contact_id) values ($1, 'הצעה', $2) returning id", [org, contact])).id;
+      await q("insert into public.quote_lines (organization_id, quote_id, name, quantity, unit_price_agorot, position) values ($1, $2, 'עבודה', 1, 10000, 1)", [org, id]);
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return { id, contact };
+    });
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [kept.contact]));
+    await run(owner, (q) => q("delete from public.contacts where id = $1", [kept.contact]));
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, kept.contact]));
+    expect((await stored(kept.id))?.bank_account).toBe("33333333");
+    const hits = await asAdmin(async (q) =>
+      (await q<{ entity_type: string }>("select entity_type from public.audit_log where organization_id = $1 and changes::text like '%33333333%'", [org])).rows,
+    );
+    expect(hits).toEqual([]);
+    await setBank(owner, org, "12345678", "העסק שלנו");
+  });
+
+  it("a deleted row's audit entry never holds the snapshot (app.audit_row, review L2)", async () => {
+    const def = await asAdmin(async (q) => (await q<{ d: string }>("select pg_get_functiondef('app.audit_row()'::regprocedure) as d")).rows[0].d);
+    expect(def).toContain("v_changes := v_old - 'bank_details'");
+    expect(def).toContain("'bank_details'];");
   });
 });

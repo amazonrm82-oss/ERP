@@ -499,7 +499,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
       </div>
       <QuoteEditor
         orgId={orgId}
-        quote={quote}
+        // TAX-02 (review M1): the bank snapshot stays on the server; the editor (a client component) never renders it
+        quote={{ ...quote, bankDetails: null }}
         lines={lines}
         archivedProducts={archivedProducts}
         pricing={pricing}
