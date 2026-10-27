@@ -631,6 +631,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   days the caller sees, null below 5). Unhandled = the waiting-leads rule (`src/features/leads/waiting.ts`): no non-private
   contact entry by a person, and a lead someone else took is hidden as in `takenLeadsFilter`; keep SQL and TS in step. New
   groups go into `MONEY_GROUPS` (`src/features/money-waiting/groups.ts`) plus a report key.
+  Since 021089 (MNY-01, owner 27 October 2026) `report_money_waiting` (last redefined there; invoker, same signature) adds `quotes`
+  (flag `quotes`; sent/viewed, valid in the org zone, newest sent version of a chain, deal not lost; a deal with a quote counted in
+  the view leaves stuck/overdue/renewals), `debts` (flags `documents`+`payments` AND `app.can_record_payments`, else null; active
+  tax invoices, proformas, positive opening balances past due with a balance from `public.money_allocation_state`, candidates first
+  narrowed by their own counted allocations; owner = deal's, else contact's, else company's) and `renewals` (recurring deals with
+  `renewal_date` in today..+30 days and no live follow-up deal; one period). Every amount is with VAT (`vat {mode, rate_bp}` from
+  `app.org_document_vat_rate`; pure `app.money_with_vat`, half up per amount; mode `unknown` = before VAT and no mixed grand total).
+  It no longer calls `report_pipeline_cleanup`: stuck/overdue/the deals list come from one `app.deal_attention_rows` pass plus an
+  inline copy of the cleanup's overdue rule, list fields, order and 300 cap (test 93 keeps them equal). Follow-up (shared ground):
+  `public.money_allocation_state` is slow with hundreds of open documents x thousands of allocations (review of 27 October 2026).
 - Stage-required built-in fields (DEAL-05, migration 020475): `stages.required_fields` (subset of amount | expected_close_date |
   contact_id, constraint `stages_required_fields_known`, mirrored by `STAGE_REQUIRED_FIELDS` in `src/features/deals/stage-required.ts`).
   App-only like FLD-09's "require": `requiredForMove` / `missingAfterChange` add pseudo fields `builtin:*` ahead of the custom ones,
