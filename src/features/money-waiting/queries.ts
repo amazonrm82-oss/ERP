@@ -29,9 +29,9 @@ export type MoneyQuote = {
   status: "sent" | "viewed";
   sentAt: string;
   validUntil: string | null;
-  // before VAT (the measure of the deals beside it); totalWithVat for the line
+  // the value counted (with VAT, as every amount on the screen; before VAT while the business's VAT status is not set)
   amount: number;
-  totalWithVat: number;
+  netAmount: number;
   dealId: string | null;
   contactId: string | null;
   ownerId: string | null;
@@ -50,6 +50,8 @@ export type MoneyDebt = {
   dealId: string | null;
   contactId: string | null;
   companyId: string | null;
+  // the deal's own contact (WhatsApp when the document names no contact)
+  dealContactId: string | null;
   ownerId: string | null;
   ownerName: string | null;
   customerName: string | null;
@@ -123,7 +125,7 @@ export async function getMoneyWaiting(orgId: string, ownerId: string | null): Pr
         sentAt: row.sent_at,
         validUntil: row.valid_until,
         amount: row.amount_agorot,
-        totalWithVat: row.total_agorot,
+        netAmount: row.net_agorot,
         dealId: row.deal_id,
         contactId: row.contact_id,
         ownerId: row.owner_id,
@@ -142,6 +144,7 @@ export async function getMoneyWaiting(orgId: string, ownerId: string | null): Pr
         dealId: row.deal_id,
         contactId: row.contact_id,
         companyId: row.company_id,
+        dealContactId: row.deal_contact_id,
         ownerId: row.owner_id,
         ownerName: nameOf(row.owner_id),
         customerName: row.customer_name,

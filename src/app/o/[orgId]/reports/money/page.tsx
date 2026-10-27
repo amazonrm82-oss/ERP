@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { EmptyState, FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
-import { MoneyView, ROWS_SHOWN } from "@/features/money-waiting/components/money-view";
+import { debtContact, MoneyView, ROWS_SHOWN } from "@/features/money-waiting/components/money-view";
 import { RowActions } from "@/features/money-waiting/components/row-actions";
 import { getMoneyWaiting, getRowActionSetup, type MoneyWaiting } from "@/features/money-waiting/queries";
 import { rowActions } from "@/features/money-waiting/row-actions";
@@ -37,7 +37,7 @@ export default async function MoneyWaitingPage({ params, searchParams }: Props) 
   const shownContacts = (value: MoneyWaiting) => [
     ...value.deals.map((deal) => deal.contactId),
     ...(value.quotes ?? []).slice(0, ROWS_SHOWN).map((quote) => quote.contactId),
-    ...(value.debts ?? []).slice(0, ROWS_SHOWN).map((debt) => debt.contactId),
+    ...(value.debts ?? []).slice(0, ROWS_SHOWN).map(debtContact),
     ...value.renewals.slice(0, ROWS_SHOWN).map((renewal) => renewal.contactId),
   ];
   const setup = money.ok && money.value ? await getRowActionSetup(orgId, context.canWrite, shownContacts(money.value)) : null;

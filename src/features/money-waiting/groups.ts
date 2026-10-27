@@ -23,6 +23,8 @@ export type MoneyGroup = {
   title: string;
   // one line under the title: what puts a record in the group
   description: string;
+  // the VAT mark next to the group's amount (set for the screen by groupVatMark)
+  mark?: string | null;
 };
 
 export const MONEY_GROUPS: readonly MoneyGroup[] = [
@@ -30,13 +32,13 @@ export const MONEY_GROUPS: readonly MoneyGroup[] = [
     key: "debts",
     part: "owed",
     title: "חובות באיחור",
-    description: 'חשבוניות, חשבונות עסקה ויתרות פתיחה שמועד התשלום שלהן עבר ועוד לא שולמו במלואן. הסכום הוא היתרה, כולל מע"מ.',
+    description: "חשבוניות, חשבונות עסקה ויתרות פתיחה שמועד התשלום שלהן עבר ועוד לא שולמו במלואן. הסכום הוא היתרה לתשלום.",
   },
   {
     key: "quotes",
     part: "to_close",
     title: "הצעות מחיר שנשלחו ולא נענו",
-    description: 'הצעות שנשלחו ועוד בתוקף, בלי תשובה מהלקוח. כל הצעה פעם אחת, בגרסה האחרונה שנשלחה. הסכום לפני מע"מ.',
+    description: "הצעות שנשלחו ועוד בתוקף, בלי תשובה מהלקוח. כל הצעה פעם אחת, בגרסה האחרונה שנשלחה.",
   },
   {
     key: "stuck",
@@ -72,7 +74,27 @@ export const MONEY_PART_LABELS: Record<MoneyPart, string> = {
 
 type Money = ReportData<"report_money_waiting">;
 
+/**
+ * The VAT mark of every amount on the screen (owner, 27 October 2026: all amounts include VAT). 'none': the
+ * business does not charge VAT, no mark; 'unknown': its VAT status is not set, the amounts are before VAT.
+ */
+export type MoneyVatMode = "included" | "none" | "unknown";
+
+export function vatMark(mode: MoneyVatMode): string | null {
+  if (mode === "included") return 'כולל מע"מ';
+  if (mode === "unknown") return 'לפני מע"מ: מצב המע"מ של העסק לא הוגדר';
+  return null;
+}
+
+/** The short VAT mark of a group's amount: debts are documents' balances, always with VAT; the rest follow the business. */
+export function groupVatMark(key: MoneyGroupKey, mode: MoneyVatMode): string | null {
+  if (mode === "none") return null;
+  if (key === "debts" || mode === "included") return 'כולל מע"מ';
+  return 'לפני מע"מ';
+}
+
 export type MoneySummary = {
+  vat: MoneyVatMode;
   // the main number: owed + to close (the estimate is never in it)
   total: number;
   // the parts that exist for this business ("owed" only while the debts group is shown)
@@ -90,6 +112,7 @@ export function moneySummary(data: Money): MoneySummary {
   if (data.debts) parts.push({ part: "owed", amount: data.debts.amount });
   parts.push({ part: "to_close", amount: toClose });
   return {
+    vat: data.vat.mode,
     total: parts.reduce((sum, part) => sum + part.amount, 0),
     parts,
     groups: {

@@ -300,7 +300,9 @@ export const REPORT_SCHEMAS = {
         created_at: z.string(),
       }),
     ),
-    // quotes sent and not answered (null without the `quotes` flag); amount = before VAT
+    // the VAT mark of every amount (owner: all with VAT): included (rate > 0), none (no VAT), unknown (status not set)
+    vat: z.object({ mode: z.enum(["included", "none", "unknown"]), rate_bp: z.number().int().nonnegative().nullable() }),
+    // quotes sent and not answered (null without the `quotes` flag)
     quotes: moneyGroup(
       z.object({
         id: uuid,
@@ -309,7 +311,9 @@ export const REPORT_SCHEMAS = {
         status: z.enum(["sent", "viewed"]),
         sent_at: z.string(),
         valid_until: day.nullable(),
+        // the value counted: with VAT (before VAT while the business's VAT status is not set)
         amount_agorot: amount,
+        net_agorot: amount,
         total_agorot: amount,
         deal_id: id,
         contact_id: id,
@@ -317,7 +321,7 @@ export const REPORT_SCHEMAS = {
         customer_name: text,
       }),
     ).nullable(),
-    // overdue debts (null without the `documents` and `payments` flags); amount = the balances left
+    // overdue debts (null without the `documents` and `payments` flags or the right to record payments); amount = the balances left
     debts: moneyGroup(
       z.object({
         id: uuid,
@@ -332,11 +336,13 @@ export const REPORT_SCHEMAS = {
         contact_id: id,
         company_id: id,
         order_id: id,
+        // the deal's contact, for a reminder when the document names no contact
+        deal_contact_id: id,
         owner_id: id,
         customer_name: text,
       }),
     ).nullable(),
-    // recurring deals renewing from today through 30 days ahead; amount = one period each
+    // recurring deals renewing from today through 30 days ahead; amount = one period each, with VAT
     renewals: moneyGroup(
       z.object({
         id: uuid,

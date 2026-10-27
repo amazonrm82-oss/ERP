@@ -1,4 +1,8 @@
 {
+  "vat": {
+    "mode": "included",
+    "rate_bp": 1800
+  },
   "deals": [
     {
       "id": "00000000-0000-4000-8000-000000000011",
@@ -12,7 +16,7 @@
       "limit_days": 7,
       "stage_name": "פנייה ראשונית",
       "pipeline_id": "00000000-0000-4000-8000-000000000006",
-      "amount_agorot": 30000,
+      "amount_agorot": 35400,
       "days_in_stage": 0,
       "stage_position": 0,
       "last_activity_at": null,
@@ -35,7 +39,8 @@
         "contact_id": "00000000-0000-4000-8000-000000000019",
         "days_overdue": 10,
         "amount_agorot": 11700,
-        "customer_name": "חייב"
+        "customer_name": "חייב",
+        "deal_contact_id": null
       }
     ],
     "count": 1,
@@ -48,7 +53,7 @@
       "phone": null,
       "owner_id": "00000000-0000-4000-8000-000000000007",
       "full_name": "ישראל ישראלי",
-      "created_at": "2026-10-27T20:41:15.379927+00:00",
+      "created_at": "2026-10-27T21:24:12.583658+00:00",
       "phone_e164": null,
       "company_name": null
     }
@@ -66,21 +71,22 @@
         "number": "2",
         "status": "sent",
         "deal_id": "00000000-0000-4000-8000-000000000012",
-        "sent_at": "2026-10-27T20:41:15.672451+00:00",
+        "sent_at": "2026-10-27T21:24:12.886952+00:00",
         "owner_id": "00000000-0000-4000-8000-000000000008",
         "contact_id": null,
+        "net_agorot": 50000,
         "valid_until": null,
         "total_agorot": 59000,
-        "amount_agorot": 50000,
+        "amount_agorot": 59000,
         "customer_name": null
       }
     ],
     "count": 1,
-    "amount": 50000
+    "amount": 59000
   },
   "overdue": {
     "deals": 1,
-    "amount": 30000
+    "amount": 35400
   },
   "estimate": {
     "days": 90,
@@ -100,14 +106,14 @@
         "contact_id": null,
         "billing_kind": "monthly",
         "renewal_date": "2026-11-06",
-        "amount_agorot": 5000
+        "amount_agorot": 5900
       }
     ],
     "count": 1,
-    "amount": 5000
+    "amount": 5900
   },
   "to_close": {
     "deals": 1,
-    "amount": 30000
+    "amount": 35400
   }
 }

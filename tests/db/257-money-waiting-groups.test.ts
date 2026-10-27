@@ -11,6 +11,7 @@ type QuoteRow = {
   id: string;
   deal_id: string | null;
   amount_agorot: number;
+  net_agorot: number;
   total_agorot: number;
   owner_id: string | null;
 };
@@ -20,6 +21,7 @@ type DebtRow = {
   days_overdue: number;
   owner_id: string | null;
   doc_type: string;
+  deal_contact_id: string | null;
 };
 type RenewalRow = {
   id: string;
@@ -28,6 +30,7 @@ type RenewalRow = {
 };
 type Money = {
   today: string;
+  vat: { mode: "included" | "none" | "unknown"; rate_bp: number | null };
   to_close: Line;
   stuck: Line;
   overdue: Line;
@@ -36,7 +39,10 @@ type Money = {
   debts: Group<DebtRow> | null;
   renewals: Group<RenewalRow>;
 };
-type Cleanup = { stuck: Line; overdue: Line; deals: Array<{ id: string }> };
+type Cleanup = { stuck: Line; overdue: Line; deals: Array<{ id: string; stuck: boolean; overdue: boolean; amount_agorot: number }> };
+
+// a before-VAT amount with VAT, half up in agorot (app.money_with_vat)
+const withVat = (amount: number, rate: number | null) => (rate ? amount + Math.round((amount * rate) / 10000) : amount);
 
 /**
  * MNY-01, the three groups whose modules exist: quotes sent and not answered (one per chain, open, by the business's
@@ -215,6 +221,16 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
     await deal(m1, "חידוש", { previous_deal_id: ids.rFollowed });
     ids.rEdge = await recurring(m2, "מנוי בקצה", "monthly", 2500, 30);
 
+    // review: m1's stuck deal with an open quote sent by the owner (whose view hides the deal), and a quote on a lost deal
+    ids.dP = await deal(m1, "תקועה עם הצעה של אחר", { amount_agorot: 70000 });
+    await makeStuck(ids.dP);
+    ids.qP = await quote(owner, ids.dP, 12000);
+    ids.dL = await deal(m1, "עסקה שאבדה", { amount_agorot: 1000 });
+    ids.qL = await quote(m1, ids.dL, 8000);
+    await asAdmin((q) =>
+      q("update public.deals d set stage_id = s.id from public.stages s where d.id = $1 and s.pipeline_id = d.pipeline_id and s.kind = 'lost'", [ids.dL]),
+    );
+
     // documents
     ids.inv1 = await doc("tax_invoice", 10000, {
       contact: c1,
@@ -239,6 +255,19 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
       due: await day(-4),
     });
     await asUser(owner.id, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [ids.cancelled]));
+    // an invoice on a deal with no contact: the reminder goes to the deal's contact
+    ids.dDebt = await deal(m1, "עסקה עם חשבונית", { amount_agorot: 6000, contact_id: c1 });
+    ids.invDeal = await asUser(
+      owner.id,
+      async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            "insert into public.accounting_documents (organization_id, deal_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', 'MW-DEAL', $3::date - 30, 6000, $3::date - 3) returning id",
+            [org, ids.dDebt, today],
+          )
+        ).id,
+    );
     ids.opening = await asUser(
       owner.id,
       async (q) =>
@@ -252,51 +281,62 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
     );
   });
 
-  it("quotes: open sent quotes, one per chain, net before VAT; declined and expired are left out", async () => {
+  it("quotes: open sent quotes, one per chain, with VAT; declined, expired and on a lost deal are left out; a won deal's stays", async () => {
     const m = await money(owner);
+    expect(m.vat.mode).toBe("included");
+    expect(m.vat.rate_bp).toBeGreaterThan(0);
     expect(m.quotes).not.toBeNull();
-    expect(sorted(m.quotes!.rows)).toEqual([ids.qA, ids.qV2, ids.qOver, ids.qR].sort());
-    expect(m.quotes!.count).toBe(4);
-    expect(m.quotes!.amount).toBe(10000 + 20000 + 40000 + 30000);
+    expect(sorted(m.quotes!.rows)).toEqual([ids.qA, ids.qV2, ids.qOver, ids.qR, ids.qP].sort());
+    expect(m.quotes!.rows.map((r) => r.id)).not.toContain(ids.qL);
+    expect(m.quotes!.count).toBe(5);
+    // the value counted is the stored total with VAT
+    for (const row of m.quotes!.rows) expect(row.amount_agorot).toBe(row.total_agorot);
+    expect(m.quotes!.amount).toBe(m.quotes!.rows.reduce((sum, r) => sum + r.total_agorot, 0));
     const a = m.quotes!.rows.find((r) => r.id === ids.qA)!;
-    expect(a.amount_agorot).toBe(10000);
-    // the VAT is on the row for the screen, not in the sum
-    expect(a.total_agorot).toBeGreaterThan(a.amount_agorot);
+    expect(a.net_agorot).toBe(10000);
+    expect(a.total_agorot).toBe(withVat(10000, m.vat.rate_bp));
   });
 
-  it("each deal once: a deal with an open quote leaves stuck and overdue, and the cleanup itself is unchanged", async () => {
+  it("each deal once: a deal with an open quote leaves stuck and overdue; amounts are summed per deal with VAT", async () => {
     const [m, c] = [await money(owner), await cleanup(owner)];
-    expect(c.deals.map((d) => d.id)).toEqual(expect.arrayContaining([ids.dQ, ids.dS, ids.dOverQ, ids.dOver, ids.rStuck]));
-    expect(m.stuck).toEqual({
-      deals: c.stuck.deals - 1,
-      amount: c.stuck.amount - 100000,
-    });
-    expect(m.overdue).toEqual({
-      deals: c.overdue.deals - 1,
-      amount: c.overdue.amount - 40000,
-    });
-    expect(m.to_close).toEqual({
-      deals: m.stuck.deals + m.overdue.deals,
-      amount: m.stuck.amount + m.overdue.amount,
-    });
+    const rate = m.vat.rate_bp;
+    expect(c.deals.map((d) => d.id)).toEqual(expect.arrayContaining([ids.dQ, ids.dP, ids.dS, ids.dOverQ, ids.dOver, ids.rStuck]));
+    const hidden = new Set([ids.dQ, ids.dP, ids.dOverQ]);
+    const kept = c.deals.filter((d) => !hidden.has(d.id));
+    const sum = (rows: typeof kept) => rows.reduce((total, d) => total + withVat(d.amount_agorot ?? 0, rate), 0);
+    expect(m.stuck).toEqual({ deals: c.stuck.deals - 2, amount: sum(kept.filter((d) => d.stuck)) });
+    expect(m.overdue).toEqual({ deals: c.overdue.deals - 1, amount: sum(kept.filter((d) => !d.stuck && d.overdue)) });
+    expect(m.to_close).toEqual({ deals: m.stuck.deals + m.overdue.deals, amount: m.stuck.amount + m.overdue.amount });
     const listed = m.deals.map((d) => d.id);
-    expect(listed).not.toContain(ids.dQ);
-    expect(listed).not.toContain(ids.dOverQ);
+    for (const id of hidden) expect(listed).not.toContain(id);
     expect(listed).toEqual(expect.arrayContaining([ids.dS, ids.dOver, ids.rStuck]));
+    expect((m.deals.find((d) => d.id === ids.dS) as unknown as { amount_agorot: number }).amount_agorot).toBe(withVat(50000, rate));
+  });
+
+  it("a quote hides its deal only in a view that counts the quote (lead's decision)", async () => {
+    // m1 owns the stuck deal, the owner sent the open quote on it
+    const mine = await money(owner, m1.id);
+    expect(mine.deals.find((d) => d.id === ids.dP)).toMatchObject({ stuck: true });
+    expect(mine.quotes!.rows.map((r) => r.id)).not.toContain(ids.qP);
+    const theirs = await money(owner, owner.id);
+    expect(theirs.quotes!.rows.map((r) => r.id)).toContain(ids.qP);
+    const all = await money(owner);
+    expect(all.deals.map((d) => d.id)).not.toContain(ids.dP);
+    expect(all.quotes!.rows.filter((r) => r.id === ids.qP)).toHaveLength(1);
   });
 
   it("renewals: open or won recurring deals renewing today through 30 days ahead, one period each, not counted twice", async () => {
     const m = await money(owner);
     // rStuck is in stuck, rQuote in quotes, rFollowed has a renewal deal of its own; rFar and rPast are outside the window
     expect(sorted(m.renewals.rows)).toEqual([ids.rWon, ids.rEdge].sort());
-    expect(m.renewals).toMatchObject({ count: 2, amount: 7500 });
-    expect(m.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(5000);
+    expect(m.renewals).toMatchObject({ count: 2, amount: withVat(5000, m.vat.rate_bp) + withVat(2500, m.vat.rate_bp) });
+    expect(m.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(withVat(5000, m.vat.rate_bp));
   });
 
   it("debts: overdue balances only, a billed proforma not counted twice, a positive opening balance counts", async () => {
     const m = await money(owner);
     expect(m.debts).not.toBeNull();
-    expect(sorted(m.debts!.rows)).toEqual([ids.inv1, ids.inv4, ids.opening].sort());
+    expect(sorted(m.debts!.rows)).toEqual([ids.inv1, ids.inv4, ids.invDeal, ids.opening].sort());
     const by = new Map(m.debts!.rows.map((r) => [r.id, r]));
     expect(by.get(ids.inv1)).toMatchObject({ balance: 6000, days_overdue: 1 });
     // the proforma's 5,000 counts on the invoice that bills it
@@ -306,7 +346,9 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
       doc_type: "opening_balance",
       owner_id: m2.id,
     });
-    expect(m.debts).toMatchObject({ count: 3, amount: 28000 });
+    // the invoice on a deal names no contact: the deal's contact is there for the reminder
+    expect(by.get(ids.invDeal)).toMatchObject({ balance: 6000, deal_contact_id: c1 });
+    expect(m.debts).toMatchObject({ count: 4, amount: 34000 });
   });
 
   it("with an owner: that person's quotes, debts and renewals", async () => {
@@ -320,24 +362,67 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
 
   it("RLS decides: under 'own' a member counts only their records, a viewer none; a viewer sees all under 'org'", async () => {
     const all = await money(owner);
-    expect(await money(viewer)).toMatchObject({
-      quotes: all.quotes,
-      debts: all.debts,
-      renewals: all.renewals,
-    });
+    // debts only for people who may record payments (owner, answer (4) ב)
+    expect(await money(viewer)).toMatchObject({ quotes: all.quotes, debts: null, renewals: all.renewals });
     await setVisibility("own");
     try {
       const m = await money(m1);
-      expect(sorted(m.quotes!.rows)).toEqual([ids.qA, ids.qR].sort());
-      expect(sorted(m.debts!.rows)).toEqual([ids.inv1, ids.inv4].sort());
+      // qP: the owner's quote on m1's deal follows the deal
+      expect(sorted(m.quotes!.rows)).toEqual([ids.qA, ids.qR, ids.qP].sort());
+      expect(m.debts).toBeNull();
       expect(sorted(m.renewals.rows)).toEqual([ids.rWon]);
       const v = await money(viewer);
       expect(v.quotes).toMatchObject({ count: 0, amount: 0, rows: [] });
-      expect(v.debts).toMatchObject({ count: 0, amount: 0, rows: [] });
+      expect(v.debts).toBeNull();
       expect(v.renewals).toMatchObject({ count: 0, amount: 0, rows: [] });
     } finally {
       await setVisibility("org");
     }
+  });
+
+  it("debts only for people who may record payments: a member gets them with the record_payments permission", async () => {
+    expect((await money(m1)).debts).toBeNull();
+    await setOverrides({ quotes: true, documents: true, payments: true, granular_permissions: true });
+    await asUser(owner.id, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [org, m1.id]));
+    try {
+      const m = await money(m1);
+      expect(m.debts).not.toBeNull();
+      expect(sorted(m.debts!.rows)).toEqual(sorted((await money(owner)).debts!.rows));
+      expect((await money(m2)).debts).toBeNull();
+    } finally {
+      await asUser(owner.id, (q) => q("select public.set_member_permissions($1, $2, '{}')", [org, m1.id]));
+      await setOverrides({ quotes: true, documents: true, payments: true });
+    }
+  });
+
+  it("the VAT mode: a business that charges VAT converts, an exempt one shows amounts as they are, an unset status before VAT", async () => {
+    const setStatus = (status: string | null) =>
+      asUser(owner.id, (q) => q("update public.org_document_settings set vat_status = $2 where organization_id = $1", [org, status]));
+    const charging = await money(owner);
+    const rate = charging.vat.rate_bp!;
+    try {
+      await setStatus("exempt");
+      const exempt = await money(owner);
+      expect(exempt.vat).toEqual({ mode: "none", rate_bp: 0 });
+      expect((exempt.deals.find((d) => d.id === ids.dS) as unknown as { amount_agorot: number }).amount_agorot).toBe(50000);
+      expect(exempt.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(5000);
+      // a quote keeps the total stored when it was sent
+      expect(exempt.quotes!.rows.find((r) => r.id === ids.qA)!.amount_agorot).toBe(withVat(10000, rate));
+
+      await setStatus(null);
+      const unknown = await money(owner);
+      expect(unknown.vat).toEqual({ mode: "unknown", rate_bp: null });
+      expect((unknown.deals.find((d) => d.id === ids.dS) as unknown as { amount_agorot: number }).amount_agorot).toBe(50000);
+      expect(unknown.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(5000);
+      // before VAT, as the rest: the quote's net
+      expect(unknown.quotes!.rows.find((r) => r.id === ids.qA)!.amount_agorot).toBe(10000);
+      // debts are documents' balances, with VAT whatever the mode
+      expect(unknown.debts!.amount).toBe(charging.debts!.amount);
+    } finally {
+      await setStatus("licensed");
+    }
+    expect(charging.vat).toEqual({ mode: "included", rate_bp: rate });
+    expect(charging.renewals.rows.find((r) => r.id === ids.rWon)!.amount_agorot).toBe(withVat(5000, rate));
   });
 
   it("another business gets nothing, and anon may not call it", async () => {
@@ -350,8 +435,8 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
     try {
       const [m, c] = [await money(owner), await cleanup(owner)];
       expect(m.quotes).toBeNull();
-      expect(m.stuck).toEqual(c.stuck);
-      expect(m.overdue).toEqual(c.overdue);
+      expect(m.stuck.deals).toBe(c.stuck.deals);
+      expect(m.overdue.deals).toBe(c.overdue.deals);
       expect(m.deals.map((d) => d.id)).toContain(ids.dQ);
       // the renewal with a quote is a renewal again
       expect(m.renewals.rows.map((r) => r.id)).toContain(ids.rQuote);
@@ -445,5 +530,52 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
       auth: true,
       anon: false,
     });
+  });
+});
+
+// Review finding 1: the debts group narrows to documents that can still have a balance before money_allocation_state
+// (whose cost grows with documents x allocations), so thousands of paid overdue invoices stay fast.
+describe("money waiting: many paid overdue invoices (MNY-01 review)", () => {
+  let owner: { id: string; email: string };
+  let org: string;
+
+  beforeAll(async () => {
+    owner = await createUser("mw-bulk-owner");
+    org = await createOrg(owner.id, "עסק החשבוניות");
+    const contact = await asUser(
+      owner.id,
+      async (q) =>
+        (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח', $2) returning id", [org, owner.id]))
+          .rows[0].id,
+    );
+    // fixture rows in bulk: triggers set aside (as server data), every invoice due 10 days ago
+    await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      await q(
+        `insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date, status)
+         select $1, $2, 'tax_invoice', 'B-' || g, current_date - 40, 1000, current_date - 10, 'active' from generate_series(1, 3005) g`,
+        [org, contact],
+      );
+      await q(
+        `insert into public.payments (organization_id, contact_id, amount_agorot, method, status)
+         select $1, $2, 1000, 'transfer', 'confirmed' from generate_series(1, 3000)`,
+        [org, contact],
+      );
+      await q(
+        `insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot)
+         select $1, p.id, d.id, 1000
+           from (select id, row_number() over (order by id) as n from public.payments where organization_id = $1) p
+           join (select id, row_number() over (order by id) as n from public.accounting_documents where organization_id = $1) d on d.n = p.n`,
+        [org],
+      );
+    });
+  });
+
+  it("3,000 paid and 5 open overdue invoices: the 5 counted, well within the statement timeout", async () => {
+    const started = Date.now();
+    const m = await asUser(owner.id, async (q) => (await q<{ r: Money }>("select public.report_money_waiting($1) as r", [org])).rows[0].r);
+    const took = Date.now() - started;
+    expect(m.debts).toMatchObject({ count: 5, amount: 5000 });
+    expect(took).toBeLessThan(2000);
   });
 });

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { dealGroup, MONEY_GROUPS, moneySummary, shownGroups } from "@/features/money-waiting/groups";
+import { dealGroup, groupVatMark, MONEY_GROUPS, moneySummary, shownGroups, vatMark } from "@/features/money-waiting/groups";
 import { rowActions } from "@/features/money-waiting/row-actions";
 import { parseReportData } from "@/features/reports/schemas";
 
@@ -101,5 +101,17 @@ describe("money waiting (MNY-01)", () => {
         phoneE164: null,
       })[0],
     ).toBe("task");
+  });
+
+  it("the VAT mark: with VAT when the business charges it, none when it does not, before VAT when its status is not set", () => {
+    expect(moneySummary(sample()).vat).toBe("included");
+    expect(vatMark("included")).toBe('כולל מע"מ');
+    expect(vatMark("none")).toBeNull();
+    expect(vatMark("unknown")).toBe('לפני מע"מ: מצב המע"מ של העסק לא הוגדר');
+    expect(groupVatMark("quotes", "included")).toBe('כולל מע"מ');
+    expect(groupVatMark("stuck", "unknown")).toBe('לפני מע"מ');
+    // debts are documents' balances, always with VAT
+    expect(groupVatMark("debts", "unknown")).toBe('כולל מע"מ');
+    expect(groupVatMark("debts", "none")).toBeNull();
   });
 });

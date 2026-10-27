@@ -11,7 +11,7 @@ import { QUOTE_STATUS_LABELS } from "@/features/quotes/schema";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
-import { dealGroup, MONEY_PART_LABELS, shownGroups, type MoneyGroup, type MoneyGroupKey } from "../groups";
+import { dealGroup, groupVatMark, MONEY_PART_LABELS, shownGroups, vatMark, type MoneyGroup, type MoneyGroupKey } from "../groups";
 import type { MoneyDebt, MoneyLead, MoneyQuote, MoneyRenewal, MoneyWaiting } from "../queries";
 
 // rows shown per group; the rest are on the full lists (the cleanup, the waiting leads)
@@ -51,6 +51,11 @@ export function debtRecord(debt: MoneyDebt): { kind: "deal" | "contact" | "compa
   return null;
 }
 
+/** The contact a debt's reminder goes to: the document's own, else its deal's (read with the user's session, so an unreadable one gives no number). */
+export function debtContact(debt: MoneyDebt): string | null {
+  return debt.contactId ?? debt.dealContactId;
+}
+
 function recordHref(orgId: string, record: { kind: "deal" | "contact" | "company"; id: string }): string {
   return record.kind === "deal" ? paths.deal(orgId, record.id) : record.kind === "contact" ? paths.contact(orgId, record.id) : paths.company(orgId, record.id);
 }
@@ -67,6 +72,7 @@ export function MoneyView({ orgId, money, owner, dealAction, leadAction, recordA
           כמה כסף מחכה לכם
         </h2>
         <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(summary.total)}</p>
+        {vatMark(summary.vat) ? <p className="text-sm text-ink-soft">{vatMark(summary.vat)}</p> : null}
         <ul className="mt-2 space-y-0.5 text-sm text-ink-soft">
           {summary.parts.map((part) => (
             <li key={part.part}>
@@ -91,7 +97,8 @@ export function MoneyView({ orgId, money, owner, dealAction, leadAction, recordA
       </section>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
-        {shownGroups(summary).map((group) => {
+        {shownGroups(summary).map((shownGroup) => {
+          const group = { ...shownGroup, mark: groupVatMark(shownGroup.key, summary.vat) };
           const line = summary.groups[group.key] ?? { count: 0, amount: 0 };
           switch (group.key) {
             case "unhandled_leads":
@@ -121,6 +128,7 @@ function GroupHeader({ group, count, amount }: { group: MoneyGroup; count: numbe
           <>
             {" · "}
             <span className="font-semibold tabular-nums">{amount}</span>
+            {group.mark ? <span className="text-sm text-ink-soft"> ({group.mark})</span> : null}
           </>
         ) : null}
       </p>
@@ -321,8 +329,12 @@ function QuotesCard({
                   {" · "}בתוקף עד <time dateTime={quote.validUntil}>{formatDate(quote.validUntil)}</time>
                 </>
               ) : null}
-              {" · "}
-              <span className="tabular-nums">{formatMoney(quote.totalWithVat)}</span> כולל מע&quot;מ
+              {quote.netAmount !== quote.amount ? (
+                <>
+                  {" · "}
+                  <span className="tabular-nums">{formatMoney(quote.netAmount)}</span> לפני מע&quot;מ
+                </>
+              ) : null}
             </p>
             {action && quote.dealId
               ? action({
@@ -414,7 +426,7 @@ function DebtsCard({
                   id: record.id,
                   name,
                   ownerId: debt.ownerId,
-                  contactId: debt.contactId,
+                  contactId: debtContact(debt),
                 })
               : null}
           </li>
