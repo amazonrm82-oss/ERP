@@ -11,7 +11,7 @@
 --   'url' (target_url). Exactly one target column per kind (qr_codes_target_shape); a 'url' code always holds its link.
 -- * app.qr_target_url_ok(url): https only, at most 2,000 characters, printable ASCII without spaces or backslashes (the app
 --   stores the browser's normalized form, so an Israeli domain arrives as punycode), no user name or password, a host name
---   of labels with a dot and a letter top-level label, an optional port. Mirrored by qrTargetUrlOk() in
+--   of labels with a dot and a letter top-level label, an optional port 1..65535 without leading zeros. Mirrored by qrTargetUrlOk() in
 --   src/features/qr-codes/target-url.ts; both read tests/unit/fixtures/qr-target-urls.json. Checked by the trigger (hint
 --   qr_code:url) and by the constraint qr_codes_target_url_ok.
 -- * app.qr_codes_check (last defined in 020295): a target is any of the four columns; a link is checked.
@@ -37,9 +37,9 @@ as $$
     -- no user name or password
     and position('@' in substring(p_url from '^https://([^/?#]+)')) = 0
     -- the host: labels of letters, digits and inner hyphens, at least one dot, a letter (or punycode) top-level label;
-    -- an optional port
+    -- an optional port 1..65535, written without leading zeros
     and substring(p_url from '^https://([^/?#]+)')
-        ~* '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})(:[0-9]{1,5})?$'
+        ~* '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$'
     and char_length(regexp_replace(substring(p_url from '^https://([^/?#]+)'), ':[0-9]+$', '')) <= 253,
     false)
 $$;

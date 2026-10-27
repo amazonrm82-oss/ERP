@@ -4,7 +4,8 @@
 export const QR_URL_MAX = 2000;
 
 const AUTHORITY = /^https:\/\/([^/?#]+)(?:[/?#][\s\S]*)?$/;
-const HOST_PORT = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})(:[0-9]{1,5})?$/i;
+// the port: 1..65535, written without leading zeros
+const HOST_PORT = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$/i;
 // printable ASCII only: no spaces, no control or non-ASCII characters
 const PRINTABLE = /^[!-~]+$/;
 
