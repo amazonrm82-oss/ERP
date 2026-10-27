@@ -1881,8 +1881,13 @@ that back.
   exception to "nothing is cached"; 24 hours, pruned on load and activate; given to the first signed-in person who opens it,
   by SHA-256 of the user id) and opens `/app/share?s=<id>` (business by `mx-last-org`, else a picker) then `/o/[org]/share`.
   Without the worker the server route reads nothing and asks to share again: shared text never goes into an address.
-  "ליד חדש" opens `LeadForm` with `prefill` (counts as unsaved); "הערה לרשומה" picks a record through `search_records` and saves a
-  note with the user's session, the image through the normal upload path. Sign-out (`SignOutButton`, `mfa-gate`) clears
+  "ליד חדש" opens `LeadForm` with `prefill` (phone/email only; counts as unsaved); "הערה לרשומה" picks a record through `search_records`
+  and saves a note with the user's session, the image through the normal upload path. Since the owner's answers (1) ב and (2) ג
+  (27 October 2026) the new lead, or with leads off (LEAD-08) "איש קשר חדש" (`ContactForm` with `prefill`), is saved through
+  `createLeadStayAction` / `createContactStayAction` (same save as the create actions, answering the id), then the shared text and
+  image become one person-logged note on it whose first line is "שותף מהטלפון" (`sharedNoteBody`, 5,000 with the mark; the image a
+  REC-07 note file); the share is cleared only when all of it saved, else the record stays and "לנסות שוב כהערה" is offered. The
+  note counts as contact (open question to the owner). Sign-out (`SignOutButton`, `mfa-gate`) clears
   `share-v1` (`src/features/share/device.ts`). The worker refuses a share POST whose `Sec-Fetch-Site` is cross-site (check on a
   device). Follow-up: a signed-out fallback POST is re-sent by the proxy's 307 to /login (shared ground).
 - App shortcuts (USR-08, no migration): four manifest shortcuts go to `/app/go/[target]` (`src/features/shortcuts/shortcuts.ts`),
