@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { LockIcon } from "@/components/ui/icons";
+import { InboxIcon, LockIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { TypeIcon } from "@/features/activity-types/components/type-icon";
 import { listActivityTypes } from "@/features/activity-types/queries";
@@ -128,6 +128,7 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam, 
                       </Badge>
                     ) : null}
                     {item.icon ? <TypeIcon icon={item.icon} className="me-1 inline size-4 align-text-bottom text-ink-soft" /> : null}
+                    {item.shareNote ? <InboxIcon aria-hidden="true" className="me-1 inline size-4 align-text-bottom text-ink-soft" /> : null}
                     <span className="font-medium text-ink">{item.label}</span>
                     {item.authorName ? <>, {item.authorName}</> : null}
                     <span className="mx-1.5" aria-hidden="true">

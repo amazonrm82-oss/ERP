@@ -13,7 +13,8 @@ describe("pinning a timeline entry (REC-01)", () => {
     for (const type of ["status_change", "stage_change", "conversion", "assignment", "system", "inquiry", "", "__proto__"]) {
       expect(isPinnableType(type)).toBe(false);
     }
-    expect([...PINNABLE_TYPES].sort()).toEqual(LOGGED_TYPES.map((t) => t.value).sort());
+    // WAB-06: a note saved from a share is a person's note too
+    expect([...PINNABLE_TYPES].sort()).toEqual([...LOGGED_TYPES.map((t) => t.value), "share_note"].sort());
   });
 
   it("the author may pin their own entry, whatever their role (except read-only)", () => {

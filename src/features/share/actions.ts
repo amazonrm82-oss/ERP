@@ -1,13 +1,21 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import type { SearchPickerResult } from "@/components/ui/search-picker";
+import { shareNoteTextSchema, subjectSchema, SUBJECT_COLUMN, type TimelineSubject } from "@/features/activities/schema";
 import { pickerQuery } from "@/components/ui/search-picker-logic";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { optionalTextArg, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
+import { fail, ok, type FormState } from "@/lib/action-result";
+import type { ActivityInsert } from "@/lib/database.types";
+import { dbErrorMessage, NOT_FOUND } from "@/lib/errors";
+import { recordPage } from "@/lib/record-types";
 
 import { shareSearchHits, type SearchRecordsAnswer } from "./records";
+import { markSharedNote, NOTE_MAX, SHARE_NOTE_TYPE } from "./share";
 
 const SEARCH_FAILED = "החיפוש נכשל. נסו שוב.";
 
@@ -34,4 +42,50 @@ export async function searchShareRecordsAction(orgId: string, query: string): Pr
   }
   const [modules, terms] = await Promise.all([getOrgModules(orgId), getOrgTerms(orgId)]);
   return { hits: shareSearchHits(data as SearchRecordsAnswer, modules, terms) };
+}
+
+const NOTE_EMPTY = "יש לכתוב את ההערה לפני השמירה.";
+const NOTE_TOO_LONG = "ההערה ארוכה מדי (עד 5,000 תווים).";
+
+/**
+ * WAB-06 (owner, 27 October 2026, answer (ב)): saves what was shared as a "הערת שיתוף" ('share_note') on a record: the mark
+ * "שותף מהטלפון", then the text, by the person, with the user's session. It is not contact with the customer, so a lead
+ * saved from a share still waits for an answer. The database lets only someone who may edit the record write one
+ * (activities_insert). Text may be empty only when an image goes with it (the image is then a file of this note, REC-07).
+ */
+export async function addShareNoteAction(
+  orgId: string,
+  subject: TimelineSubject,
+  text: string,
+  withImage: boolean,
+): Promise<FormState<{ id: string }>> {
+  const parsedSubject = subjectSchema.safeParse(subject);
+  if (!parsedSubject.success || typeof withImage !== "boolean") {
+    return fail(NOT_FOUND);
+  }
+  const context = await actionContext(orgId, parsedSubject.data.id);
+  if (!context.ok) {
+    return context;
+  }
+  const parsed = shareNoteTextSchema.safeParse(text);
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? NOTE_TOO_LONG;
+    return fail(message, { fieldErrors: { body: message } });
+  }
+  const cleaned = parsed.data ?? "";
+  const body = markSharedNote(cleaned);
+  if (body.split("\n").slice(1).join("\n").trim() === "" && !withImage) {
+    return fail(NOTE_EMPTY, { fieldErrors: { body: NOTE_EMPTY } });
+  }
+  if (body.length > NOTE_MAX) {
+    return fail(NOTE_TOO_LONG, { fieldErrors: { body: NOTE_TOO_LONG } });
+  }
+  const row: ActivityInsert = { organization_id: orgId, type: SHARE_NOTE_TYPE, body };
+  row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
+  const { data, error } = await context.supabase.from("activities").insert(row).select("id").single();
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו לשמור את ההערה. נסו שוב."));
+  }
+  revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));
+  return ok({ id: data.id });
 }

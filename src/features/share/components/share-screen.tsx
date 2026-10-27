@@ -8,7 +8,6 @@ import { Card, CardBody } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, TextareaField } from "@/components/ui/field";
 import { SearchPicker, type SearchPickerChoice } from "@/components/ui/search-picker";
-import { addNoteAction } from "@/features/activities/actions";
 import type { TimelineSubject } from "@/features/activities/schema";
 import type { BillingPriceList } from "@/features/billing/queries";
 import type { CompanyOption } from "@/features/companies/queries";
@@ -22,7 +21,7 @@ import { withPrefixThe, type OrgTerms, type TermForms } from "@/features/termino
 import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 
-import { searchShareRecordsAction } from "../actions";
+import { addShareNoteAction, searchShareRecordsAction } from "../actions";
 import { subjectFromPick } from "../records";
 import {
   NOTE_MAX,
@@ -31,6 +30,7 @@ import {
   recordPrefill,
   recordSavedLine,
   SHARE_ITEM_PREFIX,
+  SHARE_NOTE_HINT,
   SHARE_PREVIEW_TYPES,
   SHARED_FROM_PHONE,
   shareChoices,
@@ -233,10 +233,8 @@ function ShareChoices({
       return;
     }
     setAfter({ state: "saving", term, href });
-    const form = new FormData();
-    form.set("type", "note");
-    form.set("body", body);
-    const saved = await addNoteAction(orgId, subject, null, form).catch(() => null);
+    // WAB-06: a "הערת שיתוף", not contact with the customer, so the new lead still waits for an answer
+    const saved = await addShareNoteAction(orgId, subject, body, hasImage).catch(() => null);
     const pick = { id: `${kind}:${id}`, label: term.newOne };
     if (!saved || !saved.ok) {
       setAfter({ state: "failed", term, href, problems: [saved?.message ?? NOTE_FAILED], pick, body, image: loaded.image });
@@ -376,7 +374,8 @@ function SavedAsNoteLine({ term, show }: { term: TermForms; show: boolean }) {
   if (!show) return null;
   return (
     <p className="rounded-md bg-canvas px-3 py-2.5 text-sm text-ink-soft">
-      אחרי השמירה, מה ששיתפתם יישמר על {term.theSingular} כהערה &quot;{SHARED_FROM_PHONE}&quot;.
+      אחרי השמירה, מה ששיתפתם יישמר על {term.theSingular} כ&quot;הערת שיתוף&quot; תחת &quot;{SHARED_FROM_PHONE}&quot;. הערת שיתוף
+      אינה נחשבת קשר עם הלקוח.
     </p>
   );
 }
@@ -485,10 +484,8 @@ function ShareNoteForm({
       return;
     }
     setBusy(true);
-    const form = new FormData();
-    form.set("type", "note");
-    form.set("body", body);
-    const saved = await addNoteAction(orgId, subject, null, form);
+    // WAB-06: saved as a "הערת שיתוף" under the mark "שותף מהטלפון"; not contact with the customer
+    const saved = await addShareNoteAction(orgId, subject, body, image !== null && attach);
     if (!saved || !saved.ok) {
       setBusy(false);
       setError(saved?.message ?? "לא הצלחנו לשמור את ההערה. נסו שוב.");
@@ -543,6 +540,7 @@ function ShareNoteForm({
           />
           <TextareaField
             label="ההערה"
+            hint={SHARE_NOTE_HINT}
             name="body"
             rows={5}
             maxLength={NOTE_MAX}

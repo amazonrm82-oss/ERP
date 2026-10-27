@@ -21,7 +21,7 @@ export type SearchGroup = "leads" | "contacts" | "companies" | "deals" | "notes"
 type Row = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
 
-const ACTIVITY_LABELS: Record<string, string> = { note: "הערה", call: "שיחה", meeting: "פגישה", email: "אימייל", whatsapp: "WhatsApp", sms: "SMS", import_note: "הערה מייבוא" };
+const ACTIVITY_LABELS: Record<string, string> = { note: "הערה", call: "שיחה", meeting: "פגישה", email: "אימייל", whatsapp: "WhatsApp", sms: "SMS", import_note: "הערה מייבוא", share_note: "הערת שיתוף" };
 
 /** Searches the organization's records the user may see (RLS decides, in public.search_records). */
 export async function searchAction(orgId: string, query: string): Promise<SearchHit[]> {

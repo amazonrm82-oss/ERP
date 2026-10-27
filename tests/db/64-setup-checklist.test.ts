@@ -619,6 +619,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // TAX-02 redefines public.quote_public() of _quote_pdf_server.sql and public.order_public() of _order_links.sql last
       // (the stored bank details)
       "_quote_bank_details.sql",
+      // WAB-06 redefines the activity rules of _import_history.sql, app.search_notes() of _whatsapp_chat_import.sql and
+      // app.files_links_check() of _payment_files.sql last (a share note is a person's note, neither contact nor activity)
+      "_share_note_rules.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

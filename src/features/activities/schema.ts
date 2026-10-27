@@ -43,7 +43,9 @@ const LOGGED_TYPE_VALUES = ["note", "call", "meeting", "whatsapp", "email", "sms
 
 // REC-01: what a person logged can be pinned to the top of the timeline; system events cannot.
 // Several entries may be pinned at once; pinned ones come first, newest first, then the rest.
-export const PINNABLE_TYPES = LOGGED_TYPE_VALUES;
+// WAB-06: a note saved from a share ('share_note') is a person's note too (pinned, edited and deleted like one, files and
+// formatting), but it is not contact and the log form never offers it (activities_insert / _update / _delete policies).
+export const PINNABLE_TYPES = [...LOGGED_TYPE_VALUES, "share_note"] as const;
 
 export function isPinnableType(type: string): boolean {
   return (PINNABLE_TYPES as readonly string[]).includes(type);
@@ -145,6 +147,9 @@ export const TOO_MANY_MENTIONS = `אפשר לאזכר עד ${MENTION_MAX} אנש
 
 const fewMentions = (body: string) => mentionIds(body).length <= MENTION_MAX;
 
+// WAB-06: the text of a note saved from a share, cleaned like any note (the mark is added by the share flow)
+export const shareNoteTextSchema = z.preprocess(cleanNote, optionalText(NOTE_MAX, NOTE_TOO_LONG));
+
 export const noteEditSchema = z
   .object({
     body: z.preprocess(cleanNote, requiredText(NOTE_MAX, "יש לכתוב את ההערה לפני השמירה.", NOTE_TOO_LONG)),
@@ -163,12 +168,12 @@ export const noteEditSchema = z
 export const TIMELINE_FILTERS = [
   { key: "all", label: "הכול" },
   // GAP-12: a note from an imported file is a note, not a change
-  { key: "note", label: "הערות", types: ["note", "import_note"] },
+  { key: "note", label: "הערות", types: ["note", "import_note", "share_note"] },
   { key: "call", label: "שיחות", types: ["call"] },
   { key: "meeting", label: "פגישות", types: ["meeting"] },
   { key: "message", label: "הודעות", types: ["whatsapp", "email", "sms"] },
   // everything the system wrote: status and stage changes, conversions, repeat inquiries
-  { key: "system", label: "שינויים", excludeTypes: [...LOGGED_TYPE_VALUES, "import_note"] },
+  { key: "system", label: "שינויים", excludeTypes: [...LOGGED_TYPE_VALUES, "import_note", "share_note"] },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; types?: readonly string[]; excludeTypes?: readonly string[] }>;
 
 export type TimelineFilterKey = (typeof TIMELINE_FILTERS)[number]["key"];

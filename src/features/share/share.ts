@@ -179,9 +179,32 @@ export const SHARED_FROM_PHONE = "שותף מהטלפון";
  * mark only; nothing shared (no text, no image) = no note (null). Capped at NOTE_MAX.
  */
 export function sharedNoteBody(note: string, hasImage: boolean): string | null {
-  const text = note.trim();
+  const text = withoutShareMark(note);
   if (!text && !hasImage) return null;
-  return (text ? `${SHARED_FROM_PHONE}\n${text}` : SHARED_FROM_PHONE).slice(0, NOTE_MAX).trim();
+  return markSharedNote(text).slice(0, NOTE_MAX).trim();
+}
+
+/**
+ * WAB-06 (owner, 27 October 2026, answer (ב)): what a share saves is its own timeline type, "הערת שיתוף", that is not
+ * contact with the customer (a lead saved from a share still waits for an answer). The database asks for the mark as its
+ * first line (trigger activities_zz_share_note, hint share_note:mark).
+ */
+export const SHARE_NOTE_TYPE = "share_note";
+
+/** Said under the note's text on the share screen. */
+export const SHARE_NOTE_HINT = `תישמר כ"הערת שיתוף" עם השורה "${SHARED_FROM_PHONE}". הערת שיתוף אינה נחשבת קשר עם הלקוח.`;
+
+/** The text without a leading share mark (a retry carries the mark already). */
+export function withoutShareMark(note: string): string {
+  const text = note.replace(/\r\n?/g, "\n").trim();
+  const [first, ...rest] = text.split("\n");
+  return first.trim() === SHARED_FROM_PHONE ? rest.join("\n").trim() : text;
+}
+
+/** The mark, then the text: the shape of every share note, never marked twice. */
+export function markSharedNote(note: string): string {
+  const text = withoutShareMark(note);
+  return text ? `${SHARED_FROM_PHONE}\n${text}` : SHARED_FROM_PHONE;
 }
 
 /** "הליד נשמר", "הפנייה נשמרה": said when the record was saved but the shared note was not. */

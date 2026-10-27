@@ -31,6 +31,8 @@ const RERUN = [
   migrationFile("_import_history.sql"),
   migrationFile("_whatsapp_chat_import.sql"),
   migrationFile("_opening_import_undo.sql"),
+  // WAB-06 redefines app.deal_attention_rows() and the activity rules of _import_history.sql last (share notes)
+  migrationFile("_share_note_rules.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

@@ -496,6 +496,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import:original_date_fixed": "תאריך היצירה המקורי נכתב רק בייבוא, ואי אפשר לשנות אותו.",
   "import_note:too_many": "נשלחו יותר מדי הערות בבת אחת. נסו שוב.",
   "import_note:items": "ההערות שנשלחו אינן תקינות. נסו שוב.",
+  // WAB-06: the share flow always sends the mark; a direct write without it
+  "share_note:mark": "הערת שיתוף מתחילה בשורה \"שותף מהטלפון\". נסו לשתף שוב.",
   // WAB-07: an imported WhatsApp chat
   "whatsapp_import:body": "השיחה ריקה או ארוכה מדי לרשומה אחת.",
   "whatsapp_import:mention": "אי אפשר לתייג עובדים בשיחה מיובאת.",

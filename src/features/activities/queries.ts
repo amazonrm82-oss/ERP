@@ -38,6 +38,8 @@ export type TimelineItem = {
   isPrivate: boolean;
   // WAB-07: an imported WhatsApp chat; long, so the screen shows it folded
   chatImport: boolean;
+  // WAB-06: a note saved from a share; drawn with its own icon
+  shareNote: boolean;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -57,6 +59,8 @@ const TYPE_LABELS: Record<string, string> = {
   automation_note: "הערה מאוטומציה",
   // GAP-12: a note from an imported file, by the importer; not contact with the customer
   import_note: "הערה מייבוא",
+  // WAB-06: what a person shared from the phone; their note, but not contact with the customer
+  share_note: "הערת שיתוף",
 };
 
 function metaString(metadata: Json, key: string): string | null {
@@ -254,6 +258,7 @@ export async function getTimeline(
       pinned: activity.is_pinned,
       isPrivate: activity.is_private,
       chatImport: isWhatsappImport(activity.type, metaString(activity.metadata, "kind")),
+      shareNote: activity.type === "share_note",
     };
   });
 }
