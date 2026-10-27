@@ -36,6 +36,8 @@ and build this CRM here instead. The old code is preserved on the branch
    grants on *all* tables in `public`. Before applying migrations to a hosted database where ours have
    never run, list its existing tables; if `public` is not empty, stop and ask the owner. (The
    project `eowuxxkiedpjrqvfqcgn` already holds our own schema; see rule 3.)
+   Vercel: our project is `erp-3yft` only (production builds from the `production` branch, verified by the owner on 27 October
+   2026). The Vercel team also holds an old project `erp`: never read, deploy, configure or touch it.
 3. **The hosted database changes in one way only: committed migrations, on one project.**
    On 8 October 2026 the owner connected Supabase and asked that migrations be applied without him.
    - The only project is `eowuxxkiedpjrqvfqcgn` (name `CRM-Saas`). Before every write, read the project
@@ -1728,7 +1730,8 @@ that back.
   check with read-only queries that its tables, columns, functions, grants and policies are there;
   run `get_advisors` (security) and fix or report anything new; only then push the code to `main`.
   CI promotes `main` to the `production` branch only when every check passed (`GATE-01`); the live
-  site is built from `production` once the owner sets it as Vercel's production branch. If an apply fails or stops half way, do not improvise SQL on the hosted database:
+  site (`erp-3yft`) is built from `production` (owner verified, 27 October 2026). A migration must stay backward compatible:
+  the live site may run older code against the newer database until `production` is promoted. If an apply fails or stops half way, do not improvise SQL on the hosted database:
   fix it with a new migration, tested locally first, or stop and ask. Keep statements safe to run
   twice. Prefer additive changes, because the old code keeps running until the deploy finishes.
 - State of the hosted project on 8 October 2026: the owner applied 0001–0033 by hand in the SQL
