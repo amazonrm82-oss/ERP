@@ -14,7 +14,8 @@
 -- logo = the logo object's name in the public bucket org-logos, and for a quote or an order only while its design shows the
 -- logo (as the page). Never a number, an amount, a title, a time, a customer's or a meeting's detail.
 --
--- The only write is its own rate-limit counters (counted first, before the token is looked up):
+-- The only write is its own rate-limit counters (counted first, before the token is looked up; in this order: the total,
+-- the sender across all links, the sender on this link):
 --   app.link_preview_reads         one row: at most app.link_preview_reads_per_minute() (300) previews a minute in total, for
 --                                  every business together. Known limit (review L2, accepted): a flood of previews from
 --                                  anywhere refuses everyone's previews for the rest of that minute; the page itself is not
@@ -25,6 +26,10 @@
 --                                  minutes. Only the bucket number is kept, never the hash, so there is nothing for a cleanup
 --                                  job to clear (as app.booking_view_counts). A call without a hash (no secret set) meets the
 --                                  global limit only.
+--   app.link_preview_ip_counts     1,024 reused buckets keyed by the keyed IP hash alone, across all links and kinds (review,
+--                                  second round: per-link buckets alone let one IP spend the whole global limit with a new
+--                                  made-up token on every call): at most app.link_preview_ip_limit() (120) per sender in 10
+--                                  minutes. Every call counts, not found included. Bucket number only, no hash kept, no grants.
 --
 -- What it shows (review L1, accepted): the owner approved the business's display name and logo in the preview of all six pages
 -- (27 October 2026, answer (1) ב); a card adds only the name business_card_public already shows on the public card.
@@ -70,6 +75,20 @@ language sql immutable
 set search_path = ''
 as $$ select 30 $$;
 revoke all on function app.link_preview_sender_limit() from public, anon, authenticated, service_role;
+
+create table if not exists app.link_preview_ip_counts (
+  bucket       integer primary key check (bucket between 0 and 1023),
+  window_start timestamptz not null,
+  views        integer not null
+);
+alter table app.link_preview_ip_counts enable row level security;
+revoke all on app.link_preview_ip_counts from public, anon, authenticated, service_role;
+
+create or replace function app.link_preview_ip_limit() returns integer
+language sql immutable
+set search_path = ''
+as $$ select 120 $$;
+revoke all on function app.link_preview_ip_limit() from public, anon, authenticated, service_role;
 
 -- The sender of one preview, scoped to the link (review L2; the shape of app.order_link_sender): one visitor is a different
 -- sender on every link
@@ -121,6 +140,18 @@ begin
     return jsonb_build_object('refused', 'rate');
   end if;
   if p_ip_hash is not null then
+    -- the sender across all links and kinds
+    v_bucket := ((hashtextextended(p_ip_hash, 0) % 1024) + 1024) % 1024;
+    insert into app.link_preview_ip_counts as ic (bucket, window_start, views)
+    values (v_bucket, now(), 1)
+    on conflict (bucket) do update
+      set window_start = case when ic.window_start > now() - interval '10 minutes' then ic.window_start else now() end,
+          views = case when ic.window_start > now() - interval '10 minutes' then ic.views + 1 else 1 end
+    returning ic.views into v_views;
+    if v_views > app.link_preview_ip_limit() then
+      return jsonb_build_object('refused', 'rate');
+    end if;
+    -- the sender on this link
     v_bucket := ((hashtextextended(app.link_preview_sender(p_kind, p_token, p_ip_hash), 0) % 1024) + 1024) % 1024;
     insert into app.link_preview_sender_counts as vc (bucket, window_start, views)
     values (v_bucket, now(), 1)

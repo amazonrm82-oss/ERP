@@ -296,11 +296,27 @@ describe("link previews for preview bots (WAB-05)", () => {
     const unknown = "y".repeat(64);
     for (let i = 0; i < limit; i++) expect(await preview("quote", unknown, sender)).toEqual({ not_found: true });
     expect(await preview("quote", unknown, sender)).toEqual({ refused: "rate" });
-    // no hash is kept: only a bucket number and a count
-    const cols = await asAdmin(async (q) =>
-      (await q<{ column_name: string }>("select column_name from information_schema.columns where table_schema = 'app' and table_name = 'link_preview_sender_counts' order by column_name")).rows.map((r) => r.column_name),
-    );
-    expect(cols).toEqual(["bucket", "views", "window_start"]);
+    // no hash is kept: only a bucket number and a count, in both sender tables, with no grants
+    for (const table of ["link_preview_sender_counts", "link_preview_ip_counts"]) {
+      const cols = await asAdmin(async (q) =>
+        (await q<{ column_name: string }>("select column_name from information_schema.columns where table_schema = 'app' and table_name = $1 order by column_name", [table])).rows.map((r) => r.column_name),
+      );
+      expect(cols, table).toEqual(["bucket", "views", "window_start"]);
+      const grants = await asAdmin(async (q) => (await q("select 1 from information_schema.role_table_grants where table_schema = 'app' and table_name = $1 and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')", [table])).rowCount);
+      expect(grants, table).toBe(0);
+    }
+
+    // one sender across all links: a new made-up token on every call is refused after 120 (not found counts too)
+    const ipLimit = await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.link_preview_ip_limit() as n")).n));
+    expect(ipLimit).toBe(120);
+    const roamer = `roamer-${process.pid}`;
+    for (let i = 0; i < ipLimit; i++) {
+      expect(await preview("quote", i.toString(16).padStart(64, "0").replace(/0/g, "z"), roamer), String(i)).toEqual({ not_found: true });
+    }
+    expect(await preview("quote", "q".repeat(64), roamer)).toEqual({ refused: "rate" });
+    // a real link from the same sender too; another sender is not limited
+    expect(await preview("card", tokens.card, roamer)).toEqual({ refused: "rate" });
+    expect(await preview("card", tokens.card, `${roamer}-other`)).toMatchObject({ business: DISPLAY });
 
     // the total a minute (a minute ahead keeps the counter, whatever the clock does during the test)
     await asAdmin((q) =>
