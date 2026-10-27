@@ -761,7 +761,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   with `metadata.kind = 'whatsapp_import'` by `public.whatsapp_chat_import` (definer, authenticated: `app.can_edit_record` + writable,
   live lead/contact/deal; body 1..10,000, no mention tokens, occurred_at 1990..now + 1 minute stored as least(.., now()), closed
   metadata rebuilt in SQL; hints `whatsapp_import:*`). The file is not stored. `app.search_notes` finds `import_note` and
-  `app.import_record_worked` leaves out only the job's own notes (null-safe); both last redefined in 021070.
+  `app.import_record_worked` leaves out only the job's own notes (null-safe); both last redefined in 021070. The advisor's
+  `authenticated_security_definer_function_executable` on `whatsapp_chat_import` is expected.
 - Source attribution (SEG-02 + DQL-04, migration 021060; owner 18 and 26 October 2026): the first source is what the record holds
   (`source_id`, `campaign`, `utm`; contacts got server-kept `campaign`/`utm`); the last source is server-only `last_source_id`,
   `last_campaign`, `last_utm`, `last_source_at` on leads and contacts, moved only by an automatic inquiry: a lead made by intake
