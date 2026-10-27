@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { SelectField, TextField } from "@/components/ui/field";
 import { FormError, FormNotice } from "@/components/ui/feedback";
@@ -8,15 +8,41 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { createQrCodeAction } from "../actions";
+import { QR_KIND_LABELS, type QrTargetKind } from "../model";
 import type { QrTargetOption } from "../queries";
 
 const optionLabel = (option: QrTargetOption) => (option.active ? option.label : `${option.label} (כבוי)`);
 
-/** BIZ-03: a new code: its name (the sign or flyer it goes on) and what it opens. */
-export function QrCodeForm({ orgId, forms, pages }: { orgId: string; forms: QrTargetOption[]; pages: QrTargetOption[] }) {
+const PICK_LABELS: Record<Exclude<QrTargetKind, "url">, string> = {
+  form: "איזה טופס",
+  booking: "איזה דף קביעת תור",
+  card: "כרטיס הביקור של",
+};
+
+/**
+ * BIZ-03: a new code: its name (the sign or flyer it goes on), the kind of target (a form, a booking page, a rep's
+ * business card or a link) and the target itself.
+ */
+export function QrCodeForm({
+  orgId,
+  forms,
+  pages,
+  cards,
+}: {
+  orgId: string;
+  forms: QrTargetOption[];
+  pages: QrTargetOption[];
+  // active cards only: a code is not pointed at a card nobody can open
+  cards: QrTargetOption[];
+}) {
   const [state, formAction] = useActionState<FormState, FormData>(createQrCodeAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
+  const options: Record<Exclude<QrTargetKind, "url">, QrTargetOption[]> = { form: forms, booking: pages, card: cards };
+  const kinds = (["form", "booking", "card", "url"] as const).filter((k) => k === "url" || options[k].length > 0);
+  const firstKind = kinds[0];
+  const sentKind = kinds.find((k) => k === values?.kind);
+  const [kind, setKind] = useState<QrTargetKind>(sentKind ?? firstKind);
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -30,29 +56,54 @@ export function QrCodeForm({ orgId, forms, pages }: { orgId: string; forms: QrTa
         defaultValue={values?.name ?? ""}
         error={failure?.fieldErrors?.name}
       />
-      <SelectField label="מה הקוד פותח" name="target" required defaultValue={values?.target ?? ""} error={failure?.fieldErrors?.target}>
-        <option value="" disabled>
-          בחירה…
-        </option>
-        {forms.length > 0 ? (
-          <optgroup label="טפסים">
-            {forms.map((option) => (
-              <option key={option.value} value={option.value}>
-                {optionLabel(option)}
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
-        {pages.length > 0 ? (
-          <optgroup label="דפי קביעת תור">
-            {pages.map((option) => (
-              <option key={option.value} value={option.value}>
-                {optionLabel(option)}
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
+      <SelectField
+        label="מה הקוד פותח"
+        name="kind"
+        required
+        value={kind}
+        onChange={(event) => setKind(event.target.value as QrTargetKind)}
+        error={failure?.fieldErrors?.kind}
+      >
+        {kinds.map((k) => (
+          <option key={k} value={k}>
+            {QR_KIND_LABELS[k]}
+          </option>
+        ))}
       </SelectField>
+      {kind === "url" ? (
+        <TextField
+          key="url"
+          label="הקישור"
+          name="url"
+          type="url"
+          dir="ltr"
+          inputMode="url"
+          maxLength={2000}
+          required
+          placeholder="https://"
+          hint="כל כתובת שמתחילה ב-https://, למשל עמוד הביקורות שלכם בגוגל. הקוד מוסיף לקישור תיוג קמפיין (utm)."
+          defaultValue={values?.kind === "url" ? (values?.url ?? "") : ""}
+          error={failure?.fieldErrors?.url}
+        />
+      ) : (
+        <SelectField
+          key={kind}
+          label={PICK_LABELS[kind]}
+          name="target"
+          required
+          defaultValue={values?.kind === kind ? (values?.target ?? "") : ""}
+          error={failure?.fieldErrors?.target}
+        >
+          <option value="" disabled>
+            בחירה…
+          </option>
+          {options[kind].map((option) => (
+            <option key={option.value} value={option.value}>
+              {optionLabel(option)}
+            </option>
+          ))}
+        </SelectField>
+      )}
       <SubmitButton>יצירת הקוד</SubmitButton>
       <FormNotice message={state?.ok ? (state.message ?? null) : null} />
     </form>

@@ -534,6 +534,9 @@ export type QrCodeRow = {
   target_kind: string;
   form_id: string | null;
   booking_page_id: string | null;
+  // BIZ-03: a rep's business card, or an https link (exactly one target column per kind)
+  business_card_id: string | null;
+  target_url: string | null;
   token: string;
   is_active: boolean;
   created_by: string | null;
@@ -545,6 +548,8 @@ export type QrCodeWrite = {
   target_kind?: string;
   form_id?: string | null;
   booking_page_id?: string | null;
+  business_card_id?: string | null;
+  target_url?: string | null;
   is_active?: boolean;
 };
 

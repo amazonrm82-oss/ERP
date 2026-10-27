@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import cases from "../unit/fixtures/qr-target-urls.json";
 import { addMember, asAdmin, asAnon, asService, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
@@ -313,5 +314,197 @@ describe("QR codes (BIZ-03)", () => {
       ),
     );
     expect(actions).toEqual(["insert", "update"]);
+  });
+});
+
+/**
+ * BIZ-03, the rest (owner, 18 October 2026): a code may open a rep's business card (counted on the code, shown only while the
+ * card's own page would show it) or any https link (the code's own, stored and checked; set only by owners and admins).
+ */
+describe("QR codes: business cards and links (BIZ-03)", () => {
+  let owner: U, admin: U, member: U, rep: U, outsider: U;
+  let org: string, otherOrg: string;
+  let card: { id: string; token: string };
+  let otherCard: string;
+
+  const scan = (token: string) => asService(async (q) => (await q<{ r: Scan }>("select public.qr_scan($1) as r", [token])).rows[0].r);
+  const makeCode = (who: U, values: Record<string, unknown>, o: string = org) =>
+    asUser(who.id, async (q) => {
+      const row: Record<string, unknown> = { organization_id: o, name: "שלט", ...values };
+      const cols = Object.keys(row);
+      return (
+        await q<{ id: string; token: string }>(
+          `insert into public.qr_codes (${cols.join(", ")}) values (${cols.map((_, i) => `$${i + 1}`).join(", ")}) returning id, token`,
+          Object.values(row),
+        )
+      ).rows[0];
+    });
+  const scansOf = (codeId: string) =>
+    asAdmin(async (q) => Number((await q<{ n: string }>("select coalesce(sum(scans), 0) as n from app.qr_code_scan_days where qr_code_id = $1", [codeId])).rows[0].n));
+  const notFound = async (token: string) => expect((await pgError(scan(token))).code).toBe("P0002");
+
+  beforeAll(async () => {
+    owner = await createUser("qrt-owner");
+    org = await createOrg(owner.id, "עסק הכרטיסים");
+    admin = await addMember(org, owner.id, "admin", "qrt-admin");
+    member = await addMember(org, owner.id, "member", "qrt-member");
+    rep = await addMember(org, owner.id, "member", "qrt-rep");
+    outsider = await createUser("qrt-outsider");
+    otherOrg = await createOrg(outsider.id, "עסק זר");
+    card = await asUser(rep.id, async (q) =>
+      (await q<{ id: string; token: string }>("insert into public.business_cards (organization_id, user_id, job_title) values ($1, $2, 'יועץ') returning id, token", [org, rep.id]))
+        .rows[0],
+    );
+    otherCard = await asUser(outsider.id, async (q) =>
+      (await q<{ id: string }>("insert into public.business_cards (organization_id, user_id) values ($1, $2) returning id", [otherOrg, outsider.id])).rows[0].id,
+    );
+  });
+
+  it("the link rule in the database reads the same cases as the app (qrTargetUrlOk)", async () => {
+    const judge = (url: string) => asAdmin(async (q) => (await q<{ ok: boolean }>("select app.qr_target_url_ok($1) as ok", [url])).rows[0].ok);
+    for (const url of cases.ok) expect(await judge(url), url).toBe(true);
+    for (const url of cases.bad) expect(await judge(url), JSON.stringify(url)).toBe(false);
+    expect(await judge(`https://a.io/${"x".repeat(2000 - 13)}`)).toBe(true);
+    expect(await judge(`https://a.io/${"x".repeat(2001 - 13)}`)).toBe(false);
+    expect(await judge(`https://${"a".repeat(64)}.com`)).toBe(false);
+    expect(await asAdmin(async (q) => (await q<{ ok: boolean }>("select app.qr_target_url_ok(null) as ok")).rows[0].ok)).toBe(false);
+  });
+
+  it("a card code opens the card's page while its own page would show it, and counts on the code", async () => {
+    const code = await makeCode(admin, { name: "כנס", target_kind: "card", business_card_id: card.id });
+    const answer = await scan(code.token);
+    expect(answer).toEqual({ path: `/f/card/${card.token}`, campaign: "כנס" });
+    expect(await scansOf(code.id)).toBe(1);
+
+    // the card switched off
+    await asAdmin((q) => q("update public.business_cards set is_active = false where id = $1", [card.id]));
+    try {
+      await notFound(code.token);
+    } finally {
+      await asAdmin((q) => q("update public.business_cards set is_active = true where id = $1", [card.id]));
+    }
+    // the rep suspended
+    await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, rep.id]));
+    try {
+      await notFound(code.token);
+    } finally {
+      await asAdmin((q) => q("update public.memberships set status = 'active' where organization_id = $1 and user_id = $2", [org, rep.id]));
+    }
+    // the rep made a viewer
+    await asAdmin((q) => q("update public.memberships set role = 'viewer', seat_type = 'view' where organization_id = $1 and user_id = $2", [org, rep.id]));
+    try {
+      await notFound(code.token);
+    } finally {
+      await asAdmin((q) => q("update public.memberships set role = 'member', seat_type = 'full' where organization_id = $1 and user_id = $2", [org, rep.id]));
+    }
+    // the plan without business cards: the card's page is closed, so is the code's way to it
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = '{\"business_card\": false}' where organization_id = $1", [org]));
+    try {
+      await notFound(code.token);
+    } finally {
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = '{}' where organization_id = $1", [org]));
+    }
+    // nothing counted while not found
+    expect(await scansOf(code.id)).toBe(1);
+    expect((await scan(code.token)).path).toBe(`/f/card/${card.token}`);
+    // the rule is the card page's own
+    const same = await asAdmin(async (q) =>
+      (await q<{ open: boolean }>("select app.business_card_open(c) as open from public.business_cards c where c.id = $1", [card.id])).rows[0].open,
+    );
+    expect(same).toBe(true);
+  });
+
+  it("a card deleted (as when its rep leaves the business: the card cascades) leaves the code with no target: not found", async () => {
+    const tempRep = await addMember(org, owner.id, "member", "qrt-temp-rep");
+    const tempCard = await asUser(tempRep.id, async (q) =>
+      (await q<{ id: string }>("insert into public.business_cards (organization_id, user_id) values ($1, $2) returning id", [org, tempRep.id])).rows[0].id,
+    );
+    const code = await makeCode(owner, { target_kind: "card", business_card_id: tempCard });
+    await asUser(tempRep.id, (q) => q("delete from public.business_cards where id = $1", [tempCard]));
+    expect(
+      await asAdmin(async (q) => (await q<{ id: string | null }>("select business_card_id as id from public.qr_codes where id = $1", [code.id])).rows[0].id),
+    ).toBeNull();
+    await notFound(code.token);
+    expect(await scansOf(code.id)).toBe(0);
+  });
+
+  it("a link code answers the stored link and the campaign only, and counts", async () => {
+    const code = await makeCode(owner, { name: "ביקורות", target_kind: "url", target_url: "https://g.page/r/abc/review?x=1" });
+    const answer = await scan(code.token);
+    expect(answer).toEqual({ url: "https://g.page/r/abc/review?x=1", campaign: "ביקורות" });
+    expect(await scansOf(code.id)).toBe(1);
+    // the code off, or the plan without QR codes: not found
+    await asAdmin((q) => q("update public.qr_codes set is_active = false where id = $1", [code.id]));
+    await notFound(code.token);
+    await asAdmin((q) => q("update public.qr_codes set is_active = true where id = $1", [code.id]));
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = '{\"qr_codes\": false}' where organization_id = $1", [org]));
+    try {
+      await notFound(code.token);
+    } finally {
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = '{}' where organization_id = $1", [org]));
+    }
+    expect(await scansOf(code.id)).toBe(1);
+  });
+
+  it("the link: https only, at most 2,000 characters, no user name or password, a real host; checked for every writer", async () => {
+    for (const url of ["http://a.io", "https://me:pw@a.io", "https://localhost", "https://a.io/a b", `https://a.io/${"x".repeat(2000)}`]) {
+      expect(await pgError(makeCode(owner, { target_kind: "url", target_url: url })), url).toMatchObject({ code: "P0001", hint: "qr_code:url" });
+    }
+    const code = await makeCode(admin, { target_kind: "url", target_url: "https://a.io/" });
+    expect(await pgError(asUser(admin.id, (q) => q("update public.qr_codes set target_url = 'javascript:alert(1)' where id = $1", [code.id])))).toMatchObject({
+      hint: "qr_code:url",
+    });
+    // a server write is checked too
+    expect(await pgError(asAdmin((q) => q("update public.qr_codes set target_url = 'https://user@a.io' where id = $1", [code.id])))).toMatchObject({
+      hint: "qr_code:url",
+    });
+    // and the constraint holds even past the trigger
+    expect(
+      (
+        await pgError(
+          asAdmin(async (q) => {
+            await q("set local session_replication_role = replica");
+            await q("update public.qr_codes set target_url = 'http://a.io' where id = $1", [code.id]);
+          }),
+        )
+      ).code,
+    ).toBe("23514");
+    // a link code always holds its link
+    expect(await pgError(makeCode(owner, { target_kind: "url" }))).toMatchObject({ code: "P0001", hint: "qr_code:target" });
+    expect((await pgError(asUser(owner.id, (q) => q("update public.qr_codes set target_url = null where id = $1", [code.id])))).code).toBe("23514");
+  });
+
+  it("exactly one target per code: the shape covers all four kinds", async () => {
+    expect(await pgError(makeCode(owner, { target_kind: "card" }))).toMatchObject({ code: "P0001", hint: "qr_code:target" });
+    expect((await pgError(makeCode(owner, { target_kind: "card", business_card_id: card.id, target_url: "https://a.io" }))).code).toBe("23514");
+    expect((await pgError(makeCode(owner, { target_kind: "url", target_url: "https://a.io", business_card_id: card.id }))).code).toBe("23514");
+    expect((await pgError(makeCode(owner, { target_kind: "form", business_card_id: card.id }))).code).toBe("23514");
+    expect((await pgError(makeCode(owner, { target_kind: "booking", target_url: "https://a.io" }))).code).toBe("23514");
+    expect((await pgError(makeCode(owner, { target_kind: "page", target_url: "https://a.io" }))).code).toBe("23514");
+    // a code may move from one kind to another with its columns
+    const code = await makeCode(owner, { target_kind: "card", business_card_id: card.id });
+    await asUser(owner.id, (q) => q("update public.qr_codes set target_kind = 'url', business_card_id = null, target_url = 'https://a.io/x' where id = $1", [code.id]));
+    expect(await scan(code.token)).toEqual({ url: "https://a.io/x", campaign: "שלט" });
+  });
+
+  it("another business's card is refused by the composite key", async () => {
+    expect((await pgError(makeCode(owner, { target_kind: "card", business_card_id: otherCard }))).code).toBe("23503");
+    const code = await makeCode(owner, { target_kind: "card", business_card_id: card.id });
+    expect((await pgError(asUser(owner.id, (q) => q("update public.qr_codes set business_card_id = $2 where id = $1", [code.id, otherCard])))).code).toBe("23503");
+  });
+
+  it("only owners and admins set a card or a link; members and outsiders cannot", async () => {
+    for (const who of [member, rep]) {
+      expect((await pgError(makeCode(who, { target_kind: "url", target_url: "https://a.io" }))).code).toBe("42501");
+      expect((await pgError(makeCode(who, { target_kind: "card", business_card_id: card.id }))).code).toBe("42501");
+    }
+    expect((await pgError(makeCode(outsider, { target_kind: "url", target_url: "https://a.io" }))).code).toBe("42501");
+    const code = await makeCode(admin, { target_kind: "url", target_url: "https://a.io/" });
+    for (const who of [member, rep, outsider]) {
+      expect(await asUser(who.id, async (q) => (await q("update public.qr_codes set target_url = 'https://evil.io/' where id = $1", [code.id])).rowCount)).toBe(0);
+    }
+    expect(await scan(code.token)).toEqual({ url: "https://a.io/", campaign: "שלט" });
+    // a member who is not the rep may not even see that the code exists
+    expect(await asUser(member.id, (q) => count(q, "select 1 from public.qr_codes where id = $1", [code.id]))).toBe(0);
   });
 });

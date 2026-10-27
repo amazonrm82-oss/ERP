@@ -10,24 +10,28 @@ import { FormQr } from "@/features/intake/components/form-qr";
 import { qrFileName } from "@/features/intake/qr-link";
 import { deleteQrCodeAction, setQrCodeActiveAction } from "@/features/qr-codes/actions";
 import { QrCodeForm } from "@/features/qr-codes/components/qr-code-form";
+import { QR_KIND_LABELS } from "@/features/qr-codes/model";
 import { qrScanPath } from "@/features/qr-codes/paths";
 import { listQrCodes, listQrTargets, qrScanCounts } from "@/features/qr-codes/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatNumber } from "@/lib/format";
-import { paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 
 export const metadata: Metadata = { title: "קודי QR" };
 
 const RECENT_DAYS = 30;
 
+// "the <target> the code opened was deleted"
+const GONE_LABELS = { form: "הטופס", booking: "דף קביעת התור", card: "כרטיס הביקור", url: "הקישור" } as const;
+
 type Props = { params: Promise<{ orgId: string }> };
 
 /**
- * BIZ-03 part one: a QR code per sign or flyer. Each opens a web form or a booking page, tags the visit with its own
- * name as the campaign, and counts its scans (a number per day, nothing about who scanned). Owners and admins only.
+ * BIZ-03: a QR code per sign or flyer. Each opens a web form, a booking page, a rep's business card or any https link,
+ * tags the visit with its own name as the campaign, and counts its scans (a number per day, nothing about who scanned).
+ * Owners and admins only.
  */
 export default async function QrCodesPage({ params }: Props) {
   const { orgId } = await params;
@@ -49,19 +53,17 @@ export default async function QrCodesPage({ params }: Props) {
     listQrTargets(orgId),
     siteOrigin(),
   ]);
-  const names = new Map([...targets.forms, ...targets.pages].map((t) => [t.value, t]));
-  const hasTargets = targets.forms.length + targets.pages.length > 0;
-  // the first step the user may take: the form above, or a web form first; nothing outside the plan or while read-only
-  const firstAction = !inPlan || !canWrite ? null : hasTargets ? (
-    <ButtonLink href="#qr-new" variant="secondary">
-      <PlusIcon className="size-4" />
-      יצירת קוד ראשון
-    </ButtonLink>
-  ) : (
-    <ButtonLink href={paths.settingsIntake(orgId)} variant="secondary">
-      לטפסי האתר
-    </ButtonLink>
-  );
+  const names = new Map([...targets.forms, ...targets.pages, ...targets.cards].map((t) => [t.value, t]));
+  // a code is pointed only at a card someone can open
+  const openCards = targets.cards.filter((card) => card.active);
+  // the first step the user may take: the form above; nothing outside the plan or while read-only (a link is always possible)
+  const firstAction =
+    !inPlan || !canWrite ? null : (
+      <ButtonLink href="#qr-new" variant="secondary">
+        <PlusIcon className="size-4" />
+        יצירת קוד ראשון
+      </ButtonLink>
+    );
 
   return (
     <div className="space-y-6">
@@ -69,7 +71,7 @@ export default async function QrCodesPage({ params }: Props) {
         <CardHeader id="qr-title" title="קוד QR חדש" />
         <CardBody className="space-y-4">
           <p className="text-md text-ink-soft">
-            קוד נפרד לכל שלט או פלייר. הקוד פותח טופס או דף קביעת תור, וסופר כמה פעמים סרקו אותו, כדי לדעת מה עבד. לא נשמר שום פרט על מי שסרק.
+            קוד נפרד לכל שלט או פלייר. הקוד פותח טופס, דף קביעת תור, כרטיס ביקור של נציג או כל קישור, וסופר כמה פעמים סרקו אותו, כדי לדעת מה עבד. לא נשמר שום פרט על מי שסרק.
           </p>
           {!inPlan ? (
             <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
@@ -77,11 +79,9 @@ export default async function QrCodesPage({ params }: Props) {
             </p>
           ) : !canWrite ? (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ולכן אי אפשר ליצור או לשנות קודים.</p>
-          ) : !hasTargets ? (
-            <p className="text-md text-ink-soft">כדי ליצור קוד, צריך קודם טופס אתר או דף קביעת תור.</p>
           ) : (
             <div id="qr-new" className="scroll-mt-24">
-              <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} />
+              <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} cards={openCards} />
             </div>
           )}
         </CardBody>
@@ -104,7 +104,7 @@ export default async function QrCodesPage({ params }: Props) {
               const target = code.targetId ? names.get(`${code.kind}:${code.targetId}`) : undefined;
               const count = counts.get(code.id);
               const link = `${origin}${qrScanPath(code.token)}`;
-              const kindLabel = code.kind === "booking" ? "דף קביעת תור" : "טופס";
+              const kindLabel = QR_KIND_LABELS[code.kind];
               return (
                 <li key={code.id} className="space-y-3 px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -116,13 +116,20 @@ export default async function QrCodesPage({ params }: Props) {
                     </p>
                   </div>
                   <p className="text-sm text-ink-soft">
-                    {target ? (
+                    {code.kind === "url" ? (
+                      <>
+                        פותח קישור:{" "}
+                        <span dir="ltr" className="break-all">
+                          {code.url}
+                        </span>
+                      </>
+                    ) : target ? (
                       <>
                         פותח {kindLabel}: {target.label}
                         {target.active ? null : " (כבוי: מי שסורק רואה שהקוד אינו פעיל)"}
                       </>
                     ) : (
-                      `ה${kindLabel} שהקוד פתח נמחק. מי שסורק רואה שהקוד אינו פעיל.`
+                      `${GONE_LABELS[code.kind]} שהקוד פתח נמחק. מי שסורק רואה שהקוד אינו פעיל.`
                     )}
                   </p>
                   <FormQr

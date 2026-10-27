@@ -173,6 +173,8 @@ describe("tenant isolation", () => {
       await q("insert into public.business_cards (organization_id, user_id, job_title) values ($1, $2, 'יועץ')", [orgA, a.id]);
       // BIZ-03: a QR code of A that opens A's form
       await q("insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'שלט בחנות', 'form', $2)", [orgA, ids.formA]);
+      // BIZ-03: a QR code of A that opens a link
+      await q("insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'ביקורות', 'url', 'https://a.example.com/')", [orgA]);
       // SPD-07: a site widget of A (its form is made by the widget's trigger)
       await q("insert into public.site_widgets (organization_id, name) values ($1, 'האתר של א')", [orgA]);
       ids.productA = (
@@ -754,6 +756,7 @@ describe("tenant isolation", () => {
       ["insert into public.segment_members (organization_id, segment_id, contact_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.contactA]],
       ["insert into public.business_cards (organization_id, user_id) values ($1, $2)", [orgA, a.id]],
       ["insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'x', 'form', $2)", [orgA, ids.formA]],
+      ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
       ["insert into public.site_widgets (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],

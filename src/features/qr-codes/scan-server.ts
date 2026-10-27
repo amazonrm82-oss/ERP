@@ -2,11 +2,12 @@ import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
 
-import { isQrToken, qrRedirectPath } from "./redirect";
+import { isQrToken, qrRedirectLocation } from "./redirect";
 
 // BIZ-03: a QR scan, in the approved pattern for public secret-link pages (owner, 13 October 2026; hard rule 5): the
 // server calls only public.qr_scan() (security definer, service_role only), which checks the token, counts the scan
-// (a number per code and day, nothing about the visitor) and answers the stored target's path. No table is reached
+// (a number per code and day, nothing about the visitor) and answers the stored target: a page of this site, or
+// the code's own https link (BIZ-03, owner 18 October 2026). No table is reached
 // directly; no IP, cookie or visitor id is read or kept.
 
 export type QrScanResult = { ok: true; location: string } | { ok: false; reason: "not-found" | "not-configured" };
@@ -20,7 +21,7 @@ export async function scanQrCode(token: string): Promise<QrScanResult> {
     if (error.code === "P0002") return { ok: false, reason: "not-found" };
     throw new Error(`qr_scan failed: ${error.code} ${error.message}`);
   }
-  const location = qrRedirectPath(data);
+  const location = qrRedirectLocation(data);
   return location ? { ok: true, location } : { ok: false, reason: "not-found" };
 }
 
@@ -44,7 +45,8 @@ const html = (body: string, status: number) =>
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" },
   });
 
-/** The route's answer: a redirect to the stored target (relative, on this site), or a short Hebrew page. */
+/** The route's answer: a redirect to the stored target (a relative path on this site, or the code's own
+ * https link), or a short Hebrew page. */
 export async function qrScanResponse(token: string): Promise<Response> {
   const result = await scanQrCode(token);
   if (result.ok) {

@@ -405,7 +405,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // BIZ-02 (migration business_cards)
   "business_card:rep": "כרטיס ביקור שייך למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
   // BIZ-03 (migration qr_codes)
-  "qr_code:target": "קוד QR פותח טופס אתר או דף קביעת תור של העסק. בחרו אחד מהם.",
+  "qr_code:target": "קוד QR פותח טופס אתר, דף קביעת תור או כרטיס ביקור של העסק, או קישור. בחרו אחד מהם.",
+  // BIZ-03 (migration qr_targets)
+  "qr_code:url": "הקישור של קוד ה-QR צריך להיות כתובת מלאה שמתחילה ב-https://, בלי שם משתמש או סיסמה.",
   // SPD-07 (migration site_widgets)
   "site_widget:owner": "פניות מהכפתור באתר עוברות למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
   "form:widget": "הטופס של הכפתור באתר משתנה רק דרך הגדרות הכפתור.",
