@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { shareTarget } from "@/features/share/share";
 import { SHORTCUTS, shortcutUrl } from "@/features/shortcuts/shortcuts";
 import { APP_DESCRIPTION, APP_NAME, THEME_COLOR } from "@/lib/app";
 
@@ -29,6 +30,9 @@ export default function manifest(): MetadataRoute.Manifest {
       url: shortcutUrl(shortcut.target),
       icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
     })),
+    // WAB-06: "שתף ל-Mexuz" from any app (Chrome on Android): text, a link or one image. One POST, answered by the
+    // service worker, which keeps the share on the device until the person picks what to do with it
+    share_target: shareTarget(),
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

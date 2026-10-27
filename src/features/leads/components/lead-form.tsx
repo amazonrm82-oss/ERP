@@ -25,13 +25,22 @@ import type { LeadSourceOption, LeadStatusOption } from "../queries";
 
 // reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
 // products: LEAD-04, the requested product picker shows when the plan has the product catalog
-type Props = { orgId: string; statuses: LeadStatusOption[]; sources: LeadSourceOption[]; fields: FieldDefinition[]; reasons: string[]; products?: boolean };
+// prefill: WAB-06, starting values from something shared to the app (full_name, phone, email, message); still editable
+type Props = {
+  orgId: string;
+  statuses: LeadStatusOption[];
+  sources: LeadSourceOption[];
+  fields: FieldDefinition[];
+  reasons: string[];
+  products?: boolean;
+  prefill?: Record<string, string>;
+};
 
 /** New lead form. On success the action redirects to the lead's page. */
-export function LeadForm({ orgId, statuses, sources, fields, reasons, products = false }: Props) {
+export function LeadForm({ orgId, statuses, sources, fields, reasons, products = false, prefill }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
-  const values = failure?.values ?? {};
+  const values = failure?.values ?? prefill ?? {};
   const errors = failure?.fieldErrors ?? {};
 
   // a new lead cannot start as "converted"

@@ -6,11 +6,23 @@
 // src/features/notifications/push-payload.ts. A payload without them shows as before.
 //
 // Nothing else is cached: customer data never lands in the browser's cache, and
-// every page and API call always goes to the network.
+// every page and API call always goes to the network. One exception (WAB-06): a share
+// from another app ("שתף ל-Mexuz") is kept in SHARE_CACHE on this device until the
+// person saves it to a record or drops it, at most 24 hours and one share at a time,
+// so the image is never sent anywhere before the person picks where it goes.
+// The addresses mirror src/features/share/share.ts.
 
 const OFFLINE_CACHE = "offline-v1";
 const OFFLINE_URL = "/offline.html";
 const OFFLINE_ASSETS = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon.svg"];
+const SHARE_CACHE = "share-v1";
+const SHARE_RECEIVE_PATH = "/app/share/receive";
+const SHARE_PAGE_PATH = "/app/share";
+const SHARE_ITEM_PREFIX = "/app/share/item/";
+const SHARE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const SHARE_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const SHARE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
+const SHARE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(OFFLINE_CACHE).then((cache) => cache.addAll(OFFLINE_ASSETS)).then(() => self.skipWaiting()));
@@ -20,15 +32,27 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== OFFLINE_CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== OFFLINE_CACHE && key !== SHARE_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  const requestUrl = new URL(request.url);
+  if (requestUrl.origin === self.location.origin) {
+    if (request.method === "POST" && requestUrl.pathname === SHARE_RECEIVE_PATH) {
+      event.respondWith(receiveShare(request));
+      return;
+    }
+    if (requestUrl.pathname.startsWith(SHARE_ITEM_PREFIX)) {
+      event.respondWith(shareItem(request, requestUrl.pathname.slice(SHARE_ITEM_PREFIX.length)));
+      return;
+    }
+  }
   if (request.method === "GET" && request.mode === "navigate") {
     // the network answers; only when it cannot does the offline page show
+    event.waitUntil(pruneShare());
     event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
     return;
   }
@@ -137,3 +161,86 @@ self.addEventListener("notificationclick", (event) => {
   const target = (event.action && links[event.action]) || data.url || "/";
   event.waitUntil(openPath(target));
 });
+
+// WAB-06: a share from another app. Kept here only: the text as JSON and the image as it
+// came, under a fresh id; any earlier share is dropped. The page reads it, uploads the
+// image to the record the person picks with their own session, then asks us to forget it.
+function textField(form, name, max) {
+  const value = form.get(name);
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+async function receiveShare(request) {
+  let form;
+  try {
+    form = await request.formData();
+  } catch {
+    return Response.redirect(new URL(SHARE_PAGE_PATH, self.location.origin).href, 303);
+  }
+  const id = self.crypto.randomUUID();
+  const file = form.get("image");
+  const image =
+    file && typeof file === "object" && typeof file.size === "number" && file.size > 0 && file.size <= SHARE_IMAGE_MAX_BYTES && SHARE_IMAGE_TYPES.includes(file.type)
+      ? file
+      : null;
+  const item = {
+    title: textField(form, "title", 300),
+    text: textField(form, "text", 5000),
+    url: textField(form, "url", 2000),
+    image: image ? { name: (file.name || "").slice(0, 200), type: image.type, size: image.size } : null,
+    // an image that was sent but cannot be attached (type or size): the page says so
+    imageRefused: Boolean(file && typeof file === "object" && file.size > 0 && !image),
+    at: Date.now(),
+  };
+  try {
+    await caches.delete(SHARE_CACHE);
+    const cache = await caches.open(SHARE_CACHE);
+    await cache.put(SHARE_ITEM_PREFIX + id, new Response(JSON.stringify(item), { headers: { "Content-Type": "application/json" } }));
+    if (image) await cache.put(SHARE_ITEM_PREFIX + id + "/image", new Response(image, { headers: { "Content-Type": image.type } }));
+  } catch {
+    return Response.redirect(new URL(SHARE_PAGE_PATH + "?failed=1", self.location.origin).href, 303);
+  }
+  return Response.redirect(new URL(SHARE_PAGE_PATH + "?s=" + id, self.location.origin).href, 303);
+}
+
+// a share nobody finished is dropped after SHARE_MAX_AGE_MS, checked on every page load
+async function pruneShare() {
+  try {
+    if (!(await caches.has(SHARE_CACHE))) return;
+    const cache = await caches.open(SHARE_CACHE);
+    for (const key of await cache.keys()) {
+      if (key.url.endsWith("/image")) continue;
+      const item = await (await cache.match(key)).json().catch(() => null);
+      if (!item || typeof item.at !== "number" || Date.now() - item.at > SHARE_MAX_AGE_MS) await caches.delete(SHARE_CACHE);
+    }
+  } catch {
+    // never stands in the way of a page
+  }
+}
+
+async function shareItem(request, rest) {
+  const [id, part] = rest.split("/");
+  const gone = () => new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!SHARE_ID.test(id || "") || (part !== undefined && part !== "image")) return gone();
+  const cache = await caches.open(SHARE_CACHE);
+  const key = SHARE_ITEM_PREFIX + id;
+  if (request.method === "DELETE") {
+    await Promise.all([cache.delete(key), cache.delete(key + "/image")]);
+    return new Response(null, { status: 204 });
+  }
+  if (request.method !== "GET") return gone();
+  const stored = await cache.match(key);
+  if (!stored) return gone();
+  let item = null;
+  try {
+    item = await stored.clone().json();
+  } catch {
+    item = null;
+  }
+  if (!item || typeof item.at !== "number" || Date.now() - item.at > SHARE_MAX_AGE_MS) {
+    await caches.delete(SHARE_CACHE);
+    return gone();
+  }
+  if (part === "image") return (await cache.match(key + "/image")) || gone();
+  return stored;
+}
