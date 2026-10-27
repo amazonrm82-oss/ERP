@@ -244,7 +244,7 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
         <ScheduleSection rows={schedule} id="quote-schedule" />
 
         {/* TAX-02: the bank details stored when the quote was sent, while the design shows them */}
-        <BankSection bank={design.showBankDetails ? quote.bankDetails : null} id="quote-bank" />
+        <BankSection bank={design.showBankDetailsQuote ? quote.bankDetails : null} id="quote-bank" />
 
         {quote.notes ? (
           <section aria-label="הערות" className="space-y-1" data-print-keep="">

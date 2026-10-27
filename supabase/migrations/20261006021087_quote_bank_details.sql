@@ -14,11 +14,13 @@
 --                              sent before this migration keeps none. quote_send itself is unchanged.
 -- public.orders.bank_details   the same for an order, taken when the order gets its number (order_confirm, or an
 --                              order made numbered by order_from_quote / order_from_deal), by orders_zz_bank_details.
--- public.quote_designs.show_bank_details   boolean not null default true (the design shared by quotes and orders):
+-- public.quote_designs.show_bank_details_quote / show_bank_details_order   boolean not null default true each (owner,
+--                              27 October 2026: shown by default, a separate switch per document type on the one design screen):
 --                              whether the document shows the stored bank details. Column grants like the others.
 --
 -- Redefined: public.quote_public (latest body 020995) and public.order_public (latest body 020625), each only to add
--- `bank` (the stored snapshot, only when the design shows it) and `design.show_bank_details` to the full answer; their
+-- `bank` (the stored snapshot, only when the design shows it for that document type) and `design.show_bank_details_quote`
+-- (quote_public) or `design.show_bank_details_order` (order_public) to the full answer; their
 -- not-found rules, rate limits and status pages are unchanged (test 253 pins their md5).
 --
 -- Redefined: app.audit_row (latest body 020020) only to add 'bank_details' to its ignored columns, so the snapshot (the full
@@ -34,9 +36,10 @@ alter table public.orders add column if not exists bank_details jsonb;
 comment on column public.orders.bank_details is
   'TAX-02: app.document_bank_snapshot() taken when the order got its number; server only, never changed afterwards.';
 
-alter table public.quote_designs add column if not exists show_bank_details boolean not null default true;
-grant insert (show_bank_details) on public.quote_designs to authenticated;
-grant update (show_bank_details) on public.quote_designs to authenticated;
+alter table public.quote_designs add column if not exists show_bank_details_quote boolean not null default true;
+alter table public.quote_designs add column if not exists show_bank_details_order boolean not null default true;
+grant insert (show_bank_details_quote, show_bank_details_order) on public.quote_designs to authenticated;
+grant update (show_bank_details_quote, show_bank_details_order) on public.quote_designs to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- The snapshot. Definer: app.document_bank_snapshot is granted to service_role only, and the trigger reads the
@@ -88,7 +91,7 @@ create or replace trigger orders_zz_bank_details before insert or update on publ
   for each row execute function app.orders_bank_details();
 
 -- ----------------------------------------------------------------------------
--- quote_public: 020995's body, plus `bank` and design.show_bank_details
+-- quote_public: 020995's body, plus `bank` and design.show_bank_details_quote
 -- ----------------------------------------------------------------------------
 create or replace function public.quote_public(p_token text) returns jsonb
 language plpgsql volatile security definer
@@ -183,7 +186,7 @@ begin
   -- QUO-05: no design row = the defaults (logo and business details shown)
   v_show_details := coalesce(v_design.show_business_details, true);
   v_show_logo := coalesce(v_design.show_logo, true);
-  v_show_bank := coalesce(v_design.show_bank_details, true);
+  v_show_bank := coalesce(v_design.show_bank_details_quote, true);
 
   select coalesce(jsonb_agg(jsonb_build_object(
            'position', l.position,
@@ -253,7 +256,7 @@ begin
       'footer_text', v_design.footer_text,
       'show_logo', v_show_logo,
       'show_business_details', v_show_details,
-      'show_bank_details', v_show_bank,
+      'show_bank_details_quote', v_show_bank,
       'accent_color', v_design.accent_color),
     'brand', jsonb_build_object('logo', case when v_show_logo then v_org.logo_path end, 'color', v_org.brand_color),
     'built_with', v_built_with,
@@ -293,7 +296,7 @@ revoke all on function public.quote_public(text) from public, anon, authenticate
 grant execute on function public.quote_public(text) to service_role;
 
 -- ----------------------------------------------------------------------------
--- order_public: 020625's body, plus `bank` and design.show_bank_details
+-- order_public: 020625's body, plus `bank` and design.show_bank_details_order
 -- ----------------------------------------------------------------------------
 create or replace function public.order_public(p_token text, p_ip_hash text default null) returns jsonb
 language plpgsql volatile security definer
@@ -358,7 +361,7 @@ begin
   -- QUO-05: no design row = the defaults (logo and business details shown)
   v_show_details := coalesce(v_design.show_business_details, true);
   v_show_logo := coalesce(v_design.show_logo, true);
-  v_show_bank := coalesce(v_design.show_bank_details, true);
+  v_show_bank := coalesce(v_design.show_bank_details_order, true);
 
   -- a cancelled order: its state only, no prices or lines (the one rule for a sent link)
   if v_order.status = 'cancelled' then
@@ -448,7 +451,7 @@ begin
       'footer_text', v_design.footer_text,
       'show_logo', v_show_logo,
       'show_business_details', v_show_details,
-      'show_bank_details', v_show_bank,
+      'show_bank_details_order', v_show_bank,
       'accent_color', v_design.accent_color),
     'brand', jsonb_build_object('logo', case when v_show_logo then v_org.logo_path end, 'color', v_org.brand_color),
     'built_with', v_built_with,

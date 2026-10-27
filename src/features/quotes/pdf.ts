@@ -155,7 +155,7 @@ export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, 
     });
   }
   // TAX-02: the bank details stored when the quote was sent, while the design shows them
-  const bank = design.showBankDetails ? quote.bankDetails : null;
+  const bank = design.showBankDetailsQuote ? quote.bankDetails : null;
   if (bank) blocks.push({ kind: "section", title: BANK_HEADING, text: bankPdfText(bank) });
   if (quote.notes) blocks.push({ kind: "section", title: "הערות", text: quote.notes });
   if (quote.terms) blocks.push({ kind: "section", title: "תנאים", text: quote.terms });

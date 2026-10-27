@@ -12,7 +12,8 @@ type Bank = { bank_name: string; bank_branch: string; bank_account: string; bank
  * documents it issues: a quote and an order confirmation. Settings stay owners/admins only (org_bank_details); a document
  * keeps app.document_bank_snapshot() taken when it is sent (a quote) or numbered (an order), never changed afterwards, and
  * whoever reads the document reads it there. The customer page (quote_public / order_public) answers `bank` only from the
- * stored snapshot and only while the design shows it (quote_designs.show_bank_details).
+ * stored snapshot and only while the design shows it (owner, 27 October 2026: quote_designs.show_bank_details_quote for quotes and
+ * show_bank_details_order for orders, each its own switch, both on by default).
  */
 describe("bank details on quotes and orders (TAX-02)", () => {
   let owner: U, admin: U, member: U, viewer: U, other: U, outsider: U;
@@ -52,10 +53,12 @@ describe("bank details on quotes and orders (TAX-02)", () => {
   const link = (u: U, orgId: string, quote: string) => run(u, async (q) => (await one<{ t: string }>(q, "select public.quote_link_create($1, $2) as t", [orgId, quote])).t);
   const publicQuote = (token: string) =>
     asService(async (q) => (await one<{ p: Record<string, unknown> & { design: Record<string, unknown> } }>(q, "select public.quote_public($1) as p", [token])).p);
-  const setDesign = (u: U, orgId: string, show: boolean) =>
+  const setDesign = (u: U, orgId: string, kind: "quote" | "order", show: boolean) =>
     run(u, (q) =>
       q(
-        "insert into public.quote_designs (organization_id, show_bank_details) values ($1, $2) on conflict (organization_id) do update set show_bank_details = excluded.show_bank_details",
+        kind === "quote"
+          ? "insert into public.quote_designs (organization_id, show_bank_details_quote) values ($1, $2) on conflict (organization_id) do update set show_bank_details_quote = excluded.show_bank_details_quote"
+          : "insert into public.quote_designs (organization_id, show_bank_details_order) values ($1, $2) on conflict (organization_id) do update set show_bank_details_order = excluded.show_bank_details_order",
         [orgId, show],
       ),
     );
@@ -135,6 +138,19 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     expect((await stored(version))?.bank_account).toBe("87654321");
   });
 
+  it("both switches are on by default (owner, 27 October 2026)", async () => {
+    const row = await run(outsider, async (q) =>
+      one<{ quote: boolean; order: boolean }>(
+        q,
+        `insert into public.quote_designs (organization_id) values ($1)
+         on conflict (organization_id) do update set header_text = public.quote_designs.header_text
+         returning show_bank_details_quote as quote, show_bank_details_order as order`,
+        [otherOrg],
+      ),
+    );
+    expect(row).toEqual({ quote: true, order: true });
+  });
+
   it("no bank details in settings = no snapshot", async () => {
     const quote = await newQuote(outsider, otherOrg, otherPipe);
     await run(outsider, (q) => q("update public.org_bank_details set bank_account = null where organization_id = $1", [otherOrg]));
@@ -150,7 +166,9 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     const token = await link(member, org, quote);
     const shown = await publicQuote(token);
     expect(shown.bank).toEqual({ bank_name: "בנק הפועלים", bank_branch: "123", bank_account: "12345678", bank_account_name: "העסק שלנו" });
-    expect(shown.design.show_bank_details).toBe(true);
+    expect(shown.design.show_bank_details_quote).toBe(true);
+    // a quote's answer names only the quote switch
+    expect(shown.design).not.toHaveProperty("show_bank_details_order");
     // never the live settings, nor another business's
     await setBank(owner, org, "55555555", "חדש");
     const again = await publicQuote(token);
@@ -159,12 +177,17 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     expect(JSON.stringify(again)).not.toContain("55555555");
 
     // a member cannot change the design; an owner hides the block and the answer leaves it out
-    expect((await pgError(setDesign(member, org, false))).code).toBe("42501");
-    await setDesign(owner, org, false);
+    expect((await pgError(setDesign(member, org, "quote", false))).code).toBe("42501");
+    expect((await pgError(setDesign(member, org, "order", false))).code).toBe("42501");
+    // the order switch does not hide a quote's block
+    await setDesign(owner, org, "order", false);
+    expect(((await publicQuote(token)).bank as Bank).bank_account).toBe("12345678");
+    await setDesign(owner, org, "order", true);
+    await setDesign(owner, org, "quote", false);
     const hidden = await publicQuote(token);
     expect(hidden.bank).toBeNull();
-    expect(hidden.design.show_bank_details).toBe(false);
-    await setDesign(owner, org, true);
+    expect(hidden.design.show_bank_details_quote).toBe(false);
+    await setDesign(owner, org, "quote", true);
 
     // a quote with no snapshot answers null
     await asAdmin(async (q) => {
@@ -221,11 +244,16 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     const token = await run(member, async (q) => (await one<{ t: string }>(q, "select public.order_link_create($1, $2) as t", [org, order])).t);
     const page = await asService(async (q) => (await one<{ p: Record<string, unknown> & { design: Record<string, unknown> } }>(q, "select public.order_public($1, null) as p", [token])).p);
     expect((page.bank as Bank).bank_account).toBe("12345678");
-    expect(page.design.show_bank_details).toBe(true);
-    await setDesign(owner, org, false);
-    const hidden = await asService(async (q) => (await one<{ p: Record<string, unknown> }>(q, "select public.order_public($1, null) as p", [token])).p);
-    expect(hidden.bank).toBeNull();
-    await setDesign(owner, org, true);
+    expect(page.design.show_bank_details_order).toBe(true);
+    expect(page.design).not.toHaveProperty("show_bank_details_quote");
+    const orderPage = () => asService(async (q) => (await one<{ p: Record<string, unknown> }>(q, "select public.order_public($1, null) as p", [token])).p);
+    // the quote switch does not hide an order's block
+    await setDesign(owner, org, "quote", false);
+    expect(((await orderPage()).bank as Bank).bank_account).toBe("12345678");
+    await setDesign(owner, org, "quote", true);
+    await setDesign(owner, org, "order", false);
+    expect((await orderPage()).bank).toBeNull();
+    await setDesign(owner, org, "order", true);
     await setBank(owner, org, "12345678", "העסק שלנו");
   });
 

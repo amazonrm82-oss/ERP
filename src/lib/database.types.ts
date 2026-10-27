@@ -1654,8 +1654,9 @@ export type QuoteDesignDbRow = {
   footer_text: string | null;
   show_logo: boolean;
   show_business_details: boolean;
-  // TAX-02: show the bank details stored on a sent quote / numbered order
-  show_bank_details: boolean;
+  // TAX-02: show the bank details stored on a sent quote / a numbered order (a switch each)
+  show_bank_details_quote: boolean;
+  show_bank_details_order: boolean;
   accent_color: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1667,7 +1668,8 @@ type QuoteDesignWrite = {
   footer_text?: string | null;
   show_logo?: boolean;
   show_business_details?: boolean;
-  show_bank_details?: boolean;
+  show_bank_details_quote?: boolean;
+  show_bank_details_order?: boolean;
   accent_color?: string | null;
 };
 

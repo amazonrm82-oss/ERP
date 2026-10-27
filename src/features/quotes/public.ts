@@ -79,7 +79,7 @@ const answerSchema = z.object({
     show_logo: z.boolean(),
     show_business_details: z.boolean(),
     // TAX-02 (absent before 021087)
-    show_bank_details: z.boolean().optional(),
+    show_bank_details_quote: z.boolean().optional(),
     accent_color: text,
   }),
   brand: z.object({ logo: text, color: text }),
@@ -143,7 +143,9 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     footerText: design.footer_text,
     showLogo: design.show_logo,
     showBusinessDetails: design.show_business_details,
-    showBankDetails: design.show_bank_details ?? true,
+    showBankDetailsQuote: design.show_bank_details_quote ?? true,
+    // the order switch is not part of a quote's answer; this page draws a quote only
+    showBankDetailsOrder: false,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");

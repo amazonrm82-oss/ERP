@@ -166,7 +166,7 @@ describe("bank details on the customer's quote page (TAX-02)", () => {
     expect(publicQuoteFrom(answer({ bank: null }))!.quote.bankDetails).toBeNull();
     const page = publicQuoteFrom(
       answer({
-        design: { ...answer().design, show_bank_details: true },
+        design: { ...answer().design, show_bank_details_quote: true },
         bank: { bank_name: "בנק הפועלים", bank_branch: "123", bank_account: "12345678", bank_account_name: "העסק הרשום" },
       }),
     )!;

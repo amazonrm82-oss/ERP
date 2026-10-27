@@ -105,7 +105,7 @@ function sample(lineCount: number): QuoteDocumentData {
     createdAt: "2026-10-26",
   };
   return {
-    design: { headerText: "הצעה זו בתוקף ל-30 יום.", footerText: "חברת הדוגמה בע\"מ · מחויבים לשירות", showLogo: true, showBusinessDetails: true, showBankDetails: true, accentColor: null },
+    design: { headerText: "הצעה זו בתוקף ל-30 יום.", footerText: "חברת הדוגמה בע\"מ · מחויבים לשירות", showLogo: true, showBusinessDetails: true, showBankDetailsQuote: true, showBankDetailsOrder: true, accentColor: null },
     color: "#ffcc00",
     logoUrl: null,
     business: { name: 'חברת הדוגמה בע"מ', taxId: "512345678", address: "רחוב הרצל 10, תל אביב", phone: "+972-3-555-1234", email: "office@example.co.il" },

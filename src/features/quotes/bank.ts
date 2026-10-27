@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * TAX-02, the rest: the business's bank details for a transfer, as a document shows them. A quote stores
  * app.document_bank_snapshot() when it is sent and an order when it is numbered (`bank_details`); a document
- * shows that snapshot, never the live settings, and only while the design shows it (quote_designs.show_bank_details).
+ * shows that snapshot, never the live settings, and only while the design shows it (quote_designs.show_bank_details_quote / _order).
  * Pure, so the document, the customer page and the PDF share one wording.
  */
 export type DocumentBank = {

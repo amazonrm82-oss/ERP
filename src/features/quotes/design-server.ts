@@ -20,7 +20,7 @@ export const getQuoteDesign = cache(async (orgId: string): Promise<QuoteDesign> 
   const row = must(
     await supabase
       .from("quote_designs")
-      .select("header_text, footer_text, show_logo, show_business_details, show_bank_details, accent_color")
+      .select("header_text, footer_text, show_logo, show_business_details, show_bank_details_quote, show_bank_details_order, accent_color")
       .eq("organization_id", orgId)
       .maybeSingle(),
     "quote design",

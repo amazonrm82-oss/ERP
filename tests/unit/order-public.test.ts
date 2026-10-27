@@ -90,13 +90,13 @@ describe("the customer's order page (ORD-05)", () => {
 describe("bank details on the customer's order page (TAX-02)", () => {
   it("reads `bank` into the order; absent (older answers) or null is none", () => {
     expect(publicOrderFrom(answer)!.order.bankDetails).toBeNull();
-    expect(publicOrderFrom(answer)!.design.showBankDetails).toBe(true);
+    expect(publicOrderFrom(answer)!.design.showBankDetailsOrder).toBe(true);
     const page = publicOrderFrom({
       ...answer,
-      design: { ...answer.design, show_bank_details: true },
+      design: { ...answer.design, show_bank_details_order: true },
       bank: { bank_name: "בנק", bank_branch: "12", bank_account: "1234567", bank_account_name: null },
     })!;
     expect(page.order.bankDetails).toEqual({ bankName: "בנק", branch: "12", account: "1234567", accountName: null });
-    expect(publicOrderFrom({ ...answer, design: { ...answer.design, show_bank_details: false }, bank: null })!.design.showBankDetails).toBe(false);
+    expect(publicOrderFrom({ ...answer, design: { ...answer.design, show_bank_details_order: false }, bank: null })!.design.showBankDetailsOrder).toBe(false);
   });
 });

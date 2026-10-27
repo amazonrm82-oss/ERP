@@ -18,8 +18,9 @@ export type QuoteDesign = {
   footerText: string | null;
   showLogo: boolean;
   showBusinessDetails: boolean;
-  // TAX-02: the bank details stored on the document when it was sent (or an order numbered)
-  showBankDetails: boolean;
+  // TAX-02 (owner, 27 October 2026: a switch per document type): the bank details stored on a sent quote / a numbered order
+  showBankDetailsQuote: boolean;
+  showBankDetailsOrder: boolean;
   // '#rrggbb' for quotes only; null = the business colour
   accentColor: string | null;
 };
@@ -29,7 +30,8 @@ export const DEFAULT_QUOTE_DESIGN: QuoteDesign = {
   footerText: null,
   showLogo: true,
   showBusinessDetails: true,
-  showBankDetails: true,
+  showBankDetailsQuote: true,
+  showBankDetailsOrder: true,
   accentColor: null,
 };
 
@@ -38,7 +40,8 @@ export type QuoteDesignRow = {
   footer_text: string | null;
   show_logo: boolean;
   show_business_details: boolean;
-  show_bank_details: boolean;
+  show_bank_details_quote: boolean;
+  show_bank_details_order: boolean;
   accent_color: string | null;
 };
 
@@ -49,7 +52,8 @@ export function designFromRow(row: QuoteDesignRow | null): QuoteDesign {
     footerText: row.footer_text,
     showLogo: row.show_logo,
     showBusinessDetails: row.show_business_details,
-    showBankDetails: row.show_bank_details,
+    showBankDetailsQuote: row.show_bank_details_quote,
+    showBankDetailsOrder: row.show_bank_details_order,
     accentColor: isHexColor(row.accent_color) ? row.accent_color : null,
   };
 }
@@ -67,7 +71,8 @@ export const quoteDesignSchema = z
     footer_text: optionalText(QUOTE_FOOTER_MAX, `הכותרת התחתונה ארוכה מדי (עד ${QUOTE_FOOTER_MAX} תווים).`),
     show_logo: z.unknown().optional(),
     show_business_details: z.unknown().optional(),
-    show_bank_details: z.unknown().optional(),
+    show_bank_details_quote: z.unknown().optional(),
+    show_bank_details_order: z.unknown().optional(),
     color_mode: z.preprocess((value) => (typeof value === "string" ? value : "brand"), z.enum(COLOR_MODES, { error: "יש לבחור צבע." })),
     accent_color: z.unknown().optional(),
   })
@@ -85,12 +90,13 @@ export const quoteDesignSchema = z
       footer_text: value.footer_text,
       show_logo: value.show_logo === "on",
       show_business_details: value.show_business_details === "on",
-      show_bank_details: value.show_bank_details === "on",
+      show_bank_details_quote: value.show_bank_details_quote === "on",
+      show_bank_details_order: value.show_bank_details_order === "on",
       accent_color: accentColor,
     } satisfies QuoteDesignRow;
   });
 
-export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "show_bank_details", "color_mode", "accent_color"] as const;
+export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "show_bank_details_quote", "show_bank_details_order", "color_mode", "accent_color"] as const;
 
 export type DocumentCustomer = {
   // the name for invoices, else the company, else the contact

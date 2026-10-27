@@ -60,7 +60,7 @@ const answerSchema = z.object({
   ),
   schedule: z.array(z.object({ name: z.string(), percent_bp: z.number().int(), due_date: text, milestone: text, amount_agorot: money })),
   business: z.object({ name: z.string(), tax_id: text, address_line: text, city: text, postal_code: text, phone: text, email: text }),
-  design: z.object({ header_text: text, footer_text: text, show_logo: z.boolean(), show_business_details: z.boolean(), show_bank_details: z.boolean().optional(), accent_color: text }),
+  design: z.object({ header_text: text, footer_text: text, show_logo: z.boolean(), show_business_details: z.boolean(), show_bank_details_order: z.boolean().optional(), accent_color: text }),
   brand: z.object({ logo: text, color: text }),
   built_with: z.boolean(),
   decision: z.object({ decision: z.enum(["accepted", "rejected"]), decided_at: z.string() }).nullable(),
@@ -95,7 +95,9 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
     footerText: design.footer_text,
     showLogo: design.show_logo,
     showBusinessDetails: design.show_business_details,
-    showBankDetails: design.show_bank_details ?? true,
+    // the quote switch is not part of an order's answer; this page draws an order only
+    showBankDetailsQuote: false,
+    showBankDetailsOrder: design.show_bank_details_order ?? true,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");

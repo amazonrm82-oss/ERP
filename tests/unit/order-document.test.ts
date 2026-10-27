@@ -58,7 +58,7 @@ const line: OrderLine = {
 };
 
 const data: OrderDocumentData = {
-  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, showBankDetails: true, accentColor: null },
+  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, showBankDetailsQuote: true, showBankDetailsOrder: true, accentColor: null },
   color: null,
   logoUrl: null,
   business: { name: "העסק", taxId: "515555555", address: null, phone: null, email: null },
@@ -117,7 +117,7 @@ describe("bank details on an order confirmation (TAX-02)", () => {
     expect(html).toContain("פרטים להעברה בנקאית");
     expect(html).toContain("87654321");
     const hidden = renderToStaticMarkup(
-      createElement(OrderDocument, { data: { ...data, design: { ...data.design, showBankDetails: false }, order: { ...order, bankDetails: bank } } }),
+      createElement(OrderDocument, { data: { ...data, design: { ...data.design, showBankDetailsOrder: false }, order: { ...order, bankDetails: bank } } }),
     );
     expect(hidden).not.toContain("87654321");
   });

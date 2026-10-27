@@ -54,11 +54,20 @@ export function QuoteDesignForm({ orgId, design, brandColor }: Props) {
           defaultChecked={design.showBusinessDetails}
           hint="השם הרשום, מספר העוסק, הכתובת, הטלפון והאימייל, כפי שנקבעו ב&quot;מע&quot;מ ופרטים למסמכים&quot;."
         />
+      </fieldset>
+      <fieldset className="space-y-3">
+        <legend className="mb-1 text-sm font-medium">מה מופיע בסוף המסמך</legend>
         <Checkbox
-          name="show_bank_details"
-          label="פרטים להעברה בנקאית"
-          defaultChecked={design.showBankDetails}
-          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהיו כשההצעה נשלחה או כשההזמנה קיבלה מספר. מופיעים בסוף המסמך."
+          name="show_bank_details_quote"
+          label="פרטים להעברה בנקאית בהצעת מחיר"
+          defaultChecked={design.showBankDetailsQuote}
+          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהיו כשההצעה נשלחה."
+        />
+        <Checkbox
+          name="show_bank_details_order"
+          label="פרטים להעברה בנקאית באישור הזמנה"
+          defaultChecked={design.showBankDetailsOrder}
+          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהיו כשההזמנה קיבלה מספר."
         />
       </fieldset>
       <fieldset className="space-y-3">

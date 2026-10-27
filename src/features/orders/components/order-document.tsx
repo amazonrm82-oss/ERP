@@ -244,7 +244,7 @@ export function OrderDocument({ data, headingLevel = 1 }: { data: OrderDocumentD
         <ScheduleSection rows={data.schedule} id="order-schedule" />
 
         {/* TAX-02: the bank details stored when the order got its number, while the design shows them */}
-        <BankSection bank={design.showBankDetails ? data.order.bankDetails : null} id="order-bank" />
+        <BankSection bank={design.showBankDetailsOrder ? data.order.bankDetails : null} id="order-bank" />
 
         {order.notes ? (
           <section aria-label="הערות" className="space-y-1" data-print-keep="">
