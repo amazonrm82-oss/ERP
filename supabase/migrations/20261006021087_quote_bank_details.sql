@@ -21,6 +21,9 @@
 -- `bank` (the stored snapshot, only when the design shows it) and `design.show_bank_details` to the full answer; their
 -- not-found rules, rate limits and status pages are unchanged (test 253 pins their md5).
 --
+-- Redefined: app.audit_row (latest body 020020) only to add 'bank_details' to its ignored columns, so the snapshot (the full
+-- account number) never enters audit_log (owner: bank details are logged without the full number).
+--
 -- Bank details are the business's, not a person's: no erasure work.
 -- Every statement is safe to run twice. No drops, no row removal.
 
@@ -465,3 +468,85 @@ end;
 $$;
 revoke all on function public.order_public(text, text) from public, anon, authenticated;
 grant execute on function public.order_public(text, text) to service_role;
+
+-- ----------------------------------------------------------------------------
+-- app.audit_row: 020020's body (the latest), with 'bank_details' added to the ignored columns only. Owner, 13 October
+-- 2026: bank details are logged without the full number; the snapshot a quote or order takes when it is sent or numbered
+-- holds the full account number, so the update that stores it writes no change of it (and an update changing nothing else
+-- writes no entry). An insert's entry holds no values; quotes and orders that hold a snapshot are never deleted by a person.
+-- ----------------------------------------------------------------------------
+create or replace function app.audit_row() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_old jsonb;
+  v_new jsonb;
+  v_org uuid;
+  v_entity uuid;
+  v_action text;
+  v_changes jsonb := '{}'::jsonb;
+  v_key text;
+  v_rule uuid;
+  v_ignored constant text[] := array['updated_at', 'updated_by', 'stage_entered_at', 'phone_e164', 'last_lead_assigned_at', 'reminded_at', 'score',
+                                        -- TAX-02: the bank snapshot of a quote / order (the full account number) never enters the log
+                                        'bank_details'];
+begin
+  if tg_op <> 'INSERT' then v_old := to_jsonb(old); end if;
+  if tg_op <> 'DELETE' then v_new := to_jsonb(new); end if;
+
+  if tg_table_name = 'organizations' then
+    v_org := coalesce(v_new ->> 'id', v_old ->> 'id')::uuid;
+  else
+    v_org := coalesce(v_new ->> 'organization_id', v_old ->> 'organization_id')::uuid;
+  end if;
+  v_entity := nullif(coalesce(v_new ->> 'id', v_old ->> 'id'), '')::uuid;
+
+  if tg_op = 'INSERT' then
+    v_action := 'insert';
+  elsif tg_op = 'DELETE' then
+    -- nothing to attach the entry to when the organization itself is going away
+    if not app.org_exists(v_org) then
+      return null;
+    end if;
+    v_action := 'delete';
+    v_changes := v_old;
+  else
+    for v_key in select jsonb_object_keys(v_new) loop
+      if v_key <> all (v_ignored) and (v_new -> v_key) is distinct from (v_old -> v_key) then
+        v_changes := v_changes || jsonb_build_object(
+          v_key, jsonb_build_object('old', v_old -> v_key, 'new', v_new -> v_key));
+      end if;
+    end loop;
+    if v_changes = '{}'::jsonb then
+      return null;
+    end if;
+    v_action := case
+      when v_changes ? 'deleted_at' and (v_new ->> 'deleted_at') is not null then 'trash'
+      when v_changes ? 'deleted_at' then 'restore'
+      else 'update'
+    end;
+  end if;
+
+  -- PRM-01: an insert or update an automation made names the rule, as it is named now (kept in the
+  -- entry, never looked up again); a delete's entry carries no name. The rule comes from
+  -- app.automation_rule_runs, written only by app.execute_automation for this transaction (no row
+  -- when its slot was held by another transaction), and only a rule of this entry's business
+  -- counts. A plain value, not an {old, new} pair, so lists show it as context.
+  if tg_op <> 'DELETE' then
+    select r.rule_id into v_rule from app.automation_rule_runs r
+     where r.slot = (txid_current() % 65536)::integer and r.txid = txid_current()
+       and r.organization_id = v_org and r.rule_id is not null;
+    if v_rule is not null then
+      v_changes := v_changes || jsonb_build_object('automation', jsonb_build_object(
+        'id', v_rule,
+        'name', (select a.name from public.automations a where a.id = v_rule and a.organization_id = v_org)));
+    end if;
+  end if;
+
+  insert into public.audit_log (organization_id, actor_id, action, entity_type, entity_id, changes)
+  values (v_org, auth.uid(), v_action, tg_table_name, v_entity, v_changes);
+  return null;
+end;
+$$;
+

@@ -228,4 +228,38 @@ describe("bank details on quotes and orders (TAX-02)", () => {
     await setDesign(owner, org, true);
     await setBank(owner, org, "12345678", "העסק שלנו");
   });
+
+  it("sending a quote and numbering an order write no audit entry holding the snapshot or the account number", async () => {
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ orders: true })]));
+    await setBank(owner, org, "31415926", "העסק שלנו");
+    const quote = await newQuote(member, org, pipe);
+    await send(member, org, quote);
+    expect((await stored(quote))?.bank_account).toBe("31415926");
+    const order = await run(member, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח יומן', $2) returning id", [org, member.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id;
+      await q("insert into public.order_lines (organization_id, order_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+      await q("select public.order_confirm($1, $2)", [org, id]);
+      return id;
+    });
+    expect(
+      (await asAdmin(async (q) => one<{ b: Bank | null }>(q, "select bank_details as b from public.orders where id = $1", [order])))?.b?.bank_account,
+    ).toBe("31415926");
+    const entries = await asAdmin(async (q) =>
+      (await q<{ entity_type: string; action: string; changes: string }>("select entity_type, action, changes::text as changes from public.audit_log where entity_id = any($1)", [[quote, order]])).rows,
+    );
+    // the send and the numbering are audited (status, number), but never the snapshot
+    expect(entries.some((e) => e.entity_type === "quotes" && e.action === "update")).toBe(true);
+    expect(entries.some((e) => e.entity_type === "orders" && e.action === "update")).toBe(true);
+    for (const e of entries) {
+      expect(e.changes, `${e.entity_type} ${e.action}`).not.toContain("bank_details");
+      expect(e.changes, `${e.entity_type} ${e.action}`).not.toContain("31415926");
+    }
+    // nowhere else in this business's log either, but for the masked settings entry
+    const anywhere = await asAdmin(async (q) =>
+      (await q<{ entity_type: string }>("select entity_type from public.audit_log where organization_id = $1 and changes::text like '%31415926%'", [org])).rows,
+    );
+    expect(anywhere).toEqual([]);
+    await setBank(owner, org, "12345678", "העסק שלנו");
+  });
 });
