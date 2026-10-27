@@ -6,12 +6,31 @@ afterAll(closePool);
 
 type U = { id: string };
 
-// md5 of the select policies' text without white space (orders 020570/020700, documents 021076, payments 020635): the
-// definer shortcut app.order_money_facts / order_money_same_parent assumes these read rules; a change must review it
-const EXPECTED_READ_RULES = {
-  accounting_documents: "30f00ab35d06dd183856d3acb380c358",
-  orders: "59f2ef3115b4527febc70ce3fd19bb62",
-  payments: "7096643e66e0c6891c69b05815be831b",
+// The read rules the definer shortcut app.order_money_facts / app.order_money_same_parent assumes (orders 020570, documents
+// 021076, payments 020635): the deal, else the contact, else (orders, documents) the company, else the role. The test
+// recreates each as a policy on a temporary copy of its table and compares the server's own rendering of both, so a change
+// to a real policy fails here and the shortcut must be reviewed again.
+const ROLE_RULE = "coalesce(app.role_in(organization_id) = any (array['owner', 'admin', 'manager']::public.membership_role[]), false)";
+const EXPECTED_READ_RULES: Record<string, string> = {
+  orders: `case when orders.deal_id is not null
+                then exists (select 1 from public.deals d where d.organization_id = orders.organization_id and d.id = orders.deal_id)
+                when orders.contact_id is not null
+                then exists (select 1 from public.contacts c where c.organization_id = orders.organization_id and c.id = orders.contact_id)
+                when orders.company_id is not null
+                then exists (select 1 from public.companies c where c.organization_id = orders.organization_id and c.id = orders.company_id)
+                else ${ROLE_RULE} end`,
+  accounting_documents: `case when accounting_documents.deal_id is not null
+                then exists (select 1 from public.deals d where d.organization_id = accounting_documents.organization_id and d.id = accounting_documents.deal_id)
+                when accounting_documents.contact_id is not null
+                then exists (select 1 from public.contacts c where c.organization_id = accounting_documents.organization_id and c.id = accounting_documents.contact_id)
+                when accounting_documents.company_id is not null
+                then exists (select 1 from public.companies co where co.organization_id = accounting_documents.organization_id and co.id = accounting_documents.company_id)
+                else ${ROLE_RULE} end`,
+  payments: `case when payments.deal_id is not null
+                then exists (select 1 from public.deals d where d.organization_id = payments.organization_id and d.id = payments.deal_id)
+                when payments.contact_id is not null
+                then exists (select 1 from public.contacts c where c.organization_id = payments.organization_id and c.id = payments.contact_id)
+                else ${ROLE_RULE} end`,
 };
 type Step = { id: string; amount: number; billed: number | null; paid: number | null };
 type Money = {
@@ -293,17 +312,45 @@ describe("order billing and payment status (ORD-02, ORD-04)", () => {
   });
 
   it("the read rules the shortcut relies on are unchanged (app.order_money_same_parent mirrors them; review it before changing this)", async () => {
-    const quals = await asAdmin(async (q) =>
-      Object.fromEntries(
-        (
-          await q<{ t: string; m: string }>(
-            `select tablename as t, md5(regexp_replace(qual, '\s+', '', 'g')) as m from pg_policies
-              where schemaname = 'public' and tablename in ('orders', 'accounting_documents', 'payments') and cmd = 'SELECT'`,
-          )
-        ).rows.map((r) => [r.t, r.m]),
-      ),
+    // exactly one permissive select policy on each table, and no FOR ALL or restrictive one that could narrow reading
+    const policies = await asAdmin(async (q) =>
+      (
+        await q<{ t: string; name: string; cmd: string; permissive: boolean }>(
+          `select c.relname as t, p.polname as name, p.polcmd::text as cmd, p.polpermissive as permissive
+             from pg_policy p join pg_class c on c.oid = p.polrelid join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relname in ('orders', 'accounting_documents', 'payments')
+              and (p.polcmd in ('r', '*') or not p.polpermissive)
+            order by 1, 2`,
+        )
+      ).rows,
     );
-    expect(quals).toEqual(EXPECTED_READ_RULES);
+    expect(policies).toEqual([
+      { t: "accounting_documents", name: "accounting_documents_select", cmd: "r", permissive: true },
+      { t: "orders", name: "orders_select", cmd: "r", permissive: true },
+      { t: "payments", name: "payments_select", cmd: "r", permissive: true },
+    ]);
+    // each real read rule equals the expected text, both rendered by this server (pg_get_expr) in the same session; the
+    // copies live in pg_temp and are dropped when the transaction ends (on commit drop). A copy has the real table's name, so a self-reference
+    // (orders.deal_id) renders the same; every other name is schema-qualified in the expected text.
+    const rendered = await asAdmin(async (q) => {
+      await q("set local search_path = public");
+      const out: Record<string, { real: string; expected: string }> = {};
+      for (const [table, rule] of Object.entries(EXPECTED_READ_RULES)) {
+        await q(`create temp table ${table} (like public.${table}) on commit drop`);
+        await q(`create policy expected_read on pg_temp.${table} for select using (${rule})`);
+        const row = (
+          await q<{ real: string; expected: string }>(
+            `select pg_get_expr(r.polqual, r.polrelid) as real, pg_get_expr(e.polqual, e.polrelid) as expected
+               from pg_policy r, pg_policy e
+              where r.polrelid = $1::regclass and r.polname = $2 and e.polrelid = $3::regclass and e.polname = 'expected_read'`,
+            [`public.${table}`, `${table}_select`, `pg_temp.${table}`],
+          )
+        ).rows[0];
+        out[table] = row;
+      }
+      return out;
+    });
+    for (const [table, { real, expected }] of Object.entries(rendered)) expect(real, table).toBe(expected);
   });
 
   it("refuses more than 100 orders in one call; anon has no access", async () => {
