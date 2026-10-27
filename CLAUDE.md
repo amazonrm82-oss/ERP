@@ -1349,6 +1349,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `order_money:draft|parent`) and refuse any later change but the FK's own set-null. Reading still follows the deal, else the
   contact. `rerunClosure` (tests/db/rerun.ts) also re-runs later migrations that grant or revoke on a table a picked file
   touches (multi-table statements included), so a re-run never drops a later column grant.
+- Order billing and payment (ORD-02/04 rest, migration 021083; owner 27 October 2026, answers (1) ב+ג+ד (2)-(4) א): computed when
+  read, never stored. billed = active tax invoices + invoice-receipts - credit invoices with `order_id` (never below 0; a proforma is
+  `requested`, not billing); paid = A + C + greatest(F, R): counted allocations onto the order's documents, opening credits offset onto
+  them, linked payments (order_id or advance for it) less all their allocations vs. the order's active invoice-receipts (the larger,
+  never both); recorded/confirmed only. States against `total_agorot` with VAT (total <= 0 = billed/paid; draft null; cancelled still
+  worked out); per half `unknown` when the caller does not read a row (BAL-01's partial rule). `app.order_money_facts` (definer, members,
+  one grouped pass, amounts and ids only) names only rows whose read parent is not the order's (`app.order_money_same_parent`);
+  `app.order_money_rows` (invoker) re-reads those under RLS. Public: `order_money_state(org, ids)` (invoker, at most 100, hint
+  `order_money:too_many`; steps covered in schedule order) and `orders_by_money_state(org, billing, payment)` (invoker, setof orders,
+  the list filter through `.rpc().select()`). Test 254 pins the read policies of orders, accounting_documents, payments,
+  payment_allocations and opening_credit_allocations: a change there means looking at `order_money_same_parent` again.
 - Money on the timeline (DOC-04, migration 020750; owner 21 October 2026: type and number only, no amount): definer triggers
   `accounting_documents_timeline` / `payments_timeline` (after insert or update of status) write one `system` entry with no author
   on the row's deal and contact (none when the row has neither): `metadata.kind` document_recorded|document_cancelled|
