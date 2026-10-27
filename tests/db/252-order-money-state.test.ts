@@ -239,21 +239,127 @@ describe("order billing and payment status (ORD-02, ORD-04)", () => {
     // the member still reads the order through its contact, and the payment, but not the document
     expect(await run(member, (q) => count(q, "select 1 from public.orders where id = $1", [order]))).toBe(1);
     expect(await run(member, (q) => count(q, "select 1 from public.accounting_documents where order_id = $1", [order]))).toBe(0);
-    // the hidden document hides the billing half only; the payments the member reads in full still count
+    // a hidden document hides both halves: paid also counts allocations, credits and receipts on the order's documents
     expect(await stateOf(member, order)).toMatchObject({
       partial: true,
       billing_partial: true,
-      payment_partial: false,
+      payment_partial: true,
       billed: null,
-      paid: 100,
+      paid: null,
       requested: null,
       billing_state: "unknown",
-      payment_state: "partly_paid",
+      payment_state: "unknown",
     });
-    expect(await fields(member, order)).toEqual({ b: "unknown", p: "partly_paid" });
+    expect(await fields(member, order)).toEqual({ b: "unknown", p: "unknown" });
     // an order seen only partly matches no billing state
     for (const b of ["not_billed", "partly_billed", "billed"]) expect(await listed(member, order, b, null)).toBe(false);
     expect(await stateOf(owner, order)).toMatchObject({ partial: false, billed: 100, paid: 100, has_money: true });
+  });
+
+  // owner's answers of 27 October 2026: paid = allocated (A) + opening credits (C) + greatest(linked unallocated (F), receipts (R))
+  const allocate = (payment: string, document: string, amount: number) =>
+    run(owner, (q) => q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, $4)", [org, payment, document, amount]));
+  const looseDoc = (type: string, amount: number, fields: { deal?: string | null; contact?: string | null }) =>
+    run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, $3, $4, $5, $6) returning id",
+          [org, fields.deal ?? null, fields.contact ?? null, type, `OL-${++n}`, amount],
+        )
+      ).id,
+    );
+  const loosePay = (amount: number, fields: { deal?: string | null; contact?: string | null; advanceFor?: string; order?: string }) =>
+    run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          `insert into public.payments (organization_id, order_id, deal_id, contact_id, amount_agorot, method, is_advance, advance_order_id)
+           values ($1, $2, $3, $4, $5, 'transfer', $6, $7) returning id`,
+          [org, fields.order ?? null, fields.deal ?? null, fields.contact ?? null, amount, fields.advanceFor !== undefined, fields.advanceFor ?? null],
+        )
+      ).id,
+    );
+  const paidOf = async (order: string) => (await stateOf(owner, order)).paid;
+
+  it("a payment counts once: on the order, its advance and allocated to its invoice", async () => {
+    const contact = await newContact("פעם אחת");
+    const { id: order, deal } = await orderFromDeal(contact);
+    const total = await totalOf(order);
+    const invoice = await doc("tax_invoice", total, { order, deal });
+    const p = await loosePay(total, { order, deal, advanceFor: order });
+    await allocate(p, invoice, total);
+    expect(await stateOf(owner, order)).toMatchObject({ paid: total, payment_state: "paid", billing_state: "billed" });
+  });
+
+  it("a payment allocated to the order's invoice counts its allocation only; an advance counts; a failed one never", async () => {
+    const contact = await newContact("הקצאה");
+    const { id: order, deal } = await orderFromDeal(contact);
+    const invoice = await doc("tax_invoice", 10000, { order, deal });
+    const loose = await loosePay(5000, { deal });
+    await allocate(loose, invoice, 3000);
+    expect(await paidOf(order)).toBe(3000);
+    await loosePay(4000, { deal, advanceFor: order });
+    expect(await paidOf(order)).toBe(7000);
+    // a failed payment's allocation is released: nothing of it counts
+    await run(owner, (q) => q("update public.payments set status = 'failed' where id = $1", [loose]));
+    expect(await paidOf(order)).toBe(4000);
+  });
+
+  it("a linked payment allocated to another invoice counts only what is left for the order", async () => {
+    const contact = await newContact("שארית");
+    const { id: order, deal } = await orderFromDeal(contact);
+    const linked = await pay(5000, { order, deal });
+    const elsewhere = await looseDoc("tax_invoice", 2000, { deal });
+    await allocate(linked, elsewhere, 2000);
+    expect(await paidOf(order)).toBe(3000);
+  });
+
+  it("a tax invoice-receipt and the order's unallocated payments are not added together: the larger counts", async () => {
+    const contact = await newContact("קבלה");
+    const { id: order, deal } = await orderFromDeal(contact);
+    await doc("tax_invoice_receipt", 1000, { order, deal });
+    expect(await paidOf(order)).toBe(1000);
+    await pay(600, { order, deal });
+    expect(await paidOf(order)).toBe(1000);
+    await pay(800, { order, deal });
+    expect(await paidOf(order)).toBe(1400);
+    // an allocated payment is added on top: it paid an invoice, not the receipt
+    const invoice = await doc("tax_invoice", 5000, { order, deal });
+    const loose = await loosePay(700, { deal });
+    await allocate(loose, invoice, 700);
+    expect(await paidOf(order)).toBe(2100);
+  });
+
+  it("an opening credit offset onto the order's invoice counts as paid", async () => {
+    const contact = await newContact("זיכוי פתיחה");
+    const { id: order, deal } = await orderFromDeal(contact);
+    const invoice = await doc("tax_invoice", 5000, { order, deal, contact });
+    const credit = await run(owner, async (q) => (await one<{ id: string }>(q, "select public.opening_balance_set($1, $2, null, -2000, '2026-01-01') as id", [org, contact])).id);
+    await run(owner, (q) => q("insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1500)", [org, credit, invoice]));
+    expect(await paidOf(order)).toBe(1500);
+  });
+
+  it("partial for a new source: a payment of another record of the customer, allocated to the order's invoice, hidden from a member", async () => {
+    const company = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'חברת הזמנות', $2) returning id", [org, member.id])).id);
+    const mine = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id, company_id) values ($1, 'שלי', $2, $3) returning id", [org, member.id, company])).id,
+    );
+    const theirs = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id, company_id) values ($1, 'של אחר', $2, $3) returning id", [org, owner.id, company])).id,
+    );
+    const { id: order, deal } = await orderFromDeal(mine);
+    const invoice = await doc("tax_invoice", 5000, { order, deal, contact: mine });
+    const other = await loosePay(2500, { contact: theirs });
+    await allocate(other, invoice, 2500);
+    await run(owner, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      expect(await run(member, (q) => count(q, "select 1 from public.payments where id = $1", [other]))).toBe(0);
+      expect(await stateOf(member, order)).toMatchObject({ billing_partial: false, payment_partial: true, billed: 5000, paid: null, payment_state: "unknown" });
+      expect(await stateOf(owner, order)).toMatchObject({ partial: false, paid: 2500 });
+    } finally {
+      await run(owner, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
   });
 
   it("no cross-business data: another business's owner gets nothing, and a stranger's orders are not listed", async () => {
@@ -280,33 +386,35 @@ describe("order billing and payment status (ORD-02, ORD-04)", () => {
   it("the shortcut agrees with RLS: for every order, partial exactly when the user does not read every linked row", async () => {
     const orders = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.orders where organization_id = $1 and status <> 'draft'", [org])).rows.map((r) => r.id));
     expect(orders.length).toBeGreaterThan(5);
+    // every row the money of an order reads: its documents, and its payments (linked, advance, or allocated to its documents)
     const full = await asAdmin(async (q) =>
       (
-        await q<{ id: string; d: string; p: string }>(
-          `select o.id, (select count(*) from public.accounting_documents d where d.order_id = o.id)::text as d,
-                  (select count(*) from public.payments p where p.order_id = o.id)::text as p
+        await q<{ id: string; docs: string[]; pays: string[] }>(
+          `select o.id,
+                  array(select d.id from public.accounting_documents d where d.order_id = o.id)::text[] as docs,
+                  array(select p.id from public.payments p
+                         where p.order_id = o.id or (p.is_advance and p.advance_order_id = o.id)
+                            or p.id in (select a.payment_id from public.payment_allocations a
+                                          join public.accounting_documents d on d.id = a.document_id
+                                         where d.order_id = o.id and a.released_at is null and a.removed_at is null))::text[] as pays
              from public.orders o where o.id = any ($1::uuid[])`,
           [orders],
         )
       ).rows,
     );
     for (const u of [owner, member]) {
-      const seen = await run(u, async (q) =>
-        (
-          await q<{ id: string; d: string; p: string }>(
-            `select o.id, (select count(*) from public.accounting_documents d where d.order_id = o.id)::text as d,
-                    (select count(*) from public.payments p where p.order_id = o.id)::text as p
-               from public.orders o where o.id = any ($1::uuid[])`,
-            [orders],
-          )
-        ).rows,
-      );
-      const states = new Map((await state(u, seen.map((r) => r.id))).map((m) => [m.id, m]));
-      for (const row of seen) {
-        const all = full.find((f) => f.id === row.id)!;
-        const m = states.get(row.id)!;
-        expect(m.billing_partial, `${row.id} documents`).toBe(Number(row.d) < Number(all.d));
-        expect(m.payment_partial, `${row.id} payments`).toBe(Number(row.p) < Number(all.p));
+      const seen = await run(u, async (q) => (await q<{ id: string }>("select o.id from public.orders o where o.id = any ($1::uuid[])", [orders])).rows.map((r) => r.id));
+      const states = new Map((await state(u, seen)).map((m) => [m.id, m]));
+      for (const id of seen) {
+        const all = full.find((f) => f.id === id)!;
+        const [docs, pays] = await run(u, async (q) => [
+          await count(q, "select 1 from public.accounting_documents where id = any ($1::uuid[])", [all.docs]),
+          await count(q, "select 1 from public.payments where id = any ($1::uuid[])", [all.pays]),
+        ]);
+        const m = states.get(id)!;
+        const docsHidden = docs < all.docs.length;
+        expect(m.billing_partial, `${id} documents`).toBe(docsHidden);
+        expect(m.payment_partial, `${id} payments`).toBe(docsHidden || pays < all.pays.length);
       }
     }
   });

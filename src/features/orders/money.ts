@@ -5,7 +5,9 @@ import type { BadgeTone } from "@/components/ui/badge";
 // ORD-02 (the rest) / ORD-04 (the rest): an order's billing and payment status and how much of it, and of each schedule step,
 // is billed and paid. Worked out in the database (public.order_money_state, migration order_money_state, security invoker:
 // RLS decides what counts); this file only parses and words it. Billed = active tax invoices and tax invoice-receipts less
-// credit invoices linked to the order; paid = its recorded or confirmed payments; a proforma is a payment request only.
+// credit invoices linked to the order; paid (owner, 27 October 2026) = recorded or confirmed payments on the order or as its
+// advance, allocations and opening credits onto its documents, and its tax invoice-receipts, each money counted once (rule
+// in the migration's header); a proforma is a payment request only.
 
 export const BILLING_STATES = ["not_billed", "partly_billed", "billed"] as const;
 export type BillingState = (typeof BILLING_STATES)[number];
@@ -150,7 +152,10 @@ export function stepState(step: OrderMoneyStep, halves: { billing: boolean; paym
   return "open";
 }
 
-/** The note when part of the order's money is hidden from the user, worded for the halves the plan shows; null = none. */
+/**
+ * The note when part of the order's money is hidden from the user, worded for the halves the plan shows; null = none. A hidden
+ * document also hides the payment half (paid counts what was allocated to the order's documents).
+ */
 export function partialNote(money: Pick<OrderMoney, "billingPartial" | "paymentPartial">, halves: { billing: boolean; payments: boolean }): string | null {
   const documents = halves.billing && money.billingPartial;
   const payments = halves.payments && money.paymentPartial;

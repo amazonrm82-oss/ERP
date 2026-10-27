@@ -84,6 +84,8 @@ describe("order billing and payment (ORD-02, ORD-04)", () => {
     expect(partialNote({ billingPartial: true, paymentPartial: true }, both)).toContain("מסמכים ותשלומים");
     expect(partialNote({ billingPartial: true, paymentPartial: false }, both)).toContain("החיוב");
     expect(partialNote({ billingPartial: false, paymentPartial: true }, both)).toContain("התשלום");
+    // a hidden document hides the payment half too (the database sets both): with documents off, the payment note shows
+    expect(partialNote({ billingPartial: true, paymentPartial: true }, { billing: false, payments: true })).toContain("התשלום");
     // a hidden document says nothing when the documents half is not shown
     expect(partialNote({ billingPartial: true, paymentPartial: false }, { billing: false, payments: true })).toBeNull();
   });
