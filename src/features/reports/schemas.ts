@@ -52,6 +52,9 @@ const cleanupDeals = z.array(
   }),
 );
 
+// MNY-01: one group of "כסף שמחכה": its count and amount over all rows, and at most 300 rows
+const moneyGroup = <T extends z.ZodTypeAny>(row: T) => z.object({ count, amount, rows: z.array(row) });
+
 export const REPORT_SCHEMAS = {
   report_leads_by_source: z.array(
     z.object({ source_id: id, source_name: text, campaign: text, leads: count, converted: count, won: count, revenue: amount }),
@@ -295,6 +298,55 @@ export const REPORT_SCHEMAS = {
         email: text,
         owner_id: id,
         created_at: z.string(),
+      }),
+    ),
+    // quotes sent and not answered (null without the `quotes` flag); amount = before VAT
+    quotes: moneyGroup(
+      z.object({
+        id: uuid,
+        number: text,
+        title: text,
+        status: z.enum(["sent", "viewed"]),
+        sent_at: z.string(),
+        valid_until: day.nullable(),
+        amount_agorot: amount,
+        total_agorot: amount,
+        deal_id: id,
+        contact_id: id,
+        owner_id: id,
+        customer_name: text,
+      }),
+    ).nullable(),
+    // overdue debts (null without the `documents` and `payments` flags); amount = the balances left
+    debts: moneyGroup(
+      z.object({
+        id: uuid,
+        doc_type: z.enum(["tax_invoice", "proforma", "opening_balance"]),
+        number: text,
+        doc_date: day,
+        due_date: day,
+        days_overdue: count,
+        amount_agorot: amount,
+        balance: amount,
+        deal_id: id,
+        contact_id: id,
+        company_id: id,
+        order_id: id,
+        owner_id: id,
+        customer_name: text,
+      }),
+    ).nullable(),
+    // recurring deals renewing from today through 30 days ahead; amount = one period each
+    renewals: moneyGroup(
+      z.object({
+        id: uuid,
+        name: text,
+        owner_id: id,
+        status: z.enum(["open", "won"]),
+        billing_kind: z.enum(["monthly", "yearly"]),
+        amount_agorot: amount.nullable(),
+        renewal_date: day,
+        contact_id: id,
       }),
     ),
   }),

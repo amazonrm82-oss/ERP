@@ -22,6 +22,52 @@ export type MoneyLead = {
   createdAt: string;
 };
 
+export type MoneyQuote = {
+  id: string;
+  number: string | null;
+  title: string | null;
+  status: "sent" | "viewed";
+  sentAt: string;
+  validUntil: string | null;
+  // before VAT (the measure of the deals beside it); totalWithVat for the line
+  amount: number;
+  totalWithVat: number;
+  dealId: string | null;
+  contactId: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  customerName: string | null;
+};
+
+export type MoneyDebt = {
+  id: string;
+  docType: "tax_invoice" | "proforma" | "opening_balance";
+  number: string | null;
+  dueDate: string;
+  daysOverdue: number;
+  amount: number;
+  balance: number;
+  dealId: string | null;
+  contactId: string | null;
+  companyId: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  customerName: string | null;
+};
+
+export type MoneyRenewal = {
+  id: string;
+  name: string | null;
+  status: "open" | "won";
+  billingKind: "monthly" | "yearly";
+  // one period of the recurring amount
+  amount: number | null;
+  renewalDate: string;
+  contactId: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+};
+
 export type MoneyWaiting = {
   today: string;
   summary: MoneySummary;
@@ -29,6 +75,10 @@ export type MoneyWaiting = {
   deals: CleanupDeal[];
   // the 100 newest unhandled leads
   leads: MoneyLead[];
+  // at most 300 each; null: the group's module is not in the business's plan
+  quotes: MoneyQuote[] | null;
+  debts: MoneyDebt[] | null;
+  renewals: MoneyRenewal[];
 };
 
 /**
@@ -41,7 +91,14 @@ export async function getMoneyWaiting(orgId: string, ownerId: string | null): Pr
   if (raw === null) return null;
   // FXC-12: the result is checked before it is read; a mismatch throws
   const data = parseReportData("report_money_waiting", raw);
-  const names = await getUserNames([...data.deals.map((row) => row.owner_id), ...data.leads.map((row) => row.owner_id)]);
+  const names = await getUserNames([
+    ...data.deals.map((row) => row.owner_id),
+    ...data.leads.map((row) => row.owner_id),
+    ...(data.quotes?.rows ?? []).map((row) => row.owner_id),
+    ...(data.debts?.rows ?? []).map((row) => row.owner_id),
+    ...data.renewals.rows.map((row) => row.owner_id),
+  ]);
+  const nameOf = (id: string | null) => (id ? (names.get(id) ?? null) : null);
   return {
     today: data.today,
     summary: moneySummary(data),
@@ -57,6 +114,49 @@ export async function getMoneyWaiting(orgId: string, ownerId: string | null): Pr
       ownerName: row.owner_id ? (names.get(row.owner_id) ?? null) : null,
       createdAt: row.created_at,
     })),
+    quotes:
+      data.quotes?.rows.map((row) => ({
+        id: row.id,
+        number: row.number,
+        title: row.title,
+        status: row.status,
+        sentAt: row.sent_at,
+        validUntil: row.valid_until,
+        amount: row.amount_agorot,
+        totalWithVat: row.total_agorot,
+        dealId: row.deal_id,
+        contactId: row.contact_id,
+        ownerId: row.owner_id,
+        ownerName: nameOf(row.owner_id),
+        customerName: row.customer_name,
+      })) ?? null,
+    debts:
+      data.debts?.rows.map((row) => ({
+        id: row.id,
+        docType: row.doc_type,
+        number: row.number,
+        dueDate: row.due_date,
+        daysOverdue: row.days_overdue,
+        amount: row.amount_agorot,
+        balance: row.balance,
+        dealId: row.deal_id,
+        contactId: row.contact_id,
+        companyId: row.company_id,
+        ownerId: row.owner_id,
+        ownerName: nameOf(row.owner_id),
+        customerName: row.customer_name,
+      })) ?? null,
+    renewals: data.renewals.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      billingKind: row.billing_kind,
+      amount: row.amount_agorot,
+      renewalDate: row.renewal_date,
+      contactId: row.contact_id,
+      ownerId: row.owner_id,
+      ownerName: nameOf(row.owner_id),
+    })),
   };
 }
 
@@ -67,13 +167,16 @@ export type RowActionSetup = {
   contacts: Map<string, { firstName: string | null; fullName: string | null; phoneE164: string | null }>;
 };
 
-/** MNY-02: what the rows' actions need; read with the user's session. */
-export async function getRowActionSetup(orgId: string, canWrite: boolean, deals: CleanupDeal[]): Promise<RowActionSetup> {
+/**
+ * MNY-02: what the rows' actions need; read with the user's session. contactIds: the contacts the rows reach
+ * (deals' contacts, debts' contacts), so WhatsApp can go to them.
+ */
+export async function getRowActionSetup(orgId: string, canWrite: boolean, contactIdsOfRows: Array<string | null>): Promise<RowActionSetup> {
   if (!canWrite) {
     return { owners: [], contacts: new Map() };
   }
   const supabase = await createClient();
-  const contactIds = [...new Set(deals.map((deal) => deal.contactId).filter((id): id is string => Boolean(id)))];
+  const contactIds = [...new Set(contactIdsOfRows.filter((id): id is string => Boolean(id)))];
   const [members, contacts] = await Promise.all([
     listMembers(orgId),
     contactIds.length > 0

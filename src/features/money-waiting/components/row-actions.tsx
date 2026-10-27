@@ -15,11 +15,11 @@ import type { TemplateValues } from "@/features/whatsapp/templates";
 import { ROW_ACTION_LABELS, type RowAction } from "../row-actions";
 
 export type RowActionTarget = {
-  kind: "lead" | "deal";
+  kind: "lead" | "deal" | "contact" | "company";
   id: string;
   name: string;
   ownerId: string | null;
-  // where WhatsApp goes (the lead, or the deal's contact) and what a template's placeholders become
+  // where WhatsApp goes (the lead, the contact, or the deal's contact) and what a template's placeholders become
   phoneE164: string | null;
   values: TemplateValues;
   // the person the message goes to, for the window's title

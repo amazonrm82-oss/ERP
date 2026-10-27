@@ -200,6 +200,24 @@ describe("report result shapes (FXC-12)", () => {
     });
     await asAdmin((q) => q("update public.quotes set status = 'accepted' where organization_id = $1 and title = 'הצעה שאושרה'", [org]));
 
+    // MNY-01: a recurring deal renewing within 30 days and an overdue invoice (report_money_waiting's renewals and debts)
+    await asUser(owner.id, async (q) => {
+      await q(
+        `insert into public.deals (organization_id, name, amount_agorot, pipeline_id, stage_id, owner_id, billing_kind, recurring_amount_agorot, recurring_start_date, renewal_date)
+         select $1, 'מנוי', 60000, p.id, s.id, $2, 'monthly', 5000, (now() - interval '200 days')::date, (now() + interval '10 days')::date
+           from public.pipelines p join public.stages s on s.pipeline_id = p.id and s.kind = 'won'
+          where p.organization_id = $1 and p.is_default limit 1`,
+        [org, owner.id],
+      );
+      const contact = (
+        await q<{ id: string }>("insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'חייב', $2) returning id", [org, owner.id])
+      ).rows[0].id;
+      await q(
+        "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', 'SH-1', (now() - interval '40 days')::date, 11700, (now() - interval '10 days')::date)",
+        [org, contact],
+      );
+    });
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],

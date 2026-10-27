@@ -11,17 +11,20 @@ export const ROW_ACTION_LABELS: Record<RowAction, string> = {
 
 /**
  * The actions a row offers, the one that fits best first: a record with no owner is handed to a
- * rep first; a lead with a phone gets a WhatsApp message (it has not been answered); otherwise a
+ * rep first; a lead with a phone gets a WhatsApp message (it has not been answered), and so does an overdue
+ * debt's customer (a reminder); otherwise a
  * task for the next step. Only what the user may do (hints: the database decides).
  */
 export function rowActions(row: {
-  kind: "lead" | "deal";
+  kind: "lead" | "deal" | "contact" | "company";
   ownerId: string | null;
   // a usable WhatsApp number (the lead's, or the deal's contact's)
   phoneE164: string | null;
   canWrite: boolean;
   // may hand the record to someone else (managers and up who may edit it)
   canReassign: boolean;
+  // MNY-01 debts: the customer owes money already, so a message comes first when there is a number
+  reminder?: boolean;
 }): RowAction[] {
   if (!row.canWrite) return [];
   const available: RowAction[] = ["task"];
@@ -30,7 +33,7 @@ export function rowActions(row: {
 
   let first: RowAction;
   if (row.ownerId === null && row.canReassign) first = "assign";
-  else if (row.kind === "lead" && row.phoneE164) first = "whatsapp";
+  else if ((row.kind === "lead" || row.reminder) && row.phoneE164) first = "whatsapp";
   else first = "task";
   return [first, ...available.filter((action) => action !== first)];
 }
