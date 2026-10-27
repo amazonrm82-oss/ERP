@@ -7,10 +7,14 @@ import { getSupabaseEnv } from "@/lib/env";
 
 /**
  * Supabase client with the service-role key: bypasses Row Level Security.
- * Allowed only in the places listed in CLAUDE.md, hard rule 5 (and in the
- * eslint allow-list); none of them serves a signed-in user, and a new one is the
- * owner's decision:
- * - the lead intake (src/features/intake/server.ts, public-form.ts), where a
+ * Allowed only in the places listed in CLAUDE.md, hard rule 5, and in the
+ * eslint allow-list (eslint.config.mjs; tests/unit/service-key-comment.test.ts
+ * checks that every file of that list is named here). A new one is the owner's
+ * decision. None of them acts for a signed-in user with the key, with one
+ * approved exception (QUO-06, owner 26 October 2026): the server's write of a
+ * quote's PDF, below.
+ * - the lead intake (src/features/intake/server.ts and
+ *   src/features/intake/public-form.ts), where a
  *   stranger's form submission arrives with no session. It only calls
  *   public.intake_submit() and reads a form's public settings by token;
  * - the push dispatcher (src/features/notifications/push-server.ts), woken by
@@ -41,9 +45,19 @@ import { getSupabaseEnv } from "@/lib/env";
  *     public.site_widget_public() and site_widget_submit() only;
  *   - the digital business card (src/features/business-cards/public-server.ts):
  *     public.business_card_public() and business_card_submit() only;
- *   - the public subprocessors page (src/features/legal/subprocessors-public-server.ts):
- *     public.subprocessors_public_page() only, cached for an hour.
- * Never import this from code that serves a signed-in user.
+ *   - the customer's PDF download of a quote (src/features/quotes/pdf-public-server.ts,
+ *     route GET /api/forms/quote/<token>/pdf): public.quote_public_pdf() only, and
+ *     downloads only the path it answers, compared with its SHA-256;
+ *   - the public subprocessors page (src/features/legal/subprocessors-public-server.ts,
+ *     page /legal/subprocessors): public.subprocessors_public_page() only, cached for an hour;
+ * - the server's write of a quote's PDF (src/features/quotes/pdf-store-server.ts),
+ *   the one use inside a signed-in user's request (QUO-06 answer 3): called from
+ *   pdf-server.ts (a Server Action and the staff file route) only after
+ *   public.quote_pdf_allowed() or public.quote_pdf_remake_allowed() passed with
+ *   the user's own session; it calls only
+ *   public.quote_pdf_store(), which checks the named user again, and uploads
+ *   (upsert off) only to the path that function answers.
+ * Never import this from any other code that serves a signed-in user.
  * Returns null when the key is not configured.
  */
 export function createServiceClient(): SupabaseClient<Database> | null {
