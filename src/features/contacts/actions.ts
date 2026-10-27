@@ -7,7 +7,7 @@ import { billingFromForm } from "@/features/billing/form";
 import { duplicateMessage, findPersonDuplicate } from "@/features/data-quality/duplicates";
 import { customFieldsFromForm, customFieldsPatch } from "@/features/custom-fields/server";
 import { actionContext } from "@/lib/action-context";
-import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
+import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { setTrashed } from "@/lib/record-trash";
@@ -98,6 +98,24 @@ function revalidateContact(orgId: string, contactId?: string) {
 }
 
 export async function createContactAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const saved = await saveNewContact(orgId, formData);
+  if (!saved.ok) {
+    return saved;
+  }
+  redirect(saved.data.channelsFailed ? `${paths.contact(orgId, saved.data.id)}?channels=failed` : paths.contact(orgId, saved.data.id));
+}
+
+export type NewContact = { id: string; channelsFailed: boolean };
+
+/**
+ * WAB-06: the same save, answering the new contact's id instead of going to its page, so the share screen can save what
+ * was shared on it as a note first. The rights are the same: everything is written with the user's session.
+ */
+export async function createContactStayAction(orgId: string, _prev: FormState<NewContact>, formData: FormData): Promise<FormState<NewContact>> {
+  return saveNewContact(orgId, formData);
+}
+
+async function saveNewContact(orgId: string, formData: FormData): Promise<{ ok: true; data: NewContact } | Extract<ActionResult, { ok: false }>> {
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
@@ -151,7 +169,7 @@ export async function createContactAction(orgId: string, _prev: FormState, formD
   const channelError = await saveExtraChannels(context.supabase, orgId, data.id, parsed.phones, parsed.emails, []);
 
   revalidateContact(orgId);
-  redirect(channelError ? `${paths.contact(orgId, data.id)}?channels=failed` : paths.contact(orgId, data.id));
+  return ok({ id: data.id as string, channelsFailed: Boolean(channelError) });
 }
 
 export async function updateContactAction(

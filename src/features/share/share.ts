@@ -1,11 +1,14 @@
 // WAB-06: "שתף ל-Mexuz". The installed app is a share target (Chrome on Android): text, a link or one image shared from
 // another app arrives here. The service worker (public/sw.js) catches the share, keeps it on this device only (Cache
-// Storage) and opens the share screen, which offers a new lead prefilled or a note on a record the person picks. Nothing
-// is stored on the server before the person saves; the image goes up through the normal file upload of the record.
+// Storage) and opens the share screen, which offers a new lead prefilled (a new contact while leads are switched off) or
+// a note on a record the person picks. A new lead or contact gets the shared text and image as a note marked
+// SHARED_FROM_PHONE once it is saved (owner, 27 October 2026). Nothing is stored on the server before the person saves;
+// the image goes up through the normal file upload of the record, as a file of the note.
 // This file is pure: the manifest entry, the addresses the worker and the pages share, and how a share becomes a prefill.
 
 import { plainMentions } from "@/features/whatsapp/templates";
 import { ALLOWED_TYPES, FILE_MAX_BYTES } from "@/features/files/types";
+import type { TermForms } from "@/features/terminology/terms";
 import { normalizePhone } from "@/lib/phone";
 
 /** Where the share arrives (POST multipart). public/sw.js answers it; the server route is the fallback. */
@@ -156,13 +159,40 @@ export function sharePrefill(input: SharedInput): SharePrefill {
   return { note, phone, email, url: shared.url };
 }
 
-/** The new-lead form's starting values (LeadForm `prefill`). */
-export function leadPrefill(prefill: SharePrefill): Record<string, string> {
+/**
+ * The new-lead and new-contact forms' starting values (LeadForm / ContactForm `prefill`): the phone and the email only.
+ * The shared text and image are saved on the new record as a note after it is saved (owner, 27 October 2026), so the
+ * lead's "message" is left empty and nothing is stored twice.
+ */
+export function recordPrefill(prefill: SharePrefill): Record<string, string> {
   const values: Record<string, string> = {};
   if (prefill.phone) values.phone = prefill.phone;
   if (prefill.email) values.email = prefill.email;
-  if (prefill.note) values.message = prefill.note;
   return values;
+}
+
+/** The first line of a note made from a share on a new lead or contact (owner, 27 October 2026). */
+export const SHARED_FROM_PHONE = "שותף מהטלפון";
+
+/**
+ * The note saved on a new lead or contact after it is saved: the mark, then the shared text. An image alone gets the
+ * mark only; nothing shared (no text, no image) = no note (null). Capped at NOTE_MAX.
+ */
+export function sharedNoteBody(note: string, hasImage: boolean): string | null {
+  const text = note.trim();
+  if (!text && !hasImage) return null;
+  return (text ? `${SHARED_FROM_PHONE}\n${text}` : SHARED_FROM_PHONE).slice(0, NOTE_MAX).trim();
+}
+
+/** "הליד נשמר", "הפנייה נשמרה": said when the record was saved but the shared note was not. */
+export function recordSavedLine(term: TermForms): string {
+  return `${term.theSingular} ${term.gender === "m" ? "נשמר" : "נשמרה"}.`;
+}
+
+/** What the share screen offers. With leads switched off (LEAD-08) a new contact takes the new lead's place. */
+export type ShareChoice = "lead" | "contact" | "note";
+export function shareChoices(leadsOn: boolean): ShareChoice[] {
+  return [leadsOn ? "lead" : "contact", "note"];
 }
 
 /** The note's starting text; a shared image alone still needs a line (the person may change it). */

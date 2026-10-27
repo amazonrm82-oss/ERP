@@ -11,7 +11,11 @@ import {
   clearPhone,
   cleanShared,
   IMAGE_ONLY_NOTE,
-  leadPrefill,
+  recordPrefill,
+  recordSavedLine,
+  SHARED_FROM_PHONE,
+  shareChoices,
+  sharedNoteBody,
   noteStart,
   readShareParams,
   readStoredShare,
@@ -129,7 +133,7 @@ describe("prefill", () => {
   it("text, title and link go to the note, each once; nothing is guessed from a sentence", () => {
     const prefill = sharePrefill({ title: "מחירון", text: "שלום, אשמח להצעה 050-1234567", url: "https://example.com/p" });
     expect(prefill).toEqual({ note: "מחירון\nשלום, אשמח להצעה 050-1234567\nhttps://example.com/p", phone: null, email: null, url: "https://example.com/p" });
-    expect(leadPrefill(prefill)).toEqual({ message: prefill.note });
+    expect(recordPrefill(prefill)).toEqual({});
   });
 
   it("a link already inside the text is not repeated, and a title the text starts with is left out", () => {
@@ -141,7 +145,8 @@ describe("prefill", () => {
     expect(sharePrefill({ title: "דנה כהן", text: "dana@example.com" })).toEqual({ note: "דנה כהן", phone: null, email: "dana@example.com", url: null });
     expect(sharePrefill({ url: "tel:0501234567" }).phone).toBe("0501234567");
     expect(sharePrefill({ url: "mailto:a@b.co" }).email).toBe("a@b.co");
-    expect(leadPrefill(sharePrefill({ title: "דנה", text: "0501234567" }))).toEqual({ phone: "0501234567", message: "דנה" });
+    expect(recordPrefill(sharePrefill({ title: "דנה", text: "0501234567" }))).toEqual({ phone: "0501234567" });
+    expect(recordPrefill(sharePrefill({ text: "dana@example.com", url: "tel:0501234567" }))).toEqual({ phone: "0501234567", email: "dana@example.com" });
   });
 
   it("a mention token in shared text is flattened, so nobody is told anything", () => {
@@ -153,6 +158,32 @@ describe("prefill", () => {
     expect(noteStart(sharePrefill({}), true)).toBe(IMAGE_ONLY_NOTE);
     expect(noteStart(sharePrefill({}), false)).toBe("");
     expect(noteStart(sharePrefill({ text: "x" }), true)).toBe("x");
+  });
+});
+
+describe("a new lead or contact from a share (owner, 27 October 2026)", () => {
+  it("the shared text is saved as a note marked on its first line; an image alone gets the mark; nothing = no note", () => {
+    expect(sharedNoteBody("שלום\nhttps://e.com/", false)).toBe(`${SHARED_FROM_PHONE}\nשלום\nhttps://e.com/`);
+    expect(sharedNoteBody("  x  ", true)).toBe(`${SHARED_FROM_PHONE}\nx`);
+    expect(sharedNoteBody("", true)).toBe(SHARED_FROM_PHONE);
+    expect(sharedNoteBody("   ", false)).toBeNull();
+    expect(SHARED_FROM_PHONE).toBe("שותף מהטלפון");
+  });
+
+  it("the note with its mark still fits a note (5,000 characters)", () => {
+    const body = sharedNoteBody(sharePrefill({ text: "א".repeat(9000) }).note, true);
+    expect(body?.length).toBe(5000);
+    expect(body?.startsWith(`${SHARED_FROM_PHONE}\n`)).toBe(true);
+  });
+
+  it("with leads switched off a new contact is offered instead of a new lead; a note on a record always", () => {
+    expect(shareChoices(true)).toEqual(["lead", "note"]);
+    expect(shareChoices(false)).toEqual(["contact", "note"]);
+  });
+
+  it("says the record was saved in the business's word and gender", () => {
+    expect(recordSavedLine({ singular: "ליד", plural: "לידים", gender: "m", newOne: "ליד חדש", theSingular: "הליד", thePlural: "הלידים" })).toBe("הליד נשמר.");
+    expect(recordSavedLine({ singular: "פנייה", plural: "פניות", gender: "f", newOne: "פנייה חדשה", theSingular: "הפנייה", thePlural: "הפניות" })).toBe("הפנייה נשמרה.");
   });
 });
 

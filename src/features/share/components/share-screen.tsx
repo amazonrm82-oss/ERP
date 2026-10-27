@@ -10,24 +10,33 @@ import { Checkbox, TextareaField } from "@/components/ui/field";
 import { SearchPicker, type SearchPickerChoice } from "@/components/ui/search-picker";
 import { addNoteAction } from "@/features/activities/actions";
 import type { TimelineSubject } from "@/features/activities/schema";
+import type { BillingPriceList } from "@/features/billing/queries";
+import type { CompanyOption } from "@/features/companies/queries";
+import { ContactForm } from "@/features/contacts/components/contact-form";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { uploadFiles } from "@/features/files/upload-client";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import type { LeadSourceOption, LeadStatusOption } from "@/features/leads/queries";
-import type { OrgTerms } from "@/features/terminology/terms";
+import type { RecordType } from "@/features/record-type-options/schema";
+import type { OrgTerms, TermForms } from "@/features/terminology/terms";
 import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 
 import { searchShareRecordsAction } from "../actions";
 import { subjectFromPick } from "../records";
 import {
-  leadPrefill,
   NOTE_MAX,
   noteStart,
   readStoredShare,
+  recordPrefill,
+  recordSavedLine,
   SHARE_ITEM_PREFIX,
   SHARE_PREVIEW_TYPES,
+  SHARED_FROM_PHONE,
+  shareChoices,
+  sharedNoteBody,
   sharePrefill,
+  type ShareChoice,
   type ShareParams,
   type SharedInput,
 } from "../share";
@@ -40,6 +49,14 @@ export type ShareLeadForm = {
   products: boolean;
 };
 
+/** LEAD-08: with leads switched off the share offers a new contact instead (owner, 27 October 2026). */
+export type ShareContactForm = {
+  companies: CompanyOption[] | null;
+  fields: FieldDefinition[];
+  types: RecordType[];
+  priceLists: BillingPriceList[];
+};
+
 type Loaded =
   | { state: "loading" }
   | { state: "gone" }
@@ -48,7 +65,7 @@ type Loaded =
 const FALLBACK = "השיתוף לא נשמר. פתחו את האפליקציה פעם אחת ושתפו שוב.";
 const GONE = "השיתוף כבר לא זמין במכשיר הזה. שתפו שוב מהאפליקציה שממנה שיתפתם.";
 
-type Choice = "lead" | "note";
+type Choice = ShareChoice;
 
 const IMAGE_DROPPED = "התמונה לא הגיעה. שתפו אותה שוב.";
 const IMAGE_REFUSED = "את התמונה הזאת אי אפשר לצרף: אפשר JPG, PNG, GIF, WEBP או HEIC עד 25 MB.";
@@ -87,15 +104,17 @@ export function ShareScreen({
   owner,
   terms,
   leadForm,
+  contactForm,
 }: {
   orgId: string;
   share: ShareParams;
   owner: string;
   terms: OrgTerms;
   leadForm: ShareLeadForm | null;
+  contactForm: ShareContactForm | null;
 }) {
   const [loaded, setLoaded] = useState<Loaded>(() => (share.s ? { state: "loading" } : { state: "gone" }));
-  const [choice, setChoice] = useState<Choice | null>(leadForm ? null : "note");
+  const [choice, setChoice] = useState<Choice | null>(leadForm || contactForm ? null : "note");
 
   useEffect(() => {
     if (!share.s) return;
@@ -160,7 +179,18 @@ export function ShareScreen({
     );
   }
 
-  return <ShareChoices orgId={orgId} shareId={share.s} loaded={loaded} terms={terms} leadForm={leadForm} choice={choice} onChoice={setChoice} />;
+  return (
+    <ShareChoices
+      orgId={orgId}
+      shareId={share.s}
+      loaded={loaded}
+      terms={terms}
+      leadForm={leadForm}
+      contactForm={contactForm}
+      choice={choice}
+      onChoice={setChoice}
+    />
+  );
 }
 
 function ShareChoices({
@@ -169,6 +199,7 @@ function ShareChoices({
   loaded,
   terms,
   leadForm,
+  contactForm,
   choice,
   onChoice,
 }: {
@@ -177,6 +208,7 @@ function ShareChoices({
   loaded: Extract<Loaded, { state: "ready" }>;
   terms: OrgTerms;
   leadForm: ShareLeadForm | null;
+  contactForm: ShareContactForm | null;
   choice: Choice | null;
   onChoice: (choice: Choice) => void;
 }) {
@@ -185,16 +217,70 @@ function ShareChoices({
   const groupId = useId();
   const [cancelling, setCancelling] = useState(false);
   const hasImage = loaded.image !== null;
+  // after a new lead or contact is saved: the shared note on it (saving), or what was not saved (failed)
+  const [after, setAfter] = useState<AfterSave | null>(null);
+  // "לנסות שוב כהערה": the note form starts on the new record, with what is left to save
+  const [retry, setRetry] = useState<{ pick: SearchPickerChoice; body: string; image: File | null } | null>(null);
+
+  async function created(kind: "lead" | "contact", id: string, href: string) {
+    const term = kind === "lead" ? terms.lead : terms.contact;
+    const subject: TimelineSubject = { kind, id };
+    const body = sharedNoteBody(prefill.note, hasImage);
+    if (body === null) {
+      // nothing shared to keep beside the phone or email the form already saved
+      await forgetShare(shareId);
+      router.push(href);
+      return;
+    }
+    setAfter({ state: "saving", term, href });
+    const form = new FormData();
+    form.set("type", "note");
+    form.set("body", body);
+    const saved = await addNoteAction(orgId, subject, null, form).catch(() => null);
+    const pick = { id: `${kind}:${id}`, label: term.newOne };
+    if (!saved || !saved.ok) {
+      setAfter({ state: "failed", term, href, problems: [saved?.message ?? NOTE_FAILED], pick, body, image: loaded.image });
+      return;
+    }
+    const noteId = saved.data?.id;
+    // REC-07: the image goes up as a file of this note, through the record's normal upload and its rules
+    const problems = loaded.image && noteId ? await uploadFiles(orgId, subject, [loaded.image], { activityId: noteId }).catch(() => [UPLOAD_FAILED]) : [];
+    if (problems.length > 0) {
+      // the note is saved, the image is not: a retry adds only the image, under the same mark
+      setAfter({ state: "failed", term, href, problems: [NOTE_SAVED_IMAGE_NOT, ...problems], pick, body: SHARED_FROM_PHONE, image: loaded.image });
+      return;
+    }
+    // everything is saved: only now is the share forgotten on this device
+    await forgetShare(shareId);
+    router.push(href);
+  }
 
   async function cancel() {
     setCancelling(true);
     await forgetShare(shareId);
     router.push(paths.org(orgId));
   }
-  const options: { value: Choice; label: string; hint: string }[] = [
-    ...(leadForm ? [{ value: "lead" as const, label: terms.lead.newOne, hint: "טופס חדש עם מה ששיתפתם" }] : []),
-    { value: "note", label: "הערה לרשומה", hint: "לשמור על רשומה קיימת" },
-  ];
+  const labels: Record<Choice, { label: string; hint: string }> = {
+    lead: { label: terms.lead.newOne, hint: "טופס חדש עם מה ששיתפתם" },
+    contact: { label: terms.contact.newOne, hint: "טופס חדש עם מה ששיתפתם" },
+    note: { label: "הערה לרשומה", hint: "לשמור על רשומה קיימת" },
+  };
+  const options = shareChoices(leadForm !== null)
+    .filter((value) => value === "note" || (value === "lead" ? leadForm : contactForm))
+    .map((value) => ({ value, ...labels[value] }));
+
+  if (after) {
+    return (
+      <AfterSaveCard
+        after={after}
+        onRetry={(next) => {
+          setRetry(next);
+          setAfter(null);
+          onChoice("note");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -233,28 +319,106 @@ function ShareChoices({
       {choice === "lead" && leadForm ? (
         <Card>
           <CardBody className="space-y-4">
-            {hasImage ? (
-              <p className="rounded-md bg-canvas px-3 py-2.5 text-sm text-ink-soft">
-                התמונה לא נשמרת עם {terms.lead.newOne}. היא נשארת במכשיר הזה עד 24 שעות: אחרי השמירה אפשר לחזור לשיתוף
-                ולצרף אותה כ&quot;הערה לרשומה&quot;.
-              </p>
-            ) : null}
-            {/* Without an image the share is forgotten as the lead is sent: the form keeps the text if the save fails,
-                and the lead action redirects on success, so no answer reaches this screen to wait for. With an image
-                the share stays (24 hours, "ביטול השיתוף", sign-out) so the image can still go on a record. */}
-            <div onSubmit={hasImage ? undefined : () => void forgetShare(shareId)}>
-              <LeadForm orgId={orgId} {...leadForm} prefill={leadPrefill(prefill)} />
-            </div>
+            <SavedAsNoteLine term={terms.lead} show={sharedNoteBody(prefill.note, hasImage) !== null} />
+            <LeadForm
+              orgId={orgId}
+              {...leadForm}
+              prefill={recordPrefill(prefill)}
+              onCreated={(id) => void created("lead", id, paths.lead(orgId, id))}
+            />
           </CardBody>
         </Card>
       ) : null}
-      {choice === "note" ? <ShareNoteForm orgId={orgId} shareId={shareId} note={noteStart(prefill, hasImage)} image={loaded.image} /> : null}
+      {choice === "contact" && contactForm ? (
+        <Card>
+          <CardBody className="space-y-4">
+            <SavedAsNoteLine term={terms.contact} show={sharedNoteBody(prefill.note, hasImage) !== null} />
+            <ContactForm
+              orgId={orgId}
+              {...contactForm}
+              prefill={recordPrefill(prefill)}
+              onCreated={({ id, channelsFailed }) =>
+                void created("contact", id, channelsFailed ? `${paths.contact(orgId, id)}?channels=failed` : paths.contact(orgId, id))
+              }
+            />
+          </CardBody>
+        </Card>
+      ) : null}
+      {choice === "note" ? (
+        <ShareNoteForm
+          key={retry ? "retry" : "note"}
+          orgId={orgId}
+          shareId={shareId}
+          note={retry ? retry.body : noteStart(prefill, hasImage)}
+          image={retry ? retry.image : loaded.image}
+          initial={retry?.pick ?? null}
+        />
+      ) : null}
       <div>
         <Button variant="ghost" onClick={cancel} loading={cancelling}>
           ביטול השיתוף
         </Button>
       </div>
     </div>
+  );
+}
+
+const NOTE_FAILED = "לא הצלחנו לשמור את ההערה. נסו שוב.";
+const UPLOAD_FAILED = "התמונה לא הועלתה. נסו שוב.";
+const NOTE_SAVED_IMAGE_NOT = "ההערה נשמרה, אבל התמונה לא:";
+
+type AfterSave =
+  | { state: "saving"; term: TermForms; href: string }
+  | { state: "failed"; term: TermForms; href: string; problems: string[]; pick: SearchPickerChoice; body: string; image: File | null };
+
+/** Said above the new lead or contact form: what happens to the shared text and image (owner, 27 October 2026). */
+function SavedAsNoteLine({ term, show }: { term: TermForms; show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="rounded-md bg-canvas px-3 py-2.5 text-sm text-ink-soft">
+      אחרי השמירה, מה ששיתפתם יישמר על {term.theSingular} כהערה &quot;{SHARED_FROM_PHONE}&quot;.
+    </p>
+  );
+}
+
+/**
+ * After the new record is saved. While the note is saved: a status line. When the note or the image was not saved, the
+ * record stays and the person is told plainly what was not saved; the share stays on the device for "לנסות שוב כהערה".
+ */
+function AfterSaveCard({
+  after,
+  onRetry,
+}: {
+  after: AfterSave;
+  onRetry: (next: { pick: SearchPickerChoice; body: string; image: File | null }) => void;
+}) {
+  if (after.state === "saving") {
+    return (
+      <Card>
+        <CardBody>
+          <p role="status" className="text-md">
+            {recordSavedLine(after.term)} שומרים עליו את מה ששיתפתם…
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardBody className="space-y-3">
+        <FormNotice message={recordSavedLine(after.term)} />
+        <p className="text-md">מה ששיתפתם לא נשמר עליו במלואו. השיתוף נשאר במכשיר הזה, ואפשר לנסות שוב.</p>
+        {after.problems.map((problem) => (
+          <FormError key={problem} message={problem} />
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => onRetry({ pick: after.pick, body: after.body, image: after.image })}>לנסות שוב כהערה</Button>
+          <ButtonLink href={after.href} variant="secondary">
+            ל{after.term.theSingular}
+          </ButtonLink>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -289,9 +453,21 @@ function SharedPreview({
   );
 }
 
-function ShareNoteForm({ orgId, shareId, note, image }: { orgId: string; shareId: string | null; note: string; image: File | null }) {
+function ShareNoteForm({
+  orgId,
+  shareId,
+  note,
+  image,
+  initial,
+}: {
+  orgId: string;
+  shareId: string | null;
+  note: string;
+  image: File | null;
+  initial: SearchPickerChoice;
+}) {
   const router = useRouter();
-  const [picked, setPicked] = useState<SearchPickerChoice>(null);
+  const [picked, setPicked] = useState<SearchPickerChoice>(initial);
   const [body, setBody] = useState(note);
   const [attach, setAttach] = useState(image !== null);
   const [busy, setBusy] = useState(false);
@@ -358,7 +534,7 @@ function ShareNoteForm({ orgId, shareId, note, image }: { orgId: string; shareId
           <SearchPicker
             label="לאיזו רשומה?"
             name="record"
-            initial={null}
+            initial={initial}
             required
             clearable={false}
             search={(query) => searchShareRecordsAction(orgId, query)}

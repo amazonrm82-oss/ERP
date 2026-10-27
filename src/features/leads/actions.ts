@@ -42,6 +42,24 @@ function revalidateLead(orgId: string, leadId?: string) {
 }
 
 export async function createLeadAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const saved = await saveNewLead(orgId, formData);
+  if (!saved.ok) {
+    return saved;
+  }
+  redirect(paths.lead(orgId, saved.data.id));
+}
+
+/**
+ * WAB-06: the same save, answering the new lead's id instead of going to its page, so the share screen can save what
+ * was shared on it as a note first. The rights are the same: everything is written with the user's session.
+ */
+export async function createLeadStayAction(orgId: string, _prev: FormState<{ id: string }>, formData: FormData): Promise<FormState<{ id: string }>> {
+  return saveNewLead(orgId, formData);
+}
+
+type Created = { ok: true; data: { id: string } } | Extract<ActionResult, { ok: false }>;
+
+async function saveNewLead(orgId: string, formData: FormData): Promise<Created> {
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
@@ -115,7 +133,7 @@ export async function createLeadAction(orgId: string, _prev: FormState, formData
   }
 
   revalidateLead(orgId);
-  redirect(paths.lead(orgId, data.id));
+  return ok({ id: data.id as string });
 }
 
 export async function updateLeadAction(

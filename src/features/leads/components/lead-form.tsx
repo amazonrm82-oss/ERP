@@ -15,7 +15,7 @@ import type { FieldDefinition } from "@/features/custom-fields/types";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
 
-import { createLeadAction } from "../actions";
+import { createLeadAction, createLeadStayAction } from "../actions";
 import { RequestedProductPicker } from "@/features/requested-product/components/requested-product-picker";
 
 import { LeadCampaignFields } from "./lead-campaign-fields";
@@ -34,11 +34,26 @@ type Props = {
   reasons: string[];
   products?: boolean;
   prefill?: Record<string, string>;
+  // WAB-06: called with the new lead's id instead of going to its page (the share screen saves a note on it first)
+  onCreated?: (id: string) => void;
 };
 
-/** New lead form. On success the action redirects to the lead's page. */
-export function LeadForm({ orgId, statuses, sources, fields, reasons, products = false, prefill }: Props) {
-  const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
+/** New lead form. On success the action redirects to the lead's page, or hands the new id to `onCreated`. */
+export function LeadForm({ orgId, statuses, sources, fields, reasons, products = false, prefill, onCreated }: Props) {
+  // which action is fixed when the form mounts (the share screen always passes onCreated)
+  const [stay] = useState(() => onCreated !== undefined);
+  const [state, formAction] = useActionState<FormState<{ id: string }>, FormData>(
+    stay ? createLeadStayAction.bind(null, orgId) : (createLeadAction.bind(null, orgId) as (prev: FormState<{ id: string }>, form: FormData) => Promise<FormState<{ id: string }>>),
+    null,
+  );
+  const created = useRef(onCreated);
+  useEffect(() => {
+    created.current = onCreated;
+  });
+  const createdId = state?.ok ? state.data?.id : undefined;
+  useEffect(() => {
+    if (createdId) created.current?.(createdId);
+  }, [createdId]);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? prefill ?? {};
   // WAB-06: prefilled values are not saved yet. FormGuard takes its starting point when it mounts; this marker is then
