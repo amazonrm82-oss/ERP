@@ -107,6 +107,16 @@ and build this CRM here instead. The old code is preserved on the branch
    reads a minute in total through `app.subprocessor_page_reads`, then `{refused: 'rate'}`), cached for an hour through
    `unstable_cache` (tag `subprocessors-public`, `updateTag` by the platform screen's actions); a failed read is not cached, backs off
    for a minute and logs one redacted line; no visitor input, no uncached route; in the eslint allow-list.
+   In use (WAB-05, owner 27 October 2026, answers (1) ב and (2) ב, migration 021084): link previews for preview bots
+   (`src/features/link-preview/preview-server.ts`, used by the six customer pages `/f/<token>`, `/f/quote`, `/f/order`, `/f/book`,
+   `/f/book/manage`, `/f/card` only when the User-Agent matches the closed list in `src/lib/preview-bots.ts`), which calls only
+   `public.link_preview_public()` (kind from a closed list; answers only the business's display name `organizations.name` and its logo,
+   hidden for a quote or order whose design hides it, and for a card the name the card always shows; not found by each page's own rule,
+   pinned by test 253; no view counted, no status change, no notice, no automation). Limits, counted before the token is looked up, then
+   `{refused: 'rate'}`: 300 a minute in total (`app.link_preview_reads`), 120 per sender across all links in 10 minutes
+   (`app.link_preview_ip_counts`, not found included) and 30 per sender and link (`app.link_preview_sender_counts`, scoped by
+   `app.link_preview_sender`); the sender is the keyed IP hash with scope `preview`, only bucket numbers are kept. Any other User-Agent
+   gets the normal page. In the eslint allow-list.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
@@ -444,9 +454,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   display fields only: never the customer's name, a price, a number or a time; logo from `org-logos`, else no image, never the app's
   own share image; noindex; quote/order keep `referrer: no-referrer`). Each page reads through ONE `cache()`-wrapped loader shared by
   the page and its metadata, so a public function that counts views (quote_public, order_public, booking/card) runs once per request
-  (unit test `link-preview`). The widget form is left out. Open: preview bots (WhatsApp on the rep's phone, Facebook, Telegram…) still
-  run the page and count a view; for a quote that marks it viewed and notifies its owner (owner question); the web form's preview has
-  no business name (`intake_form` does not return it); quote/order previews show the registered name `quote_public`/`order_public` return.
+  (unit test `link-preview`). The widget form is left out. Since 021084 (owner 27 October 2026, answers (1) ב and (2) ב) a request whose
+  User-Agent is on the closed list of `src/lib/preview-bots.ts` never runs the page: each of the six pages checks
+  `isPreviewBotRequest()` first and renders only a preview from `public.link_preview_public` (display name `organizations.name` and
+  logo; no view, no status change, no notice, no automation; see hard rule 5); any other User-Agent gets the normal page, so a human's
+  metadata still carries the name `quote_public`/`order_public` return. `next.config.ts` `htmlLimitedBots` = Next's default list plus
+  TelegramBot|Facebot (metadata in `<head>` for them). Test 253 compares each kind's "not found" with its page function's answer and
+  pins the md5(prosrc) of the six page functions: redefining one fails the test until the preview rule is checked again.
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
