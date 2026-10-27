@@ -176,49 +176,46 @@ export function isShareId(value: unknown): value is string {
   return typeof value === "string" && SHARE_ID.test(value);
 }
 
-// imageDropped: the server fallback got the share and never keeps an image; failed: the worker could not keep the share
-export type ShareParams = { s: string | null; title: string; text: string; url: string; imageDropped: boolean; failed: boolean };
+// Only the id of the share the worker keeps travels in an address, never what was shared (owner, M1). `fallback`: no
+// worker caught the share and the server dropped it; `failed`: the worker could not keep it.
+export type ShareParams = { s: string | null; fallback: boolean; failed: boolean };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
 
-/**
- * The share screen's address carries either the id of the share the worker keeps (`s`), or, when no worker caught the
- * share (the server fallback), the text itself and `image=dropped` (the server never keeps the image).
- */
 export function readShareParams(params: Record<string, string | string[] | undefined>): ShareParams {
   const s = first(params.s);
   return {
     s: isShareId(s) ? s.toLowerCase() : null,
-    title: cap(first(params.title), SHARE_TITLE_MAX),
-    text: cap(first(params.text), SHARE_TEXT_MAX),
-    url: cap(first(params.url), SHARE_URL_MAX),
-    imageDropped: first(params.image) === "dropped",
+    fallback: first(params.fallback) === "1",
     failed: first(params.failed) === "1",
   };
 }
 
 export function shareQuery(params: ShareParams): string {
-  const query = new URLSearchParams();
-  if (params.s) query.set("s", params.s);
-  if (params.title) query.set("title", params.title);
-  if (params.text) query.set("text", params.text);
-  if (params.url) query.set("url", params.url);
-  if (params.imageDropped) query.set("image", "dropped");
-  if (params.failed) query.set("failed", "1");
-  const out = query.toString();
-  return out ? `?${out}` : "";
+  if (params.s) return `?s=${params.s}`;
+  if (params.fallback) return "?fallback=1";
+  if (params.failed) return "?failed=1";
+  return "";
 }
 
 export function sharePath(orgId: string, params: ShareParams): string {
   return `/o/${orgId}/share${shareQuery(params)}`;
 }
 
+/** The share screen sends the SHA-256 (hex) of the signed-in user's id; the worker ties a share to the first one. */
+export const SHARE_OWNER = /^[0-9a-f]{64}$/;
+
+/** Previewed in the page; any other image (HEIC: most browsers cannot show it) is shown by its name. */
+export const SHARE_PREVIEW_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
 /** The worker's answer for a share id: the text, and what is known of the image. */
 export type StoredShare = SharedClean & { image: { name: string; type: string; size: number } | null; imageRefused: boolean; at: number };
 
-export function readStoredShare(value: unknown, now: number): StoredShare | null {
+export function readStoredShare(value: unknown, now: number, owner: string): StoredShare | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
+  // the worker already refuses another person's share; the screen checks again
+  if (!SHARE_OWNER.test(owner) || row.owner !== owner) return null;
   const at = typeof row.at === "number" ? row.at : NaN;
   if (!Number.isFinite(at) || now - at > SHARE_MAX_AGE_MS) return null;
   const image = row.image && typeof row.image === "object" ? (row.image as Record<string, unknown>) : null;

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +13,7 @@ import { readShareParams } from "@/features/share/share";
 import { ReadOnlyNotice } from "@/features/shell/components/read-only-notice";
 import { getOrgContext } from "@/features/shell/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
+import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "שיתוף" };
 
@@ -23,7 +26,9 @@ type Props = {
 export default async function OrgSharePage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const share = readShareParams(await searchParams);
-  const [{ canWrite }, terms, modules] = await Promise.all([getOrgContext(orgId), getOrgTerms(orgId), getOrgModules(orgId)]);
+  const [{ canWrite }, terms, modules, user] = await Promise.all([getOrgContext(orgId), getOrgTerms(orgId), getOrgModules(orgId), requireUser()]);
+  // the share kept on this device belongs to the first signed-in person who opens it (the worker compares this hash)
+  const owner = createHash("sha256").update(user.id).digest("hex");
 
   if (!canWrite) {
     return (
@@ -49,7 +54,7 @@ export default async function OrgSharePage({ params, searchParams }: Props) {
   return (
     <div className="max-w-2xl">
       <PageHeader title="שיתוף" description="מה לעשות עם מה ששיתפתם?" />
-      <ShareScreen orgId={orgId} share={share} terms={terms} leadForm={leadForm} />
+      <ShareScreen orgId={orgId} share={share} owner={owner} terms={terms} leadForm={leadForm} />
     </div>
   );
 }

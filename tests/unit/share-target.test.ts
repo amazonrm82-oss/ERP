@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import manifest from "@/app/manifest";
 import { DEFAULT_TERMS } from "@/features/terminology/terms";
+import { SHARE_CACHE } from "@/features/share/device";
 import { shareSearchHits, subjectFromPick } from "@/features/share/records";
 import {
   clearEmail,
@@ -19,6 +20,7 @@ import {
   SHARE_ITEM_PREFIX,
   SHARE_MAX_AGE_MS,
   SHARE_PAGE_PATH,
+  SHARE_PREVIEW_TYPES,
   SHARE_RECEIVE_PATH,
   sharePath,
   sharePrefill,
@@ -54,8 +56,19 @@ describe("share target in the manifest (WAB-06)", () => {
     expect(sw).toContain("const SHARE_MAX_AGE_MS = 24 * 60 * 60 * 1000;");
     expect(SHARE_IMAGE_MAX_BYTES).toBe(25 * 1024 * 1024);
     expect(sw).toContain("const SHARE_IMAGE_MAX_BYTES = 25 * 1024 * 1024;");
-    // the activate step keeps the share cache, as it keeps the offline page
+    expect(sw).toContain(`const SHARE_CACHE = "${SHARE_CACHE}";`);
+    // the activate step keeps the share cache, as it keeps the offline page, and drops an old share
     expect(sw).toMatch(/key !== OFFLINE_CACHE && key !== SHARE_CACHE/);
+    expect(sw).toMatch(/\.then\(\(\) => pruneShare\(\)\)/);
+    // a share POST from another site is refused; each item is tied to the first person who opens it
+    expect(sw).toContain('site && site !== "none" && site !== "same-origin"');
+    expect(sw).toContain("item.owner !== owner");
+  });
+
+  it("the server fallback keeps nothing and passes no shared text on", () => {
+    const route = readFileSync(new URL("../../src/app/app/share/receive/route.ts", import.meta.url), "utf8");
+    expect(route).not.toMatch(/formData|searchParams\.set|title|text=/);
+    expect(route).toContain('"?fallback=1"');
   });
 });
 
@@ -144,24 +157,34 @@ describe("prefill", () => {
 });
 
 describe("the share screen's address", () => {
-  it("keeps only a valid share id and the known fields", () => {
-    const params = readShareParams({ s: ID.toUpperCase(), evil: "x", image: "dropped" });
-    expect(params).toEqual({ s: ID, title: "", text: "", url: "", imageDropped: true, failed: false });
+  it("carries only a valid share id or a flag, never what was shared", () => {
+    const params = readShareParams({ s: ID.toUpperCase(), title: "t", text: "secret 050-1234567", url: "https://e.com/" });
+    expect(params).toEqual({ s: ID, fallback: false, failed: false });
+    expect(sharePath(ORG, params)).toBe(`/o/${ORG}/share?s=${ID}`);
     expect(readShareParams({ s: "../../etc" }).s).toBeNull();
-    expect(sharePath(ORG, params)).toBe(`/o/${ORG}/share?s=${ID}&image=dropped`);
     expect(shareQuery(readShareParams({}))).toBe("");
-    expect(shareQuery(readShareParams({ text: "שלום & עוד", failed: "1" }))).toBe("?text=%D7%A9%D7%9C%D7%95%D7%9D+%26+%D7%A2%D7%95%D7%93&failed=1");
+    expect(shareQuery(readShareParams({ fallback: "1", text: "x" }))).toBe("?fallback=1");
+    expect(shareQuery(readShareParams({ failed: "1" }))).toBe("?failed=1");
   });
 
-  it("reads what the worker kept, and forgets it after 24 hours or when the image is not attachable", () => {
+  it("reads what the worker kept for this person only, and forgets it after 24 hours or when the image is not attachable", () => {
     const now = 1_800_000_000_000;
-    const row = { title: "t", text: "x", url: "https://e.com/", image: { name: "a.jpg", type: "image/jpeg", size: 10 }, imageRefused: false, at: now - 1000 };
-    expect(readStoredShare(row, now)).toEqual({ ...row });
-    expect(readStoredShare({ ...row, at: now - SHARE_MAX_AGE_MS - 1 }, now)).toBeNull();
-    expect(readStoredShare({ ...row, image: { name: "a.svg", type: "image/svg+xml", size: 10 } }, now)?.image).toBeNull();
-    expect(readStoredShare({ ...row, image: { name: "a.jpg", type: "image/jpeg", size: SHARE_IMAGE_MAX_BYTES + 1 } }, now)?.image).toBeNull();
-    expect(readStoredShare(null, now)).toBeNull();
-    expect(readStoredShare("x", now)).toBeNull();
+    const owner = "a".repeat(64);
+    const row = { title: "t", text: "x", url: "https://e.com/", image: { name: "a.jpg", type: "image/jpeg", size: 10 }, imageRefused: false, owner, at: now - 1000 };
+    expect(readStoredShare(row, now, owner)).toEqual({ title: "t", text: "x", url: "https://e.com/", image: row.image, imageRefused: false, at: row.at });
+    expect(readStoredShare(row, now, "b".repeat(64))).toBeNull();
+    expect(readStoredShare({ ...row, owner: undefined }, now, owner)).toBeNull();
+    expect(readStoredShare(row, now, "")).toBeNull();
+    expect(readStoredShare({ ...row, at: now - SHARE_MAX_AGE_MS - 1 }, now, owner)).toBeNull();
+    expect(readStoredShare({ ...row, image: { name: "a.svg", type: "image/svg+xml", size: 10 } }, now, owner)?.image).toBeNull();
+    expect(readStoredShare({ ...row, image: { name: "a.jpg", type: "image/jpeg", size: SHARE_IMAGE_MAX_BYTES + 1 } }, now, owner)?.image).toBeNull();
+    expect(readStoredShare(null, now, owner)).toBeNull();
+    expect(readStoredShare("x", now, owner)).toBeNull();
+  });
+
+  it("HEIC is named, not previewed", () => {
+    expect(SHARE_PREVIEW_TYPES).not.toContain("image/heic");
+    expect(SHARE_IMAGE_TYPES.filter((type) => !SHARE_PREVIEW_TYPES.includes(type))).toEqual(["image/heic"]);
   });
 });
 

@@ -23,6 +23,8 @@ const SHARE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SHARE_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
 const SHARE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
 const SHARE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+// the SHA-256 (hex) of the signed-in user's id, sent by the share screen; the first one to open a share owns it
+const SHARE_OWNER = /^[0-9a-f]{64}$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(OFFLINE_CACHE).then((cache) => cache.addAll(OFFLINE_ASSETS)).then(() => self.skipWaiting()));
@@ -33,6 +35,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== OFFLINE_CACHE && key !== SHARE_CACHE).map((key) => caches.delete(key))))
+      .then(() => pruneShare())
       .then(() => self.clients.claim()),
   );
 });
@@ -42,11 +45,19 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(request.url);
   if (requestUrl.origin === self.location.origin) {
     if (request.method === "POST" && requestUrl.pathname === SHARE_RECEIVE_PATH) {
+      // a share comes from the system's share sheet (no site: "none"), never from another site's form.
+      // A browser that sends no Sec-Fetch-Site is let through. TO VERIFY ON A DEVICE: what Chrome on
+      // Android sends for a share target's POST as the service worker sees it.
+      const site = request.headers.get("Sec-Fetch-Site");
+      if (site && site !== "none" && site !== "same-origin") {
+        event.respondWith(new Response(null, { status: 403 }));
+        return;
+      }
       event.respondWith(receiveShare(request));
       return;
     }
     if (requestUrl.pathname.startsWith(SHARE_ITEM_PREFIX)) {
-      event.respondWith(shareItem(request, requestUrl.pathname.slice(SHARE_ITEM_PREFIX.length)));
+      event.respondWith(shareItem(request, requestUrl.pathname.slice(SHARE_ITEM_PREFIX.length), requestUrl.searchParams.get("owner")));
       return;
     }
   }
@@ -218,7 +229,7 @@ async function pruneShare() {
   }
 }
 
-async function shareItem(request, rest) {
+async function shareItem(request, rest, owner) {
   const [id, part] = rest.split("/");
   const gone = () => new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
   if (!SHARE_ID.test(id || "") || (part !== undefined && part !== "image")) return gone();
@@ -228,12 +239,12 @@ async function shareItem(request, rest) {
     await Promise.all([cache.delete(key), cache.delete(key + "/image")]);
     return new Response(null, { status: 204 });
   }
-  if (request.method !== "GET") return gone();
+  if (request.method !== "GET" || !SHARE_OWNER.test(owner || "")) return gone();
   const stored = await cache.match(key);
   if (!stored) return gone();
   let item = null;
   try {
-    item = await stored.clone().json();
+    item = await stored.json();
   } catch {
     item = null;
   }
@@ -241,6 +252,13 @@ async function shareItem(request, rest) {
     await caches.delete(SHARE_CACHE);
     return gone();
   }
+  // tied to the first signed-in person who opens it; anyone else on this device gets nothing
+  if (typeof item.owner !== "string") {
+    item.owner = owner;
+    await cache.put(key, new Response(JSON.stringify(item), { headers: { "Content-Type": "application/json" } }));
+  } else if (item.owner !== owner) {
+    return gone();
+  }
   if (part === "image") return (await cache.match(key + "/image")) || gone();
-  return stored;
+  return new Response(JSON.stringify(item), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 }

@@ -8,6 +8,7 @@ import { FormError } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { APP_NAME } from "@/lib/app";
 import { AUTH_UNAVAILABLE_MESSAGE, AUTH_UNAVAILABLE_TITLE } from "@/lib/auth-unavailable";
+import { clearSharedOnDevice } from "@/features/share/device";
 import { createClient } from "@/lib/supabase/client";
 
 import { recoverWithCodeAction } from "../actions";
@@ -55,6 +56,8 @@ export function MfaGate({ next, onDone }: { next?: string; onDone?: () => void }
         // this device's session is gone (for example, turning on two-step verification on
         // another device signs out all the others): sign in again
         await supabase.auth.signOut({ scope: "local" });
+        // WAB-06: a share kept on this device goes with the session
+        await clearSharedOnDevice();
         router.replace(`/login?next=${encodeURIComponent(next ?? window.location.pathname)}`);
         return;
       }

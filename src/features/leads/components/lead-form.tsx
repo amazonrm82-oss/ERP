@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
@@ -41,6 +41,12 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons, products =
   const [state, formAction] = useActionState<FormState, FormData>(createLeadAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values ?? prefill ?? {};
+  // WAB-06: prefilled values are not saved yet. FormGuard takes its starting point when it mounts; this marker is then
+  // emptied (its value attribute changes, which FormGuard watches), so leaving a prefilled form asks first.
+  const prefillMarker = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (prefillMarker.current) prefillMarker.current.value = "";
+  }, []);
   const errors = failure?.fieldErrors ?? {};
 
   // a new lead cannot start as "converted"
@@ -55,6 +61,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons, products =
   return (
     <form action={formAction} className="space-y-4" noValidate>
       <FormGuard state={state} />
+      {prefill ? <input ref={prefillMarker} type="hidden" name="prefill_unsaved" defaultValue="1" /> : null}
       <FormError message={failure?.message} />
       {errors.allow_duplicate ? <DuplicateNotice href={errors.allow_duplicate} createLabel="ליצור ליד חדש בכל זאת" /> : null}
       <TextField

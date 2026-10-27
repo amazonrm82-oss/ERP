@@ -26,6 +26,7 @@ import {
   noteStart,
   readStoredShare,
   SHARE_ITEM_PREFIX,
+  SHARE_PREVIEW_TYPES,
   sharePrefill,
   type ShareParams,
   type SharedInput,
@@ -44,9 +45,12 @@ type Loaded =
   | { state: "gone" }
   | { state: "ready"; input: SharedInput; image: File | null; imageUrl: string | null; imageProblem: string | null };
 
+const FALLBACK = "השיתוף לא נשמר. פתחו את האפליקציה פעם אחת ושתפו שוב.";
+const GONE = "השיתוף כבר לא זמין במכשיר הזה. שתפו שוב מהאפליקציה שממנה שיתפתם.";
+
 type Choice = "lead" | "note";
 
-const IMAGE_DROPPED = "התמונה לא הגיעה. פתחו את האפליקציה פעם אחת ושתפו אותה שוב.";
+const IMAGE_DROPPED = "התמונה לא הגיעה. שתפו אותה שוב.";
 const IMAGE_REFUSED = "את התמונה הזאת אי אפשר לצרף: אפשר JPG, PNG, GIF, WEBP או HEIC עד 25 MB.";
 
 function recordPath(orgId: string, subject: TimelineSubject): string {
@@ -63,28 +67,34 @@ function recordPath(orgId: string, subject: TimelineSubject): string {
 }
 
 /** Forget the share kept on this device (the service worker answers; no worker = nothing kept). */
-function forgetShare(id: string | null) {
-  if (!id) return;
-  void fetch(`${SHARE_ITEM_PREFIX}${id}`, { method: "DELETE", cache: "no-store" }).catch(() => undefined);
+function forgetShare(id: string | null): Promise<void> {
+  if (!id) return Promise.resolve();
+  return fetch(`${SHARE_ITEM_PREFIX}${id}`, { method: "DELETE", cache: "no-store" }).then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 /**
- * WAB-06: the share screen. The share is read from the service worker on this device (or from the address when no worker
- * caught it), then the person picks: a new lead prefilled (the business's word), or a note on a record they find, with the
- * image attached through the record's normal upload. Everything is saved with the person's own session.
+ * WAB-06: the share screen. The share is read from the service worker on this device (only its id is in the address),
+ * tied to the signed-in person (`owner`, the SHA-256 of their id); then the person picks: a new lead prefilled (the
+ * business's word), or a note on a record they find, with the image attached through the record's normal upload.
+ * Everything is saved with the person's own session.
  */
-export function ShareScreen({ orgId, share, terms, leadForm }: { orgId: string; share: ShareParams; terms: OrgTerms; leadForm: ShareLeadForm | null }) {
-  const [loaded, setLoaded] = useState<Loaded>(() =>
-    share.s
-      ? { state: "loading" }
-      : {
-          state: "ready",
-          input: { title: share.title, text: share.text, url: share.url },
-          image: null,
-          imageUrl: null,
-          imageProblem: share.imageDropped ? IMAGE_DROPPED : null,
-        },
-  );
+export function ShareScreen({
+  orgId,
+  share,
+  owner,
+  terms,
+  leadForm,
+}: {
+  orgId: string;
+  share: ShareParams;
+  owner: string;
+  terms: OrgTerms;
+  leadForm: ShareLeadForm | null;
+}) {
+  const [loaded, setLoaded] = useState<Loaded>(() => (share.s ? { state: "loading" } : { state: "gone" }));
   const [choice, setChoice] = useState<Choice | null>(leadForm ? null : "note");
 
   useEffect(() => {
@@ -92,15 +102,17 @@ export function ShareScreen({ orgId, share, terms, leadForm }: { orgId: string; 
     let cancelled = false;
     (async () => {
       try {
-        const answer = await fetch(`${SHARE_ITEM_PREFIX}${share.s}`, { cache: "no-store" });
-        const stored = answer.ok ? readStoredShare(await answer.json(), Date.now()) : null;
+        const item = `${SHARE_ITEM_PREFIX}${share.s}`;
+        const query = `?owner=${owner}`;
+        const answer = await fetch(`${item}${query}`, { cache: "no-store" });
+        const stored = answer.ok ? readStoredShare(await answer.json(), Date.now(), owner) : null;
         if (!stored) {
           if (!cancelled) setLoaded({ state: "gone" });
           return;
         }
         let image: File | null = null;
         if (stored.image) {
-          const response = await fetch(`${SHARE_ITEM_PREFIX}${share.s}/image`, { cache: "no-store" });
+          const response = await fetch(`${item}/image${query}`, { cache: "no-store" });
           if (response.ok) {
             const blob = await response.blob();
             image = new File([blob], stored.image.name, { type: stored.image.type });
@@ -111,8 +123,8 @@ export function ShareScreen({ orgId, share, terms, leadForm }: { orgId: string; 
             state: "ready",
             input: stored,
             image,
-            // a local preview (a blob: address); the image is not uploaded before the person saves
-            imageUrl: image ? URL.createObjectURL(image) : null,
+            // a local preview (a blob: address); the image is not uploaded before the person saves. HEIC is named instead
+            imageUrl: image && SHARE_PREVIEW_TYPES.includes(image.type) ? URL.createObjectURL(image) : null,
             imageProblem: stored.imageRefused ? IMAGE_REFUSED : stored.image && !image ? IMAGE_DROPPED : null,
           });
         }
@@ -123,7 +135,7 @@ export function ShareScreen({ orgId, share, terms, leadForm }: { orgId: string; 
     return () => {
       cancelled = true;
     };
-  }, [share.s]);
+  }, [share.s, owner]);
 
   const imageUrl = loaded.state === "ready" ? loaded.imageUrl : null;
   useEffect(() => (imageUrl ? () => URL.revokeObjectURL(imageUrl) : undefined), [imageUrl]);
@@ -132,7 +144,7 @@ export function ShareScreen({ orgId, share, terms, leadForm }: { orgId: string; 
     return (
       <Card>
         <CardBody className="space-y-3">
-          <p className="text-md">השיתוף כבר לא זמין במכשיר הזה. שתפו שוב מהאפליקציה שממנה שיתפתם.</p>
+          <p className="text-md">{share.fallback ? FALLBACK : GONE}</p>
           <ButtonLink href={paths.org(orgId)} variant="secondary">
             להיום שלי
           </ButtonLink>
@@ -168,8 +180,17 @@ function ShareChoices({
   choice: Choice | null;
   onChoice: (choice: Choice) => void;
 }) {
+  const router = useRouter();
   const prefill = useMemo(() => sharePrefill(loaded.input), [loaded.input]);
   const groupId = useId();
+  const [cancelling, setCancelling] = useState(false);
+  const hasImage = loaded.image !== null;
+
+  async function cancel() {
+    setCancelling(true);
+    await forgetShare(shareId);
+    router.push(paths.org(orgId));
+  }
   const options: { value: Choice; label: string; hint: string }[] = [
     ...(leadForm ? [{ value: "lead" as const, label: terms.lead.newOne, hint: "טופס חדש עם מה ששיתפתם" }] : []),
     { value: "note", label: "הערה לרשומה", hint: "לשמור על רשומה קיימת" },
@@ -177,7 +198,7 @@ function ShareChoices({
 
   return (
     <div className="space-y-4">
-      <SharedPreview prefill={prefill.note} imageUrl={loaded.imageUrl} imageProblem={loaded.imageProblem} />
+      <SharedPreview prefill={prefill.note} image={loaded.image} imageUrl={loaded.imageUrl} imageProblem={loaded.imageProblem} />
       {options.length > 1 ? (
         <fieldset className="space-y-2">
           <legend id={groupId} className="mb-2 font-medium">
@@ -212,21 +233,42 @@ function ShareChoices({
       {choice === "lead" && leadForm ? (
         <Card>
           <CardBody className="space-y-4">
-            {loaded.image ? (
+            {hasImage ? (
               <p className="rounded-md bg-canvas px-3 py-2.5 text-sm text-ink-soft">
-                התמונה לא נשמרת עם {terms.lead.newOne}. כדי לצרף אותה לרשומה, בחרו &quot;הערה לרשומה&quot;.
+                התמונה לא נשמרת עם {terms.lead.newOne}. היא נשארת במכשיר הזה עד 24 שעות: אחרי השמירה אפשר לחזור לשיתוף
+                ולצרף אותה כ&quot;הערה לרשומה&quot;.
               </p>
             ) : null}
-            <LeadForm orgId={orgId} {...leadForm} prefill={leadPrefill(prefill)} />
+            {/* Without an image the share is forgotten as the lead is sent: the form keeps the text if the save fails,
+                and the lead action redirects on success, so no answer reaches this screen to wait for. With an image
+                the share stays (24 hours, "ביטול השיתוף", sign-out) so the image can still go on a record. */}
+            <div onSubmit={hasImage ? undefined : () => void forgetShare(shareId)}>
+              <LeadForm orgId={orgId} {...leadForm} prefill={leadPrefill(prefill)} />
+            </div>
           </CardBody>
         </Card>
       ) : null}
-      {choice === "note" ? <ShareNoteForm orgId={orgId} shareId={shareId} note={noteStart(prefill, loaded.image !== null)} image={loaded.image} /> : null}
+      {choice === "note" ? <ShareNoteForm orgId={orgId} shareId={shareId} note={noteStart(prefill, hasImage)} image={loaded.image} /> : null}
+      <div>
+        <Button variant="ghost" onClick={cancel} loading={cancelling}>
+          ביטול השיתוף
+        </Button>
+      </div>
     </div>
   );
 }
 
-function SharedPreview({ prefill, imageUrl, imageProblem }: { prefill: string; imageUrl: string | null; imageProblem: string | null }) {
+function SharedPreview({
+  prefill,
+  image,
+  imageUrl,
+  imageProblem,
+}: {
+  prefill: string;
+  image: File | null;
+  imageUrl: string | null;
+  imageProblem: string | null;
+}) {
   return (
     <Card>
       <CardBody className="space-y-3">
@@ -235,8 +277,12 @@ function SharedPreview({ prefill, imageUrl, imageProblem }: { prefill: string; i
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview, nothing to optimize
           <img src={imageUrl} alt="התמונה ששיתפתם" className="max-h-60 max-w-full rounded-md border border-line object-contain" />
+        ) : image ? (
+          <p className="text-sm break-all text-ink-soft" dir="ltr">
+            {image.name}
+          </p>
         ) : null}
-        {!prefill && !imageUrl ? <p className="text-ink-soft">לא הגיע טקסט. אפשר לכתוב אותו כאן למטה.</p> : null}
+        {!prefill && !image ? <p className="text-ink-soft">לא הגיע טקסט. אפשר לכתוב אותו כאן למטה.</p> : null}
         {imageProblem ? <p className="text-sm text-ink-soft">{imageProblem}</p> : null}
       </CardBody>
     </Card>
@@ -276,13 +322,15 @@ function ShareNoteForm({ orgId, shareId, note, image }: { orgId: string; shareId
     const noteId = saved.data?.id;
     // REC-07: the image goes up as a file of this note, through the record's normal upload and its rules
     const problems = image && attach && noteId ? await uploadFiles(orgId, subject, [image], { activityId: noteId }) : [];
-    forgetShare(shareId);
     const href = recordPath(orgId, subject);
-    setBusy(false);
     if (problems.length === 0) {
+      await forgetShare(shareId);
+      setBusy(false);
       router.push(href);
       return;
     }
+    // L1: the note is saved but the image is not: the share stays on the device for another try
+    setBusy(false);
     setDone({ href, problems });
   }
 
