@@ -34,7 +34,7 @@ export const openingDateUnknown = (raw: string) => `תאריך יתרת הפתי
 export const openingDueUnknown = (raw: string) => `מועד התשלום "${raw}" לא זוהה, לפני תאריך היתרה או שהיתרה היא זכות, ולכן היתרה נרשמה בלי מועד.`;
 export const OPENING_ROW_SKIPPED = "יתרת הפתיחה לא נרשמה כי השורה דולגה.";
 // GAP-12 follow-up (owner, 27 October 2026, answer (1) ג): the customer's balance holds allocations, so it is not replaced
-export const OPENING_ALLOCATED = "יתרת הפתיחה לא הוחלפה (דולגה): ליתרה הקיימת יש תשלומים או קיזוזים משויכים. קודם בטלו את השיוכים ביד, ואז רשמו את היתרה בכרטיס.";
+export const OPENING_ALLOCATED = "יתרת הפתיחה דולגה. הסיבה: יתרת פתיחה קיימת עם תשלומים משויכים: לשחרר שיוכים ולייבא שוב";
 export const OPENING_FAILED = "יתרת הפתיחה לא נרשמה בגלל תקלה. אפשר לרשום אותה בכרטיס.";
 
 /** The warning of an opening balance the database did not write: a refused replace names its reason (the row is kept). */
