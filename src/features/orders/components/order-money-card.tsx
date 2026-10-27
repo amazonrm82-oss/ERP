@@ -7,6 +7,7 @@ import {
   BILLING_STATE_LABELS,
   moneyRemainders,
   moneyStateTone,
+  partialNote,
   PAYMENT_STATE_LABELS,
   STEP_STATE_LABELS,
   stepState,
@@ -38,6 +39,11 @@ function Row({ label, value }: { label: string; value: string }) {
 export function OrderMoneyCard({ money, schedule, billing, payments }: Props) {
   const left = moneyRemainders(money);
   const names = new Map(schedule.map((step) => [step.id, step.name]));
+  const halves = { billing, payments };
+  const note = partialNote(money, halves);
+  // a half is shown when its plan key is on and the user sees all of its rows
+  const showBilling = billing && !money.billingPartial;
+  const showPayments = payments && !money.paymentPartial;
   return (
     <Card aria-labelledby="order-money">
       <CardHeader id="order-money" title="חיוב ותשלום" />
@@ -46,13 +52,12 @@ export function OrderMoneyCard({ money, schedule, billing, payments }: Props) {
           {billing && money.billingState ? <Badge tone={moneyStateTone(money.billingState)}>{BILLING_STATE_LABELS[money.billingState]}</Badge> : null}
           {payments && money.paymentState ? <Badge tone={moneyStateTone(money.paymentState)}>{PAYMENT_STATE_LABELS[money.paymentState]}</Badge> : null}
         </div>
-        {money.partial ? (
-          <p className="text-ink-soft">יש להזמנה מסמכים או תשלומים שאין לכם הרשאה לראות, ולכן הסכומים לא מוצגים.</p>
-        ) : (
+        {note ? <p className="text-ink-soft">{note}</p> : null}
+        {showBilling || showPayments ? (
           <>
             <dl className="space-y-1">
               <Row label="סכום ההזמנה" value={formatMoney(money.totalAgorot)} />
-              {billing ? (
+              {showBilling ? (
                 <>
                   <Row label="חויב" value={formatMoney(money.billedAgorot ?? 0)} />
                   <Row label="נשאר לחייב" value={formatMoney(left.toBill ?? 0)} />
@@ -60,7 +65,7 @@ export function OrderMoneyCard({ money, schedule, billing, payments }: Props) {
                   {money.requestedAgorot ? <Row label="דרישות תשלום (חשבון עסקה)" value={formatMoney(money.requestedAgorot)} /> : null}
                 </>
               ) : null}
-              {payments ? (
+              {showPayments ? (
                 <>
                   <Row label="שולם" value={formatMoney(money.paidAgorot ?? 0)} />
                   <Row label="נשאר לתשלום" value={formatMoney(left.toPay ?? 0)} />
@@ -69,16 +74,20 @@ export function OrderMoneyCard({ money, schedule, billing, payments }: Props) {
               ) : null}
             </dl>
             <p className="text-ink-soft">
-              נספרים רק מסמכים ותשלומים שנרשמו על ההזמנה הזו. חשבונית זיכוי מורידה מהחיוב; מסמך או תשלום שבוטל לא נספר.
+              {showBilling && showPayments
+                ? "נספרים רק מסמכים ותשלומים שנרשמו על ההזמנה הזו. חשבונית זיכוי מורידה מהחיוב; מסמך או תשלום שבוטל לא נספר."
+                : showBilling
+                  ? "נספרים רק מסמכים שנרשמו על ההזמנה הזו. חשבונית זיכוי מורידה מהחיוב; מסמך שבוטל לא נספר."
+                  : "נספרים רק תשלומים שנרשמו על ההזמנה הזו. תשלום שבוטל, נכשל או הוחזר לא נספר."}
             </p>
           </>
-        )}
-        {money.steps.length > 0 && !money.partial ? (
+        ) : null}
+        {money.steps.length > 0 && (showBilling || showPayments) ? (
           <div>
             <h3 className="mb-2 text-md font-semibold">לפי לוח התשלומים</h3>
             <ul className="divide-y divide-line">
               {money.steps.map((step) => {
-                const state = stepState(step);
+                const state = stepState(step, { billing: showBilling, payments: showPayments });
                 return (
                   <li key={step.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 first:pt-0 last:pb-0">
                     <span className="min-w-0 break-words">
@@ -86,13 +95,13 @@ export function OrderMoneyCard({ money, schedule, billing, payments }: Props) {
                       <span className="text-ink-soft">
                         {" · "}
                         <span className="tabular-nums">{formatMoney(step.amountAgorot)}</span>
-                        {billing ? (
+                        {showBilling ? (
                           <>
                             {" · חויב "}
                             <span className="tabular-nums">{formatMoney(step.billedAgorot ?? 0)}</span>
                           </>
                         ) : null}
-                        {payments ? (
+                        {showPayments ? (
                           <>
                             {" · שולם "}
                             <span className="tabular-nums">{formatMoney(step.paidAgorot ?? 0)}</span>

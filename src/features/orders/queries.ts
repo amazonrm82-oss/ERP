@@ -263,15 +263,21 @@ export type OrderListFilters = {
 export async function listOrders(orgId: string, filters: OrderListFilters): Promise<{ orders: OrderSummary[]; hasMore: boolean }> {
   const supabase = await createClient();
   const from = (filters.page - 1) * PAGE_SIZE;
-  let query = supabase.from("orders").select(SUMMARY_COLUMNS).eq("organization_id", orgId);
+  // ORD-02: a billing or payment filter reads the set public.orders_by_money_state returns (invoker, grouped once for the
+  // business; RLS decides what counts), and PostgREST filters, orders and pages it like the table
+  const base = supabase.from("orders").select(SUMMARY_COLUMNS);
+  let query = (
+    filters.billing || filters.payment
+      ? (supabase
+          .rpc("orders_by_money_state", { p_org: orgId, p_billing: filters.billing, p_payment: filters.payment })
+          .select(SUMMARY_COLUMNS) as unknown as typeof base)
+      : base
+  ).eq("organization_id", orgId);
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.source) query = query.eq("source", filters.source);
   if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
   if (filters.from) query = query.gte("order_date", filters.from);
   if (filters.to) query = query.lte("order_date", filters.to);
-  // computed fields (security invoker): RLS decides which documents and payments count; a partial view is 'unknown'
-  if (filters.billing) query = query.filter("billing_state", "eq", filters.billing);
-  if (filters.payment) query = query.filter("payment_state", "eq", filters.payment);
   const rows = must(await query.order("created_at", { ascending: false }).order("id").range(from, from + PAGE_SIZE), "orders");
   const page = await withCustomers(supabase, orgId, rows.slice(0, PAGE_SIZE));
   return { orders: page, hasMore: rows.length > PAGE_SIZE };

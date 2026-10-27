@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moneyRemainders, moneyStateTone, parseOrderMoney, stepState, BILLING_STATE_LABELS, PAYMENT_STATE_LABELS } from "@/features/orders/money";
+import { moneyRemainders, moneyStateTone, parseOrderMoney, partialNote, showsMoneyBadges, stepState, BILLING_STATE_LABELS, PAYMENT_STATE_LABELS } from "@/features/orders/money";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
@@ -14,6 +14,9 @@ describe("order billing and payment (ORD-02, ORD-04)", () => {
           status: "new",
           total: "11800",
           partial: false,
+          billing_partial: false,
+          payment_partial: false,
+          has_money: true,
           billed: 5000,
           paid: "0",
           requested: 0,
@@ -27,6 +30,9 @@ describe("order billing and payment (ORD-02, ORD-04)", () => {
       id: ID,
       totalAgorot: 11800,
       partial: false,
+      billingPartial: false,
+      paymentPartial: false,
+      hasMoney: true,
       billedAgorot: 5000,
       paidAgorot: 0,
       requestedAgorot: 0,
@@ -39,13 +45,13 @@ describe("order billing and payment (ORD-02, ORD-04)", () => {
   it("a partial view and a draft parse with nulls; an unknown state is refused", () => {
     const map = parseOrderMoney({
       orders: [
-        { id: "a", total: 100, partial: true, billed: null, paid: null, requested: null, billing_state: "unknown", payment_state: "unknown", steps: [] },
-        { id: "b", total: 0, partial: false, billed: 0, paid: 0, requested: 0, billing_state: null, payment_state: null, steps: [] },
+        { id: "a", total: 100, partial: true, billing_partial: true, payment_partial: true, has_money: true, billed: null, paid: null, requested: null, billing_state: "unknown", payment_state: "unknown", steps: [] },
+        { id: "b", total: 0, partial: false, billing_partial: false, payment_partial: false, has_money: false, billed: 0, paid: 0, requested: 0, billing_state: null, payment_state: null, steps: [] },
       ],
     });
     expect(map.get("a")?.billingState).toBe("unknown");
     expect(map.get("b")?.paymentState).toBeNull();
-    expect(() => parseOrderMoney({ orders: [{ id: "c", total: 1, partial: false, billed: 0, paid: 0, requested: 0, billing_state: "whatever", payment_state: null, steps: [] }] })).toThrow();
+    expect(() => parseOrderMoney({ orders: [{ id: "c", total: 1, partial: false, billing_partial: false, payment_partial: false, has_money: false, billed: 0, paid: 0, requested: 0, billing_state: "whatever", payment_state: null, steps: [] }] })).toThrow();
   });
 
   it("works out what is left and what was beyond the total", () => {
@@ -62,6 +68,30 @@ describe("order billing and payment (ORD-02, ORD-04)", () => {
     expect(step(0, 100)).toBe("paid");
     expect(step(null, null)).toBe("unknown");
     expect(step(0, 0, 0)).toBe("open");
+  });
+
+  it("a step counts only the halves the plan shows", () => {
+    const s = { id: "s", amountAgorot: 100, billedAgorot: 100, paidAgorot: 40 };
+    expect(stepState(s, { billing: false, payments: true })).toBe("partly_paid");
+    expect(stepState(s, { billing: true, payments: false })).toBe("billed");
+    expect(stepState(s, { billing: false, payments: false })).toBe("open");
+    expect(stepState({ ...s, billedAgorot: null }, { billing: false, payments: true })).toBe("partly_paid");
+  });
+
+  it("words the partial note per half shown", () => {
+    const both = { billing: true, payments: true };
+    expect(partialNote({ billingPartial: false, paymentPartial: false }, both)).toBeNull();
+    expect(partialNote({ billingPartial: true, paymentPartial: true }, both)).toContain("מסמכים ותשלומים");
+    expect(partialNote({ billingPartial: true, paymentPartial: false }, both)).toContain("החיוב");
+    expect(partialNote({ billingPartial: false, paymentPartial: true }, both)).toContain("התשלום");
+    // a hidden document says nothing when the documents half is not shown
+    expect(partialNote({ billingPartial: true, paymentPartial: false }, { billing: false, payments: true })).toBeNull();
+  });
+
+  it("a cancelled order with no money shows no badges", () => {
+    expect(showsMoneyBadges("cancelled", { hasMoney: false })).toBe(false);
+    expect(showsMoneyBadges("cancelled", { hasMoney: true })).toBe(true);
+    expect(showsMoneyBadges("new", { hasMoney: false })).toBe(true);
   });
 
   it("has a label and a tone for every state", () => {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoney } from "@/lib/format";
 
-import { BILLING_STATE_LABELS, moneyStateTone, PAYMENT_STATE_LABELS, type OrderMoney } from "../money";
+import { BILLING_STATE_LABELS, moneyStateTone, PAYMENT_STATE_LABELS, showsMoneyBadges, type OrderMoney } from "../money";
 import { orderPath } from "../paths";
 import type { OrderSummary } from "../queries";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "../schema";
@@ -49,7 +49,7 @@ export function OrderListItems({ orgId, orders, showCustomer = true, money }: { 
           </div>
           <span className="flex flex-wrap items-center gap-2 text-sm">
             <OrderStatusBadge status={order.status} />
-            {money ? <OrderMoneyBadges state={money.states.get(order.id)} billing={money.billing} payments={money.payments} /> : null}
+            {money ? <OrderMoneyBadges status={order.status} state={money.states.get(order.id)} billing={money.billing} payments={money.payments} /> : null}
             <span className="font-medium whitespace-nowrap tabular-nums">{formatMoney(order.totalAgorot)}</span>
           </span>
         </li>
@@ -59,8 +59,9 @@ export function OrderListItems({ orgId, orders, showCustomer = true, money }: { 
 }
 
 /** ORD-02: the order's billing and payment states (none for a draft). */
-function OrderMoneyBadges({ state, billing, payments }: { state: OrderMoney | undefined; billing: boolean; payments: boolean }) {
-  if (!state) return null;
+function OrderMoneyBadges({ status, state, billing, payments }: { status: OrderStatus; state: OrderMoney | undefined; billing: boolean; payments: boolean }) {
+  // a cancelled order with no document or payment shows none
+  if (!state || !showsMoneyBadges(status, state)) return null;
   return (
     <>
       {billing && state.billingState ? <Badge tone={moneyStateTone(state.billingState)}>{BILLING_STATE_LABELS[state.billingState]}</Badge> : null}

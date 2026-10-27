@@ -52,6 +52,9 @@ const orderSchema = z.object({
   id: z.string(),
   total: amount,
   partial: z.boolean(),
+  billing_partial: z.boolean(),
+  payment_partial: z.boolean(),
+  has_money: z.boolean(),
   billed: nullableAmount,
   paid: nullableAmount,
   requested: nullableAmount,
@@ -65,8 +68,13 @@ export type OrderMoneyStep = { id: string; amountAgorot: number; billedAgorot: n
 export type OrderMoney = {
   id: string;
   totalAgorot: number;
-  // the caller does not read every document or payment of the order: nothing is worked out
+  // the caller does not read every document (billingPartial) or payment (paymentPartial) of the order: that half is not
+  // worked out (amounts null, state 'unknown'); partial = either
   partial: boolean;
+  billingPartial: boolean;
+  paymentPartial: boolean;
+  // the order has a document or a payment at all (seen or not)
+  hasMoney: boolean;
   billedAgorot: number | null;
   paidAgorot: number | null;
   requestedAgorot: number | null;
@@ -86,6 +94,9 @@ export function parseOrderMoney(value: unknown): Map<string, OrderMoney> {
         id: o.id,
         totalAgorot: o.total,
         partial: o.partial,
+        billingPartial: o.billing_partial,
+        paymentPartial: o.payment_partial,
+        hasMoney: o.has_money,
         billedAgorot: o.billed,
         paidAgorot: o.paid,
         requestedAgorot: o.requested,
@@ -124,14 +135,34 @@ export const STEP_STATE_LABELS: Record<StepState, string> = {
   unknown: "לא ידוע",
 };
 
-/** One schedule step: paid wins over billed; a step of zero is open until money covers anything beyond it. */
-export function stepState(step: OrderMoneyStep): StepState {
-  if (step.billedAgorot === null || step.paidAgorot === null) return "unknown";
-  if (step.amountAgorot > 0 && step.paidAgorot >= step.amountAgorot) return "paid";
-  if (step.paidAgorot > 0) return "partly_paid";
-  if (step.amountAgorot > 0 && step.billedAgorot >= step.amountAgorot) return "billed";
-  if (step.billedAgorot > 0) return "partly_billed";
+/**
+ * One schedule step: paid wins over billed; a step of zero is open until money covers anything beyond it. Only the halves
+ * the plan shows count (`billing` = the documents key, `payments` = the payments key); a half not worked out is unknown.
+ */
+export function stepState(step: OrderMoneyStep, halves: { billing: boolean; payments: boolean } = { billing: true, payments: true }): StepState {
+  const billed = halves.billing ? step.billedAgorot : 0;
+  const paid = halves.payments ? step.paidAgorot : 0;
+  if (billed === null || paid === null) return "unknown";
+  if (step.amountAgorot > 0 && paid >= step.amountAgorot) return "paid";
+  if (paid > 0) return "partly_paid";
+  if (step.amountAgorot > 0 && billed >= step.amountAgorot) return "billed";
+  if (billed > 0) return "partly_billed";
   return "open";
+}
+
+/** The note when part of the order's money is hidden from the user, worded for the halves the plan shows; null = none. */
+export function partialNote(money: Pick<OrderMoney, "billingPartial" | "paymentPartial">, halves: { billing: boolean; payments: boolean }): string | null {
+  const documents = halves.billing && money.billingPartial;
+  const payments = halves.payments && money.paymentPartial;
+  if (documents && payments) return "יש להזמנה מסמכים ותשלומים שאין לכם הרשאה לראות, ולכן החיוב והתשלום לא מחושבים.";
+  if (documents) return "יש להזמנה מסמכים שאין לכם הרשאה לראות, ולכן החיוב לא מחושב.";
+  if (payments) return "יש להזמנה תשלומים שאין לכם הרשאה לראות, ולכן התשלום לא מחושב.";
+  return null;
+}
+
+/** ORD-02: a cancelled order with no document or payment shows no billing or payment state in the list. */
+export function showsMoneyBadges(status: string, money: Pick<OrderMoney, "hasMoney">): boolean {
+  return status !== "cancelled" || money.hasMoney;
 }
 
 /** The list filter's values, read from the address; anything else is left out. */
