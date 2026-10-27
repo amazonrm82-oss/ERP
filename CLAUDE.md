@@ -436,6 +436,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   caller's own running update-mode job of that type created within 2 hours; notes are always told. `import_jobs.status` is
   one-way (trigger `import_jobs_status_one_way`, hint `import:status`). `app.notify_followers_of_change/_of_entry` were last
   redefined in 0199. Accepted risk: an importer (manager and up) can mute their own change notices for one job's window.
+- Link previews (WAB-05, no migration; 27 October 2026): the six customer pages (`/f/[token]`, `/f/quote`, `/f/order`, `/f/book`,
+  `/f/book/manage`, `/f/card`) build Open Graph / Twitter metadata in `generateMetadata` through `src/lib/link-preview.ts` (business
+  display fields only: never the customer's name, a price, a number or a time; logo from `org-logos`, else no image, never the app's
+  own share image; noindex; quote/order keep `referrer: no-referrer`). Each page reads through ONE `cache()`-wrapped loader shared by
+  the page and its metadata, so a public function that counts views (quote_public, order_public, booking/card) runs once per request
+  (unit test `link-preview`). The widget form is left out. Open: preview bots (WhatsApp on the rep's phone, Facebook, Telegram…) still
+  run the page and count a view; for a quote that marks it viewed and notifies its owner (owner question); the web form's preview has
+  no business name (`intake_form` does not return it); quote/order previews show the registered name `quote_public`/`order_public` return.
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.
