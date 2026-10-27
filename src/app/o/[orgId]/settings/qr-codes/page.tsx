@@ -12,12 +12,13 @@ import { deleteQrCodeAction, setQrCodeActiveAction } from "@/features/qr-codes/a
 import { QrCodeForm } from "@/features/qr-codes/components/qr-code-form";
 import { QR_KIND_LABELS } from "@/features/qr-codes/model";
 import { qrScanPath } from "@/features/qr-codes/paths";
-import { listQrCodes, listQrTargets, qrScanCounts } from "@/features/qr-codes/queries";
+import { listQrCodes, listQrTargets, qrExternalBlocked, qrScanCounts } from "@/features/qr-codes/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatNumber } from "@/lib/format";
 import { siteOrigin } from "@/lib/site-origin";
+import { SUPPORT } from "@/lib/support";
 
 export const metadata: Metadata = { title: "קודי QR" };
 
@@ -46,12 +47,13 @@ export default async function QrCodesPage({ params }: Props) {
       </Card>
     );
   }
-  const [inPlan, codes, counts, targets, origin] = await Promise.all([
+  const [inPlan, codes, counts, targets, origin, externalOff] = await Promise.all([
     orgHasFeature(orgId, "qr_codes"),
     listQrCodes(orgId),
     qrScanCounts(orgId, RECENT_DAYS),
     listQrTargets(orgId),
     siteOrigin(),
+    qrExternalBlocked(orgId),
   ]);
   const names = new Map([...targets.forms, ...targets.pages, ...targets.cards].map((t) => [t.value, t]));
   // a code is pointed only at a card someone can open
@@ -70,6 +72,13 @@ export default async function QrCodesPage({ params }: Props) {
       <Card aria-labelledby="qr-title">
         <CardHeader id="qr-title" title="קוד QR חדש" />
         <CardBody className="space-y-4">
+          {externalOff ? (
+            // BIZ-03 (owner, 27 October 2026, answer (ה)): the platform's emergency switch
+            <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
+              הקישורים החיצוניים של העסק כובו על ידי צוות המערכת. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל. קודים שפותחים טופס, דף
+              קביעת תור או כרטיס ביקור ממשיכים לעבוד. לפרטים פנו לתמיכה בטלפון <span dir="ltr">{SUPPORT.phone}</span>.
+            </p>
+          ) : null}
           <p className="text-md text-ink-soft">
             קוד נפרד לכל שלט או פלייר. הקוד פותח טופס, דף קביעת תור, כרטיס ביקור של נציג או כל קישור, וסופר כמה פעמים סרקו אותו, כדי לדעת מה עבד. לא נשמר שום פרט על מי שסרק.
           </p>
@@ -122,6 +131,7 @@ export default async function QrCodesPage({ params }: Props) {
                         <span dir="ltr" className="break-all">
                           {code.url}
                         </span>
+                        {externalOff ? " (כבוי על ידי צוות המערכת: מי שסורק רואה שהקוד אינו פעיל)" : " (לפני המעבר מוצג דף עם שם האתר ושם העסק)"}
                       </>
                     ) : target ? (
                       <>

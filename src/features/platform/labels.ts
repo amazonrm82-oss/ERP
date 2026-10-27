@@ -35,6 +35,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "vat_rate.add": "הוספת שיעור מע\"מ",
   "vat_rate.update": "תיקון שיעור מע\"מ עתידי",
   "vat_rate.remove": "הסרת שיעור מע\"מ עתידי",
+  "qr_external.block": "כיבוי הקישורים החיצוניים בקודי QR",
+  "qr_external.unblock": "החזרת הקישורים החיצוניים בקודי QR",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

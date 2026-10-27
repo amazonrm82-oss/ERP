@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { parseTarget, qrCodeSchema, targetColumns } from "@/features/qr-codes/model";
-import { isQrToken, qrRedirectLocation as qrRedirectPath, withQrTags } from "@/features/qr-codes/redirect";
+import { escapeHtml, qrInterstitialHtml } from "@/features/qr-codes/interstitial";
+import { isQrToken, qrLinkHost, qrScanTarget, withQrTags } from "@/features/qr-codes/redirect";
 import { normalizeQrTargetUrl, qrTargetUrlOk } from "@/features/qr-codes/target-url";
 
 import cases from "./fixtures/qr-target-urls.json";
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
+
+// where a scan leads: the redirect's location for an internal target, the page's continue link for an external one
+function qrRedirectPath(answer: unknown): string | null {
+  const target = qrScanTarget(answer && typeof answer === "object" && "url" in answer ? { business: "עסק", ...answer } : answer);
+  if (!target) return null;
+  return target.kind === "redirect" ? target.location : target.href;
+}
 const ID = "00000000-0000-4000-8000-000000000001";
 
 describe("QR code redirect (BIZ-03)", () => {
@@ -123,5 +131,67 @@ describe("QR code links (BIZ-03, owner 18 October 2026)", () => {
 
   it("a card answer leads to the card's page", () => {
     expect(qrRedirectPath({ path: `/f/card/${TOKEN}`, campaign: "כנס" })).toBe(`/f/card/${TOKEN}?utm_source=qr&utm_campaign=${encodeURIComponent("כנס")}`);
+  });
+});
+
+describe("the page before an external link (BIZ-03, owner 27 October 2026)", () => {
+  const external = (answer: Record<string, unknown>) => {
+    const target = qrScanTarget(answer);
+    if (!target || target.kind !== "external") throw new Error("expected the page before the link");
+    return target;
+  };
+
+  it("a link answer is never a redirect: it shows the host, the business and a continue link with the code's tags", () => {
+    const target = external({ url: "https://Shop.Example.co.il:8443/p?x=1#top", campaign: "פלייר", business: " המספרה של דנה " });
+    expect(target).toEqual({
+      kind: "external",
+      href: `https://Shop.Example.co.il:8443/p?x=1&utm_source=qr&utm_campaign=${encodeURIComponent("פלייר")}#top`,
+      host: "shop.example.co.il:8443",
+      hostUnicode: null,
+      business: "המספרה של דנה",
+    });
+    const html = qrInterstitialHtml(target);
+    expect(html).toContain("אתם עוברים לאתר");
+    expect(html).toContain('<bdi dir="ltr" class="host">shop.example.co.il:8443</bdi>');
+    expect(html).toContain("<bdi>המספרה של דנה</bdi> אחראי לתוכן שלו.");
+    expect(html).toContain(`href="https://Shop.Example.co.il:8443/p?x=1&amp;utm_source=qr&amp;utm_campaign=${encodeURIComponent("פלייר")}#top"`);
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('<meta name="referrer" content="no-referrer">');
+    expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
+    expect(html).toContain('<meta name="color-scheme" content="light">');
+    expect(html).toContain('<html lang="he" dir="rtl">');
+    expect(html).toContain("המשך לאתר");
+    expect(html).toContain("חזרה");
+    // the back button's script carries the request's CSP nonce, and only a nonce of the expected shape
+    expect(html).toContain("<script>");
+    expect(qrInterstitialHtml(target, "Eokb6vnvYLfQFs7n/XPB8w==")).toContain('<script nonce="Eokb6vnvYLfQFs7n/XPB8w==">');
+    expect(qrInterstitialHtml(target, '"><x')).toContain("<script>");
+  });
+
+  it("an international name: the punycode host as stored, and its own letters beside it", () => {
+    expect(qrLinkHost("https://xn--4dbrk0ce.co.il/a")).toEqual({ host: "xn--4dbrk0ce.co.il", hostUnicode: "ישראל.co.il" });
+    expect(qrLinkHost("https://xn--4dbrk0ce.co.il:444")).toEqual({ host: "xn--4dbrk0ce.co.il:444", hostUnicode: "ישראל.co.il:444" });
+    expect(qrLinkHost("https://a.io?q")).toEqual({ host: "a.io", hostUnicode: null });
+    const html = qrInterstitialHtml(external({ url: "https://xn--4dbrk0ce.co.il/", campaign: "", business: "עסק" }));
+    expect(html).toContain('xn--4dbrk0ce.co.il</bdi> (<bdi dir="auto">ישראל.co.il</bdi>)');
+  });
+
+  it("everything from the database is escaped: the business's name and the link", () => {
+    expect(escapeHtml(`<a href="x">'&`)).toBe("&lt;a href=&quot;x&quot;&gt;&#39;&amp;");
+    const html = qrInterstitialHtml(external({ url: 'https://a.io/"><script>alert(1)</script>', campaign: "x", business: "<img src=x onerror=alert(1)>" }));
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).toContain('href="https://a.io/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;?utm_source=qr&amp;utm_campaign=x"');
+  });
+
+  it("an internal target is never the page before a link; a link without the business's name is not found", () => {
+    for (const path of [`/f/${TOKEN}`, `/f/book/${TOKEN}`, `/f/card/${TOKEN}`]) {
+      expect(qrScanTarget({ path, campaign: "x", business: "עסק" })).toMatchObject({ kind: "redirect" });
+    }
+    expect(qrScanTarget({ url: "https://a.io", campaign: "x" })).toBeNull();
+    expect(qrScanTarget({ url: "https://a.io", campaign: "x", business: " " })).toBeNull();
+    expect(qrScanTarget({ url: "https://a.io", campaign: "x", business: 5 })).toBeNull();
+    for (const url of cases.bad) expect(qrScanTarget({ url, campaign: "x", business: "עסק" }), JSON.stringify(url)).toBeNull();
   });
 });

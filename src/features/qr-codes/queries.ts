@@ -101,3 +101,12 @@ export async function listQrTargets(
       .sort((a, b) => a.label.localeCompare(b.label, "he")),
   };
 }
+
+/**
+ * BIZ-03 (owner, 27 October 2026, answer (ה)): true while the platform has switched off the business's external links. The
+ * database answers one boolean, and only to a member of the business.
+ */
+export async function qrExternalBlocked(orgId: string): Promise<boolean> {
+  const supabase = await createClient();
+  return must(await supabase.rpc("qr_external_blocked", { p_org: orgId }), "qr_external_blocked") === true;
+}

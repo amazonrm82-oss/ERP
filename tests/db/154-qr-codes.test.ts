@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import cases from "../unit/fixtures/qr-target-urls.json";
-import { addMember, asAdmin, asAnon, asService, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
+import { addMember, asAdmin, asAnon, asMfaUser, asService, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
 
@@ -431,7 +431,7 @@ describe("QR codes: business cards and links (BIZ-03)", () => {
   it("a link code answers the stored link and the campaign only, and counts", async () => {
     const code = await makeCode(owner, { name: "ביקורות", target_kind: "url", target_url: "https://g.page/r/abc/review?x=1" });
     const answer = await scan(code.token);
-    expect(answer).toEqual({ url: "https://g.page/r/abc/review?x=1", campaign: "ביקורות" });
+    expect(answer).toEqual({ url: "https://g.page/r/abc/review?x=1", campaign: "ביקורות", business: "עסק הכרטיסים" });
     expect(await scansOf(code.id)).toBe(1);
     // the code off, or the plan without QR codes: not found
     await asAdmin((q) => q("update public.qr_codes set is_active = false where id = $1", [code.id]));
@@ -484,7 +484,7 @@ describe("QR codes: business cards and links (BIZ-03)", () => {
     // a code may move from one kind to another with its columns
     const code = await makeCode(owner, { target_kind: "card", business_card_id: card.id });
     await asUser(owner.id, (q) => q("update public.qr_codes set target_kind = 'url', business_card_id = null, target_url = 'https://a.io/x' where id = $1", [code.id]));
-    expect(await scan(code.token)).toEqual({ url: "https://a.io/x", campaign: "שלט" });
+    expect(await scan(code.token)).toEqual({ url: "https://a.io/x", campaign: "שלט", business: "עסק הכרטיסים" });
   });
 
   it("another business's card is refused by the composite key", async () => {
@@ -503,8 +503,165 @@ describe("QR codes: business cards and links (BIZ-03)", () => {
     for (const who of [member, rep, outsider]) {
       expect(await asUser(who.id, async (q) => (await q("update public.qr_codes set target_url = 'https://evil.io/' where id = $1", [code.id])).rowCount)).toBe(0);
     }
-    expect(await scan(code.token)).toEqual({ url: "https://a.io/", campaign: "שלט" });
+    expect(await scan(code.token)).toEqual({ url: "https://a.io/", campaign: "שלט", business: "עסק הכרטיסים" });
     // a member who is not the rep may not even see that the code exists
     expect(await asUser(member.id, (q) => count(q, "select 1 from public.qr_codes where id = $1", [code.id]))).toBe(0);
+  });
+});
+
+/**
+ * BIZ-03 (owner, 27 October 2026, (ד) + (ה)): a link answers the business's display name for the page shown before it, and a
+ * platform emergency switch turns off one business's external links (logged in the platform log). Internal targets are
+ * untouched by the switch.
+ */
+describe("QR codes: the page before a link and the platform's switch (BIZ-03)", () => {
+  let owner: U, admin: U, member: U, outsider: U, support: U, finance: U, plain: U;
+  let org: string, otherOrg: string;
+  let form: { id: string; token: string };
+  const staffIds: string[] = [];
+
+  const scan = (token: string) => asService(async (q) => (await q<{ r: Scan }>("select public.qr_scan($1) as r", [token])).rows[0].r);
+  const makeCode = (who: U, values: Record<string, unknown>, o: string = org) =>
+    asUser(who.id, async (q) => {
+      const row: Record<string, unknown> = { organization_id: o, name: "שלט", ...values };
+      const cols = Object.keys(row);
+      return (
+        await q<{ id: string; token: string }>(
+          `insert into public.qr_codes (${cols.join(", ")}) values (${cols.map((_, i) => `$${i + 1}`).join(", ")}) returning id, token`,
+          Object.values(row),
+        )
+      ).rows[0];
+    });
+  const scansOf = (codeId: string) =>
+    asAdmin(async (q) => Number((await q<{ n: string }>("select coalesce(sum(scans), 0) as n from app.qr_code_scan_days where qr_code_id = $1", [codeId])).rows[0].n));
+  const setBlock = (who: U, blocked: boolean, reason = "אתר מתחזה", o: string = org, aal2 = true) =>
+    (aal2 ? asMfaUser : asUser)(who.id, async (q) =>
+      (await q<{ r: { blocked: boolean; changed: boolean } }>("select public.platform_set_qr_external_block($1, $2, $3) as r", [o, blocked, reason])).rows[0].r,
+    );
+  const blockedFor = (who: U, o: string = org) =>
+    asUser(who.id, async (q) => (await q<{ b: boolean | null }>("select public.qr_external_blocked($1) as b", [o])).rows[0].b);
+  const logs = (action: string, o: string = org) =>
+    asAdmin((q) => count(q, "select 1 from app.platform_log where action = $1 and organization_id = $2", [action, o]));
+
+  beforeAll(async () => {
+    owner = await createUser("qrx-owner");
+    org = await createOrg(owner.id, "המספרה של דנה");
+    admin = await addMember(org, owner.id, "admin", "qrx-admin");
+    member = await addMember(org, owner.id, "member", "qrx-member");
+    outsider = await createUser("qrx-outsider");
+    otherOrg = await createOrg(outsider.id, "עסק שכן");
+    support = await createUser("qrx-support");
+    finance = await createUser("qrx-finance");
+    plain = await createUser("qrx-plain");
+    for (const [who, role] of [[support, "support"], [finance, "finance"]] as const) {
+      staffIds.push(who.id);
+      await asAdmin((q) => q("insert into app.platform_staff (user_id, role) values ($1, $2) on conflict (user_id) do update set role = excluded.role", [who.id, role]));
+    }
+    form = await asUser(owner.id, async (q) =>
+      (await q<{ id: string; token: string }>("insert into public.forms (organization_id, name) values ($1, 'טופס אתר') returning id, token", [org])).rows[0],
+    );
+  });
+
+  afterAll(async () => {
+    await asAdmin(async (q) => {
+      await q("delete from app.platform_staff where user_id = any($1)", [staffIds]);
+      await q("delete from app.qr_external_blocks where organization_id = any($1)", [[org, otherOrg]]);
+    });
+  });
+
+  it("a link answers its stored link, the campaign and the business's display name only", async () => {
+    const code = await makeCode(owner, { name: "ביקורות", target_kind: "url", target_url: "https://g.page/r/x" });
+    expect(await scan(code.token)).toEqual({ url: "https://g.page/r/x", campaign: "ביקורות", business: "המספרה של דנה" });
+    // the display name follows the business's name when it changes
+    await asUser(owner.id, (q) => q("update public.organizations set name = 'המספרה של דנה בע\"מ' where id = $1", [org]));
+    try {
+      expect((await scan(code.token)).business).toBe('המספרה של דנה בע"מ');
+    } finally {
+      await asUser(owner.id, (q) => q("update public.organizations set name = 'המספרה של דנה' where id = $1", [org]));
+    }
+    // an internal target's answer is unchanged: no business
+    const onForm = await makeCode(owner, { name: "שלט", target_kind: "form", form_id: form.id });
+    expect(await scan(onForm.token)).toEqual({ path: `/f/${form.token}`, campaign: "שלט" });
+  });
+
+  it("the switch: a link of the business is not found and not counted; its internal targets and other businesses are untouched", async () => {
+    const link = await makeCode(owner, { target_kind: "url", target_url: "https://a.io/x" });
+    const onForm = await makeCode(owner, { target_kind: "form", form_id: form.id });
+    const otherLink = await makeCode(outsider, { target_kind: "url", target_url: "https://b.io/" }, otherOrg);
+    expect(await setBlock(support, true)).toEqual({ blocked: true, changed: true });
+    try {
+      expect((await pgError(scan(link.token))).code).toBe("P0002");
+      expect(await scansOf(link.id)).toBe(0);
+      expect((await scan(onForm.token)).path).toBe(`/f/${form.token}`);
+      expect((await scan(otherLink.token)).url).toBe("https://b.io/");
+      // creating and editing link codes stays allowed while switched off; the scan is where the switch holds
+      const later = await makeCode(admin, { target_kind: "url", target_url: "https://c.io/" });
+      await asUser(admin.id, (q) => q("update public.qr_codes set target_url = 'https://d.io/' where id = $1", [later.id]));
+      expect((await pgError(scan(later.token))).code).toBe("P0002");
+    } finally {
+      expect(await setBlock(support, false, "נבדק, תקין")).toEqual({ blocked: false, changed: true });
+    }
+    expect((await scan(link.token)).url).toBe("https://a.io/x");
+    expect(await scansOf(link.id)).toBe(1);
+  });
+
+  it("the platform function: owner or support with two-step verification, a reason, logged, idempotent", async () => {
+    const before = { block: await logs("qr_external.block"), unblock: await logs("qr_external.unblock") };
+    // switching back a business never switched off changes nothing and logs nothing
+    expect(await setBlock(support, false)).toEqual({ blocked: false, changed: false });
+    expect(await asAdmin((q) => count(q, "select 1 from app.qr_external_blocks where organization_id = $1", [otherOrg]))).toBe(0);
+    expect(await setBlock(support, false, "x", otherOrg)).toEqual({ blocked: false, changed: false });
+    expect(await asAdmin((q) => count(q, "select 1 from app.qr_external_blocks where organization_id = $1", [otherOrg]))).toBe(0);
+
+    expect(await setBlock(support, true, "  הפניה לאתר מתחזה  ")).toEqual({ blocked: true, changed: true });
+    expect(await setBlock(support, true, "שוב")).toEqual({ blocked: true, changed: false });
+    expect(await logs("qr_external.block")).toBe(before.block + 1);
+    const entry = await asAdmin(async (q) =>
+      (await q<{ actor_id: string; details: Record<string, unknown> }>(
+        "select actor_id, details from app.platform_log where action = 'qr_external.block' and organization_id = $1 order by id desc limit 1",
+        [org],
+      )).rows[0],
+    );
+    expect(entry).toEqual({ actor_id: support.id, details: { reason: "הפניה לאתר מתחזה" } });
+    const state = await asMfaUser(finance.id, async (q) => (await q<{ r: Record<string, unknown> }>("select public.platform_qr_external_block($1) as r", [org])).rows[0].r);
+    expect(state).toMatchObject({ blocked: true, reason: "הפניה לאתר מתחזה" });
+    expect(typeof state.changed_at).toBe("string");
+    expect(await asMfaUser(finance.id, async (q) => (await q<{ r: unknown }>("select public.platform_qr_external_block($1) as r", [otherOrg])).rows[0].r)).toEqual({
+      blocked: false,
+    });
+
+    expect(await setBlock(support, false, "תוקן")).toEqual({ blocked: false, changed: true });
+    expect(await setBlock(support, false, "שוב")).toEqual({ blocked: false, changed: false });
+    expect(await logs("qr_external.unblock")).toBe(before.unblock + 1);
+
+    // not staff, staff without the role, staff without aal2, a business's own owner: refused
+    for (const who of [plain, finance, owner]) expect((await pgError(setBlock(who, true))).code, who.email).toBe("42501");
+    expect((await pgError(setBlock(support, true, "x", org, false))).code).toBe("42501");
+    expect((await pgError(asMfaUser(plain.id, (q) => q("select public.platform_qr_external_block($1)", [org])))).code).toBe("42501");
+    expect((await pgError(asUser(finance.id, (q) => q("select public.platform_qr_external_block($1)", [org])))).code).toBe("42501");
+    // a reason is required; an unknown business is not found
+    for (const reason of ["", "   ", "x".repeat(501)]) expect((await pgError(setBlock(support, true, reason))).code).toBe("22023");
+    expect((await pgError(setBlock(support, true, "x", "00000000-0000-4000-8000-000000000000"))).code).toBe("P0002");
+    expect(await logs("qr_external.block")).toBe(before.block + 1);
+    // visitors and the server key cannot call it
+    expect((await pgError(asAnon((q) => q("select public.platform_set_qr_external_block($1, true, 'x')", [org])))).code).toBe("42501");
+  });
+
+  it("a member reads one boolean for their own business; anyone else gets nothing; nobody reads the table", async () => {
+    expect(await blockedFor(member)).toBe(false);
+    await setBlock(support, true);
+    try {
+      for (const who of [owner, admin, member]) expect(await blockedFor(who)).toBe(true);
+      expect(await blockedFor(outsider)).toBeNull();
+      expect(await blockedFor(outsider, otherOrg)).toBe(false);
+      expect((await pgError(asAnon((q) => q("select public.qr_external_blocked($1)", [org])))).code).toBe("42501");
+      for (const who of [owner, member, support]) {
+        expect((await pgError(asUser(who.id, (q) => q("select * from app.qr_external_blocks")))).code).toBe("42501");
+      }
+      expect((await pgError(asService((q) => q("select * from app.qr_external_blocks")))).code).toBe("42501");
+      expect((await pgError(asUser(owner.id, (q) => q("select app.qr_external_off($1)", [org])))).code).toBe("42501");
+    } finally {
+      await setBlock(support, false);
+    }
   });
 });

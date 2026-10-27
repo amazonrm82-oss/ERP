@@ -5,11 +5,11 @@ import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
-import { openSupportAction, setOrgStatusAction, setOverridesAction, updateSubscriptionAction } from "@/features/platform/actions";
+import { openSupportAction, setOrgStatusAction, setOverridesAction, setQrExternalBlockAction, updateSubscriptionAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { activationText } from "@/features/platform/activation";
 import { ACTION_LABELS, canDo, ORG_STATUS_LABELS } from "@/features/platform/labels";
-import { getPlatformOrg, listPlans, listPlatformLog, platformReady } from "@/features/platform/queries";
+import { getPlatformOrg, getQrExternalBlock, listPlans, listPlatformLog, platformReady } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
 import type { MembershipRole } from "@/lib/database.types";
 import { formatDate, formatDateTime, formatNumber, zoneDate } from "@/lib/format";
@@ -28,7 +28,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
   if (!isUuid(orgId)) notFound();
   const me = await platformReady();
   if (!me) return null;
-  const [data, plans, log] = await Promise.all([getPlatformOrg(orgId), listPlans(), listPlatformLog(orgId, 50)]);
+  const [data, plans, log, qrBlock] = await Promise.all([getPlatformOrg(orgId), listPlans(), listPlatformLog(orgId, 50), getQrExternalBlock(orgId)]);
   if (!data) notFound();
 
   const org = data.org as Obj;
@@ -100,6 +100,36 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
               </>
             ) : (
               <p className="text-md">הלקוח לא אישר גישת תמיכה. בלי אישור לא רואים את הנתונים שלו. האישור נעשה אצל הלקוח: הגדרות ← פרטי העסק ← גישת תמיכה.</p>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* BIZ-03 (owner, 27 October 2026, answer (ה)): the emergency switch for the business's external QR links */}
+        <Card aria-labelledby="qr-external">
+          <CardHeader id="qr-external" title="קישורים חיצוניים בקודי QR" />
+          <CardBody className="space-y-3">
+            {qrBlock.blocked ? (
+              <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
+                כבויים{qrBlock.changedAt ? ` מאז ${formatDateTime(qrBlock.changedAt)}` : ""}
+                {qrBlock.reason ? `. סיבה: ${qrBlock.reason}` : ""}. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל.
+              </p>
+            ) : (
+              <p className="text-md">פעילים. קוד שפותח קישור חיצוני מראה קודם דף מעבר עם שם האתר ושם העסק.</p>
+            )}
+            {canDo(me.role, ["support"]) ? (
+              <PlatformForm
+                action={setQrExternalBlockAction.bind(null, orgId, !qrBlock.blocked)}
+                submitLabel={qrBlock.blocked ? "החזרת הקישורים החיצוניים" : "כיבוי הקישורים החיצוניים"}
+              >
+                <p className="text-sm text-ink-soft">
+                  {qrBlock.blocked
+                    ? "הקודים של העסק שפותחים קישור חיצוני יחזרו לעבוד מיד."
+                    : "לשימוש לרעה בלבד, למשל הפניה לאתר מתחזה. קודים שפותחים טופס, דף קביעת תור או כרטיס ביקור ממשיכים לעבוד."}
+                </p>
+                {REASON}
+              </PlatformForm>
+            ) : (
+              <p className="text-sm text-ink-soft">את המתג מפעילים תפקידי תמיכה ובעלים.</p>
             )}
           </CardBody>
         </Card>

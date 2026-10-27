@@ -151,6 +151,19 @@ export async function getPlatformOrg(orgId: string): Promise<Obj | null> {
   return data ? obj(data) : null;
 }
 
+/** BIZ-03 (owner, 27 October 2026, answer (ה)): whether the platform switched off the business's external QR links. */
+export type QrExternalBlock = { blocked: boolean; reason: string | null; changedAt: string | null };
+
+export async function getQrExternalBlock(orgId: string): Promise<QrExternalBlock> {
+  const supabase = await createClient();
+  const data = obj(must(await supabase.rpc("platform_qr_external_block", { p_org: orgId }), "platform_qr_external_block"));
+  return {
+    blocked: data.blocked === true,
+    reason: typeof data.reason === "string" ? data.reason : null,
+    changedAt: typeof data.changed_at === "string" ? data.changed_at : null,
+  };
+}
+
 export async function listPlatformLog(orgId: string | null, limit = 100): Promise<Obj[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("platform_log_list", { p_org: orgId, p_limit: limit });

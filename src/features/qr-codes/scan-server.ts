@@ -2,15 +2,16 @@ import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
 
-import { isQrToken, qrRedirectLocation } from "./redirect";
+import { qrInterstitialHtml } from "./interstitial";
+import { isQrToken, qrScanTarget, type QrScanTarget } from "./redirect";
 
 // BIZ-03: a QR scan, in the approved pattern for public secret-link pages (owner, 13 October 2026; hard rule 5): the
 // server calls only public.qr_scan() (security definer, service_role only), which checks the token, counts the scan
 // (a number per code and day, nothing about the visitor) and answers the stored target: a page of this site, or
-// the code's own https link (BIZ-03, owner 18 October 2026). No table is reached
-// directly; no IP, cookie or visitor id is read or kept.
+// the code's own https link (BIZ-03, owner 18 October 2026), with the business's display name for the page shown before
+// it (owner 27 October 2026). No table is reached directly; no IP, cookie or visitor id is read or kept.
 
-export type QrScanResult = { ok: true; location: string } | { ok: false; reason: "not-found" | "not-configured" };
+export type QrScanResult = { ok: true; target: QrScanTarget } | { ok: false; reason: "not-found" | "not-configured" };
 
 export async function scanQrCode(token: string): Promise<QrScanResult> {
   if (!isQrToken(token)) return { ok: false, reason: "not-found" };
@@ -21,8 +22,8 @@ export async function scanQrCode(token: string): Promise<QrScanResult> {
     if (error.code === "P0002") return { ok: false, reason: "not-found" };
     throw new Error(`qr_scan failed: ${error.code} ${error.message}`);
   }
-  const location = qrRedirectLocation(data);
-  return location ? { ok: true, location } : { ok: false, reason: "not-found" };
+  const target = qrScanTarget(data);
+  return target ? { ok: true, target } : { ok: false, reason: "not-found" };
 }
 
 const NOT_FOUND_PAGE = `<!doctype html>
@@ -45,13 +46,27 @@ const html = (body: string, status: number) =>
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" },
   });
 
-/** The route's answer: a redirect to the stored target (a relative path on this site, or the code's own
- * https link), or a short Hebrew page. */
-export async function qrScanResponse(token: string): Promise<Response> {
-  const result = await scanQrCode(token);
-  if (result.ok) {
-    // never cached: every scan reaches the counter, and a code switched off stops at once
-    return new Response(null, { status: 302, headers: { Location: result.location, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+/** The route's answer for a scan's target: a redirect to a page of this site, or the page before an external link. */
+export function qrTargetResponse(target: QrScanTarget, nonce?: string): Response {
+  // never cached: every scan reaches the counter, and a code switched off stops at once
+  if (target.kind === "redirect") {
+    return new Response(null, { status: 302, headers: { Location: target.location, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
   }
+  return new Response(qrInterstitialHtml(target, nonce), {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+}
+
+/** The route's answer: a redirect to a page of this site, the page before the code's own https link, or a short
+ * Hebrew page. */
+export async function qrScanResponse(token: string, nonce?: string): Promise<Response> {
+  const result = await scanQrCode(token);
+  if (result.ok) return qrTargetResponse(result.target, nonce);
   return result.reason === "not-configured" ? html(UNAVAILABLE_PAGE, 503) : html(NOT_FOUND_PAGE, 404);
 }

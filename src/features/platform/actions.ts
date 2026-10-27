@@ -91,6 +91,23 @@ export async function setOrgStatusAction(orgId: string, _prev: FormState, formDa
   return { ok: true, message: "נשמר." };
 }
 
+/**
+ * BIZ-03 (owner, 27 October 2026, answer (ה)): the emergency switch for one business's external QR links. Platform owner or
+ * support; the reason goes into the platform log. The same state again changes nothing.
+ */
+export async function setQrExternalBlockAction(orgId: string, blocked: boolean, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(orgId) || typeof blocked !== "boolean") return fail(SESSION_EXPIRED);
+  const reason = text(formData, "reason");
+  if (reason === "" || reason.length > 500) return fail("יש לכתוב סיבה (עד 500 תווים).", { values: formValues(formData) });
+  const { data, error } = await supabase.rpc("platform_set_qr_external_block", { p_org: orgId, p_blocked: blocked, p_reason: reason });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminOrg(orgId));
+  const changed = data && typeof data === "object" && !Array.isArray(data) && (data as Record<string, unknown>).changed === true;
+  if (!changed) return { ok: true, message: blocked ? "הקישורים החיצוניים כבר כבויים." : "הקישורים החיצוניים כבר פעילים." };
+  return { ok: true, message: blocked ? "הקישורים החיצוניים של העסק כובו." : "הקישורים החיצוניים של העסק הוחזרו." };
+}
+
 const shekels = (value: string) => {
   const n = Number(value.replace(/[,₪\s]/g, ""));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;

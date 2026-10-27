@@ -3366,6 +3366,11 @@ export type Database = {
         Returns: Json;
       };
       qr_code_scans: { Args: { p_org: string; p_days?: number }; Returns: Json };
+      // BIZ-03 (owner, 27 October 2026, answer (ה)): a member learns whether the platform switched off the external QR links
+      qr_external_blocked: { Args: { p_org: string }; Returns: boolean };
+      // platform staff: the emergency switch for one business's external QR links (owner or support; logged)
+      platform_qr_external_block: { Args: { p_org: string }; Returns: Json };
+      platform_set_qr_external_block: { Args: { p_org: string; p_blocked: boolean; p_reason: string }; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_card_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
