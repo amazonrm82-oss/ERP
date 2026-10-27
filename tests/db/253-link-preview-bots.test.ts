@@ -34,10 +34,23 @@ describe("link previews for preview bots (WAB-05)", () => {
     asService(async (q) => (await q<{ p: Preview }>("select public.link_preview_public($1, $2, $3) as p", [kind, token, ip])).rows[0].p);
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
   const setStatus = (orgId: string, status: string) => asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, orgId]));
+  // the limits' counters are shared by every call of this file (and outlive a run): emptied where a test needs a known state
+  const clearLimits = () =>
+    asAdmin(async (q) => {
+      await q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1");
+      await q("delete from app.link_preview_ip_counts");
+      await q("delete from app.link_preview_sender_counts");
+    });
+  const ipBucket = (ip: string) =>
+    asAdmin(async (q) => Number((await one<{ b: string }>(q, "select ((hashtextextended($1, 0) % 1024) + 1024) % 1024 as b", [ip])).b));
+  const linkBucket = (kind: string, token: string, ip: string) =>
+    asAdmin(async (q) =>
+      Number((await one<{ b: string }>(q, "select ((hashtextextended(app.link_preview_sender($1, $2, $3), 0) % 1024) + 1024) % 1024 as b", [kind, token, ip])).b),
+    );
 
   beforeAll(async () => {
-    // the total a minute outlives a run: start from zero
-    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
+    // the limits' counters outlive a run: start from empty
+    await clearLimits();
     owner = await createUser("lp-owner");
     org = await createOrg(owner.id, DISPLAY);
     rep = await addMember(org, owner.id, "member", "lp-rep");
@@ -281,9 +294,22 @@ describe("link previews for preview bots (WAB-05)", () => {
   });
 
   it("limits each sender, and all previews together", async () => {
-    // the total a minute is shared by the whole file (and an earlier run in the same minute): start from zero
-    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
-    const sender = `limited-${process.pid}`;
+    await clearLimits();
+    // fixed senders whose buckets are checked apart, so no call here lands in a bucket another one filled
+    const sender = "lp-sender-a";
+    const otherSender = "lp-sender-b";
+    const roamer = "lp-roamer-a";
+    const otherRoamer = "lp-roamer-b";
+    const unknown = "y".repeat(64);
+    const ipBuckets = await Promise.all([sender, otherSender, roamer, otherRoamer].map(ipBucket));
+    expect(new Set(ipBuckets).size, "IP buckets").toBe(4);
+    const linkBuckets = await Promise.all([
+      linkBucket("card", tokens.card, sender),
+      linkBucket("form", tokens.form, sender),
+      linkBucket("quote", unknown, sender),
+      linkBucket("card", tokens.card, otherSender),
+    ]);
+    expect(new Set(linkBuckets).size, "link buckets").toBe(4);
     const limit = await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.link_preview_sender_limit() as n")).n));
     expect(limit).toBe(30);
     for (let i = 0; i < limit; i++) expect(await preview("card", tokens.card, sender)).toMatchObject({ business: DISPLAY });
@@ -291,9 +317,8 @@ describe("link previews for preview bots (WAB-05)", () => {
     // the limit is per sender AND link (review L2, as app.order_link_sender): the same sender on another link is not limited,
     // nor is another sender on this link
     expect(await preview("form", tokens.form, sender)).toMatchObject({ business: DISPLAY });
-    expect(await preview("card", tokens.card, `${sender}-other`)).toMatchObject({ business: DISPLAY });
+    expect(await preview("card", tokens.card, otherSender)).toMatchObject({ business: DISPLAY });
     // an unknown token is counted too, before it is looked up
-    const unknown = "y".repeat(64);
     for (let i = 0; i < limit; i++) expect(await preview("quote", unknown, sender)).toEqual({ not_found: true });
     expect(await preview("quote", unknown, sender)).toEqual({ refused: "rate" });
     // no hash is kept: only a bucket number and a count, in both sender tables, with no grants
@@ -309,14 +334,15 @@ describe("link previews for preview bots (WAB-05)", () => {
     // one sender across all links: a new made-up token on every call is refused after 120 (not found counts too)
     const ipLimit = await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.link_preview_ip_limit() as n")).n));
     expect(ipLimit).toBe(120);
-    const roamer = `roamer-${process.pid}`;
+    // the per-link buckets the part above filled could be hit by the roamer's made-up tokens: start the roamer from empty
+    await clearLimits();
     for (let i = 0; i < ipLimit; i++) {
       expect(await preview("quote", i.toString(16).padStart(64, "0").replace(/0/g, "z"), roamer), String(i)).toEqual({ not_found: true });
     }
     expect(await preview("quote", "q".repeat(64), roamer)).toEqual({ refused: "rate" });
     // a real link from the same sender too; another sender is not limited
     expect(await preview("card", tokens.card, roamer)).toEqual({ refused: "rate" });
-    expect(await preview("card", tokens.card, `${roamer}-other`)).toMatchObject({ business: DISPLAY });
+    expect(await preview("card", tokens.card, otherRoamer)).toMatchObject({ business: DISPLAY });
 
     // the total a minute (a minute ahead keeps the counter, whatever the clock does during the test)
     await asAdmin((q) =>
@@ -326,9 +352,10 @@ describe("link previews for preview bots (WAB-05)", () => {
       expect(await preview("card", tokens.card, null)).toEqual({ refused: "rate" });
       expect(await preview("form", tokens.form)).toEqual({ refused: "rate" });
     } finally {
-      await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
+      await clearLimits();
     }
     expect(await preview("card", tokens.card, null)).toMatchObject({ business: DISPLAY });
+    await clearLimits();
   });
 
   // --- review M1: the preview's not-found rule equals each page's own answer, case by case ---------------------------------
@@ -374,7 +401,7 @@ describe("link previews for preview bots (WAB-05)", () => {
     });
 
   it("agrees with every page's own answer, case by case (review M1)", async () => {
-    await asAdmin((q) => q("update app.link_preview_reads set minute = now() - interval '1 hour', reads = 0 where id = 1"));
+    await clearLimits();
     for (const kind of Object.keys(tokens) as Kind[]) await agree(`${kind}: as it is`, kind, tokens[kind], "shows");
 
     // a deleted customer, on a quote and on an order
