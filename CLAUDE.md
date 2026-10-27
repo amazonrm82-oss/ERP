@@ -535,6 +535,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (hint `bank:invalid`, no value in errors); audit masks the account (`app.mask_bank_account`); every change notifies all
   active owners/admins with kind `system`; documents store `app.document_bank_snapshot(org)` (service_role only) when made.
   Business name rule (owner): customer-facing communication uses the display name; documents use the registered name when set.
+  Bank details on issued documents (TAX-02 rest, migration 021087; owner 13 and 27 October 2026): `quotes.bank_details` and
+  `orders.bank_details` (jsonb, server only, no client grant; readers of the row under RLS see it) are filled from
+  `app.document_bank_snapshot` by definer triggers `quotes_zz_bank_details` (draft -> sent) and `orders_zz_bank_details` (numbering),
+  only while that type's switch `quote_designs.show_bank_details_quote` / `show_bank_details_order` (default true) is on at that
+  moment; every other write puts the old value back. Shown on the staff documents, the PDF and `quote_public` / `order_public`
+  (`bank`, full page only, per the switch). `app.audit_row` (last redefined in 021087) ignores `bank_details` on update and strips it
+  on delete, so the account number never enters `audit_log`. Documents sent before 021087 or while the switch was off have none
+  (owner (2) א). Accepted: a snapshot taken while on stays readable by the row's readers after the switch is turned off.
   Since 0193 (ADM-01) the platform owner (aal2) adds, edits or removes a FUTURE rate through `platform_add/update/remove_vat_rate`
   (logged in `app.platform_log`); a removed rate gets `cancelled_at` (never deleted) and `app.vat_rate_at` skips it; the guard also
   locks cancelling or reviving a started row; no TRUNCATE for API roles. `app.vat_rate_at` and `app.vat_rates_guard` were last
