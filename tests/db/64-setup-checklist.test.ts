@@ -611,6 +611,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // GAP-12 (import undo) redefines app.import_record_worked() of _whatsapp_chat_import.sql and public.undo_import() /
       // undo_own_import() of _import_consent_undo.sql last (an import's own opening balances)
       "_opening_import_undo.sql",
+      // RVW-54 redefines app.payments_advance() of _credit_advances_list.sql last (the same-customer test is never NULL)
+      "_payments_advance_null.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -283,6 +283,23 @@ describe("customer credit (PAY-03)", () => {
     expect((await pgError(run(owner, (q) => q("update public.payments set is_advance = false where id = $1", [linked])))).hint).toBe("payment:cancelled");
   });
 
+  it("RVW-54: an advance never links another customer's quote when one side has no deal or no contact", async () => {
+    const a = await contact("פזית");
+    const otherDeal = await deal(null, null);
+    const dealOnlyQuote = await sentQuote({ deal: otherDeal, contact: null });
+    // a contact-only payment against a deal-only quote of another customer
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { contact: a }, { quote: dealOnlyQuote }))).hint).toBe("payment:advance_link");
+    // a deal-only payment against a contact-only quote of another customer
+    const b = await contact("רונן");
+    const contactOnlyQuote = await sentQuote({ deal: null, contact: b });
+    const lonelyDeal = await deal(null, null);
+    expect((await pgError(advance(manager, 1000, "2026-08-01", { deal: lonelyDeal }, { quote: contactOnlyQuote }))).hint).toBe("payment:advance_link");
+    // the same customer still passes: the same deal, the same contact
+    await advance(manager, 1000, "2026-08-01", { deal: otherDeal }, { quote: dealOnlyQuote });
+    await advance(manager, 1000, "2026-08-01", { contact: b }, { quote: contactOnlyQuote });
+    await advance(manager, 1000, "2026-08-01", { deal: otherDeal, contact: a }, { quote: dealOnlyQuote });
+  });
+
   it("offsetting offers first the advances of the document's order (or of the quote it was made from), then the oldest", async () => {
     const a = await contact("אורית");
     const d = await deal(a, null);
