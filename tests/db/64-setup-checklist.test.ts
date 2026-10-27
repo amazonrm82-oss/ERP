@@ -599,6 +599,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_source_attribution.sql",
       // WAB-07 redefines app.import_record_worked() of _import_history.sql last (an imported chat is work on the record)
       "_whatsapp_chat_import.sql",
+      // the PAY-02 fix redefines app.money_same_customer() of _payment_allocations.sql last (never NULL)
+      "_money_same_customer_null.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
