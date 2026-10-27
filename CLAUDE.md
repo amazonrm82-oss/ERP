@@ -134,7 +134,9 @@ and build this CRM here instead. The old code is preserved on the branch
    `/f/order/<token>`, route `POST /api/forms/order/<token>/decide`), which calls only `public.order_public()` and `public.order_public_decide()`;
    in the eslint allow-list.
    In use (BIZ-03 part one, owner 13 October 2026, migration 020295): the QR scan route (`src/features/qr-codes/scan-server.ts`, route
-   `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>` or `/f/book/<token>`; in the eslint allow-list.
+   `/f/q/<token>`), which calls only `public.qr_scan()` and redirects only to the stored `/f/<token>`, `/f/book/<token>`,
+   `/f/card/<token>` (while `app.business_card_open`; BIZ-03 rest, owner 18 October 2026, migration 021086) or the code's own stored https
+   link (`app.qr_target_url_ok`, set by owners/admins only; utm_source/utm_campaign replaced by the code's); in the eslint allow-list.
    In use (SPD-07, owner 13 October 2026, migration 020305): the site widget (`src/features/site-widgets/public-server.ts`; script
    `/f/w/<token>.js`, form page `/f/widget/<token>`, route `POST /api/forms/widget/<token>`), which calls only `public.site_widget_public()`
    and `public.site_widget_submit()` (through `intake_submit`); no cookies or visitor id; in the eslint allow-list.
@@ -410,8 +412,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   kind `form` or a booking page, composite FKs set null; server-made `token`; owners/admins of a writable org only, because a code
   leads to a booking page's link; outsider guard first in `app.qr_codes_check`). Scans are a counter only: `app.qr_code_scan_days`
   (per code and day) and `app.qr_scan_windows` (60 counted per code per minute); `public.qr_scan` (service_role) answers only
-  `{path, campaign}`; `public.qr_code_scans(org, days)` (owners/admins). Campaign tags only (utm_source=qr); Google review and card
-  targets wait for the owner.
+  `{path, campaign}`; `public.qr_code_scans(org, days)` (owners/admins). Campaign tags only (utm_source=qr).
+  Since 021086 (owner 18 October 2026, answers (2) ג and (4)) a code may also open a rep's business card (`business_card_id`, composite FK
+  set null; not found unless `app.business_card_open`) or any https link (`target_url`, rule `app.qr_target_url_ok` = `qrTargetUrlOk`
+  in `src/features/qr-codes/target-url.ts`, both reading `tests/unit/fixtures/qr-target-urls.json`: https, ASCII, no userinfo, a DNS
+  host, port 1..65535); `qr_codes_target_shape` holds one target per kind form|booking|card|url; `qr_scan` answers `{url, campaign}` for
+  a link. `app.qr_codes_check` and `public.qr_scan` were last redefined in 021086. A Google review link is an ordinary https link.
+  Follow-up: the owner's "one source 'קוד QR'" (answer (1)) is still campaign tagging only; no lead source row yet.
 - Site widget (SPD-07, migration 020305; flag `site_widget`, quota `max_site_widgets`): `public.site_widgets` (owners/admins of a writable
   org; outsider guard first in `app.site_widgets_check`; lead owner an active non-viewer, hint `site_widget:owner`). Each widget owns a
   form of kind `widget` (`forms.site_widget_id`, `forms_widget_shape`), made and kept in step by `app.site_widgets_sync_form`; a person
