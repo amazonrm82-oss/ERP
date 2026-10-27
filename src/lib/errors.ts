@@ -428,6 +428,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "profile:phone": "מספר הטלפון אינו תקין.",
   "profile:locale": "השפה שנבחרה אינה נתמכת.",
   "profile:timezone": "אזור הזמן הזה אינו נתמך. בחרו עיר אחרת באותו אזור זמן.",
+  "org:timezone": "אזור הזמן שנבחר לעסק אינו מוכר.",
   "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
   "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",
   // FLD-05 (apply_industry_template)
