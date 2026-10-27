@@ -398,4 +398,24 @@ describe("lead retention policy (PRV-01)", () => {
       expect(row?.binned, id).toBe(true);
     }
   });
+
+  it("RVW-57: a lead a person binned and restored counts as kept since the restore", async () => {
+    const restoreOrg = await createOrg(owner.id, "עסק השבה");
+    const restored = await insertLead(owner.id, restoreOrg, { full_name: "הושב" });
+    const untouched = await insertLead(owner.id, restoreOrg, { full_name: "לא נגעו" });
+    const binned = await insertLead(owner.id, restoreOrg, { full_name: "בסל" });
+    for (const id of [restored, untouched, binned]) await ago(id, 13);
+    await asUser(owner.id, (q) => q("update public.leads set deleted_at = now() where id = any($1)", [[restored, binned]]));
+    await asUser(owner.id, (q) => q("update public.leads set deleted_at = null where id = $1", [restored]));
+    const candidates = async () =>
+      (
+        await asAdmin(async (q) =>
+          (await q<{ id: string }>("select app.lead_retention_candidates($1, now() - interval '12 months') as id", [restoreOrg])).rows,
+        )
+      ).map((r) => r.id);
+    expect(await candidates()).toEqual([untouched]);
+    // a restore older than the cutoff no longer keeps it
+    await raw("update public.audit_log set created_at = now() - interval '13 months' where entity_id = $1 and action = 'restore'", [restored]);
+    expect((await candidates()).sort()).toEqual([restored, untouched].sort());
+  });
 });
