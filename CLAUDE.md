@@ -1387,6 +1387,27 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   לבעלים ומנהלי מערכת"; each document under one customer (its company, else contact's, else deal's), while cards and lists count it
   under each of its companies (accepted). `public.log_export` was last redefined in 021097. Follow-up: debt columns for payment
   recorders need a per-user kept amount (with PAY-03's).
+- Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
+  (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
+  `app.can_record_payments` + keys `collection`, `documents`, `payments`): BAL-02's debt, BAL-03's buckets, report_debt_aging's
+  customer/rep and candidate narrowing (copied, keep in step; test 264 compares the totals), 500 rows, COL-05 `held`, each row's
+  effective promise. A caller who cannot read every money row (`app.business_money_rows`) gets `partial: true`, the documents they
+  read with amounts and NO totals (`totals`/`shown` null; screen "רשימה חלקית"); owners/admins skip that count (test 264 pins the
+  select policies of accounting_documents, payments, deals, contacts, companies: a change there means judging the shortcut again).
+  `public.payment_promises`: one subject (a document, a contact without a company, or a company; one each), promised date + note
+  (1..500); read follows the subject; write `can_record_payments` + writable + `collection` (delete without the key, on purpose)
+  on a readable subject; invoker trigger `app.payment_promises_check` (date today..+366, hints `payment_promise:*`); audited. A
+  customer promise covers only the documents open when made (`public.payment_promise_documents`, written only by definer
+  `app.payment_promise_cover`; `app.customer_open_documents` keeps BAL-02's scope, a contact's documents on a deal with a company
+  left out). Effective promise `app.document_promise` (the document's own wins, else the newest covering customer promise);
+  COL-04 reads `app.collection_held_until` / `app.collection_reminder_held` (held through the promised date, mirrored by
+  `reminderHeld()`). pg_cron `crm-promise-breaks` (every 15 minutes, `app.send_promise_breaks`, from 08:00 in the org zone, once per
+  promise and date in `app.payment_promise_judged`, 200 per business / 2,000 per run, 3 failures then skipped with a warning line)
+  sends kind `payment` "ההבטחה לא קוימה" to the rep (document: MNY-01's owner; customer: the contact's/company's owner; else
+  owners/admins) when a still-effective covered document (a billed proforma judged by its invoice) has a balance. Merge moves a
+  duplicate's customer promise (`app.merge_payment_promises` on the `merged` entry, marker `app.payment_promise_merge`).
+  `app.audit_erase_core` was last redefined in 021100 (promise notes emptied, their entries erased; known limit: a note on a
+  company's document naming one of its contacts is not reached by that contact's erasure).
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
