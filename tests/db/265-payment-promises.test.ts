@@ -21,7 +21,10 @@ describe("payment promises (COL-03)", () => {
 
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
   const run = <T>(u: U, fn: (q: Query) => Promise<T>) => asUser(u.id, fn);
-  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  // calendar days of the business (Asia/Jerusalem), as the SQL counts them; a UTC date is a day behind
+  // between midnight in Israel and midnight UTC
+  const day = (offset: number) =>
+    new Date(Date.now() + offset * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const doc = (type = "tax_invoice", amount = 1000) =>
     run(owner, async (q) =>
       (
@@ -73,7 +76,7 @@ describe("payment promises (COL-03)", () => {
     const other = await doc();
     expect(await pgError(asAdmin((q) => q("update public.payment_promises set document_id = $2 where id = $1", [id, other])))).toMatchObject({ hint: "payment_promise:fixed" });
     // the date passed (moved by the server): changing only the note is fine, a new past date is not
-    await asAdmin((q) => q("update public.payment_promises set promised_date = current_date - 3 where id = $1", [id]));
+    await asAdmin((q) => q("update public.payment_promises set promised_date = (now() at time zone 'Asia/Jerusalem')::date - 3 where id = $1", [id]));
     await run(owner, (q) => q("update public.payment_promises set note = 'לא ענה' where id = $1", [id]));
     expect(await pgError(run(owner, (q) => q("update public.payment_promises set promised_date = $2 where id = $1", [id, day(-2)])))).toMatchObject({ hint: "payment_promise:date" });
   });
@@ -476,10 +479,10 @@ describe("payment promises (COL-03)", () => {
       });
       // promises made before the proformas were billed (the database refuses a promise on a billed proforma? no: it stays active)
       const pPaid = await asAdmin(async (q) =>
-        (await one<{ id: string }>(q, "insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date) returning id", [org, proformaPaid])).id,
+        (await one<{ id: string }>(q, "insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, (now() at time zone 'Asia/Jerusalem')::date) returning id", [org, proformaPaid])).id,
       );
       const pOpen = await asAdmin(async (q) =>
-        (await one<{ id: string }>(q, "insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date) returning id", [org, proformaOpen])).id,
+        (await one<{ id: string }>(q, "insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, (now() at time zone 'Asia/Jerusalem')::date) returning id", [org, proformaOpen])).id,
       );
       await pastDue([pPaid, pOpen], zone);
       await asAdmin((q) => q("select app.send_promise_breaks()"));

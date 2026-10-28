@@ -31,7 +31,10 @@ describe("customer debt (BAL-02)", () => {
 
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
   const run = <T>(u: U, fn: (q: Query) => Promise<T>) => asUser(u.id, fn);
-  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  // calendar days of the business (Asia/Jerusalem), as the SQL counts them; a UTC date is a day behind
+  // between midnight in Israel and midnight UTC
+  const day = (offset: number) =>
+    new Date(Date.now() + offset * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const company = (name: string) =>
     run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, $2, $3) returning id", [org, name, owner.id])).id);
   const contact = (name: string, companyId: string | null = null, ownerId: string = owner.id) =>
