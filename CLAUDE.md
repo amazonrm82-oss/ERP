@@ -419,7 +419,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   set null; not found unless `app.business_card_open`) or any https link (`target_url`, rule `app.qr_target_url_ok` = `qrTargetUrlOk`
   in `src/features/qr-codes/target-url.ts`, both reading `tests/unit/fixtures/qr-target-urls.json`: https, ASCII, no userinfo, a DNS
   host, port 1..65535); `qr_codes_target_shape` holds one target per kind form|booking|card|url; `qr_scan` answers `{url, campaign}` for
-  a link. `app.qr_codes_check` was last redefined in 021086. A Google review link is an ordinary https link.
+  a link. A Google review link is an ordinary https link.
   Since 021088 (owner 27 October 2026, answer (ד)+(ה)) a link is never redirected to at once: `qr_scan` (last redefined there) answers
   `{url, campaign, business}` (`organizations.name`) and `/f/q/<token>` serves a page "אתם עוברים לאתר [domain]. [business] אחראי לתוכן
   שלו" (`src/features/qr-codes/interstitial.ts`, every value escaped; a punycode host is shown decoded only when every label is ASCII or
@@ -427,8 +427,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Platform emergency switch: `app.qr_external_blocks` (no grants), `public.platform_set_qr_external_block(org, blocked, reason)`
   (owner/support, aal2, logged `qr_external.block|unblock`), `platform_qr_external_block(org)` for the admin card,
   `qr_external_blocked(org)` (a member's boolean, the settings screen says so); while on, a link answers not found and is not counted;
-  internal targets are untouched and creating or editing a link code stays allowed (open question); the advisor's findings on the three
-  new public functions and on `app.qr_external_blocks` are expected (the `platform_*` and schema-app patterns).
+  internal targets are untouched; the advisor's findings on the three new public functions and on `app.qr_external_blocks` are
+  expected (the `platform_*` and schema-app patterns). Since 021092 (owner 27 October 2026, answer (ג)) `app.qr_codes_check` (last
+  redefined there) refuses, for every writer while the switch is on, a new link code, a code turned into a link, a changed link and
+  switching a link code on (hint `qr_code:external_off`); switching off, renaming, deleting and retargeting to an internal target stay
+  allowed. The settings screen leaves "link" out of the new-code form and marks every link code "כבוי" with the reason.
   Follow-up: the owner's "one source 'קוד QR'" (answer (1)) is still campaign tagging only; no lead source row yet.
 - Site widget (SPD-07, migration 020305; flag `site_widget`, quota `max_site_widgets`): `public.site_widgets` (owners/admins of a writable
   org; outsider guard first in `app.site_widgets_check`; lead owner an active non-viewer, hint `site_widget:owner`). Each widget owns a
