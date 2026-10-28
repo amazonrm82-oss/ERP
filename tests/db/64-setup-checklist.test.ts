@@ -622,6 +622,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // WAB-06 redefines the activity rules of _import_history.sql, app.search_notes() of _whatsapp_chat_import.sql and
       // app.files_links_check() of _payment_files.sql last (a share note is a person's note, neither contact nor activity)
       "_share_note_rules.sql",
+      // BIZ-03 redefines public.intake_submit() of _automation_more_triggers.sql and app.activities_inquiry_source() /
+      // app.booking_links_source() of _source_attribution.sql last (a QR-tagged inquiry gets the "קוד QR" source)
+      "_qr_lead_source.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
