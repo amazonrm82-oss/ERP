@@ -431,6 +431,35 @@ describe("roles and record visibility", () => {
     expect(await asUser(admin.id, async (q) => (await q("update public.customer_holds set cleared_at = now() where id = $1", [hold])).rowCount)).toBe(1);
   });
 
+  it("a document's lines follow the document; recorders write them only with it, nobody changes them (DOC-02)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח שורות') returning id", [org])).rows[0].id,
+    );
+    const record = (u: U, number: string) =>
+      asUser(u.id, async (q) =>
+        (
+          await q<{ id: string }>("select public.accounting_document_record($1, $2, $3) as id", [
+            org,
+            JSON.stringify({ contact_id: contact, doc_type: "tax_invoice", number, amount_agorot: 1000 }),
+            JSON.stringify([{ description: "שורה", unit_price_agorot: 1000 }]),
+          ])
+        ).rows[0].id,
+      );
+    const doc = await record(manager, "R03-DL");
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.accounting_document_lines where document_id = $1", [doc]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // owners and admins record with lines; a member without the key and a viewer cannot
+    for (const [i, u] of [owner, admin].entries()) expect(await record(u, `R03-DL-${i}`), u.email).toBeTruthy();
+    for (const u of [m1, viewer]) expect((await pgError(record(u, `R03-DL-${u.email}`))).code, u.email).toBe("42501");
+    // nobody changes or removes a line
+    for (const u of [owner, admin, manager]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.accounting_document_lines set description = 'x' where document_id = $1", [doc])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.accounting_document_lines where document_id = $1", [doc])))).code, u.email).toBe("42501");
+    }
+  });
+
   it("a payment promise follows its document; owners, admins and managers write it, members and viewers only read (COL-03)", async () => {
     await setVisibility("own");
     const contact = await asUser(m1.id, async (q) =>

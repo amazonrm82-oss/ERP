@@ -85,6 +85,15 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "document:frozen": "מסמך שנרשם לא משתנה. אם נרשם בטעות, בטלו אותו עם סיבה ורשמו אותו מחדש.",
   "document:cancelled": "רישום שבוטל נשאר מבוטל.",
   "document:cancel_reason": "יש לכתוב למה הרישום מבוטל (עד 500 תווים).",
+  // DOC-02: the document's details and lines
+  "document:provider": "ספק החשבוניות נרשם רק כשהמסמך מגיע ממנו.",
+  "document:source": "מסמך המקור הוא הצעת מחיר שאושרה, של אותו לקוח.",
+  "document:original": "חשבונית זיכוי מתייחסת לחשבונית מס או לחשבונית מס/קבלה של אותו לקוח.",
+  "document_line:frozen": "שורות נרשמות יחד עם המסמך, ואחר כך לא משתנות.",
+  "document_line:opening": "ליתרת פתיחה אין שורות.",
+  "document_lines:max": "במסמך יש עד 200 שורות.",
+  "document_line:total": "ההנחה בשורה גדולה מסכום השורה.",
+  "document_line:description": "לכל שורה צריך תיאור או מוצר.",
   // GAP-12: the opening balance of an imported customer
   "document:opening_admin": "יתרת פתיחה רושמים, משנים ומבטלים רק בעלים ומנהלי מערכת.",
   "document:opening_exists": "ללקוח כבר יש יתרת פתיחה בתוקף. כדי לשנות אותה, רשמו יתרה חדשה במקומה.",

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
-import { fail, formValues, invalid, ok, type FormState } from "@/lib/action-result";
+import { fail, FORM_INVALID, formValues, invalid, ok, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
@@ -13,6 +13,7 @@ import { moneyRowParents } from "@/features/payments/deal-contact";
 import { appliedCreditMessage, parseAppliedCredit, recordedMessage, type AppliedCredit } from "@/features/allocations/credit";
 import { MONEY_SUBJECT_KINDS, moneySubjectPath } from "@/features/payments/money-subject";
 
+import { parseDocumentDetails, parseDocumentLines } from "./details";
 import { cancelReasonSchema, DOCUMENT_FIELD_NAMES, documentSchema, dueDateSchema, isOpeningBalance, takesDueDate } from "./schema";
 
 // DOC-01: recording and cancelling an external accounting document, with the user's session. RLS and the table's trigger
@@ -57,21 +58,50 @@ export async function recordDocumentAction(orgId: string, subject: Subject, _pre
   const parents = await moneyRowParents(context.supabase, orgId, subject);
   if ("error" in parents) return fail(dbErrorMessage(parents.error), { values: formValues(formData) });
   if ("missing" in parents) return fail(CANNOT, { values: formValues(formData) });
-  const { data: created, error } = await context.supabase
-    .from("accounting_documents")
-    .insert({
-      organization_id: orgId,
+  // DOC-02: the optional details and the lines, recorded with the document in one call (lines are written only with it)
+  const text = (name: string) => String(formData.get(name) ?? "");
+  const details = parseDocumentDetails(
+    {
+      allocation_number: text("allocation_number"),
+      net: text("net"),
+      vat: text("vat"),
+      vat_rate: text("vat_rate"),
+      quote_id: text("quote_id"),
+      original_document_id: text("original_document_id"),
+    },
+    parsed.data.doc_type,
+    parsed.data.amount,
+  );
+  if (!details.ok) return fail(FORM_INVALID, { fieldErrors: details.fieldErrors, values: formValues(formData) });
+  const lines = parseDocumentLines(text("lines"));
+  if (!lines.ok) return fail(lines.message, { values: formValues(formData) });
+  const { data: createdId, error } = await context.supabase.rpc("accounting_document_record", {
+    p_org: orgId,
+    p_document: {
       ...parents,
       doc_type: parsed.data.doc_type,
       number: parsed.data.number,
       doc_date: parsed.data.doc_date,
       amount_agorot: parsed.data.amount,
       // PAY-02 answer 7: empty = from the customer's payment terms
-      ...(parsed.data.due_date ? { due_date: parsed.data.due_date } : {}),
-    })
-    .select("id")
-    .single();
+      due_date: parsed.data.due_date,
+      allocation_number: details.details.allocationNumber,
+      net_agorot: details.details.netAgorot,
+      vat_agorot: details.details.vatAgorot,
+      vat_rate_bp: details.details.vatRateBp,
+      quote_id: details.details.quoteId,
+      original_document_id: details.details.originalDocumentId,
+    },
+    p_lines: lines.lines.map((line) => ({
+      description: line.description,
+      quantity: Math.round(line.quantity * 1000) / 1000,
+      unit_price_agorot: line.unitPriceAgorot,
+      discount_agorot: line.discountAgorot,
+      vat_exempt: line.vatExempt,
+    })),
+  });
   if (error) return fail(writeError(error), { values: formValues(formData) });
+  const created = { id: createdId };
   // PAY-03: "לקזז מיתרת הזכות" allocates the customer's credit to the new tax invoice or proforma, with the user's session
   // (the allocation rules and RLS decide). The document stays recorded whatever happens here.
   let applied: AppliedCredit | null = null;

@@ -15,9 +15,97 @@ import type { MoneySubject } from "@/features/payments/money-subject";
 import type { FormState } from "@/lib/action-result";
 
 import { applyCreditAction, cancelDocumentAction, recordDocumentAction, setDocumentDueDateAction } from "../actions";
-import { CANCEL_REASON_MAX, DOCUMENT_NUMBER_MAX, DOCUMENT_TYPE_LABELS, isDocumentType, isOpeningBalance, parseSignedAgorot, recordableTypes, takesDueDate } from "../schema";
+import { ALLOCATION_NUMBER_MAX, takesAllocationNumber, type DocumentLineDraft } from "../details";
+import {
+  CANCEL_REASON_MAX,
+  DOCUMENT_NUMBER_MAX,
+  DOCUMENT_TYPE_LABELS,
+  isDocumentType,
+  isOpeningBalance,
+  parseSignedAgorot,
+  recordableTypes,
+  takesDueDate,
+  type DocumentType,
+} from "../schema";
+import { DocumentLinesEditor } from "./document-lines-editor";
 
 type Subject = MoneySubject;
+
+/** DOC-02: what a new document may name: the record's accepted quotes (its source) and its invoices (a credit's original). */
+export type DocumentSources = { quotes: { id: string; label: string }[]; originals: { id: string; label: string }[] };
+const NO_SOURCES: DocumentSources = { quotes: [], originals: [] };
+
+function parseLineDrafts(json: string | undefined): DocumentLineDraft[] {
+  if (!json) return [];
+  try {
+    const rows: unknown = JSON.parse(json);
+    return Array.isArray(rows) ? (rows as DocumentLineDraft[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** DOC-02: the optional details of a document as printed on it, folded away until opened. */
+function DetailsFields({
+  docType,
+  sources,
+  errors,
+  values,
+}: {
+  docType: DocumentType;
+  sources: DocumentSources;
+  errors: Record<string, string>;
+  values: Record<string, string> | undefined;
+}) {
+  const opened = Boolean(values && (values.allocation_number || values.net || values.vat || values.quote_id || values.original_document_id || parseLineDrafts(values.lines).length > 0));
+  return (
+    <details className="rounded-lg border border-line p-3" open={opened || Object.keys(errors).some((key) => DETAIL_FIELDS.includes(key))}>
+      <summary className="cursor-pointer text-md font-medium">פרטים נוספים מהמסמך (רשות)</summary>
+      <div className="mt-3 space-y-4">
+        {takesAllocationNumber(docType) ? (
+          <TextField
+            label="מספר הקצאה"
+            name="allocation_number"
+            dir="ltr"
+            inputMode="numeric"
+            maxLength={ALLOCATION_NUMBER_MAX}
+            defaultValue={values?.allocation_number ?? ""}
+            hint="המספר מרשות המסים, כפי שמופיע על החשבונית."
+            error={errors.allocation_number}
+          />
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <TextField label='לפני מע"מ (₪)' name="net" dir="ltr" inputMode="decimal" defaultValue={values?.net ?? ""} error={errors.net} />
+          <TextField label='מע"מ (₪)' name="vat" dir="ltr" inputMode="decimal" defaultValue={values?.vat ?? ""} error={errors.vat} />
+          <TextField label='שיעור מע"מ (%)' name="vat_rate" dir="ltr" inputMode="decimal" defaultValue={values?.vat_rate ?? ""} error={errors.vat_rate} />
+        </div>
+        <p className="text-sm text-ink-soft">אם ממלאים: הסכום לפני מע&quot;מ ועוד המע&quot;מ שווים לסכום המסמך.</p>
+        {sources.quotes.length > 0 ? (
+          <SelectField label="הצעת המחיר שהמסמך הופק ממנה" name="quote_id" defaultValue={values?.quote_id ?? ""} error={errors.quote_id}>
+            <option value="">בלי</option>
+            {sources.quotes.map((quote) => (
+              <option key={quote.id} value={quote.id}>
+                {quote.label}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+        {docType === "credit_invoice" && sources.originals.length > 0 ? (
+          <SelectField label="המסמך המקורי" name="original_document_id" defaultValue={values?.original_document_id ?? ""} error={errors.original_document_id}>
+            <option value="">בלי</option>
+            {sources.originals.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.label}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+        <DocumentLinesEditor initial={parseLineDrafts(values?.lines)} />
+      </div>
+    </details>
+  );
+}
+const DETAIL_FIELDS = ["allocation_number", "net", "vat", "vat_rate", "quote_id", "original_document_id"];
 
 function RecordForm({
   orgId,
@@ -25,6 +113,7 @@ function RecordForm({
   today,
   credit,
   canOpening,
+  sources,
   onDone,
   onCancel,
 }: {
@@ -33,6 +122,7 @@ function RecordForm({
   today: string;
   credit: number;
   canOpening: boolean;
+  sources: DocumentSources;
   onDone: (message: string | null) => void;
   onCancel: () => void;
 }) {
@@ -111,6 +201,7 @@ function RecordForm({
           error={errors.due_date}
         />
       ) : null}
+      {isDocumentType(docType) && !opening ? <DetailsFields docType={docType} sources={sources} errors={errors} values={values} /> : null}
       {credit > 0 && hasBalance ? (
         // PAY-03: the customer's credit is allocated to the new document, oldest payment first, up to its amount
         <Checkbox
@@ -137,6 +228,7 @@ export function RecordDocumentButton({
   today,
   credit = 0,
   canOpening = false,
+  sources = NO_SOURCES,
 }: {
   orgId: string;
   subject: Subject;
@@ -144,6 +236,8 @@ export function RecordDocumentButton({
   credit?: number;
   // GAP-12: owners and admins also record an opening balance
   canOpening?: boolean;
+  // DOC-02: the accepted quotes and the invoices a new document may name as its source or original
+  sources?: DocumentSources;
 }) {
   const [open, setOpen] = useState(false);
   // PAY-03: what the last save said (the credit it allocated), shown beside the button after the window closes
@@ -174,6 +268,7 @@ export function RecordDocumentButton({
             today={today}
             credit={credit}
             canOpening={canOpening}
+            sources={sources}
             onDone={(message) => {
               setOpen(false);
               setNotice(message && message !== "המסמך נרשם." ? message : null);

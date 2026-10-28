@@ -13,7 +13,7 @@ import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
 import { DOCUMENT_DEFAULT_SORT, DOCUMENT_SORT_COLUMNS, documentTotalsByType, type DocumentListFilters, type DocumentTotalKey } from "./list";
-import { isDocumentType, type DocumentType } from "./schema";
+import { documentTitle, isDocumentType, type DocumentType } from "./schema";
 
 // DOC-01: the accounting documents recorded on a deal or a contact, read with the user's session (RLS: whoever reads the
 // deal, else the contact).
@@ -35,9 +35,151 @@ export type AccountingDocument = {
   cancelledBy: string | null;
   createdBy: string | null;
   createdAt: string;
+  // DOC-02 (null on documents recorded before it, or left empty)
+  provider: string | null;
+  allocationNumber: string | null;
+  netAgorot: number | null;
+  vatAgorot: number | null;
+  vatRateBp: number | null;
+  quoteId: string | null;
+  originalDocumentId: string | null;
 };
 
 export type DocumentsSubject = MoneySubject;
+
+const RECORD_COLUMNS =
+  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id";
+
+type RecordRow = {
+  id: string;
+  doc_type: string;
+  number: string | null;
+  doc_date: string;
+  amount_agorot: number;
+  proforma_id: string | null;
+  due_date: string | null;
+  status: string;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  provider: string | null;
+  allocation_number: string | null;
+  net_agorot: number | null;
+  vat_agorot: number | null;
+  vat_rate_bp: number | null;
+  quote_id: string | null;
+  original_document_id: string | null;
+};
+
+const num = (value: number | null) => (value === null ? null : Number(value));
+
+function documentFromRow(row: RecordRow, docType: DocumentType): AccountingDocument {
+  return {
+    id: row.id,
+    docType,
+    number: row.number,
+    docDate: row.doc_date,
+    amountAgorot: Number(row.amount_agorot),
+    proformaId: row.proforma_id,
+    dueDate: row.due_date,
+    cancelled: row.status === "cancelled",
+    cancelReason: row.cancel_reason,
+    cancelledAt: row.cancelled_at,
+    cancelledBy: row.cancelled_by,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    provider: row.provider,
+    allocationNumber: row.allocation_number,
+    netAgorot: num(row.net_agorot),
+    vatAgorot: num(row.vat_agorot),
+    vatRateBp: row.vat_rate_bp,
+    quoteId: row.quote_id,
+    originalDocumentId: row.original_document_id,
+  };
+}
+
+/** DOC-02: a line of a recorded document, as stored. */
+export type DocumentLine = {
+  documentId: string;
+  position: number;
+  description: string;
+  quantity: number;
+  unitPriceAgorot: number;
+  discountAgorot: number;
+  vatExempt: boolean;
+  totalAgorot: number;
+};
+
+/** DOC-02: the lines of these documents (RLS: whoever reads the document), in their order. */
+export async function listDocumentLines(orgId: string, documentIds: string[]): Promise<Map<string, DocumentLine[]>> {
+  const lines = new Map<string, DocumentLine[]>();
+  if (documentIds.length === 0) return lines;
+  const supabase = await createClient();
+  const rows = await readAllPagesByIds(documentIds, async (slice, from, to) =>
+    must(
+      await supabase
+        .from("accounting_document_lines")
+        .select("id, document_id, position, description, quantity, unit_price_agorot, discount_agorot, vat_exempt, total_agorot")
+        .eq("organization_id", orgId)
+        .in("document_id", slice)
+        .order("document_id")
+        .order("position")
+        .order("id")
+        .range(from, to),
+      "document lines",
+    ),
+  );
+  for (const row of rows) {
+    const list = lines.get(row.document_id) ?? [];
+    list.push({
+      documentId: row.document_id,
+      position: row.position,
+      description: row.description,
+      quantity: Number(row.quantity),
+      unitPriceAgorot: Number(row.unit_price_agorot),
+      discountAgorot: Number(row.discount_agorot),
+      vatExempt: row.vat_exempt,
+      totalAgorot: Number(row.total_agorot),
+    });
+    lines.set(row.document_id, list);
+  }
+  for (const list of lines.values()) list.sort((a, b) => a.position - b.position);
+  return lines;
+}
+
+/**
+ * DOC-02: what a new document on this record may name: its accepted quotes (the source; a deal's or a contact's, at most 50)
+ * and its tax invoices (a credit invoice's original), read with the user's session.
+ */
+export async function listDocumentSources(
+  orgId: string,
+  subject: DocumentsSubject,
+  documents: readonly AccountingDocument[],
+): Promise<{ quotes: { id: string; label: string }[]; originals: { id: string; label: string }[] }> {
+  const originals = documents
+    .filter((doc) => !doc.cancelled && (doc.docType === "tax_invoice" || doc.docType === "tax_invoice_receipt"))
+    .map((doc) => ({ id: doc.id, label: documentTitle(doc) }));
+  if (subject.kind === "order") return { quotes: [], originals };
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("quotes")
+      .select("id, number_display, title")
+      .eq("organization_id", orgId)
+      .eq(subject.kind === "deal" ? "deal_id" : "contact_id", subject.id)
+      .eq("status", "accepted")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .limit(50),
+    "accepted quotes",
+  );
+  return {
+    quotes: rows.map((row) => ({ id: row.id, label: `הצעה ${row.number_display ?? ""} ${row.title ? `· ${row.title}` : ""}`.replace(/\s+/g, " ").trim() })),
+    originals,
+  };
+}
 
 /**
  * Whether the documents capability is in the plan, whether the user may record (owners, admins, managers, the key), and
@@ -55,7 +197,7 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
   const rows = must(
     await supabase
       .from("accounting_documents")
-      .select("id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
+      .select(RECORD_COLUMNS)
       .eq("organization_id", orgId)
       .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
       .order("doc_date", { ascending: false })
@@ -64,27 +206,7 @@ export async function listRecordDocuments(orgId: string, subject: DocumentsSubje
       .limit(100),
     "accounting documents",
   );
-  const documents = rows.flatMap((row): AccountingDocument[] =>
-    isDocumentType(row.doc_type)
-      ? [
-          {
-            id: row.id,
-            docType: row.doc_type,
-            number: row.number,
-            docDate: row.doc_date,
-            amountAgorot: Number(row.amount_agorot),
-            proformaId: row.proforma_id,
-            dueDate: row.due_date,
-            cancelled: row.status === "cancelled",
-            cancelReason: row.cancel_reason,
-            cancelledAt: row.cancelled_at,
-            cancelledBy: row.cancelled_by,
-            createdBy: row.created_by,
-            createdAt: row.created_at,
-          },
-        ]
-      : [],
-  );
+  const documents = rows.flatMap((row): AccountingDocument[] => (isDocumentType(row.doc_type) ? [documentFromRow(row, row.doc_type)] : []));
   const names = await getUserNames(documents.flatMap((d) => [d.createdBy, d.cancelledBy]));
   return { documents, names };
 }
@@ -245,7 +367,7 @@ export async function listCompanyOpeningBalances(orgId: string, companyId: strin
   const rows = must(
     await supabase
       .from("accounting_documents")
-      .select("id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at")
+      .select(RECORD_COLUMNS)
       .eq("organization_id", orgId)
       .eq("company_id", companyId)
       .eq("doc_type", "opening_balance")
@@ -254,21 +376,7 @@ export async function listCompanyOpeningBalances(orgId: string, companyId: strin
       .limit(20),
     "company opening balances",
   );
-  const documents: AccountingDocument[] = rows.map((row) => ({
-    id: row.id,
-    docType: "opening_balance",
-    number: row.number,
-    docDate: row.doc_date,
-    amountAgorot: Number(row.amount_agorot),
-    proformaId: row.proforma_id,
-    dueDate: row.due_date,
-    cancelled: row.status === "cancelled",
-    cancelReason: row.cancel_reason,
-    cancelledAt: row.cancelled_at,
-    cancelledBy: row.cancelled_by,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
-  }));
+  const documents: AccountingDocument[] = rows.map((row) => documentFromRow(row, "opening_balance"));
   const names = await getUserNames(documents.flatMap((d) => [d.createdBy, d.cancelledBy]));
   return { documents, names };
 }

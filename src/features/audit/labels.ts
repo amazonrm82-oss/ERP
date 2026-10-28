@@ -90,6 +90,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   order_lines: "שורה בהזמנה",
   order_payment_steps: "תשלום בלוח התשלומים של הזמנה",
   accounting_documents: "מסמך חשבונאי",
+  // DOC-02
+  accounting_document_lines: "שורה במסמך חשבונאי",
   payments: "תשלום",
   // PAY-02
   payment_allocations: "שיוך תשלום למסמך",

@@ -636,6 +636,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_collection_reminder_import_undo.sql",
       // COL-06 redefines public.log_export() of _debt_aging.sql last (the collection report key)
       "_collection_report.sql",
+      // DOC-02 redefines app.audit_erase_core() of _payment_promise_erasure.sql last (a document line's text, emptied by an
+      // erasure) and grants on accounting_documents after _opening_balance.sql
+      "_document_details.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -2043,6 +2043,37 @@ export type AccountingDocumentRow = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // DOC-02: the issuing provider and its id there (server only; null = recorded by hand)
+  provider: string | null;
+  provider_document_id: string | null;
+  // DOC-02: the Tax Authority's allocation number (tax invoices only)
+  allocation_number: string | null;
+  // DOC-02: the VAT split as printed (both or neither; net + vat = amount)
+  net_agorot: number | null;
+  vat_agorot: number | null;
+  vat_rate_bp: number | null;
+  // DOC-02: the source quote (accepted, same customer) and a credit invoice's original document
+  quote_id: string | null;
+  original_document_id: string | null;
+};
+
+// DOC-02: a line of an accounting document (migration document_details), written with its document only, never changed
+export type AccountingDocumentLineRow = {
+  id: string;
+  organization_id: string;
+  document_id: string;
+  position: number;
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_agorot: number;
+  vat_exempt: boolean;
+  total_agorot: number;
+  currency: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 // PAY-02: a share of a payment allocated to a tax invoice or a proforma (migration payment_allocations). Never deleted:
@@ -3041,8 +3072,30 @@ export type Database = {
           doc_date?: string;
           amount_agorot: number;
           currency?: string;
+          // DOC-02: insert only
+          allocation_number?: string | null;
+          net_agorot?: number | null;
+          vat_agorot?: number | null;
+          vat_rate_bp?: number | null;
+          quote_id?: string | null;
+          original_document_id?: string | null;
         },
         { status?: string; cancel_reason?: string | null; proforma_id?: string | null; due_date?: string | null }
+      >;
+      // DOC-02: insert only, in the transaction that recorded the document (public.accounting_document_record); no update or delete
+      accounting_document_lines: Table<
+        AccountingDocumentLineRow,
+        {
+          organization_id: string;
+          document_id: string;
+          position?: number;
+          description: string;
+          quantity?: number;
+          unit_price_agorot?: number;
+          discount_agorot?: number;
+          vat_exempt?: boolean;
+        },
+        Record<string, never>
       >;
       // PAY-02: column grants; recorders allocate, owners and admins change the amount or undo (no delete)
       payment_allocations: Table<
@@ -3357,6 +3410,8 @@ export type Database = {
       order_money_state: { Args: { p_org: string; p_orders: string[] }; Returns: Json };
       // ORD-02: the orders list's filter, the numbered orders the caller reads in these states (setof orders, invoker)
       orders_by_money_state: { Args: { p_org: string; p_billing: string | null; p_payment: string | null }; Returns: OrderRow[] };
+      // DOC-02: a document and its lines in one call
+      accounting_document_record: { Args: { p_org: string; p_document: Json; p_lines: Json | null }; Returns: string };
       // PAY-02: what the allocation window offers for a payment or a document (invoker)
       money_allocation_candidates: { Args: { p_org: string; p_payment: string | null; p_document: string | null }; Returns: Json };
       // PAY-03: the credit a document recorded on this deal / contact / company could use (invoker)

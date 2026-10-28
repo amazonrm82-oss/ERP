@@ -163,6 +163,14 @@ describe("currency next to every amount", () => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח למסמך') returning id", [org])).rows[0].id;
         await q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'CUR-1', 1000)", [org, contact]);
       },
+      // DOC-02
+      accounting_document_lines: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לשורת מסמך') returning id", [org])).rows[0].id;
+        const doc = (
+          await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'CUR-L', 1000) returning id", [org, contact])
+        ).rows[0].id;
+        await q("insert into public.accounting_document_lines (organization_id, document_id, position, description, unit_price_agorot) values ($1, $2, 1, 'שורה', 1000)", [org, doc]);
+      },
       // PAY-01
       payments: async (q) => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לתשלום') returning id", [org])).rows[0].id;

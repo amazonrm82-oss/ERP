@@ -256,6 +256,8 @@ describe("tenant isolation", () => {
           ids.dealA,
         ])
       ).rows[0].id;
+      // DOC-02: a line, written with its document (same transaction)
+      await q("insert into public.accounting_document_lines (organization_id, document_id, description, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.documentA]);
       // DOC-01 follow-up: the document's file (its one subject is the document)
       await q("insert into public.files (organization_id, accounting_document_id, name, mime_type, size_bytes) values ($1, $2, 'קבלה.pdf', 'application/pdf', 1000)", [
         orgA,
@@ -450,6 +452,8 @@ describe("tenant isolation", () => {
     "order_decisions",
     // DOC-01
     "accounting_documents",
+    // DOC-02
+    "accounting_document_lines",
     // PAY-02
     "payment_allocations",
     // GAP-12
@@ -662,6 +666,8 @@ describe("tenant isolation", () => {
       order_decisions: "ip = ip",
       // no delete grant at all (never deleted): a permission error is the expected outcome for the delete
       accounting_documents: "cancel_reason = cancel_reason",
+      // no update or delete grant at all (written with the document, never changed): a permission error is expected
+      accounting_document_lines: "description = description",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
       payment_allocations: "amount_agorot = amount_agorot",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
@@ -810,6 +816,7 @@ describe("tenant isolation", () => {
       ["insert into public.payment_promise_documents (organization_id, promise_id, document_id) values ($1, (select id from public.payment_promises where organization_id = $1 and company_id is not null limit 1), $2)", [orgA, ids.contactInvoiceA]],
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
       ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
+      ["insert into public.accounting_document_lines (organization_id, document_id, description) values ($1, $2, 'x')", [orgA, ids.documentA]],
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
       ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
@@ -936,6 +943,7 @@ describe("tenant isolation", () => {
       ["payment_promise_documents", "created_at = now() - interval '1 year'", "created_at < now() - interval '300 days'"],
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
+      ["accounting_document_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["opening_credit_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_credit_companies", "credit_agorot = 777", "credit_agorot = 777"],
@@ -1251,6 +1259,18 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503", "P0001"]).toContain(viaProforma.code);
+    // DOC-02: B's document cannot name A's quote or A's invoice as its source or original; B's line cannot hang on A's document
+    for (const sql of [
+      "insert into public.accounting_documents (organization_id, deal_id, quote_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'tax_invoice', 'B-QUO', 1)",
+      "insert into public.accounting_documents (organization_id, deal_id, original_document_id, doc_type, number, amount_agorot) values ($1, $2, $3, 'credit_invoice', 'B-ORIG', 1)",
+    ]) {
+      const viaSource = await pgError(asUser(b.id, (q) => q(sql, [orgB, dealB, sql.includes("quote_id") ? ids.quoteA : ids.invoiceA])));
+      expect(["42501", "23503", "P0001"], sql).toContain(viaSource.code);
+    }
+    const viaLine = await pgError(
+      asUser(b.id, (q) => q("insert into public.accounting_document_lines (organization_id, document_id, description) values ($1, $2, 'x')", [orgB, ids.documentA])),
+    );
+    expect(["42501", "23503", "P0001"]).toContain(viaLine.code);
     const viaQuoteProduct = await pgError(
       asUser(b.id, (q) => q("insert into public.quote_lines (organization_id, quote_id, product_id, name, price_source) values ($1, $2, $3, 'x', 'product')", [orgB, quoteB, ids.productA])),
     );

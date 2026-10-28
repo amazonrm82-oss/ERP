@@ -18,7 +18,9 @@ import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
 import { documentsPath } from "../paths";
-import { getDocumentsAccess, listRecordDocuments } from "../queries";
+import { documentOrigin } from "../details";
+import { getDocumentsAccess, listDocumentLines, listDocumentSources, listRecordDocuments } from "../queries";
+import { DocumentDetailsLine, DocumentLinesList } from "./document-details";
 import { DOCUMENT_TYPE_LABELS, documentTitle, isOpeningBalance, takesDueDate } from "../schema";
 import { ApplyCreditButton, CancelDocumentButton, DueDateButton, RecordDocumentButton } from "./document-forms";
 
@@ -59,6 +61,13 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
   const collection = await getCollectionAccess(orgId);
   const promises = collection.inPlan ? await listPromises(orgId, ids) : { effective: new Map(), own: new Map() };
   const numbers = new Map(documents.map((d) => [d.id, d.number]));
+  // DOC-02: each document's lines, and what a new document may name as its source or original
+  const [lines, sources] = await Promise.all([
+    listDocumentLines(orgId, ids),
+    access.canRecord ? listDocumentSources(orgId, subject, documents) : Promise.resolve({ quotes: [], originals: [] }),
+  ]);
+  const titles = new Map(documents.map((d) => [d.id, documentTitle(d)]));
+  const quoteLabels = new Map(sources.quotes.map((quote) => [quote.id, quote.label]));
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `documents-${subject.id}`;
   return (
@@ -74,6 +83,7 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
               credit={credit.total}
               // GAP-12: an opening balance is a contact's (or a company's, on its own card), never a deal's or an order's
               canOpening={access.canOpening && subject.kind === "contact"}
+              sources={sources}
             /> : null
         }
       />
@@ -130,7 +140,11 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                     <p className="text-sm text-ink-soft">
                       {formatDate(`${doc.docDate}T12:00:00Z`)}
                       {doc.createdBy && names.get(doc.createdBy) ? ` · נרשם על ידי ${names.get(doc.createdBy)}` : ""}
+                      {/* DOC-01's mark, DOC-02's provider */}
+                      {opening ? "" : ` · ${documentOrigin(doc.provider)}`}
                     </p>
+                    <DocumentDetailsLine doc={doc} quoteLabel={doc.quoteId ? (quoteLabels.get(doc.quoteId) ?? null) : null} originalLabel={doc.originalDocumentId ? (titles.get(doc.originalDocumentId) ?? null) : null} />
+                    <DocumentLinesList lines={lines.get(doc.id) ?? []} />
                     {doc.cancelled ? (
                       <p className="text-sm break-words text-ink-soft">
                         בוטל{doc.cancelledAt ? ` ב-${formatDate(doc.cancelledAt)}` : ""}
