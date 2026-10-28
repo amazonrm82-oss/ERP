@@ -432,7 +432,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   redefined there) refuses, for every writer while the switch is on, a new link code, a code turned into a link, a changed link and
   switching a link code on (hint `qr_code:external_off`); switching off, renaming, deleting and retargeting to an internal target stay
   allowed. The settings screen leaves "link" out of the new-code form and marks every link code "כבוי" with the reason.
-  Follow-up: the owner's "one source 'קוד QR'" (answer (1)) is still campaign tagging only; no lead source row yet.
+  Since 021093 (owner 18 October 2026, answer (1)) an inquiry whose attribution has `utm_source = 'qr'` gets the lead source "קוד QR"
+  (kind `qr`, made once per business by `app.qr_lead_source`, advisory lock, found by kind so a rename or switch-off keeps it, made again
+  after a delete), through `app.intake_qr_source(org, kind, source, attr)` (both definer, no grants): a web form's or booking page's own
+  source wins; it replaces "כרטיס ביקור" on a card form and "דף קביעת תור" on a booking page without a source; widgets unchanged.
+  New records only for the first source; a repeat inquiry moves the last source. Visitor-controlled (anyone can add ?utm_source=qr):
+  accepted, the only effect is the source. `public.intake_submit`, `public.booking_submit`, `app.activities_inquiry_source` and
+  `app.booking_links_source` were last redefined in 021093.
 - Site widget (SPD-07, migration 020305; flag `site_widget`, quota `max_site_widgets`): `public.site_widgets` (owners/admins of a writable
   org; outsider guard first in `app.site_widgets_check`; lead owner an active non-viewer, hint `site_widget:owner`). Each widget owns a
   form of kind `widget` (`forms.site_widget_id`, `forms_widget_shape`), made and kept in step by `app.site_widgets_sync_form`; a person
@@ -954,7 +960,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   over `app.lead_distribution_pick` (CAP-09/HEB-08 eligibility unchanged; weighted = stride passes in `app.lead_rotation_passes` /
   `app.lead_rotation_clock`; load = unanswered open leads, `app.member_open_load`). `leads.preferred_locale` and
   `forms.locale_choice` (column grants; conversion copies to an empty contact). An automation round robin with a team now puts that
-  team on the lead (deliberate). `public.intake_submit` was last redefined in 021000 (AUT-03; keep its `app.emit_form_submitted` calls) and `public.intake_form` in
+  team on the lead (deliberate). `public.intake_submit` was last redefined in 021093 (BIZ-03 QR source; keep its `app.emit_form_submitted` calls) and `public.intake_form` in
   020935 (`app.run_automation_actions` in 021060); `app.check_lead_responses` and `app.next_lead_turn` in 019600; `app.default_team` in 019630.
 - Requested product on the public form (LEAD-04 / CAP-08, migration 020830; owner 14 and 25 October 2026): `forms.product_choice` asks
   "במה אתם מתעניינים?" (shown only with the `products` flag); `forms.product_ids` (1..100) and `product_category_ids` (1..50, a top
@@ -1846,7 +1852,7 @@ that back.
   `leads_enabled`, `companies_enabled`, both true by default, no row = both on; members read, owners/admins of a writable org write,
   no delete, audited). Off only hides (nav, + menu, `leads/` and `companies/` layouts show "המודול כבוי", search, My day, reports,
   company pickers keep the stored value in a hidden field); `getOrgModules(orgId)` falls back to both on. With leads off
-  `public.intake_submit` (last redefined in 021000) and `public.booking_submit` (in 020465) match or create a contact instead of a lead
+  `public.intake_submit` and `public.booking_submit` (both last redefined in 021093) match or create a contact instead of a lead
   (`app.org_leads_enabled`, definer), with a "לחזור ללקוח" task (`app.intake_contact_follow_up`) and an 'inquiry' timeline entry for
   what a contact has no field for; a leads import is refused (trigger `import_jobs_module_check`, hint `module:leads_off`); with
   companies off `app.contacts_company_by_domain` (last redefined in 020465) links no company. A new redefinition of either intake
