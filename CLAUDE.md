@@ -648,8 +648,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `renewal_date` in today..+30 days and no live follow-up deal; one period). Every amount is with VAT (`vat {mode, rate_bp}` from
   `app.org_document_vat_rate`; pure `app.money_with_vat`, half up per amount; mode `unknown` = before VAT and no mixed grand total).
   It no longer calls `report_pipeline_cleanup`: stuck/overdue/the deals list come from one `app.deal_attention_rows` pass plus an
-  inline copy of the cleanup's overdue rule, list fields, order and 300 cap (test 93 keeps them equal). Follow-up (shared ground):
-  `public.money_allocation_state` is slow with hundreds of open documents x thousands of allocations (review of 27 October 2026).
+  inline copy of the cleanup's overdue rule, list fields, order and 300 cap (test 93 keeps them equal). Since 021094 (shared ground,
+  review of 27 October 2026) `public.money_allocation_state` (last redefined there; same signature, invoker, answer) reads each table
+  once, set-based, with `set jit = off` and `set enable_nestloop = off` (test 260 compares it with the 021077 body as four roles;
+  `scripts/perf/money-allocation-state*.sql` measure it: one document 7.8 s -> 0.08 s locally). JIT is off and unavailable on the
+  hosted project (checked 28 October 2026), so locally only an invoker report under RLS may still pay JIT (`report_money_waiting`).
 - Stage-required built-in fields (DEAL-05, migration 020475): `stages.required_fields` (subset of amount | expected_close_date |
   contact_id, constraint `stages_required_fields_known`, mirrored by `STAGE_REQUIRED_FIELDS` in `src/features/deals/stage-required.ts`).
   App-only like FLD-09's "require": `requiredForMove` / `missingAfterChange` add pseudo fields `builtin:*` ahead of the custom ones,
@@ -858,7 +861,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`deleted_at = now()`) through the narrow `app.document_server = 'undo'` branch, "בוטל עם ביטול הייבוא"; a replaced one is not
   restored. `app.import_record_worked`, `public.undo_import`, `public.undo_own_import` were last redefined in 021078 (keep WAB-07's
   null-safe notes line and the opening-balance exclusions); `app.audit_erase_core` (companies reach their balances),
-  `app.accounting_documents_check`, `app.payment_allocations_check` (021077), `public.money_allocation_state` (021077),
+  `app.accounting_documents_check`, `app.payment_allocations_check` (021077), `public.money_allocation_state` (021077, then 021094 set-based),
   `public.customer_ledger` (021077), `public.money_allocation_candidates`, `app.scheduled_debt_overdue`,
   `app.export_choice_values` and `public.sort_customer(accounting_documents)` (company name) were last redefined in 021076/021077.
   Since 021085 (owner 27 October 2026, answers (1) ג and (2) ג) `public.opening_balance_set` refuses to replace a balance while it has a
