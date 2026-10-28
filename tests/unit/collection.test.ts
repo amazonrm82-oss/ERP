@@ -75,6 +75,9 @@ describe("collection screen (COL-01)", () => {
           customer_name: "דנה",
           owner_id: null,
           held: false,
+          promised_date: null,
+          promise_note: null,
+          promise_kind: null,
         },
       ],
     });
@@ -87,5 +90,22 @@ describe("collection screen (COL-01)", () => {
     expect(texts.kind.company).toBe("חברה");
     expect(texts.kind.contact).toBe(DEFAULT_TERMS.contact.singular);
     expect(texts.kind.deal).toBe(DEFAULT_TERMS.deal.singular);
+  });
+});
+
+describe("payment promises (COL-03)", () => {
+  it("holds the reminders up to and including the promised date", async () => {
+    const { reminderHeld, promiseState, lastPromiseDay, promiseSchema } = await import("../../src/features/collection/promise");
+    expect(reminderHeld("2026-11-10", "2026-11-09")).toBe(true);
+    expect(reminderHeld("2026-11-10", "2026-11-10")).toBe(true);
+    expect(reminderHeld("2026-11-10", "2026-11-11")).toBe(false);
+    expect(reminderHeld(null, "2026-11-10")).toBe(false);
+    expect(reminderHeld("bad", "2026-11-10")).toBe(false);
+    expect(promiseState("2026-11-10", "2026-11-10")).toBe("holds");
+    expect(promiseState("2026-11-10", "2026-11-11")).toBe("broken");
+    expect(lastPromiseDay("2026-10-28")).toBe("2027-10-29");
+    expect(promiseSchema.safeParse({ promised_date: "2026-11-01", note: "  x  " }).data?.note).toBe("x");
+    expect(promiseSchema.safeParse({ promised_date: "", note: "" }).success).toBe(false);
+    expect(promiseSchema.safeParse({ promised_date: "2026-11-01", note: "א".repeat(501) }).success).toBe(false);
   });
 });

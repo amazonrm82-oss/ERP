@@ -8,6 +8,9 @@ import { NO_CREDIT } from "@/features/allocations/credit";
 import { getAllocationAccess, getMoneyState, getSubjectCredit, listAllocations, listCreditOffsets } from "@/features/allocations/queries";
 import { CreditOffsetRows } from "@/features/allocations/components/credit-offset-rows";
 import { documentStateChip, takesPayments } from "@/features/allocations/state";
+import { PromiseButton } from "@/features/collection/components/promise-button";
+import { PromiseLine } from "@/features/collection/components/promise-line";
+import { getCollectionAccess, listPromises } from "@/features/collection/queries";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
 import type { MoneySubject } from "@/features/payments/money-subject";
@@ -52,6 +55,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
         listCreditOffsets(orgId, ids),
       ])
     : [null, [], NO_CREDIT, []];
+  // COL-03: the payment promises of these documents, while the plan holds collection
+  const collection = await getCollectionAccess(orgId);
+  const promises = collection.inPlan ? await listPromises(orgId, ids) : { effective: new Map(), own: new Map() };
   const numbers = new Map(documents.map((d) => [d.id, d.number]));
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `documents-${subject.id}`;
@@ -86,6 +92,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
               const hasBalance = takesDueDate(doc.docType, doc.amountAgorot);
               // PAY-02 answer 7: overdue = past its due date with a balance left
               const overdue = !doc.cancelled && doc.dueDate !== null && doc.dueDate < today && takesPayments(state);
+              // the document's effective promise (its own, else the customer's that covered it); the button edits its own
+              const promise = promises.effective.get(doc.id);
+              const ownPromise = promises.own.get(doc.id);
               return (
                 <li key={doc.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -151,6 +160,10 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                         ) : null}
                       </p>
                     ) : null}
+                    {/* COL-03: shown while the document still owes */}
+                    {promise && !doc.cancelled && takesPayments(state) ? (
+                      <PromiseLine date={promise.date} note={promise.note} today={today} customer={promise.kind === "customer"} />
+                    ) : null}
                     <CreditOffsetRows documentId={doc.id} offsets={offsets} />
                     {doc.proformaId ? (
                       <p className="text-sm text-ink-soft">
@@ -181,6 +194,9 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                     ) : null}
                     {allocation.canAllocate && credit.total > 0 && !doc.cancelled && takesPayments(state) ? (
                       <ApplyCreditButton orgId={orgId} subject={subject} documentId={doc.id} label={label} />
+                    ) : null}
+                    {collection.canPromise && !doc.cancelled && hasBalance && takesPayments(state) ? (
+                      <PromiseButton orgId={orgId} target={{ kind: "document", id: doc.id }} label={label} back={subject} current={ownPromise ?? null} today={today} />
                     ) : null}
                     {canChangeDoc && !doc.cancelled && hasBalance && state?.state !== "transferred" ? (
                       <DueDateButton orgId={orgId} subject={subject} documentId={doc.id} label={label} dueDate={doc.dueDate} />

@@ -96,6 +96,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // GAP-12
   opening_credit_allocations: "קיזוז יתרת פתיחה",
   customer_holds: "סימון לא למכור עד הסדרת חוב",
+  // COL-03
+  payment_promises: "הבטחת תשלום",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",
   quote_template_lines: "שורה בתבנית הצעת מחיר",
@@ -185,6 +187,8 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "last_utm", "last_source_at"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // COL-03
+  promised_date: "התאריך שהלקוח התחייב אליו",
   // QUO-06 follow-up (pdf_remake)
   old_size: "גודל קודם (בתים)",
   new_size: "גודל חדש (בתים)",

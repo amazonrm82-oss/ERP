@@ -431,6 +431,54 @@ describe("roles and record visibility", () => {
     expect(await asUser(admin.id, async (q) => (await q("update public.customer_holds set cleared_at = now() where id = $1", [hold])).rowCount)).toBe(1);
   });
 
+  it("a payment promise follows its document; owners, admins and managers write it, members and viewers only read (COL-03)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח שהבטיח') returning id", [org])).rows[0].id,
+    );
+    const invoice = await asUser(manager.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'R03-PP', 1000) returning id", [
+          org,
+          contact,
+        ])
+      ).rows[0].id,
+    );
+    const promise = await asUser(manager.id, async (q) =>
+      (
+        await q<{ id: string }>("insert into public.payment_promises (organization_id, document_id, promised_date, note) values ($1, $2, current_date + 3, 'יעביר') returning id", [
+          org,
+          invoice,
+        ])
+      ).rows[0].id,
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payment_promises where id = $1", [promise]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // a promise on the whole customer (the contact, which has no company) and the documents it covered follow the contact
+    const customerPromise = await asUser(manager.id, async (q) =>
+      (await q<{ id: string }>("insert into public.payment_promises (organization_id, contact_id, promised_date) values ($1, $2, current_date + 4) returning id", [org, contact])).rows[0].id,
+    );
+    const seenCustomer = (u: U) =>
+      asUser(u.id, async (q) => [
+        await count(q, "select 1 from public.payment_promises where id = $1", [customerPromise]),
+        await count(q, "select 1 from public.payment_promise_documents where promise_id = $1", [customerPromise]),
+      ]);
+    for (const u of [owner, admin, manager, m1]) expect(await seenCustomer(u), u.email).toEqual([1, 1]);
+    for (const u of [m2, viewer]) expect(await seenCustomer(u), u.email).toEqual([0, 0]);
+    expect(await asUser(m1.id, async (q) => (await q("delete from public.payment_promises where id = $1", [customerPromise])).rowCount)).toBe(0);
+    // m1 reads the document but holds no key: changes and removes nothing, adds nothing
+    expect(await asUser(m1.id, async (q) => (await q("update public.payment_promises set note = 'x' where id = $1", [promise])).rowCount)).toBe(0);
+    expect(await asUser(m1.id, async (q) => (await q("delete from public.payment_promises where id = $1", [promise])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.payment_promises set note = 'x' where id = $1", [promise])).rowCount)).toBe(0);
+    expect(await asUser(viewer.id, async (q) => (await q("delete from public.payment_promises where id = $1", [promise])).rowCount)).toBe(0);
+    expect(await asUser(admin.id, async (q) => (await q("update public.payment_promises set note = 'עד יום חמישי' where id = $1", [promise])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("delete from public.payment_promises where id = $1", [promise])).rowCount)).toBe(1);
+    expect((await pgError(asUser(m1.id, (q) => q("insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date)", [org, invoice])))).code).toBe("42501");
+  });
+
   it("payments follow their deal; owners, admins and managers record, only owners and admins correct and cancel, nobody deletes (PAY-01, PAY-06)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

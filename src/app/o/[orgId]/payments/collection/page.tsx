@@ -16,9 +16,12 @@ import {
   type CollectionFilters,
   type CollectionRow,
 } from "@/features/collection/collection";
+import { PromiseButton } from "@/features/collection/components/promise-button";
+import { PromiseLine } from "@/features/collection/components/promise-line";
 import {
   getCollection,
   getCollectionAccess,
+  getCustomerPromise,
 } from "@/features/collection/queries";
 import {
   DOCUMENT_TYPE_LABELS,
@@ -61,7 +64,7 @@ const BUCKET_TONES = {
  * overdue only, age bucket and one customer. Read with the user's session through public.collection_documents (invoker). Who:
  * BAL-01's rule (owners, admins, managers, or the record_payments key); when any document or payment of the business is hidden
  * from the user, no amount is shown (BAL-03's partial rule). Nothing is changed here: payments, allocations and due dates are
- * worked on the document's card.
+ * worked on the document's card. COL-03: each row shows its payment promise, and whoever may record one sets it here too.
  */
 export default async function CollectionPage({ params, searchParams }: Props) {
   const { orgId } = await params;
@@ -113,6 +116,14 @@ export default async function CollectionPage({ params, searchParams }: Props) {
     : null;
   const day = (value: string) => formatDate(`${value}T12:00:00Z`);
   const activeMembers = members.filter((m) => m.status === "active");
+  // COL-03 (1) ג: the promise on the whole customer, offered while the list is narrowed to a contact or a company
+  const promiseCustomer =
+    filters.customer && filters.customer.kind !== "deal"
+      ? { kind: filters.customer.kind, id: filters.customer.id }
+      : null;
+  const customerPromise = promiseCustomer
+    ? await getCustomerPromise(orgId, promiseCustomer)
+    : null;
 
   return (
     <>
@@ -253,7 +264,27 @@ export default async function CollectionPage({ params, searchParams }: Props) {
           >
             לכל הלקוחות
           </Link>
+          {promiseCustomer && access.canPromise ? (
+            <PromiseButton
+              orgId={orgId}
+              target={promiseCustomer}
+              label={customerName ?? "הלקוח שנבחר"}
+              back={{ kind: "collection" }}
+              current={customerPromise}
+              today={data.today}
+            />
+          ) : null}
         </p>
+      ) : null}
+      {customerPromise ? (
+        <div className="mb-4">
+          <PromiseLine
+            date={customerPromise.date}
+            note={customerPromise.note}
+            today={data.today}
+            customer
+          />
+        </div>
       ) : null}
 
       {filtered && data.shown ? (
@@ -310,7 +341,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                             },
                           })}
                           className="text-accent-strong underline-offset-4 hover:underline"
-                          aria-label={`רק ${row.customer_name ?? "הלקוח הזה"}`}
+                          aria-label={`${row.customer_name ?? "לקוח"}: רק המסמכים של הלקוח הזה`}
                         >
                           <bdi>{row.customer_name ?? "לקוח"}</bdi>
                         </Link>{" "}
@@ -353,6 +384,15 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                           {` · נציג: ${owner ?? "אין"}`}
                         </span>
                       </p>
+                      {/* COL-03 */}
+                      {row.promised_date ? (
+                        <PromiseLine
+                          date={row.promised_date}
+                          note={row.promise_note}
+                          today={data.today}
+                          customer={row.promise_kind === "customer"}
+                        />
+                      ) : null}
                     </div>
                     <span className="text-end">
                       <span className="block font-medium whitespace-nowrap tabular-nums">
@@ -363,12 +403,30 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                           מתוך {formatMoney(row.amount)}
                         </span>
                       ) : null}
-                      <span className="mt-1 flex flex-wrap justify-end gap-1">
+                      <span className="mt-1 flex flex-wrap items-center justify-end gap-1">
                         <Badge
                           tone={late ? BUCKET_TONES[row.bucket] : "neutral"}
                         >
                           {lateText(row.days_late)}
                         </Badge>
+                        {access.canPromise ? (
+                          <PromiseButton
+                            orgId={orgId}
+                            target={{ kind: "document", id: row.id }}
+                            label={title}
+                            back={{ kind: "collection" }}
+                            current={
+                              row.promised_date &&
+                              row.promise_kind === "document"
+                                ? {
+                                    date: row.promised_date,
+                                    note: row.promise_note,
+                                  }
+                                : null
+                            }
+                            today={data.today}
+                          />
+                        ) : null}
                       </span>
                     </span>
                   </li>

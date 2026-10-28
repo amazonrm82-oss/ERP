@@ -1902,6 +1902,31 @@ export type CustomerHoldRow = {
   updated_at: string;
 };
 
+// COL-03: a payment promise on an open debt document: the promised date and a collection note (migration payment_promises).
+export type PaymentPromiseRow = {
+  id: string;
+  organization_id: string;
+  // exactly one: a document, or the whole customer (a contact without a company, or a company)
+  document_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  promised_date: string;
+  note: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// COL-03: the documents a customer promise covered (open when it was made; server-made, never changed).
+export type PaymentPromiseDocumentRow = {
+  id: string;
+  organization_id: string;
+  promise_id: string;
+  document_id: string;
+  created_at: string;
+};
+
 export type PaymentRow = {
   id: string;
   organization_id: string;
@@ -2930,6 +2955,21 @@ export type Database = {
         CustomerHoldRow,
         { organization_id: string; contact_id?: string | null; company_id?: string | null; reason: string },
         { cleared_at?: string | null }
+      >;
+      // COL-03: server only (no client write grant)
+      payment_promise_documents: ReadOnlyTable<PaymentPromiseDocumentRow>;
+      // COL-03: column grants; the subject never changes; a promise is removed by delete
+      payment_promises: Table<
+        PaymentPromiseRow,
+        {
+          organization_id: string;
+          document_id?: string | null;
+          contact_id?: string | null;
+          company_id?: string | null;
+          promised_date: string;
+          note?: string | null;
+        },
+        { promised_date?: string; note?: string | null }
       >;
       // PAY-03: server only (no client write grant)
       payment_credit_companies: ReadOnlyTable<PaymentCreditCompanyRow>;

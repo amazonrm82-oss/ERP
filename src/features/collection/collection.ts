@@ -34,6 +34,11 @@ const row = z.object({
   customer_name: z.string().nullable(),
   owner_id: z.string().nullable(),
   held: z.boolean(),
+  // COL-03: the payment promise on the document
+  promised_date: z.string().nullable(),
+  promise_note: z.string().nullable(),
+  // the document's own promise, or the customer promise that covered it
+  promise_kind: z.enum(["document", "customer"]).nullable(),
 });
 export type CollectionRow = z.infer<typeof row>;
 

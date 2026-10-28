@@ -295,6 +295,10 @@ describe("tenant isolation", () => {
       ]);
       // COL-05
       await q("insert into public.customer_holds (organization_id, contact_id, reason) values ($1, $2, 'חוב פתוח')", [orgA, ids.contactA]);
+      // COL-03
+      await q("insert into public.payment_promises (organization_id, document_id, promised_date, note) values ($1, $2, current_date + 5, 'יעביר בשבוע הבא')", [orgA, ids.invoiceA]);
+      // COL-03 (1) ג: a promise on the whole company, covering its open documents (the server writes the covered set)
+      await q("insert into public.payment_promises (organization_id, company_id, promised_date) values ($1, $2, current_date + 9)", [orgA, ids.companyA]);
     });
     // PAY-03: the server's row of A's payment on A's company (kept by triggers; no client grant)
     await asAdmin((q) =>
@@ -439,6 +443,9 @@ describe("tenant isolation", () => {
     "payments",
     // COL-05
     "customer_holds",
+    // COL-03
+    "payment_promises",
+    "payment_promise_documents",
     // ORD-05
     "order_decisions",
     // DOC-01
@@ -648,6 +655,9 @@ describe("tenant isolation", () => {
       payments: "note = note",
       // no delete grant at all (lifted, never deleted): a permission error is the expected outcome for the delete
       customer_holds: "cleared_at = cleared_at",
+      payment_promises: "note = note",
+      // no client write grant at all (the server writes the covered set)
+      payment_promise_documents: "created_at = created_at",
       // no write grant at all (order_public_decide() writes): a permission error is the expected outcome
       order_decisions: "ip = ip",
       // no delete grant at all (never deleted): a permission error is the expected outcome for the delete
@@ -795,6 +805,9 @@ describe("tenant isolation", () => {
       ["insert into public.order_payment_steps (organization_id, order_id, name, percent_bp, milestone) values ($1, $2, 'x', 1, 'x')", [orgA, ids.orderA]],
       ["insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1, 'cash')", [orgA, ids.contactA]],
       ["insert into public.customer_holds (organization_id, company_id, reason) values ($1, $2, 'x')", [orgA, ids.companyA]],
+      ["insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date + 1)", [orgA, ids.contactInvoiceA]],
+      ["insert into public.payment_promises (organization_id, company_id, promised_date) values ($1, $2, current_date + 1)", [orgA, ids.company2A]],
+      ["insert into public.payment_promise_documents (organization_id, promise_id, document_id) values ($1, (select id from public.payment_promises where organization_id = $1 and company_id is not null limit 1), $2)", [orgA, ids.contactInvoiceA]],
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
       ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
@@ -919,6 +932,8 @@ describe("tenant isolation", () => {
       ["order_payment_steps", "name = 'HACKED'", "name = 'HACKED'"],
       ["payments", "note = 'HACKED'", "note = 'HACKED'"],
       ["customer_holds", "cleared_at = now()", "cleared_at = now()"],
+      ["payment_promises", "note = 'HACKED'", "note = 'HACKED'"],
+      ["payment_promise_documents", "created_at = now() - interval '1 year'", "created_at < now() - interval '300 days'"],
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
       ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],

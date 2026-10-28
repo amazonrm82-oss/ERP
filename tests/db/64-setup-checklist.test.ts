@@ -630,6 +630,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_money_allocation_state_speed.sql",
       // BAL-03 redefines public.log_export() of _source_attribution.sql last (the debt aging report key)
       "_debt_aging.sql",
+      // COL-03 redefines app.audit_erase_core() of _opening_balance.sql last (a payment promise's note, emptied by an erasure)
+      "_payment_promise_erasure.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
