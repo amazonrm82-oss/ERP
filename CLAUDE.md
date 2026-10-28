@@ -1385,7 +1385,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   owner/admin AND the three keys). Report `public.report_debt_aging(org, owner)` (invoker; key `debt_aging`, report definition flag
   `balances`): partial for the whole business through `app.business_money_rows` (count only), the screen says "הדוח המלא זמין
   לבעלים ומנהלי מערכת"; each document under one customer (its company, else contact's, else deal's), while cards and lists count it
-  under each of its companies (accepted). `public.log_export` was last redefined in 021097. Follow-up: debt columns for payment
+  under each of its companies (accepted). `public.log_export` was last redefined in 021103 (COL-06 `collection`). Follow-up: debt columns for payment
   recorders need a per-user kept amount (with PAY-03's).
 - Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
   (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
@@ -1408,6 +1408,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   duplicate's customer promise (`app.merge_payment_promises` on the `merged` entry, marker `app.payment_promise_merge`).
   `app.audit_erase_core` was last redefined in 021100 (promise notes emptied, their entries erased; known limit: a note on a
   company's document naming one of its contacts is not reached by that contact's erasure).
+- Collection report (COL-06, migration 021103; owner's answer pending on how collection days are counted, built (א)):
+  `public.report_collection(org, from, to, owner)` (invoker, `set jit = off`, `set enable_nestloop = off`; key `collection` in
+  `public.log_export`, report definition flag `collection`): COL-01's rights, keys and partial rule (copied, keep in step; partial =
+  rows from what the caller reads, `totals` null and every collection-days figure null). Payments recorded/confirmed by `paid_on`
+  month (every month of the period), by method, by rep (COL-01's rule for a payment: deal's owner, else contact's, else none; keep
+  in step). Collection days: active tax invoices and proformas (a billed proforma counts on its invoice; opening balances left out)
+  that `money_allocation_state` calls paid and whose last counted allocation (payment `paid_on`, or an opening-credit offset's day
+  in the org zone) falls in the period: days from the document date, and past due; average, median, null below 5. The screen
+  links to `debt_aging` only with `balances` (`ReportSection.exported = false` keeps link rows out of CSV/xlsx).
 - Collection reminders (COL-04, migrations 021101, 021102; owner's answers pending, built (ב) (א) DRAFT (א)): pg_cron
   `crm-collection-reminders` (every 15 minutes, `app.send_collection_reminders(p_orgs)`, definer, no grants) makes ONE task for the
   rep (MNY-01's owner rule, active full-seat non-viewer, else the owner, else the oldest admin) at offsets -3, 0, +7, +14 calendar days
