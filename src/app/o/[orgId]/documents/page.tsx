@@ -23,7 +23,11 @@ import {
 import { documentsPath } from "@/features/documents/paths";
 import { getCollectionAccess } from "@/features/collection/queries";
 import { collectionPath } from "@/features/payments/paths";
-import { DOCUMENT_TOTALS_LIMIT, getDocumentsAccess, listDocuments, listDocumentTotals } from "@/features/documents/queries";
+import { DOCUMENT_TOTALS_LIMIT, getDocumentsAccess, listDocumentPayStates, listDocuments, listDocumentTotals } from "@/features/documents/queries";
+import { getAllocationAccess } from "@/features/allocations/queries";
+import { DocumentCustomerFilter } from "@/features/documents/components/customer-filter";
+import { PayStateBadge } from "@/features/documents/components/documents-table";
+import { DOCUMENT_PAY_FILTERS, DOCUMENT_PAY_STATE_LABELS } from "@/features/documents/pay-state";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schema";
 import { resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
@@ -58,7 +62,15 @@ type Props = {
  */
 export default async function DocumentsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const [context, access, terms, collection] = await Promise.all([getOrgContext(orgId), getDocumentsAccess(orgId), getOrgTerms(orgId), getCollectionAccess(orgId)]);
+  const [context, access, terms, collection, allocation] = await Promise.all([
+    getOrgContext(orgId),
+    getDocumentsAccess(orgId),
+    getOrgTerms(orgId),
+    getCollectionAccess(orgId),
+    getAllocationAccess(orgId),
+  ]);
+  // DOC-03: payment states and balances only with the payments key (PAY-02's rule)
+  const payments = allocation.inPlan;
   // RVW-49: the business's own words (FLD-10)
   const texts = documentsListTexts(terms);
   if (!access.inPlan) {
@@ -74,7 +86,8 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
     );
   }
   const query = await searchParams;
-  const filters = documentListFilters(query);
+  const parsedFilters = documentListFilters(query);
+  const filters = payments ? parsedFilters : { ...parsedFilters, pay: null };
   const sort = filters.sort ?? DOCUMENT_DEFAULT_SORT;
   // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
   const [granted, listColumns] = await Promise.all([
@@ -91,12 +104,16 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
     listDocumentTotals(orgId, listed),
     viewChips(orgId, "document", context),
   ]);
-  const names = await getUserNames(documents.map((doc) => doc.createdBy));
+  const [names, payStates] = await Promise.all([
+    getUserNames(documents.map((doc) => doc.createdBy)),
+    payments ? listDocumentPayStates(orgId, documents) : Promise.resolve(null),
+  ]);
   const views = viewData.chips;
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
   const shownColumns = activeView?.config.columns ? resolveColumns("document", activeView.config.columns, listColumns.catalog) : listColumns.columns;
   const exportAllowed = canExport(context.role, granted);
-  const filtered = filters.type !== null || filters.status !== null || filters.from !== null || filters.to !== null || filter.tree !== null;
+  const filtered =
+    filters.type !== null || filters.status !== null || filters.from !== null || filters.to !== null || Boolean(filters.pay) || Boolean(filters.customer) || filter.tree !== null;
 
   const extra = { f: filterParam, sv: activeView?.id ?? null };
   const hrefFor = (target: number) => documentListHref(orgId, filters, target, extra);
@@ -105,7 +122,14 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
     documentListHref(orgId, { ...filters, sort: nextSort(sort, key as DocumentSortKey, documentSortStartsAscending(key as DocumentSortKey)) }, 1, extra);
   // what the advanced filter and a saved view keep from the page's own selects
   const kept: Record<string, string> = Object.fromEntries(
-    Object.entries({ type: filters.type ?? "", status: filters.status ?? "", from: filters.from ?? "", to: filters.to ?? "" }).filter(([, value]) => value !== ""),
+    Object.entries({
+      type: filters.type ?? "",
+      status: filters.status ?? "",
+      from: filters.from ?? "",
+      to: filters.to ?? "",
+      pay: filters.pay ?? "",
+      ...(filters.customer ? { [filters.customer.kind]: filters.customer.id, [`${filters.customer.kind}__label`]: filters.customer.label } : {}),
+    }).filter(([, value]) => value !== ""),
   );
   // GAP-12: an opening balance's debts and credits are two lines, never netted
   const totalLines = DOCUMENT_TOTAL_KEYS.flatMap((key) => {
@@ -177,6 +201,24 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
             ))}
           </Select>
         </label>
+        {payments ? (
+          <label>
+            <span className="mb-1.5 block text-sm font-medium">מצב תשלום</span>
+            <Select name="pay" defaultValue={filters.pay ?? ""} className="w-36">
+              <option value="">הכול</option>
+              {DOCUMENT_PAY_FILTERS.map((state) => (
+                <option key={state} value={state}>
+                  {DOCUMENT_PAY_STATE_LABELS[state]}
+                </option>
+              ))}
+            </Select>
+          </label>
+        ) : null}
+        <DocumentCustomerFilter
+          orgId={orgId}
+          contact={filters.customer?.kind === "contact" ? { id: filters.customer.id, label: filters.customer.label || "איש קשר" } : null}
+          company={filters.customer?.kind === "company" ? { id: filters.customer.id, label: filters.customer.label || "חברה" } : null}
+        />
         <label>
           <span className="mb-1.5 block text-sm font-medium">מתאריך</span>
           <Input type="date" name="from" defaultValue={filters.from ?? ""} className="w-40" />
@@ -196,9 +238,27 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
       </form>
       {totalLines.length > 0 ? (
         <section aria-labelledby="documents-totals" className="mb-5 rounded-lg border border-line bg-surface px-4 py-3">
+          {/* DOC-03: the summary line */}
           <h2 id="documents-totals" className="mb-2 text-sm font-semibold">
-            סיכום לפי סוג {filtered ? "(לפי הסינון)" : ""}
+            סיכום {filtered ? "(לפי הסינון)" : ""}
           </h2>
+          <p className="mb-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <span>
+              מסמכים בתוקף: <span className="font-medium tabular-nums">{totals.summary.count.toLocaleString("he-IL")}</span>
+            </span>
+            {totals.summary.open !== null ? (
+              <span>
+                יתרה פתוחה: <span className="font-medium tabular-nums">{formatMoney(totals.summary.open)}</span>
+              </span>
+            ) : null}
+            {totals.summary.overdue !== null ? (
+              <span>
+                מתוכה באיחור: <span className="font-medium tabular-nums">{formatMoney(totals.summary.overdue)}</span>
+              </span>
+            ) : null}
+            {/* COL-01's partial rule: the balances are summed only for whoever reads every money row of the business */}
+            {payments && totals.summary.partial ? <span className="text-ink-soft">רשימה חלקית: היתרות לא מסוכמות, כי יש מסמכים או תשלומים שאינם גלויים לכם.</span> : null}
+          </p>
           <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
             {totalLines.map((line) => (
               <li key={line.key}>
@@ -248,7 +308,11 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
                     </p>
                   </div>
                   <span className="flex items-center gap-2 text-sm">
-                    {doc.cancelled ? <Badge tone="warning">בוטל</Badge> : null}
+                    {payStates?.get(doc.id) ? (
+                      <PayStateBadge state={payStates.get(doc.id)!.payState} />
+                    ) : doc.cancelled ? (
+                      <Badge tone="warning">בוטל</Badge>
+                    ) : null}
                     <span className={`font-medium whitespace-nowrap tabular-nums ${doc.cancelled ? "text-ink-soft line-through" : ""}`}>{formatMoney(doc.amountAgorot)}</span>
                   </span>
                 </li>
@@ -262,6 +326,7 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
               columns={shownColumns}
               catalog={listColumns.catalog}
               recorderNames={names}
+              payStates={payStates}
               sort={sort}
               sortHref={sortHref}
               exportPath={exportAllowed ? `${documentsPath(orgId)}/export` : null}

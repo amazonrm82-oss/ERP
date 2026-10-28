@@ -12,7 +12,19 @@ import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { PAGE_SIZE } from "@/lib/search";
 import { createClient } from "@/lib/supabase/server";
 
-import { DOCUMENT_DEFAULT_SORT, DOCUMENT_SORT_COLUMNS, documentTotalsByType, type DocumentListFilters, type DocumentTotalKey } from "./list";
+import { z } from "zod";
+
+
+import {
+  DOCUMENT_DEFAULT_SORT,
+  DOCUMENT_SORT_COLUMNS,
+  DOCUMENT_TOTAL_KEYS,
+  needsPayStateRead,
+  type DocumentListFilters,
+  type DocumentListSummary,
+  type DocumentTotalKey,
+} from "./list";
+import { DOCUMENT_PAY_STATES, type DocumentPayState } from "./pay-state";
 import { documentTitle, isDocumentType, type DocumentType } from "./schema";
 
 // DOC-01: the accounting documents recorded on a deal or a contact, read with the user's session (RLS: whoever reads the
@@ -221,6 +233,8 @@ export type DocumentListItem = {
   // GAP-12: null on an opening balance
   number: string | null;
   docDate: string;
+  // PAY-02 answer 7 (DOC-03's overdue)
+  dueDate: string | null;
   amountAgorot: number;
   cancelled: boolean;
   createdBy: string | null;
@@ -238,23 +252,57 @@ export type DocumentListItem = {
  * list's selects and the advanced filter, sorted by any column; one page at a time, the picked rows, or an export chunk.
  * Read with the user's session: the accounting_documents RLS decides.
  */
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * The list's rows with its selects applied: the table, or (DOC-03) the set public.documents_by_pay_state returns when a
+ * payment state or a customer is asked (invoker: RLS decides; PostgREST filters, orders and pages it like the table).
+ */
+function documentsQuery(supabase: Client, orgId: string, filters: DocumentListFilters, columns: string) {
+  const base = supabase.from("accounting_documents").select(columns);
+  let query = (
+    needsPayStateRead(filters)
+      ? (supabase
+          .rpc("documents_by_pay_state", {
+            p_org: orgId,
+            p_states: filters.pay ? [filters.pay] : null,
+            p_contact: filters.customer?.kind === "contact" ? filters.customer.id : null,
+            p_company: filters.customer?.kind === "company" ? filters.customer.id : null,
+          })
+          .select(columns) as unknown as typeof base)
+      : base
+  ).eq("organization_id", orgId);
+  if (filters.type) query = query.eq("doc_type", filters.type);
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.from) query = query.gte("doc_date", filters.from);
+  if (filters.to) query = query.lte("doc_date", filters.to);
+  if (filters.filter) query = query.or(filters.filter);
+  return query;
+}
+
+const LIST_COLUMNS = "id, doc_type, number, doc_date, due_date, amount_agorot, status, created_by, created_at, deal_id, contact_id, company_id";
+type ListRow = {
+  id: string;
+  doc_type: string;
+  number: string | null;
+  doc_date: string;
+  due_date: string | null;
+  amount_agorot: number;
+  status: string;
+  created_by: string | null;
+  created_at: string;
+  deal_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+};
+
 export async function listDocuments(orgId: string, filters: DocumentListFilters): Promise<{ documents: DocumentListItem[]; hasMore: boolean }> {
   const supabase = await createClient();
   const size = filters.chunk?.size ?? PAGE_SIZE;
   const offset = filters.chunk?.from ?? (filters.page - 1) * PAGE_SIZE;
-  let query = supabase
-    .from("accounting_documents")
-    .select("id, doc_type, number, doc_date, amount_agorot, status, created_by, created_at, deal_id, contact_id, company_id")
-    .eq("organization_id", orgId);
-  if (filters.ids) {
-    query = query.in("id", filters.ids);
-  } else {
-    if (filters.type) query = query.eq("doc_type", filters.type);
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.from) query = query.gte("doc_date", filters.from);
-    if (filters.to) query = query.lte("doc_date", filters.to);
-    if (filters.filter) query = query.or(filters.filter);
-  }
+  const query = filters.ids
+    ? supabase.from("accounting_documents").select(LIST_COLUMNS).eq("organization_id", orgId).in("id", filters.ids)
+    : documentsQuery(supabase, orgId, filters, LIST_COLUMNS);
   const sort = filters.sort ?? DOCUMENT_DEFAULT_SORT;
   const rows = must(
     await query
@@ -263,7 +311,7 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
       .order("id")
       .range(offset, offset + size),
     "documents list",
-  );
+  ) as unknown as ListRow[];
   const page = rows.slice(0, size);
   const customers = await customerNames(orgId, page);
   return {
@@ -276,6 +324,7 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
               docType: row.doc_type,
               number: row.number,
               docDate: row.doc_date,
+              dueDate: row.due_date,
               amountAgorot: Number(row.amount_agorot),
               cancelled: row.status === "cancelled",
               createdBy: row.created_by,
@@ -291,36 +340,85 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
   };
 }
 
-// the totals read at most this many documents; past it the screen says the totals are partial
+// with an advanced filter, the summary reads the matching ids first, at most this many; past it the screen says so
 export const DOCUMENT_TOTALS_LIMIT = 20_000;
 
+const summarySchema = z.object({
+  count: z.coerce.number(),
+  by_type: z.record(z.string(), z.object({ count: z.coerce.number(), agorot: z.coerce.number() })),
+  partial: z.boolean(),
+  open: z.coerce.number().nullable(),
+  overdue: z.coerce.number().nullable(),
+});
+
 /**
- * LST-09 (owner, 21 October 2026): the list's totals per document type, over every document the filters find (not only
- * the page), documents in force only, never netted. Read with the user's session, like the list.
+ * LST-09 + DOC-03: the summary line, over every document in force the filters find (not only the page), in ONE call to
+ * public.documents_pay_summary (invoker: RLS decides; COL-01's partial rule for the balances): the count, per type (never
+ * netted; an opening balance as debt and credit) and, with the payments key, the open balance and its overdue part. The
+ * list's advanced filter cannot travel to SQL, so with one the matching ids are read first (at most DOCUMENT_TOTALS_LIMIT;
+ * `complete` says whether all were).
  */
 export async function listDocumentTotals(
   orgId: string,
   filters: DocumentListFilters,
-): Promise<{ totals: Map<DocumentTotalKey, { count: number; agorot: number }>; complete: boolean }> {
+): Promise<{ totals: Map<DocumentTotalKey, { count: number; agorot: number }>; complete: boolean; summary: DocumentListSummary }> {
   const supabase = await createClient();
-  const { rows, complete } = await readAllPages(
-    async (from, to) => {
-      let query = supabase.from("accounting_documents").select("id, doc_type, amount_agorot, status").eq("organization_id", orgId).eq("status", "active");
-      if (filters.type) query = query.eq("doc_type", filters.type);
-      if (filters.status) query = query.eq("status", filters.status);
-      if (filters.from) query = query.gte("doc_date", filters.from);
-      if (filters.to) query = query.lte("doc_date", filters.to);
-      if (filters.filter) query = query.or(filters.filter);
-      return must(await query.order("id").range(from, to), "documents totals");
-    },
-    { limit: DOCUMENT_TOTALS_LIMIT },
+  let ids: string[] | null = null;
+  let complete = true;
+  if (filters.filter) {
+    const read = await readAllPages(
+      async (from, to) =>
+        must(await documentsQuery(supabase, orgId, filters, "id").eq("status", "active").order("id").range(from, to), "documents totals") as unknown as { id: string }[],
+      { limit: DOCUMENT_TOTALS_LIMIT },
+    );
+    ids = read.rows.map((row) => row.id);
+    complete = read.complete;
+  }
+  const raw = must(
+    await supabase.rpc("documents_pay_summary", {
+      p_org: orgId,
+      p_states: filters.pay ? [filters.pay] : null,
+      p_contact: filters.customer?.kind === "contact" ? filters.customer.id : null,
+      p_company: filters.customer?.kind === "company" ? filters.customer.id : null,
+      p_type: filters.type,
+      p_status: filters.status,
+      p_from: filters.from,
+      p_to: filters.to,
+      p_ids: ids,
+    }),
+    "documents summary",
   );
-  return {
-    complete,
-    totals: documentTotalsByType(
-      rows.flatMap((row) => (isDocumentType(row.doc_type) ? [{ docType: row.doc_type, amountAgorot: Number(row.amount_agorot), cancelled: row.status !== "active" }] : [])),
-    ),
-  };
+  const parsed = summarySchema.parse(raw);
+  const totals = new Map<DocumentTotalKey, { count: number; agorot: number }>();
+  for (const key of DOCUMENT_TOTAL_KEYS) {
+    const line = parsed.by_type[key];
+    if (line) totals.set(key, { count: line.count, agorot: line.agorot });
+  }
+  return { complete, totals, summary: { count: parsed.count, open: parsed.open, overdue: parsed.overdue, partial: parsed.partial } };
+}
+
+// public.documents_pay_rows takes at most this many ids in one call
+const PAY_ROWS_CHUNK = 2_000;
+const payRowsSchema = z.array(z.object({ id: z.string(), pay_state: z.enum(DOCUMENT_PAY_STATES), balance: z.coerce.number().nullable() }));
+
+/**
+ * DOC-03: the payment state and open balance of the page's (or an export's) documents, from public.documents_pay_rows (the
+ * same rule as the filter, invoker), in chunks; only with the payments key.
+ */
+export async function listDocumentPayStates(
+  orgId: string,
+  documents: readonly Pick<DocumentListItem, "id">[],
+): Promise<Map<string, { payState: DocumentPayState; balance: number | null }>> {
+  const supabase = await createClient();
+  const states = new Map<string, { payState: DocumentPayState; balance: number | null }>();
+  for (let start = 0; start < documents.length; start += PAY_ROWS_CHUNK) {
+    const raw = must(
+      await supabase.rpc("documents_pay_rows", { p_org: orgId, p_ids: documents.slice(start, start + PAY_ROWS_CHUNK).map((doc) => doc.id) }),
+      "documents pay states",
+    );
+    for (const row of payRowsSchema.parse(raw)) states.set(row.id, { payState: row.pay_state, balance: row.balance });
+  }
+  return states;
 }
 
 /**

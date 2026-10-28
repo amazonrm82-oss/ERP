@@ -1,7 +1,9 @@
 import { isCalendarDate } from "@/lib/calendar-date";
+import { isUuid } from "@/lib/paths";
 import { parsePage } from "@/lib/search";
 import { parseSort, sortValue, type Sort } from "@/lib/sort";
 
+import { isDocumentPayFilter, type DocumentPayFilter } from "./pay-state";
 import { documentsPath } from "./paths";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES, isDocumentType, isOpeningBalance, type DocumentType } from "./schema";
 
@@ -17,6 +19,8 @@ export const DOCUMENT_SORT_COLUMNS = {
   date: "doc_date",
   amount: "amount_agorot",
   status: "status",
+  // DOC-03
+  due: "due_date",
   recorder: "sort_recorder",
   created: "created_at",
 } as const;
@@ -24,12 +28,18 @@ export type DocumentSortKey = keyof typeof DOCUMENT_SORT_COLUMNS;
 export const DOCUMENT_DEFAULT_SORT: Sort<DocumentSortKey> = { key: "date", ascending: false };
 // a header's first click: names from A, dates and sums from the highest
 export const documentSortStartsAscending = (key: DocumentSortKey) =>
-  key === "name" || key === "type" || key === "customer" || key === "status" || key === "recorder";
+  key === "name" || key === "type" || key === "customer" || key === "status" || key === "recorder" || key === "due";
 
 export const DOCUMENT_LIST_STATUSES = ["active", "cancelled"] as const;
 export type DocumentListStatus = (typeof DOCUMENT_LIST_STATUSES)[number];
 export const DOCUMENT_LIST_STATUS_LABELS: Record<DocumentListStatus, string> = { active: "בתוקף", cancelled: "בוטל" };
 const isListStatus = (value: unknown): value is DocumentListStatus => value === "active" || value === "cancelled";
+
+/** DOC-03: the documents of one customer (public.documents_by_pay_state's scope). */
+export type DocumentCustomerFilter = { kind: "contact" | "company"; id: string; label: string };
+
+/** Whether the list must read through public.documents_by_pay_state (a payment state or a customer is asked). */
+export const needsPayStateRead = (filters: Pick<DocumentListFilters, "pay" | "customer">) => Boolean(filters.pay || filters.customer);
 
 export type DocumentListFilters = {
   type: DocumentType | null;
@@ -37,6 +47,10 @@ export type DocumentListFilters = {
   // the document's date, inclusive
   from: string | null;
   to: string | null;
+  // DOC-03: the payment state (only with the `payments` key; the page drops it otherwise) and one customer (a contact or a
+  // company; its label rides along in the address for the picker)
+  pay?: DocumentPayFilter | null;
+  customer?: DocumentCustomerFilter | null;
   page: number;
   sort?: Sort<DocumentSortKey>;
   // LST-05: the advanced filter as one PostgREST logic tree (prepareListFilter), or null
@@ -58,11 +72,21 @@ export function documentListFilters(params: Record<string, string | string[] | u
   to = isCalendarDate(to) ? to : "";
   // a range typed backwards is read the right way round
   if (from && to && from > to) [from, to] = [to, from];
+  const pay = one(params.pay);
+  const contact = one(params.contact) ?? "";
+  const company = one(params.company) ?? "";
+  const label = (value: string | undefined) => (value ?? "").trim().slice(0, 200);
   return {
     type: isDocumentType(type) ? type : null,
     status: isListStatus(status) ? status : null,
     from: from || null,
     to: to || null,
+    pay: isDocumentPayFilter(pay) ? pay : null,
+    customer: isUuid(contact)
+      ? { kind: "contact", id: contact, label: label(one(params.contact__label)) }
+      : isUuid(company)
+        ? { kind: "company", id: company, label: label(one(params.company__label)) }
+        : null,
     page: parsePage(params.page),
     sort: parseSort(one(params.sort) ?? "", Object.keys(DOCUMENT_SORT_COLUMNS) as DocumentSortKey[], DOCUMENT_DEFAULT_SORT),
   };
@@ -75,6 +99,11 @@ export function documentListHref(orgId: string, filters: DocumentListFilters, pa
   if (filters.status) query.set("status", filters.status);
   if (filters.from) query.set("from", filters.from);
   if (filters.to) query.set("to", filters.to);
+  if (filters.pay) query.set("pay", filters.pay);
+  if (filters.customer) {
+    query.set(filters.customer.kind, filters.customer.id);
+    if (filters.customer.label) query.set(`${filters.customer.kind}__label`, filters.customer.label);
+  }
   if (filters.sort && sortValue(filters.sort) !== sortValue(DOCUMENT_DEFAULT_SORT)) query.set("sort", sortValue(filters.sort));
   if (extra.f) query.set("f", extra.f);
   if (extra.sv) query.set("sv", extra.sv);
@@ -119,3 +148,10 @@ export function documentTotalKey(type: DocumentType, amountAgorot: number): Docu
   if (isOpeningBalance(type)) return amountAgorot < 0 ? "opening_credit" : "opening_debt";
   return type as Exclude<DocumentType, "opening_balance">;
 }
+
+/**
+ * DOC-03: the list's summary line (public.documents_pay_summary): how many documents in force the filters find, and (with the
+ * payments key, and only when the caller reads every money row of the business: COL-01's partial rule) the open balance and
+ * its part past the due date. `partial` = balances not shown ("רשימה חלקית").
+ */
+export type DocumentListSummary = { count: number; open: number | null; overdue: number | null; partial: boolean };

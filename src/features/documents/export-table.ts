@@ -5,6 +5,7 @@ import { plainShekels } from "@/features/products/export-table";
 import { zoneDate } from "@/lib/format";
 
 import { DOCUMENT_LIST_STATUS_LABELS } from "./list";
+import { DOCUMENT_PAY_STATE_LABELS, type DocumentPayState } from "./pay-state";
 import type { DocumentListItem } from "./queries";
 import { DOCUMENT_TYPE_LABELS } from "./schema";
 
@@ -25,4 +26,16 @@ export function documentExportRows(documents: DocumentForExport[], recorderNames
     doc.createdBy ? (recorderNames.get(doc.createdBy) ?? "") : "",
     zoneDate(new Date(doc.createdAt), timeZone),
   ]);
+}
+
+/** DOC-03: the columns the export adds after the header: the due date always, the payment state and balance with the payments key. */
+export function documentExtraHeader(payments: boolean): string[] {
+  return payments ? ["מועד תשלום", "מצב תשלום", "יתרה"] : ["מועד תשלום"];
+}
+
+/** DOC-03: one document's extra cells, in documentExtraHeader's order (`pay` null = no payments key). */
+export function documentExtraCells(doc: Pick<DocumentListItem, "dueDate">, pay: { payState: DocumentPayState; balance: number | null } | null | undefined, payments: boolean): string[] {
+  const due = doc.dueDate ?? "";
+  if (!payments) return [due];
+  return [due, pay ? DOCUMENT_PAY_STATE_LABELS[pay.payState] : "", pay?.balance !== null && pay?.balance !== undefined ? plainShekels(pay.balance) : ""];
 }

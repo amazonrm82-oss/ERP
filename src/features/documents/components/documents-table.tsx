@@ -8,6 +8,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
+import { DOCUMENT_PAY_STATE_LABELS, DOCUMENT_PAY_STATE_TONES, type DocumentPayState } from "../pay-state";
 import type { DocumentListItem } from "../queries";
 import { DOCUMENT_TYPE_LABELS, documentTitle, isOpeningBalance } from "../schema";
 
@@ -17,6 +18,8 @@ type Props = {
   columns: ColumnChoice[];
   catalog: CatalogColumn[];
   recorderNames: Map<string, string>;
+  // DOC-03: each row's payment state and open balance (with the payments key), else null
+  payStates: Map<string, { payState: DocumentPayState; balance: number | null }> | null;
   sort: Sort<string>;
   sortHref: (key: string) => string;
   // the export route for "export the picked rows"; null when the user may not export
@@ -32,6 +35,11 @@ export function documentHome(orgId: string, doc: Pick<DocumentListItem, "dealId"
       : doc.companyId
         ? paths.company(orgId, doc.companyId)
         : null;
+}
+
+/** DOC-03: a document's payment state as a chip. */
+export function PayStateBadge({ state }: { state: DocumentPayState }) {
+  return <Badge tone={DOCUMENT_PAY_STATE_TONES[state]}>{DOCUMENT_PAY_STATE_LABELS[state]}</Badge>;
 }
 
 /** A document's type and number, as the first column and the mobile list show them. */
@@ -59,7 +67,7 @@ const day = (value: string) => (
  * A document is recorded and cancelled only on its deal's or contact's card (owner, 21 October 2026), so there are no
  * other bulk actions and no editing in the cell; the name links to that card.
  */
-export function DocumentsTable({ orgId, documents, columns, catalog, recorderNames, sort, sortHref, exportPath }: Props) {
+export function DocumentsTable({ orgId, documents, columns, catalog, recorderNames, payStates, sort, sortHref, exportPath }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -110,8 +118,21 @@ export function DocumentsTable({ orgId, documents, columns, catalog, recorderNam
               return day(doc.docDate);
             case "amount":
               return <span className={`whitespace-nowrap tabular-nums ${doc.cancelled ? "text-ink-soft line-through" : ""}`}>{formatMoney(doc.amountAgorot)}</span>;
-            case "status":
+            case "status": {
+              // DOC-03: the payment state (and the balance left) with the payments key
+              const pay = payStates?.get(doc.id);
+              if (pay) {
+                return (
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <PayStateBadge state={pay.payState} />
+                    {pay.balance !== null && pay.payState !== "paid" ? <span className="text-sm whitespace-nowrap text-ink-soft tabular-nums">{formatMoney(pay.balance)}</span> : null}
+                  </span>
+                );
+              }
               return doc.cancelled ? <Badge tone="warning">בוטל</Badge> : <Badge>בתוקף</Badge>;
+            }
+            case "due":
+              return doc.dueDate ? day(doc.dueDate) : null;
             case "recorder":
               return doc.createdBy ? (recorderNames.get(doc.createdBy) ?? null) : null;
             case "created":

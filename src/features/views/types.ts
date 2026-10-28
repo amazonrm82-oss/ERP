@@ -7,8 +7,8 @@ export type ViewObject = (typeof VIEW_OBJECTS)[number];
 
 // "f": the advanced filter (LST-05), as JSON; "pipeline" and "view": the deals table (LST-09); "who": the tasks list;
 // "category" and "kind": the product catalog's own selects (LST-09); "owner", "from" and "to": the quotes list's (LST-09);
-// "type" and "method": the documents and payments lists' (LST-09)
-export const VIEW_FILTER_KEYS = ["q", "status", "tag", "f", "pipeline", "view", "who", "category", "kind", "owner", "from", "to", "type", "method"] as const;
+// "type" and "method": the documents and payments lists' (LST-09); "pay": the documents list's payment state (DOC-03)
+export const VIEW_FILTER_KEYS = ["q", "status", "tag", "f", "pipeline", "view", "who", "category", "kind", "owner", "from", "to", "type", "method", "pay"] as const;
 export type ViewFilters = Partial<Record<(typeof VIEW_FILTER_KEYS)[number], string>>;
 
 /** Only the known filter keys, as non-empty strings. */

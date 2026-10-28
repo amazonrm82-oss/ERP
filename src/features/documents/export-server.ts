@@ -13,9 +13,11 @@ import { sortValue } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
 import { xlsxFile } from "@/lib/xlsx";
 
-import { DOCUMENT_EXPORT_HEADER, documentExportRows } from "./export-table";
+import { getAllocationAccess } from "@/features/allocations/queries";
+
+import { DOCUMENT_EXPORT_HEADER, documentExportRows, documentExtraCells, documentExtraHeader } from "./export-table";
 import { documentListFilters } from "./list";
-import { listDocuments, type DocumentListItem } from "./queries";
+import { listDocumentPayStates, listDocuments, type DocumentListItem } from "./queries";
 
 // LST-09: the accounting documents list as CSV or Excel, with the list's selects, advanced filter and sort (the same query
 // string as the page), or only the picked rows. Read with the user's session (the accounting_documents RLS decides);
@@ -46,7 +48,10 @@ export async function exportDocuments(request: Request, orgId: string): Promise<
     return text(`אפשר לייצא עד ${MAX_PICKED} מסמכים נבחרים. לייצוא של יותר, השתמשו בסינון.`, 400);
   }
   const scope = params.has("ids") ? "selected" : "filtered";
-  const filters = documentListFilters(Object.fromEntries(params.entries()));
+  // DOC-03: the payment state filter and columns only with the payments key (the page's rule)
+  const payments = (await getAllocationAccess(orgId)).inPlan;
+  const parsedFilters = documentListFilters(Object.fromEntries(params.entries()));
+  const filters = payments ? parsedFilters : { ...parsedFilters, pay: null };
   // LST-05: the advanced filter, checked against the list's fields as on the page
   const filter = await prepareListFilter(orgId, "document", params.get("f") ?? "", context.user.id, []);
 
@@ -89,8 +94,12 @@ export async function exportDocuments(request: Request, orgId: string): Promise<
   }
 
   const names = await getUserNames(documents.map((doc) => doc.createdBy));
-  const header = [...DOCUMENT_EXPORT_HEADER];
-  const body = documentExportRows(documents, names, context.org.timeZone);
+  const pays = payments ? await listDocumentPayStates(orgId, documents) : null;
+  const header = [...DOCUMENT_EXPORT_HEADER, ...documentExtraHeader(payments)];
+  const body = documentExportRows(documents, names, context.org.timeZone).map((row, index) => [
+    ...row,
+    ...documentExtraCells(documents[index], pays?.get(documents[index].id), payments),
+  ]);
   const filename = `documents-${zoneDate(new Date(), context.org.timeZone)}.${format}`;
   if (format === "xlsx") {
     return new Response(xlsxFile("מסמכים חשבונאיים", header, body) as unknown as BodyInit, {

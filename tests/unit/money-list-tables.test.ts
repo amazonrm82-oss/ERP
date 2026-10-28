@@ -23,15 +23,15 @@ const one = (field: string, op: string, value?: string): FilterTree => ({ match:
 describe("the documents list", () => {
   it("offers its columns, starts with a short set, and every column sorts", () => {
     const catalog = catalogFor("document", []);
-    expect(catalog.map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status", "recorder", "created"]);
+    expect(catalog.map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status", "due", "recorder", "created"]);
     expect(resolveColumns("document", null, catalog).map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status"]);
     for (const key of ["name", ...catalog.map((column) => column.key)]) expect(Object.keys(DOCUMENT_SORT_COLUMNS), key).toContain(key);
   });
 
   it("reads its selects and sort from the address, never trusting them", () => {
-    expect(documentListFilters({})).toEqual({ type: null, status: null, from: null, to: null, page: 1, sort: DOCUMENT_DEFAULT_SORT });
+    expect(documentListFilters({})).toEqual({ type: null, status: null, from: null, to: null, pay: null, customer: null, page: 1, sort: DOCUMENT_DEFAULT_SORT });
     const filters = documentListFilters({ type: "receipt", status: "active", from: "2026-08-01", to: "2026-07-01", sort: "-amount", page: "3" });
-    expect(filters).toEqual({ type: "receipt", status: "active", from: "2026-07-01", to: "2026-08-01", page: 3, sort: { key: "amount", ascending: false } });
+    expect(filters).toEqual({ type: "receipt", status: "active", from: "2026-07-01", to: "2026-08-01", pay: null, customer: null, page: 3, sort: { key: "amount", ascending: false } });
     expect(documentListFilters({ type: "invoice", status: "deleted", from: "yesterday", sort: "secret" })).toEqual(documentListFilters({}));
     expect(documentListHref(ORG, filters, 2, { f: '{"match":"all"}', sv: "v1" })).toBe(
       `/o/${ORG}/documents?type=receipt&status=active&from=2026-07-01&to=2026-08-01&sort=-amount&f=%7B%22match%22%3A%22all%22%7D&sv=v1&page=2`,

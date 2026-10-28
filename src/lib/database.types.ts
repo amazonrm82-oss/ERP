@@ -3412,6 +3412,26 @@ export type Database = {
       orders_by_money_state: { Args: { p_org: string; p_billing: string | null; p_payment: string | null }; Returns: OrderRow[] };
       // DOC-02: a document and its lines in one call
       accounting_document_record: { Args: { p_org: string; p_document: Json; p_lines: Json | null }; Returns: string };
+      // DOC-03: the documents list by payment state and customer
+      documents_by_pay_state: {
+        Args: { p_org: string; p_states: string[] | null; p_contact: string | null; p_company: string | null };
+        Returns: AccountingDocumentRow[];
+      };
+      documents_pay_summary: {
+        Args: {
+          p_org: string;
+          p_states: string[] | null;
+          p_contact: string | null;
+          p_company: string | null;
+          p_type: string | null;
+          p_status: string | null;
+          p_from: string | null;
+          p_to: string | null;
+          p_ids: string[] | null;
+        };
+        Returns: Json;
+      };
+      documents_pay_rows: { Args: { p_org: string; p_ids: string[] }; Returns: Json };
       // PAY-02: what the allocation window offers for a payment or a document (invoker)
       money_allocation_candidates: { Args: { p_org: string; p_payment: string | null; p_document: string | null }; Returns: Json };
       // PAY-03: the credit a document recorded on this deal / contact / company could use (invoker)
