@@ -375,7 +375,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 020425, QUO-17 `quotes`; 020331 DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 021097 (BAL-03 `debt_aging`); 020425, QUO-17 `quotes`; 020331 DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x paid seats, `app.paid_seat_count`, 020340): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -1370,6 +1370,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   no balance of any kind. A proforma is a debit on its own date; the tax invoice that bills it carries only the difference, netted
   only against a proforma that is a line of this ledger and dated on or before it (lead's decision). Accepted: a conservative false
   "partial"; a proforma billed by an invoice outside the ledger keeps its debit while open_debt gives it 0.
+- Customer debt and aging (BAL-02/BAL-03, migrations 021096, 021097; owner 28 October 2026, answers (1) א (2) א (3) א): debt =
+  `money_allocation_state`'s balance of active tax invoices, proformas and positive opening balances (a billed proforma counts on
+  its invoice); overdue = due_date before the org's today; age = whole days past due, buckets current (not yet due or no due date,
+  "טרם הגיע מועד התשלום") | d1_30 | d31_60 | d61_90 | d91_plus. Card: `public.customer_debt_summary(org, contact, company)` (invoker,
+  BAL-01's rights, keys and partial rule and scope; keep in step with `customer_ledger`). Lists (owners/admins only, as PAY-03's
+  credit column): server-kept `public.debt_document_customers` (document x each company and its contact, balance + due date, a
+  row that ends stays at 0) and `public.customer_debt_totals` (open total + open amounts by due date; overdue summed when read),
+  refreshed by `app.debt_document_sync` / `_family_sync` from DEFERRABLE INITIALLY DEFERRED constraint triggers on
+  accounting_documents (debt-moving columns only; non-debt types return before the lock), payment_allocations,
+  opening_credit_allocations and contacts/deals company changes, under PAY-03's business lock `customer_credit:<org>` (a purge can
+  rarely meet an allocation commit in 40P01, as PAY-03). Computed fields `debt_balance`, `overdue_debt`, `has_debt`,
+  `has_overdue_debt` (contacts, companies; inlined, advisor finding expected) over definer `app.customer_debt_of` (null unless
+  owner/admin AND the three keys). Report `public.report_debt_aging(org, owner)` (invoker; key `debt_aging`, report definition flag
+  `balances`): partial for the whole business through `app.business_money_rows` (count only), the screen says "הדוח המלא זמין
+  לבעלים ומנהלי מערכת"; each document under one customer (its company, else contact's, else deal's), while cards and lists count it
+  under each of its companies (accepted). `public.log_export` was last redefined in 021097. Follow-up: debt columns for payment
+  recorders need a per-user kept amount (with PAY-03's).
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
