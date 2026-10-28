@@ -583,6 +583,50 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("the server's debt rows and totals are read by owners and admins only, whatever the visibility; nobody writes them (BAL-02)", async () => {
+    await setVisibility("own");
+    try {
+      const company = await asUser(m1.id, async (q) => (await q<{ id: string }>("insert into public.companies (organization_id, name) values ($1, 'חברת חוב') returning id", [org])).rows[0].id);
+      const contact = await asUser(m1.id, async (q) =>
+        (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, company_id) values ($1, 'לקוח חייב', $2) returning id", [org, company])).rows[0].id,
+      );
+      const invoice = await asUser(owner.id, async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', 'BAL02-ROLES', current_date - 30, 1500, current_date - 5) returning id",
+            [org, contact],
+          )
+        ).rows[0].id,
+      );
+      const rows = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.debt_document_customers where document_id = $1 and balance_agorot = 1500", [invoice]));
+      const totals = (u: U) =>
+        asUser(u.id, (q) => count(q, "select 1 from public.customer_debt_totals where (company_id = $1 or contact_id = $2) and open_agorot = 1500", [company, contact]));
+      for (const u of [owner, admin]) {
+        expect(await rows(u), u.email).toBe(2);
+        expect(await totals(u), u.email).toBe(2);
+      }
+      for (const u of [manager, m1, m2, viewer]) {
+        expect(await rows(u), u.email).toBe(0);
+        expect(await totals(u), u.email).toBe(0);
+      }
+      for (const u of [owner, admin, m1]) {
+        for (const sql of [
+          "update public.debt_document_customers set balance_agorot = 1 where document_id = $1",
+          "delete from public.debt_document_customers where document_id = $1",
+          "update public.customer_debt_totals set open_agorot = 1 where organization_id = (select organization_id from public.accounting_documents where id = $1)",
+          "delete from public.customer_debt_totals where organization_id = (select organization_id from public.accounting_documents where id = $1)",
+        ]) {
+          expect((await pgError(asUser(u.id, (q) => q(sql, [invoice])))).code, `${u.email}: ${sql}`).toBe("42501");
+        }
+        expect(
+          (await pgError(asUser(u.id, (q) => q("insert into public.customer_debt_totals (organization_id, contact_id) values ($1, $2)", [org, contact])))).code,
+        ).toBe("42501");
+      }
+    } finally {
+      await setVisibility("org");
+    }
+  });
+
   it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
     await setVisibility("org");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));

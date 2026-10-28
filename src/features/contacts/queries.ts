@@ -95,6 +95,9 @@ export const CONTACT_SORT_COLUMNS = {
   completeness: "completeness",
   // PAY-03: computed field public.credit_balance(contacts); offered only with the money keys (offeredSortKeys)
   credit: "credit_balance",
+  // BAL-02: computed fields public.debt_balance / overdue_debt(contacts); offered only with the balances keys
+  debt: "debt_balance",
+  overdue_debt: "overdue_debt",
 } as const;
 export type ContactSortKey = keyof typeof CONTACT_SORT_COLUMNS;
 export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", ascending: false };

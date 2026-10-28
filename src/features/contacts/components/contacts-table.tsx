@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+import type { DebtNumbers } from "@/features/balances/debt";
 import Link from "next/link";
 
 import { BulkSelection, RowCheck } from "@/features/bulk/components/bulk-selection";
@@ -36,6 +38,8 @@ type Props = {
   completeness?: Map<string, number>;
   // PAY-03: the credit of each row, read only when the column is shown
   credit?: Map<string, number>;
+  // BAL-02: the open and overdue debt of each row, read only when a debt column is shown
+  debt?: Map<string, DebtNumbers>;
   // WA-01 follow-up: the WhatsApp templates in the phone cell; null for someone who cannot write
   whatsapp?: WhatsappListContext | null;
   // SEG-01: static segments for the bulk "add to segment"; null for someone who does not write segments
@@ -43,7 +47,7 @@ type Props = {
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, credit, whatsapp = null, segments = null }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, credit, debt, whatsapp = null, segments = null }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -162,6 +166,14 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
               // PAY-03: the customer's credit (a contact with a company shows the company's)
               const value = credit?.get(contact.id);
               return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
+            }
+            case "debt":
+            case "overdue_debt": {
+              // BAL-02: the customer's open or overdue debt (a contact with a company shows the company's)
+              const value = debt?.get(contact.id);
+              if (value === undefined) return null;
+              const amount = key === "debt" ? value.open : value.overdue;
+              return <span className={cn("tabular-nums", key === "overdue_debt" && amount > 0 && "text-danger")}>{formatMoney(amount)}</span>;
             }
             case "original_created":
               return contact.originalCreatedOn ? (

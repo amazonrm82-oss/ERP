@@ -66,6 +66,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
@@ -150,6 +151,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           </>
         }
       />
+      {/* BAL-02: the customer's open and overdue debt (its company's, when it has one), for whoever opens its ledger */}
+      <DebtSummary orgId={orgId} where={{ contact: contact.id, company: null }} />
       {channels === "failed" ? (
         <FormError
           className="mb-4"

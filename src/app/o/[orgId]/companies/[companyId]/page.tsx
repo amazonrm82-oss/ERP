@@ -35,6 +35,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CompanyOpeningCard } from "@/features/documents/components/company-opening-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
@@ -110,6 +111,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           </>
         }
       />
+      {/* BAL-02: the company's open and overdue debt, for whoever opens its ledger */}
+      <DebtSummary orgId={orgId} where={{ contact: null, company: company.id }} />
       <div className="mb-5 print:hidden">
         <ContactActions
           phone={company.phone}

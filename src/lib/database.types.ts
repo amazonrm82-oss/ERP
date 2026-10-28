@@ -1949,6 +1949,32 @@ export type CustomerCreditTotalRow = {
   updated_at: string;
 };
 
+// BAL-02: each open document's balance per customer it belongs to (written by triggers only; owners and admins read)
+export type DebtDocumentCustomerRow = {
+  id: string;
+  organization_id: string;
+  document_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  balance_agorot: number;
+  due_date: string | null;
+  currency: string;
+  updated_at: string;
+};
+
+// BAL-02: a customer's open debt, and its open amounts grouped by due date (written by triggers only; owners and admins read)
+export type CustomerDebtTotalRow = {
+  id: string;
+  organization_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  open_agorot: number;
+  due_dates: string[];
+  due_amounts: number[];
+  currency: string;
+  updated_at: string;
+};
+
 // PAY-03: the server's list of payments with credit per company they belong to (written by triggers only; members read the
 // rows of payments they read)
 export type PaymentCreditCompanyRow = {
@@ -2908,6 +2934,9 @@ export type Database = {
       // PAY-03: server only (no client write grant)
       payment_credit_companies: ReadOnlyTable<PaymentCreditCompanyRow>;
       customer_credit_totals: ReadOnlyTable<CustomerCreditTotalRow>;
+      // BAL-02: server only (no client write grant)
+      debt_document_customers: ReadOnlyTable<DebtDocumentCustomerRow>;
+      customer_debt_totals: ReadOnlyTable<CustomerDebtTotalRow>;
       payments: Table<
         PaymentRow,
         {
@@ -3178,6 +3207,8 @@ export type Database = {
       report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // BAL-01: the customer's ledger (invoker; {"allowed": false} without the keys or membership)
       customer_ledger: { Args: { p_org: string; p_contact: string | null; p_company: string | null; p_from: string; p_to: string }; Returns: Json };
+      // BAL-02: the customer's open and overdue debt for the card (invoker; BAL-01's rights and partial rule)
+      customer_debt_summary: { Args: { p_org: string; p_contact: string | null; p_company: string | null }; Returns: Json };
       report_gross_profit: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // CON-06
       report_referrals: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
@@ -3292,6 +3323,11 @@ export type Database = {
       // PAY-03: computed fields on contacts and companies for the "יתרת זכות" column and filter (owners and admins; null / false for others)
       credit_balance: { Args: Record<string, never>; Returns: number | null };
       has_credit: { Args: Record<string, never>; Returns: boolean };
+      // BAL-02: computed fields on contacts and companies for the debt columns and filters (owners and admins; null / false for others)
+      debt_balance: { Args: Record<string, never>; Returns: number | null };
+      overdue_debt: { Args: Record<string, never>; Returns: number | null };
+      has_debt: { Args: Record<string, never>; Returns: boolean };
+      has_overdue_debt: { Args: Record<string, never>; Returns: boolean };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+import type { DebtNumbers } from "@/features/balances/debt";
 import Link from "next/link";
 
 import { BulkSelection, RowCheck } from "@/features/bulk/components/bulk-selection";
@@ -29,10 +31,12 @@ type Props = {
   tags: TagOption[];
   // PAY-03: the credit of each row, read only when the column is shown
   credit?: Map<string, number>;
+  // BAL-02: the open and overdue debt of each row, read only when a debt column is shown
+  debt?: Map<string, DebtNumbers>;
 };
 
 /** Companies as a table, with the columns the user chose. */
-export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags, credit }: Props) {
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags, credit, debt }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -113,6 +117,14 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
               // PAY-03: the customer's credit (a contact with a company shows the company's)
               const value = credit?.get(company.id);
               return value === undefined ? null : <span className="tabular-nums">{formatMoney(value)}</span>;
+            }
+            case "debt":
+            case "overdue_debt": {
+              // BAL-02: the customer's open or overdue debt (a contact with a company shows the company's)
+              const value = debt?.get(company.id);
+              if (value === undefined) return null;
+              const amount = key === "debt" ? value.open : value.overdue;
+              return <span className={cn("tabular-nums", key === "overdue_debt" && amount > 0 && "text-danger")}>{formatMoney(amount)}</span>;
             }
             case "original_created":
               return company.originalCreatedOn ? (

@@ -309,6 +309,19 @@ describe("tenant isolation", () => {
         [orgA, ids.companyA],
       ),
     );
+    // BAL-02: the server's debt rows of A's invoice and A's company total (kept by triggers; no client grant)
+    await asAdmin((q) =>
+      q(
+        "insert into public.debt_document_customers (organization_id, document_id, company_id, balance_agorot) values ($1, $2, $3, 500) on conflict (organization_id, document_id, company_id) do nothing",
+        [orgA, ids.contactInvoiceA, ids.companyA],
+      ),
+    );
+    await asAdmin((q) =>
+      q(
+        "insert into public.customer_debt_totals (organization_id, company_id, open_agorot) values ($1, $2, 500) on conflict (organization_id, company_id) do nothing",
+        [orgA, ids.companyA],
+      ),
+    );
     // ORD-05: a customer's answer on an order is written only by public.order_public_decide (no client grant)
     await asAdmin((q) =>
       q("insert into public.order_decisions (organization_id, order_id, decision, content_sha256, ip) values ($1, $2, 'rejected', repeat('0', 64), '203.0.113.7')", [orgA, ids.orderA]),
@@ -437,6 +450,9 @@ describe("tenant isolation", () => {
     // PAY-03
     "payment_credit_companies",
     "customer_credit_totals",
+    // BAL-02
+    "debt_document_customers",
+    "customer_debt_totals",
     // QUO-09
     "quote_decisions",
     // QUO-10
@@ -615,6 +631,9 @@ describe("tenant isolation", () => {
       // PAY-03: no client write grant at all: a permission error is the expected outcome
       payment_credit_companies: "credit_agorot = credit_agorot",
       customer_credit_totals: "credit_agorot = credit_agorot",
+      // BAL-02: no client write grant at all
+      debt_document_customers: "balance_agorot = balance_agorot",
+      customer_debt_totals: "open_agorot = open_agorot",
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
       deal_lines: "quantity = quantity",
@@ -795,6 +814,8 @@ describe("tenant isolation", () => {
       ["insert into public.member_permissions (organization_id, user_id, permissions) values ($1, $2, '{import}')", [orgA, a.id]],
       ["insert into public.payment_credit_companies (organization_id, payment_id, company_id, credit_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.companyA]],
       ["insert into public.customer_credit_totals (organization_id, contact_id, credit_agorot) values ($1, $2, 1)", [orgA, ids.contactA]],
+      ["insert into public.debt_document_customers (organization_id, document_id, contact_id, balance_agorot) values ($1, $2, $3, 1)", [orgA, ids.contactInvoiceA, ids.contactA]],
+      ["insert into public.customer_debt_totals (organization_id, contact_id, open_agorot) values ($1, $2, 1)", [orgA, ids.contactA]],
     ];
     for (const [sql, params] of inserts) {
       const err = await pgError(asUser(b.id, (q) => q(sql, params)));
@@ -904,6 +925,8 @@ describe("tenant isolation", () => {
       ["opening_credit_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_credit_companies", "credit_agorot = 777", "credit_agorot = 777"],
       ["customer_credit_totals", "credit_agorot = 777", "credit_agorot = 777"],
+      ["debt_document_customers", "balance_agorot = 777", "balance_agorot = 777"],
+      ["customer_debt_totals", "open_agorot = 777", "open_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
       ["consent_blocklist", "removed_at = now(), removed_reason = 'other'", "removed_at is not null"],

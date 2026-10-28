@@ -61,6 +61,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "completeness", label: "שלמות" },
       // PAY-03: the customer's credit, only where the business sees money (CREDIT_COLUMN)
       { key: "credit", label: "יתרת זכות" },
+      // BAL-02: the customer's open and overdue debt, only where the business sees balances (DEBT_COLUMNS)
+      { key: "debt", label: "יתרת חוב" },
+      { key: "overdue_debt", label: "חוב באיחור" },
     ],
     defaults: ["phone", "email", "company", "owner", "created"],
   },
@@ -77,6 +80,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "original_created", label: "תאריך יצירה מקורי" },
       // PAY-03
       { key: "credit", label: "יתרת זכות" },
+      // BAL-02
+      { key: "debt", label: "יתרת חוב" },
+      { key: "overdue_debt", label: "חוב באיחור" },
     ],
     defaults: ["phone", "city", "owner", "created"],
   },
@@ -179,22 +185,32 @@ export const CUSTOM_PREFIX = "cf:";
 export const PRODUCT_COLUMN = "product";
 // PAY-03: the contacts' and companies' credit column, offered only with the money keys (payments and documents)
 export const CREDIT_COLUMN = "credit";
+// BAL-02: the contacts' and companies' debt columns, offered only with the balances keys (balances, documents, payments)
+export const DEBT_COLUMNS: readonly string[] = ["debt", "overdue_debt"];
 
 /**
  * Every column a list can show: the built-in ones, then the organization's custom fields.
  * `products`: whether the business has the product catalog (the leads' product column); `money`: whether it sees the
- * customer's credit (the contacts' and companies' credit column).
+ * customer's credit (the contacts' and companies' credit column); `debt`: whether it sees the customer's debt (BAL-02).
  */
-export function catalogFor(object: ListObject, fields: Array<{ key: string; label: string }>, options: { products?: boolean; money?: boolean } = {}): CatalogColumn[] {
+export function catalogFor(
+  object: ListObject,
+  fields: Array<{ key: string; label: string }>,
+  options: { products?: boolean; money?: boolean; debt?: boolean } = {},
+): CatalogColumn[] {
   const builtIn = BUILT_IN[object].columns.filter(
-    (column) => (object !== "lead" || column.key !== PRODUCT_COLUMN || options.products === true) && (column.key !== CREDIT_COLUMN || options.money === true),
+    (column) =>
+      (object !== "lead" || column.key !== PRODUCT_COLUMN || options.products === true) &&
+      (column.key !== CREDIT_COLUMN || options.money === true) &&
+      (!DEBT_COLUMNS.includes(column.key) || options.debt === true),
   );
   return [...builtIn, ...fields.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
 }
 
-/** PAY-03: a list's sort keys without the credit column when the list does not offer it (people who do not see money). */
+/** PAY-03, BAL-02: a list's sort keys without the money columns the list does not offer (people who do not see money). */
 export function offeredSortKeys(keys: string[], catalog: CatalogColumn[]): string[] {
-  return catalog.some((column) => column.key === CREDIT_COLUMN) ? keys : keys.filter((key) => key !== CREDIT_COLUMN);
+  const gated = [CREDIT_COLUMN, ...DEBT_COLUMNS];
+  return keys.filter((key) => !gated.includes(key) || catalog.some((column) => column.key === key));
 }
 
 export const columnChoicesSchema = z

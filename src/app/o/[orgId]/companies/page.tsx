@@ -11,9 +11,10 @@ import { PlusIcon, SearchIcon, BuildingIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
 import { getCreditNumbers } from "@/features/allocations/queries";
+import { getDebtNumbers } from "@/features/balances/queries";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { withFieldRefs } from "@/features/custom-fields/refs";
@@ -73,6 +74,8 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const shownColumns = activeView?.config.columns ? resolveColumns("company", activeView.config.columns, listColumns.catalog) : listColumns.columns;
   // PAY-03: the credit only when the column is shown (it is in the catalog only for people who see money)
   const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
+  // BAL-02: the debt only when a debt column is shown (in the catalog only for people who see balances)
+  const debt = shownColumns.some((c) => DEBT_COLUMNS.includes(c.key)) ? await getDebtNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -183,6 +186,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               editing={editing}
               tags={tags}
               credit={credit}
+              debt={debt}
             />
           </div>
         </>

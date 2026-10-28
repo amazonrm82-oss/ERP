@@ -40,6 +40,9 @@ export const COMPANY_SORT_COLUMNS = {
   original_created: "original_created_on",
   // PAY-03: computed field public.credit_balance(companies); offered only with the money keys (offeredSortKeys)
   credit: "credit_balance",
+  // BAL-02: computed fields public.debt_balance / overdue_debt(companies); offered only with the balances keys
+  debt: "debt_balance",
+  overdue_debt: "overdue_debt",
 } as const;
 export type CompanySortKey = keyof typeof COMPANY_SORT_COLUMNS;
 export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascending: true };

@@ -199,6 +199,18 @@ describe("currency next to every amount", () => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לסך יתרה') returning id", [org])).rows[0].id;
         await q("insert into public.customer_credit_totals (organization_id, contact_id, credit_agorot) values ($1, $2, 1000)", [org, contact]);
       },
+      // BAL-02 (triggers are off here: the rows are the server's)
+      debt_document_customers: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לחוב') returning id", [org])).rows[0].id;
+        const document = (
+          await q<{ id: string }>("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', 'CUR-DB', 1000) returning id", [org, contact])
+        ).rows[0].id;
+        await q("insert into public.debt_document_customers (organization_id, document_id, contact_id, balance_agorot) values ($1, $2, $3, 1000) on conflict (organization_id, document_id, contact_id) do nothing", [org, document, contact]);
+      },
+      customer_debt_totals: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לסך חוב') returning id", [org])).rows[0].id;
+        await q("insert into public.customer_debt_totals (organization_id, contact_id, open_agorot) values ($1, $2, 1000) on conflict (organization_id, contact_id) do nothing", [org, contact]);
+      },
       // QUO-04
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;

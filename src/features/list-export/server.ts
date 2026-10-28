@@ -2,6 +2,7 @@ import "server-only";
 
 import { sourceLine } from "@/features/attribution/source";
 import { getCreditNumbers } from "@/features/allocations/queries";
+import { getDebtNumbers } from "@/features/balances/queries";
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
 import { channelLabel, localeLabel } from "@/features/contacts/preferences";
@@ -15,7 +16,7 @@ import { displayCustomFields } from "@/features/custom-fields/values";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
-import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
 import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -100,6 +101,8 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   const percent = (score: number | undefined) => (score === undefined ? null : `${score}%`);
   // PAY-03: the credit column is read only when it is exported (in the catalog only for people who see money)
   const withCredit = columns.some((column) => column.key === "credit");
+  // BAL-02: the debt columns are read only when one is exported (in the catalog only for people who see balances)
+  const withDebt = columns.some((column) => DEBT_COLUMNS.includes(column.key));
   const money = (value: number | undefined) => (value === undefined ? null : formatMoney(value));
 
   // one page of the list as export rows; read page after page until a short page (RVW-2: a read
@@ -136,6 +139,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
       const page = await listContacts(orgId, { ...options, chunk });
       const scores = withScores ? await getScoreNumbers(orgId, "contact", page.contacts.map((contact) => contact.id)) : null;
       const credits = withCredit ? await getCreditNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
+      const debts = withDebt ? await getDebtNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
       for (const contact of page.contacts) {
         rows.push({
           name: contactDisplayName(contact),
@@ -157,6 +161,8 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             original_created: contact.originalCreatedOn ? formatDate(contact.originalCreatedOn) : null,
             completeness: percent(scores?.get(contact.id)),
             credit: money(credits?.get(contact.id)),
+            debt: money(debts?.get(contact.id)?.open),
+            overdue_debt: money(debts?.get(contact.id)?.overdue),
           },
         });
       }
@@ -204,6 +210,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
     } else {
       const page = await listCompanies(orgId, { ...options, chunk });
       const credits = withCredit ? await getCreditNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
+      const debts = withDebt ? await getDebtNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
       for (const company of page.companies) {
         rows.push({
           name: company.name,
@@ -217,6 +224,8 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             created: created(company.createdAt),
             original_created: company.originalCreatedOn ? formatDate(company.originalCreatedOn) : null,
             credit: money(credits?.get(company.id)),
+            debt: money(debts?.get(company.id)?.open),
+            overdue_debt: money(debts?.get(company.id)?.overdue),
           },
         });
       }

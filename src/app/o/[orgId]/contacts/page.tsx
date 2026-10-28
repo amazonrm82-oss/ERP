@@ -12,10 +12,11 @@ import { PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
 import { getCreditNumbers } from "@/features/allocations/queries";
+import { getDebtNumbers } from "@/features/balances/queries";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { withFieldRefs } from "@/features/custom-fields/refs";
@@ -92,6 +93,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const completeness = shownColumns.some((c) => c.key === "completeness") && contacts.length > 0 ? await getScoreNumbers(orgId, "contact", contacts.map((c) => c.id)) : undefined;
   // PAY-03: the credit only when the column is shown (it is in the catalog only for people who see money)
   const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
+  // BAL-02: the debt only when a debt column is shown (in the catalog only for people who see balances)
+  const debt = shownColumns.some((c) => DEBT_COLUMNS.includes(c.key)) ? await getDebtNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -222,6 +225,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               tags={tags}
               completeness={completeness}
               credit={credit}
+              debt={debt}
               whatsapp={whatsappListContext(context)}
               segments={segmentOptions}
             />

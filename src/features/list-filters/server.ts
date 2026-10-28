@@ -68,6 +68,8 @@ type Lookups = {
   units?: Option[];
   // PAY-03: contacts and companies offer "יש יתרת זכות" only where the business sees money
   money?: boolean;
+  // BAL-02: contacts and companies offer "יש חוב פתוח" / "יש חוב באיחור" only where the business sees balances
+  debt?: boolean;
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -86,7 +88,16 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
   const text = (key: string, label: string, column: string): ServerField => ({ key, label, kind: "text", column });
   const type: ServerField = { key: "type", label: "סוג", kind: "select", column: "type_id", options: lookups.types ?? [] };
   // PAY-03: the computed field public.has_credit (the cards' rule; false without the money keys)
-  const credit: ServerField[] = lookups.money ? [{ key: "has_credit", label: "יש יתרת זכות", kind: "checkbox", column: "has_credit" }] : [];
+  const credit: ServerField[] = [
+    ...(lookups.money ? [{ key: "has_credit", label: "יש יתרת זכות", kind: "checkbox" as const, column: "has_credit" }] : []),
+    // BAL-02: the computed fields public.has_debt / has_overdue_debt (the kept totals; false without the balances keys)
+    ...(lookups.debt
+      ? [
+          { key: "has_debt", label: "יש חוב פתוח", kind: "checkbox" as const, column: "has_debt" },
+          { key: "has_overdue_debt", label: "יש חוב באיחור", kind: "checkbox" as const, column: "has_overdue_debt" },
+        ]
+      : []),
+  ];
 
   const builtIn: Record<FilterObject, ServerField[]> = {
     lead: [
