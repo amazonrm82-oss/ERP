@@ -11,7 +11,8 @@ const MARK = "שותף מהטלפון";
 /**
  * WAB-06, owner's answer of 27 October 2026 (ב): what the share flow saves is a 'share_note' ("הערת שיתוף") by the person,
  * first line "שותף מהטלפון". A person's note on the timeline, but neither contact (a shared lead still waits) nor activity
- * (lead's decision: like an import note). Written only by someone who may edit the record.
+ * (lead's decision: like an import note). Written by anyone who may write an ordinary note on the record (owner, 28 October
+ * 2026: a writer who reads it).
  */
 describe("share note (WAB-06)", () => {
   let owner: U, rep: U, other: U, manager: U, viewer: U, outsider: U;
@@ -81,33 +82,67 @@ describe("share note (WAB-06)", () => {
     ).toBe("activity_type:invalid");
   });
 
-  it("only someone who may edit every record of the entry writes one", async () => {
+  it("anyone who may write an ordinary note there writes one: a writer who reads every record of the entry (owner, 28 October 2026)", async () => {
+    const note = (who: U, column: "lead_id" | "contact_id", id: string, body = "הערה") =>
+      asUser(who.id, (q) => q(`insert into public.activities (organization_id, type, body, ${column}) values ($1, 'note', $2, $3)`, [org, body, id]));
     const lead = await insertLead(rep.id, org, { full_name: "של הנציג", owner_id: rep.id });
-    // another member reads it and may log an ordinary note there, but may not edit it, so no share note
+    // another member reads it but may not edit it: an ordinary note and a share note both pass
     expect(await asUser(other.id, (q) => count(q, "select 1 from public.leads where id = $1", [lead]))).toBe(1);
-    await asUser(other.id, (q) => q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'note', 'הערה', $2)", [org, lead]));
-    expect((await pgError(share(other, "lead_id", lead))).code).toBe("42501");
-    expect((await pgError(share(viewer, "lead_id", lead))).code).toBe("42501");
-    // a manager without a team over the lead neither; owners do
-    expect((await pgError(share(manager, "lead_id", lead))).code).toBe("42501");
+    expect(await asUser(other.id, (q) => count(q, "select 1 from public.leads where id = $1 and app.can_edit_record(organization_id, owner_id, team_id)", [lead]))).toBe(0);
+    await note(other, "lead_id", lead);
+    expect(await share(other, "lead_id", lead)).toMatch(/^[0-9a-f-]{36}$/);
+    // a manager without a team over the lead too; owners too
+    expect(await share(manager, "lead_id", lead)).toMatch(/^[0-9a-f-]{36}$/);
     expect(await share(owner, "lead_id", lead)).toMatch(/^[0-9a-f-]{36}$/);
-    // an outsider, naming this business
+    expect(await asAdmin((q) => q("select created_by from public.activities where lead_id = $1 and type = 'share_note' order by created_at", [lead])).then((r) => r.rows.map((x) => x.created_by))).toEqual([
+      other.id,
+      manager.id,
+      owner.id,
+    ]);
+    // a viewer reads it but writes neither
+    expect(await asUser(viewer.id, (q) => count(q, "select 1 from public.leads where id = $1", [lead]))).toBe(1);
+    expect((await pgError(note(viewer, "lead_id", lead))).code).toBe("42501");
+    expect((await pgError(share(viewer, "lead_id", lead))).code).toBe("42501");
+    // an outsider, naming this business, writes neither
     expect((await pgError(share(outsider, "lead_id", lead))).code).toBe("42501");
-    // a record in the bin
+    expect((await pgError(asUser(outsider.id, (q) => q("insert into public.activities (organization_id, type, body, lead_id) values ($1, 'note', 'x', $2)", [org, lead])))).code).toBe("42501");
+    // a record the person cannot read: neither (the business shows each member only their own leads)
+    await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      const hidden = await insertLead(rep.id, org, { full_name: "מוסתר", owner_id: rep.id });
+      expect(await asUser(other.id, (q) => count(q, "select 1 from public.leads where id = $1", [hidden]))).toBe(0);
+      expect((await pgError(note(other, "lead_id", hidden))).code).toBe("42501");
+      expect((await pgError(share(other, "lead_id", hidden))).code).toBe("42501");
+      // two records, one of them not readable
+      const mine = await insertLead(other.id, org, { owner_id: other.id });
+      const hiddenContact = await asUser(rep.id, async (q) => (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'של הנציג', $2) returning id", [org, rep.id])).rows[0].id);
+      expect(await asUser(other.id, (q) => count(q, "select 1 from public.contacts where id = $1", [hiddenContact]))).toBe(0);
+      expect(
+        (
+          await pgError(
+            asUser(other.id, (q) => q("insert into public.activities (organization_id, type, body, lead_id, contact_id) values ($1, 'share_note', $2, $3, $4)", [org, MARK, mine, hiddenContact])),
+          )
+        ).code,
+      ).toBe("42501");
+      expect(await share(other, "lead_id", mine)).toMatch(/^[0-9a-f-]{36}$/);
+      expect(await asAdmin((q) => count(q, "select 1 from public.activities where lead_id = $1", [hidden]))).toBe(0);
+    } finally {
+      await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
+    // a share note on a record in the bin follows the ordinary note: same answer for both
     const binned = await insertLead(rep.id, org, { owner_id: rep.id });
     await asUser(owner.id, (q) => q("update public.leads set deleted_at = now() where id = $1", [binned]));
-    expect((await pgError(share(owner, "lead_id", binned))).code).toBe("42501");
-    // two records, one of them not editable
-    const mine = await insertLead(other.id, org, { owner_id: other.id });
-    const contact = await asUser(rep.id, async (q) => (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'של הנציג') returning id", [org])).rows[0].id);
-    expect(
-      (
-        await pgError(
-          asUser(other.id, (q) => q("insert into public.activities (organization_id, type, body, lead_id, contact_id) values ($1, 'share_note', $2, $3, $4)", [org, MARK, mine, contact])),
-        )
-      ).code,
-    ).toBe("42501");
-    expect(await asAdmin((q) => count(q, "select 1 from public.activities where lead_id = $1 and type = 'share_note' and created_by <> $2", [lead, owner.id]))).toBe(0);
+    const noteAnswer = await note(owner, "lead_id", binned).then(
+      () => "ok",
+      (e: { code?: string }) => e.code,
+    );
+    const shareAnswer = await share(owner, "lead_id", binned).then(
+      () => "ok",
+      (e: { code?: string }) => e.code,
+    );
+    expect(shareAnswer).toBe(noteAnswer);
+    // the mark is still required of a reader
+    expect((await pgError(share(other, "lead_id", lead, "בלי סימון"))).hint).toBe("share_note:mark");
   });
 
   it("its author edits and deletes it for 24 hours like a note; others do not", async () => {

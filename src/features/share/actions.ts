@@ -46,13 +46,13 @@ export async function searchShareRecordsAction(orgId: string, query: string): Pr
 
 const NOTE_EMPTY = "יש לכתוב את ההערה לפני השמירה.";
 const NOTE_TOO_LONG = "ההערה ארוכה מדי (עד 5,000 תווים).";
-const SHARE_NOTE_NO_EDIT = "אין לכם הרשאה לערוך את הרשומה הזו, ולכן אי אפשר לשמור עליה הערת שיתוף. בחרו רשומה אחרת.";
+const SHARE_NOTE_NOT_ALLOWED = "אין לכם הרשאה להוסיף הערה לרשומה הזו. בחרו רשומה אחרת.";
 
 /**
  * WAB-06 (owner, 27 October 2026, answer (ב)): saves what was shared as a "הערת שיתוף" ('share_note') on a record: the mark
  * "שותף מהטלפון", then the text, by the person, with the user's session. It is not contact with the customer, so a lead
- * saved from a share still waits for an answer. The database lets only someone who may edit the record write one
- * (activities_insert). Text may be empty only when an image goes with it (the image is then a file of this note, REC-07).
+ * saved from a share still waits for an answer. The database lets anyone who may write an ordinary note there write one
+ * (activities_insert: a writer of a writable business who reads the record; owner, 28 October 2026). Text may be empty only when an image goes with it (the image is then a file of this note, REC-07).
  */
 export async function addShareNoteAction(
   orgId: string,
@@ -85,9 +85,9 @@ export async function addShareNoteAction(
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
   const { data, error } = await context.supabase.from("activities").insert(row).select("id").single();
   if (error) {
-    // a share note needs edit rights on the record (owner's question pending, DECISIONS.md WAB-06): say so plainly
+    // the rule of an ordinary note (a writer who reads the record): a viewer, or a record no longer readable
     if (error.code === "42501") {
-      return fail(SHARE_NOTE_NO_EDIT);
+      return fail(SHARE_NOTE_NOT_ALLOWED);
     }
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את ההערה. נסו שוב."));
   }
