@@ -1,0 +1,41 @@
+{
+  "to": "2026-10-29",
+  "from": "2026-10-27",
+  "today": "2026-10-28",
+  "by_rep": [
+    {
+      "amount": 5000,
+      "owner_id": "00000000-0000-4000-8000-000000000007",
+      "payments": 1
+    }
+  ],
+  "totals": {
+    "amount": 5000,
+    "payments": 1
+  },
+  "allowed": true,
+  "partial": false,
+  "by_month": [
+    {
+      "month": "2026-10-01",
+      "amount": 5000,
+      "payments": 1
+    }
+  ],
+  "by_method": [
+    {
+      "amount": 5000,
+      "method": "transfer",
+      "payments": 1
+    }
+  ],
+  "collection_days": {
+    "documents": 1,
+    "median_days": null,
+    "average_days": null,
+    "min_documents": 5,
+    "with_due_date": 1,
+    "late_documents": 1,
+    "average_days_late": null
+  }
+}

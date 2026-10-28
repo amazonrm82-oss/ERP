@@ -216,6 +216,20 @@ describe("report result shapes (FXC-12)", () => {
         "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', 'SH-1', (now() - interval '40 days')::date, 11700, (now() - interval '10 days')::date)",
         [org, contact],
       );
+      // COL-06: a document paid in full by a payment of today (report_collection's months, methods, reps and days)
+      const paidDoc = (
+        await q<{ id: string }>(
+          "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', 'SH-2', (now() - interval '20 days')::date, 5000, (now() - interval '5 days')::date) returning id",
+          [org, contact],
+        )
+      ).rows[0].id;
+      const payment = (
+        await q<{ id: string }>(
+          "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 5000, (now() at time zone 'Asia/Jerusalem')::date, 'transfer') returning id",
+          [org, contact],
+        )
+      ).rows[0].id;
+      await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 5000)", [org, payment, paidDoc]);
     });
 
     const range = [org, from(), to()];
@@ -244,6 +258,10 @@ describe("report result shapes (FXC-12)", () => {
       report_referrals: ["public.report_referrals($1, $2, $3)", range],
       report_quotes: ["public.report_quotes($1, $2, $3)", range],
       report_debt_aging: ["public.report_debt_aging($1)", [org]],
+      report_collection: [
+        "public.report_collection($1, ((now() at time zone 'Asia/Jerusalem')::date - 1), ((now() at time zone 'Asia/Jerusalem')::date + 1))",
+        [org],
+      ],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

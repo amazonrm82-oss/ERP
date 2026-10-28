@@ -14,6 +14,7 @@ import { findReport, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { canViewCosts } from "@/features/permissions/keys";
 import { seesBalances } from "@/features/balances/queries";
+import { getCollectionAccess } from "@/features/collection/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
@@ -55,10 +56,15 @@ export default async function ReportPage({ params, searchParams }: Props) {
   if (definition.balances && !(await seesBalances(orgId))) {
     notFound();
   }
+  // COL-06: the collection report does not exist for someone who does not open the collection screen
+  if (definition.collection && !(await getCollectionAccess(orgId)).canOpen) {
+    notFound();
+  }
   const filters = reportFilters(definition, await searchParams);
 
   const [view, members, pipelines] = await Promise.all([
-    withReportShape(() => buildReport(orgId, definition.key, filters)),
+    // COL-06: the link to the debt aging report only for those who may open it
+    withReportShape(async () => buildReport(orgId, definition.key, filters, { balances: definition.collection ? await seesBalances(orgId) : false })),
     definition.filters.includes("owner") ? listMembers(orgId) : Promise.resolve([]),
     definition.filters.includes("pipeline") ? listPipelines(orgId) : Promise.resolve([]),
   ]);

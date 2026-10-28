@@ -4,6 +4,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { REPORTS } from "@/features/reports/definitions";
+import { reportXlsxRows } from "@/features/reports/xlsx";
 import { REPORT_FUNCTIONS, REPORT_SHAPE_MESSAGE, ReportShapeError, keyPaths, parseReportData, withReportShape, type ReportFunction } from "@/features/reports/schemas";
 
 // FXC-12: every report result is checked against a schema before it is shaped. The samples in
@@ -188,6 +189,33 @@ describe("report shaping from the saved samples", () => {
     })();
     expect(full.sections.map((s) => s.title)).toEqual(["לפי ותק", "לפי לקוח"]);
     expect(full.sections[1].rows[0]).toMatchObject({ customer: "חייב", d1_30: 11700, total: 11700 });
+  });
+
+  it("COL-06: collection by month, method and rep; a partial view keeps its rows, says so once, and has no total, share or days", async () => {
+    const full = await buildReport("00000000-0000-4000-8000-000000000099", "collection", filters);
+    expect(full.sections.map((s) => s.title)).toEqual(["לפי חודש", "לפי אמצעי תשלום", "לפי נציג", "ימי גבייה"]);
+    expect(full.sections[1].rows[0]).toMatchObject({ method: "העברה בנקאית", amount: 5000, payments: 1, percent: 100 });
+    expect(full.kpis[0]).toMatchObject({ label: "נגבה בתקופה", hint: "תשלום אחד" });
+    expect(full.note).toBeUndefined();
+    expect(full.sections[3].note).toContain("נדרשים לפחות 5 מסמכים");
+    // the debt aging link only for those who see balances; never exported
+    const withLink = await buildReport("00000000-0000-4000-8000-000000000099", "collection", filters, { balances: true });
+    expect(withLink.sections.at(-1)).toMatchObject({ title: "חוב לפי גיל", exported: false });
+    expect(withLink.sections.at(-1)?.rows[0]._href).toMatch(/\/reports\/debt_aging$/);
+    expect(reportXlsxRows("גבייה", null, withLink).some((row) => row.some((cell) => cell === "דוח גיול חובות"))).toBe(false);
+
+    const data = sample("report_collection") as Record<string, unknown>;
+    const nulls = { min_documents: 5, documents: null, average_days: null, median_days: null, with_due_date: null, average_days_late: null, late_documents: null };
+    results.report_collection = { ...data, partial: true, totals: null, collection_days: nulls };
+    const partial = await buildReport("00000000-0000-4000-8000-000000000099", "collection", filters);
+    expect(partial.note).toBe("דוח חלקי: מוצגים רק התשלומים והמסמכים שיש לך גישה אליהם, ולכן אין סכום כולל וימי הגבייה מוצגים רק בדוח המלא.");
+    expect(partial.sections.every((s) => !s.note?.includes("דוח חלקי"))).toBe(true);
+    expect(partial.kpis.map((k) => k.value)).toEqual(["—", "—", "—"]);
+    expect(partial.sections[0].rows[0]).toMatchObject({ amount: 5000 });
+    expect(partial.sections[1].rows[0].percent).toBeNull();
+    expect(partial.sections[3]).toMatchObject({ rows: [], empty: "ימי הגבייה מוצגים רק בדוח המלא." });
+    results.report_collection = { allowed: false };
+    expect((await buildReport("00000000-0000-4000-8000-000000000099", "collection", filters)).sections).toEqual([]);
   });
 
     it("DLI-06: only the gross profit report is about costs", () => {

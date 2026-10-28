@@ -424,6 +424,40 @@ export const REPORT_SCHEMAS = {
     z.object({ allowed: z.literal(true), partial: z.literal(true) }).strict(),
     z.object({ allowed: z.literal(false) }).strict(),
   ]),
+  // COL-06: payments collected in the period (recorded/confirmed) by month, method and rep, and the collection days of the
+  // debt documents fully paid in it; {allowed: false} without the rights or keys; a partial view has rows but no totals
+  report_collection: z.union([
+    z
+      .object({
+        allowed: z.literal(true),
+        partial: z.boolean(),
+        today: day,
+        from: day,
+        to: day,
+        totals: z.object({ amount, payments: count }).strict().nullable(),
+        by_month: z.array(z.object({ month: day, amount, payments: count }).strict()),
+        by_method: z.array(
+          z
+            .object({ method: z.enum(["credit", "transfer", "cash", "cheque", "bit_paybox", "standing_order", "other"]), amount, payments: count })
+            .strict(),
+        ),
+        by_rep: z.array(z.object({ owner_id: id, amount, payments: count }).strict()),
+        // a partial view: every figure but min_documents is null (an unreadable allocation could hold the real last date)
+        collection_days: z
+          .object({
+            min_documents: count,
+            documents: count.nullable(),
+            average_days: decimal,
+            median_days: decimal,
+            with_due_date: count.nullable(),
+            average_days_late: decimal,
+            late_documents: count.nullable(),
+          })
+          .strict(),
+      })
+      .strict(),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
   report_quotes: z.object({
     rate_min: count,
     totals: z.object({

@@ -11,6 +11,8 @@ import { formatCell } from "../format";
 export function ReportBody({ view, replace = {} }: { view: ReportView; replace?: Record<string, ReactNode> }) {
   return (
     <div className="space-y-5">
+      {/* a note about the whole report (a refusal, or COL-06's partial view) */}
+      {view.note ? <p className="rounded-lg border border-line bg-surface px-4 py-3 text-md text-ink-soft">{view.note}</p> : null}
       {view.kpis.length > 0 ? (
         <dl className="grid gap-3 sm:grid-cols-3">
           {view.kpis.map((kpi) => (

@@ -33,7 +33,7 @@ export function reportXlsxRows(title: string, period: { fromDate: string; toDate
   if (period) {
     rows.push(["תקופה", { type: "date", value: period.fromDate }, { type: "date", value: period.toDate }]);
   }
-  for (const section of view.sections) {
+  for (const section of view.sections.filter((s) => s.exported !== false)) {
     rows.push([], [{ type: "text", value: section.title, bold: true }]);
     rows.push(section.columns.map((c) => ({ type: "text", value: c.kind === "money" ? `${c.label} (₪)` : c.label, bold: true })));
     for (const row of section.rows) {

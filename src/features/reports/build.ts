@@ -22,6 +22,8 @@ import { byGender } from "@/features/terminology/terms";
 import { createClient } from "@/lib/supabase/server";
 
 import { AGING_BUCKETS } from "@/features/balances/debt";
+import { collectionPath } from "@/features/payments/paths";
+import { PAYMENT_METHOD_LABELS } from "@/features/payments/schema";
 
 import type { ReportColumn, ReportRow, ReportSection, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
@@ -42,6 +44,9 @@ const list = (value: Json | null): Obj[] => (Array.isArray(value) ? (value as Ob
 const obj = (value: Json | null | undefined): Obj => (value && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {});
 
 const NO_OWNER = "ללא אחראי";
+// COL-06 (COL-01's partial rule): what a caller who does not read every money row sees
+export const COLLECTION_PARTIAL_NOTE = "דוח חלקי: מוצגים רק התשלומים והמסמכים שיש לך גישה אליהם, ולכן אין סכום כולל וימי הגבייה מוצגים רק בדוח המלא.";
+const paymentsCount = (n: number): string => (n === 1 ? "תשלום אחד" : `${formatNumber(n)} תשלומים`);
 const monthFormat = new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" });
 
 // RPT-01: a line's billing, and what a total of that billing is
@@ -160,7 +165,7 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
   return { sections, note: null };
 }
 
-export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean } = {}): Promise<ReportView> {
+export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean; balances?: boolean } = {}): Promise<ReportView> {
   // FLD-10 part two: titles and column headers name leads and deals in the business's own words (notes and empty texts
   // keep today's words)
   const terms = await getOrgTerms(orgId);
@@ -1287,6 +1292,118 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             note: "לקוח הוא החברה של המסמך (החברה שלו, של איש הקשר שלו או של העסקה שלו), ואם אין, איש הקשר, ואם אין, העסקה. הלקוחות עם החוב הגדול ביותר באיחור קודם; עד 300 לקוחות, והסיכומים למעלה כוללים את כולם.",
           },
         ],
+      };
+    }
+
+    case "collection": {
+      // COL-06: payments collected in the period (recorded or confirmed) by month, method and rep, and the collection days
+      // of the debt documents fully paid in it; COL-01's rights and partial rule in the database
+      const data = parseReportData(
+        "report_collection",
+        await rpc("report_collection", { p_org: orgId, p_from: period.fromDate, p_to: period.toDate, p_owner: ownerId }),
+      );
+      if (!data.allowed) {
+        return { kpis: [], sections: [], note: "רק מי שרואה את מסך הגבייה (בעלים, מנהלי מערכת, מנהלים ומי שרושם תשלומים) רואה את הדוח הזה." };
+      }
+      const partial = data.partial || data.totals === null;
+      const shown = data.by_method.reduce((sum, r) => sum + r.amount, 0);
+      const name = await ownerNames(data.by_rep.map((r) => r.owner_id));
+      const days = data.collection_days;
+      const dayFigure = (value: number | null) => (value === null ? "—" : `${formatNumber(value)} ימים`);
+      const sections: ReportSection[] = [
+        {
+          title: "לפי חודש",
+          columns: [
+            { key: "month", label: "חודש", kind: "text" },
+            { key: "amount", label: "נגבה", kind: "money" },
+            { key: "payments", label: "תשלומים", kind: "number" },
+          ],
+          rows: data.by_month.map((r): ReportRow => ({ month: monthLabel(r.month), amount: r.amount, payments: r.payments })),
+          bar: "amount",
+          empty: "אין חודשים בתקופה הזו.",
+          note: "נספרים תשלומים שנרשמו או אושרו, לפי תאריך התשלום. תשלומים שנכשלו, הוחזרו או בוטלו לא נספרים. סכומים כפי שנרשמו בתשלום.",
+        },
+        {
+          title: "לפי אמצעי תשלום",
+          columns: [
+            { key: "method", label: "אמצעי", kind: "text" },
+            { key: "amount", label: "נגבה", kind: "money" },
+            { key: "payments", label: "תשלומים", kind: "number" },
+            { key: "percent", label: "חלק מהגבייה", kind: "percent" },
+          ],
+          rows: data.by_method.map(
+            (r): ReportRow => ({ method: PAYMENT_METHOD_LABELS[r.method], amount: r.amount, payments: r.payments, percent: partial ? null : pct(r.amount, shown) }),
+          ),
+          bar: "amount",
+          empty: "לא נגבו תשלומים בתקופה הזו.",
+        },
+        {
+          title: "לפי נציג",
+          columns: [
+            { key: "owner", label: "נציג", kind: "text" },
+            { key: "amount", label: "נגבה", kind: "money" },
+            { key: "payments", label: "תשלומים", kind: "number" },
+          ],
+          rows: data.by_rep.map((r): ReportRow => ({ owner: name(r.owner_id), amount: r.amount, payments: r.payments })),
+          bar: "amount",
+          empty: "לא נגבו תשלומים בתקופה הזו.",
+          note: "הנציג הוא האחראי על העסקה של התשלום, ואם אין, על איש הקשר.",
+        },
+        {
+          title: "ימי גבייה",
+          columns: [
+            { key: "measure", label: "מדד", kind: "text" },
+            { key: "days", label: "ימים", kind: "days" },
+            { key: "documents", label: "מסמכים", kind: "number" },
+          ],
+          rows: partial
+            ? []
+            : [
+                { measure: "ממוצע ימים מתאריך המסמך עד התשלום המלא", days: days.average_days, documents: days.documents },
+                { measure: "חציון ימים מתאריך המסמך עד התשלום המלא", days: days.median_days, documents: days.documents },
+                { measure: "ממוצע ימי איחור אחרי מועד התשלום", days: days.average_days_late, documents: days.with_due_date },
+              ],
+          empty: "ימי הגבייה מוצגים רק בדוח המלא.",
+          note: [
+            "נספרים חשבוניות מס וחשבונות עסקה ששולמו במלואם, שהתשלום האחרון שהוקצה להם נרשם בתקופה. הימים נספרים מתאריך המסמך עד תאריך התשלום האחרון; ימי איחור נספרים רק במסמכים עם מועד תשלום, ומסמך ששולם בזמן נספר כ-0.",
+            !partial && (days.documents ?? 0) < days.min_documents ? `נדרשים לפחות ${formatNumber(days.min_documents)} מסמכים כדי להציג ממוצע.` : null,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        },
+      ];
+      // the open debt by age is BAL-03's report, for those who see balances; a link, not data, so it is not exported
+      if (options.balances) {
+        sections.push({
+          title: "חוב לפי גיל",
+          columns: [{ key: "where", label: "איפה רואים", kind: "text" }],
+          rows: [
+            { _href: paths.report(orgId, "debt_aging"), where: "דוח גיול חובות" },
+            { _href: collectionPath(orgId), where: "מסך הגבייה" },
+          ],
+          empty: "",
+          note: "החוב הפתוח לפי ותק, נכון להיום, מופיע בדוח גיול החובות ובמסך הגבייה.",
+          exported: false,
+        });
+      }
+      return {
+        kpis: [
+          data.totals
+            ? { label: "נגבה בתקופה", value: formatMoney(data.totals.amount), hint: paymentsCount(data.totals.payments) }
+            : { label: "נגבה בתקופה", value: "—", hint: "דוח חלקי: אין סכום כולל" },
+          {
+            label: "ימי גבייה בממוצע",
+            value: dayFigure(days.average_days),
+            hint: days.documents === null ? "רק בדוח המלא" : `${formatNumber(days.documents)} מסמכים ששולמו במלואם`,
+          },
+          {
+            label: "ימי איחור בממוצע",
+            value: dayFigure(days.average_days_late),
+            hint: days.late_documents === null ? "רק בדוח המלא" : `${formatNumber(days.late_documents)} מסמכים שולמו אחרי מועד התשלום`,
+          },
+        ],
+        note: partial ? COLLECTION_PARTIAL_NOTE : undefined,
+        sections,
       };
     }
 

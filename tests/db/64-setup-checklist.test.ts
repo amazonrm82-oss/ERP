@@ -634,6 +634,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_promise_erasure.sql",
       // COL-04 redefines app.import_record_worked() of _opening_import_undo.sql last (a reminder task is not work)
       "_collection_reminder_import_undo.sql",
+      // COL-06 redefines public.log_export() of _debt_aging.sql last (the collection report key)
+      "_collection_report.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

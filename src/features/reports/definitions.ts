@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -18,6 +18,9 @@ export type ReportDefinition = {
   // BAL-03: shown, opened and exported only by those who open a customer's ledger (BAL-01: owners, admins, managers and
   // holders of record_payments) with the balances, documents and payments keys; the SQL answers {allowed: false} to others
   balances?: true;
+  // COL-06: shown, opened and exported only by those who open the collection screen (COL-01: BAL-01's rule with the
+  // collection, documents and payments keys); the SQL answers {allowed: false} to others
+  collection?: true;
   // LEAD-08: a report about one module only, left out of the index while the business has that module switched off
   module?: "leads";
 };
@@ -70,6 +73,15 @@ export const REPORTS: ReportDefinition[] = [
     description: "החוב הפתוח של כל הלקוחות לפי ותק: טרם הגיע מועד התשלום, 0 עד 30, 31 עד 60, 61 עד 90 ומעל 90 יום באיחור.",
     filters: ["owner"],
     balances: true,
+  },
+  // COL-06
+  {
+    key: "collection",
+    title: "גבייה",
+    description: "כמה נגבה בכל חודש, בכל אמצעי תשלום ואצל כל נציג, ותוך כמה ימים בממוצע לקוחות משלמים מסמך עד הסוף.",
+    filters: ["period", "owner"],
+    ownerLabel: "נציג",
+    collection: true,
   },
 ];
 
@@ -142,6 +154,8 @@ export type ReportSection = {
   note?: string;
   // the section's element id, for links to it ("#overdue-deals"); a page may also render it its own way
   anchor?: string;
+  // COL-06: a section of links only, shown on screen and left out of the CSV and Excel files
+  exported?: false;
 };
 
 // GOL-04: an open deal whose expected close date has passed, for the forecast screen's actions

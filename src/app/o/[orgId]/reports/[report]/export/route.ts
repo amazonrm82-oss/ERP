@@ -4,6 +4,7 @@ import { getOrgTerms } from "@/features/terminology/queries";
 import { csvCell } from "@/features/reports/format";
 import { canViewCosts } from "@/features/permissions/keys";
 import { seesBalances } from "@/features/balances/queries";
+import { getCollectionAccess } from "@/features/collection/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canExport, reportFilters } from "@/features/reports/request";
@@ -35,6 +36,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   if (definition.balances && !(await seesBalances(orgId))) {
     return new Response("not found", { status: 404 });
   }
+  // COL-06: the collection report (log_export refuses it too)
+  if (definition.collection && !(await getCollectionAccess(orgId)).canOpen) {
+    return new Response("not found", { status: 404 });
+  }
   if (!canExport(context.role, granted)) {
     return new Response("ייצוא מותר לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת ייצוא.", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
@@ -47,7 +52,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   if (!built.ok) {
     return new Response(built.message, { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
-  const view = built.value;
+  // COL-06: a section of links only stays on the screen
+  const view = { ...built.value, sections: built.value.sections.filter((section) => section.exported !== false) };
 
   // IMP-02: written to the audit log before the file is handed over, with its format; no log, no file
   const supabase = await createClient();
