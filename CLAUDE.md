@@ -1830,7 +1830,7 @@ that back.
   grants; a new column on any of them needs `grant insert, update (col) ... to authenticated`. `last_contacted_at` /
   `first_contacted_at` are server-only. Tasks may link only records the caller can see (0074: `tasks_insert` +
   trigger `tasks_check_links`, which checks only links an update changes); activities from the browser are limited to
-  the six logged types (0072).
+  the six logged types (0072) plus `share_note` on records the person may edit (021090).
 - Reads past 1,000 rows (RVW-2): PostgREST caps a read at 1,000 rows; a read that can pass it pages through
   `readAllPages` / `readAllPagesByIds` in `src/lib/paged-read.ts` with a deterministic order (by id or a tie-break on id).
 - Managed lists (owner's rule, 12 October 2026): every list an organization manages (types, reasons, statuses and the like)
@@ -1896,8 +1896,15 @@ that back.
   (27 October 2026) the new lead, or with leads off (LEAD-08) "איש קשר חדש" (`ContactForm` with `prefill`), is saved through
   `createLeadStayAction` / `createContactStayAction` (same save as the create actions, answering the id), then the shared text and
   image become one person-logged note on it whose first line is "שותף מהטלפון" (`sharedNoteBody`, 5,000 with the mark; the image a
-  REC-07 note file); the share is cleared only when all of it saved, else the record stays and "לנסות שוב כהערה" is offered. The
-  note counts as contact (open question to the owner). Sign-out (`SignOutButton`, `mfa-gate`) clears
+  REC-07 note file); the share is cleared only when all of it saved, else the record stays and "לנסות שוב כהערה" is offered.
+  Since 021090/021091 (owner 27 October 2026, answer (ב)) that note is activity type `share_note` ("הערת שיתוף", `addShareNoteAction`):
+  by the person (author kept), first line "שותף מהטלפון" (trigger `activities_zz_share_note`, hint `share_note:mark`), never private,
+  written only by someone who may edit every linked record (`app.can_edit_activity_subjects`, the `activities_insert` branch; open
+  question to the owner), edited/deleted like a note (`activities_update`/`activities_delete`). It is NOT contact (not in
+  `app.contact_types()`) and NOT activity: `app.scheduled_no_activity`, `app.automation_run_facts`, `app.automation_event_still_holds`,
+  `app.deal_attention_rows` and `public.report_pipeline_cleanup` skip it like `import_note`; it is a note for `app.search_notes`,
+  `app.files_links_check` (REC-07 files), `app.notify_mentions` and `app.notify_followers_of_entry`. All nine were last redefined in
+  021091 (keep the `share_note` lines beside the `import_note` ones). Share notes saved as `note` before 021090 stay notes. Sign-out (`SignOutButton`, `mfa-gate`) clears
   `share-v1` (`src/features/share/device.ts`). The worker refuses a share POST whose `Sec-Fetch-Site` is cross-site (check on a
   device). Follow-up: a signed-out fallback POST is re-sent by the proxy's 307 to /login (shared ground).
 - App shortcuts (USR-08, no migration): four manifest shortcuts go to `/app/go/[target]` (`src/features/shortcuts/shortcuts.ts`),
