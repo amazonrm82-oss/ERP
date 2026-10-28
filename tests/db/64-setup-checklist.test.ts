@@ -625,6 +625,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // BIZ-03 redefines public.intake_submit() of _automation_more_triggers.sql and app.activities_inquiry_source() /
       // app.booking_links_source() of _source_attribution.sql last (a QR-tagged inquiry gets the "קוד QR" source)
       "_qr_lead_source.sql",
+      // the shared-ground speed-up redefines public.money_allocation_state() of _opening_credit.sql last (one grouped pass,
+      // jit off)
+      "_money_allocation_state_speed.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
