@@ -21,6 +21,8 @@ import {
   type DocumentSortKey,
 } from "@/features/documents/list";
 import { documentsPath } from "@/features/documents/paths";
+import { getCollectionAccess } from "@/features/collection/queries";
+import { collectionPath } from "@/features/payments/paths";
 import { DOCUMENT_TOTALS_LIMIT, getDocumentsAccess, listDocuments, listDocumentTotals } from "@/features/documents/queries";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schema";
 import { resolveColumns } from "@/features/list-columns/columns";
@@ -56,7 +58,7 @@ type Props = {
  */
 export default async function DocumentsPage({ params, searchParams }: Props) {
   const { orgId } = await params;
-  const [context, access, terms] = await Promise.all([getOrgContext(orgId), getDocumentsAccess(orgId), getOrgTerms(orgId)]);
+  const [context, access, terms, collection] = await Promise.all([getOrgContext(orgId), getDocumentsAccess(orgId), getOrgTerms(orgId), getCollectionAccess(orgId)]);
   // RVW-49: the business's own words (FLD-10)
   const texts = documentsListTexts(terms);
   if (!access.inPlan) {
@@ -116,7 +118,17 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
       <PageHeader
         title="מסמכים חשבונאיים"
         description={texts.description}
-        actions={exportAllowed ? <ExportMenu href={exportHref(documentsPath(orgId), documentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
+        actions={
+          <span className="flex flex-wrap items-center gap-2">
+            {/* COL-01 */}
+            {collection.canOpen ? (
+              <Link href={collectionPath(orgId)} className={buttonClasses("secondary", "sm")}>
+                גבייה
+              </Link>
+            ) : null}
+            {exportAllowed ? <ExportMenu href={exportHref(documentsPath(orgId), documentListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
+          </span>
+        }
       />
       <SavedViewsBar
         orgId={orgId}

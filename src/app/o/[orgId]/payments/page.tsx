@@ -16,7 +16,8 @@ import { AdvancedFilter } from "@/features/list-filters/components/advanced-filt
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
 import { PAYMENT_STATUS_TONES, paymentCounts, paymentHome, PaymentsTable } from "@/features/payments/components/payments-table";
 import { PAYMENT_DEFAULT_SORT, paymentListFilters, paymentListHref, paymentSortStartsAscending, type PaymentSortKey } from "@/features/payments/list";
-import { chequesPath, paymentsPath } from "@/features/payments/paths";
+import { chequesPath, collectionPath, paymentsPath } from "@/features/payments/paths";
+import { getCollectionAccess } from "@/features/collection/queries";
 import { getPaymentsAccess, listPayments, listPaymentTotal, PAYMENT_TOTALS_LIMIT } from "@/features/payments/queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -67,14 +68,17 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
   const filters = paymentListFilters(query);
   const sort = filters.sort ?? PAYMENT_DEFAULT_SORT;
   // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
-  const [granted, listColumns, quickSale] = await Promise.all([
+  const [granted, listColumns, quickSale, collectionAccess] = await Promise.all([
     // PRM-01: extra permissions (export)
     getMyPermissions(orgId),
     getListColumns(orgId, "payment"),
     // GAP-08: the quick sale, for whoever records payments while the plan holds products too
     quickSaleOffered(orgId),
+    // COL-01: the collection screen, for whoever may open it
+    getCollectionAccess(orgId),
     startListFilterLookups(orgId, "payment"),
   ]);
+  const collection = collectionAccess.canOpen;
   const filter = await prepareListFilter(orgId, "payment", firstParam(query.f), context.user.id, []);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   const listed = { ...filters, filter: filter.logic };
@@ -107,6 +111,12 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
             {quickSale ? (
               <Link href={quickSalePath(orgId)} className={buttonClasses("primary", "sm")}>
                 מכירה מהירה
+              </Link>
+            ) : null}
+            {/* COL-01 */}
+            {collection ? (
+              <Link href={collectionPath(orgId)} className={buttonClasses("secondary", "sm")}>
+                גבייה
               </Link>
             ) : null}
             {/* PAY-04 answer 7 */}

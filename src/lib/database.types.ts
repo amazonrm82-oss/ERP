@@ -3246,6 +3246,18 @@ export type Database = {
       report_money_waiting: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
       // BAL-03: debt aging for the business (invoker; {"allowed": false} without BAL-01's rights, partial when a row is hidden)
       report_debt_aging: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
+      // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
+      collection_documents: {
+        Args: {
+          p_org: string;
+          p_owner?: string | null;
+          p_overdue?: boolean;
+          p_bucket?: string | null;
+          p_customer_kind?: string | null;
+          p_customer_id?: string | null;
+        };
+        Returns: Json;
+      };
       // GOL-03: progress against the goals the caller reads (migration goal_progress)
       report_goal_progress: {
         Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };
