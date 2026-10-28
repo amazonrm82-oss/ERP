@@ -408,6 +408,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "qr_code:target": "קוד QR פותח טופס אתר, דף קביעת תור או כרטיס ביקור של העסק, או קישור. בחרו אחד מהם.",
   // BIZ-03 (migration qr_targets)
   "qr_code:url": "הקישור של קוד ה-QR צריך להיות כתובת מלאה שמתחילה ב-https://, בלי שם משתמש או סיסמה.",
+  // BIZ-03 (migration qr_external_block_writes)
+  "qr_code:external_off": "צוות המערכת כיבה את הקישורים החיצוניים של העסק, ולכן אי אפשר ליצור, לשנות או להפעיל קוד שמוביל לאתר חיצוני.",
   // SPD-07 (migration site_widgets)
   "site_widget:owner": "פניות מהכפתור באתר עוברות למשתמש פעיל בעסק שאינו בהרשאת צפייה בלבד.",
   "form:widget": "הטופס של הכפתור באתר משתנה רק דרך הגדרות הכפתור.",

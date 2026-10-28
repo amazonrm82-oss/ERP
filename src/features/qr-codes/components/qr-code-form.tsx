@@ -28,21 +28,33 @@ export function QrCodeForm({
   forms,
   pages,
   cards,
+  externalOff = false,
 }: {
   orgId: string;
   forms: QrTargetOption[];
   pages: QrTargetOption[];
   // active cards only: a code is not pointed at a card nobody can open
   cards: QrTargetOption[];
+  // BIZ-03 (owner, 27 October 2026, answer (ג)): the platform has switched off the business's external links
+  externalOff?: boolean;
 }) {
   const [state, formAction] = useActionState<FormState, FormData>(createQrCodeAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const options: Record<Exclude<QrTargetKind, "url">, QrTargetOption[]> = { form: forms, booking: pages, card: cards };
-  const kinds = (["form", "booking", "card", "url"] as const).filter((k) => k === "url" || options[k].length > 0);
+  const kinds = (["form", "booking", "card", "url"] as const).filter((k) => (k === "url" ? !externalOff : options[k].length > 0));
   const firstKind = kinds[0];
   const sentKind = kinds.find((k) => k === values?.kind);
-  const [kind, setKind] = useState<QrTargetKind>(sentKind ?? firstKind);
+  const [kind, setKind] = useState<QrTargetKind | undefined>(sentKind ?? firstKind);
+
+  if (!kind) {
+    // nothing to open: links are switched off and the business has no form, booking page or open card yet
+    return (
+      <p role="status" className="text-md text-ink-soft">
+        אין כרגע יעד לקוד: קישורים חיצוניים כובו על ידי צוות המערכת, ועוד אין לעסק טופס אתר, דף קביעת תור או כרטיס ביקור פעיל.
+      </p>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -63,6 +75,7 @@ export function QrCodeForm({
         value={kind}
         onChange={(event) => setKind(event.target.value as QrTargetKind)}
         error={failure?.fieldErrors?.kind}
+        hint={externalOff ? "קישור לאתר חיצוני לא זמין: צוות המערכת כיבה את הקישורים החיצוניים של העסק." : undefined}
       >
         {kinds.map((k) => (
           <option key={k} value={k}>

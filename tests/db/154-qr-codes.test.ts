@@ -594,10 +594,8 @@ describe("QR codes: the page before a link and the platform's switch (BIZ-03)", 
       expect(await scansOf(link.id)).toBe(0);
       expect((await scan(onForm.token)).path).toBe(`/f/${form.token}`);
       expect((await scan(otherLink.token)).url).toBe("https://b.io/");
-      // creating and editing link codes stays allowed while switched off; the scan is where the switch holds
-      const later = await makeCode(admin, { target_kind: "url", target_url: "https://c.io/" });
-      await asUser(admin.id, (q) => q("update public.qr_codes set target_url = 'https://d.io/' where id = $1", [later.id]));
-      expect((await pgError(scan(later.token))).code).toBe("P0002");
+      // creating or changing a link code is refused while switched off (answer (ג), 021092; test 258)
+      expect(await pgError(makeCode(admin, { target_kind: "url", target_url: "https://c.io/" }))).toMatchObject({ hint: "qr_code:external_off" });
     } finally {
       expect(await setBlock(support, false, "נבדק, תקין")).toEqual({ blocked: false, changed: true });
     }

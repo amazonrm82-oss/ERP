@@ -75,8 +75,9 @@ export default async function QrCodesPage({ params }: Props) {
           {externalOff ? (
             // BIZ-03 (owner, 27 October 2026, answer (ה)): the platform's emergency switch
             <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
-              הקישורים החיצוניים של העסק כובו על ידי צוות המערכת. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל. קודים שפותחים טופס, דף
-              קביעת תור או כרטיס ביקור ממשיכים לעבוד. לפרטים פנו לתמיכה בטלפון <span dir="ltr">{SUPPORT.phone}</span>.
+              הקישורים החיצוניים של העסק כובו על ידי צוות המערכת. מי שסורק קוד שפותח קישור חיצוני רואה שהקוד אינו פעיל, ואי אפשר ליצור, לשנות או
+              להפעיל קוד כזה. קודים שפותחים טופס, דף קביעת תור או כרטיס ביקור ממשיכים לעבוד. לפרטים פנו לתמיכה בטלפון{" "}
+              <span dir="ltr">{SUPPORT.phone}</span>.
             </p>
           ) : null}
           <p className="text-md text-ink-soft">
@@ -90,7 +91,7 @@ export default async function QrCodesPage({ params }: Props) {
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ולכן אי אפשר ליצור או לשנות קודים.</p>
           ) : (
             <div id="qr-new" className="scroll-mt-24">
-              <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} cards={openCards} />
+              <QrCodeForm orgId={orgId} forms={targets.forms} pages={targets.pages} cards={openCards} externalOff={externalOff} />
             </div>
           )}
         </CardBody>
@@ -114,11 +115,13 @@ export default async function QrCodesPage({ params }: Props) {
               const count = counts.get(code.id);
               const link = `${origin}${qrScanPath(code.token)}`;
               const kindLabel = QR_KIND_LABELS[code.kind];
+              // BIZ-03 (owner, 27 October 2026, answer (ג)): a link code is off while the platform's switch is on
+              const switchedOff = externalOff && code.kind === "url";
               return (
                 <li key={code.id} className="space-y-3 px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="min-w-0 text-md font-medium break-words">
-                      {code.name} {code.isActive ? <Badge tone="success">פעיל</Badge> : <Badge>כבוי</Badge>}
+                      {code.name} {code.isActive && !switchedOff ? <Badge tone="success">פעיל</Badge> : <Badge>כבוי</Badge>}
                     </h3>
                     <p className="text-sm text-ink-soft">
                       {formatNumber(count?.recent ?? 0)} סריקות ב-{RECENT_DAYS} הימים האחרונים · {formatNumber(count?.total ?? 0)} בסך הכול
@@ -131,7 +134,9 @@ export default async function QrCodesPage({ params }: Props) {
                         <span dir="ltr" className="break-all">
                           {code.url}
                         </span>
-                        {externalOff ? " (כבוי על ידי צוות המערכת: מי שסורק רואה שהקוד אינו פעיל)" : " (לפני המעבר מוצג דף עם שם האתר ושם העסק)"}
+                        {switchedOff
+                          ? " (כבוי: הקישורים החיצוניים כובו על ידי צוות המערכת. מי שסורק רואה שהקוד אינו פעיל.)"
+                          : " (לפני המעבר מוצג דף עם שם האתר ושם העסק)"}
                       </>
                     ) : target ? (
                       <>
@@ -150,13 +155,16 @@ export default async function QrCodesPage({ params }: Props) {
                   />
                   {inPlan && canWrite ? (
                     <div className="flex flex-wrap gap-2">
-                      <ActionButton
-                        action={setQrCodeActiveAction.bind(null, orgId, code.id, !code.isActive)}
-                        pendingText="שומרים…"
-                        srLabel={code.name}
-                      >
-                        {code.isActive ? "כיבוי הקוד" : "הפעלת הקוד"}
-                      </ActionButton>
+                      {/* a link code cannot be switched on while the platform's switch is on; switching it off stays */}
+                      {switchedOff && !code.isActive ? null : (
+                        <ActionButton
+                          action={setQrCodeActiveAction.bind(null, orgId, code.id, !code.isActive)}
+                          pendingText="שומרים…"
+                          srLabel={code.name}
+                        >
+                          {code.isActive ? "כיבוי הקוד" : "הפעלת הקוד"}
+                        </ActionButton>
+                      )}
                       <ActionButton
                         action={deleteQrCodeAction.bind(null, orgId, code.id)}
                         pendingText="מוחקים…"
