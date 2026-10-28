@@ -3244,6 +3244,8 @@ export type Database = {
       report_pipeline_cleanup: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
       // MNY-01: money waiting: deals to close (the cleanup's) and unhandled leads as an estimate (migration money_waiting)
       report_money_waiting: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
+      // BAL-03: debt aging for the business (invoker; {"allowed": false} without BAL-01's rights, partial when a row is hidden)
+      report_debt_aging: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
       // GOL-03: progress against the goals the caller reads (migration goal_progress)
       report_goal_progress: {
         Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };

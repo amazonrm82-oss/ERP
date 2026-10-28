@@ -628,6 +628,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the shared-ground speed-up redefines public.money_allocation_state() of _opening_credit.sql last (one grouped pass,
       // jit off)
       "_money_allocation_state_speed.sql",
+      // BAL-03 redefines public.log_export() of _source_attribution.sql last (the debt aging report key)
+      "_debt_aging.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

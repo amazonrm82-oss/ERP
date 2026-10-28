@@ -387,6 +387,43 @@ export const REPORT_SCHEMAS = {
   }),
   // QUO-17: quotes sent in the period (each version chain once, by its newest sent version), the acceptance rate (null
   // below rate_min decided), hours from sending to acceptance, and the quotes open now
+  // BAL-03: debt aging for the business; {allowed: false} without the rights or keys, {allowed, partial} when a row is hidden
+  report_debt_aging: z.union([
+    z.object({
+      allowed: z.literal(true),
+      partial: z.literal(false),
+      today: day,
+      totals: z.object({
+        current: amount,
+        d1_30: amount,
+        d31_60: amount,
+        d61_90: amount,
+        d91_plus: amount,
+        total: amount,
+        overdue: amount,
+        customers: count,
+        documents: count,
+      }),
+      customers: z.array(
+        z.object({
+          kind: z.enum(["company", "contact", "deal"]),
+          id: uuid,
+          name: text,
+          current: amount,
+          d1_30: amount,
+          d31_60: amount,
+          d61_90: amount,
+          d91_plus: amount,
+          total: amount,
+          overdue: amount,
+          documents: count,
+          oldest_due_date: day.nullable(),
+        }),
+      ),
+    }),
+    z.object({ allowed: z.literal(true), partial: z.literal(true) }).strict(),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
   report_quotes: z.object({
     rate_min: count,
     totals: z.object({

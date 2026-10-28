@@ -243,6 +243,7 @@ describe("report result shapes (FXC-12)", () => {
       report_money_waiting: ["public.report_money_waiting($1)", [org]],
       report_referrals: ["public.report_referrals($1, $2, $3)", range],
       report_quotes: ["public.report_quotes($1, $2, $3)", range],
+      report_debt_aging: ["public.report_debt_aging($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

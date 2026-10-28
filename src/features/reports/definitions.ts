@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -15,6 +15,9 @@ export type ReportDefinition = {
   costs?: true;
   // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it
   feature?: "quotes";
+  // BAL-03: shown, opened and exported only by those who open a customer's ledger (BAL-01: owners, admins, managers and
+  // holders of record_payments) with the balances, documents and payments keys; the SQL answers {allowed: false} to others
+  balances?: true;
   // LEAD-08: a report about one module only, left out of the index while the business has that module switched off
   module?: "leads";
 };
@@ -59,6 +62,14 @@ export const REPORTS: ReportDefinition[] = [
       "כמה הצעות נשלחו, אחוז האישור, הזמן עד אישור ושווי ההצעות הפתוחות. הצעה שנשלחה לה גרסה חדשה נספרת פעם אחת, בחודש שבו נשלחה הגרסה האחרונה, ולכן נתוני חודש קודם יכולים להשתנות. תוספת להצעה נספרת כהצעה בפני עצמה, גם באחוז האישור ובשווי שאושר.",
     filters: ["period", "owner"],
     feature: "quotes",
+  },
+  // BAL-03
+  {
+    key: "debt_aging",
+    title: "גיול חובות",
+    description: "החוב הפתוח של כל הלקוחות לפי ותק: טרם הגיע מועד התשלום, 0 עד 30, 31 עד 60, 61 עד 90 ומעל 90 יום באיחור.",
+    filters: ["owner"],
+    balances: true,
   },
 ];
 

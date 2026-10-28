@@ -15,6 +15,7 @@ import { withReportShape } from "@/features/reports/schemas";
 import { canViewCosts } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
+import { seesBalances } from "@/features/balances/queries";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
@@ -26,6 +27,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   const { role, org } = await getOrgContext(orgId);
   // DLI-06: a report about costs is listed only for those who may see costs
   const seesCosts = canViewCosts(role, await getMyPermissions(orgId));
+  // BAL-03: a report about customers' balances is listed only for those who open a ledger
+  const balances = await seesBalances(orgId);
   // QUO-17: a report of a plan capability is listed only while the business has it (each capability read once)
   const features = [...new Set(REPORTS.flatMap((report) => (report.feature ? [report.feature] : [])))];
   const hasFeature = new Map(await Promise.all(features.map(async (key) => [key, await orgHasFeature(orgId, key)] as const)));
@@ -36,7 +39,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   // FLD-10: report titles in the business's words
   const terms = await getOrgTerms(orgId);
   const reports = REPORTS.filter(
-    (report) => (!report.costs || seesCosts) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
+    (report) => (!report.costs || seesCosts) && (!report.balances || balances) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
   );
   // the dashboard is for people who manage others; reps get the reports list
   const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId, role === "owner" || role === "admin" ? { unteamed: { timeZone: org.timeZone } } : {})) : null;

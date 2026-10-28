@@ -1,0 +1,32 @@
+{
+  "today": "2026-10-28",
+  "totals": {
+    "d1_30": 11700,
+    "total": 11700,
+    "d31_60": 0,
+    "d61_90": 0,
+    "current": 0,
+    "overdue": 11700,
+    "d91_plus": 0,
+    "customers": 1,
+    "documents": 1
+  },
+  "allowed": true,
+  "partial": false,
+  "customers": [
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "kind": "contact",
+      "name": "חייב",
+      "d1_30": 11700,
+      "total": 11700,
+      "d31_60": 0,
+      "d61_90": 0,
+      "current": 0,
+      "overdue": 11700,
+      "d91_plus": 0,
+      "documents": 1,
+      "oldest_due_date": "2026-10-18"
+    }
+  ]
+}

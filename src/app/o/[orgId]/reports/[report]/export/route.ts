@@ -3,6 +3,7 @@ import { findReport, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { csvCell } from "@/features/reports/format";
 import { canViewCosts } from "@/features/permissions/keys";
+import { seesBalances } from "@/features/balances/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canExport, reportFilters } from "@/features/reports/request";
@@ -28,6 +29,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   }
   // QUO-17: a report of a plan capability (log_export refuses it too)
   if (definition.feature && !(await orgHasFeature(orgId, definition.feature))) {
+    return new Response("not found", { status: 404 });
+  }
+  // BAL-03: a report about customers' balances (log_export refuses it too)
+  if (definition.balances && !(await seesBalances(orgId))) {
     return new Response("not found", { status: 404 });
   }
   if (!canExport(context.role, granted)) {

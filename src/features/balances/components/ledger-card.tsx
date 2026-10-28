@@ -5,8 +5,9 @@ import { getOrgContext } from "@/features/shell/queries";
 import { cn } from "@/lib/cn";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
+import { agingRows } from "../debt";
 import { LEDGER_PARTIAL_TEXT, ledgerPeriod, ledgerView, lineMuted, lineNote, lineTitle } from "../ledger";
-import { getLedger, ledgerInPlan } from "../queries";
+import { getDebtSummary, getLedger, ledgerInPlan } from "../queries";
 
 type Props = {
   orgId: string;
@@ -37,6 +38,9 @@ export async function LedgerCard({ orgId, where, from, to, keep = {} }: Props) {
   const view = ledgerView(ledger);
   if (view === "hidden" || !ledger.allowed) return null;
   const full = ledger.partial ? null : ledger;
+  // BAL-03: the open debt by days late, under the same rights and partial rule (one read shared with the top of the page)
+  const debt = full ? await getDebtSummary(orgId, where.contact, where.company) : null;
+  const aging = debt && debt.allowed && !debt.partial && debt.open_debt > 0 ? agingRows(debt.aging) : null;
   const titleId = `ledger-${where.contact ?? where.company}`;
   return (
     <Card aria-labelledby={titleId} id="ledger">
@@ -66,6 +70,38 @@ export async function LedgerCard({ orgId, where, from, to, keep = {} }: Props) {
             {LEDGER_PARTIAL_TEXT}
           </p>
         )}
+
+        {aging ? (
+          <div className="overflow-x-auto rounded-lg border border-line" role="region" aria-label="גיול החוב" tabIndex={0}>
+            <table className="w-full border-collapse text-sm">
+              <caption className="px-3 pt-2 text-start font-medium">גיול החוב הפתוח (לפי ימים מתאריך התשלום)</caption>
+              <thead>
+                <tr className="border-b border-line text-ink-soft">
+                  <th scope="col" className="px-3 py-2 text-start font-medium">
+                    ותק
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-end font-medium">
+                    סכום
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-end font-medium">
+                    חלק מהחוב
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {aging.map((row) => (
+                  <tr key={row.key} className={cn(row.amount === 0 && "text-ink-soft")}>
+                    <th scope="row" className="px-3 py-2 text-start font-normal">
+                      {row.label}
+                    </th>
+                    <td className="px-3 py-2 text-end tabular-nums">{formatMoney(row.amount)}</td>
+                    <td className="px-3 py-2 text-end tabular-nums">{row.percent === null ? "" : `${row.percent}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
 
         <form method="get" action="#ledger" className="flex flex-wrap items-end gap-2 print:hidden">
           {Object.entries(keep).map(([name, value]) => (value ? <input key={name} type="hidden" name={name} value={value} /> : null))}

@@ -178,7 +178,19 @@ describe("report shaping from the saved samples", () => {
     expect(hidden).toEqual({ kpis: [], sections: [], note: "רק מי שמורשה לראות עלות רואה את הדוח הזה." });
   });
 
-  it("DLI-06: only the gross profit report is about costs", () => {
+  it("BAL-03: debt aging with a hidden row shows no amount and says who sees it in full", async () => {
+    results.report_debt_aging = { allowed: true, partial: true };
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "debt_aging", filters);
+    expect(view).toEqual({ kpis: [], sections: [], note: "חלק מהמסמכים או התשלומים של העסק מוסתרים ממך, ולכן הדוח לא מציג סכומים. הדוח המלא זמין לבעלים ומנהלי מערכת." });
+    const full = await (async () => {
+      results.report_debt_aging = sample("report_debt_aging");
+      return buildReport("00000000-0000-4000-8000-000000000099", "debt_aging", filters);
+    })();
+    expect(full.sections.map((s) => s.title)).toEqual(["לפי ותק", "לפי לקוח"]);
+    expect(full.sections[1].rows[0]).toMatchObject({ customer: "חייב", d1_30: 11700, total: 11700 });
+  });
+
+    it("DLI-06: only the gross profit report is about costs", () => {
     expect(REPORTS.filter((r) => r.costs).map((r) => r.key)).toEqual(["profit"]);
   });
 

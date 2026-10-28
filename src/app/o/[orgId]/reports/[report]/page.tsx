@@ -13,6 +13,7 @@ import { ReportFilters } from "@/features/reports/components/report-filters";
 import { findReport, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { canViewCosts } from "@/features/permissions/keys";
+import { seesBalances } from "@/features/balances/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
@@ -48,6 +49,10 @@ export default async function ReportPage({ params, searchParams }: Props) {
   }
   // QUO-17: a report of a plan capability does not exist while the business does not have it
   if (definition.feature && !(await orgHasFeature(orgId, definition.feature))) {
+    notFound();
+  }
+  // BAL-03: a report about customers' balances does not exist for someone who does not open a ledger
+  if (definition.balances && !(await seesBalances(orgId))) {
     notFound();
   }
   const filters = reportFilters(definition, await searchParams);

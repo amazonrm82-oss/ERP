@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 
+import { canRecordPayments } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
@@ -34,6 +36,15 @@ export const getDebtSummary = cache(async (orgId: string, contact: string | null
   const supabase = await createClient();
   const raw = must(await supabase.rpc("customer_debt_summary", { p_org: orgId, p_contact: contact, p_company: company }), "customer debt");
   return parseDebtSummary(raw);
+});
+
+/**
+ * BAL-03: whether the user may see balances at all (the aging report): BAL-01's rule (owners, admins and managers by role,
+ * or the record_payments permission; the database's app.can_record_payments) with the ledger's three keys.
+ */
+export const seesBalances = cache(async (orgId: string): Promise<boolean> => {
+  const [inPlan, context, granted] = await Promise.all([ledgerInPlan(orgId), getOrgContext(orgId), getMyPermissions(orgId)]);
+  return inPlan && canRecordPayments(context.role, granted);
 });
 
 /**

@@ -21,7 +21,9 @@ import { getOrgTerms } from "@/features/terminology/queries";
 import { byGender } from "@/features/terminology/terms";
 import { createClient } from "@/lib/supabase/server";
 
-import type { ReportRow, ReportSection, ReportView } from "./definitions";
+import { AGING_BUCKETS } from "@/features/balances/debt";
+
+import type { ReportColumn, ReportRow, ReportSection, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
 import { responseTargetLabels } from "./response-target";
@@ -1218,6 +1220,71 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             bar: "sent",
             empty: "אין הצעות מחיר להצגה.",
             note: `נספרות הצעות שנשלחו בתקופה, לפי מועד השליחה. הצעה שיש לה גרסה חדשה שנשלחה נספרת פעם אחת, לפי הגרסה האחרונה שנשלחה. אחוז אישור: מתוך ההצעות שאושרו או נדחו; כשיש פחות מ-${formatNumber(data.rate_min)} כאלה, האחוז לא מוצג. זמן עד אישור: ממועד השליחה עד שהלקוח אישר. הצעות פתוחות: הצעות שנשלחו או נצפו ועוד לא פג תוקפן, נכון להיום, בלי קשר לתקופה. סכומים כפי שנשמרו בהצעה.`,
+          },
+        ],
+      };
+    }
+
+    case "debt_aging": {
+      // BAL-03: the business's open debt by days late, per customer (PAY-02's customer of each document); BAL-01's rights and
+      // partial rule in the database
+      const data = parseReportData("report_debt_aging", await rpc("report_debt_aging", { p_org: orgId, p_owner: ownerId }));
+      if (!data.allowed) {
+        return { kpis: [], sections: [], note: "רק מי שרואה כרטסת לקוח (בעלים, מנהלי מערכת, מנהלים ומי שרושם תשלומים) רואה את הדוח הזה." };
+      }
+      if (data.partial) {
+        return { kpis: [], sections: [], note: "חלק מהמסמכים או התשלומים של העסק מוסתרים ממך, ולכן הדוח לא מציג סכומים. הדוח המלא זמין לבעלים ומנהלי מערכת." };
+      }
+      const t = data.totals;
+      const buckets = AGING_BUCKETS.map((b) => ({ key: b.key, label: b.label, amount: t[b.key] }));
+      const customerHref = (kind: string, id: string) =>
+        kind === "company" ? paths.company(orgId, id) : kind === "contact" ? paths.contact(orgId, id) : paths.deal(orgId, id);
+      return {
+        kpis: [
+          { label: "חוב פתוח", value: formatMoney(t.total), hint: `${formatNumber(t.documents)} מסמכים, ${formatNumber(t.customers)} לקוחות` },
+          { label: "חוב באיחור", value: formatMoney(t.overdue) },
+          { label: "מעל 90 יום באיחור", value: formatMoney(t.d91_plus) },
+          { label: "טרם הגיע מועד התשלום", value: formatMoney(t.current) },
+        ],
+        sections: [
+          {
+            title: "לפי ותק",
+            columns: [
+              { key: "bucket", label: "ותק", kind: "text" },
+              { key: "amount", label: "סכום", kind: "money" },
+              { key: "percent", label: "חלק מהחוב", kind: "percent" },
+            ],
+            rows: buckets.map((b): ReportRow => ({ bucket: b.label, amount: b.amount, percent: pct(b.amount, t.total) })),
+            bar: "amount",
+            empty: "אין חוב פתוח.",
+            note: `נכון ל-${formatDate(`${data.today}T12:00:00Z`)}. ותק לפי ימים מתאריך התשלום של כל מסמך, לפי אזור הזמן של העסק; מסמך באיחור מהיום שאחרי תאריך התשלום. נספרות חשבוניות מס, חשבונות עסקה ויתרות פתיחה של חוב, ביתרה שנשארה אחרי התשלומים והזיכויים שהוקצו להם. חשבון עסקה שחשבונית מס מחייבת אותו נספר פעם אחת, בחשבונית. סכומים כולל מע"מ, כפי שנרשמו במסמכים.`,
+          },
+          {
+            title: "לפי לקוח",
+            columns: [
+              { key: "customer", label: "לקוח", kind: "text" },
+              ...AGING_BUCKETS.map((b): ReportColumn => ({ key: b.key, label: b.label, kind: "money" })),
+              { key: "total", label: "סך הכול", kind: "money" },
+              { key: "documents", label: "מסמכים", kind: "number" },
+              { key: "oldest", label: "באיחור מאז", kind: "text" },
+            ],
+            rows: data.customers.map(
+              (r): ReportRow => ({
+                _href: customerHref(r.kind, r.id),
+                customer: r.name ?? (r.kind === "company" ? "חברה ללא שם" : r.kind === "contact" ? "איש קשר ללא שם" : "עסקה ללא שם"),
+                current: r.current,
+                d1_30: r.d1_30,
+                d31_60: r.d31_60,
+                d61_90: r.d61_90,
+                d91_plus: r.d91_plus,
+                total: r.total,
+                documents: r.documents,
+                oldest: r.oldest_due_date ? formatDate(`${r.oldest_due_date.slice(0, 10)}T12:00:00Z`) : null,
+              }),
+            ),
+            bar: "total",
+            empty: "אין חוב פתוח.",
+            note: "לקוח הוא החברה של המסמך (החברה שלו, של איש הקשר שלו או של העסקה שלו), ואם אין, איש הקשר, ואם אין, העסקה. הלקוחות עם החוב הגדול ביותר באיחור קודם; עד 300 לקוחות, והסיכומים למעלה כוללים את כולם.",
           },
         ],
       };
