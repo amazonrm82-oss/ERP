@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 
 import { mentionIds } from "@/features/mentions/token";
 import { sentMessageSchema, templateSchema } from "@/features/whatsapp/schema";
+import { COLLECTION_REMINDER_DRAFT_TEXT } from "@/features/collection/reminders";
 import {
+  COLLECTION_REMINDER_KIND,
   DEFAULT_TEMPLATES,
   fillTemplate,
   firstNameOf,
@@ -66,9 +68,13 @@ describe("WhatsApp templates (WA-01)", () => {
     expect(sentMessageSchema.safeParse({ text: "x", templateId: "not-an-id" }).success).toBe(false);
   });
 
-  it("the defaults equal the seed of the migration, with one meeting reminder", () => {
+  it("the defaults equal the latest seed of the migrations, with one meeting reminder and one collection reminder", () => {
     const dir = path.join(process.cwd(), "supabase/migrations");
-    const file = readdirSync(dir).find((name) => name.endsWith("_whatsapp_templates.sql"));
+    // the latest migration that defines app.seed_whatsapp_templates (COL-04 added the collection reminder)
+    const file = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql") && readFileSync(path.join(dir, name), "utf8").includes("function app.seed_whatsapp_templates("))
+      .sort()
+      .at(-1);
     expect(file).toBeDefined();
     const sql = readFileSync(path.join(dir, file!), "utf8");
     const rows = [...sql.matchAll(/\((\d+), '([^']+)',\s*'([^']+)', (null(?:::text)?|'[a-z_]+')\)/g)].map((m) => ({
@@ -78,6 +84,8 @@ describe("WhatsApp templates (WA-01)", () => {
     }));
     expect(rows).toEqual(DEFAULT_TEMPLATES.map((t) => ({ name: t.name, body: t.body, kind: t.kind })));
     expect(DEFAULT_TEMPLATES.filter((t) => t.kind === MEETING_REMINDER_KIND)).toHaveLength(1);
+    expect(DEFAULT_TEMPLATES.filter((t) => t.kind === COLLECTION_REMINDER_KIND)).toHaveLength(1);
+    expect(DEFAULT_TEMPLATES.find((t) => t.kind === COLLECTION_REMINDER_KIND)?.body).toBe(COLLECTION_REMINDER_DRAFT_TEXT);
     for (const template of DEFAULT_TEMPLATES) {
       expect(templateSchema.safeParse({ name: template.name, body: template.body }).success).toBe(true);
     }

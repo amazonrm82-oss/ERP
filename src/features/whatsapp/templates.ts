@@ -14,6 +14,8 @@ export const MESSAGE_MAX = 2000;
 
 // the default template the seed marks with kind 'meeting_reminder' (GAP-03 offers it first)
 export const MEETING_REMINDER_KIND = "meeting_reminder";
+// COL-04: the default template the seed marks with kind 'collection_reminder' (the collection reminder task offers it first)
+export const COLLECTION_REMINDER_KIND = "collection_reminder";
 
 /**
  * The placeholders a template may hold, written in Hebrew inside braces. Keep the
@@ -27,6 +29,10 @@ export const PLACEHOLDERS = {
   businessName: { token: "{שם העסק}", label: "שם העסק" },
   date: { token: "{תאריך}", label: "תאריך הפגישה" },
   time: { token: "{שעה}", label: "שעת הפגישה" },
+  // COL-04: filled only by a collection reminder task
+  document: { token: "{מסמך}", label: "המסמך (סוג ומספר), בתזכורת גבייה" },
+  amount: { token: "{סכום}", label: "הסכום לתשלום, בתזכורת גבייה" },
+  dueDate: { token: "{מועד תשלום}", label: "מועד התשלום, בתזכורת גבייה" },
 } as const;
 
 export type PlaceholderKey = keyof typeof PLACEHOLDERS;
@@ -94,6 +100,12 @@ export const DEFAULT_TEMPLATES: ReadonlyArray<{ name: string; body: string; kind
     name: "תודה על השיחה",
     body: "תודה {שם פרטי}, היה נעים לדבר. אם יש שאלות, אני כאן. {שם הנציג}, {שם העסק}",
     kind: null,
+  },
+  // COL-04: DRAFT wording, seeded for new businesses only (migration collection_reminders)
+  {
+    name: "תזכורת לתשלום",
+    body: "שלום {שם פרטי}, תזכורת לתשלום {מסמך} על סך {סכום}, שמועד התשלום שלו {מועד תשלום}. אם כבר שילמת, תודה ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}",
+    kind: COLLECTION_REMINDER_KIND,
   },
 ];
 

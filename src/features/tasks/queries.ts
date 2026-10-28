@@ -38,6 +38,8 @@ export type TaskItem = {
   related: { kind: "lead" | "contact" | "company" | "deal"; id: string } | null;
   // TASK-06 part B: the parent of a sub-task; null for a top-level task
   parentId: string | null;
+  // COL-04: the document of a collection reminder task (server-made); null for any other task
+  collectionDocumentId: string | null;
 };
 
 export type TaskGroups = {
@@ -52,7 +54,7 @@ export type TaskGroups = {
 
 const OPEN_LIMIT = 300;
 const DONE_SHOWN = 20;
-const TASK_ITEM_COLUMNS = "id, title, task_type, activity_type_id, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id, parent_task_id";
+const TASK_ITEM_COLUMNS = "id, title, task_type, activity_type_id, priority, outcome, recurrence, due_at, remind_at, owner_id, team_id, completed_at, lead_id, contact_id, company_id, deal_id, parent_task_id, collection_document_id";
 
 type TaskItemRow = {
   id: string;
@@ -72,6 +74,7 @@ type TaskItemRow = {
   company_id: string | null;
   deal_id: string | null;
   parent_task_id: string | null;
+  collection_document_id: string | null;
 };
 
 function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
@@ -99,6 +102,7 @@ function toTaskItem(row: TaskItemRow, owners: Map<string, string>): TaskItem {
             ? { kind: "company", id: row.company_id }
             : null,
     parentId: row.parent_task_id,
+    collectionDocumentId: row.collection_document_id,
   };
 }
 

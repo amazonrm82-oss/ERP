@@ -23,6 +23,8 @@ type Props = {
   // GAP-03: the template chosen when the window opens (the meeting reminder); one that is
   // gone by then is simply not chosen, and the window offers the rest
   preselectId?: string | null;
+  // COL-04: the text offered (unsaved, as "בלי תבנית") when there is no template to preselect
+  fallbackText?: string | null;
   // SPD-01: full width and 44px tall (the short new-lead screen)
   wide?: boolean;
   // SPD-01: open the window once on arrival ("WhatsApp" pressed on the push)
@@ -38,7 +40,7 @@ const NO_TEMPLATE = "";
  * lets the person change the text, opens wa.me with it, and logs the message on the
  * timeline. One message, sent by the person from their own WhatsApp; nothing is sent by us.
  */
-export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null, wide, autoStart, iconOnly }: Props) {
+export function WhatsappButton({ phoneE164, orgId, subject, name, values, preselectId = null, fallbackText = null, wide, autoStart, iconOnly }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<TemplateChoice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function WhatsappButton({ phoneE164, orgId, subject, name, values, presel
           const list = answer.data ?? [];
           setTemplates(list);
           if (preselectId && list.some((item) => item.id === preselectId)) choose(list, preselectId);
+          else if (fallbackText) setText(fillTemplate(fallbackText, values));
         } else setLoadError(answer.message);
       });
     } else if (preselectId && choice === NO_TEMPLATE && text === "" && templates.some((item) => item.id === preselectId)) {

@@ -28,6 +28,7 @@ import { TaskForm } from "@/features/tasks/components/task-form";
 import { remindOption } from "@/features/tasks/components/task-fields";
 import { listChecklistSteps, listChecklistTemplates } from "@/features/task-checklists/queries";
 import { TaskRow, type TaskRowView } from "@/features/tasks/components/task-row";
+import { whatsappListContext } from "@/features/whatsapp/templates";
 import { TasksTable } from "@/features/tasks/components/tasks-table";
 import { listCoveringTasks, listOpenTeamTasks, listSubtasks, listTaskGroups, listTasks, listTaskTeams, taskTitles, TASK_DEFAULT_SORT, TASK_SORT_COLUMNS, type TaskItem } from "@/features/tasks/queries";
 import { SavedViewsBar } from "@/features/views/components/saved-views-bar";
@@ -166,6 +167,8 @@ export default async function TasksPage({ params, searchParams }: Props) {
     .filter((member) => member.status === "active" && member.role !== "viewer")
     .map((member) => ({ userId: member.userId, name: member.userId === user.id ? `${member.name} (אני)` : member.name }));
 
+  // COL-04: the names a collection reminder's WhatsApp text fills in (null for someone who cannot write)
+  const whatsapp = whatsappListContext(context);
   const view = (task: TaskItem, overdue: boolean): TaskRowView => {
     const due = task.dueAt ? new Date(task.dueAt) : null;
     return {
@@ -197,6 +200,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
         ownerName: sub.ownerName,
       })),
       parent: task.parentId ? { id: task.parentId, title: parentTitles.get(task.parentId) ?? null } : null,
+      collectionDocumentId: task.collectionDocumentId,
       teamTask:
         task.ownerId === null && task.teamId !== null && task.completedAt === null
           ? { teamName: teams.names.get(task.teamId) ?? "", canTake: teams.rights.has(task.teamId) }
@@ -247,6 +251,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                         businessDays={businessDays}
                         templates={templates}
                         kinds={kinds}
+                        whatsapp={whatsapp}
                       />
                     ))}
                   </ul>
@@ -298,6 +303,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                       businessDays={businessDays}
                       templates={templates}
                       kinds={kinds}
+                      whatsapp={whatsapp}
                     />
                   ))}
                 </ul>
@@ -320,6 +326,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
                     businessDays={businessDays}
                     templates={templates}
                     kinds={kinds}
+                    whatsapp={whatsapp}
                   />
                 ))}
               </ul>

@@ -20,6 +20,8 @@ import type { ChecklistStep } from "@/features/task-checklists/templates";
 import { isRestDay } from "@/features/calendar-days/holidays";
 import type { ActivityTypeOption } from "@/features/activity-types/types";
 import { addDays } from "@/lib/calendar-grid";
+import { CollectionWhatsapp } from "@/features/collection/components/collection-whatsapp";
+import type { WhatsappListContext } from "@/features/whatsapp/templates";
 
 import { describeRecurrence, repeatValues, type Recurrence } from "../recurrence";
 import { searchParentTasksAction } from "../picker-actions";
@@ -63,6 +65,8 @@ export type TaskRowView = {
   // TASK-06 part B: set on a sub-task (null on any other task); title null when the user cannot see the parent.
   // Required, so every screen that shows the row (and its edit form, which hides the repeat for a sub-task) says it.
   parent: { id: string; title: string | null } | null;
+  // COL-04: a collection reminder task (made by the server) names its document; the row offers a WhatsApp reminder
+  collectionDocumentId?: string | null;
 };
 
 type Props = {
@@ -77,9 +81,11 @@ type Props = {
   templates?: ChecklistTemplateOption[];
   /** TASK-08: the business's activity and task types, for the edit form */
   kinds?: ActivityTypeOption[];
+  /** COL-04: the user's and business's names for the collection reminder's WhatsApp text; null for someone who cannot write */
+  whatsapp?: WhatsappListContext | null;
 };
 
-export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays, templates = [], kinds = [] }: Props) {
+export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDays, templates = [], kinds = [], whatsapp = null }: Props) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +166,11 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
             </Link>
           ) : null}
         </p>
+        {task.collectionDocumentId && whatsapp && canEdit && !task.done ? (
+          <div className="mt-2">
+            <CollectionWhatsapp orgId={orgId} taskId={task.id} context={whatsapp} />
+          </div>
+        ) : null}
         <TaskChecklist orgId={orgId} taskId={task.id} taskTitle={task.title} steps={task.checklist ?? []} canEdit={canEdit} templates={templates} />
         {task.parent ? null : <Subtasks orgId={orgId} taskId={task.id} taskTitle={task.title} subtasks={task.subtasks ?? []} canEdit={canEdit} assignees={assignees} />}
         {task.done && canEdit ? <TaskOutcome orgId={orgId} task={task} /> : task.done && task.outcome ? <p className="mt-1 text-sm">תוצאה: {task.outcome}</p> : null}

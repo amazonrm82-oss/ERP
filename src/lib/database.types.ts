@@ -833,7 +833,7 @@ export type DisqualifyReasonRow = {
 };
 
 // WA-01: the organization's WhatsApp text templates (migration whatsapp_templates).
-// kind is set by the seed only ('meeting_reminder' on the default reminder template).
+// kind is set by the seed only ('meeting_reminder' on the default reminder template; 'collection_reminder', COL-04).
 export type WhatsappTemplateRow = {
   id: string;
   organization_id: string;
@@ -2511,6 +2511,8 @@ export type TaskRow = {
   parent_task_id: string | null;
   // TASK-06 part B: true on a sub-task the bin took with its parent (server only)
   binned_with_parent: boolean | null;
+  // COL-04: the document of a collection reminder task; server only (no client grant), FK set null of the column
+  collection_document_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;

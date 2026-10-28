@@ -632,6 +632,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_debt_aging.sql",
       // COL-03 redefines app.audit_erase_core() of _opening_balance.sql last (a payment promise's note, emptied by an erasure)
       "_payment_promise_erasure.sql",
+      // COL-04 redefines app.import_record_worked() of _opening_import_undo.sql last (a reminder task is not work)
+      "_collection_reminder_import_undo.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

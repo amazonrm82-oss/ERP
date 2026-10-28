@@ -11,7 +11,7 @@ import type { FormState } from "@/lib/action-result";
 
 import { addTemplateAction, deleteTemplateAction, moveTemplateAction, updateTemplateAction } from "../actions";
 import type { WhatsappTemplate } from "../queries";
-import { MEETING_REMINDER_KIND, TEMPLATE_BODY_MAX, TEMPLATE_NAME_MAX } from "../templates";
+import { COLLECTION_REMINDER_KIND, MEETING_REMINDER_KIND, TEMPLATE_BODY_MAX, TEMPLATE_NAME_MAX } from "../templates";
 
 /** WA-01: the organization's WhatsApp templates: edit, reorder and delete. */
 export function TemplateList({ orgId, templates, editable }: { orgId: string; templates: WhatsappTemplate[]; editable: boolean }) {
@@ -34,7 +34,9 @@ export function TemplateList({ orgId, templates, editable }: { orgId: string; te
 type RowProps = { orgId: string; template: WhatsappTemplate; editable: boolean; isFirst: boolean; isLast: boolean };
 
 function ReminderBadge({ template }: { template: WhatsappTemplate }) {
-  return template.kind === MEETING_REMINDER_KIND ? <Badge tone="accent">מוצעת בתזכורת לפגישה</Badge> : null;
+  if (template.kind === MEETING_REMINDER_KIND) return <Badge tone="accent">מוצעת בתזכורת לפגישה</Badge>;
+  if (template.kind === COLLECTION_REMINDER_KIND) return <Badge tone="accent">מוצעת בתזכורת גבייה</Badge>;
+  return null;
 }
 
 function TemplateRow({ orgId, template, editable, isFirst, isLast }: RowProps) {

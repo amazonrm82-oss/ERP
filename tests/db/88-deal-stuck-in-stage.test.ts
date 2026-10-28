@@ -33,6 +33,8 @@ const RERUN = [
   migrationFile("_opening_import_undo.sql"),
   // WAB-06 redefines app.deal_attention_rows() and the activity rules of _import_history.sql last (share notes)
   migrationFile("_share_note_rules.sql"),
+  // COL-04 redefines app.import_record_worked() of _opening_import_undo.sql last (a reminder task is not work)
+  migrationFile("_collection_reminder_import_undo.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
