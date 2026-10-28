@@ -1406,7 +1406,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   sends kind `payment` "ההבטחה לא קוימה" to the rep (document: MNY-01's owner; customer: the contact's/company's owner; else
   owners/admins) when a still-effective covered document (a billed proforma judged by its invoice) has a balance. Merge moves a
   duplicate's customer promise (`app.merge_payment_promises` on the `merged` entry, marker `app.payment_promise_merge`).
-  `app.audit_erase_core` was last redefined in 021100 (promise notes emptied, their entries erased; known limit: a note on a
+  `app.audit_erase_core` was last redefined in 021100, then 021104 (DOC-02 lines) (promise notes emptied, their entries erased; known limit: a note on a
   company's document naming one of its contacts is not reached by that contact's erasure).
 - Collection report (COL-06, migration 021103; owner's answer pending on how collection days are counted, built (א)):
   `public.report_collection(org, from, to, owner)` (invoker, `set jit = off`, `set enable_nestloop = off`; key `collection` in
@@ -1417,6 +1417,25 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   that `money_allocation_state` calls paid and whose last counted allocation (payment `paid_on`, or an opening-credit offset's day
   in the org zone) falls in the period: days from the document date, and past due; average, median, null below 5. The screen
   links to `debt_aging` only with `balances` (`ReportSection.exported = false` keeps link rows out of CSV/xlsx).
+- Document details and the documents list (DOC-02, DOC-03; migrations 021104, 021105; owner's answers pending, built (ב) (א) (א)
+  (א)): nullable insert-only columns on `accounting_documents`: `provider`/`provider_document_id` (server only: a person's insert
+  naming them is refused, hint `document:provider`; the server fills them once; unique per business), `allocation_number` (digits
+  1..20, tax invoice or invoice-receipt only), `net_agorot`/`vat_agorot`/`vat_rate_bp` (both or neither, net + vat = amount),
+  `quote_id` (composite FK set null; an accepted quote of the same customer, hint `document:source`; never with `order_id`) and
+  `original_document_id` (a credit invoice's ACTIVE tax invoice or invoice-receipt of the same customer, hint `document:original`),
+  frozen for every writer by the INVOKER trigger `app.accounting_documents_source` (outsider guard first; the source and original
+  read under the caller's RLS so an unreadable row answers like a missing one; PAY-02's same-customer rule written inline over
+  readable rows, keep in step with `app.money_same_customer`: it may refuse a pair only a hidden row joins, fails closed).
+  `public.accounting_document_lines` (rights follow the document; written only in the transaction that inserted the document, by
+  its recorder, through `public.accounting_document_record(org, doc, lines)` (invoker); never updated or deleted but the erasure's
+  neutral text; 200 per document under an advisory lock; `product_id` server-only; invoker trigger
+  `app.accounting_document_lines_check`; audited). `app.audit_erase_core` was last redefined in 021104 (lines get "הפריט נמחק
+  (מחיקת פרטיות)"). DOC-03: `app.document_pay_state` = `documentPayState()` (test 270) over `app.document_pay_rows` (invoker; asks
+  `money_allocation_state` only about balance-capable documents): cancelled|paid|overdue|partial|open, plus shown-only
+  transferred|none; `public.documents_by_pay_state(org, states, contact, company)` (invoker, setof, PostgREST pages it),
+  `public.documents_pay_summary(...)` (one call, COL-01's partial rule, non-members learn nothing, 20,000 ids max, `jit off`) and
+  `public.documents_pay_rows(org, ids)` (2,000 max, hint `documents_pay:too_many`). Customer filter: a contact = its documents and
+  its deals'; a company = its own, its contacts' and its deals'.
 - Collection reminders (COL-04, migrations 021101, 021102; owner's answers pending, built (ב) (א) DRAFT (א)): pg_cron
   `crm-collection-reminders` (every 15 minutes, `app.send_collection_reminders(p_orgs)`, definer, no grants) makes ONE task for the
   rep (MNY-01's owner rule, active full-seat non-viewer, else the owner, else the oldest admin) at offsets -3, 0, +7, +14 calendar days
