@@ -46,6 +46,7 @@ export async function searchShareRecordsAction(orgId: string, query: string): Pr
 
 const NOTE_EMPTY = "יש לכתוב את ההערה לפני השמירה.";
 const NOTE_TOO_LONG = "ההערה ארוכה מדי (עד 5,000 תווים).";
+const SHARE_NOTE_NO_EDIT = "אין לכם הרשאה לערוך את הרשומה הזו, ולכן אי אפשר לשמור עליה הערת שיתוף. בחרו רשומה אחרת.";
 
 /**
  * WAB-06 (owner, 27 October 2026, answer (ב)): saves what was shared as a "הערת שיתוף" ('share_note') on a record: the mark
@@ -84,6 +85,10 @@ export async function addShareNoteAction(
   row[SUBJECT_COLUMN[parsedSubject.data.kind]] = parsedSubject.data.id;
   const { data, error } = await context.supabase.from("activities").insert(row).select("id").single();
   if (error) {
+    // a share note needs edit rights on the record (owner's question pending, DECISIONS.md WAB-06): say so plainly
+    if (error.code === "42501") {
+      return fail(SHARE_NOTE_NO_EDIT);
+    }
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את ההערה. נסו שוב."));
   }
   revalidatePath(recordPage(parsedSubject.data.kind, orgId, parsedSubject.data.id));

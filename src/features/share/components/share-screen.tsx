@@ -543,7 +543,7 @@ function ShareNoteForm({
             hint={SHARE_NOTE_HINT}
             name="body"
             rows={5}
-            maxLength={NOTE_MAX}
+            maxLength={NOTE_MAX - SHARED_FROM_PHONE.length - 1}
             value={body}
             onChange={(event) => setBody(event.target.value)}
             error={fieldErrors.body}
