@@ -1408,6 +1408,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   duplicate's customer promise (`app.merge_payment_promises` on the `merged` entry, marker `app.payment_promise_merge`).
   `app.audit_erase_core` was last redefined in 021100 (promise notes emptied, their entries erased; known limit: a note on a
   company's document naming one of its contacts is not reached by that contact's erasure).
+- Collection reminders (COL-04, migrations 021101, 021102; owner's answers pending, built (ב) (א) DRAFT (א)): pg_cron
+  `crm-collection-reminders` (every 15 minutes, `app.send_collection_reminders(p_orgs)`, definer, no grants) makes ONE task for the
+  rep (MNY-01's owner rule, active full-seat non-viewer, else the owner, else the oldest admin) at offsets -3, 0, +7, +14 calendar days
+  from a BAL-02 debt document's due date (`app.collection_reminder_offset` = `collectionReminderOffset()`, the latest reached offset
+  for 7 days; test 267 compares them), from 08:00 in the org zone; never while `app.collection_held_until` holds, for a paid/cancelled
+  document, a billed proforma, a binned deal/contact/company, a business not writable or without `collection`+`documents`+`payments`.
+  Once per document, due date and offset in `app.collection_reminders_sent`; businesses take turns (`app.collection_reminder_turns`),
+  200 per business / 2,000 per run (lowerable per transaction), held/binned rows filtered before the cap, 3 failures then skipped.
+  An open earlier reminder task moves to the new stage only while its title and due time are still the job's and its owner usable;
+  else a new task. `tasks.collection_document_id` (server only, composite FK set null) marks it; the task row offers "תזכורת
+  ב-WhatsApp" (WA-01 window, kind `collection_reminder` template seeded for NEW businesses by `app.seed_whatsapp_templates`, DRAFT
+  wording; {סכום} left unfilled when the caller's view of the customer's money is partial). `app.import_record_worked` (last
+  redefined in 021102) ignores a reminder task on a document of the same import. Follow-up: the button on My day and record pages.
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
