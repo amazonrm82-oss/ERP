@@ -162,7 +162,7 @@ export default async function QrCodesPage({ params }: Props) {
                           pendingText="שומרים…"
                           srLabel={code.name}
                         >
-                          {code.isActive ? "כיבוי הקוד" : "הפעלת הקוד"}
+                          {switchedOff ? "להשאיר כבוי גם כשהקישורים יחזרו" : code.isActive ? "כיבוי הקוד" : "הפעלת הקוד"}
                         </ActionButton>
                       )}
                       <ActionButton
