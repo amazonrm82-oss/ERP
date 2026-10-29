@@ -631,7 +631,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only goals whose actual the caller sees in full are returned (own meetings goal via `app.goal_entries_readable`). Overdue
   open deals are their own line, never inside a month; the goal comparison is null when the view is partial or a pipeline is
   picked. Pace shows after a quarter of the period (`src/features/goals/progress.ts`).
-- Collection goals (GOL-01 rest, migration 021106; owner's answers pending, built (א) (א) (א)): `goals.metric` takes `collected`
+- Collection goals (GOL-01 rest, migrations 021106, 021111; owner 29 October 2026, answers (15) ב (16) ב (17) ג): `goals.metric` takes `collected`
   ("גבייה", money). Trigger `goals_collected` (`app.goals_collected_check`, definer, outsider guard first) refuses a new or changed
   collection goal while the plan lacks `payments` (hint `feature:payments`); removal stays allowed. `public.report_goal_progress` (last
   redefined in 021106) sums recorded/confirmed payments by `paid_on` in the period (COL-06's rule, keep in step with
@@ -640,7 +640,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.goal_payments_counted(org, goal)` (definer, count only, for a caller who reads the goal: `goals_select`'s rule, keep in step).
   Accepted (review): whether such a goal shows tells a caller that unreadable payments exist (no amount); a goal is falsely hidden
   when a payment's deal has no owner/team and its contact is unreadable (fails safe; the 021106 comment says otherwise). Follow-ups:
-  a collection goal of a plan that lost `payments` cannot be removed from the grid; the refusal reads the general payments message.
+  a collection goal of a plan that lost a key cannot be removed from the grid.
+  Since 021111: the trigger needs payments, documents AND collection (hints `feature:payments|documents|collection`, in that order);
+  `report_goal_progress` leaves a collection goal out unless `app.can_record_payments` (the target stays on the grid), and
+  `app.goal_payments_counted` is null without it or without the keys; a cheque counts once cleared or its `cheque_due_date` is on or
+  before the business's today, never bounced (both functions; keep in step), so a past month's actual can grow when a post-dated
+  cheque falls due (accepted, the owner's wording; COL-06's report counts every recorded payment). `app.goals_collected_check`,
+  `app.goal_payments_counted` and `public.report_goal_progress` were last redefined in 021111.
 - Revenue by product (RPT-01 part one, migration 020275): `public.report_revenue_by_product(org, from, to, pipeline, owner)` (invoker)
   takes `report_revenue`'s won-deal rule (keep in step) and sums stored `deal_lines.total_agorot` by product and billing; `by_billing`
   keeps one-time and each recurring period apart (never summed together); `totals.deals_with_vat/without_vat` let the screen warn
@@ -1435,14 +1441,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   כשנרשמה"). A customer promise's broken notice goes to the contact's/company's usable owner, else the usable recorder (`created_by`),
   else owners/admins (lead's choice); `app.send_promise_breaks` was last redefined in 021109. The contact and company cards record the
   customer promise (`CustomerPromiseCard`; a contact of a company shows its own older promise and links to the company's card).
-- Collection report (COL-06, migration 021103; owner's answer pending on how collection days are counted, built (א)):
+- Collection report (COL-06, migrations 021103, 021110; owner 29 October 2026: (1) (א) simple average from the document date, (2) (ב) a tax
+  invoice billing an active proforma counts from the proforma's date; days late from the invoice's due date):
   `public.report_collection(org, from, to, owner)` (invoker, `set jit = off`, `set enable_nestloop = off`; key `collection` in
   `public.log_export`, report definition flag `collection`): COL-01's rights, keys and partial rule (copied, keep in step; partial =
   rows from what the caller reads, `totals` null and every collection-days figure null). Payments recorded/confirmed by `paid_on`
   month (every month of the period), by method, by rep (COL-01's rule for a payment: deal's owner, else contact's, else none; keep
   in step). Collection days: active tax invoices and proformas (a billed proforma counts on its invoice; opening balances left out)
   that `money_allocation_state` calls paid and whose last counted allocation (payment `paid_on`, or an opening-credit offset's day
-  in the org zone) falls in the period: days from the document date, and past due; average, median, null below 5. The screen
+  in the org zone) falls in the period: days from the document date, and past due; average, median, null below 5. `public.report_collection` was last redefined in 021110. The screen
   links to `debt_aging` only with `balances` (`ReportSection.exported = false` keeps link rows out of CSV/xlsx).
 - Document details and the documents list (DOC-02, DOC-03; migrations 021104, 021105; owner's answers pending, built (ב) (א) (א)
   (א)): nullable insert-only columns on `accounting_documents`: `provider`/`provider_document_id` (server only: a person's insert
