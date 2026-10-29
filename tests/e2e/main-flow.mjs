@@ -1,5 +1,5 @@
 // End-to-end check of the main path, in a real browser, against a LOCAL stack:
-//   npx supabase start                      (Docker; uses supabase/config.toml)
+//   npm run stack:start                     (Docker; uses supabase/config.toml; CLI pinned to 2.121.0)
 //   npm run dev with the local URL and publishable key in .env.local
 //   npm run test:e2e
 // sign up -> confirm email (read from the local Mailpit inbox) -> create the

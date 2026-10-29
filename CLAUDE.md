@@ -166,12 +166,14 @@ npm run db:test:start  # start a throwaway local PostgreSQL on 127.0.0.1:54329
 npm run test:db        # rebuild crm_saas_test from the migrations and run all database tests
 npm run test:unit      # unit tests of the app logic (no database, no browser)
 npm run db:test:stop
-npm run test:e2e       # browser flow; needs `npx supabase start` (Docker) + `npm run dev` on the local stack
+npm run stack:start    # local Supabase stack (Docker); the CLI is pinned to 2.121.0 so it uses the images on disk (owner, 29 October 2026)
+npm run test:e2e       # browser flow; needs `npm run stack:start` + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy
 node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of the main screens with sample data (DSN-14)
 ```
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
+Nothing is merged without the browser flow (`test:e2e`) passing on the local stack (owner, 29 October 2026).
 `test:db` fails at teardown when a test leaves any app/public function body different from the fresh build
 (`tests/db/global-setup.ts`); a test that re-runs a migration uses `rerunClosure()` from `tests/db/rerun.ts`. A hand-picked re-run list is checked with
 `staleRestores()` (same file), which names every function whose latest redefinition the list misses.

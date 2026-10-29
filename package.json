@@ -12,6 +12,8 @@
     "test:unit": "vitest run --config vitest.unit.config.mts",
     "db:test:start": "bash scripts/test-db.sh start",
     "db:test:stop": "bash scripts/test-db.sh stop",
+    "stack:start": "npx -y supabase@2.121.0 start",
+    "stack:stop": "npx -y supabase@2.121.0 stop",
     "test:e2e": "node tests/e2e/main-flow.mjs"
   },
   "dependencies": {
