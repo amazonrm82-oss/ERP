@@ -19,19 +19,31 @@
 -- (1) app.collection_template_backfill(p_orgs) inserts the template once into every business that has no template of kind
 --     'collection_reminder' (renamed or not): name "תזכורת לתשלום", else "תזכורת גבייה" when a template of that name exists,
 --     else the business is skipped; a business at the 50-template cap is skipped; insert only (on conflict do nothing), at the end
---     of the list. Run once below for every business. The app keeps offering the same text unsaved when a business has no such
---     template (deleted later, or skipped here).
+--     of the list; one business at a time in its own exception block, so a refusal (a concurrent insert reaching the cap
+--     trigger) skips that business with one warning line and never stops the migration. Run once below for every business.
+--     Accepted: applying this file again gives the template back to a business that deleted it in between. The app keeps
+--     offering the same text unsaved when a business has no such template (deleted later, or skipped here).
 -- (3) app.seed_whatsapp_templates gets the final wording (mirrored by DEFAULT_TEMPLATES and COLLECTION_REMINDER_TEXT). Templates
 --     businesses already have are not rewritten.
--- (4) app.close_paid_collection_tasks(p_orgs), run by app.send_collection_reminders first (the same pg_cron job every 15 minutes):
---     an open, not binned task marked with tasks.collection_document_id is set done with outcome "נסגרה: החוב שולם" when its
---     document has no balance (public.money_allocation_state; a proforma billed by an active tax invoice is judged by that
---     invoice, as COL-03 judges it), or "נסגרה: המסמך בוטל" when the document is cancelled. Never a task whose status a person
---     ever changed (any audit 'update' entry of the task that names status: a person closed it, or reopened it after the
---     system closed it). Only in a writable business (not gated by plan keys: it only tidies a task the feature made). Fair like
---     the reminders: 200 per business and 2,000 per run (the same settings), businesses by their turn, failures after fresh ones
---     and skipped after 3 (app.collection_task_closes, no grants, RLS on); each task in its own exception block with one
---     redacted warning line. The close is an ordinary task update (audited with no actor; automations see "task done").
+-- (4) app.close_paid_collection_tasks(p_orgs), run by app.send_collection_reminders first (the same pg_cron job every 15 minutes),
+--     in the businesses the reminders serve (app.collection_reminder_orgs: writable, plan keys collection, documents and
+--     payments):
+--     * close: an open, not binned task marked with tasks.collection_document_id and without a repeat rule is set done with
+--       outcome "נסגרה: החוב שולם" when its document has no balance (public.money_allocation_state; a proforma billed by an
+--       active tax invoice is judged by that invoice, as COL-03 judges it; app.collection_document_paid is the cheap cut).
+--       A cancelled document closes nothing (the owner's answer covers "paid" only; the question is open). The system's close
+--       is recorded (app.collection_task_closes.closed_at / outcome, the marker).
+--     * a person's task is never touched: no close of a task whose status a person ever changed (an audit 'update' entry naming
+--       status with an actor), nor of an open task that carries the marker (the system reopen clears it, so an open marked task
+--       was reopened by someone else). Remaining fail-open cases: a person's status change written by a server path with no
+--       actor, and an audit entry emptied by a privacy erasure ({"erased": true}) are not seen as a person's change.
+--     * reopen: a task the system closed (marker), still done, with no status change by anyone since that close, whose
+--       document is active and has a balance again (a cheque bounced, an allocation was released) is set open, its outcome
+--       cleared and the marker cleared; it may be closed again later.
+--     Fair like the reminders: 200 per business and 2,000 per run (the same settings), businesses by their turn, failures after
+--     fresh ones and skipped after 3 (app.collection_task_closes, no grants, RLS on); each task in its own exception block with
+--     one redacted warning line. Closing and reopening are ordinary task updates (audited with no actor; automations see them).
+-- (review) The reminder job reads the businesses first and evaluates app.collection_reminder_at only for candidate documents.
 -- Every statement is safe to run twice. No object or row is removed.
 
 -- ----------------------------------------------------------------------------
@@ -125,11 +137,53 @@ create table if not exists app.collection_task_closes (
   task_id          uuid primary key references public.tasks (id) on delete cascade,
   organization_id  uuid not null references public.organizations (id) on delete cascade,
   failures         integer not null default 0,
-  last_attempt_at  timestamptz
+  last_attempt_at  timestamptz,
+  -- set while the task is closed by the system (the marker); cleared when the system reopens it
+  closed_at        timestamptz,
+  outcome          text
 );
+alter table app.collection_task_closes add column if not exists closed_at timestamptz;
+alter table app.collection_task_closes add column if not exists outcome text;
 create index if not exists collection_task_closes_org_idx on app.collection_task_closes (organization_id);
 alter table app.collection_task_closes enable row level security;
 revoke all on app.collection_task_closes from public, anon, authenticated, service_role;
+
+-- the businesses both passes serve: writable, with the three plan keys of the reminders (optionally only the named ones)
+create or replace function app.collection_reminder_orgs(p_orgs uuid[]) returns setof uuid
+language sql stable
+set search_path = ''
+as $$
+  select o.id
+    from public.organizations o
+   where (p_orgs is null or o.id = any (p_orgs))
+     and app.org_writable(o.id)
+     and app.org_has_feature(o.id, 'collection')
+     and app.org_has_feature(o.id, 'documents')
+     and app.org_has_feature(o.id, 'payments')
+$$;
+revoke all on function app.collection_reminder_orgs(uuid[]) from public, anon, authenticated, service_role;
+
+-- the counted allocations and opening-credit offsets on a document, plus, for a tax invoice, on the proforma it bills while
+-- that proforma is active (public.money_allocation_state's "paid"); a cheap cut, the balance itself is read from that function
+create or replace function app.collection_document_paid(p_org uuid, p_document uuid) returns bigint
+language sql stable
+set search_path = ''
+as $$
+  with docs as (
+    select p_document as id
+    union
+    select p.id from public.accounting_documents d
+      join public.accounting_documents p on p.organization_id = d.organization_id and p.id = d.proforma_id and p.status = 'active'
+     where d.organization_id = p_org and d.id = p_document and d.doc_type = 'tax_invoice'
+  )
+  select coalesce((select sum(a.amount_agorot) from public.payment_allocations a
+                    where a.organization_id = p_org and a.document_id in (select id from docs)
+                      and a.released_at is null and a.removed_at is null), 0)
+       + coalesce((select sum(oc.amount_agorot) from public.opening_credit_allocations oc
+                    where oc.organization_id = p_org and oc.document_id in (select id from docs)
+                      and oc.released_at is null and oc.removed_at is null), 0)
+$$;
+revoke all on function app.collection_document_paid(uuid, uuid) from public, anon, authenticated, service_role;
 
 create or replace function app.close_paid_collection_tasks(p_orgs uuid[] default null) returns integer
 language plpgsql security definer
@@ -143,66 +197,80 @@ declare
 begin
   for v_row in
     select z.* from (
-      select t.organization_id, t.id as task_id, d.status as doc_status, coalesce(bi.id, d.id) as judged_id,
+      select t.organization_id, t.id as task_id, t.status::text as task_status, j.id as judged_id,
              f.last_attempt_at, tn.served_at,
              row_number() over (partition by t.organization_id order by f.last_attempt_at nulls first, t.created_at, t.id) as n
-        from public.tasks t
+        from app.collection_reminder_orgs(p_orgs) og(id)
+        join public.tasks t on t.organization_id = og.id
         join public.accounting_documents d
           on d.organization_id = t.organization_id and d.id = t.collection_document_id
-        -- a proforma billed by an active tax invoice owes through the invoice (COL-03's rule)
-        left join lateral (
-          select i.id, i.amount_agorot, i.proforma_id
-            from public.accounting_documents i
-           where d.doc_type = 'proforma' and i.organization_id = d.organization_id and i.proforma_id = d.id and i.status = 'active'
-           limit 1
-        ) bi on true
+        -- the judged document: a proforma billed by an active tax invoice owes through the invoice (COL-03's rule)
+        cross join lateral (
+          select coalesce((select i.id from public.accounting_documents i
+                            where d.doc_type = 'proforma' and i.organization_id = d.organization_id and i.proforma_id = d.id
+                              and i.status = 'active'
+                            limit 1), d.id) as id
+        ) j
+        join public.accounting_documents jd on jd.organization_id = d.organization_id and jd.id = j.id
         left join app.collection_task_closes f on f.task_id = t.id
         left join app.collection_reminder_turns tn on tn.organization_id = t.organization_id
-       where (p_orgs is null or t.organization_id = any (p_orgs))
-         and t.collection_document_id is not null
-         and t.status = 'open'
+       where t.collection_document_id is not null
          and t.deleted_at is null
+         -- a repeating task is never closed (no next occurrence is made behind the person's back)
+         and t.recurrence is null
          and coalesce(f.failures, 0) < 3
-         and app.org_writable(t.organization_id)
-         -- cancelled, or a cheap first cut of "paid" (a superset: every counted allocation and opening-credit offset on the
-         -- judged document and on any proforma it bills); the balance itself is read below
-         and (d.status <> 'active'
-              or coalesce(bi.amount_agorot, d.amount_agorot) <=
-                 coalesce((select sum(a.amount_agorot) from public.payment_allocations a
-                            where a.organization_id = d.organization_id
-                              and a.document_id in (coalesce(bi.id, d.id), coalesce(bi.proforma_id, d.proforma_id))
-                              and a.released_at is null and a.removed_at is null), 0)
-                 + coalesce((select sum(oc.amount_agorot) from public.opening_credit_allocations oc
-                              where oc.organization_id = d.organization_id
-                                and oc.document_id in (coalesce(bi.id, d.id), coalesce(bi.proforma_id, d.proforma_id))
-                                and oc.released_at is null and oc.removed_at is null), 0))
-         -- never a task whose status a person changed (closed it, or reopened it after it was closed)
-         and not exists (select 1 from public.audit_log al
-                           where al.organization_id = t.organization_id and al.entity_type = 'tasks' and al.entity_id = t.id
-                             and al.action = 'update' and al.changes ? 'status')
+         -- only "paid" closes (the owner's answer (4) ב); a cancelled document neither closes nor reopens a task. Should a
+         -- cancelled document close it too, its branch goes here and in the loop's v_note
+         and d.status = 'active'
+         and (
+           -- to close: open and not closed by the system before (a system-closed task that is open again was reopened by a
+           -- person: the system reopen clears the marker), no status change by a person ever, and the cheap cut says paid
+           (t.status = 'open' and f.closed_at is null
+            and app.collection_document_paid(jd.organization_id, jd.id) >= jd.amount_agorot
+            and not exists (select 1 from public.audit_log al
+                             where al.organization_id = t.organization_id and al.entity_type = 'tasks' and al.entity_id = t.id
+                               and al.action = 'update' and al.changes ? 'status' and al.actor_id is not null))
+           or
+           -- to reopen: closed by the system, still done, no status change by anyone since that close, and owed again
+           (t.status = 'done' and f.closed_at is not null
+            and app.collection_document_paid(jd.organization_id, jd.id) < jd.amount_agorot
+            and not exists (select 1 from public.audit_log al
+                             where al.organization_id = t.organization_id and al.entity_type = 'tasks' and al.entity_id = t.id
+                               and al.action = 'update' and al.changes ? 'status' and al.created_at > f.closed_at))
+         )
     ) z
      where z.n <= app.collection_reminder_per_org()
      order by z.n, z.served_at nulls first, z.organization_id, z.last_attempt_at nulls first, z.task_id
      limit app.collection_reminder_limit()
   loop
     begin
-      v_note := null;
-      if v_row.doc_status <> 'active' then
-        v_note := 'נסגרה: המסמך בוטל';
-      else
-        select coalesce((x ->> 'balance')::bigint, 0) into v_balance
-          from jsonb_array_elements(public.money_allocation_state(v_row.organization_id, array[v_row.judged_id], '{}'::uuid[]) -> 'documents') x
-         where (x ->> 'id')::uuid = v_row.judged_id;
-        if coalesce(v_balance, 0) <= 0 then
-          v_note := 'נסגרה: החוב שולם';
-        end if;
-      end if;
-      if v_note is not null then
+      select coalesce((x ->> 'balance')::bigint, 0) into v_balance
+        from jsonb_array_elements(public.money_allocation_state(v_row.organization_id, array[v_row.judged_id], '{}'::uuid[]) -> 'documents') x
+       where (x ->> 'id')::uuid = v_row.judged_id;
+      v_balance := coalesce(v_balance, 0);
+      if v_row.task_status = 'open' and v_balance <= 0 then
+        v_note := 'נסגרה: החוב שולם';
         update public.tasks t
            set status = 'done', outcome = v_note
          where t.organization_id = v_row.organization_id and t.id = v_row.task_id
            and t.status = 'open' and t.deleted_at is null;
         if found then
+          insert into app.collection_task_closes (task_id, organization_id, failures, last_attempt_at, closed_at, outcome)
+          values (v_row.task_id, v_row.organization_id, 0, null, now(), v_note)
+          on conflict (task_id) do update
+            set failures = 0, last_attempt_at = null, closed_at = excluded.closed_at, outcome = excluded.outcome;
+          v_done := v_done + 1;
+        end if;
+      elsif v_row.task_status = 'done' and v_balance > 0 then
+        -- the debt came back (a payment failed, an allocation was released): the task the system closed is open again
+        update public.tasks t
+           set status = 'open', outcome = null
+         where t.organization_id = v_row.organization_id and t.id = v_row.task_id
+           and t.status = 'done' and t.deleted_at is null;
+        if found then
+          update app.collection_task_closes c
+             set closed_at = null, outcome = null, failures = 0, last_attempt_at = null
+           where c.task_id = v_row.task_id;
           v_done := v_done + 1;
         end if;
       end if;
@@ -211,7 +279,9 @@ begin
       values (v_row.task_id, v_row.organization_id, 1, now())
       on conflict (task_id)
         do update set failures = app.collection_task_closes.failures + 1, last_attempt_at = excluded.last_attempt_at;
-      raise warning 'crm-collection-reminders: closing task % failed (SQLSTATE %)', v_row.task_id, sqlstate;
+      raise warning 'crm-collection-reminders: closing task % failed (SQLSTATE %)%', v_row.task_id, sqlstate,
+        case when coalesce((select c.failures from app.collection_task_closes c where c.task_id = v_row.task_id), 0) >= 3
+             then ', skipped after 3 failures' else '' end;
     end;
   end loop;
   return v_done;
@@ -241,39 +311,20 @@ begin
   perform app.close_paid_collection_tasks(p_orgs);
 
   for v_row in
-    select z.* from (
-      select d.organization_id, d.id, d.doc_type, d.number, d.due_date, d.deal_id, d.contact_id, d.company_id,
-             c.today, c.zone, c.offset_days, c.reminder_day, s.last_attempt_at, tn.served_at,
-             -- a document that failed before goes after the fresh ones, so failing rows never starve the rest
-             row_number() over (partition by d.organization_id order by s.last_attempt_at nulls first, d.due_date, d.id) as n
-        from public.accounting_documents d
-        join public.organizations o on o.id = d.organization_id
-        cross join lateral (
-          select (now() at time zone app.intake_zone(o.timezone))::date as today, app.intake_zone(o.timezone) as zone
-        ) t0
-        -- answers (2): the reminder moved to the business's next working day (app.collection_reminder_at)
-        cross join lateral (
-          select t0.today, t0.zone, r.offset_days, r.reminder_day
-            from app.collection_reminder_at(d.organization_id, d.due_date, t0.today) r
-        ) c
-        left join app.collection_reminders_sent s
-          on s.document_id = d.id and s.due_date = d.due_date and s.offset_days = c.offset_days
-        left join app.collection_reminder_turns tn on tn.organization_id = d.organization_id
-       where (p_orgs is null or d.organization_id = any (p_orgs))
-         and d.status = 'active'
+    -- answers (review): the businesses first (writable, the three keys), then the documents that can be due at all, and only
+    -- then the per-document rule (app.collection_reminder_at)
+    with cand as materialized (
+      select d.organization_id, d.id, d.doc_type, d.number, d.due_date, d.deal_id, d.contact_id, d.company_id, d.amount_agorot,
+             o.timezone
+        from app.collection_reminder_orgs(p_orgs) og(id)
+        join public.organizations o on o.id = og.id
+        join public.accounting_documents d on d.organization_id = og.id
+       where d.status = 'active'
          and d.doc_type in ('tax_invoice', 'proforma', 'opening_balance')
          and d.amount_agorot > 0
          -- a cheap bound first (every zone's today is within a day of the server's): an offset's day is reached only while
          -- today - due is in -3..20 plus the days it was moved (answers (2): up to 30), so nothing outside it can be due
          and d.due_date between current_date - 52 and current_date + 4
-         and d.due_date between c.today - 50 and c.today + 3
-         and c.offset_days is not null
-         and (now() at time zone c.zone)::time >= time '08:00'
-         and (s.document_id is null or (s.done_at is null and s.failures < 3))
-         and app.org_writable(d.organization_id)
-         and app.org_has_feature(d.organization_id, 'collection')
-         and app.org_has_feature(d.organization_id, 'documents')
-         and app.org_has_feature(d.organization_id, 'payments')
          -- a proforma billed by an active tax invoice owes through the invoice
          and not (d.doc_type = 'proforma'
                   and exists (select 1 from public.accounting_documents i
@@ -282,9 +333,6 @@ begin
          and not exists (select 1 from public.deals dl where dl.organization_id = d.organization_id and dl.id = d.deal_id and dl.deleted_at is not null)
          and not exists (select 1 from public.contacts ct where ct.organization_id = d.organization_id and ct.id = d.contact_id and ct.deleted_at is not null)
          and not exists (select 1 from public.companies co where co.organization_id = d.organization_id and co.id = d.company_id and co.deleted_at is not null)
-         -- COL-03: a promise holds the reminders; nothing is recorded, so the offset is judged again after the promise. Here,
-         -- before the per-business cap, so held documents never take the places of the others
-         and app.collection_held_until(d.organization_id, d.id) is null
          -- a cheap first cut (public.collection_documents' candidates); the balance itself is read below
          and coalesce((select sum(a.amount_agorot) from public.payment_allocations a
                         where a.organization_id = d.organization_id and a.document_id = d.id
@@ -293,6 +341,33 @@ begin
                           where oc.organization_id = d.organization_id and oc.document_id = d.id
                             and oc.released_at is null and oc.removed_at is null), 0)
              < d.amount_agorot
+    )
+    select z.* from (
+      select d.organization_id, d.id, d.doc_type, d.number, d.due_date, d.deal_id, d.contact_id, d.company_id,
+             c.today, c.zone, c.offset_days, c.reminder_day, s.last_attempt_at, tn.served_at,
+             -- a document that failed before goes after the fresh ones, so failing rows never starve the rest
+             row_number() over (partition by d.organization_id order by s.last_attempt_at nulls first, d.due_date, d.id) as n
+        from cand d
+        cross join lateral (
+          select (now() at time zone app.intake_zone(d.timezone))::date as today, app.intake_zone(d.timezone) as zone
+        ) t0
+        -- answers (2): the reminder moved to the business's next working day (app.collection_reminder_at)
+        cross join lateral (
+          select t0.today, t0.zone, r.offset_days, r.reminder_day
+            -- no day (nothing to do, the rule is not evaluated) outside the bound or before 08:00 in the business's zone
+            from app.collection_reminder_at(d.organization_id, d.due_date,
+                                            case when d.due_date between t0.today - 50 and t0.today + 3
+                                                      and (now() at time zone t0.zone)::time >= time '08:00'
+                                                 then t0.today end) r
+        ) c
+        left join app.collection_reminders_sent s
+          on s.document_id = d.id and s.due_date = d.due_date and s.offset_days = c.offset_days
+        left join app.collection_reminder_turns tn on tn.organization_id = d.organization_id
+       where c.offset_days is not null
+         and (s.document_id is null or (s.done_at is null and s.failures < 3))
+         -- COL-03: a promise holds the reminders; nothing is recorded, so the offset is judged again after the promise. Here,
+         -- before the per-business cap, so held documents never take the places of the others
+         and app.collection_held_until(d.organization_id, d.id) is null
     ) z
      where z.n <= app.collection_reminder_per_org()
      -- businesses take turns: every business's first document, then every business's second, ...; among businesses, the
@@ -436,31 +511,41 @@ language plpgsql security definer
 set search_path = ''
 as $$
 declare
-  v_count integer;
+  v_org uuid;
+  v_count integer := 0;
 begin
-  with added as (
-    insert into public.whatsapp_templates (organization_id, name, body, position, kind)
-    select o.id, nm.name,
-           'שלום {שם פרטי}, תזכורת: {מסמך} על סך {סכום}, מועד התשלום {מועד תשלום}. אם כבר שילמתם, תודה, ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}',
-           coalesce((select max(t.position) + 1 from public.whatsapp_templates t where t.organization_id = o.id), 0),
-           'collection_reminder'
-      from public.organizations o
-      -- the first of the two names the business does not use already (names are unique ignoring case); none = skipped
-      cross join lateral (
-        select x.name from (values (1, 'תזכורת לתשלום'), (2, 'תזכורת גבייה')) as x(i, name)
-         where not exists (select 1 from public.whatsapp_templates t where t.organization_id = o.id and lower(t.name) = lower(x.name))
-         order by x.i
-         limit 1
-      ) nm
+  for v_org in
+    select o.id from public.organizations o
      where (p_orgs is null or o.id = any (p_orgs))
        -- already has one, renamed or not
        and not exists (select 1 from public.whatsapp_templates t where t.organization_id = o.id and t.kind = 'collection_reminder')
+     order by o.id
+  loop
+    -- one business at a time: a refusal (a concurrent insert reaching the cap trigger) skips that business only
+    begin
+      insert into public.whatsapp_templates (organization_id, name, body, position, kind)
+      select v_org, nm.name,
+             'שלום {שם פרטי}, תזכורת: {מסמך} על סך {סכום}, מועד התשלום {מועד תשלום}. אם כבר שילמתם, תודה, ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}',
+             coalesce((select max(t.position) + 1 from public.whatsapp_templates t where t.organization_id = v_org), 0),
+             'collection_reminder'
+        -- the first of the two names the business does not use already (names are unique ignoring case); none = skipped
+        from (
+          select x.name from (values (1, 'תזכורת לתשלום'), (2, 'תזכורת גבייה')) as x(i, name)
+           where not exists (select 1 from public.whatsapp_templates t where t.organization_id = v_org and lower(t.name) = lower(x.name))
+           order by x.i
+           limit 1
+        ) nm
        -- at the 50-template cap: skipped, never a failure
-       and (select count(*) from public.whatsapp_templates t where t.organization_id = o.id) < 50
-    on conflict do nothing
-    returning 1
-  )
-  select count(*)::integer into v_count from added;
+       where (select count(*) from public.whatsapp_templates t where t.organization_id = v_org) < 50
+         and not exists (select 1 from public.whatsapp_templates t where t.organization_id = v_org and t.kind = 'collection_reminder')
+      on conflict do nothing;
+      if found then
+        v_count := v_count + 1;
+      end if;
+    exception when others then
+      raise warning 'collection template backfill: business % skipped (SQLSTATE %)', v_org, sqlstate;
+    end;
+  end loop;
   return v_count;
 end;
 $$;

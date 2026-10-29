@@ -10,7 +10,9 @@ import {
   collectionReminderStage,
 } from "../../src/features/collection/reminders";
 import { COLLECTION_REMINDER_KIND } from "../../src/features/whatsapp/templates";
-import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, pgError, type Query } from "./helpers";
+import { Client } from "pg";
+
+import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, pgError, TEST_DB_URL, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -492,7 +494,12 @@ describe("collection reminders (COL-04)", () => {
       run(owner, async (q) => {
         const p = await one<{ id: string }>(q, "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, $3, current_date, 'cash') returning id", [org, contact, amount]);
         await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, $4)", [org, p.id, document, amount]);
+        return p.id;
       });
+    // a failed payment releases its allocations: the debt is back
+    const fail = (payment: string) => run(owner, (q) => q("update public.payments set status = 'failed' where id = $1", [payment]));
+    const marker = (task: string) =>
+      asAdmin(async (q) => (await q<{ closed: boolean; failures: number }>("select closed_at is not null as closed, failures from app.collection_task_closes where task_id = $1", [task])).rows[0] ?? null);
     const state = (task: string) =>
       asAdmin(async (q) => await one<{ status: string; outcome: string | null }>(q, "select status::text as status, outcome from public.tasks where id = $1", [task]));
 
@@ -513,13 +520,121 @@ describe("collection reminders (COL-04)", () => {
       ).toBeNull();
     });
 
-    it("a cancelled document: done with its own note", async () => {
+    it("a cancelled document closes nothing (the owner's answer covers a paid debt only)", async () => {
       const invoice = await doc(0);
       await job();
       const [t] = await tasks(invoice);
       await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [invoice]));
       await job();
-      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+      expect(await state(t.id)).toEqual({ status: "open", outcome: null });
+    });
+
+    it("the debt comes back: the task the system closed is open again, and closed again once paid", async () => {
+      const invoice = await doc(0, "tax_invoice", 600);
+      await job();
+      const [t] = await tasks(invoice);
+      const payment = await pay(invoice, 600);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      expect(await marker(t.id)).toEqual({ closed: true, failures: 0 });
+      await fail(payment);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "open", outcome: null });
+      expect(await marker(t.id)).toEqual({ closed: false, failures: 0 });
+      await pay(invoice, 600);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+    });
+
+    it("a person who reopened or re-closed a task the system closed keeps it", async () => {
+      const reopened = await doc(0, "tax_invoice", 350);
+      const reclosed = await doc(0, "tax_invoice", 350);
+      await job();
+      const [a] = await tasks(reopened);
+      const [b] = await tasks(reclosed);
+      await pay(reopened, 350);
+      const second = await pay(reclosed, 350);
+      await job();
+      // a person reopens the first while it is still paid: the system never closes it again
+      await run(member, (q) => q("update public.tasks set status = 'open' where id = $1", [a.id]));
+      // a person reopens and closes the second, then the debt comes back: the system never reopens it
+      await run(member, (q) => q("update public.tasks set status = 'open' where id = $1", [b.id]));
+      await run(member, (q) => q("update public.tasks set status = 'done' where id = $1", [b.id]));
+      await fail(second);
+      await job();
+      expect((await state(a.id)).status).toBe("open");
+      expect((await state(b.id)).status).toBe("done");
+    });
+
+    it("a task with a repeat rule is never closed", async () => {
+      const invoice = await doc(0, "tax_invoice", 150);
+      await job();
+      const [t] = await tasks(invoice);
+      await run(member, (q) => q(`update public.tasks set recurrence = '{"kind": "daily"}' where id = $1`, [t.id]));
+      await pay(invoice, 150);
+      await job();
+      expect((await state(t.id)).status).toBe("open");
+    });
+
+    it("only in the named businesses, and only with the three plan keys", async () => {
+      const invoice = await doc(0, "tax_invoice", 120);
+      await job();
+      const [t] = await tasks(invoice);
+      await pay(invoice, 120);
+      const other = await createUser("cr-close-other");
+      const elsewhere = await createOrg(other.id, "עסק אחר");
+      await asAdmin((q) => q("select app.close_paid_collection_tasks($1::uuid[])", [[elsewhere]]));
+      expect((await state(t.id)).status).toBe("open");
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify({ ...FEATURES, collection: false })]));
+      try {
+        await job();
+        expect((await state(t.id)).status).toBe("open");
+      } finally {
+        await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(FEATURES)]));
+      }
+      await asAdmin((q) => q("select app.close_paid_collection_tasks($1::uuid[])", [[org]]));
+      expect((await state(t.id)).status).toBe("done");
+    });
+
+    it("a failing close is counted, warned in one redacted line, and skipped after 3 attempts", async () => {
+      const invoice = await doc(0, "tax_invoice", 90);
+      await job();
+      const [t] = await tasks(invoice);
+      await pay(invoice, 90);
+      // a test-only trigger that refuses this one task's update (removed below)
+      await asAdmin(async (q) => {
+        await q("create schema if not exists cr_test");
+        await q(`create or replace function cr_test.refuse() returns trigger language plpgsql as $f$
+                 begin if new.id = '${t.id}'::uuid then raise exception 'refused by the test'; end if; return new; end $f$`);
+        await q("create or replace trigger zz_cr_test_refuse before update on public.tasks for each row execute function cr_test.refuse()");
+      });
+      const notices: string[] = [];
+      try {
+        for (let i = 0; i < 4; i++) {
+          const client = new Client({ connectionString: TEST_DB_URL });
+          client.on("notice", (n) => notices.push(n.message ?? ""));
+          await client.connect();
+          try {
+            await client.query("select app.close_paid_collection_tasks($1::uuid[])", [[org]]);
+          } finally {
+            await client.end();
+          }
+        }
+      } finally {
+        await asAdmin(async (q) => {
+          await q("drop trigger if exists zz_cr_test_refuse on public.tasks");
+          await q("drop schema if exists cr_test cascade");
+        });
+      }
+      expect(await marker(t.id)).toEqual({ closed: false, failures: 3 });
+      const lines = notices.filter((n) => n.includes(t.id));
+      expect(lines).toHaveLength(3);
+      expect(lines[0]).toBe(`crm-collection-reminders: closing task ${t.id} failed (SQLSTATE P0001)`);
+      expect(lines[2]).toMatch(/skipped after 3 failures$/);
+      expect(lines.join(" ")).not.toMatch(/refused by the test/);
+      // skipped now, even with the refusal gone
+      await job();
+      expect((await state(t.id)).status).toBe("open");
     });
 
     it("a task a person closed or reopened is never touched", async () => {

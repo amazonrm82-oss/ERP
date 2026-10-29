@@ -63,7 +63,7 @@ export function CollectionWhatsapp({ orgId, taskId, context }: Props) {
         </span>
       </button>
       {loading ? <span className="text-sm text-ink-soft">טוענים…</span> : null}
-      {message?.state === "paid" ? <span className="text-sm text-ink-soft">המסמך כבר שולם או בוטל. המערכת תסגור את המשימה בעצמה בדקות הקרובות.</span> : null}
+      {message?.state === "paid" ? <span className="text-sm text-ink-soft">המסמך כבר שולם או בוטל. כשהחוב שולם, המערכת בדרך כלל סוגרת את המשימה בעצמה בדקות הקרובות; אפשר גם לסגור אותה עכשיו.</span> : null}
       {message?.state === "no_phone" ? <span className="text-sm text-ink-soft">אין מספר טלפון ל{message.name}.</span> : null}
       {error ? (
         <span role="alert" className="text-sm text-danger">
