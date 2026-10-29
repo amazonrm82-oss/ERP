@@ -629,6 +629,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only goals whose actual the caller sees in full are returned (own meetings goal via `app.goal_entries_readable`). Overdue
   open deals are their own line, never inside a month; the goal comparison is null when the view is partial or a pipeline is
   picked. Pace shows after a quarter of the period (`src/features/goals/progress.ts`).
+- Collection goals (GOL-01 rest, migration 021106; owner's answers pending, built (א) (א) (א)): `goals.metric` takes `collected`
+  ("גבייה", money). Trigger `goals_collected` (`app.goals_collected_check`, definer, outsider guard first) refuses a new or changed
+  collection goal while the plan lacks `payments` (hint `feature:payments`); removal stays allowed. `public.report_goal_progress` (last
+  redefined in 021106) sums recorded/confirmed payments by `paid_on` in the period (COL-06's rule, keep in step with
+  `public.report_collection`): a person by the deal's owner, else the contact's; a team by the deal's team, else the contact's, with
+  its sub-teams; the business all. A collection goal is returned only when the payments the caller reads for it equal
+  `app.goal_payments_counted(org, goal)` (definer, count only, for a caller who reads the goal: `goals_select`'s rule, keep in step).
+  Accepted (review): whether such a goal shows tells a caller that unreadable payments exist (no amount); a goal is falsely hidden
+  when a payment's deal has no owner/team and its contact is unreadable (fails safe; the 021106 comment says otherwise). Follow-ups:
+  a collection goal of a plan that lost `payments` cannot be removed from the grid; the refusal reads the general payments message.
 - Revenue by product (RPT-01 part one, migration 020275): `public.report_revenue_by_product(org, from, to, pipeline, owner)` (invoker)
   takes `report_revenue`'s won-deal rule (keep in step) and sums stored `deal_lines.total_agorot` by product and billing; `by_billing`
   keeps one-time and each recurring period apart (never summed together); `totals.deals_with_vat/without_vat` let the screen warn
