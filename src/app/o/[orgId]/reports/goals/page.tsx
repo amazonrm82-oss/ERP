@@ -49,8 +49,13 @@ export default async function GoalsPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const context = await getOrgContext(orgId);
   const today = zoneDate(new Date(), context.org.timeZone);
-  // GOL-01: collection is offered only with the plan key payments (trigger goals_collected)
-  const metrics = goalMetricKeysFor({ payments: await orgHasFeature(orgId, "payments") });
+  // GOL-01: collection is offered only with the plan keys payments, documents and collection (trigger goals_collected)
+  const [payments, documents, collection] = await Promise.all([
+    orgHasFeature(orgId, "payments"),
+    orgHasFeature(orgId, "documents"),
+    orgHasFeature(orgId, "collection"),
+  ]);
+  const metrics = goalMetricKeysFor({ payments, documents, collection });
   const view = goalView({ metric: firstParam(query.metric), period: firstParam(query.period), year: firstParam(query.year) }, today, metrics);
   const grid = await getGoalsGrid(context, view);
   const definition = goalMetric(view.metric);

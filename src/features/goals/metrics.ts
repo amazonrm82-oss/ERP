@@ -1,7 +1,8 @@
 // GOL-01: what a goal can measure, for whom and over what period. Mirrors the check
 // constraints of public.goals (migration goals, metric list widened by goal_collected);
-// tests/unit/goals.test.ts keeps them equal. Collection ("גבייה") needs the plan key payments
-// (trigger goals_collected; report_goal_progress returns no collection goal without it).
+// tests/unit/goals.test.ts keeps them equal. Collection ("גבייה") needs the plan keys payments, documents and
+// collection (trigger goals_collected; report_goal_progress returns no collection goal without them, nor to a caller
+// who may not record payments; owner's answers of 29 October 2026).
 
 export const GOAL_SCOPES = ["user", "team", "org"] as const;
 export type GoalScope = (typeof GOAL_SCOPES)[number];
@@ -9,14 +10,16 @@ export type GoalScope = (typeof GOAL_SCOPES)[number];
 export const GOAL_PERIODS = ["month", "quarter", "year"] as const;
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 
+export type GoalMetricFeature = "payments" | "documents" | "collection";
+
 export type GoalMetricDefinition = {
   key: string;
   label: string;
   // money: the target is agorot and is typed in shekels; count: a whole number
   kind: "money" | "count";
   description: string;
-  // the plan key the metric needs (offered, saved and counted only with it)
-  feature?: "payments";
+  // the plan keys the metric needs, all of them (offered, saved and counted only with them)
+  features?: readonly GoalMetricFeature[];
 };
 
 export const GOAL_METRICS = [
@@ -28,8 +31,9 @@ export const GOAL_METRICS = [
     key: "collected",
     label: "גבייה",
     kind: "money",
-    description: "סכום התשלומים שנרשמו או אושרו, לפי תאריך התשלום. תשלום נזקף לבעלים של העסקה, ואם אין עסקה, לבעלים של איש הקשר.",
-    feature: "payments",
+    description:
+      "סכום התשלומים שנרשמו או אושרו, לפי תאריך התשלום. צ'ק דחוי נספר רק כשמועד הפירעון שלו הגיע או כשנפרע. תשלום נזקף לבעלים של העסקה, ואם אין עסקה, לבעלים של איש הקשר. כמה נגבה רואים רק מי שרשאים לרשום תשלומים.",
+    features: ["payments", "documents", "collection"],
   },
 ] as const satisfies readonly GoalMetricDefinition[];
 
@@ -37,9 +41,11 @@ export type GoalMetric = (typeof GOAL_METRICS)[number]["key"];
 
 export const GOAL_METRIC_KEYS = GOAL_METRICS.map((m) => m.key) as GoalMetric[];
 
-/** The metrics the business's plan offers (a metric with a plan key only while the plan holds it). */
-export function goalMetricKeysFor(features: { payments: boolean }): GoalMetric[] {
-  return (GOAL_METRICS as readonly GoalMetricDefinition[]).filter((m) => !m.feature || features[m.feature]).map((m) => m.key as GoalMetric);
+/** The metrics the business's plan offers (a metric with plan keys only while the plan holds every one of them). */
+export function goalMetricKeysFor(features: Record<GoalMetricFeature, boolean>): GoalMetric[] {
+  return (GOAL_METRICS as readonly GoalMetricDefinition[])
+    .filter((m) => (m.features ?? []).every((f) => features[f]))
+    .map((m) => m.key as GoalMetric);
 }
 
 export const GOAL_SCOPE_LABELS: Record<GoalScope, string> = { user: "חבר צוות", team: "צוות", org: "כל העסק" };

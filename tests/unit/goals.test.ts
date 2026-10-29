@@ -44,9 +44,13 @@ describe("goal metrics", () => {
       expect(metric.description).toMatch(/[א-ת]/);
     }
     expect(GOAL_METRICS.filter((m) => m.kind === "money").map((m) => m.key)).toEqual(["won_amount", "collected"]);
-    // GOL-01: collection only with the plan key payments
-    expect(goalMetricKeysFor({ payments: false })).toEqual(["won_amount", "won_deals", "leads_handled", "meetings_held"]);
-    expect(goalMetricKeysFor({ payments: true })).toEqual(GOAL_METRIC_KEYS);
+    // GOL-01: collection only with the plan keys payments, documents and collection
+    const base = ["won_amount", "won_deals", "leads_handled", "meetings_held"];
+    // collection needs all three keys (owner's answer (15) ב, 29 October 2026)
+    expect(goalMetricKeysFor({ payments: false, documents: true, collection: true })).toEqual(base);
+    expect(goalMetricKeysFor({ payments: true, documents: false, collection: true })).toEqual(base);
+    expect(goalMetricKeysFor({ payments: true, documents: true, collection: false })).toEqual(base);
+    expect(goalMetricKeysFor({ payments: true, documents: true, collection: true })).toEqual(GOAL_METRIC_KEYS);
     expect(goalMetric("collected").label).toBe("גבייה");
     expect(isGoalMetric("won_deals")).toBe(true);
     expect(isGoalMetric("collections")).toBe(false);

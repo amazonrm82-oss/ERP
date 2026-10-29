@@ -11,7 +11,9 @@ type Row = { goal_id: string; scope: string; metric: string; target: number; act
  * GOL-01, collection ("גבייה"): goals.metric 'collected'. report_goal_progress counts payments recorded or confirmed whose
  * paid_on is in the goal's period (COL-06's rule), by rep (the deal's owner, else the contact's) and team (the deal's, else
  * the contact's, with the teams below), and returns a collection goal only when the caller reads every payment that counts
- * for it (app.goal_payments_counted). Plan key: payments (trigger goals_collected, hint feature:payments).
+ * for it (app.goal_payments_counted). Owner's answers of 29 October 2026: plan keys payments, documents and collection
+ * (trigger goals_collected, a hint per key); the actual only for those who record payments (app.can_record_payments); a
+ * cheque counts once cleared or due.
  */
 describe("collection goals (GOL-01)", () => {
   let owner: U, admin: U, manager: U, m1: U, m2: U, viewer: U, outsider: U;
@@ -19,7 +21,7 @@ describe("collection goals (GOL-01)", () => {
   let north: string, northWest: string;
   let pipelineId: string, stageId: string;
   const goal: Record<string, string> = {};
-  const FEATURES = { payments: true, goals_per_rep: true };
+  const FEATURES = { payments: true, documents: true, collection: true, goals_per_rep: true, granular_permissions: true };
   const SEP = "2026-09-01";
 
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
@@ -136,6 +138,8 @@ describe("collection goals (GOL-01)", () => {
     goal.m2 = await addGoal(owner, { scope: "user", user_id: m2.id });
     goal.orgQuarter = await addGoal(owner, { scope: "org", period: "quarter", period_start: "2026-07-01" });
     goal.orgOctober = await addGoal(owner, { scope: "org", period_start: "2026-10-01" });
+    // m1 records payments through the PRM-01 key; m2 does not (owner's answer (16) ב)
+    await asUser(owner.id, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [org, m1.id]));
 
     // a later payment on the deal with no owner: credited to its contact's owner (m1), but m1 cannot read that deal
     goal.dNoOwner = dNoOwner;
@@ -155,10 +159,17 @@ describe("collection goals (GOL-01)", () => {
     expect(await collected(admin)).toEqual(await collected(owner));
   });
 
-  it("shows a goal only to a caller who reads every payment it counts", async () => {
-    // own visibility: m1 reads only their records' payments, so not the business's or the team's (m2's are hidden)
+  it("shows a goal only to a caller who records payments and reads every payment it counts", async () => {
+    // own visibility: m1 (the record_payments key) reads only their records' payments, so not the business's or the
+    // team's (m2's are hidden)
     expect(await collected(m1)).toEqual({ [goal.m1]: 700000 });
-    expect(await collected(m2)).toEqual({ [goal.m2]: 800000 });
+    // m2 may not record payments: their own goal's actual is never shown, and the counting helper answers nothing
+    expect(await collected(m2)).toEqual({});
+    const n = await asUser(m2.id, async (q) => (await one<{ n: string | null }>(q, "select app.goal_payments_counted($1, $2) as n", [org, goal.m2])).n);
+    expect(n).toBeNull();
+    // the other metrics of m2 are untouched, and the goal row itself stays readable (the goals grid)
+    const own = await asUser(m2.id, async (q) => (await q("select id from public.goals where id = $1", [goal.m2])).rowCount);
+    expect(own).toBe(1);
     // the team's manager reads the team's records (and the team below), so the team goal and its people
     // and here every payment of the business is on north records, so the business goal too
     expect(await collected(manager)).toEqual({ [goal.org]: 1500000, [goal.north]: 1500000, [goal.m1]: 700000, [goal.m2]: 800000 });
@@ -179,22 +190,37 @@ describe("collection goals (GOL-01)", () => {
     expect(await collected(m1)).toEqual({ [goal.m1]: 700000 });
   });
 
-  it("under org visibility a member sees the business goal when every payment is on a readable record", async () => {
+  it("under org visibility a member who records payments sees the business goal when every payment is on a readable record", async () => {
     await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
     try {
       expect(await collected(m1)).toMatchObject({ [goal.org]: 1500000, [goal.m1]: 700000 });
+      // a member without the key still sees none
+      expect(await collected(m2)).toEqual({});
     } finally {
       await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
     }
   });
 
-  it("needs the plan key payments: no new goal or changed target, no actual, removal allowed", async () => {
-    await setFeatures({ payments: false, goals_per_rep: true });
+  it("needs the plan keys payments, documents and collection: no new goal or changed target, no actual", async () => {
+    for (const key of ["payments", "documents", "collection"]) {
+      await setFeatures({ ...FEATURES, [key]: false });
+      try {
+        const e = await pgError(addGoal(owner, { scope: "org", period_start: "2026-11-01" }));
+        expect(e.hint).toBe(`feature:${key}`);
+        const change = await pgError(asUser(owner.id, (q) => q("update public.goals set target = 5 where id = $1", [goal.m2])));
+        expect(change.hint).toBe(`feature:${key}`);
+        expect(await collected(owner)).toEqual({});
+        const n = await asUser(owner.id, async (q) => (await one<{ n: string | null }>(q, "select app.goal_payments_counted($1, $2) as n", [org, goal.org])).n);
+        expect(n).toBeNull();
+      } finally {
+        await setFeatures(FEATURES);
+      }
+    }
+  });
+
+  it("without the payments key: an unchanged write and a removal pass", async () => {
+    await setFeatures({ ...FEATURES, payments: false });
     try {
-      const e = await pgError(addGoal(owner, { scope: "org", period_start: "2026-11-01" }));
-      expect(e.hint).toBe("feature:payments");
-      const change = await pgError(asUser(owner.id, (q) => q("update public.goals set target = 5 where id = $1", [goal.m2])));
-      expect(change.hint).toBe("feature:payments");
       // an unchanged write still passes, and the other metrics are untouched
       await asUser(owner.id, (q) => q("update public.goals set target = target where id = $1", [goal.m2]));
       const won = await addGoal(owner, { scope: "org", metric: "won_amount", period_start: "2026-11-01" });
@@ -234,5 +260,40 @@ describe("collection goals (GOL-01)", () => {
     // the counting helper answers nothing about a goal the caller does not read
     const count = await asUser(outsider.id, async (q) => (await one<{ n: string | null }>(q, "select app.goal_payments_counted($1, $2) as n", [org, goal.org])).n);
     expect(count).toBeNull();
+  });
+  it("a cheque counts once it is cleared or its due date has come; a bounced one never (owner's answer (17) ג)", async () => {
+    const cheque = (amount: number, due: string, number: string) =>
+      asUser(owner.id, async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            `insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method, cheque_number, cheque_bank, cheque_branch, cheque_due_date, cheque_status)
+             values ($1, $2, $3, '2026-09-05', 'cheque', $4, '12', '601', $5, 'in_hand') returning id`,
+            [org, goal.c1, amount, number, due],
+          )
+        ).id,
+      );
+    const setStatus = (id: string, status: string) =>
+      asUser(owner.id, (q) => q("update public.payments set cheque_status = $2 where id = $1", [id, status]));
+    const due = await cheque(1000, "2026-09-25", "9001"); // due in the past: counts while in hand
+    const deposited = await cheque(2000, "2026-09-26", "9002"); // deposited, due in the past: counts
+    await setStatus(deposited, "deposited");
+    const future = await cheque(4000, "2030-01-01", "9003"); // post-dated: not yet
+    const bounced = await cheque(8000, "2026-09-27", "9004"); // bounced: never
+    await setStatus(bounced, "bounced");
+    try {
+      expect(await collected(owner)).toMatchObject({ [goal.m1]: 703000, [goal.org]: 1503000 });
+      // m1 (a recorder who reads c1) still sees the goal: the full count follows the same rule
+      expect(await collected(m1)).toEqual({ [goal.m1]: 703000 });
+      // the post-dated cheque counts once cleared, in the month of its paid_on
+      await setStatus(future, "cleared");
+      expect(await collected(owner)).toMatchObject({ [goal.m1]: 707000, [goal.org]: 1507000 });
+      expect(await collected(m1)).toEqual({ [goal.m1]: 707000 });
+    } finally {
+      for (const id of [due, deposited, future, bounced]) {
+        await asUser(owner.id, (q) => q("update public.payments set status = 'cancelled', cancel_reason = 'בדיקה' where id = $1 and status <> 'cancelled'", [id]));
+      }
+    }
+    expect(await collected(owner)).toMatchObject({ [goal.m1]: 700000 });
   });
 });
