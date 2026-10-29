@@ -645,6 +645,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   takes `report_revenue`'s won-deal rule (keep in step) and sums stored `deal_lines.total_agorot` by product and billing; `by_billing`
   keeps one-time and each recurring period apart (never summed together); `totals.deals_with_vat/without_vat` let the screen warn
   about mixed VAT modes. Report key `products`.
+- Recurring revenue (RPT-01 rest, migration 021107; owner 18 October 2026: every plan, no key, NEW monthly recurring revenue by close
+  month; ended revenue waits for a subscriptions module): `public.report_recurring_revenue(org, from, to, pipeline, owner)` (invoker;
+  `report_revenue`'s won rule, keep in step; period bounds and months in the business zone, 3,660 days max, 22023) counts won deals with
+  `billing_kind` monthly|yearly at their stored recurring amount: monthly as is, yearly / 12 rounded half up per deal; every month of
+  the period, by owner, `deals_without_amount`, `deals_with_vat/without_vat` from the deal's lines. Report key `recurring`. Test 64's
+  re-run list ends with `_report_recurring_revenue.sql` for `log_export`: a later redefinition is appended there.
 - Pipeline cleanup and money waiting (MNY-05/01/02, migrations 0144, 0145): `report_pipeline_cleanup(org, owner)` (security
   invoker) copies `report_stuck_deals`' stuck rule (keep in step; test 93 compares them in two far time zones); overdue =
   expected close date before the org's today; postponed deals left out; each deal once (stuck, else overdue); 300 rows.
@@ -1397,7 +1403,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   owner/admin AND the three keys). Report `public.report_debt_aging(org, owner)` (invoker; key `debt_aging`, report definition flag
   `balances`): partial for the whole business through `app.business_money_rows` (count only), the screen says "הדוח המלא זמין
   לבעלים ומנהלי מערכת"; each document under one customer (its company, else contact's, else deal's), while cards and lists count it
-  under each of its companies (accepted). `public.log_export` was last redefined in 021103 (COL-06 `collection`). Follow-up: debt columns for payment
+  under each of its companies (accepted). `public.log_export` was last redefined in 021107 (RPT-01 `recurring`; 021103 COL-06 `collection`). Follow-up: debt columns for payment
   recorders need a per-user kept amount (with PAY-03's).
 - Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
   (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
