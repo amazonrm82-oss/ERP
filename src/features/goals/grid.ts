@@ -87,8 +87,12 @@ export function peopleTotals(values: GoalValue[], columns: GoalColumn[]): Record
 export type GoalView = { metric: GoalMetric; period: GoalPeriod; year: number };
 
 /** The screen's choices from the query string; anything unknown falls back to this month's revenue. */
-export function goalView(params: { metric?: string; period?: string; year?: string }, today: string): GoalView {
-  const metric = (GOAL_METRIC_KEYS as string[]).includes(params.metric ?? "") ? (params.metric as GoalMetric) : "won_amount";
+export function goalView(
+  params: { metric?: string; period?: string; year?: string },
+  today: string,
+  metrics: readonly GoalMetric[] = GOAL_METRIC_KEYS,
+): GoalView {
+  const metric = (metrics as readonly string[]).includes(params.metric ?? "") ? (params.metric as GoalMetric) : "won_amount";
   const period = (GOAL_PERIODS as readonly string[]).includes(params.period ?? "") ? (params.period as GoalPeriod) : "month";
   const parsed = Number(params.year);
   const year = Number.isInteger(parsed) && parsed >= YEAR_MIN && parsed <= YEAR_MAX ? parsed : Number(today.slice(0, 4));

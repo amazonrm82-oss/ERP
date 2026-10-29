@@ -1,7 +1,7 @@
 // GOL-01: what a goal can measure, for whom and over what period. Mirrors the check
-// constraints of public.goals (migration goals); tests/unit/goals.test.ts keeps them equal.
-// Collections ("גבייה") joins GOAL_METRICS with the payments module, together with a
-// migration that widens goals_metric_check.
+// constraints of public.goals (migration goals, metric list widened by goal_collected);
+// tests/unit/goals.test.ts keeps them equal. Collection ("גבייה") needs the plan key payments
+// (trigger goals_collected; report_goal_progress returns no collection goal without it).
 
 export const GOAL_SCOPES = ["user", "team", "org"] as const;
 export type GoalScope = (typeof GOAL_SCOPES)[number];
@@ -15,6 +15,8 @@ export type GoalMetricDefinition = {
   // money: the target is agorot and is typed in shekels; count: a whole number
   kind: "money" | "count";
   description: string;
+  // the plan key the metric needs (offered, saved and counted only with it)
+  feature?: "payments";
 };
 
 export const GOAL_METRICS = [
@@ -22,11 +24,23 @@ export const GOAL_METRICS = [
   { key: "won_deals", label: "עסקאות שנסגרו", kind: "count", description: "מספר העסקאות שנסגרו בהצלחה בתקופה." },
   { key: "leads_handled", label: "לידים שטופלו", kind: "count", description: "לידים שנוצר איתם מגע ראשון בתקופה." },
   { key: "meetings_held", label: "פגישות שהתקיימו", kind: "count", description: "פגישות שהתקיימו בתקופה." },
+  {
+    key: "collected",
+    label: "גבייה",
+    kind: "money",
+    description: "סכום התשלומים שנרשמו או אושרו, לפי תאריך התשלום. תשלום נזקף לבעלים של העסקה, ואם אין עסקה, לבעלים של איש הקשר.",
+    feature: "payments",
+  },
 ] as const satisfies readonly GoalMetricDefinition[];
 
 export type GoalMetric = (typeof GOAL_METRICS)[number]["key"];
 
 export const GOAL_METRIC_KEYS = GOAL_METRICS.map((m) => m.key) as GoalMetric[];
+
+/** The metrics the business's plan offers (a metric with a plan key only while the plan holds it). */
+export function goalMetricKeysFor(features: { payments: boolean }): GoalMetric[] {
+  return (GOAL_METRICS as readonly GoalMetricDefinition[]).filter((m) => !m.feature || features[m.feature]).map((m) => m.key as GoalMetric);
+}
 
 export const GOAL_SCOPE_LABELS: Record<GoalScope, string> = { user: "חבר צוות", team: "צוות", org: "כל העסק" };
 export const GOAL_PERIOD_LABELS: Record<GoalPeriod, string> = { month: "חודש", quarter: "רבעון", year: "שנה" };

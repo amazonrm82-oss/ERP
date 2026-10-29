@@ -4,8 +4,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { GoalsFilters } from "@/features/goals/components/goals-filters";
 import { GoalsPanel } from "@/features/goals/components/goals-panel";
 import { defaultCopyTarget, goalColumns, goalView, previousStart, type GoalValue } from "@/features/goals/grid";
-import { goalMetric, GOAL_PERIOD_LABELS } from "@/features/goals/metrics";
+import { goalMetric, goalMetricKeysFor, GOAL_PERIOD_LABELS } from "@/features/goals/metrics";
 import { getGoalsGrid } from "@/features/goals/queries";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { planHintMessage } from "@/lib/errors";
 import { zoneDate } from "@/lib/format";
@@ -48,7 +49,9 @@ export default async function GoalsPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const context = await getOrgContext(orgId);
   const today = zoneDate(new Date(), context.org.timeZone);
-  const view = goalView({ metric: firstParam(query.metric), period: firstParam(query.period), year: firstParam(query.year) }, today);
+  // GOL-01: collection is offered only with the plan key payments (trigger goals_collected)
+  const metrics = goalMetricKeysFor({ payments: await orgHasFeature(orgId, "payments") });
+  const view = goalView({ metric: firstParam(query.metric), period: firstParam(query.period), year: firstParam(query.year) }, today, metrics);
   const grid = await getGoalsGrid(context, view);
   const definition = goalMetric(view.metric);
 
@@ -71,7 +74,7 @@ export default async function GoalsPage({ params, searchParams }: Props) {
         description={`${definition.label} לפי ${GOAL_PERIOD_LABELS[view.period]}, ${view.year}. ${definition.description}`}
         back={{ href: paths.reports(orgId), label: "דוחות" }}
       />
-      <GoalsFilters metric={view.metric} period={view.period} year={view.year} years={years} />
+      <GoalsFilters metrics={metrics} metric={view.metric} period={view.period} year={view.year} years={years} />
       <p className="mb-4 text-md text-ink-soft">{accessNote(context.role, context.canWrite, grid.editable.length > 0, grid.perRep)}</p>
       {grid.perRep ? null : <p className="mb-4 rounded-md border border-line bg-canvas px-3 py-2.5 text-md text-ink-soft">{planHintMessage("feature:goals_per_rep")}</p>}
       <GoalsPanel

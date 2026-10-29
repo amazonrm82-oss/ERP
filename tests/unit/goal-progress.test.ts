@@ -103,6 +103,9 @@ describe("needed per day, as text", () => {
     expect(requiredPerDayText("won_deals", 36 / 24)).toBe("1.5 עסקאות");
     expect(requiredPerDayText("meetings_held", 1.23)).toBe("1.3 פגישות");
     expect(requiredPerDayText("won_deals", 1)).toBe("עסקה אחת");
+    // GOL-01 collection is money: whole shekels, rounded up
+    expect(requiredPerDayValue("collected", 12_345.6)).toBe(12_400);
+    expect(requiredPerDayText("collected", 12_345.6)).toBe(requiredPerDayText("won_amount", 12_345.6));
     expect(requiredPerDayText("leads_handled", 360 / 24)).toBe("15 לידים");
     expect(requiredPerDayText("leads_handled", 12.2)).toBe("13 לידים");
     expect(requiredPerDayValue("won_deals", 36 / 24)).toBe(1.5);

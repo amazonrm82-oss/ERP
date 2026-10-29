@@ -119,7 +119,7 @@ export const STANDING_LABELS: Record<GoalStanding, { label: string; tone: "succe
   behind: { label: "מתחת לקצב", tone: "warning" },
 };
 
-const COUNT_UNITS: Record<Exclude<GoalMetric, "won_amount">, { one: string; many: string }> = {
+const COUNT_UNITS: Record<Exclude<GoalMetric, "won_amount" | "collected">, { one: string; many: string }> = {
   won_deals: { one: "עסקה אחת", many: "עסקאות" },
   leads_handled: { one: "ליד אחד", many: "לידים" },
   meetings_held: { one: "פגישה אחת", many: "פגישות" },
@@ -132,7 +132,7 @@ const oneDecimal = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 1 });
  * decimal under 10 and a whole number from 10, with the metric's unit ("1.5 עסקאות").
  */
 export function requiredPerDayText(metric: GoalMetric, value: number): string {
-  if (metric === "won_amount") return formatMoney(Math.ceil(value / 100) * 100);
+  if (metric === "won_amount" || metric === "collected") return formatMoney(Math.ceil(value / 100) * 100);
   const rounded = requiredPerDayValue(metric, value);
   const unit = COUNT_UNITS[metric];
   return rounded === 1 ? unit.one : `${oneDecimal.format(rounded)} ${unit.many}`;
@@ -140,7 +140,7 @@ export function requiredPerDayText(metric: GoalMetric, value: number): string {
 
 /** The same rounding as a number (agorot for money), for tables and exports. */
 export function requiredPerDayValue(metric: GoalMetric, value: number): number {
-  if (metric === "won_amount") return Math.ceil(value / 100) * 100;
+  if (metric === "won_amount" || metric === "collected") return Math.ceil(value / 100) * 100;
   return value < 10 ? Math.ceil(Math.round(value * 1000) / 100) / 10 : Math.ceil(value);
 }
 

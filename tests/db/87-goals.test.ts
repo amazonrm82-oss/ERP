@@ -67,13 +67,18 @@ describe("goals (GOL-01)", () => {
     ids.south = await insertGoal(admin.id, { scope: "team", team_id: teamSouth, period: "year", period_start: "2026-01-01", metric: "meetings_held", target: 40 });
   });
 
-  it("the metric, period and scope lists match the app's", () => {
+  it("the metric, period and scope lists match the app's", async () => {
     const sql = readFileSync(path.resolve(__dirname, "../../supabase/migrations/20261006013300_goals.sql"), "utf8");
     const list = (name: string) => {
       const match = new RegExp(`constraint ${name} check \\(\\w+ in \\(([^)]*)\\)\\)`).exec(sql);
       return match ? [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]) : [];
     };
-    expect(list("goals_metric_check")).toEqual(GOAL_METRIC_KEYS);
+    // the metric list as built (GOL-01 collection widened it in a later migration)
+    const metricDef = await asAdmin(
+      async (q) =>
+        (await q<{ d: string }>("select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.goals'::regclass and conname = 'goals_metric_check'")).rows[0].d,
+    );
+    expect([...metricDef.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1])).toEqual(GOAL_METRIC_KEYS);
     expect(list("goals_period_check")).toEqual([...GOAL_PERIODS]);
     const scopeCheck = sql.slice(sql.indexOf("constraint goals_scope_check"), sql.indexOf("constraint goals_period_check"));
     expect([...scopeCheck.matchAll(/scope = '([a-z]+)'/g)].map((m) => m[1])).toEqual([...GOAL_SCOPES]);

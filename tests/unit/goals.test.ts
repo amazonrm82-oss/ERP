@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -9,6 +9,7 @@ import {
   GOAL_PERIODS,
   addMonths,
   goalMetric,
+  goalMetricKeysFor,
   isGoalMetric,
   monthStart,
   parseTarget,
@@ -21,19 +22,32 @@ import { EXPORT_README, EXPORT_TABLES } from "@/features/imports/export-build";
 // GOL-01
 describe("goal metrics", () => {
   it("the lists match the migration's check constraints", () => {
-    const sql = readFileSync(path.resolve(__dirname, "../../supabase/migrations/20261006013300_goals.sql"), "utf8");
-    const list = (name: string) => [...(new RegExp(`constraint ${name} check \\(\\w+ in \\(([^)]*)\\)\\)`).exec(sql)?.[1] ?? "").matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-    expect(list("goals_metric_check")).toEqual(GOAL_METRIC_KEYS);
+    const dir = path.resolve(__dirname, "../../supabase/migrations");
+    const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    const sql = readFileSync(path.join(dir, files.find((f) => f.endsWith("_goals.sql")) as string), "utf8");
+    const list = (name: string, text = sql) =>
+      [...(new RegExp(`constraint ${name}\\s+check \\(\\w+ in \\(([^)]*)\\)\\)`).exec(text)?.[1] ?? "").matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    // the latest migration that sets the metric list (GOL-01 collection widened it)
+    const latest = files
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .filter((text) => list("goals_metric_check", text).length > 0)
+      .at(-1) as string;
+    expect(latest).toContain("'collected'");
+    expect(list("goals_metric_check", latest)).toEqual(GOAL_METRIC_KEYS);
     expect(list("goals_period_check")).toEqual([...GOAL_PERIODS]);
     expect(sql).toContain("check (target between 0 and 100000000000)");
   });
 
-  it("every metric has a Hebrew label and a kind; only revenue is money", () => {
+  it("every metric has a Hebrew label and a kind; revenue and collection are money", () => {
     for (const metric of GOAL_METRICS) {
       expect(metric.label).toMatch(/[א-ת]/);
       expect(metric.description).toMatch(/[א-ת]/);
     }
-    expect(GOAL_METRICS.filter((m) => m.kind === "money").map((m) => m.key)).toEqual(["won_amount"]);
+    expect(GOAL_METRICS.filter((m) => m.kind === "money").map((m) => m.key)).toEqual(["won_amount", "collected"]);
+    // GOL-01: collection only with the plan key payments
+    expect(goalMetricKeysFor({ payments: false })).toEqual(["won_amount", "won_deals", "leads_handled", "meetings_held"]);
+    expect(goalMetricKeysFor({ payments: true })).toEqual(GOAL_METRIC_KEYS);
+    expect(goalMetric("collected").label).toBe("גבייה");
     expect(isGoalMetric("won_deals")).toBe(true);
     expect(isGoalMetric("collections")).toBe(false);
     expect(goalMetric("meetings_held").kind).toBe("count");
