@@ -546,6 +546,37 @@ describe("collection reminders (COL-04)", () => {
       expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
     });
 
+    it("a reopen keeps an outcome a person wrote after the close", async () => {
+      const invoice = await doc(0, "tax_invoice", 650);
+      await job();
+      const [t] = await tasks(invoice);
+      const payment = await pay(invoice, 650);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      await run(member, (q) => q("update public.tasks set outcome = 'שילם בצ''ק דחוי' where id = $1", [t.id]));
+      await fail(payment);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "open", outcome: "שילם בצ'ק דחוי" });
+    });
+
+    it("a reopen waits while the task's owner is not active (the task stays done)", async () => {
+      const invoice = await doc(0, "tax_invoice", 660);
+      await job();
+      const [t] = await tasks(invoice);
+      expect(t.owner_id).toBe(member.id);
+      const payment = await pay(invoice, 660);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, member.id]));
+      try {
+        await fail(payment);
+        await job();
+        expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      } finally {
+        await asAdmin((q) => q("update public.memberships set status = 'active' where organization_id = $1 and user_id = $2", [org, member.id]));
+      }
+    });
+
     it("a person who reopened or re-closed a task the system closed keeps it", async () => {
       const reopened = await doc(0, "tax_invoice", 350);
       const reclosed = await doc(0, "tax_invoice", 350);

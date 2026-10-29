@@ -262,11 +262,20 @@ begin
           v_done := v_done + 1;
         end if;
       elsif v_row.task_status = 'done' and v_balance > 0 then
-        -- the debt came back (a payment failed, an allocation was released): the task the system closed is open again
+        -- the debt came back (a payment failed, an allocation was released): the task the system closed is open again.
+        -- The outcome is cleared only while it is still the system's own note (a person's edited outcome is kept), and
+        -- only while the task's owner is still an active, full-seat member who is not a viewer (else it stays done; the
+        -- reminder job makes a new task at the next stage)
         update public.tasks t
-           set status = 'open', outcome = null
-         where t.organization_id = v_row.organization_id and t.id = v_row.task_id
-           and t.status = 'done' and t.deleted_at is null;
+           set status = 'open',
+               outcome = case when t.outcome is not distinct from c.outcome then null else t.outcome end
+          from app.collection_task_closes c
+         where c.task_id = t.id
+           and t.organization_id = v_row.organization_id and t.id = v_row.task_id
+           and t.status = 'done' and t.deleted_at is null
+           and exists (select 1 from public.memberships m
+                        where m.organization_id = t.organization_id and m.user_id = t.owner_id
+                          and m.status = 'active' and m.role <> 'viewer' and m.seat_type = 'full');
         if found then
           update app.collection_task_closes c
              set closed_at = null, outcome = null, failures = 0, last_attempt_at = null
