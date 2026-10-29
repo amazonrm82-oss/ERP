@@ -1426,6 +1426,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   duplicate's customer promise (`app.merge_payment_promises` on the `merged` entry, marker `app.payment_promise_merge`).
   `app.audit_erase_core` was last redefined in 021100, then 021104 (DOC-02 lines) (promise notes emptied, their entries erased; known limit: a note on a
   company's document naming one of its contacts is not reached by that contact's erasure).
+  Since 021109 (owner 29 October 2026, answers (5) א (6) ב (7) א (8) ב): the cover trigger `app.payment_promises_cover` is DEFINER, so
+  a customer promise covers every open document of the customer, read by the recorder or not (`app.customer_open_documents` and
+  `app.payment_promise_cover` have no grants; `payment_promise:nothing_open` = the customer has nothing open). The recorder sees how
+  many, never which: `public.payment_promise_coverage(org, promises)` (invoker, 200, RLS picks the promises) over definer
+  `app.payment_promise_covered_counts` (counts only, `can_record_payments`; it does not re-check that the caller reads each promise,
+  accepted: app is not in the API and the invoker wrapper filters); the count is the set fixed when the promise was made ("שהיו פתוחים
+  כשנרשמה"). A customer promise's broken notice goes to the contact's/company's usable owner, else the usable recorder (`created_by`),
+  else owners/admins (lead's choice); `app.send_promise_breaks` was last redefined in 021109. The contact and company cards record the
+  customer promise (`CustomerPromiseCard`; a contact of a company shows its own older promise and links to the company's card).
 - Collection report (COL-06, migration 021103; owner's answer pending on how collection days are counted, built (א)):
   `public.report_collection(org, from, to, owner)` (invoker, `set jit = off`, `set enable_nestloop = off`; key `collection` in
   `public.log_export`, report definition flag `collection`): COL-01's rights, keys and partial rule (copied, keep in step; partial =
