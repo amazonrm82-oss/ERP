@@ -283,6 +283,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
             note={customerPromise.note}
             today={data.today}
             customer
+            covered={customerPromise.covered}
           />
         </div>
       ) : null}

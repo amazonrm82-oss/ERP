@@ -9,6 +9,7 @@ import { getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { coverageOf } from "./promise";
 import {
   parseCollection,
   type Collection,
@@ -139,16 +140,21 @@ export async function listPromises(
   return { effective, own };
 }
 
+export type CustomerPromise = DocumentPromise & {
+  // answer (6) ב: how many open documents it covered when made (all of the customer's, a count only); null = not shown
+  covered: number | null;
+};
+
 /** COL-03: the customer promise of a contact (without a company) or a company, if there is one the user reads. */
 export async function getCustomerPromise(
   orgId: string,
   customer: { kind: "contact" | "company"; id: string },
-): Promise<DocumentPromise | null> {
+): Promise<CustomerPromise | null> {
   const supabase = await createClient();
   const row = must(
     await supabase
       .from("payment_promises")
-      .select("promised_date, note")
+      .select("id, promised_date, note")
       .eq("organization_id", orgId)
       .eq(
         customer.kind === "contact" ? "contact_id" : "company_id",
@@ -157,7 +163,31 @@ export async function getCustomerPromise(
       .maybeSingle(),
     "customer promise",
   );
-  return row
-    ? { date: row.promised_date, note: row.note, kind: "customer" }
-    : null;
+  if (!row) return null;
+  const covered = await getPromiseCoverage(orgId, row.id);
+  return {
+    date: row.promised_date,
+    note: row.note,
+    kind: "customer",
+    covered,
+  };
+}
+
+/**
+ * COL-03 answer (6) ב: the number of documents a customer promise covers (public.payment_promise_coverage: counts only, for
+ * whoever records payments and reads the promise); null when it is not answered.
+ */
+export async function getPromiseCoverage(
+  orgId: string,
+  promiseId: string,
+): Promise<number | null> {
+  const supabase = await createClient();
+  const raw = must(
+    await supabase.rpc("payment_promise_coverage", {
+      p_org: orgId,
+      p_promises: [promiseId],
+    }),
+    "promise coverage",
+  );
+  return coverageOf(raw, promiseId);
 }

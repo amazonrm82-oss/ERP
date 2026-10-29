@@ -20,7 +20,9 @@ import {
   moneySubjectPath,
 } from "@/features/payments/money-subject";
 
-import { promiseSchema } from "./promise";
+import { paths } from "@/lib/paths";
+
+import { coverageOf, coveredText, promiseSchema } from "./promise";
 
 // COL-03: a payment promise on one document or on the whole customer (owner's answer (1) ג), saved with the user's session.
 // RLS and the table's triggers decide: owners, admins and managers, or the record_payments key, in a writable business with
@@ -35,10 +37,11 @@ const writeError = (error: {
   hint?: string;
 }) => (error.code === "42501" ? CANNOT : dbErrorMessage(error));
 
-// where the form was opened: the collection screen, or a deal's, contact's or order's card
+// where the form was opened: the collection screen, a deal's, contact's or order's card, or (answer (8) ב) a company's card
 const backSchema = z.union([
   z.object({ kind: z.literal("collection") }),
   z.object({ kind: z.enum(MONEY_SUBJECT_KINDS), id: z.guid() }),
+  z.object({ kind: z.literal("company"), id: z.guid() }),
 ]);
 export type PromiseBack = z.infer<typeof backSchema>;
 
@@ -57,7 +60,9 @@ const COLUMN = {
 const pageOf = (orgId: string, back: PromiseBack) =>
   back.kind === "collection"
     ? collectionPath(orgId)
-    : moneySubjectPath(orgId, back);
+    : back.kind === "company"
+      ? paths.company(orgId, back.id)
+      : moneySubjectPath(orgId, back);
 
 export async function savePromiseAction(
   orgId: string,
@@ -122,7 +127,23 @@ export async function savePromiseAction(
     }
   }
   revalidatePath(pageOf(orgId, back));
-  return ok();
+  if (target.kind === "document") return ok();
+  // answer (6) ב: a customer promise covers every open document of the customer; the person is told how many (a count only)
+  const saved = await context.supabase
+    .from("payment_promises")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq(column, target.id)
+    .maybeSingle();
+  if (saved.error || !saved.data) return ok();
+  const coverage = await context.supabase.rpc("payment_promise_coverage", {
+    p_org: orgId,
+    p_promises: [saved.data.id],
+  });
+  const covered = coverage.error ? null : coverageOf(coverage.data, saved.data.id);
+  return covered === null
+    ? ok()
+    : { ok: true, message: `ההבטחה נשמרה. ${coveredText(covered)}.` };
 }
 
 export async function removePromiseAction(

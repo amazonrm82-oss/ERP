@@ -3357,6 +3357,8 @@ export type Database = {
         };
         Returns: Json;
       };
+      // COL-03 answer (6): how many documents each customer promise the caller reads covers (counts only)
+      payment_promise_coverage: { Args: { p_org: string; p_promises: string[] }; Returns: Json };
       // GOL-03: progress against the goals the caller reads (migration goal_progress)
       report_goal_progress: {
         Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };

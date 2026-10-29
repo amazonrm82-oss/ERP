@@ -35,3 +35,23 @@ export const promiseSchema = z.object({
   promised_date: z.string().regex(DAY, "בחרו תאריך"),
   note: z.string().trim().max(PROMISE_NOTE_MAX, `עד ${PROMISE_NOTE_MAX} תווים`),
 });
+
+/**
+ * COL-03 answer (6) ב: how many open documents a customer promise covers (all of the customer's, also those the reader
+ * cannot see; only the count is shown, never which).
+ */
+export function coveredText(documents: number): string {
+  if (documents === 1) return "ההבטחה חלה על מסמך פתוח אחד";
+  return `ההבטחה חלה על ${documents.toLocaleString("he-IL")} מסמכים פתוחים`;
+}
+
+const coverageSchema = z.array(
+  z.object({ promise_id: z.string(), documents: z.number().int().min(0) }),
+);
+
+/** The count public.payment_promise_coverage answers for one promise; null when it is not there (not answered). */
+export function coverageOf(raw: unknown, promiseId: string): number | null {
+  const parsed = coverageSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data.find((c) => c.promise_id === promiseId)?.documents ?? null;
+}

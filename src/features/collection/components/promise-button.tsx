@@ -39,6 +39,12 @@ export function PromiseButton({
   today: string;
 }) {
   const [open, setOpen] = useState(false);
+  // answer (6) ב: after a customer promise is saved, the dialog says how many open documents it covers (a count only)
+  const [saved, setSaved] = useState<string | null>(null);
+  const close = () => {
+    setOpen(false);
+    setSaved(null);
+  };
   const customer = target.kind !== "document";
   return (
     <>
@@ -58,18 +64,27 @@ export function PromiseButton({
       </Button>
       <Dialog
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={`הבטחת תשלום: ${label}`}
         variant="sheet"
       >
-        {open ? (
+        {open && saved ? (
+          <div className="space-y-4">
+            <p className="text-sm" role="status">
+              {saved}
+            </p>
+            <Button variant="secondary" onClick={close} autoFocus>
+              סגירה
+            </Button>
+          </div>
+        ) : open ? (
           <PromiseForm
             orgId={orgId}
             target={target}
             back={back}
             current={current}
             today={today}
-            onDone={() => setOpen(false)}
+            onDone={(message) => (message ? setSaved(message) : close())}
           />
         ) : null}
       </Dialog>
@@ -90,13 +105,13 @@ function PromiseForm({
   back: PromiseBack;
   current: Current;
   today: string;
-  onDone: () => void;
+  onDone: (message?: string) => void;
 }) {
   const action = savePromiseAction.bind(null, orgId, target, back);
   const [state, formAction] = useActionState<FormState, FormData>(
     async (prev, formData) => {
       const result = await action(prev, formData);
-      if (result?.ok) onDone();
+      if (result?.ok) onDone(result.message);
       return result;
     },
     null,
@@ -113,7 +128,7 @@ function PromiseForm({
       <p className="text-sm text-ink-soft">
         {target.kind === "document"
           ? "התאריך שהלקוח התחייב לשלם בו. עד אז לא נשלחות לו תזכורות גבייה על המסמך הזה."
-          : "התאריך שהלקוח התחייב לשלם בו את החובות הפתוחים שלו. ההבטחה חלה על המסמכים הפתוחים עכשיו, לא על מסמכים שיירשמו אחר כך."}
+          : "התאריך שהלקוח התחייב לשלם בו את החובות הפתוחים שלו. ההבטחה חלה על כל המסמכים הפתוחים של הלקוח עכשיו, גם על כאלה שאינם מוצגים לכם, ולא על מסמכים שיירשמו אחר כך."}
       </p>
       <DateField
         label="הלקוח התחייב לשלם עד"
@@ -135,7 +150,7 @@ function PromiseForm({
       />
       <div className="flex flex-wrap gap-2 pt-1">
         <SubmitButton pendingText="שומרים…">שמירה</SubmitButton>
-        <Button variant="ghost" onClick={onDone}>
+        <Button variant="ghost" onClick={() => onDone()}>
           חזרה
         </Button>
         {current ? (
@@ -148,7 +163,7 @@ function PromiseForm({
             }
             confirmLabel="הסרה"
             action={removePromiseAction.bind(null, orgId, target, back)}
-            onDone={onDone}
+            onDone={() => onDone()}
           >
             הסרת ההבטחה
           </ConfirmButton>

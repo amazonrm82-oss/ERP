@@ -94,6 +94,17 @@ describe("collection screen (COL-01)", () => {
 });
 
 describe("payment promises (COL-03)", () => {
+  it("answer (6) ב: says how many open documents a customer promise covers, a count only", async () => {
+    const { coveredText } = await import("../../src/features/collection/promise");
+    expect(coveredText(1)).toBe("ההבטחה חלה על מסמך פתוח אחד");
+    expect(coveredText(3)).toBe("ההבטחה חלה על 3 מסמכים פתוחים");
+    expect(coveredText(1200)).toBe("ההבטחה חלה על 1,200 מסמכים פתוחים");
+    const { coverageOf } = await import("../../src/features/collection/promise");
+    expect(coverageOf([{ promise_id: ID, documents: 4 }], ID)).toBe(4);
+    expect(coverageOf([], ID)).toBeNull();
+    expect(coverageOf({ nope: true }, ID)).toBeNull();
+    expect(coverageOf([{ promise_id: ID, documents: -1 }], ID)).toBeNull();
+  });
   it("holds the reminders up to and including the promised date", async () => {
     const { reminderHeld, promiseState, lastPromiseDay, promiseSchema } = await import("../../src/features/collection/promise");
     expect(reminderHeld("2026-11-10", "2026-11-09")).toBe(true);

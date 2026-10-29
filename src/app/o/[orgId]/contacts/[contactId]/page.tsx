@@ -66,6 +66,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -270,6 +271,13 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
+          {/* COL-03 answer (8) ב: the customer's payment promise (a contact of a company: on the company's card) */}
+          <CustomerPromiseCard
+            orgId={orgId}
+            customer={{ kind: "contact", id: contact.id }}
+            name={name}
+            company={contact.company_id ? { id: contact.company_id, name: contact.companyName } : null}
+          />
           {/* BAL-01: the customer's ledger (its company's contacts and deals too) */}
           <LedgerCard
             orgId={orgId}

@@ -536,4 +536,99 @@ describe("payment promises (COL-03)", () => {
     const p = await customerPromise(owner, { contact: person }, day(5));
     expect(await covered(p)).toEqual([mine]);
   });
+
+  // ---- owner's answers of 29 October 2026: (5) א, (6) ב, (7) א ----
+
+  it("(6) ב: a customer promise covers every open document, also those the recorder cannot read; the recorder sees a count only", async () => {
+    const co = await run(manager, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name) values ($1, 'חברה בחלקה נסתרת') returning id", [org])).id);
+    // two documents on the owner's contacts (hidden from the manager under 'own'), one on the manager's own contact
+    const hidden1 = await companyDoc(co, 1000);
+    const hidden2 = await companyDoc(co, 2000);
+    const mine = await run(manager, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, company_id) values ($1, 'של המנהל', $2) returning id", [org, co])).id);
+    const seen = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, $4, 300) returning id", [org, mine, `PP-${++n}`, day(-3)])).id,
+    );
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      const readable = await run(manager, async (q) => (await q<{ id: string }>("select id from public.accounting_documents where id = any($1)", [[hidden1, hidden2, seen]])).rows.map((r) => r.id));
+      expect(readable).toEqual([seen]);
+      const p = await customerPromise(manager, { company: co }, day(6));
+      expect(await covered(p)).toEqual([hidden1, hidden2, seen].sort());
+      // the manager reads the count, never the hidden rows
+      const coverage = await run(manager, async (q) => (await one<{ c: unknown }>(q, "select public.payment_promise_coverage($1, $2) as c", [org, [p]])).c);
+      expect(coverage).toEqual([{ promise_id: p, documents: 3 }]);
+      const rows = await run(manager, async (q) => (await q<{ d: string }>("select document_id as d from public.payment_promise_documents where promise_id = $1", [p])).rows.map((r) => r.d));
+      expect(rows).toEqual([seen]);
+      // a member who does not record payments gets nothing; neither does anyone for a promise they cannot read
+      expect(await run(member, async (q) => (await one<{ c: unknown }>(q, "select public.payment_promise_coverage($1, $2) as c", [org, [p]])).c)).toEqual([]);
+      const other = await newCompany("חברה של הבעלים");
+      await companyDoc(other, 400);
+      const theirs = await customerPromise(owner, { company: other }, day(6));
+      expect(await run(manager, async (q) => (await one<{ c: unknown }>(q, "select public.payment_promise_coverage($1, $2) as c", [org, [theirs]])).c)).toEqual([]);
+      expect(await run(owner, async (q) => (await one<{ c: unknown }>(q, "select public.payment_promise_coverage($1, $2) as c", [org, [theirs, p]])).c)).toEqual(
+        [{ promise_id: theirs, documents: 1 }, { promise_id: p, documents: 3 }].sort((a, b) => a.promise_id.localeCompare(b.promise_id)),
+      );
+      // a person cannot reach the definer helpers directly
+      expect((await pgError(run(manager, (q) => q("select app.payment_promise_cover($1, $2, $3)", [org, p, [hidden1]])))).code).toBe("42501");
+      expect((await pgError(run(manager, (q) => q("select app.customer_open_documents($1, null, $2)", [org, co])))).code).toBe("42501");
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
+  });
+
+  it("(5) א: a customer promise not kept goes to the owner, else the recorder, else owners and admins; a document promise keeps its rule", async () => {
+    await withAwakeZone(async (zone) => {
+      const notices = (entity: string) =>
+        asAdmin(async (q) => (await q<{ user_id: string }>("select user_id from public.notifications where organization_id = $1 and title = 'ההבטחה לא קוימה' and entity_id = $2 order by user_id", [org, entity])).rows.map((r) => r.user_id));
+      // no owner on the company: the manager who recorded the promise
+      const co1 = await newCompany("חברה בלי אחראי");
+      await asAdmin((q) => q("update public.companies set owner_id = null where id = $1", [co1]));
+      await companyDoc(co1, 900);
+      const p1 = await customerPromise(manager, { company: co1 }, day(2));
+      // an owner who is no longer active is not usable: again the recorder
+      const gone = await addMember(org, owner.id, "member", "pp-gone-owner");
+      const alone = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'לקוח של מי שעזב') returning id", [org])).id);
+      await asAdmin((q) => q("update public.contacts set owner_id = $2 where id = $1", [alone, gone.id]));
+      await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, gone.id]));
+      await run(owner, (q) => q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, $4, 800)", [org, alone, `PP-${++n}`, day(-3)]));
+      const p2 = await customerPromise(manager, { contact: alone }, day(2));
+      // neither usable (the recorder left): every active owner and admin
+      const leaver = await addMember(org, owner.id, "manager", "pp-leaver");
+      const co3 = await newCompany("חברה שהרושם עזב");
+      await asAdmin((q) => q("update public.companies set owner_id = null where id = $1", [co3]));
+      await companyDoc(co3, 700);
+      const p3 = await customerPromise(leaver, { company: co3 }, day(2));
+      await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, leaver.id]));
+      await pastDue([p1, p2, p3], zone);
+      await asAdmin((q) => q("select app.send_promise_breaks()"));
+      expect(await notices(co1)).toEqual([manager.id]);
+      expect(await notices(alone)).toEqual([manager.id]);
+      const admins = await asAdmin(async (q) => (await q<{ user_id: string }>("select user_id from public.memberships where organization_id = $1 and status = 'active' and role in ('owner', 'admin') order by user_id", [org])).rows.map((r) => r.user_id));
+      expect(await notices(co3)).toEqual(admins);
+      // a document promise never goes to its recorder: no owner on its record = owners and admins
+      const orphan = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'בלי אחראי') returning id", [org])).id);
+      await asAdmin((q) => q("update public.contacts set owner_id = null where id = $1", [orphan]));
+      const d = await run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, $4, 600) returning id", [org, orphan, `PP-${++n}`, day(-3)])).id,
+      );
+      const p4 = await promise(manager, d, day(2));
+      await pastDue([p4], zone);
+      await asAdmin((q) => q("select app.send_promise_breaks()"));
+      expect(await notices(orphan)).toEqual(admins);
+    });
+  });
+
+  it("(7) א: two customer promises covering one document (the contact moved to a company): the newest wins", async () => {
+    const person = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'עוברת לחברה') returning id", [org])).id);
+    const d = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, $4, 500) returning id", [org, person, `PP-${++n}`, day(-3)])).id,
+    );
+    const first = await customerPromise(owner, { contact: person }, day(20));
+    expect(await effective(d)).toBe(first);
+    const co = await newCompany("החברה החדשה שלה");
+    await run(owner, (q) => q("update public.contacts set company_id = $2 where id = $1", [person, co]));
+    const second = await customerPromise(owner, { company: co }, day(4));
+    expect(await covered(second)).toEqual([d]);
+    expect(await effective(d)).toBe(second);
+  });
 });

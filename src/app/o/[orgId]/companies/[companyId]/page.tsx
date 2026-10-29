@@ -35,6 +35,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CompanyOpeningCard } from "@/features/documents/components/company-opening-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { listRelatedDeals } from "@/features/deals/queries";
@@ -211,6 +212,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
+          {/* COL-03 answer (8) ב: the customer's payment promise */}
+          <CustomerPromiseCard orgId={orgId} customer={{ kind: "company", id: company.id }} name={company.name} />
           {/* PAY-03: the company's credit balance */}
           <CompanyCreditCard orgId={orgId} companyId={company.id} />
           {/* GAP-12: the company's opening balance */}
