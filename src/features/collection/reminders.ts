@@ -1,8 +1,12 @@
+import { nextWorkingDay } from "@/features/calendar-days/business-days";
+import type { CalendarSettings } from "@/features/calendar-days/holidays";
+import { addDays } from "@/lib/calendar-grid";
 import { formatMoney } from "@/lib/format";
 
 // COL-04: collection reminders on a schedule. The job lives in the database (app.send_collection_reminders); this file
-// mirrors its pure rules (app.collection_reminder_offsets, app.collection_reminder_offset, app.collection_reminder_stage;
-// test 267 compares them day by day) and holds the WhatsApp side of the reminder task. Pure, unit tested.
+// mirrors its rules (app.collection_reminder_offsets, app.collection_reminder_offset, app.collection_reminder_at,
+// app.collection_reminder_stage; test 267 compares them day by day) and holds the WhatsApp side of the reminder task. Pure,
+// unit tested.
 
 /** Calendar days from the due date: 3 before, the day itself, 7 and 14 after (spec 7.5). */
 export const COLLECTION_REMINDER_OFFSETS = [-3, 0, 7, 14] as const;
@@ -25,18 +29,53 @@ export function collectionReminderOffset(due: string | null, today: string): Col
   return reached !== undefined && since < reached + COLLECTION_REMINDER_WINDOW_DAYS ? reached : null;
 }
 
-/** The stage the task's title names (= app.collection_reminder_stage). */
+/**
+ * The owner's answer (2) ב of 29 October 2026 (= app.collection_reminder_at): on a WORKING day of the business, the latest
+ * offset whose reminder day has come, for 7 days from that day. An offset's reminder day is the calendar day due + offset
+ * itself when the business works on it, else its next working day (nextWorkingDay, CAL-03 settings). A rest day makes nothing.
+ */
+export function collectionReminderAt(
+  due: string | null,
+  today: string,
+  settings: CalendarSettings,
+): { offset: CollectionReminderOffset; day: string } | null {
+  if (!due || !DAY.test(due) || !DAY.test(today)) return null;
+  if (dayNumber(today) < dayNumber(due) - 3) return null;
+  if (nextWorkingDay(settings, today) !== today) return null;
+  for (const offset of [...COLLECTION_REMINDER_OFFSETS].reverse()) {
+    const calendarDay = addDays(due, offset);
+    if (calendarDay > today) continue;
+    const day = nextWorkingDay(settings, calendarDay);
+    if (day > today) continue;
+    return dayNumber(today) < dayNumber(day) + COLLECTION_REMINDER_WINDOW_DAYS ? { offset, day } : null;
+  }
+  return null;
+}
+
+/** The stage the task's title names, by the days from the due date to the reminder day (= app.collection_reminder_stage). */
+export function collectionReminderStage(days: number): string {
+  if (days === 0) return "היום מועד התשלום";
+  if (days === -1) return "מחר מועד התשלום";
+  if (days === -2) return "בעוד יומיים מועד התשלום";
+  if (days < 0) return `בעוד ${-days} ימים מועד התשלום`;
+  if (days === 1) return "יום אחרי מועד התשלום";
+  if (days === 2) return "יומיים אחרי מועד התשלום";
+  return `${days} ימים אחרי מועד התשלום`;
+}
+
+/** The stage of each offset when its day was not moved. */
 export const COLLECTION_REMINDER_STAGES: Record<CollectionReminderOffset, string> = {
-  [-3]: "בעוד 3 ימים מועד התשלום",
-  0: "היום מועד התשלום",
-  7: "7 ימים אחרי מועד התשלום",
-  14: "14 ימים אחרי מועד התשלום",
+  [-3]: collectionReminderStage(-3),
+  0: collectionReminderStage(0),
+  7: collectionReminderStage(7),
+  14: collectionReminderStage(14),
 };
 
-// DRAFT wording (not yet approved by the owner). Equal to the seeded template of kind 'collection_reminder'
-// (app.seed_whatsapp_templates, DEFAULT_TEMPLATES); offered as an unsaved text when the business has no such template.
-export const COLLECTION_REMINDER_DRAFT_TEXT =
-  "שלום {שם פרטי}, תזכורת לתשלום {מסמך} על סך {סכום}, שמועד התשלום שלו {מועד תשלום}. אם כבר שילמת, תודה ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}";
+// The owner's wording of 29 October 2026 (answer (3)). Equal to the seeded template of kind 'collection_reminder'
+// (app.seed_whatsapp_templates, DEFAULT_TEMPLATES); offered as an unsaved text when the business has no such template (it was
+// deleted, or the business was at the 50-template cap or used both names when the template was added to existing businesses).
+export const COLLECTION_REMINDER_TEXT =
+  "שלום {שם פרטי}, תזכורת: {מסמך} על סך {סכום}, מועד התשלום {מועד תשלום}. אם כבר שילמתם, תודה, ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}";
 
 /** "16.11.2026" from "2026-11-16" (a business day, no time zone). */
 export function dueDateText(day: string | null): string | null {

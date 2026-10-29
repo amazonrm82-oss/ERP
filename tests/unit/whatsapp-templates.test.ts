@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { mentionIds } from "@/features/mentions/token";
 import { sentMessageSchema, templateSchema } from "@/features/whatsapp/schema";
-import { COLLECTION_REMINDER_DRAFT_TEXT } from "@/features/collection/reminders";
+import { COLLECTION_REMINDER_TEXT } from "@/features/collection/reminders";
 import {
   COLLECTION_REMINDER_KIND,
   DEFAULT_TEMPLATES,
@@ -85,7 +85,7 @@ describe("WhatsApp templates (WA-01)", () => {
     expect(rows).toEqual(DEFAULT_TEMPLATES.map((t) => ({ name: t.name, body: t.body, kind: t.kind })));
     expect(DEFAULT_TEMPLATES.filter((t) => t.kind === MEETING_REMINDER_KIND)).toHaveLength(1);
     expect(DEFAULT_TEMPLATES.filter((t) => t.kind === COLLECTION_REMINDER_KIND)).toHaveLength(1);
-    expect(DEFAULT_TEMPLATES.find((t) => t.kind === COLLECTION_REMINDER_KIND)?.body).toBe(COLLECTION_REMINDER_DRAFT_TEXT);
+    expect(DEFAULT_TEMPLATES.find((t) => t.kind === COLLECTION_REMINDER_KIND)?.body).toBe(COLLECTION_REMINDER_TEXT);
     for (const template of DEFAULT_TEMPLATES) {
       expect(templateSchema.safeParse({ name: template.name, body: template.body }).success).toBe(true);
     }

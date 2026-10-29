@@ -101,10 +101,11 @@ export const DEFAULT_TEMPLATES: ReadonlyArray<{ name: string; body: string; kind
     body: "תודה {שם פרטי}, היה נעים לדבר. אם יש שאלות, אני כאן. {שם הנציג}, {שם העסק}",
     kind: null,
   },
-  // COL-04: DRAFT wording, seeded for new businesses only (migration collection_reminders)
+  // COL-04: the owner's wording of 29 October 2026; seeded for new businesses and added once to existing ones that had none
+  // (migration collection_reminders_answers)
   {
     name: "תזכורת לתשלום",
-    body: "שלום {שם פרטי}, תזכורת לתשלום {מסמך} על סך {סכום}, שמועד התשלום שלו {מועד תשלום}. אם כבר שילמת, תודה ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}",
+    body: "שלום {שם פרטי}, תזכורת: {מסמך} על סך {סכום}, מועד התשלום {מועד תשלום}. אם כבר שילמתם, תודה, ואפשר להתעלם מההודעה. {שם הנציג}, {שם העסק}",
     kind: COLLECTION_REMINDER_KIND,
   },
 ];
