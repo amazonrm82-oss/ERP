@@ -1467,6 +1467,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   ב-WhatsApp" (WA-01 window, kind `collection_reminder` template seeded for NEW businesses by `app.seed_whatsapp_templates`, DRAFT
   wording; {סכום} left unfilled when the caller's view of the customer's money is partial). `app.import_record_worked` (last
   redefined in 021102) ignores a reminder task on a document of the same import. Follow-up: the button on My day and record pages.
+  Since 021108 (owner 29 October 2026, answers (1) א (2) ב (3) (4) ב): the template was added once to existing businesses
+  (`app.collection_template_backfill`: none of the kind, under 50, name 'תזכורת לתשלום' else 'תזכורת גבייה' else skipped, insert only,
+  one business per exception block); final wording in `app.seed_whatsapp_templates` (last redefined there) = `COLLECTION_REMINDER_TEXT`.
+  The rule is `app.collection_reminder_at(org, due, today)` = `collectionReminderAt()` (test 267): an offset's day moves to the next
+  working day (CAL-03, `add_business_days(.., 0)` walked with `rest_day_with`; keep in step), nothing is made on a rest day, 7 days
+  from the moved day, the later offset when two meet; titles by `app.collection_reminder_stage(moved day - due)`, kept in
+  `collection_reminders_sent.task_title`. Businesses first (`app.collection_reminder_orgs`: writable + the three keys).
+  `app.close_paid_collection_tasks` (first step of the job) sets an open marked task without a repeat rule done with outcome
+  'נסגרה: החוב שולם' when its document's balance is 0 (billed proforma by its invoice; cheap cut `app.collection_document_paid`),
+  never on a cancelled document (owner's question open); records the close in `app.collection_task_closes.closed_at/outcome`; reopens a
+  system-closed, still-done task with no status change since when the debt returns (outcome cleared only while it is the system's
+  own note; only while the owner is an active full-seat non-viewer); never a task whose status a person changed (audit actor) or a
+  marked task that is open again. `app.send_collection_reminders` was last redefined in 021108.
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
