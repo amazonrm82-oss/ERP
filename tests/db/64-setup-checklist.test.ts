@@ -641,6 +641,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_document_details.sql",
       // RPT-01 redefines public.log_export() of _collection_report.sql last (the recurring revenue report key)
       "_report_recurring_revenue.sql",
+      // the COL-06 answers redefine public.report_collection() of _collection_report.sql last (a billed proforma's date)
+      "_collection_report_answers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

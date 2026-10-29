@@ -203,7 +203,8 @@ describe("collection report (COL-06)", () => {
           )
         ).id,
       );
-    // A: a proforma paid in part (10 February), billed by an invoice of 5 February paid the rest on 25 February: 20 days
+    // A: a proforma of 1 February paid in part (10 February), billed by an invoice of 5 February paid the rest on 25 February:
+    // 24 days, from the PROFORMA's date (owner's answer (2) ב, 29 October 2026), not 20 from the invoice's
     const pA = await docOf(1000, "2027-02-01", "proforma");
     await allocate(await pay(600, "2027-02-10", "cash", { contact: c }), pA, 600);
     const iA = await docOf(1000, "2027-02-05", "tax_invoice", pA);
@@ -212,8 +213,9 @@ describe("collection report (COL-06)", () => {
     const pB = await docOf(1000, "2027-02-01", "proforma");
     await allocate(await pay(1000, "2027-02-12", "cash", { contact: c }), pB, 1000);
     await docOf(1000, "2027-02-01", "tax_invoice", pB);
-    // C: an invoice of 1 February paid on 14 February (13 days) whose proforma, paid on 27 February, is then cancelled
-    const pC = await docOf(1000, "2027-02-01", "proforma");
+    // C: an invoice of 1 February paid on 14 February (13 days) whose proforma of 20 January, paid on 27 February, is then
+    // cancelled: a cancelled proforma leaves the invoice's own date
+    const pC = await docOf(1000, "2027-01-20", "proforma");
     await allocate(await pay(1000, "2027-02-27", "cash", { contact: c }), pC, 1000);
     const iC = await docOf(1000, "2027-02-01", "tax_invoice", pC);
     await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [pC]));
@@ -222,8 +224,8 @@ describe("collection report (COL-06)", () => {
     await allocate(await pay(1000, "2027-02-03", "cash", { contact: c }), await docOf(1000, "2027-02-01", "tax_invoice"), 1000);
     await allocate(await pay(1000, "2027-02-21", "cash", { contact: c }), await docOf(1000, "2027-02-01", "tax_invoice"), 1000);
 
-    // the proformas are not counted; A, B, C, E, F are: 20, 11, 13, 2, 20
-    expect((await full(owner, "2027-02-01", "2027-02-28")).collection_days).toMatchObject({ documents: 5, average_days: 13.2, median_days: 13 });
+    // the proformas are not counted; A, B, C, E, F are: 24, 11, 13, 2, 20 (a simple average, owner's answer (1) א)
+    expect((await full(owner, "2027-02-01", "2027-02-28")).collection_days).toMatchObject({ documents: 5, average_days: 14, median_days: 13 });
 
     // opening-credit offsets settle the last part; their day is the day they were made in Asia/Jerusalem (UTC+2)
     const credit = await run(owner, async (q) => (await one<{ id: string }>(q, "select public.opening_balance_set($1, $2, null, -1000, '2027-01-01') as id", [org, c])).id);
@@ -256,8 +258,8 @@ describe("collection report (COL-06)", () => {
     expect((await full(owner, "2027-02-01", "2027-02-28")).collection_days.documents).toBe(5);
     expect((await full(owner, "2027-03-01", "2027-03-31")).collection_days.documents).toBe(1);
     expect((await full(owner, "2027-04-01", "2027-04-30")).collection_days.documents).toBe(1);
-    // D5 counts 14 days (15 February to 1 March): February and March together, 20 + 11 + 13 + 2 + 20 + 14 = 80 over 6
-    expect((await full(owner, "2027-02-01", "2027-03-31")).collection_days).toMatchObject({ documents: 6, average_days: 13.3 });
+    // D5 counts 14 days (15 February to 1 March): February and March together, 24 + 11 + 13 + 2 + 20 + 14 = 84 over 6
+    expect((await full(owner, "2027-02-01", "2027-03-31")).collection_days).toMatchObject({ documents: 6, average_days: 14 });
   });
 
   it("rights: the PRM-01 key opens it, a member without it and a viewer get nothing; the keys; partial has no totals", async () => {
