@@ -27,11 +27,30 @@ export async function CustomerPromiseCard({ orgId, customer, name, company = nul
   const access = await getCollectionAccess(orgId);
   if (!access.canOpen) return null;
   const titleId = `promise-${customer.id}`;
+  const [promise, context] = await Promise.all([getCustomerPromise(orgId, customer), getOrgContext(orgId)]);
+  const today = zoneDate(new Date(), context.org.timeZone);
   if (customer.kind === "contact" && company) {
+    // a promise made before the contact joined the company still holds its documents: show it, so it can be changed or removed
     return (
       <Card aria-labelledby={titleId} className="print:hidden">
-        <CardHeader id={titleId} title="הבטחת תשלום" />
-        <CardBody>
+        <CardHeader
+          id={titleId}
+          title="הבטחת תשלום"
+          action={
+            access.canPromise && promise ? (
+              <PromiseButton
+                orgId={orgId}
+                target={customer}
+                label={name}
+                back={{ kind: customer.kind, id: customer.id }}
+                current={{ date: promise.date, note: promise.note }}
+                today={today}
+              />
+            ) : null
+          }
+        />
+        <CardBody className="space-y-2">
+          {promise ? <PromiseLine date={promise.date} note={promise.note} today={today} customer covered={promise.covered} /> : null}
           <p className="text-sm text-ink-soft">
             איש הקשר משלם דרך החברה שלו, ולכן הבטחת תשלום נרשמת בכרטיס החברה:{" "}
             <Link href={paths.company(orgId, company.id)} className="text-accent-strong underline-offset-4 hover:underline">
@@ -42,8 +61,6 @@ export async function CustomerPromiseCard({ orgId, customer, name, company = nul
       </Card>
     );
   }
-  const [promise, context] = await Promise.all([getCustomerPromise(orgId, customer), getOrgContext(orgId)]);
-  const today = zoneDate(new Date(), context.org.timeZone);
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
       <CardHeader

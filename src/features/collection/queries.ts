@@ -182,12 +182,11 @@ export async function getPromiseCoverage(
   promiseId: string,
 ): Promise<number | null> {
   const supabase = await createClient();
-  const raw = must(
-    await supabase.rpc("payment_promise_coverage", {
-      p_org: orgId,
-      p_promises: [promiseId],
-    }),
-    "promise coverage",
-  );
-  return coverageOf(raw, promiseId);
+  // a count is a detail: a failed read leaves the line out instead of failing the whole record page
+  const { data, error } = await supabase.rpc("payment_promise_coverage", {
+    p_org: orgId,
+    p_promises: [promiseId],
+  });
+  if (error) return null;
+  return coverageOf(data, promiseId);
 }

@@ -41,8 +41,9 @@ export const promiseSchema = z.object({
  * cannot see; only the count is shown, never which).
  */
 export function coveredText(documents: number): string {
-  if (documents === 1) return "ההבטחה חלה על מסמך פתוח אחד";
-  return `ההבטחה חלה על ${documents.toLocaleString("he-IL")} מסמכים פתוחים`;
+  // the set is fixed when the promise is made, so the text says "were open then"
+  if (documents === 1) return "ההבטחה חלה על מסמך אחד שהיה פתוח כשנרשמה";
+  return `ההבטחה חלה על ${documents.toLocaleString("he-IL")} מסמכים שהיו פתוחים כשנרשמה`;
 }
 
 const coverageSchema = z.array(

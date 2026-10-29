@@ -143,7 +143,7 @@ export async function savePromiseAction(
   const covered = coverage.error ? null : coverageOf(coverage.data, saved.data.id);
   return covered === null
     ? ok()
-    : { ok: true, message: `ההבטחה נשמרה. ${coveredText(covered)}.` };
+    : { ok: true, message: `נשמר. ${coveredText(covered)}.` };
 }
 
 export async function removePromiseAction(
