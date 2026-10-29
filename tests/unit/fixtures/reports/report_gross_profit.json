@@ -4,7 +4,8 @@
     "lines": 2,
     "costed_lines": 1,
     "uncosted_lines": 1,
-    "deals_with_costs": 1
+    "deals_with_costs": 1,
+    "deals_with_document_discount": 0
   },
   "allowed": true,
   "by_billing": [

@@ -6,7 +6,9 @@
     "deals_with_lines": 1,
     "deals_without_vat": 1,
     "deals_without_lines": 1,
-    "amount_without_lines": 40000
+    "amount_without_lines": 40000,
+    "deals_with_document_discount": 0,
+    "document_discount_agorot": 0
   },
   "by_billing": [
     {

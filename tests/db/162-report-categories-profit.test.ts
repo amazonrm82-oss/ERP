@@ -225,7 +225,7 @@ describe("revenue by category and gross profit (DLI-06)", () => {
       ),
     );
     expect(net).toBeLessThan(11700);
-    expect(r.totals).toEqual({ deals: 2, deals_with_costs: 2, lines: 6, costed_lines: 4, uncosted_lines: 2 });
+    expect(r.totals).toEqual({ deals: 2, deals_with_costs: 2, lines: 6, costed_lines: 4, uncosted_lines: 2, deals_with_document_discount: 0 });
     const chairRow = r.by_product.find((x) => x.product_id === chair && x.billing === "one_time")!;
     // 2 x 6000 (the copy kept when the line was made) + 1 x 9000 (the line made after the catalog changed)
     expect([Number(chairRow.quantity), chairRow.deals, chairRow.revenue, chairRow.cost]).toEqual([3, 2, 20000 + net, 12000 + 9000]);

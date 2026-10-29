@@ -170,6 +170,9 @@ export const REPORT_SCHEMAS = {
       amount_without_lines: amount,
       deals_with_vat: count,
       deals_without_vat: count,
+      // DSC-01: an accepted quote's document discount split between its deal's lines
+      deals_with_document_discount: count,
+      document_discount_agorot: amount,
     }),
     // one total per billing (null = a line saved before DLI-04, in its deal's period); never added together
     by_billing: z.array(z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, amount })),
@@ -214,6 +217,8 @@ export const REPORT_SCHEMAS = {
       amount_without_lines: amount,
       deals_with_vat: count,
       deals_without_vat: count,
+      deals_with_document_discount: count,
+      document_discount_agorot: amount,
     }),
     by_billing: z.array(z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, amount })),
     by_category: z.array(
@@ -235,7 +240,7 @@ export const REPORT_SCHEMAS = {
   report_gross_profit: z.union([
     z.object({
       allowed: z.literal(true),
-      totals: z.object({ deals: count, deals_with_costs: count, lines: count, costed_lines: count, uncosted_lines: count }),
+      totals: z.object({ deals: count, deals_with_costs: count, lines: count, costed_lines: count, uncosted_lines: count, deals_with_document_discount: count }),
       by_billing: z.array(
         z.object({ billing: z.enum(["one_time", "monthly", "quarterly", "yearly"]).nullable(), lines: count, deals: count, revenue: amount, cost: amount, profit: amount, margin_bp: decimal }),
       ),

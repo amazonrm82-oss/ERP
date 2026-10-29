@@ -115,6 +115,9 @@ describe("revenue by product (RPT-01)", () => {
       amount_without_lines: 70000,
       deals_with_vat: 0,
       deals_without_vat: 3,
+      // DSC-01: no accepted quote with a document discount here
+      deals_with_document_discount: 0,
+      document_discount_agorot: 0,
     });
     // one total per billing type: the monthly line is never added to the one-time sales
     expect(r.by_billing).toEqual([

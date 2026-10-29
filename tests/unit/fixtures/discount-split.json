@@ -1,0 +1,21 @@
+{
+  "_comment": "DSC-01: app.discount_split (SQL) and discountSplit() (src/features/tax/discount-split.ts) must both answer these. null = input the rule does not take.",
+  "cases": [
+    { "name": "exact shares", "totals": [100, 200, 300], "discount": 60, "shares": [10, 20, 30] },
+    { "name": "equal remainders go to the earlier line", "totals": [100, 100, 100], "discount": 100, "shares": [34, 33, 33] },
+    { "name": "one agora, two lines", "totals": [1, 1], "discount": 1, "shares": [1, 0] },
+    { "name": "a zero line gets nothing", "totals": [0, 500], "discount": 100, "shares": [0, 100] },
+    { "name": "no lines", "totals": [], "discount": 0, "shares": [] },
+    { "name": "no discount", "totals": [10, 20], "discount": 0, "shares": [0, 0] },
+    { "name": "the whole sum", "totals": [10, 20], "discount": 30, "shares": [10, 20] },
+    { "name": "largest remainder wins", "totals": [333, 667], "discount": 100, "shares": [33, 67] },
+    { "name": "two agorot left", "totals": [7, 7, 6], "discount": 5, "shares": [2, 2, 1] },
+    { "name": "remainders against the order", "totals": [6, 7, 7], "discount": 5, "shares": [1, 2, 2] },
+    { "name": "lines of zero only", "totals": [0, 0], "discount": 0, "shares": [0, 0] },
+    { "name": "very large line", "totals": [9007199254740991, 1], "discount": 1000000000000, "shares": [1000000000000, 0] },
+    { "name": "discount larger than the lines", "totals": [10, 20], "discount": 31, "shares": null },
+    { "name": "a discount on nothing", "totals": [], "discount": 1, "shares": null },
+    { "name": "a negative line", "totals": [-1, 5], "discount": 1, "shares": null },
+    { "name": "a negative discount", "totals": [5], "discount": -1, "shares": null }
+  ]
+}

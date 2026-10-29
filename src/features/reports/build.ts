@@ -109,6 +109,15 @@ function vatModeNote(totals: Record<string, unknown>): string | null {
   return null;
 }
 
+// DSC-01: an accepted quote's document discount, which the deal's copied lines do not carry, split between them
+function documentDiscountNote(totals: Record<string, unknown>): string | null {
+  const deals = num(totals.deals_with_document_discount);
+  if (deals === 0) return null;
+  const amount = numOrNull(totals.document_discount_agorot);
+  const where = deals === 1 ? "בעסקה אחת" : `ב-${formatNumber(deals)} עסקאות`;
+  return `${where} הסכום הוא של הצעת מחיר שאושרה עם הנחה על כל ההצעה${amount ? ` (${formatMoney(amount)})` : ""}. ההנחה חולקה בין השורות לפי הסכום של כל שורה.`;
+}
+
 function monthLabel(month: unknown): string {
   const value = str(month);
   return value ? monthFormat.format(new Date(`${value.slice(0, 10)}T12:00:00Z`)) : "ללא תאריך צפוי";
@@ -955,6 +964,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             note: [
               "נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה, לפי תאריך הסגירה. הסכום הוא סכום השורה כפי שנשמר בעסקה. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, כי הסכום שלה הוא לתקופת חיוב אחת, ולא מתווסף למכירות החד-פעמיות. עסקה בלי שורות לא נספרת כאן; היא מופיעה בדוח \"הכנסות\".",
               vatModeNote(totals),
+              documentDiscountNote(totals),
             ]
               .filter(Boolean)
               .join(" "),
@@ -1076,7 +1086,7 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             })),
             bar: "amount",
             empty: "לא נמכרו מוצרים בעסקאות שנסגרו בתקופה הזו.",
-            note: [amountNote, vatModeNote(totals)].filter(Boolean).join(" "),
+            note: [amountNote, vatModeNote(totals), documentDiscountNote(totals)].filter(Boolean).join(" "),
           },
         ],
       };
@@ -1141,7 +1151,12 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             ),
             bar: "profit",
             empty: "אין בתקופה הזו שורות עם עלות בעסקאות שנסגרו.",
-            note: 'נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה. ההכנסה היא סכום השורה לפני מע"מ, והעלות היא העלות שנשמרה בשורה כפול הכמות. שורה בלי עלות לא נכללת. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, לתקופת חיוב אחת. רק מי שמורשה לראות עלות רואה את הדוח הזה.',
+            note: [
+              'נספרות שורות של עסקאות שנסגרו בהצלחה בתקופה. ההכנסה היא סכום השורה לפני מע"מ, והעלות היא העלות שנשמרה בשורה כפול הכמות. שורה בלי עלות לא נכללת. שורה חודשית, רבעונית או שנתית מוצגת בנפרד, לתקופת חיוב אחת. רק מי שמורשה לראות עלות רואה את הדוח הזה.',
+              documentDiscountNote(totals),
+            ]
+              .filter(Boolean)
+              .join(" "),
           },
         ],
       };

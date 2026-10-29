@@ -643,6 +643,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_report_recurring_revenue.sql",
       // the COL-06 answers redefine public.report_collection() of _collection_report.sql last (a billed proforma's date)
       "_collection_report_answers.sql",
+      // DSC-01 redefines public.report_revenue_by_product() of _report_revenue_by_product.sql and report_revenue_by_category() /
+      // report_gross_profit() of _report_categories_profit.sql last (an accepted quote's document discount split between the lines)
+      "_document_discount_split.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
