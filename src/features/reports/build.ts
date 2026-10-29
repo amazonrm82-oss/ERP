@@ -66,6 +66,37 @@ function billingFigureHint(billing: string | null): string {
   return "שורות שנשמרו לפני שהיה לשורה סוג חיוב; סכומן לפי תקופת העסקה.";
 }
 
+// RPT-01: how the recurring revenue report counts, and what its amounts are (one VAT mode per deal, that of its lines)
+function recurringNote(totals: {
+  deals: number;
+  deals_without_amount: number;
+  deals_with_vat: number;
+  deals_without_vat: number;
+}): string {
+  const withVat = totals.deals_with_vat;
+  const withoutVat = totals.deals_without_vat;
+  const noMode = Math.max(0, totals.deals - withVat - withoutVat);
+  return [
+    "נספרות עסקאות בחיוב חודשי או שנתי שנסגרו בהצלחה בתקופה, לפי חודש הסגירה. עסקה חודשית נספרת בסכום החוזר שלה; עסקה שנתית בסכום השנתי חלקי 12, מעוגל לאגורה. הסכום הוא הסכום החוזר כפי שנשמר בעסקה. עסקה חד-פעמית לא נספרת כאן.",
+    totals.deals_without_amount > 0
+      ? `${formatNumber(totals.deals_without_amount)} מהעסקאות נסגרו בלי סכום חוזר, ונספרו כאן ב-0.`
+      : null,
+    withVat > 0 && withoutVat > 0
+      ? `שימו לב: בתקופה יש עסקאות שתומחרו כולל מע"מ (${formatNumber(withVat)}) ועסקאות שתומחרו לפני מע"מ (${formatNumber(withoutVat)}), והסכומים כאן לא אוחדו לאחד מהם.`
+      : withVat > 0 && noMode === 0
+        ? 'כל הסכומים כאן כוללים מע"מ, כפי שתומחרו בעסקאות.'
+        : withoutVat > 0 && noMode === 0
+          ? 'כל הסכומים כאן לפני מע"מ, כפי שתומחרו בעסקאות.'
+          : null,
+    noMode > 0 && withVat + withoutVat > 0
+      ? `${formatNumber(noMode)} מהעסקאות בלי שורות, ולכן לא ידוע אם הסכום החוזר שלהן כולל מע"מ.`
+      : null,
+    "הכנסה חוזרת שהסתיימה תוצג כשיהיה מודול מנויים.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 // RPT-01, DLI-06: what the stored line totals of a period are, with VAT or before it (one mode per deal)
 function vatModeNote(totals: Record<string, unknown>): string | null {
   const withVat = num(totals.deals_with_vat);
@@ -927,6 +958,58 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             ]
               .filter(Boolean)
               .join(" "),
+          },
+        ],
+      };
+    }
+
+    // RPT-01: new recurring revenue (MRR) of the monthly and yearly deals won in the period, by close month and owner
+    // (owner, 18 October 2026: new revenue by close month; ended revenue waits for a subscriptions module)
+    case "recurring": {
+      const data = parseReportData(
+        "report_recurring_revenue",
+        await rpc("report_recurring_revenue", { p_org: orgId, p_from: period.fromDate, p_to: period.toDate, p_pipeline: pipelineId, p_owner: ownerId }),
+      );
+      const { totals } = data;
+      const name = await ownerNames(data.by_owner.map((r) => r.owner_id));
+      const dealsCount = (n: number) => `${formatNumber(n)} ${D.plural}`;
+      return {
+        kpis: [
+          { label: "הכנסה חוזרת חדשה לחודש", value: formatMoney(totals.new_mrr), hint: `${dealsCount(totals.deals)} שנסגרו` },
+          { label: "מחיוב חודשי", value: formatMoney(totals.monthly_mrr), hint: dealsCount(totals.monthly_deals) },
+          {
+            label: "מחיוב שנתי, לחודש",
+            value: formatMoney(totals.yearly_mrr),
+            hint: `${dealsCount(totals.yearly_deals)}, ${formatMoney(totals.yearly_amount)} לשנה`,
+          },
+        ],
+        sections: [
+          {
+            title: "לפי חודש סגירה",
+            columns: [
+              { key: "month", label: "חודש", kind: "text" },
+              { key: "deals", label: D.plural, kind: "number" },
+              { key: "new_mrr", label: "הכנסה חוזרת חדשה לחודש", kind: "money" },
+              { key: "monthly_mrr", label: "מחיוב חודשי", kind: "money" },
+              { key: "yearly_mrr", label: "מחיוב שנתי", kind: "money" },
+            ],
+            rows: data.by_month.map(
+              (r): ReportRow => ({ month: monthLabel(r.month), deals: r.deals, new_mrr: r.new_mrr, monthly_mrr: r.monthly_mrr, yearly_mrr: r.yearly_mrr }),
+            ),
+            bar: "new_mrr",
+            empty: "אין חודשים בתקופה הזו.",
+            note: recurringNote(totals),
+          },
+          {
+            title: "לפי חבר צוות",
+            columns: [
+              { key: "owner", label: "חבר צוות", kind: "text" },
+              { key: "deals", label: D.plural, kind: "number" },
+              { key: "new_mrr", label: "הכנסה חוזרת חדשה לחודש", kind: "money" },
+            ],
+            rows: data.by_owner.map((r): ReportRow => ({ owner: name(r.owner_id), deals: r.deals, new_mrr: r.new_mrr })),
+            bar: "new_mrr",
+            empty: "לא נסגרו עסקאות חודשיות או שנתיות בתקופה הזו.",
           },
         ],
       };

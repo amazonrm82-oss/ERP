@@ -154,6 +154,30 @@ describe("report shaping from the saved samples", () => {
     expect(view.sections[0].note).toContain('שימו לב: בתקופה יש עסקאות שתמחרו כולל מע"מ (2) ועסקאות שתמחרו לפני מע"מ (3)');
   });
 
+  it("RPT-01: recurring revenue by close month and owner, with the counting rule and the subscriptions line", async () => {
+    const view = await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters);
+    const [months, owners] = view.sections;
+    expect(months.rows.map((r) => [r.deals, r.new_mrr, r.monthly_mrr, r.yearly_mrr])).toEqual([[3, 25000, 15000, 10000]]);
+    expect(owners.rows.map((r) => [r.owner, r.deals, r.new_mrr])).toEqual([["נציג", 3, 25000]]);
+    expect(view.kpis.map((k) => k.label)).toEqual(["הכנסה חוזרת חדשה לחודש", "מחיוב חודשי", "מחיוב שנתי, לחודש"]);
+    expect(view.kpis[2].hint).toContain("לשנה");
+    expect(months.note).toContain("חלקי 12");
+    expect(months.note).toContain("מודול מנויים");
+    expect(months.note).not.toContain("שימו לב");
+  });
+
+  it("RPT-01: recurring revenue warns about mixed VAT modes, deals without lines and deals without an amount", async () => {
+    const data = sample("report_recurring_revenue") as { totals: Record<string, number> };
+    results.report_recurring_revenue = { ...data, totals: { ...data.totals, deals: 6, deals_with_vat: 2, deals_without_vat: 3, deals_without_amount: 1 } };
+    const note = (await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters)).sections[0].note ?? "";
+    expect(note).toContain('שימו לב: בתקופה יש עסקאות שתומחרו כולל מע"מ (2) ועסקאות שתומחרו לפני מע"מ (3)');
+    expect(note).toContain("1 מהעסקאות בלי שורות");
+    expect(note).toContain("1 מהעסקאות נסגרו בלי סכום חוזר");
+    results.report_recurring_revenue = { ...data, totals: { ...data.totals, deals: 2, deals_with_vat: 2, deals_without_vat: 0 } };
+    const all = (await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters)).sections[0].note ?? "";
+    expect(all).toContain('כל הסכומים כאן כוללים מע"מ');
+  });
+
   it("DLI-06: revenue by category rolls subcategories up, names free lines, and keeps billing apart", async () => {
     const view = await buildReport("00000000-0000-4000-8000-000000000099", "categories", filters);
     const [tops, categories] = view.sections;

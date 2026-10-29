@@ -105,6 +105,18 @@ describe("report result shapes (FXC-12)", () => {
       ),
     );
 
+    // RPT-01: a monthly and a yearly deal won today (report_recurring_revenue's months and owners)
+    await asUser(owner.id, (q) =>
+      q(
+        `insert into public.deals (organization_id, name, amount_agorot, pipeline_id, stage_id, owner_id, billing_kind, recurring_amount_agorot, recurring_start_date)
+         select $1, x.name, 0, p.id, s.id, $2, x.kind, x.amount, (now() at time zone 'Asia/Jerusalem')::date
+           from public.pipelines p join public.stages s on s.pipeline_id = p.id and s.kind = 'won'
+          cross join (values ('מנוי חודשי', 'monthly', 10000), ('מנוי שנתי', 'yearly', 120000)) as x(name, kind, amount)
+          where p.organization_id = $1 and p.is_default`,
+        [org, owner.id],
+      ),
+    );
+
     // an open deal with no next step (stuck) and an expected close date (forecast)
     await asUser(member.id, (q) =>
       q(
@@ -258,6 +270,10 @@ describe("report result shapes (FXC-12)", () => {
       report_referrals: ["public.report_referrals($1, $2, $3)", range],
       report_quotes: ["public.report_quotes($1, $2, $3)", range],
       report_debt_aging: ["public.report_debt_aging($1)", [org]],
+      report_recurring_revenue: [
+        "public.report_recurring_revenue($1, ((now() at time zone 'Asia/Jerusalem')::date - 1), ((now() at time zone 'Asia/Jerusalem')::date + 1))",
+        [org],
+      ],
       report_collection: [
         "public.report_collection($1, ((now() at time zone 'Asia/Jerusalem')::date - 1), ((now() at time zone 'Asia/Jerusalem')::date + 1))",
         [org],

@@ -1,0 +1,33 @@
+{
+  "totals": {
+    "deals": 3,
+    "new_mrr": 25000,
+    "yearly_mrr": 10000,
+    "monthly_mrr": 15000,
+    "yearly_deals": 1,
+    "monthly_deals": 2,
+    "yearly_amount": 120000,
+    "deals_with_vat": 0,
+    "deals_without_vat": 0,
+    "deals_without_amount": 0
+  },
+  "by_month": [
+    {
+      "deals": 3,
+      "month": "2026-10-01",
+      "new_mrr": 25000,
+      "yearly_mrr": 10000,
+      "monthly_mrr": 15000,
+      "yearly_deals": 1,
+      "monthly_deals": 2
+    }
+  ],
+  "by_owner": [
+    {
+      "deals": 3,
+      "new_mrr": 25000,
+      "owner_id": "00000000-0000-4000-8000-000000000007"
+    }
+  ],
+  "currency": "ILS"
+}

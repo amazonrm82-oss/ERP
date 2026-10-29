@@ -184,6 +184,26 @@ export const REPORT_SCHEMAS = {
       }),
     ),
   }),
+  // RPT-01: new recurring revenue (MRR) of the recurring deals won in the period, by close month and owner
+  report_recurring_revenue: z.object({
+    currency: z.literal("ILS"),
+    totals: z.object({
+      deals: count,
+      new_mrr: amount,
+      monthly_deals: count,
+      monthly_mrr: amount,
+      yearly_deals: count,
+      yearly_mrr: amount,
+      yearly_amount: amount,
+      deals_without_amount: count,
+      deals_with_vat: count,
+      deals_without_vat: count,
+    }),
+    by_month: z.array(
+      z.object({ month: day, deals: count, new_mrr: amount, monthly_deals: count, monthly_mrr: amount, yearly_deals: count, yearly_mrr: amount }),
+    ),
+    by_owner: z.array(z.object({ owner_id: id, deals: count, new_mrr: amount })),
+  }),
   // DLI-06: the same won lines by the category their product is in today; free lines and uncategorized products apart
   report_revenue_by_category: z.object({
     totals: z.object({

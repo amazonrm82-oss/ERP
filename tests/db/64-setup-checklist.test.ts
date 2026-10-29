@@ -639,6 +639,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // DOC-02 redefines app.audit_erase_core() of _payment_promise_erasure.sql last (a document line's text, emptied by an
       // erasure) and grants on accounting_documents after _opening_balance.sql
       "_document_details.sql",
+      // RPT-01 redefines public.log_export() of _collection_report.sql last (the recurring revenue report key)
+      "_report_recurring_revenue.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

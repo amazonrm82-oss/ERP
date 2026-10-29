@@ -3298,6 +3298,8 @@ export type Database = {
       report_revenue_by_product: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // SEG-02: revenue of won deals by first source and campaign
       report_revenue_by_source: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      // RPT-01: new recurring revenue (MRR) of the recurring deals won in the period (from/to: business days, inclusive)
+      report_recurring_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // DLI-06
       report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // BAL-01: the customer's ledger (invoker; {"allowed": false} without the keys or membership)

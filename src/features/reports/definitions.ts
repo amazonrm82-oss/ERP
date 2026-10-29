@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -45,6 +45,13 @@ export const REPORTS: ReportDefinition[] = [
   },
   // RPT-01
   { key: "products", title: "הכנסה לפי מוצר", description: "מה נמכר בעסקאות שנסגרו: כמות, מספר עסקאות וסכום לכל מוצר.", filters: ["period", "owner", "pipeline"] },
+  // RPT-01: new recurring revenue (owner, 18 October 2026: every plan, by close month; ended revenue waits for subscriptions)
+  {
+    key: "recurring",
+    title: "הכנסה חוזרת",
+    description: "הכנסה חוזרת חדשה לחודש מעסקאות חודשיות ושנתיות שנסגרו, לפי חודש הסגירה ולפי אחראי.",
+    filters: ["period", "owner", "pipeline"],
+  },
   // DLI-06
   { key: "categories", title: "הכנסה לפי קטגוריה", description: "מה נמכר בעסקאות שנסגרו לפי קטגוריית המוצר: מספר עסקאות וסכום.", filters: ["period", "owner", "pipeline"] },
   {
@@ -121,6 +128,11 @@ export function reportTexts(report: ReportDefinition, terms: OrgTerms = DEFAULT_
       };
     case "products":
       return { title: report.title, description: `מה נמכר ב${closed}: כמות, מספר ${deal.plural} וסכום לכל מוצר.` };
+    case "recurring":
+      return {
+        title: report.title,
+        description: `הכנסה חוזרת חדשה לחודש מ${deal.plural} ${byGender(deal, "חודשיים ושנתיים", "חודשיות ושנתיות")} שנסגרו, לפי חודש הסגירה ולפי אחראי.`,
+      };
     case "categories":
       return { title: report.title, description: `מה נמכר ב${closed} לפי קטגוריית המוצר: מספר ${deal.plural} וסכום.` };
     case "profit":
