@@ -38,12 +38,15 @@ const lines = [
 const quote = { vatRateBp: 1800, pricesIncludeVat: false, discountBp: null, discountAgorot: null };
 
 describe("optional lines on the customer's page (QUO-08)", () => {
-  it("starts from the rep's preselection", () => {
-    expect(initialChoice(lines)).toEqual(["line-4"]);
+  it("starts with every optional line unticked, whatever the rep preselected (owner: ברירת מחדל לא מסומנות)", () => {
+    expect(initialChoice(lines)).toEqual([]);
+    // the starting total is the quote without its optional lines, not the sent total (which counts the preselected one)
+    const start = choiceTotals(quote, lines, initialChoice(lines));
+    expect(start.ok && start.totals.netTotalAgorot).toBe(50000);
   });
 
   it("works the total of the choice out at the quote's rate", () => {
-    const sent = choiceTotals(quote, lines, initialChoice(lines));
+    const sent = choiceTotals(quote, lines, ["line-4"]);
     expect(sent.ok && sent.totals.netTotalAgorot).toBe(70000);
     const picked = choiceTotals(quote, lines, ["line-3"]);
     expect(picked.ok && picked.totals.netTotalAgorot).toBe(60000);

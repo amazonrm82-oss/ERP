@@ -4,14 +4,16 @@
 -- (1) Optional lines. Quote lines already carry is_optional and optional_selected (QUO-02, 020105): the rep marks a line optional
 --     on a draft, may preselect it, and both are frozen with the quote once it is sent (the lines policies write drafts only). The
 --     stored totals of a sent quote count the items that are not optional plus the preselected optional ones, as before; that is
---     the figure the rep sent and the PDF shows. The page starts from that preselection (a line the rep did not preselect starts
---     unticked) and shows the total of the customer's choice by the same rule (quoteTotals in TS = app.document_totals).
---   * public.quote_public_decide takes two more arguments: p_optional_keys, the 1-based places of the ticked optional lines in
+--     the figure the rep sent and the PDF shows. On the page every optional line starts UNTICKED, whatever the rep preselected
+--     (owner's answer: "ברירת מחדל: לא מסומנות"), so the starting total is the quote without its optional lines and the page says
+--     "הסכום כולל רק את מה שסימנתם"; it shows the total of the customer's choice by the same rule (quoteTotals = app.document_totals).
+--   * public.quote_public_answer is quote_public_decide with two more arguments: p_optional_keys, the 1-based places of the ticked optional lines in
 --     the order quote_public lists them (position, id; quote_public answers no ids), and p_accepted_total_agorot, the total the
 --     page showed for that choice. A key that is unknown, repeated, or names a heading or a line that is not optional answers
---     'invalid'; a total that is not the total of that choice answers 'changed' (nothing is decided either way). Without the two
---     arguments (a page older than this migration) the rep's preselection is the choice, as before. The old signature is retired
---     (renamed, moved to schema app, every grant revoked), so there is one function with defaults.
+--     'invalid'; a total that is not the total of that choice answers 'changed' (nothing is decided either way). An acceptance
+--     with no choice (a page older than this migration, or the thin public.quote_public_decide wrapper) keeps meaning the rep's
+--     preselected lines, as before; only the new page starts unticked. quote_public_decide keeps its 12-argument
+--     signature as that wrapper (a new name rather than an overload, see below).
 --   * public.quote_decisions keeps, for an acceptance: optional_line_ids (the lines ticked), choice_sha256 (SHA-256 of the
 --     version's fingerprint and the sorted ticked ids: app.quote_choice_fingerprint), the totals as sent and the accepted totals
 --     (app.quote_counted_totals over the items that are not optional plus the ticked ones, by app.document_totals at the quote's

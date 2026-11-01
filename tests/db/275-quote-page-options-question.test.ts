@@ -168,7 +168,9 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
     expect(after.lines.map((l) => l.optional_selected)).toEqual([false, false, true, false]);
   });
 
-  it("no optional line ticked is a choice too", async () => {
+  // the page starts with every optional line unticked (owner, 1 November 2026); accepting that start is a choice of none, even
+  // where the rep preselected a line, and the quote's figures follow it
+  it("no optional line ticked (the page's start) is a choice too, also over the rep's preselection", async () => {
     const ids = await sentQuote();
     const token = await linkOf(ids.quote);
     const fp = await fingerprint(token);
@@ -177,6 +179,8 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
     const d = await asAdmin((q) => one<{ ids: string[]; c: string }>(q, "select optional_line_ids as ids, choice_sha256 as c from public.quote_decisions where quote_id = $1", [ids.quote]));
     expect(d).toEqual({ ids: [], c: sha(`${fp}:`) });
     expect((await quoteRow(ids.quote)).net_total_agorot).toBe("50000");
+    // the preselected B is no longer counted on the accepted quote
+    expect(await asAdmin(async (q) => (await one<{ s: boolean }>(q, "select optional_selected as s from public.quote_lines where id = $1", [ids.b])).s)).toBe(false);
   });
 
   it("an unknown, repeated, heading or required line, a missing or wrong total decide nothing", async () => {

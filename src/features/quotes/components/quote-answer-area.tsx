@@ -18,7 +18,7 @@ type Props = {
 
 /**
  * QUO-08 (owner, 1 November 2026): the customer's answer to an open quote. When the quote has optional lines, the customer
- * ticks the ones they want first (the rep's preselection to start with) and sees the total of that choice; the acceptance
+ * ticks the ones they want first (all start unticked, owner's answer) and sees the total of that choice; the acceptance
  * carries the choice and that total, and the server refuses it if the two disagree.
  */
 export function QuoteAnswerArea({ token, fingerprint, quote, lines }: Props) {
@@ -37,6 +37,8 @@ export function QuoteAnswerArea({ token, fingerprint, quote, lines }: Props) {
           שורות רשות
         </h2>
         <p className="text-sm text-ink-soft">סמנו את מה שתרצו להוסיף להצעה. הסכום מתעדכן לפי הבחירה.</p>
+        {/* the starting total is the quote without its optional lines: told apart from the sent total and the PDF */}
+        <p className="text-sm text-ink-soft">הסכום כולל רק את מה שסימנתם.</p>
         <ul className="space-y-2">
           {optional.map((line) => (
             <li key={line.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">

@@ -4,8 +4,9 @@ import type { QuoteLine } from "./queries";
 import { quoteTotals } from "./totals";
 
 /**
- * QUO-08 (owner, 1 November 2026, answer (27) א): the customer ticks the optional lines they want on the quote's page. The
- * page starts from the rep's preselection (a line the rep did not preselect starts unticked), works the total of the choice
+ * QUO-08 (owner, 1 November 2026, answer (27) א: "ברירת מחדל: לא מסומנות"): the customer ticks the optional lines they want on
+ * the quote's page. Every optional line starts unticked, whatever the rep preselected, so the starting total is the quote
+ * without its optional lines (it may differ from the sent total and the PDF; the page says so). The page works the total of the choice
  * out by the one totals rule at the rate the quote was sent with (the database does the same, app.quote_counted_totals), and
  * posts each ticked line by its 1-based place in the page's list (quote_public answers no ids; publicQuoteFrom names the
  * lines `line-<place>`), with the total it showed.
@@ -15,9 +16,10 @@ type ChoiceQuote = { vatRateBp: number | null; pricesIncludeVat: boolean; discou
 
 export const isOptionalItem = (line: Pick<QuoteLine, "kind" | "isOptional">) => line.kind === "item" && line.isOptional;
 
-/** The optional lines the page starts with ticked: the rep's preselection. */
+/** The optional lines the page starts with ticked: none (owner, 1 November 2026: "ברירת מחדל: לא מסומנות"). */
 export function initialChoice(lines: readonly QuoteLine[]): string[] {
-  return lines.filter((line) => isOptionalItem(line) && line.optionalSelected).map((line) => line.id);
+  void lines;
+  return [];
 }
 
 /** The lines with the customer's choice in place of the rep's preselection. */
