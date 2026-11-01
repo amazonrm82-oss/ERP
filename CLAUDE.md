@@ -572,7 +572,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `orders.bank_details` (jsonb, server only, no client grant; readers of the row under RLS see it) are filled from
   `app.document_bank_snapshot` by definer triggers `quotes_zz_bank_details` (draft -> sent) and `orders_zz_bank_details` (numbering),
   only while that type's switch `quote_designs.show_bank_details_quote` / `show_bank_details_order` (default true) is on at that
-  moment; every other write puts the old value back. Shown on the staff documents, the PDF and `quote_public` / `order_public`
+  moment; every other write puts the old value back. A third switch, `show_bank_details_statement` (021115), controls the statement page (BAL-04), read live there. Shown on the staff documents, the PDF and `quote_public` / `order_public`
   (`bank`, full page only, per the switch). `app.audit_row` (last redefined in 021087) ignores `bank_details` on update and strips it
   on delete, so the account number never enters `audit_log`. Documents sent before 021087 or while the switch was off have none
   (owner (2) א). Accepted: a snapshot taken while on stays readable by the row's readers after the switch is turned off.
@@ -1446,7 +1446,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `balances`+`documents`+`payments`, live customer, a contact still without a company. `public.statement_public(token, ip_hash)`
   (service_role): 120 views per link + 60 per sender (scope `statement`) in 10 minutes, counted after the token lookup (as ORD-05);
   answers BAL-02's open debt documents of the customer (500 max, `more`), open/overdue totals and PAY-03 credit separately; no ids,
-  notes or payments. Accepted: a merge drops the duplicate's link; sample removal does not count a link as work. PDF waits for (2).
+  notes or payment details. Accepted: a merge drops the duplicate's link; sample removal does not count a link as work.
+  Since 021115 (owner (30) ב, (32) ב) it also answers `payments` (recorded/confirmed, paid_on in the last 12 months in the business
+  zone, the ledger's scope; date, method code, amount only; 500 max, `payments_more`) and `bank` (`app.document_bank_snapshot` read at
+  view time while `quote_designs.show_bank_details_statement`, default true, is on; never stored). `public.statement_public` was last
+  redefined in 021115; keep its document and payment scopes in step with `customer_ledger`. The PDF is made per request (owner (24) א).
 - Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
   (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
   `app.can_record_payments` + keys `collection`, `documents`, `payments`): BAL-02's debt, BAL-03's buckets, report_debt_aging's
