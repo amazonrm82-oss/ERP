@@ -55,7 +55,7 @@ export function QuoteAnswerArea({ token, fingerprint, quote, lines }: Props) {
           ))}
         </ul>
         <p role="status" aria-live="polite" className="flex flex-wrap justify-between gap-2 border-t border-line pt-3 text-md font-semibold text-ink">
-          <span>סה״כ לתשלום לפי הבחירה שלך</span>
+          <span>סה״כ לתשלום לפי הבחירה שלכם</span>
           <span className="tabular-nums">{totals.ok ? formatMoney(totals.totals.totalAgorot) : "—"}</span>
         </p>
         {totals.ok ? null : <p className="text-sm text-danger">ההנחה על ההצעה גדולה מהשורות שנבחרו. סמנו שורות נוספות או פנו לעסק.</p>}

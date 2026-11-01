@@ -14,20 +14,22 @@ type Props = {
   href: string | null;
   // may keep it now: a sent quote whose deal or contact the user may edit (the database decides again)
   canStore: boolean;
+  // QUO-08 (interim): the link text when the stored PDF is the quote as sent, not as the customer accepted it
+  label?: string;
 };
 
 /**
  * QUO-06: the PDF of a sent quote, as it was kept when the quote was sent. A quote sent before the PDF existed, or whose
  * PDF could not be kept then (a full monthly quota), offers to keep it now.
  */
-export function QuotePdfButton({ orgId, quoteId, href, canStore }: Props) {
+export function QuotePdfButton({ orgId, quoteId, href, canStore, label }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   if (href) {
     return (
       // a plain link: the route checks the file against its SHA-256 and sends it
       <a href={href} className={buttonClasses("secondary", "sm")}>
-        הורדת PDF
+        {label ?? "הורדת PDF"}
       </a>
     );
   }

@@ -10,6 +10,7 @@ import {
   isDecisionStatus,
   isQuestionStatus,
   publicVersionFingerprint,
+  publicVersionPdfAsSent,
   QUESTION_MESSAGES,
   questionBodySchema,
   type DecisionBody,
@@ -72,6 +73,22 @@ export async function getPublicQuoteFingerprint(token: string, shownNumber: stri
   return publicVersionFingerprint(data, shownNumber);
 }
 
+/**
+ * QUO-08 (interim): whether the stored PDF of the accepted quote on screen is the quote as sent, not as accepted (the
+ * customer's choice of optional lines changed it). Read through public.quote_public_version, which counts no view.
+ */
+export async function getPublicQuotePdfAsSent(token: string, shownNumber: string | null): Promise<boolean> {
+  if (!QUOTE_LINK_TOKEN.test(token)) return false;
+  const service = createServiceClient();
+  if (!service) return false;
+  const { data, error } = await service.rpc("quote_public_version", { p_token: token });
+  if (error) {
+    if (error.code !== "P0002") console.error("quote_public_version failed", error.code, error.message);
+    return false;
+  }
+  return publicVersionPdfAsSent(data, shownNumber);
+}
+
 /** The sender's address from the proxy's headers (Vercel sets x-forwarded-for). */
 function clientIp(headers: Headers): string | null {
   const forwarded = headers.get("x-forwarded-for");
@@ -114,8 +131,9 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
     p_ip: clientIp(request.headers),
     p_user_agent: request.headers.get("user-agent")?.slice(0, 500) ?? null,
     // QUO-08: the ticked optional lines and the total shown, both or neither (the database checks every key and the total)
-    p_optional_keys: accepted?.optionalKeys && accepted.acceptedTotalAgorot !== undefined ? accepted.optionalKeys : null,
-    p_accepted_total_agorot: accepted?.optionalKeys && accepted.acceptedTotalAgorot !== undefined ? accepted.acceptedTotalAgorot : null,
+    // (the schema refuses one without the other)
+    p_optional_keys: accepted?.optionalKeys ?? null,
+    p_accepted_total_agorot: accepted?.acceptedTotalAgorot ?? null,
   });
   if (error) {
     if (error.code === "P0002") return reply(404, { ok: false, message: NOT_FOUND });

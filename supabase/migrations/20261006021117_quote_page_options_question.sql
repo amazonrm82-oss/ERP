@@ -30,7 +30,8 @@
 -- (2) A question to the rep. public.quote_public_question(token, ip_hash, text) (security definer, service_role only; the quote
 --     page's approved pattern, hard rule 5): the same link rule as quote_public (app.quote_link_usable, then the version the page
 --     shows, app.quote_shown_version), only while the page shows the quote in full (open, or accepted). Text 1..500 characters
---     after trimming (control characters but line breaks become spaces). Counted first: in the link's view window (120 in 10
+--     on at most 20 lines after cleaning (zero-width and bidi controls removed, other controls but the line break become spaces,
+--     trimmed). Counted first: in the link's view window (120 in 10
 --     minutes, shared with the page), 20 questions per link in 24 hours (app.quote_links.question_*), and 5 per sender in 10
 --     minutes by the server's keyed IP hash scoped to the quote (FXS-11 scope 'quote', app.quote_link_sender; 1,024 reused
 --     buckets in app.quote_question_counts, no hash kept). It writes one `system` entry with no author on the quote's deal and
@@ -43,7 +44,8 @@
 --     erased customer's quotes keep only "שאלה מהלקוח על הצעת מחיר <number> (הטקסט נמחק)", and the question leaves the notices'
 --     body (as the decline reason does); the entries' audit history is erased with the rest.
 --
--- Shared functions redefined from their latest bodies: app.quotes_check (020270), public.quote_public_decide (020550),
+-- Shared functions redefined from their latest bodies: app.quotes_check (020270), public.quote_public_decide and
+-- public.quote_public_version (020550),
 -- app.audit_erase_core (021104). Every statement is safe to run twice. No drops, no row removal.
 
 -- ----------------------------------------------------------------------------
@@ -440,6 +442,56 @@ revoke all on function public.quote_public_decide(text, text, text, text, text, 
 grant execute on function public.quote_public_decide(text, text, text, text, text, text, text, text, boolean, text, text, text) to service_role;
 
 -- ----------------------------------------------------------------------------
+-- The version the page shows: public.quote_public_version of 020550 with one QUO-08 key (marked)
+-- ----------------------------------------------------------------------------
+-- An accepted quote whose accepted choice of optional lines differs from what was sent also answers pdf_as_sent: true (no key
+-- otherwise, so every other answer is unchanged), so the page
+-- labels the stored PDF (kept as sent) "המסמך כפי שנשלח (לפני הבחירה שלכם)". Interim, until the owner decides about the PDF.
+create or replace function public.quote_public_version(p_token text) returns jsonb
+language plpgsql stable security definer
+set search_path = ''
+as $$
+declare
+  v_link app.quote_links;
+  v_quote public.quotes;
+begin
+  if coalesce(p_token, '') !~ '^[A-Za-z0-9_-]{64}$' then
+    raise exception 'quote not found' using errcode = 'P0002';
+  end if;
+  select * into v_link from app.quote_links l where l.token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex');
+  if not found then
+    raise exception 'quote not found' using errcode = 'P0002';
+  end if;
+  select * into v_quote from public.quotes q where q.organization_id = v_link.organization_id and q.id = v_link.quote_id;
+  -- owner, 19 October 2026: the link of a sent quote never answers not found (app.quote_link_usable)
+  if not found or not app.quote_link_usable(v_quote) then
+    raise exception 'quote not found' using errcode = 'P0002';
+  end if;
+  if v_link.window_started_at > now() - interval '10 minutes' and v_link.window_count > 120 then
+    return jsonb_build_object('rate_limited', true);
+  end if;
+  v_quote := app.quote_shown_version(v_quote);
+  if v_quote.customer_deleted_at is not null then
+    raise exception 'quote not found' using errcode = 'P0002';
+  end if;
+  -- QUO-08: an accepted quote whose stored PDF (as sent) differs from what was accepted says so; every other answer is as before
+  if v_quote.status = 'accepted'
+     and exists (select 1 from public.quote_decisions d
+                  where d.organization_id = v_quote.organization_id and d.quote_id = v_quote.id
+                    and d.decision = 'accepted' and d.accepted_net_total_agorot is not null
+                    and d.accepted_net_total_agorot is distinct from d.sent_net_total_agorot) then
+    return jsonb_build_object('number', v_quote.number_display, 'fingerprint', null, 'pdf_as_sent', true);
+  end if;
+  -- a fingerprint only for an open newest version: only that one is decided
+  return jsonb_build_object(
+    'number', v_quote.number_display,
+    'fingerprint', case when app.quote_offer_open(v_quote) then app.quote_fingerprint(v_quote) end);
+end;
+$$;
+revoke all on function public.quote_public_version(text) from public, anon, authenticated;
+grant execute on function public.quote_public_version(text) to service_role;
+
+-- ----------------------------------------------------------------------------
 -- (2) A question to the rep from the customer's page
 -- ----------------------------------------------------------------------------
 -- 20 questions per link in 24 hours
@@ -523,10 +575,19 @@ begin
     return jsonb_build_object('status', 'closed');
   end if;
 
-  -- 1..500 characters after trimming; control characters other than a line break become spaces
+  -- the text as the app cleans it (questionText in src/features/quotes/decision.ts, keep the two in step): line breaks as LF;
+  -- zero-width characters (U+200B-U+200D, U+FEFF) and bidi controls (U+200E/U+200F, U+202A-U+202E, U+2066-U+2069) removed;
+  -- the other C0 controls, DEL and the C1 controls (U+0080-U+009F) become spaces; trimmed of spaces and line breaks;
+  -- then 1..500 characters on at most 20 lines
   v_text := replace(replace(coalesce(p_text, ''), chr(13) || chr(10), chr(10)), chr(13), chr(10));
-  v_text := btrim(regexp_replace(v_text, '[' || chr(1) || '-' || chr(9) || chr(11) || '-' || chr(31) || chr(127) || ']', ' ', 'g'));
-  if char_length(v_text) not between 1 and 500 then
+  v_text := translate(v_text,
+                      chr(8203) || chr(8204) || chr(8205) || chr(65279) || chr(8206) || chr(8207)
+                        || chr(8234) || chr(8235) || chr(8236) || chr(8237) || chr(8238)
+                        || chr(8294) || chr(8295) || chr(8296) || chr(8297),
+                      '');
+  v_text := regexp_replace(v_text, '[' || chr(1) || '-' || chr(9) || chr(11) || '-' || chr(31) || chr(127) || '-' || chr(159) || ']', ' ', 'g');
+  v_text := btrim(v_text, ' ' || chr(10));
+  if char_length(v_text) not between 1 and 500 or array_length(string_to_array(v_text, chr(10)), 1) > 20 then
     return jsonb_build_object('status', 'invalid');
   end if;
 

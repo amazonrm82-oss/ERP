@@ -70,7 +70,9 @@ describe("optional lines on the customer's page (QUO-08)", () => {
 });
 
 describe("what the page posts (QUO-08)", async () => {
-  const { decisionBodySchema, questionBodySchema, QUESTION_MESSAGES, isQuestionStatus } = await import("@/features/quotes/decision");
+  const { decisionBodySchema, questionBodySchema, questionText, publicVersionPdfAsSent, QUESTION_MESSAGES, isQuestionStatus } = await import(
+    "@/features/quotes/decision"
+  );
   const accept = { decision: "accepted", fingerprint: "a".repeat(64), signerName: "נועה לוי", idNumber: null, signatureKind: "typed", signatureImage: null, agreed: true };
 
   it("an acceptance may carry the ticked places and the total shown", () => {
@@ -79,6 +81,28 @@ describe("what the page posts (QUO-08)", async () => {
     expect(decisionBodySchema.safeParse({ ...accept, optionalKeys: [0], acceptedTotalAgorot: 1 }).success).toBe(false);
     expect(decisionBodySchema.safeParse({ ...accept, optionalKeys: [1.5], acceptedTotalAgorot: 1 }).success).toBe(false);
     expect(decisionBodySchema.safeParse({ ...accept, optionalKeys: [], acceptedTotalAgorot: -1 }).success).toBe(false);
+    // the choice and its total go together, or neither
+    expect(decisionBodySchema.safeParse({ ...accept, optionalKeys: [3] }).success).toBe(false);
+    expect(decisionBodySchema.safeParse({ ...accept, acceptedTotalAgorot: 70800 }).success).toBe(false);
+    expect(decisionBodySchema.safeParse({ ...accept, optionalKeys: [], acceptedTotalAgorot: 59000 }).success).toBe(true);
+  });
+
+  it("cleans a question as the database does: invisible characters go, controls become spaces, 20 lines at most", () => {
+    const zw = String.fromCodePoint(0x200b, 0x200c, 0x200d, 0xfeff);
+    const bidi = String.fromCodePoint(0x202a, 0x202e, 0x2066, 0x2069, 0x200e, 0x200f);
+    const c1 = String.fromCodePoint(0x80, 0x9f);
+    expect(questionText(`${bidi} שא${zw}לה${c1}א\tב\r\nשורה 2 ${bidi}`)).toBe("שאלה  א ב\nשורה 2");
+    expect(questionText(`${zw}${bidi} \n `)).toBeNull();
+    expect(questionText(Array.from({ length: 21 }, () => "שורה").join("\n"))).toBeNull();
+    expect(questionText(Array.from({ length: 20 }, () => "שורה").join("\n"))).not.toBeNull();
+    expect(questionText("א".repeat(501))).toBeNull();
+    expect(questionBodySchema.safeParse({ text: `${zw}  ` }).success).toBe(false);
+  });
+
+  it("the PDF is named as sent only for the version on screen", () => {
+    expect(publicVersionPdfAsSent({ number: "Q-1", fingerprint: null, pdf_as_sent: true }, "Q-1")).toBe(true);
+    expect(publicVersionPdfAsSent({ number: "Q-2", fingerprint: null, pdf_as_sent: true }, "Q-1")).toBe(false);
+    expect(publicVersionPdfAsSent({ number: "Q-1", fingerprint: null }, "Q-1")).toBe(false);
   });
 
   it("a question is 1..500 characters after trimming", () => {

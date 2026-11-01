@@ -29,9 +29,11 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
 
   // a sent quote: a heading, one item (500 ₪), optional A (100 ₪, not preselected), optional B (200 ₪, preselected)
-  const sentQuote = (opts: { discountAgorot?: number } = {}) =>
+  const sentQuote = (opts: { discountAgorot?: number; dealOnly?: boolean } = {}) =>
     asUser(member.id, async (q) => {
-      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'נועה', $2) returning id", [org, member.id])).id;
+      const contact = opts.dealOnly
+        ? null
+        : (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'נועה', $2) returning id", [org, member.id])).id;
       const deal = (
         await one<{ id: string }>(q, "insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id, owner_id) values ($1, 'עבודה', $2, $3, $4, $5) returning id", [
           org,
@@ -281,6 +283,48 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
     });
   });
 
+  it("the server's recompute holds only for the quote the setting names, and never after the decision", async () => {
+    const ids = await sentQuote();
+    const other = await sentQuote();
+    const net = (quote: string) => asAdmin(async (q) => (await one<{ n: string }>(q, "select net_total_agorot as n from public.quotes where id = $1", [quote])).n);
+    // as the server (auth.uid() is null): the setting names another quote, so this sent quote keeps its sent totals
+    await asAdmin(async (q) => {
+      expect((await one<{ u: string | null }>(q, "select auth.uid() as u")).u).toBeNull();
+      await q("select set_config('app.quote_accept_choice', $1, true)", [other.quote]);
+      await q("update public.quote_lines set optional_selected = true where id = $1", [ids.a]);
+      expect((await one<{ n: string }>(q, "select net_total_agorot as n from public.quotes where id = $1", [ids.quote])).n).toBe("70000");
+      await q("update public.quote_lines set optional_selected = false where id = $1", [ids.a]);
+    });
+    expect(await net(ids.quote)).toBe("70000");
+    // an accepted quote keeps its accepted totals even while the setting names it
+    const token = await linkOf(ids.quote);
+    const rate = (await quoteRow(ids.quote)).vat_rate_bp;
+    expect(await answer(token, { fingerprint: await fingerprint(token), keys: [], total: withVat(50000, rate) })).toEqual({ status: "accepted" });
+    await asAdmin(async (q) => {
+      await q("select set_config('app.quote_accept_choice', $1, true)", [ids.quote]);
+      await q("update public.quote_lines set optional_selected = true where id = $1", [ids.a]);
+      expect((await one<{ n: string }>(q, "select net_total_agorot as n from public.quotes where id = $1", [ids.quote])).n).toBe("50000");
+      await q("update public.quote_lines set optional_selected = false where id = $1", [ids.a]);
+    });
+    expect(await net(ids.quote)).toBe("50000");
+  });
+
+  it("the version reader tells the page when the stored PDF is the quote as sent", async () => {
+    const version = (token: string) => asService(async (q) => (await one<{ v: Record<string, unknown> }>(q, "select public.quote_public_version($1) as v", [token])).v);
+    // the choice changed the total
+    const changed = await sentQuote();
+    const t1 = await linkOf(changed.quote);
+    const rate = (await quoteRow(changed.quote)).vat_rate_bp;
+    expect(Object.keys(await version(t1)).sort()).toEqual(["fingerprint", "number"]);
+    await answer(t1, { fingerprint: await fingerprint(t1), keys: [3], total: withVat(60000, rate) });
+    expect(await version(t1)).toMatchObject({ fingerprint: null, pdf_as_sent: true });
+    // the rep's preselection accepted as it was
+    const same = await sentQuote();
+    const t2 = await linkOf(same.quote);
+    await answer(t2, { fingerprint: await fingerprint(t2), keys: [4], total: withVat(70000, rate) });
+    expect(await version(t2)).toEqual({ number: (await page(t2)).quote.number, fingerprint: null });
+  });
+
   it("only the server may call the two functions", async () => {
     for (const fn of ["public.quote_public_answer(text,text,text,text,text,text,text,text,boolean,text,text,text,integer[],bigint)", "public.quote_public_question(text,text,text)"]) {
       const rights = await asAdmin((q) =>
@@ -373,6 +417,46 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
       expect((await pgError(ask("short", "שלום"))).code).toBe("P0002");
     });
 
+    it("answers closed on an expired or a cancelled quote", async () => {
+      const expired = await sentQuote();
+      const t1 = await linkOf(expired.quote);
+      await asAdmin((q) => q("update public.quotes set status = 'expired' where id = $1", [expired.quote]));
+      expect(await ask(t1, "עדיין בתוקף?")).toEqual({ status: "closed" });
+      const cancelled = await sentQuote();
+      const t2 = await linkOf(cancelled.quote);
+      await asUser(member.id, (q) => q("select public.quote_cancel($1, $2)", [org, cancelled.quote]));
+      expect(await ask(t2, "למה בוטלה?")).toEqual({ status: "closed" });
+      expect([...(await entries(expired.quote)), ...(await entries(cancelled.quote))]).toEqual([]);
+    });
+
+    it("a question through an older version's link lands on the version the page shows", async () => {
+      const first = await sentQuote();
+      const oldToken = await linkOf(first.quote);
+      const newer = await asUser(member.id, async (q) => {
+        const id = (await one<{ id: string }>(q, "select public.quote_new_version($1, $2) as id", [org, first.quote])).id;
+        await q("select public.quote_send($1, $2)", [org, id]);
+        return id;
+      });
+      expect(await ask(oldToken, "מה השתנה?")).toEqual({ status: "sent" });
+      expect(await entries(first.quote)).toEqual([]);
+      expect(await entries(newer)).toHaveLength(1);
+      expect((await notices(newer)).length).toBeGreaterThan(0);
+    });
+
+    it("cleans invisible and control characters, and refuses an empty or 21-line text", async () => {
+      const ids = await sentQuote();
+      const token = await linkOf(ids.quote);
+      const zw = String.fromCodePoint(0x200b, 0x200d, 0xfeff);
+      const bidi = String.fromCodePoint(0x202e, 0x2066, 0x200f);
+      const c1 = String.fromCodePoint(0x85, 0x9f);
+      expect(await ask(token, `${bidi}שא${zw}לה${c1}א\tב${bidi}`)).toEqual({ status: "sent" });
+      const body = (await entries(ids.quote))[0].body;
+      expect(body.endsWith(": שאלה  א ב")).toBe(true);
+      expect(await ask(token, `${zw}${bidi}  ${zw}`)).toEqual({ status: "invalid" });
+      expect(await ask(token, Array.from({ length: 21 }, (_, i) => `שורה ${i}`).join("\n"))).toEqual({ status: "invalid" });
+      expect(await ask(token, Array.from({ length: 20 }, (_, i) => `שורה ${i}`).join("\n"))).toEqual({ status: "sent" });
+    });
+
     it("5 per sender in 10 minutes, and 20 per link in 24 hours", async () => {
       const ids = await sentQuote();
       const token = await linkOf(ids.quote);
@@ -419,6 +503,22 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
       for (const a of audits) expect(JSON.stringify(a.changes)).not.toContain("הנחה");
       // another customer's question stays
       expect((await entries(other.quote))[0].body).toContain("שאלה של לקוח אחר");
+    });
+
+    it("a quote of a deal with no contact: erasing the deal empties its question", async () => {
+      const ids = await sentQuote({ dealOnly: true });
+      const token = await linkOf(ids.quote);
+      await ask(token, "נועה שואלת על המחיר");
+      const number = (await page(token)).quote.number;
+      expect((await entries(ids.quote))[0]).toMatchObject({ deal_id: ids.deal, contact_id: null });
+      await asUser(owner.id, async (q) => {
+        await q("update public.deals set deleted_at = now() where id = $1", [ids.deal]);
+        await q("delete from public.deals where id = $1", [ids.deal]);
+      });
+      await asUser(owner.id, (q) => q("select public.audit_erase_record($1, 'deals', $2)", [org, ids.deal]));
+      // the entry went with the deal (it was the deal's alone); the notice keeps no text
+      for (const e of await entries(ids.quote)) expect(e.body).not.toContain("נועה");
+      expect(await notices(ids.quote)).toEqual([{ user_id: member.id, type: "quote", title: "שאלה על הצעת מחיר: הצעת מחיר", body: `הצעה ${number}` }]);
     });
   });
 });

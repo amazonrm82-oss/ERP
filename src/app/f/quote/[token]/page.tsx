@@ -13,7 +13,8 @@ import { QuoteAnswerArea } from "@/features/quotes/components/quote-answer-area"
 import { QuoteQuestionForm } from "@/features/quotes/components/quote-question-form";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
-import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
+import { PDF_AS_SENT_PUBLIC } from "@/features/quotes/decision";
+import { getPublicQuote, getPublicQuoteFingerprint, getPublicQuotePdfAsSent } from "@/features/quotes/public-server";
 import { formatDate, formatMoney } from "@/lib/format";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
@@ -133,6 +134,8 @@ export default async function PublicQuotePage({ params }: Props) {
   // QUO-09: the fingerprint of the version drawn, for an open quote only
   const fingerprint =
     page.quote.status === "sent" || page.quote.status === "viewed" ? await getPublicQuoteFingerprint(token, page.quote.numberDisplay) : null;
+  // QUO-08 (interim): the stored PDF shows the quote as sent; say so when the customer's choice changed it
+  const pdfAsSent = page.quote.status === "accepted" && page.hasPdf ? await getPublicQuotePdfAsSent(token, page.quote.numberDisplay) : false;
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
@@ -184,7 +187,7 @@ export default async function PublicQuotePage({ params }: Props) {
         {/* QUO-06 follow-up: the PDF the business kept for this version, only when one exists */}
         {page.hasPdf ? (
           <a href={publicQuotePdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
-            הורדת PDF
+            {pdfAsSent ? PDF_AS_SENT_PUBLIC : "הורדת PDF"}
           </a>
         ) : null}
         <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
