@@ -1,9 +1,13 @@
 import { z } from "zod";
 
 import { DOCUMENT_TYPE_LABELS } from "@/features/documents/schema";
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/features/payments/schema";
+import { bankFromSnapshot, type DocumentBank } from "@/features/quotes/bank";
 
 // BAL-04: the customer's statement page, from public.statement_public(token, ip_hash) (service_role only). The answer holds no
-// ids: the business, the customer's name, the business's today and the open debt documents (BAL-02's rule) with the totals.
+// ids: the business, the customer's name, the business's today and the open debt documents (BAL-02's rule) with the totals;
+// since the owner's answers of 1 November 2026 also the payments received in the last 12 months (date, method, amount only)
+// and the business's bank details while the statement's TAX-02 switch shows them.
 
 /** The customer's link: 64 base64url characters (only its SHA-256 is kept). */
 export const STATEMENT_LINK_TOKEN = /^[A-Za-z0-9_-]{64}$/;
@@ -45,6 +49,9 @@ const answerSchema = z.object({
     }),
   ),
   more: z.coerce.number().int().min(0),
+  payments: z.array(z.object({ paid_on: day, method: z.enum(PAYMENT_METHODS), amount_agorot: money })),
+  payments_more: z.coerce.number().int().min(0),
+  bank: z.unknown().nullable(),
   totals: z.object({ open_agorot: money, overdue_agorot: money, credit_agorot: money }),
   built_with: z.boolean(),
 });
@@ -61,6 +68,15 @@ export type StatementLine = {
   overdueDays: number;
 };
 
+export type StatementPayment = {
+  /** a key for the page only (the answer holds no ids) */
+  key: string;
+  paidOn: string;
+  /** the method's label only; a cheque is "צ'ק", never its number or bank */
+  method: string;
+  amountAgorot: number;
+};
+
 export type PublicStatement = {
   business: { name: string; legalName: string | null; taxId: string | null; address: string | null; phone: string | null; email: string | null };
   logoPath: string | null;
@@ -69,6 +85,9 @@ export type PublicStatement = {
   today: string;
   lines: StatementLine[];
   more: number;
+  payments: StatementPayment[];
+  paymentsMore: number;
+  bank: DocumentBank | null;
   openAgorot: number;
   overdueAgorot: number;
   creditAgorot: number;
@@ -79,7 +98,7 @@ export type PublicStatement = {
 export function publicStatementFrom(raw: unknown): PublicStatement | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { business, brand, customer, today, documents, more, totals, built_with } = parsed.data;
+  const { business, brand, customer, today, documents, more, payments, payments_more, bank, totals, built_with } = parsed.data;
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");
   const address = [business.address_line, place].filter(Boolean).join(", ");
   return {
@@ -106,6 +125,14 @@ export function publicStatementFrom(raw: unknown): PublicStatement | null {
       overdueDays: d.overdue_days,
     })),
     more,
+    payments: payments.map((p, index) => ({
+      key: `pay-${index + 1}`,
+      paidOn: p.paid_on,
+      method: PAYMENT_METHOD_LABELS[p.method],
+      amountAgorot: p.amount_agorot,
+    })),
+    paymentsMore: payments_more,
+    bank: bankFromSnapshot(bank),
     openAgorot: totals.open_agorot,
     overdueAgorot: totals.overdue_agorot,
     creditAgorot: totals.credit_agorot,

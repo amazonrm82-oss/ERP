@@ -58,7 +58,7 @@ const line: OrderLine = {
 };
 
 const data: OrderDocumentData = {
-  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, showBankDetailsQuote: true, showBankDetailsOrder: true, accentColor: null },
+  design: { headerText: null, footerText: null, showLogo: false, showBusinessDetails: true, showBankDetailsQuote: true, showBankDetailsOrder: true, showBankDetailsStatement: true, accentColor: null },
   color: null,
   logoUrl: null,
   business: { name: "העסק", taxId: "515555555", address: null, phone: null, email: null },

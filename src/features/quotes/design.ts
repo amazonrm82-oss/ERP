@@ -21,6 +21,8 @@ export type QuoteDesign = {
   // TAX-02 (owner, 27 October 2026: a switch per document type): the bank details stored on a sent quote / a numbered order
   showBankDetailsQuote: boolean;
   showBankDetailsOrder: boolean;
+  // BAL-04 (owner, 1 November 2026): the business's current bank details on the customer's statement page
+  showBankDetailsStatement: boolean;
   // '#rrggbb' for quotes only; null = the business colour
   accentColor: string | null;
 };
@@ -32,6 +34,7 @@ export const DEFAULT_QUOTE_DESIGN: QuoteDesign = {
   showBusinessDetails: true,
   showBankDetailsQuote: true,
   showBankDetailsOrder: true,
+  showBankDetailsStatement: true,
   accentColor: null,
 };
 
@@ -42,6 +45,7 @@ export type QuoteDesignRow = {
   show_business_details: boolean;
   show_bank_details_quote: boolean;
   show_bank_details_order: boolean;
+  show_bank_details_statement: boolean;
   accent_color: string | null;
 };
 
@@ -54,6 +58,7 @@ export function designFromRow(row: QuoteDesignRow | null): QuoteDesign {
     showBusinessDetails: row.show_business_details,
     showBankDetailsQuote: row.show_bank_details_quote,
     showBankDetailsOrder: row.show_bank_details_order,
+    showBankDetailsStatement: row.show_bank_details_statement,
     accentColor: isHexColor(row.accent_color) ? row.accent_color : null,
   };
 }
@@ -73,6 +78,7 @@ export const quoteDesignSchema = z
     show_business_details: z.unknown().optional(),
     show_bank_details_quote: z.unknown().optional(),
     show_bank_details_order: z.unknown().optional(),
+    show_bank_details_statement: z.unknown().optional(),
     color_mode: z.preprocess((value) => (typeof value === "string" ? value : "brand"), z.enum(COLOR_MODES, { error: "יש לבחור צבע." })),
     accent_color: z.unknown().optional(),
   })
@@ -92,11 +98,12 @@ export const quoteDesignSchema = z
       show_business_details: value.show_business_details === "on",
       show_bank_details_quote: value.show_bank_details_quote === "on",
       show_bank_details_order: value.show_bank_details_order === "on",
+      show_bank_details_statement: value.show_bank_details_statement === "on",
       accent_color: accentColor,
     } satisfies QuoteDesignRow;
   });
 
-export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "show_bank_details_quote", "show_bank_details_order", "color_mode", "accent_color"] as const;
+export const QUOTE_DESIGN_FIELD_NAMES = ["header_text", "footer_text", "show_logo", "show_business_details", "show_bank_details_quote", "show_bank_details_order", "show_bank_details_statement", "color_mode", "accent_color"] as const;
 
 export type DocumentCustomer = {
   // the name for invoices, else the company, else the contact

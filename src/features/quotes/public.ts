@@ -146,6 +146,7 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
     showBankDetailsQuote: design.show_bank_details_quote ?? true,
     // the order switch is not part of a quote's answer; this page draws a quote only
     showBankDetailsOrder: false,
+    showBankDetailsStatement: false,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");

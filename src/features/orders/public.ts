@@ -98,6 +98,7 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
     // the quote switch is not part of an order's answer; this page draws an order only
     showBankDetailsQuote: false,
     showBankDetailsOrder: design.show_bank_details_order ?? true,
+    showBankDetailsStatement: false,
     accentColor: design.accent_color,
   };
   const place = [business.city, business.postal_code].filter(Boolean).join(" ");

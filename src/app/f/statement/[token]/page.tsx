@@ -33,7 +33,8 @@ const MESSAGES = {
 
 /**
  * BAL-04: the customer's statement through its secret link: no sign-in and no cookies; the open debt documents and their
- * balances, the totals and any credit, in the business's colours. Printable (GAP-11's print rules).
+ * balances, the totals and any credit, the payments of the last 12 months and the bank details (while the design shows them),
+ * in the business's colours. Printable (GAP-11's print rules).
  */
 export default async function PublicStatementPage({ params }: Props) {
   const { token } = await params;

@@ -1,5 +1,6 @@
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BankSection } from "@/features/quotes/components/bank-section";
 import { formatDate, formatMoney } from "@/lib/format";
 
 import { overdueText, type PublicStatement } from "../public";
@@ -9,7 +10,8 @@ const day = (iso: string | null) => (iso ? formatDate(`${iso}T12:00:00Z`) : "");
 /**
  * BAL-04: the customer's statement as they see it through the link: the business, the customer, today's date, every open
  * debt document with its balance and how late it is, the total, the overdue part and any credit. A table on a wide page and
- * on paper, cards on a phone. Only what public.statement_public answered.
+ * on paper, cards on a phone; then the payments received in the last 12 months (date, method, amount) and, while the design
+ * shows them, the business's bank details for a transfer. Only what public.statement_public answered.
  */
 export function StatementView({ data, logoUrl }: { data: PublicStatement; logoUrl: string | null }) {
   const { business } = data;
@@ -173,8 +175,49 @@ export function StatementView({ data, logoUrl }: { data: PublicStatement; logoUr
           </section>
         )}
 
+        <section aria-labelledby="statement-payments" className="space-y-3">
+          <h2 id="statement-payments" className="text-md font-semibold">
+            תשלומים שהתקבלו ב-12 החודשים האחרונים
+          </h2>
+          {data.payments.length === 0 ? (
+            <p className="text-sm text-ink-soft">לא התקבלו תשלומים בתקופה הזו.</p>
+          ) : (
+            <div className="overflow-x-auto" role="region" aria-labelledby="statement-payments" tabIndex={0}>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-line text-ink-soft">
+                    <th scope="col" className="px-2 py-2 text-start font-medium">
+                      תאריך
+                    </th>
+                    <th scope="col" className="px-2 py-2 text-start font-medium">
+                      אמצעי תשלום
+                    </th>
+                    <th scope="col" className="px-2 py-2 text-end font-medium">
+                      סכום
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.payments.map((payment) => (
+                    <tr key={payment.key} className="border-b border-line">
+                      <td className="px-2 py-2 whitespace-nowrap">{day(payment.paidOn)}</td>
+                      <td className="px-2 py-2">
+                        <bdi>{payment.method}</bdi>
+                      </td>
+                      <td className="px-2 py-2 text-end tabular-nums whitespace-nowrap">{formatMoney(payment.amountAgorot)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {data.paymentsMore > 0 ? <p className="text-sm text-ink-soft">ועוד {data.paymentsMore} תשלומים מוקדמים יותר שלא מוצגים כאן.</p> : null}
+        </section>
+
+        <BankSection bank={data.bank} id="statement-bank" />
+
         <p className="text-sm text-ink-soft">
-          הדף מציג את החובות הפתוחים לפי הרישומים של <bdi>{business.name}</bdi> נכון להיום. זה אינו מסמך חשבונאי. לשאלות על החשבון פנו לעסק.
+          הדף מציג את החובות הפתוחים ואת התשלומים שהתקבלו לפי הרישומים של <bdi>{business.name}</bdi> נכון להיום. זה אינו מסמך חשבונאי. לשאלות על החשבון פנו לעסק.
         </p>
       </article>
     </BrandScope>

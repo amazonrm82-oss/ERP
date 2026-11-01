@@ -17,6 +17,12 @@ const ANSWER = {
     { type: "opening_balance", number: null, doc_date: "2026-01-01", due_date: null, amount_agorot: 4000, balance_agorot: 4000, overdue_days: 0 },
   ],
   more: 0,
+  payments: [
+    { paid_on: "2026-10-20", method: "cheque", amount_agorot: 3000 },
+    { paid_on: "2026-06-02", method: "transfer", amount_agorot: 1000 },
+  ],
+  payments_more: 2,
+  bank: { bank_name: "בנק הפועלים", bank_branch: "123", bank_account: "12345678", bank_account_name: null },
   totals: { open_agorot: 10000, overdue_agorot: 6000, credit_agorot: 0 },
   built_with: true,
 };
@@ -30,6 +36,20 @@ describe("the statement page's answer (BAL-04)", () => {
       ["doc-2", "יתרת פתיחה", null, 4000],
     ]);
     expect([page.openAgorot, page.overdueAgorot, page.creditAgorot]).toEqual([10000, 6000, 0]);
+  });
+
+  it("reads the payments (date, method label, amount only) and the bank details", () => {
+    const page = publicStatementFrom(ANSWER)!;
+    expect(page.payments).toEqual([
+      { key: "pay-1", paidOn: "2026-10-20", method: "צ'ק", amountAgorot: 3000 },
+      { key: "pay-2", paidOn: "2026-06-02", method: "העברה בנקאית", amountAgorot: 1000 },
+    ]);
+    expect(page.paymentsMore).toBe(2);
+    expect(page.bank).toEqual({ bankName: "בנק הפועלים", branch: "123", account: "12345678", accountName: null });
+    expect(publicStatementFrom({ ...ANSWER, bank: null })!.bank).toBeNull();
+    // an unknown method or a missing payments part is not the expected shape
+    expect(publicStatementFrom({ ...ANSWER, payments: [{ ...ANSWER.payments[0], method: "crypto" }] })).toBeNull();
+    expect(publicStatementFrom({ ...ANSWER, payments: undefined })).toBeNull();
   });
 
   it("refuses an unexpected shape or a document type that is not debt", () => {

@@ -1657,6 +1657,8 @@ export type QuoteDesignDbRow = {
   // TAX-02: show the bank details stored on a sent quote / a numbered order (a switch each)
   show_bank_details_quote: boolean;
   show_bank_details_order: boolean;
+  // BAL-04: show the business's current bank details on the customer's statement page
+  show_bank_details_statement: boolean;
   accent_color: string | null;
   updated_by: string | null;
   created_at: string;
@@ -1670,6 +1672,7 @@ type QuoteDesignWrite = {
   show_business_details?: boolean;
   show_bank_details_quote?: boolean;
   show_bank_details_order?: boolean;
+  show_bank_details_statement?: boolean;
   accent_color?: string | null;
 };
 

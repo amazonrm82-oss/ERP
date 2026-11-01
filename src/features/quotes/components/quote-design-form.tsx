@@ -69,6 +69,12 @@ export function QuoteDesignForm({ orgId, design, brandColor }: Props) {
           defaultChecked={design.showBankDetailsOrder}
           hint="פרטי הבנק שנקבעו בהגדרות, כפי שהיו כשההזמנה קיבלה מספר."
         />
+        <Checkbox
+          name="show_bank_details_statement"
+          label="פרטים להעברה בנקאית בדף החשבון ללקוח"
+          defaultChecked={design.showBankDetailsStatement}
+          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהם היום."
+        />
       </fieldset>
       <fieldset className="space-y-3">
         <legend className="mb-1 text-sm font-medium">צבע</legend>

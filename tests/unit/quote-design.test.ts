@@ -18,12 +18,12 @@ describe("quote design rules (QUO-05)", () => {
     expect(quoteColor({ ...DEFAULT_QUOTE_DESIGN, accentColor: "#aabbcc" }, "#112233")).toBe("#aabbcc");
     expect(quoteColor(DEFAULT_QUOTE_DESIGN, null)).toBeNull();
     // a stored value that is not a colour is ignored
-    expect(designFromRow({ header_text: null, footer_text: null, show_logo: true, show_business_details: false, show_bank_details_quote: true, show_bank_details_order: false, accent_color: "red" }).accentColor).toBeNull();
+    expect(designFromRow({ header_text: null, footer_text: null, show_logo: true, show_business_details: false, show_bank_details_quote: true, show_bank_details_order: false, show_bank_details_statement: false, accent_color: "red" }).accentColor).toBeNull();
   });
 
   it("the form: unchecked boxes are off, the business colour clears the own one, an own colour must be a colour", () => {
     const off = quoteDesignSchema.safeParse(form({ header_text: "  שלום  " }));
-    expect(off.success && off.data).toEqual({ header_text: "שלום", footer_text: null, show_logo: false, show_business_details: false, show_bank_details_quote: false, show_bank_details_order: false, accent_color: null });
+    expect(off.success && off.data).toEqual({ header_text: "שלום", footer_text: null, show_logo: false, show_business_details: false, show_bank_details_quote: false, show_bank_details_order: false, show_bank_details_statement: false, accent_color: null });
     const own = quoteDesignSchema.safeParse(form({ color_mode: "own", accent_color: "#ABC", show_logo: "on", show_business_details: "on" }));
     expect(own.success && own.data).toMatchObject({ show_logo: true, show_business_details: true, accent_color: "#aabbcc" });
     expect(quoteDesignSchema.safeParse(form({ color_mode: "own", accent_color: "כחול" })).success).toBe(false);
@@ -212,7 +212,9 @@ describe("bank details on a quote (TAX-02)", () => {
   it("the design form's box: unchecked is off, checked is on", () => {
     expect(quoteDesignSchema.safeParse(form({ show_bank_details_quote: "on" })).data).toMatchObject({ show_bank_details_quote: true, show_bank_details_order: false });
     expect(quoteDesignSchema.safeParse(form({ show_bank_details_order: "on" })).data).toMatchObject({ show_bank_details_quote: false, show_bank_details_order: true });
-    expect(DEFAULT_QUOTE_DESIGN).toMatchObject({ showBankDetailsQuote: true, showBankDetailsOrder: true });
+    // BAL-04: the statement page's own switch
+    expect(quoteDesignSchema.safeParse(form({ show_bank_details_statement: "on" })).data).toMatchObject({ show_bank_details_quote: false, show_bank_details_order: false, show_bank_details_statement: true });
+    expect(DEFAULT_QUOTE_DESIGN).toMatchObject({ showBankDetailsQuote: true, showBankDetailsOrder: true, showBankDetailsStatement: true });
     // the order switch never hides a quote's block
     const bankQuote = data({ design: { ...DEFAULT_QUOTE_DESIGN, showBankDetailsOrder: false }, quote: quote({ status: "sent", bankDetails: bank }) });
     expect(renderToStaticMarkup(createElement(QuoteDocument, { data: bankQuote }))).toContain(BANK_HEADING);
