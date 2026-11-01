@@ -29,10 +29,17 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
       await q("select public.order_confirm($1, $2)", [org, order]);
       return order;
     });
-  const call = (u: U, orderId: string, digest: string, path: string | null = null) =>
-    asService(
-      async (q) => (await one<{ r: Store }>(q, "select public.order_pdf_store($1, $2, $3, 20000, $4, 'אישור הזמנה.pdf', $5) as r", [org, orderId, u.id, digest, path])).r,
+  // the order's content stamp as a render reads it now (text, so microseconds survive the round trip)
+  const stampOf = (orderId: string) =>
+    asAdmin(async (q) => (await one<{ s: string | null }>(q, "select pdf_content_changed_at::text as s from public.orders where id = $1", [orderId])).s);
+  // stamp: what the caller's render read; by default the order's present content
+  const call = async (u: U, orderId: string, digest: string, path: string | null = null, stamp?: string | null) => {
+    const read = stamp === undefined ? await stampOf(orderId) : stamp;
+    return asService(
+      async (q) =>
+        (await one<{ r: Store }>(q, "select public.order_pdf_store($1, $2, $3, 20000, $4, 'אישור הזמנה.pdf', $5, $6::timestamptz) as r", [org, orderId, u.id, digest, path, read])).r,
     );
+  };
   const putObject = (path: string) =>
     asAdmin(async (q) => {
       await q("insert into storage.objects (bucket_id, name) values ('record-files', $1) on conflict do nothing", [path]);
@@ -52,8 +59,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
   const download = (token: string) => asService(async (q) => (await one<{ p: Pdf }>(q, "select public.order_public_pdf($1, null) as p", [token])).p);
   const produced = () =>
     asAdmin(async (q) => (await q<{ produced: number }>("select produced from app.pdf_months where organization_id = $1 and month = app.automation_run_month($1)", [org])).rows[0]?.produced ?? 0);
-  // created_at is the transaction's time: move the first file back so "changed after it was made" is clear
-  const age = (orderId: string) => asAdmin((q) => q("update public.files set created_at = created_at - interval '1 minute' where order_id = $1", [orderId]));
 
   beforeAll(async () => {
     owner = await createUser("opv-owner");
@@ -109,7 +114,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
       const order = await newOrder(member);
       const token = await link(member, order);
       const first = await storeFully(member, order, sha("a"));
-      await age(order);
       // nothing changed: the same file
       expect(await call(member, order, sha("b"))).toEqual({ status: "stored", file_id: first.id });
       const before = await produced();
@@ -136,7 +140,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
   it("any other edit makes no new version", async () => {
     const order = await newOrder(member);
     const first = await storeFully(member, order, sha("1"));
-    await age(order);
     await run(member, (q) => q("update public.orders set status = 'in_progress' where id = $1", [order]));
     await run(member, (q) => q("update public.orders set delivery_contact_id = null where id = $1", [order]));
     // the same values again count as no change
@@ -149,7 +152,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
     const order = await newOrder(member);
     const token = await link(member, order);
     const first = await storeFully(member, order, sha("3"));
-    await age(order);
     await run(member, (q) => q("update public.orders set notes = 'שונה' where id = $1", [order]));
     const waiting = await call(member, order, sha("4"));
     expect(waiting.status).toBe("upload");
@@ -171,6 +173,89 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
     expect(await download(token)).toMatchObject({ sha256: sha("3") });
   });
 
+  it("review (medium): a change between a render's read and its store leaves no out-of-date file current", async () => {
+    const order = await newOrder(member);
+    const token = await link(member, order);
+    // A reads the order (no change yet) ... B changes the notes ... A stores: refused as changed, nothing written
+    const readByA = await stampOf(order);
+    await run(owner, (q) => q("update public.orders set notes = 'שינוי של ב' where id = $1", [order]));
+    expect(await call(member, order, sha("a"), null, readByA)).toEqual({ status: "changed" });
+    expect(await files(order)).toHaveLength(0);
+    // a render of the present content is kept
+    const first = await storeFully(member, order, sha("b"));
+    // A2 uploads from a read, B2 changes the order before A2 confirms: A2's file is confirmed with the content it read, and is
+    // out of date at once
+    const readByA2 = await stampOf(order);
+    await run(owner, (q) => q("update public.orders set delivery_date = '2026-12-31' where id = $1", [order]));
+    const stale = await call(member, order, sha("c"), null, readByA2);
+    // the current file was made from older content: A2's render (also older) is refused, the next render makes a version
+    expect(stale).toEqual({ status: "changed" });
+    const second = await storeFully(member, order, sha("d"));
+    expect(await files(order)).toEqual([
+      { id: first.id, previous_id: null, sha256: sha("b") },
+      { id: second.id, previous_id: first.id, sha256: sha("d") },
+    ]);
+    expect(await download(token)).toMatchObject({ sha256: sha("d") });
+    // a change after a version's upload call and before its confirmation: the confirmed version is out of date, the next store
+    // makes another
+    await run(owner, (q) => q("update public.orders set notes = 'עוד' where id = $1", [order]));
+    const third = await call(member, order, sha("e"));
+    expect(third.status).toBe("upload");
+    await putObject(third.path!);
+    await run(owner, (q) => q("update public.orders set shipping_address = 'רחוב אחר 2' where id = $1", [order]));
+    expect((await call(member, order, sha("e"), third.path!, null)).status).toBe("stored");
+    const stamps = await asAdmin(async (q) =>
+      (await q<{ s: string | null }>("select order_content_stamp::text as s from public.files where order_id = $1 order by created_at, id", [order])).rows.map((r) => r.s),
+    );
+    expect(stamps[2]).not.toBe(await stampOf(order));
+    const fourth = await call(member, order, sha("f"));
+    expect(fourth.status).toBe("upload");
+    expect(await files(order)).toHaveLength(4);
+  });
+
+  it("review (medium): a takeover of a waiting version keeps the content its own render read, and costs no extra version", async () => {
+    const order = await newOrder(member);
+    await storeFully(member, order, sha("1"));
+    await run(owner, (q) => q("update public.orders set notes = 'גרסה' where id = $1", [order]));
+    const waiting = await call(member, order, sha("2"));
+    expect(waiting.status).toBe("upload");
+    // another change while the version waits; after two minutes a render of the present content takes the row over
+    await run(owner, (q) => q("update public.orders set notes = 'גרסה שנייה' where id = $1", [order]));
+    expect(await call(member, order, sha("3"))).toEqual({ status: "busy" });
+    await asAdmin((q) =>
+      q("update public.files set upload_checked_at = now() - interval '3 minutes' where order_id = $1 and unconfirmed_since is not null", [order]),
+    );
+    // a render of the older content may not take it over
+    expect(await call(member, order, sha("3"), null, "2020-01-01 00:00:00+00")).toEqual({ status: "changed" });
+    const taken = await call(member, order, sha("3"));
+    expect(taken.status).toBe("upload");
+    await putObject(taken.path!);
+    expect((await call(member, order, sha("3"), taken.path!)).status).toBe("stored");
+    // the taken-over version is current: no extra version
+    const id = (await files(order))[1].id;
+    expect(await call(member, order, sha("4"))).toEqual({ status: "stored", file_id: id });
+    expect(await files(order)).toHaveLength(2);
+    expect(
+      await asAdmin(async (q) => (await one<{ s: string | null }>(q, "select order_content_stamp::text as s from public.files where id = $1", [id])).s),
+    ).toBe(await stampOf(order));
+  });
+
+  it("the stamp is never written by a person, and an order's audit entry never carries it", async () => {
+    expect(await asAdmin((q) => one<{ c: boolean }>(q, "select has_column_privilege('authenticated', 'public.files', 'order_content_stamp', 'insert') as c"))).toEqual({ c: false });
+    expect(await asAdmin((q) => one<{ c: boolean }>(q, "select has_column_privilege('authenticated', 'public.files', 'order_content_stamp', 'update') as c"))).toEqual({ c: false });
+    const order = await newOrder(member);
+    await run(member, (q) => q("update public.orders set notes = 'נבדק' where id = $1", [order]));
+    const entry = await asAdmin((q) =>
+      one<{ changes: Record<string, unknown> }>(
+        q,
+        "select changes from public.audit_log where entity_type = 'orders' and entity_id = $1 and action = 'update' order by created_at desc, id desc limit 1",
+        [order],
+      ),
+    );
+    expect(Object.keys(entry.changes)).toContain("notes");
+    expect(Object.keys(entry.changes)).not.toContain("pdf_content_changed_at");
+  });
+
   it("an order's files stay one line: a version follows only the current confirmed file of the same order", async () => {
     const order = await newOrder(member);
     const otherOrder = await newOrder(member);
@@ -189,7 +274,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
     expect((await pgError(insert(order, theirs.id))).hint).toBe("order_pdf:version");
     expect((await pgError(insert(order, null))).code).toBe("23505");
     // a version of a version that is no longer current
-    await age(order);
     await run(member, (q) => q("update public.orders set notes = 'אחרת' where id = $1", [order]));
     await storeFully(member, order, sha("9"));
     // REC-07's own rule answers first (files_links_check: one newer version per file)
@@ -205,7 +289,6 @@ describe("order PDF versions (ORD-05, answer (34) ב)", () => {
       return { contact: c, order: o };
     });
     await storeFully(member, order, sha("a"));
-    await age(order);
     await run(member, (q) => q("update public.orders set notes = 'חדש' where id = $1", [order]));
     await storeFully(member, order, sha("b"));
     expect(await files(order)).toHaveLength(2);

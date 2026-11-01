@@ -1101,6 +1101,8 @@ export type FileRow = {
   sha256: string | null;
   // ORD-05 PDF (migration order_pdfs): the numbered order whose PDF this is (one per order, written by the server, kept)
   order_id: string | null;
+  // ORD-05 PDF versions (migration order_pdf_versions): the orders.pdf_content_changed_at its render read (server only)
+  order_content_stamp: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -3810,7 +3812,10 @@ export type Database = {
       // ORD-05 PDF: the person's right (their own session); the server's write (service_role only); the customer's download of
       // the order's stored PDF (service_role only)
       order_pdf_allowed: { Args: { p_org: string; p_order: string }; Returns: boolean };
-      order_pdf_store: { Args: { p_org: string; p_order: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null }; Returns: Json };
+      order_pdf_store: {
+        Args: { p_org: string; p_order: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null; p_content_stamp?: string | null };
+        Returns: Json;
+      };
       order_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // PRM-01 follow-up: a member with the import permission undoes their own import ({done, kept})
       undo_own_import: { Args: { p_org: string; p_job: string }; Returns: Json };

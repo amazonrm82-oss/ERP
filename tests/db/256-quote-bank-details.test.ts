@@ -416,6 +416,7 @@ describe("bank details on quotes and orders (TAX-02)", () => {
   it("a deleted row's audit entry never holds the snapshot (app.audit_row, review L2)", async () => {
     const def = await asAdmin(async (q) => (await q<{ d: string }>("select pg_get_functiondef('app.audit_row()'::regprocedure) as d")).rows[0].d);
     expect(def).toContain("v_changes := v_old - 'bank_details'");
-    expect(def).toContain("'bank_details'];");
+    // in the ignored keys (ORD-05 PDF versions added pdf_content_changed_at after it)
+    expect(def).toMatch(/v_ignored constant text\[\] := array\[[^\]]*'bank_details'[,\]]/);
   });
 });

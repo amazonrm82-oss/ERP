@@ -137,11 +137,12 @@ describe("the order confirmation PDF (ORD-05)", () => {
     expect(DAMAGED_ORDER_PDF_MESSAGE).toContain("ההזמנה");
   });
 
-  it("a PDF is out of date only when the order's content changed after it was made (answer (34) ב)", () => {
-    const file = { createdAt: "2026-11-01T10:00:00Z" };
-    expect(orderPdfOutdated({ pdfContentChangedAt: null }, file)).toBe(false);
-    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T09:59:59Z" }, file)).toBe(false);
-    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01Z" }, file)).toBe(true);
-    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01Z" }, null)).toBe(false);
+  it("a PDF is out of date when it was made from other content than the order's present one (review, medium)", () => {
+    expect(orderPdfOutdated({ pdfContentChangedAt: null }, { contentStamp: null })).toBe(false);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:00.123456+00:00" }, { contentStamp: "2026-11-01T10:00:00.123456+00:00" })).toBe(false);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01+00:00" }, { contentStamp: "2026-11-01T10:00:00+00:00" })).toBe(true);
+    // made before any change, the order changed since
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01+00:00" }, { contentStamp: null })).toBe(true);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01+00:00" }, null)).toBe(false);
   });
 });

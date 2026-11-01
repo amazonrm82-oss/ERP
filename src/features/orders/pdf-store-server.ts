@@ -12,12 +12,21 @@ import { createServiceClient } from "@/lib/supabase/service";
 // to exactly that path with upsert off, and the same function again naming that path, which confirms the row once the object
 // is there.
 
-export type ServerStoreResult = { ok: true; fileId: string } | { ok: false; message: string; busy?: boolean };
+// changed: the order's content changed after the render read it (review, medium); nothing was written
+export type ServerStoreResult = { ok: true; fileId: string } | { ok: false; message: string; busy?: boolean; changed?: boolean };
 
 const NOT_MADE = "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.";
 const NOT_PERMITTED = "אין לכם הרשאה לשמור את קובץ ה-PDF של ההזמנה הזאת.";
 
-export async function writeOrderPdfAsServer(input: { orgId: string; orderId: string; userId: string; bytes: Uint8Array; name: string }): Promise<ServerStoreResult> {
+export async function writeOrderPdfAsServer(input: {
+  orgId: string;
+  orderId: string;
+  userId: string;
+  bytes: Uint8Array;
+  name: string;
+  // the orders.pdf_content_changed_at the render read (null = never changed), kept with the file
+  contentStamp: string | null;
+}): Promise<ServerStoreResult> {
   const service = createServiceClient();
   if (!service) return { ok: false, message: NOT_MADE };
   const args = {
@@ -27,12 +36,16 @@ export async function writeOrderPdfAsServer(input: { orgId: string; orderId: str
     p_size: input.bytes.length,
     p_sha256: sha256Hex(input.bytes),
     p_name: input.name,
+    p_content_stamp: input.contentStamp,
   };
-  type Asked = { error: { code?: string; message: string }; answer?: undefined } | { error: null; answer: ReturnType<typeof storeAnswerFrom> };
+  type Asked =
+    | { error: { code?: string; message: string }; answer?: undefined; changed?: undefined }
+    | { error: null; answer: ReturnType<typeof storeAnswerFrom>; changed: boolean };
   const ask = async (path: string | null): Promise<Asked> => {
     const { data, error } = await service.rpc("order_pdf_store", { ...args, p_path: path });
     if (error) return { error };
-    return { error: null, answer: storeAnswerFrom(data, input.orgId) };
+    const changed = !!data && typeof data === "object" && !Array.isArray(data) && (data as { status?: unknown }).status === "changed";
+    return { error: null, answer: storeAnswerFrom(data, input.orgId), changed };
   };
 
   const first = await ask(null);
@@ -40,6 +53,7 @@ export async function writeOrderPdfAsServer(input: { orgId: string; orderId: str
     if (first.error.code === "42501") return { ok: false, message: NOT_PERMITTED };
     return { ok: false, message: dbErrorMessage(first.error, NOT_MADE) };
   }
+  if (first.changed) return { ok: false, message: NOT_MADE, changed: true };
   if (!first.answer) return { ok: false, message: NOT_MADE };
   if (first.answer.status === "stored") return { ok: true, fileId: first.answer.fileId };
   if (first.answer.status === "busy") return { ok: false, message: NOT_MADE, busy: true };

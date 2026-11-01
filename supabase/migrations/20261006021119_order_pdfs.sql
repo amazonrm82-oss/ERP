@@ -378,9 +378,11 @@ revoke all on function app.order_pdf_user_may(uuid, uuid, uuid, uuid, uuid) from
 -- ----------------------------------------------------------------------------
 -- The one service-role entry for writing (QUO-06's public.quote_pdf_store with the order in place of the quote): answers
 -- {status: upload, path}, {status: stored, file_id} or {status: busy}; refusals raise
+-- p_content_stamp: the orders.pdf_content_changed_at the caller's render read (null when never changed); 20261006021121 keeps it
+-- with the file and judges the order's current PDF by it. Unused here.
 -- ----------------------------------------------------------------------------
 create or replace function public.order_pdf_store(p_org uuid, p_order uuid, p_user uuid, p_size bigint, p_sha256 text, p_name text,
-                                                  p_path text default null)
+                                                  p_path text default null, p_content_stamp timestamptz default null)
 returns jsonb
 language plpgsql volatile security definer
 set search_path = ''
@@ -462,8 +464,8 @@ begin
   return jsonb_build_object('status', 'upload', 'path', v_path);
 end;
 $$;
-revoke all on function public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text) from public, anon, authenticated;
-grant execute on function public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text) to service_role;
+revoke all on function public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text, timestamptz) from public, anon, authenticated;
+grant execute on function public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text, timestamptz) to service_role;
 
 -- ----------------------------------------------------------------------------
 -- The customer's download: a per-sender window, keyed by the server's IP hash scoped to the order (no hash kept)

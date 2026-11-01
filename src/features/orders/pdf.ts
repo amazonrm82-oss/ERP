@@ -156,10 +156,13 @@ export function orderPdfDocument(data: OrderDocumentData, logo: PdfLogo | null):
 }
 
 /**
- * Owner's answer (34) ב: the current PDF is out of date when the order's delivery date, shipping address or notes changed after it
- * was made (orders.pdf_content_changed_at, server-kept); public.order_pdf_store then makes a new version.
+ * Owner's answer (34) ב: the current PDF is out of date when it was made from other content than the order's present one: the
+ * orders.pdf_content_changed_at its render read (files.order_content_stamp) differs from the order's (review, medium: never by
+ * the time the file was made). public.order_pdf_store then makes a new version.
  */
-export function orderPdfOutdated(order: Pick<Order, "pdfContentChangedAt">, file: { createdAt: string } | null): boolean {
-  if (!file || !order.pdfContentChangedAt) return false;
-  return new Date(order.pdfContentChangedAt).getTime() > new Date(file.createdAt).getTime();
+export function orderPdfOutdated(order: Pick<Order, "pdfContentChangedAt">, file: { contentStamp: string | null } | null): boolean {
+  if (!file) return false;
+  const present = order.pdfContentChangedAt ?? null;
+  if (present === null) return file.contentStamp !== null;
+  return file.contentStamp === null || new Date(present).getTime() !== new Date(file.contentStamp).getTime();
 }

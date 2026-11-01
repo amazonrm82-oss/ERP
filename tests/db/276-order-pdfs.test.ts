@@ -114,7 +114,7 @@ describe("order confirmation PDFs (ORD-05 PDF)", () => {
 
   it("the write and download functions are for service_role only; the right check is for signed-in people", async () => {
     const { order } = await newOrder(owner);
-    for (const fn of ["public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text)", "public.order_public_pdf(text, text)", "public.order_pdf_allowed(uuid, uuid)"]) {
+    for (const fn of ["public.order_pdf_store(uuid, uuid, uuid, bigint, text, text, text, timestamptz)", "public.order_public_pdf(text, text)", "public.order_pdf_allowed(uuid, uuid)"]) {
       const can = async (role: string) => (await asAdmin((q) => one<{ c: boolean }>(q, "select has_function_privilege($1, $2, 'execute') as c", [role, fn]))).c;
       const serviceOnly = fn !== "public.order_pdf_allowed(uuid, uuid)";
       expect(await can("anon"), fn).toBe(false);

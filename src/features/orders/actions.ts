@@ -78,8 +78,13 @@ export async function updateOrderDetailsAction(orgId: string, orderId: string, _
   // ORD-05 PDF (owner's answer (34) ב): a changed delivery date, shipping address or notes of a numbered order makes a new PDF
   // version (the database knows whether they changed); a failed render never refuses the edit
   const order = await readOrder(context.supabase, orgId, orderId).catch(() => null);
-  if (order && order.status !== "draft") await storeOrderPdf(context.supabase, orgId, order, context.user.id, { onlyNewVersion: true }).catch(() => null);
+  const pdf =
+    order && order.status !== "draft"
+      ? await storeOrderPdf(context.supabase, orgId, order, context.user.id, { onlyNewVersion: true }).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }))
+      : null;
   revalidateOrder(orgId, { id: orderId, dealId: data[0].deal_id, contactId: data[0].contact_id, companyId: data[0].company_id });
+  // review: the edit is saved either way; a version that could not be made (quota, render, another one on its way) is said
+  if (pdf && !pdf.ok) return { ok: true, message: `הפרטים נשמרו, אבל קובץ ה-PDF של ההזמנה לא עודכן: ${pdf.message} אפשר לעדכן אותו בכפתור "עדכון ה-PDF".` };
   return { ok: true, message: "הפרטים נשמרו." };
 }
 
