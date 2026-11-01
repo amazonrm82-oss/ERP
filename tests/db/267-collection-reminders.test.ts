@@ -520,13 +520,98 @@ describe("collection reminders (COL-04)", () => {
       ).toBeNull();
     });
 
-    it("a cancelled document closes nothing (the owner's answer covers a paid debt only)", async () => {
+    const cancel = (document: string) =>
+      run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [document]));
+
+    it("answer (20): a cancelled document closes its open task with its own note, as an update with no actor", async () => {
       const invoice = await doc(0);
       await job();
       const [t] = await tasks(invoice);
-      await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [invoice]));
+      await cancel(invoice);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+      expect(await marker(t.id)).toEqual({ closed: true, failures: 0 });
+      expect(
+        await asAdmin(async (q) => (await one<{ a: string | null }>(q, "select actor_id as a from public.audit_log where entity_type = 'tasks' and entity_id = $1 and action = 'update' order by id desc limit 1", [t.id])).a),
+      ).toBeNull();
+      // the job again changes nothing, and no new reminder is made for the cancelled document
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+      expect(await tasks(invoice)).toHaveLength(1);
+    });
+
+    it("answer (20): a cancelled proforma's task closes too, even when partly paid before", async () => {
+      const proforma = await doc(0, "proforma", 700);
+      await job();
+      const [t] = await tasks(proforma);
+      await pay(proforma, 100);
+      await cancel(proforma);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+    });
+
+    it("answer (20): a task whose status a person changed, or a repeating task, stays as it is when its document is cancelled", async () => {
+      const a = await doc(0);
+      const b = await doc(0);
+      const c = await doc(0);
+      await job();
+      const [ta] = await tasks(a);
+      const [tb] = await tasks(b);
+      const [tc] = await tasks(c);
+      // a person closed and reopened the first; closed the second with their own outcome; the third repeats
+      await run(member, (q) => q("update public.tasks set status = 'done' where id = $1", [ta.id]));
+      await run(member, (q) => q("update public.tasks set status = 'open' where id = $1", [ta.id]));
+      await run(member, (q) => q("update public.tasks set status = 'done', outcome = 'דיברתי איתו' where id = $1", [tb.id]));
+      await run(member, (q) => q(`update public.tasks set recurrence = '{"kind": "daily"}' where id = $1`, [tc.id]));
+      for (const d of [a, b, c]) await cancel(d);
+      await job();
+      expect(await state(ta.id)).toEqual({ status: "open", outcome: null });
+      expect(await state(tb.id)).toEqual({ status: "done", outcome: "דיברתי איתו" });
+      expect(await state(tc.id)).toEqual({ status: "open", outcome: null });
+      for (const id of [ta.id, tb.id, tc.id]) expect(await marker(id)).toBeNull();
+    });
+
+    it("answer (20): a task detached from its document (no collection_document_id) is never closed by itself", async () => {
+      const invoice = await doc(0);
+      await job();
+      const [t] = await tasks(invoice);
+      // detached (a server path; a person cannot write the column), then the document is cancelled
+      await asAdmin((q) => q("update public.tasks set collection_document_id = null where id = $1", [t.id]));
+      // and a person's own task on the same customer, never marked
+      const own = await run(member, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.tasks (organization_id, title, contact_id, owner_id) values ($1, 'לבדוק את החשבונית', $2, $3) returning id", [org, contact, member.id])).id,
+      );
+      await cancel(invoice);
       await job();
       expect(await state(t.id)).toEqual({ status: "open", outcome: null });
+      expect(await state(own)).toEqual({ status: "open", outcome: null });
+      expect(await marker(t.id)).toBeNull();
+    });
+
+    it("answer (20): a cancelled document is never owed again: no reopen, whatever happens to its payments", async () => {
+      // closed as cancelled, then the payment allocated to it fails: stays closed
+      const first = await doc(0, "tax_invoice", 400);
+      await job();
+      const [a] = await tasks(first);
+      const p1 = await pay(first, 100);
+      await cancel(first);
+      await job();
+      expect(await state(a.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+      await fail(p1);
+      await job();
+      expect(await state(a.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+      // closed as paid, then the document is cancelled (its allocations are released, so it has a balance again): no reopen,
+      // and the note stays the one the system wrote
+      const second = await doc(0, "tax_invoice", 450);
+      await job();
+      const [b] = await tasks(second);
+      await pay(second, 450);
+      await job();
+      expect(await state(b.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      await cancel(second);
+      await job();
+      expect(await state(b.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      expect(await marker(b.id)).toEqual({ closed: true, failures: 0 });
     });
 
     it("the debt comes back: the task the system closed is open again, and closed again once paid", async () => {
