@@ -614,6 +614,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `src/features/calendar-days/business-days.ts` (test 92 compares them day by day). Automations: `create_task` may carry
   `due_in_business_days` (0..60, due at the current local time); another value is ignored with the step warning "the
   business-day offset is invalid". `app.run_automation_actions` was last redefined in 0134. QUO / PAY use the same function.
+  Quote validity (HEB-03 rest, no migration): the draft quote's "בתוקף עד" has shortcuts 7 / 14 business days (`addBusinessDays`) and
+  30 calendar days moved to the next working day (`src/features/quotes/validity.ts`, `QuoteValidityField`); a picked rest day only warns
+  (`RestDayWarning`, which now also takes `day`/`onMove`). Payment due dates stay calendar days (0179).
 - Goals (GOL-01/02, migration 0133): `public.goals` (scope user|team|org, period month|quarter|year, metric won_amount|won_deals|
   leads_handled|meetings_held mirrored by `src/features/goals/metrics.ts`; clients insert identity columns once and update only
   `target`). Owners/admins write every goal; a manager (role, not team flag) only goals of teams they manage and of their
