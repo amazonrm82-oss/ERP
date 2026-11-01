@@ -96,6 +96,10 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   Owner, 1 November 2026 (approved, not built yet): the order confirmation PDF (ORD-05) is stored once and downloaded by the
+   customer from the order link in the same pattern and conditions as QUO-06 (one definer per use, service_role only, SHA-256 on every
+   serving, its own "In use" line once built). The statement PDF (BAL-04) and report PDFs (RPT-02) are made per request with the
+   user's session (or the statement page's own definer answer) and never stored: no new service-key use.
    In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
    (`src/features/quotes/pdf-store-server.ts`, called from `pdf-server.ts` after `public.quote_pdf_allowed` with the user's session),
    which calls only `public.quote_pdf_store()` and uploads (upsert off) only to the path it answers, with the service key; in the
