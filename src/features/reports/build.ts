@@ -66,6 +66,11 @@ function billingFigureHint(billing: string | null): string {
   return "שורות שנשמרו לפני שהיה לשורה סוג חיוב; סכומן לפי תקופת העסקה.";
 }
 
+// RPT-01: the count of recurring deals with no stored VAT mode (no lines), as the owner worded it
+export function noVatModeLine(count: number): string {
+  return count === 1 ? 'עסקה אחת בלי מצב מע"מ' : `${formatNumber(count)} עסקאות בלי מצב מע"מ`;
+}
+
 // RPT-01: how the recurring revenue report counts, and what its amounts are (one VAT mode per deal, that of its lines)
 function recurringNote(totals: {
   deals: number;
@@ -88,9 +93,8 @@ function recurringNote(totals: {
         : withoutVat > 0 && noMode === 0
           ? 'כל הסכומים כאן לפני מע"מ, כפי שתומחרו בעסקאות.'
           : null,
-    noMode > 0 && withVat + withoutVat > 0
-      ? `${formatNumber(noMode)} מהעסקאות בלי שורות, ולכן לא ידוע אם הסכום החוזר שלהן כולל מע"מ.`
-      : null,
+    // the owner's answer (19) (א), 1 November 2026: counted as they are, with the line "N עסקאות בלי מצב מע"מ"
+    noMode > 0 ? `${noVatModeLine(noMode)}. בלי שורות בעסקה לא ידוע אם הסכום החוזר כולל מע"מ.` : null,
     "הכנסה חוזרת שהסתיימה תוצג כשיהיה מודול מנויים.",
   ]
     .filter(Boolean)

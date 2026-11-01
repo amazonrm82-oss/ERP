@@ -26,7 +26,7 @@ vi.mock("@/features/shell/queries", () => ({
   getUserNames: async (ids: (string | null)[]) => new Map(ids.filter((id): id is string => !!id).map((id) => [id, "נציג"])),
 }));
 
-const { buildReport } = await import("@/features/reports/build");
+const { buildReport, noVatModeLine } = await import("@/features/reports/build");
 const { getDashboard } = await import("@/features/reports/dashboard");
 
 const filters = {
@@ -171,11 +171,24 @@ describe("report shaping from the saved samples", () => {
     results.report_recurring_revenue = { ...data, totals: { ...data.totals, deals: 6, deals_with_vat: 2, deals_without_vat: 3, deals_without_amount: 1 } };
     const note = (await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters)).sections[0].note ?? "";
     expect(note).toContain('שימו לב: בתקופה יש עסקאות שתומחרו כולל מע"מ (2) ועסקאות שתומחרו לפני מע"מ (3)');
-    expect(note).toContain("1 מהעסקאות בלי שורות");
+    expect(note).toContain('עסקה אחת בלי מצב מע"מ.');
+    expect(note).not.toContain("מהעסקאות בלי שורות");
     expect(note).toContain("1 מהעסקאות נסגרו בלי סכום חוזר");
     results.report_recurring_revenue = { ...data, totals: { ...data.totals, deals: 2, deals_with_vat: 2, deals_without_vat: 0 } };
     const all = (await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters)).sections[0].note ?? "";
     expect(all).toContain('כל הסכומים כאן כוללים מע"מ');
+    expect(all).not.toContain("בלי מצב מע\"מ");
+    // RPT-01 (19) (א): the line shows also when no deal has a VAT mode, and counts in the plural
+    results.report_recurring_revenue = { ...data, totals: { ...data.totals, deals: 4, deals_with_vat: 0, deals_without_vat: 0 } };
+    const none = (await buildReport("00000000-0000-4000-8000-000000000099", "recurring", filters)).sections[0].note ?? "";
+    expect(none).toContain('4 עסקאות בלי מצב מע"מ');
+    expect(none).not.toContain("כל הסכומים כאן");
+  });
+
+  it("RPT-01 (19): the no-VAT-mode line, one and many", () => {
+    expect(noVatModeLine(1)).toBe('עסקה אחת בלי מצב מע"מ');
+    expect(noVatModeLine(2)).toBe('2 עסקאות בלי מצב מע"מ');
+    expect(noVatModeLine(1200)).toBe('1,200 עסקאות בלי מצב מע"מ');
   });
 
   it("DLI-06: revenue by category rolls subcategories up, names free lines, and keeps billing apart", async () => {
