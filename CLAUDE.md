@@ -126,7 +126,8 @@ and build this CRM here instead. The old code is preserved on the branch
    `app.link_preview_sender`); the sender is the keyed IP hash with scope `preview`, only bucket numbers are kept. Any other User-Agent
    gets the normal page. In the eslint allow-list.
    In use (BAL-04, owner 8 October 2026, migration 021114): the customer's statement page (`src/features/statements/public-server.ts`,
-   page `/f/statement/<token>`), which calls only `public.statement_public()`; never framed (`NOT_EMBEDDABLE_PUBLIC_PREFIXES` in
+   page `/f/statement/<token>` and since 1 November 2026 its PDF route `GET /api/forms/statement/<token>/pdf`, made per request, never
+   stored or counted), which calls only `public.statement_public()`; never framed (`NOT_EMBEDDABLE_PUBLIC_PREFIXES` in
    `src/lib/csp.ts`, `next.config.ts`), `Referrer-Policy: no-referrer`; in the eslint allow-list.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
