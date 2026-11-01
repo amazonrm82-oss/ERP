@@ -642,8 +642,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   its sub-teams; the business all. A collection goal is returned only when the payments the caller reads for it equal
   `app.goal_payments_counted(org, goal)` (definer, count only, for a caller who reads the goal: `goals_select`'s rule, keep in step).
   Accepted (review): whether such a goal shows tells a caller that unreadable payments exist (no amount); a goal is falsely hidden
-  when a payment's deal has no owner/team and its contact is unreadable (fails safe; the 021106 comment says otherwise). Follow-ups:
-  a collection goal of a plan that lost a key cannot be removed from the grid.
+  when a payment's deal has no owner/team and its contact is unreadable (fails safe; the 021106 comment says otherwise). Since
+  1 November 2026 (no migration) the grid keeps "גבייה (לא בחבילה)" while the caller reads such a goal: read only, each goal with
+  "הסרה" for whoever may write that row (`removable`, without the `goals_per_rep` condition).
   Since 021111: the trigger needs payments, documents AND collection (hints `feature:payments|documents|collection`, in that order);
   `report_goal_progress` leaves a collection goal out unless `app.can_record_payments` (the target stays on the grid), and
   `app.goal_payments_counted` is null without it or without the keys; a cheque counts once cleared or its `cheque_due_date` is on or
