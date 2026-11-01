@@ -174,9 +174,11 @@ node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
 Nothing is merged without the browser flow (`test:e2e`) passing on the local stack (owner, 29 October 2026).
-`test:db` fails at teardown when a test leaves any app/public function body different from the fresh build
-(`tests/db/global-setup.ts`); a test that re-runs a migration uses `rerunClosure()` from `tests/db/rerun.ts`. A hand-picked re-run list is checked with
-`staleRestores()` (same file), which names every function whose latest redefinition the list misses.
+`test:db` fails at teardown when a test leaves any app/public function body, or any policy (app, public, storage), RLS switch,
+table/column/function grant, trigger or constraint, different from the fresh build (`tests/db/global-setup.ts`). A test that re-runs a
+migration uses `rerunClosure()` from `tests/db/rerun.ts`, which brings in later migrations that redefine its functions, reset its grants
+or alter its policies. A hand-picked re-run list is checked with `staleRestores()`, `stalePolicies()` and `staleGrants()` (same file),
+which name every function, policy or grant the list leaves at an older version.
 `db:test:start` refuses a port another server already answers on and checks that the started postmaster owns it; `test:db`
 refuses to rebuild unless the server at `TEST_DATABASE_URL` reports `TEST_DB_DIR/data` (default `/tmp/crm-saas-pgtest/data`)
 as its data directory (skipped only in CI without `TEST_DB_DIR`): every worker sets `TEST_DB_DIR` together with its port.
@@ -1689,7 +1691,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   redefined in 020965; keep the filter in any later redefinition); a required file (own box or a FLD-09 "require" condition on the
   stored values) is replaced, never removed (app-only: `removeFieldFileAction` + `requiredFileRemovalProblem`); a conditional
   "require" is checked for file fields on the edit card. Test 64's re-run list ends with 020905/020910/020925 because re-running 020640/020645
-  resets the `record_files_delete` storage policy (the teardown compares function bodies only, not policies).
+  resets the `record_files_delete` storage policy.
   Since 021020 (owner 26 October 2026, answer (ב)) a replaced field file is kept as the earlier version of the new one
   (`app.custom_field_file_keep_version`, from `app.custom_field_files_release`; both files of this record and field, the old one with no
   newer version and the new one with no history, else the old one stays as a plain earlier file); only a cleared value, a deleted field
