@@ -14,6 +14,9 @@
 --   document: it belongs to the rep now and is never moved, retitled or re-dated by the job; the job makes a new, attached task
 --   for the stage, as it already does when the earlier task cannot be moved (retitled, re-dated, owner gone), also while the
 --   detached task is still open.
+--   Also: a document with no deal, contact or company (its customer was purged and the foreign keys were set null) is left out
+--   of the reminder candidates altogether: there is no customer to remind, and no task could ever be attached to it (each
+--   offset would otherwise make a new task with no links that nothing ever closes). Nothing is recorded for it.
 -- Safe to run twice. No object or row is removed.
 
 create or replace function app.collection_task_attached(
@@ -199,6 +202,8 @@ begin
        where d.status = 'active'
          and d.doc_type in ('tax_invoice', 'proforma', 'opening_balance')
          and d.amount_agorot > 0
+         -- 021116: a document with no customer left (deal, contact and company all purged) gets no reminder
+         and (d.deal_id is not null or d.contact_id is not null or d.company_id is not null)
          -- a cheap bound first (every zone's today is within a day of the server's): an offset's day is reached only while
          -- today - due is in -3..20 plus the days it was moved (answers (2): up to 30), so nothing outside it can be due
          and d.due_date between current_date - 52 and current_date + 4
@@ -271,7 +276,7 @@ begin
 
         -- one open reminder task per document: a still-open earlier one moves to this stage, but only while it is as the
         -- job left it (its title and due time unchanged: a person who retitled or re-dated it keeps it), still attached to
-        -- its document (021115: a task a rep moved to another record belongs to the rep, app.collection_task_attached, the
+        -- its document (021116: a task a rep moved to another record belongs to the rep, app.collection_task_attached, the
         -- rule of app.close_paid_collection_tasks) and its owner is still an active, full-seat member who is not a viewer;
         -- otherwise a new task is made
         select t.id into v_task

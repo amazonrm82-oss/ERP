@@ -360,7 +360,7 @@ describe("collection reminders (COL-04)", () => {
     }
   });
 
-  it("021115: a task a rep moved to another record is never moved to the next stage; a new attached task is made instead", async () => {
+  it("021116: a task a rep moved to another record is never moved to the next stage; a new attached task is made instead", async () => {
     const other = await run(member, async (q) =>
       (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'אחר', $2) returning id", [org, member.id])).id,
     );
@@ -453,7 +453,65 @@ describe("collection reminders (COL-04)", () => {
     expect(closed.find((t) => t.id !== a.id)).toMatchObject({ status: "done", outcome: "נסגרה: החוב שולם" });
   });
 
-  it("021115: the detached rule is one helper, shared by the reminder job and the close job", async () => {
+  it("021116: a document with no customer left (deal, contact and company purged) gets no reminder task", async () => {
+    const gone = await run(member, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'נמחק', $2) returning id", [org, member.id])).id,
+    );
+    const orphan = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, current_date - 40, 350) returning id",
+          [org, gone, `CR-${++n}`],
+        )
+      ).id,
+    );
+    // the contact is purged: the document's foreign key is set null, so it has no deal, contact or company
+    await asAdmin((q) => q("delete from public.contacts where organization_id = $1 and id = $2", [org, gone]));
+    const links = await asAdmin(async (q) =>
+      await one<{ deal_id: string | null; contact_id: string | null; company_id: string | null; status: string }>(
+        q,
+        "select deal_id, contact_id, company_id, status::text as status from public.accounting_documents where id = $1",
+        [orphan],
+      ),
+    );
+    expect(links).toEqual({ deal_id: null, contact_id: null, company_id: null, status: "active" });
+    for (const k of [3, 0, -7, -14]) {
+      await setDue(orphan, k);
+      await job();
+    }
+    expect(await tasks(orphan)).toEqual([]);
+    expect(await sent(orphan)).toEqual([]);
+  });
+
+  it("021116: a task the system closed and a rep then moved to another record is not reopened when the debt returns", async () => {
+    const other = await run(member, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'אחר', $2) returning id", [org, member.id])).id,
+    );
+    const invoice = await doc(0, "tax_invoice", 360);
+    await job();
+    const [t] = await tasks(invoice);
+    const payment = await run(owner, async (q) => {
+      const p = await one<{ id: string }>(q, "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 360, current_date, 'cash') returning id", [org, contact]);
+      await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 360)", [org, p.id, invoice]);
+      return p.id;
+    });
+    await job();
+    const status = (id: string) =>
+      asAdmin(async (q) => await one<{ status: string; outcome: string | null }>(q, "select status::text as status, outcome from public.tasks where id = $1", [id]));
+    expect(await status(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+    // the rep moves the closed task to another contact (a link change only, not a status change)
+    expect((await run(member, (q) => q("update public.tasks set contact_id = $2 where id = $1 returning id", [t.id, other]))).rowCount).toBe(1);
+    // the payment fails: the debt is back, but the task is the rep's now
+    await run(owner, (q) => q("update public.payments set status = 'failed' where id = $1", [payment]));
+    await job();
+    expect(await status(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+    expect(
+      await asAdmin(async (q) => (await one<{ closed: boolean }>(q, "select closed_at is not null as closed from app.collection_task_closes where task_id = $1", [t.id])).closed),
+    ).toBe(true);
+  });
+
+  it("021116: the detached rule is one helper, shared by the reminder job and the close job", async () => {
     const [x, y, z] = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002", "00000000-0000-4000-8000-000000000003"];
     const at = (t: (string | null)[], d: (string | null)[]) =>
       asAdmin(async (q) => (await one<{ r: boolean }>(q, "select app.collection_task_attached($1, $2, $3, $4, $5, $6) as r", [...t, ...d])).r);
