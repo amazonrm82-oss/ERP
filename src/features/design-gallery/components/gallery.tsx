@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { BarList, ChartBar, Meter } from "@/components/ui/chart";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Calendar, DateField } from "@/components/ui/date-picker";
 import { Dialog, LeaveDialog } from "@/components/ui/dialog";
@@ -313,6 +314,83 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section title="תרשימים (DSN-13)">
+        <p className="text-sm text-ink-soft">כל תרשים מראה את המספרים גם בטקסט. מצב חריג מסומן גם בפסים ובמילים, לא רק בצבע.</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card aria-labelledby="gallery-bars">
+            <CardHeader id="gallery-bars" title="עמודות להשוואה" />
+            <CardBody>
+              <BarList
+                label="לידים לפי מקור"
+                items={[
+                  { key: "site", label: "אתר", value: 128, valueText: "128" },
+                  { key: "fb", label: "פייסבוק", value: 74, valueText: "74" },
+                  { key: "ref", label: "המלצה", value: 31, valueText: "31" },
+                  { key: "phone", label: "טלפון", value: 2, valueText: "2" },
+                  { key: "none", label: "ללא מקור", value: 0, valueText: "0" },
+                ]}
+              />
+            </CardBody>
+          </Card>
+          <Card aria-labelledby="gallery-meters">
+            <CardHeader id="gallery-meters" title="מדים והתקדמות" />
+            <CardBody className="space-y-4">
+              <div>
+                <p className="mb-1.5 flex justify-between text-sm">
+                  <span>משתמשים</span>
+                  <span className="tabular-nums text-ink-soft">3 מתוך 10</span>
+                </p>
+                <Meter label="משתמשים" value={3} max={10} valueText="3 מתוך 10" />
+              </div>
+              <div>
+                <p className="mb-1.5 flex justify-between text-sm">
+                  <span>טפסים</span>
+                  <span className="font-semibold tabular-nums text-danger">9 מתוך 10 · קרוב למכסה</span>
+                </p>
+                <Meter label="טפסים" value={9} max={10} tone="alert" valueText="9 מתוך 10, קרוב למכסה" />
+              </div>
+              <div>
+                <p className="mb-1.5 flex justify-between text-sm">
+                  <span>יעד החודש</span>
+                  <span className="tabular-nums">100% · הושג</span>
+                </p>
+                <Meter decorative value={100} max={100} tone="done" />
+              </div>
+              <div>
+                <p className="mb-1.5 text-sm">מייבאים… 420 מתוך 1,000 שורות.</p>
+                <Meter kind="progress" label="התקדמות הייבוא" value={420} max={1000} valueText="420 מתוך 1,000 שורות" />
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+        <Card aria-labelledby="gallery-report-bars">
+          <CardHeader id="gallery-report-bars" title="עמודה בתוך טבלת דוח" />
+          <Table caption="עסקאות שנסגרו לפי נציג" hideCaption>
+            <thead>
+              <tr>
+                <Th>נציג</Th>
+                <Th className="text-end">עסקאות שנסגרו</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["דנה כהן", 12],
+                ["יוסי לוי", 7],
+                ["רונית אברהם", 1],
+              ].map(([name, deals]) => (
+                <Tr key={name}>
+                  <Td>
+                    {name}
+                    <ChartBar value={deals as number} max={12} className="mt-1" />
+                  </Td>
+                  <Td className="text-end tabular-nums">{deals}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       </Section>
 
       <Section title="מצב ריק וטעינה">

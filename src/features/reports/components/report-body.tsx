@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Card, CardHeader } from "@/components/ui/card";
+import { ChartBar } from "@/components/ui/chart";
+import { chartMax } from "@/components/ui/chart-logic";
 import { cn } from "@/lib/cn";
 
 import type { ReportSection, ReportView } from "../definitions";
@@ -37,7 +39,7 @@ export function ReportBody({ view, replace = {} }: { view: ReportView; replace?:
 
 function Section({ section, id }: { section: ReportSection; id: string }) {
   const barColumn = section.bar ? section.columns.find((c) => c.key === section.bar) : undefined;
-  const max = barColumn ? Math.max(0, ...section.rows.map((r) => (typeof r[barColumn.key] === "number" ? (r[barColumn.key] as number) : 0))) : 0;
+  const max = barColumn ? chartMax(section.rows.map((r) => r[barColumn.key])) : 0;
   const [first, ...rest] = section.columns;
 
   return (
@@ -76,9 +78,7 @@ function Section({ section, id }: { section: ReportSection; id: string }) {
                         label
                       )}
                       {barColumn && max > 0 ? (
-                        <span aria-hidden="true" className="mt-1 block h-1.5 rounded-full bg-canvas">
-                          <span className="block h-1.5 rounded-full bg-accent" style={{ width: `${Math.max(2, (barValue / max) * 100)}%` }} />
-                        </span>
+                        <ChartBar value={barValue} max={max} className="mt-1" />
                       ) : null}
                     </th>
                     {rest.map((column) => (

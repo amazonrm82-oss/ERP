@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/cn";
+import { Meter } from "@/components/ui/chart";
 
 import { EDIT_PARAM, type CompletenessType } from "../completeness";
 import { toCompletePath } from "../paths";
@@ -30,9 +30,7 @@ export async function CompletenessCard({ orgId, type, id, editBase }: Props) {
     <Card aria-labelledby={titleId}>
       <CardHeader id={titleId} title="השלמת פרטים" action={<span className="text-lg font-semibold tabular-nums">{score.score}%</span>} />
       <CardBody className="space-y-3">
-        <span aria-hidden="true" className="block h-2 rounded-full bg-canvas">
-          <span className={cn("block h-2 rounded-full", done ? "bg-success" : "bg-accent")} style={{ width: `${score.score > 0 ? Math.max(2, score.score) : 0}%` }} />
-        </span>
+        <Meter decorative value={score.score} max={100} tone={done ? "done" : "bar"} />
         {done ? (
           <p className="text-md text-ink-soft">כל השדות החשובים מלאים.</p>
         ) : (

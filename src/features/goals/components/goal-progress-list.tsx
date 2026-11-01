@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/cn";
+import { Meter } from "@/components/ui/chart";
 import { formatNumber } from "@/lib/format";
 
 import { goalMetric } from "../metrics";
@@ -32,7 +32,6 @@ export function GoalProgressList({ items, showSubject = true, orgId }: { items: 
         const figures = progressFigures(item, item.today);
         const metric = goalMetric(item.metric);
         const standing = figures.standing ? STANDING_LABELS[figures.standing] : null;
-        const fill = Math.min(100, Math.max(0, figures.percent ?? 0));
         return (
           <li key={item.goalId} className="py-3 first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -56,12 +55,7 @@ export function GoalProgressList({ items, showSubject = true, orgId }: { items: 
                 <span className="text-lg font-semibold tabular-nums">{figures.percent === null ? "—" : `${formatNumber(figures.percent)}%`}</span>
               </span>
             </div>
-            <span aria-hidden="true" className="mt-2 block h-2 rounded-full bg-canvas">
-              <span
-                className={cn("block h-2 rounded-full", figures.standing === "reached" ? "bg-success" : "bg-accent")}
-                style={{ width: `${fill > 0 ? Math.max(2, fill) : 0}%` }}
-              />
-            </span>
+            <Meter decorative value={figures.percent ?? 0} max={100} tone={figures.standing === "reached" ? "done" : "bar"} className="mt-2" />
             {figures.phase === "pace" && figures.projected !== null ? (
               <p className="mt-1.5 text-sm text-ink-soft">
                 קצב צפוי {periodEndLabel(item.period)}: {metricValue(item.metric, figures.projected)}

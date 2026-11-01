@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Meter } from "@/components/ui/chart";
 import { CheckIcon } from "@/components/ui/icons";
 import { DeviceStatus } from "@/features/notifications/components/device-warning";
 import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
@@ -18,17 +19,7 @@ export function SetupChecklist({ orgId, items, labelledBy }: Props) {
         <span className="font-medium">{`${percent}% הושלם`}</span>
         <span className="text-ink-soft">{`${done} מתוך ${total}`}</span>
       </div>
-      <div
-        role="progressbar"
-        aria-labelledby={labelledBy}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        aria-valuetext={`${percent}%, ${done} מתוך ${total}`}
-        className="mb-4 h-2 overflow-hidden rounded-full bg-line-strong"
-      >
-        <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
-      </div>
+      <Meter kind="progress" labelledBy={labelledBy} value={percent} max={100} valueText={`${percent}%, ${done} מתוך ${total}`} className="mb-4" />
       <ul className="divide-y divide-line">
         {items.map((item) => (
           <li key={item.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">

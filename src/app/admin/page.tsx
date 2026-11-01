@@ -1,4 +1,5 @@
 import { Card, CardHeader } from "@/components/ui/card";
+import { BarList } from "@/components/ui/chart";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { consentHealthWarnings, getConsentHealth, getPlatformMetrics, platformReady } from "@/features/platform/queries";
@@ -34,7 +35,6 @@ export default async function AdminHomePage() {
   const byStatus = (m.by_status ?? {}) as Obj;
   const byPlan = (m.by_plan ?? {}) as Obj;
   const newByMonth = (m.new_by_month ?? []) as Array<{ month: string; n: number }>;
-  const maxNew = Math.max(1, ...newByMonth.map((r) => n(r.n)));
 
   return (
     <>
@@ -85,19 +85,11 @@ export default async function AdminHomePage() {
         </Card>
         <Card aria-labelledby="new-orgs">
           <CardHeader id="new-orgs" title="ארגונים חדשים לפי חודש" />
-          <ul className="space-y-2 px-4 py-3 sm:px-5">
-            {newByMonth.map((r) => (
-              <li key={r.month} className="text-sm">
-                <span className="flex justify-between">
-                  <span dir="ltr">{r.month}</span>
-                  <span className="tabular-nums">{formatNumber(n(r.n))}</span>
-                </span>
-                <span aria-hidden="true" className="mt-1 block h-1.5 rounded-full bg-canvas">
-                  <span className="block h-1.5 rounded-full bg-accent" style={{ width: `${(n(r.n) / maxNew) * 100}%` }} />
-                </span>
-              </li>
-            ))}
-          </ul>
+          <BarList
+            label="ארגונים חדשים לפי חודש"
+            className="px-4 py-3 sm:px-5"
+            items={newByMonth.map((r) => ({ key: r.month, label: <span dir="ltr">{r.month}</span>, value: n(r.n), valueText: formatNumber(n(r.n)) }))}
+          />
         </Card>
       </div>
       <Card aria-labelledby="health" className="mt-5">

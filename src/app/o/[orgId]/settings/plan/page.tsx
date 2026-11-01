@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Meter } from "@/components/ui/chart";
 import { EmptyState } from "@/components/ui/feedback";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { listPlanCards } from "@/features/plans/queries";
@@ -92,21 +93,21 @@ export default async function PlanUsagePage({ params }: Props) {
                     ) : (
                       <>
                         {amount(row.used)} מתוך {amount(row.limit)}
+                        {/* DSN-13: said in words too, not by the red colour alone */}
+                        {near ? " · קרוב למכסה" : null}
                       </>
                     )}
                   </span>
                 </div>
                 {row.limit !== null ? (
-                  <div
-                    role="meter"
-                    aria-label={row.label}
-                    aria-valuemin={0}
-                    aria-valuemax={row.limit}
-                    aria-valuenow={row.used}
-                    className="mt-2 h-2 overflow-hidden rounded-full bg-canvas"
-                  >
-                    <div className={cn("h-full rounded-full", near ? "bg-danger" : "bg-accent")} style={{ width: `${Math.round(share * 100)}%` }} />
-                  </div>
+                  <Meter
+                    label={row.label}
+                    value={row.used}
+                    max={row.limit}
+                    valueText={`${formatNumber(row.used)} מתוך ${formatNumber(row.limit)}${near ? ", קרוב למכסה" : ""}`}
+                    tone={near ? "alert" : "bar"}
+                    className="mt-2"
+                  />
                 ) : null}
               </li>
             );

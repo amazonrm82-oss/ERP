@@ -5,6 +5,7 @@ import { useId, useRef, useState } from "react";
 
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { Meter } from "@/components/ui/chart";
 import { FormError } from "@/components/ui/feedback";
 import { Select, SelectField, TextareaField } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
@@ -551,9 +552,7 @@ export function ImportWizard({
             <p className="mb-1.5 text-md">
               {step === "running" ? "מייבאים… אל תסגרו את הדף עד הסוף." : stopped ? "הייבוא נעצר." : "הייבוא הסתיים."} {formatNumber(progress)} מתוך {formatNumber(sheet.rows.length)} שורות.
             </p>
-            <div role="progressbar" aria-label="התקדמות הייבוא" aria-valuemin={0} aria-valuemax={sheet.rows.length} aria-valuenow={progress} className="h-2.5 rounded-full bg-canvas">
-              <div className="h-2.5 rounded-full bg-accent transition-[width]" style={{ width: `${(progress / sheet.rows.length) * 100}%` }} />
-            </div>
+            <Meter kind="progress" label="התקדמות הייבוא" value={progress} max={sheet.rows.length} valueText={`${formatNumber(progress)} מתוך ${formatNumber(sheet.rows.length)} שורות`} animate />
           </div>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-live="polite">
             {[

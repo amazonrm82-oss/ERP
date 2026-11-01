@@ -52,6 +52,11 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["on-brand", "brand"],
 ];
 
+// DSN-13: chart marks against what they sit on (3:1, WCAG 1.4.11 non-text contrast): their track, a card, the page
+const CHART_MARKS = ["chart-bar", "chart-done", "chart-alert"];
+const CHART_GROUNDS = ["chart-track", "surface", "canvas"];
+const MARK_PAIRS: Array<[string, string]> = CHART_MARKS.flatMap((mark) => CHART_GROUNDS.map((ground) => [mark, ground] as [string, string]));
+
 describe.each([
   ["light", light],
   ["dark", dark],
@@ -59,6 +64,10 @@ describe.each([
   it.each(TEXT_PAIRS)("%s on %s: 4.5:1 or more", (text, background) => {
     const ratio = contrast(resolve(vars, `--color-${text}`), resolve(vars, `--color-${background}`));
     expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(MARK_PAIRS)("chart mark %s on %s: 3:1 or more", (mark, ground) => {
+    expect(contrast(resolve(vars, `--color-${mark}`), resolve(vars, `--color-${ground}`))).toBeGreaterThanOrEqual(3);
   });
 
   it("control borders stand out from the surface (3:1, WCAG 1.4.11)", () => {
