@@ -3672,7 +3672,9 @@ export type Database = {
         Returns: Array<{ contact_id: string; kind: "phone" | "email"; value: string }>;
       };
       // an exported list goes to the audit log (migration 0034)
-      log_export: { Args: { p_org: string; p_kind: string; p_report: string | null; p_rows: number; p_format?: "csv" | "xlsx" }; Returns: undefined };
+      // RPT-02 review: a read-only look at the month's PDF quota and the minute's rate (null = room left, else the hint)
+      pdf_quota_check: { Args: { p_org: string }; Returns: string | null };
+      log_export: { Args: { p_org: string; p_kind: string; p_report: string | null; p_rows: number; p_format?: "csv" | "xlsx" | "pdf" }; Returns: undefined };
       // PRM-01: owners and admins set a manager's or member's extra permissions (the whole set)
       set_member_permissions: { Args: { p_org: string; p_user: string; p_permissions: string[] }; Returns: string[] };
       // PRM-01: the keys the caller holds (all for owners and admins)

@@ -97,6 +97,11 @@ export default async function ReportPage({ params, searchParams }: Props) {
               <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}`} className={buttonClasses("secondary", "sm")} download>
                 ייצוא ל-CSV
               </a>
+              {/* RPT-02: made on our server for this export, counted in the monthly PDF quota; no download attribute, so a refusal
+                  (the month's quota, too many this minute) shows as a readable page and the file still downloads (attachment) */}
+              <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}&format=pdf`} className={buttonClasses("secondary", "sm")}>
+                ייצוא ל-PDF
+              </a>
             </div>
           ) : null
         }

@@ -649,6 +649,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // QUO-08 redefines app.quotes_check() of _quote_send.sql, public.quote_public_decide() of _quote_link_expired_lists.sql and
       // app.audit_erase_core() of _document_details.sql last (the customer's choice of optional lines and question)
       "_quote_page_options_question.sql",
+      // RPT-02 redefines public.log_export() of _report_recurring_revenue.sql last (a report's PDF, counted in the PDF quota)
+      "_report_pdf_export.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
