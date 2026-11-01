@@ -22,10 +22,14 @@ type Options = {
 
 /**
  * A public page that may be framed by customers' sites: every /f/ page except the QR scan route, whose page before an
- * external link (BIZ-03) carries the business's name on our domain and must never sit inside another site.
+ * external link (BIZ-03) carries the business's name on our domain and must never sit inside another site, and the
+ * customer's statement page (BAL-04), which shows a customer's debts and must never sit inside another site either.
+ * next.config.ts leaves the same two prefixes out of `frame-ancestors *`; keep the two in step.
  */
+export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/"] as const;
+
 export function isEmbeddablePublicPath(pathname: string): boolean {
-  return pathname.startsWith("/f/") && !pathname.startsWith("/f/q/");
+  return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }: Options): string {

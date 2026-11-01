@@ -343,6 +343,117 @@ describe("the customer's statement link (BAL-04)", () => {
     expect(await page(token, "c".repeat(64))).toEqual({ rate_limited: true });
   });
 
+  it("the issuer called directly: refused for a customer the caller does not read; the partial rule is all it skips (review)", async () => {
+    const issue = (u: U, where: { contact?: string; company?: string }) =>
+      run(u, async (q) => (await one<{ t: string }>(q, "select app.statement_link_issue($1, $2, $3) as t", [org, where.contact ?? null, where.company ?? null])).t);
+    const notMine = await contact("מירב");
+    const notMineCo = await company("חברה זרה");
+    const mineCo = await company("חברה של המחזיק", org, keyHolder);
+    const hiddenDeal = await deal(null, mineCo, owner.id);
+    await doc("tax_invoice", 4200, day(-4), { deal: hiddenDeal });
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      expect((await pgError(issue(keyHolder, { contact: notMine }))).code).toBe("42501");
+      expect((await pgError(issue(keyHolder, { company: notMineCo }))).code).toBe("42501");
+      // no right to record payments, even on a customer they read
+      const membersOwn = await contact("נוי", null, member.id);
+      expect((await pgError(issue(member, { contact: membersOwn }))).code).toBe("42501");
+      // another business's customer
+      const theirs = await run(outsider, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'זרה', $2) returning id", [otherOrg, outsider.id])).id);
+      expect((await pgError(issue(keyHolder, { company: theirs }))).code).toBe("42501");
+      expect((await pgError(run(keyHolder, (q) => q("select app.statement_link_issue($1, null, $2)", [otherOrg, theirs])))).code).toBe("42501");
+      // a customer they read: today the direct call skips only the partial rule (create refuses it, the issuer does not)
+      expect((await pgError(create(keyHolder, { company: mineCo }))).hint).toBe("statement_link:partial");
+      const token = await issue(keyHolder, { company: mineCo });
+      expect(token).toMatch(/^[A-Za-z0-9_-]{64}$/);
+      expect((await page(token)).totals.open_agorot).toBe(4200);
+      // and every other check still holds
+      const inCo = await contact("רז", mineCo, keyHolder.id);
+      expect((await pgError(issue(keyHolder, { contact: inCo }))).hint).toBe("statement_link:company");
+      await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+      try {
+        expect((await pgError(issue(keyHolder, { company: mineCo }))).hint).toBe("org:read_only");
+      } finally {
+        await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [org]));
+      }
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
+  });
+
+  it("status and turning off need a customer the caller reads (review)", async () => {
+    const theirs = await contact("שקד");
+    await create(owner, { contact: theirs });
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      expect((await pgError(status(keyHolder, { contact: theirs }))).code).toBe("42501");
+      expect((await pgError(revoke(keyHolder, { contact: theirs }))).code).toBe("42501");
+      expect(await status(owner, { contact: theirs })).toMatchObject({ active: true });
+      const mine = await contact("תמר", null, keyHolder.id);
+      await create(keyHolder, { contact: mine });
+      expect(await status(keyHolder, { contact: mine })).toMatchObject({ active: true });
+      expect(await revoke(keyHolder, { contact: mine })).toBe(true);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
+    expect(await status(keyHolder, { contact: theirs })).toMatchObject({ active: true });
+    // a customer in the bin can still be seen and turned off
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [theirs]));
+    expect(await status(keyHolder, { contact: theirs })).toMatchObject({ active: false });
+    expect(await revoke(keyHolder, { contact: theirs })).toBe(true);
+  });
+
+  it("not found while the plan lacks documents or payments; back when it has them again", async () => {
+    const k = await contact("עדי");
+    await doc("tax_invoice", 300, day(2), { contact: k });
+    const token = await create(owner, { contact: k });
+    for (const key of ["documents", "payments"]) {
+      await setFeatures(org, { ...FEATURES, [key]: false });
+      try {
+        await notFound(token);
+      } finally {
+        await setFeatures(org, FEATURES);
+      }
+      expect((await page(token)).documents.length, key).toBe(1);
+    }
+  });
+
+  it("a company's totals equal its card (BAL-02), and its credit counts its contacts' payments (PAY-03)", async () => {
+    const co = await company("חברת הזיכוי");
+    const c1 = await contact("אביב", co);
+    const c2 = await contact("ברק", co);
+    const d = await deal(c2, co);
+    await doc("tax_invoice", 6000, day(-8), { contact: c1 });
+    const inv = await doc("tax_invoice", 3500, day(4), { deal: d });
+    const partial = await pay(1000, { deal: d });
+    await allocate(partial, inv, 1000);
+    // unallocated payments of its contacts: the company's credit
+    await pay(1200, { contact: c1 });
+    await pay(300, { contact: c2 });
+    const p = await page(await create(owner, { company: co }));
+    const card = await run(owner, async (q) => (await one<{ s: { open_debt: number; overdue_debt: number; partial: boolean } }>(q, "select public.customer_debt_summary($1, null, $2) as s", [org, co])).s);
+    expect(card.partial).toBe(false);
+    expect([Number(p.totals.open_agorot), Number(p.totals.overdue_agorot)]).toEqual([Number(card.open_debt), Number(card.overdue_debt)]);
+    expect(p.totals).toEqual({ open_agorot: 8500, overdue_agorot: 6000, credit_agorot: 1500 });
+  });
+
+  it("at most 500 documents, oldest due first; `more` counts the rest and the totals count all", async () => {
+    const m = await contact("רבים");
+    await asAdmin((q) =>
+      q(
+        `insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date)
+         select $1, $2, 'tax_invoice', 'BULK-' || g, $3::date, 100, $3::date + g from generate_series(1, 503) g`,
+        [org, m, day(-30)],
+      ),
+    );
+    const p = await page(await create(owner, { contact: m }));
+    expect(p.documents.length).toBe(500);
+    expect(Number(p.more)).toBe(3);
+    expect(p.documents[0].number).toBe("BULK-1");
+    expect(p.documents[499].number).toBe("BULK-500");
+    expect(Number(p.totals.open_agorot)).toBe(50300);
+  });
+
   it("grants: the page is for the service role only; the staff functions for signed-in people", async () => {
     const rows = await asAdmin(async (q) =>
       (

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
 
+import nextConfig from "../../next.config";
+
 describe("content security policy (FXS-05)", () => {
   const base = { nonce: "abc", supabaseUrl: "https://ref.supabase.co", isDev: false, publicForm: false };
 
@@ -39,6 +41,38 @@ describe("content security policy (FXS-05)", () => {
     expect(isEmbeddablePublicPath("/f/book/abc")).toBe(true);
     expect(isEmbeddablePublicPath("/f/q/abc")).toBe(false);
     expect(isEmbeddablePublicPath("/o/x")).toBe(false);
+  });
+
+  it("the customer's statement page is never embeddable (BAL-04 review)", () => {
+    expect(isEmbeddablePublicPath("/f/statement/abc")).toBe(false);
+    expect(isEmbeddablePublicPath("/f/statementx")).toBe(true);
+    expect(isEmbeddablePublicPath("/f/order/abc")).toBe(true);
+  });
+
+  it("next.config frames the same pages: DENY for the app, the QR route and the statement page; * for the other /f/ pages", async () => {
+    const blocks = await nextConfig.headers!();
+    const headersFor = (path: string) => {
+      const out: Record<string, string> = {};
+      for (const block of blocks) {
+        // the regex sources are plain JS regexes; ":path*" is path-to-regexp for "anything after"
+        const re = new RegExp(`^${block.source.replace("/:path*", "(?:/.*)?")}$`);
+        if (re.test(path)) for (const h of block.headers) out[h.key] = h.value;
+      }
+      return out;
+    };
+    for (const path of ["/o/x", "/f/q/abc", "/f/statement/abc", "/app"]) {
+      const h = headersFor(path);
+      expect(h["Content-Security-Policy"], path).toBe("frame-ancestors 'none'");
+      expect(h["X-Frame-Options"], path).toBe("DENY");
+      expect(isEmbeddablePublicPath(path), path).toBe(false);
+    }
+    for (const path of ["/f/abc", "/f/book/abc", "/f/order/abc", "/f/statementx"]) {
+      const h = headersFor(path);
+      expect(h["Content-Security-Policy"], path).toBe("frame-ancestors *");
+      expect(h["X-Frame-Options"], path).toBeUndefined();
+      expect(isEmbeddablePublicPath(path), path).toBe(true);
+    }
+    expect(headersFor("/f/statement/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
   });
 
   it("development keeps eval for React's error stacks", () => {

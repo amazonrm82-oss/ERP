@@ -19,18 +19,24 @@
 --   a document or payment the caller cannot read) = refused (hint statement_link:partial), because the page shows every
 --   open document of the customer and its holder would learn amounts the caller may not see. Then the definer
 --   app.statement_link_issue (schema app, not in the API; granted to authenticated for this wrapper only) checks again
---   what it can (app.can_record_payments, a writable business (org:read_only), the keys balances, documents and payments,
---   a live customer of the business (statement_link:deleted), no company on a contact) and writes the link. Audited as
+--   what it can (app.can_record_payments, that the caller reads the customer (app.statement_customer_readable: the
+--   rule of app.user_can_read_record on the record's owner and team), a writable business (org:read_only), the keys
+--   balances, documents and payments, a live customer of the business (statement_link:deleted), no company on a contact)
+--   and writes the link. Called directly, it can at most skip the partial rule; never reach a customer the caller does not
+--   read. A deputy who reads a customer only through HEB-08's deputy rule is refused (fails closed). Audited as
 --   action 'statement_link' on the contact or company, {"link": "created" | "revoked"}: never the token or its hash.
--- * public.statement_link_revoke / statement_link_status (definer): app.can_record_payments in the business. Revoking only
---   lessens access: no key, no writable business needed.
+-- * public.statement_link_revoke / statement_link_status (definer): app.can_record_payments in the business and a customer
+--   the caller reads (the same app.statement_customer_readable). Revoking only lessens access: no key, no writable
+--   business needed.
 -- * The one rule for a link (app.statement_link_usable): not found (P0002) for an unknown or revoked token, a business whose
 --   public pages are closed (app.org_public_pages_open), a business without one of the keys balances, documents, payments,
 --   a customer in the recycle bin or gone, and a contact that now has a company.
 -- * public.statement_public(token, ip_hash): service_role only. Views: 120 per link in 10 minutes (counted on the link) and,
 --   with the server's keyed IP hash (FXS-11, src/lib/keyed-ip-hash.ts, scope "statement"), 60 per sender in 10 minutes in
 --   app.statement_link_view_counts (1,024 reused buckets per link, no hash stored; the sender is scoped to the link by
---   app.statement_link_sender). Past either: {"rate_limited": true}. Both are counted before anything is read.
+--   app.statement_link_sender). Past either: {"rate_limited": true}. Both are counted right after the token is looked up
+--   and judged usable (the link's own row and the business's state are read first, as ORD-05's order link does, which
+--   accepts this), before any of the page's data is read.
 --   The answer: the business (display name, the registered details as on documents while QUO-05's design shows them, the
 --   logo while it shows it, the colour), the customer's name as documents name it (CON-08: billing name, else the name),
 --   the business's today, and the customer's OPEN debt documents by BAL-02's rule: active tax invoices, proformas and
@@ -42,6 +48,8 @@
 --   `more` counts the rest (the totals count all). No ids, no notes, no payment details, nothing of another customer.
 --   The money functions are security invoker; here they run as this function's owner, so every row of THIS customer
 --   counts (the page is not a person); the scope is the customer's alone, as BAL-02's card.
+-- * Accepted (review): a merge of two contacts leaves the duplicate's link to go with the duplicate (cascade), so the kept
+--   contact has no link until one is made again; removing sample data (USR-04) does not count a link as work on the record.
 -- Every statement is safe to run twice. No drops, no row removal.
 
 create table if not exists app.statement_links (
@@ -126,7 +134,27 @@ as $$
 $$;
 revoke all on function app.statement_link_usable(app.statement_links) from public, anon, authenticated, service_role;
 
--- Who may manage a customer's link: whoever records payments in the business (BAL-01's rule); one customer named
+-- The caller reads the customer: a contact or company of the business (in the recycle bin too, so a binned customer's
+-- link can still be seen and turned off), judged by app.user_can_read_record (the rule of app.can_read_record for a named
+-- user; keep in step) on the record's owner and team
+create or replace function app.statement_customer_readable(p_org uuid, p_contact uuid, p_company uuid) returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select case
+    when p_contact is not null and p_company is null then exists (
+      select 1 from public.contacts c
+       where c.organization_id = p_org and c.id = p_contact
+         and app.user_can_read_record(p_org, auth.uid(), c.owner_id, c.team_id))
+    when p_company is not null and p_contact is null then exists (
+      select 1 from public.companies c
+       where c.organization_id = p_org and c.id = p_company
+         and app.user_can_read_record(p_org, auth.uid(), c.owner_id, c.team_id))
+    else false end
+$$;
+revoke all on function app.statement_customer_readable(uuid, uuid, uuid) from public, anon, authenticated, service_role;
+
+-- Who may manage a customer's link: whoever records payments in the business (BAL-01's rule), for one customer they read
 create or replace function app.statement_link_check(p_org uuid, p_contact uuid, p_company uuid) returns void
 language plpgsql stable security definer
 set search_path = ''
@@ -136,6 +164,9 @@ begin
     raise exception 'name a contact or a company' using errcode = '22023';
   end if;
   if not app.can_record_payments(p_org) then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+  if not app.statement_customer_readable(p_org, p_contact, p_company) then
     raise exception 'not permitted' using errcode = '42501';
   end if;
 end;
@@ -202,7 +233,8 @@ begin
   return v_token;
 end;
 $$;
--- schema app is not in the API: only public.statement_link_create (invoker) reaches it
+-- schema app is not in the API: only public.statement_link_create (invoker) reaches it. A direct call still needs
+-- app.statement_link_check (rights and a customer the caller reads) and the checks above; it skips only the partial rule.
 revoke all on function app.statement_link_issue(uuid, uuid, uuid) from public, anon, authenticated, service_role;
 grant execute on function app.statement_link_issue(uuid, uuid, uuid) to authenticated;
 
@@ -331,7 +363,8 @@ begin
     raise exception 'statement not found' using errcode = 'P0002';
   end if;
 
-  -- 120 views per link in 10 minutes; counted first, so the limit holds under parallel load
+  -- 120 views per link in 10 minutes; counted (one row update) before the page's data is read, so the limit holds under
+  -- parallel load
   update app.statement_links l
      set window_started_at = case when l.window_started_at > now() - interval '10 minutes' then l.window_started_at else now() end,
          window_count = case when l.window_started_at > now() - interval '10 minutes' then l.window_count + 1 else 1 end
