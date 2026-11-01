@@ -96,9 +96,11 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
-   Owner, 1 November 2026 (approved, not built yet): the order confirmation PDF (ORD-05) is stored once and downloaded by the
-   customer from the order link in the same pattern and conditions as QUO-06 (one definer per use, service_role only, SHA-256 on every
-   serving, its own "In use" line once built). The statement PDF (BAL-04) and report PDFs (RPT-02) are made per request with the
+   In use (ORD-05 PDF, owner 1 November 2026, answers (1) ב and (34) ב, migrations 021119-021121): the server writes an order's PDF
+   (`src/features/orders/pdf-store-server.ts`, after `public.order_pdf_allowed` with the user's session), calling only
+   `public.order_pdf_store()` (8 arguments; the content stamp its render read); the customer's download
+   (`src/features/orders/pdf-public-server.ts`, route `GET /api/forms/order/<token>/pdf`) calls only `public.order_public_pdf()` and
+   compares the bytes with the SHA-256; both in the eslint allow-list. The PDF prints the customer's own billing details (as the quote PDF). The statement PDF (BAL-04) and report PDFs (RPT-02) are made per request with the
    user's session (or the statement page's own definer answer) and never stored: no new service-key use.
    In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
    (`src/features/quotes/pdf-store-server.ts`, called from `pdf-server.ts` after `public.quote_pdf_allowed` with the user's session),
@@ -1597,6 +1599,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   The warning is app-only (quote and order creation for a held contact or its held company); nothing is refused and no public page reads
   the table. Merge moves ALL the duplicate's holds (history included) through the `merged` entry (`app.merge_customer_holds`); when the
   kept record is held already, the duplicate's active hold is lifted first (the header of 020680 says otherwise; 020690 corrects it). `app.audit_erase_core`, `app.sample_untouched` and `app.import_record_worked` were last redefined in 020680.
+- Order PDF (ORD-05, migrations 021119-021121, 021120 pasted by hand): QUO-06's shape for orders: `files.order_id` (`files_one_subject`
+  eight columns, `files_order_pdf_shape`, root-unique `files_order_pdf_root` + `files_one_newer` = one line of versions per order),
+  server rows only (`files_insert` false, `record_files_insert` refuses, `app.reconcile_pending_files` skips), made at numbering and on
+  the button, counted by `app.pdf_take` through trigger `files_order_pdf` (a person's write re-checked like `files_quote_pdf`), kept
+  except a waiting row and erasure (`app.order_pdf_drop`, body in the pasted 021120). Versions (owner (34) ב): trigger
+  `orders_zz_pdf_content` stamps server-only `orders.pdf_content_changed_at` when a numbered order's delivery date, shipping address or
+  notes change; each file keeps the stamp its render read (`files.order_content_stamp`); `order_pdf_store` keeps the current file
+  only while the stamps match, else makes a version (a stale render answers `changed`); `order_public_pdf` serves the newest confirmed
+  version; staff see every version. `app.audit_row` (last redefined in 021121) ignores the stamp. RPT-02 (021118): `log_export` takes
+  'pdf' for a report and counts it through `app.pdf_take` atomically with the audit; `public.pdf_quota_check` (definer, exporters
+  only, read-only; the advisor's finding on it is expected) is the route's pre-check. The files policies, `app.files_keep_attached`,
+  `app.reconcile_pending_files`, `public.order_public` and `app.audit_erase_core` were last redefined in 021119, `log_export` in 021118.
 - Order documents and payments (ORD-06 part two, migration 020740; owner 21 October 2026: numbered orders only, a cancelled order
   still takes them): nullable `order_id` on `accounting_documents` and `payments` (composite FK set null, full index, insert-only
   column grant). Definer triggers `app.accounting_documents_order` / `app.payments_order` (outsider guard first) run
