@@ -2,16 +2,26 @@
 -- open reminder task with outcome "נסגרה: המסמך בוטל".
 --
 -- app.close_paid_collection_tasks is redefined from its latest body (021108, collection_reminders_answers). Changes:
--- * a third branch: an open, not binned task marked with tasks.collection_document_id, without a repeat rule, never closed by the
---   system before (no marker: an open marked task was reopened by someone else) and whose status no person ever changed, is set
---   done with outcome "נסגרה: המסמך בוטל" when the task's own document has status 'cancelled'. No balance is read for it.
--- * the loop chooses the note by the document's status (doc_status in the row).
--- Unchanged: only tasks with tasks.collection_document_id are touched (a task detached from its document, null, is never closed by
--- itself: the owner's exception); the businesses (app.collection_reminder_orgs: writable, the three plan keys); the caps and turns;
--- the marker (app.collection_task_closes.closed_at / outcome); the per-task exception block; the "paid" close; the reopen, which
--- still needs an ACTIVE document, so a cancelled document never "owes again" (a document is never un-cancelled). A task the system
--- closed as paid whose document is cancelled later keeps its "paid" note. The cheap cut (app.collection_document_paid) only
--- narrows the paid and reopen branches; the cancel branch reads no money.
+-- * cancel: an open, not binned task marked with tasks.collection_document_id, without a repeat rule, never closed by the system
+--   before (no marker: an open marked task was reopened by someone else) and whose status no person ever changed, is set done
+--   with outcome "נסגרה: המסמך בוטל" when its JUDGED document (below) is cancelled. No balance is read for it.
+-- * judged document for every branch: a proforma billed by an active tax invoice is judged by that invoice (COL-03's rule), so
+--   the paid close and the reopen need the judged document active, and the cancel close needs it cancelled. A proforma cancelled
+--   while its invoice stays active is judged by the invoice (closed as paid once the invoice is paid), never closed as cancelled
+--   while its debt lives on the invoice.
+-- * detached (the owner's exception to (21) (א), "משימה שנותקה מהמסמך לא נסגרת לבד"; the lead's reading until the owner confirms):
+--   a task is detached when it has no collection_document_id, or when a person moved its links away from its document: compared
+--   with the task's own document's first link, the document's deal when it has one, else its contact, else its company, the
+--   task's link of that kind must be the same (the job gave the task the document's links). A detached task is never closed
+--   (paid or cancelled) and never reopened. Any other edit (title, due time, owner, outcome text) keeps the task attached.
+-- * the loop chooses the note by the judged document's status (doc_status in the row).
+-- Unchanged: the businesses (app.collection_reminder_orgs: writable, the three plan keys); the caps and turns; the marker
+-- (app.collection_task_closes.closed_at / outcome); the per-task exception block; the reopen, which still needs an ACTIVE judged
+-- document, so a cancelled document never "owes again" (a document is never un-cancelled). A task the system closed as paid whose
+-- document is cancelled later keeps its "paid" note. The cheap cut (app.collection_document_paid) only narrows the paid and reopen
+-- branches; the cancel branch reads no money.
+-- Accepted: on the first run after this file, every open untouched reminder task of a document cancelled earlier closes in one
+-- sweep (within the per-business and per-run caps, over the next runs).
 -- Safe to run twice. No object or row is removed.
 
 create or replace function app.close_paid_collection_tasks(p_orgs uuid[] default null) returns integer
@@ -26,7 +36,7 @@ declare
 begin
   for v_row in
     select z.* from (
-      select t.organization_id, t.id as task_id, t.status::text as task_status, j.id as judged_id, d.status::text as doc_status,
+      select t.organization_id, t.id as task_id, t.status::text as task_status, j.id as judged_id, jd.status::text as doc_status,
              f.last_attempt_at, tn.served_at,
              row_number() over (partition by t.organization_id order by f.last_attempt_at nulls first, t.created_at, t.id) as n
         from app.collection_reminder_orgs(p_orgs) og(id)
@@ -48,9 +58,14 @@ begin
          -- a repeating task is never closed (no next occurrence is made behind the person's back)
          and t.recurrence is null
          and coalesce(f.failures, 0) < 3
+         -- not detached: the task still carries its document's first link (deal, else contact, else company)
+         and case when d.deal_id is not null then t.deal_id is not distinct from d.deal_id
+                  when d.contact_id is not null then t.contact_id is not distinct from d.contact_id
+                  when d.company_id is not null then t.company_id is not distinct from d.company_id
+                  else false end
          and (
-           -- "paid" closes and reopens only while the task's document is active (the owner's answer (4) ב)
-           (d.status = 'active' and (
+           -- "paid" closes and reopens only while the judged document is active (the owner's answer (4) ב)
+           (jd.status = 'active' and (
              -- to close: open and not closed by the system before (a system-closed task that is open again was reopened by a
              -- person: the system reopen clears the marker), no status change by a person ever, and the cheap cut says paid
              (t.status = 'open' and f.closed_at is null
@@ -70,7 +85,7 @@ begin
            -- a cancelled document closes its open task (the owner's answer (20) א, 1 November 2026), under the same rules as
            -- "paid" (open, no marker, no status change by a person ever); no money is read; never reopened (a cancelled
            -- document is never un-cancelled, and the reopen above needs an active document)
-           (d.status = 'cancelled' and t.status = 'open' and f.closed_at is null
+           (jd.status = 'cancelled' and t.status = 'open' and f.closed_at is null
             and not exists (select 1 from public.audit_log al
                              where al.organization_id = t.organization_id and al.entity_type = 'tasks' and al.entity_id = t.id
                                and al.action = 'update' and al.changes ? 'status' and al.actor_id is not null))

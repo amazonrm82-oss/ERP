@@ -588,6 +588,112 @@ describe("collection reminders (COL-04)", () => {
       expect(await marker(t.id)).toBeNull();
     });
 
+    it("answer (21) exception: a task a person moved away from its document's contact or deal is never closed nor reopened", async () => {
+      const other = await run(member, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'אחר', $2) returning id", [org, member.id])).id,
+      );
+      // a document on the contact: the task moved to another contact, then the document is paid / cancelled
+      const paidDoc = await doc(0, "tax_invoice", 210);
+      const cancelledDoc = await doc(0, "tax_invoice", 220);
+      // a document on a deal (and the contact): the task moved to another deal, the contact kept
+      const [deal, otherDeal] = await run(owner, async (q) => {
+        const ids: string[] = [];
+        for (const name of ["עסקת גבייה", "עסקה אחרת"]) {
+          ids.push(
+            (
+              await one<{ id: string }>(
+                q,
+                `insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id)
+                 select $1, $2, p.id, (select s.id from public.stages s where s.pipeline_id = p.id order by s.position, s.id limit 1), $3
+                   from public.pipelines p where p.organization_id = $1 and p.deleted_at is null order by p.position, p.id limit 1
+                 returning id`,
+                [org, name, contact],
+              )
+            ).id,
+          );
+        }
+        return ids;
+      });
+      const dealDoc = await run(owner, async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            "insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, $3, 'tax_invoice', $4, current_date - 40, 230) returning id",
+            [org, deal, contact, `CR-${++n}`],
+          )
+        ).id,
+      );
+      await setDue(dealDoc, 0);
+      // a document the system closes as paid; then a person moves the task, and the debt comes back
+      const reopenDoc = await doc(0, "tax_invoice", 240);
+      await job();
+      const [a] = await tasks(paidDoc);
+      const [b] = await tasks(cancelledDoc);
+      const [c] = await tasks(dealDoc);
+      const [d] = await tasks(reopenDoc);
+      expect(c.contact_id).toBe(contact);
+      const p = await pay(reopenDoc, 240);
+      await job();
+      expect(await state(d.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      expect(
+        (await run(member, (q) => q("update public.tasks set contact_id = $2 where id = any($1::uuid[]) returning id", [[a.id, b.id], other]))).rowCount,
+      ).toBe(2);
+      // the deal's task belongs to the deal's owner (MNY-01's rule): they move it
+      expect(
+        (await run(owner, (q) => q("update public.tasks set deal_id = $2 where id = $1 returning id", [c.id, otherDeal]))).rowCount,
+      ).toBe(1);
+      await asAdmin((q) => q("update public.tasks set contact_id = $2 where id = $1", [d.id, other]));
+      await pay(paidDoc, 210);
+      await cancel(cancelledDoc);
+      await pay(dealDoc, 230);
+      await fail(p);
+      await job();
+      expect(await state(a.id)).toEqual({ status: "open", outcome: null });
+      expect(await state(b.id)).toEqual({ status: "open", outcome: null });
+      expect(await state(c.id)).toEqual({ status: "open", outcome: null });
+      expect(await state(d.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      for (const id of [a.id, b.id, c.id]) expect(await marker(id)).toBeNull();
+    });
+
+    it("answer (21) (א): a task a person retitled, re-dated or handed to someone else still closes (paid or cancelled)", async () => {
+      const paidDoc = await doc(0, "tax_invoice", 260);
+      const cancelledDoc = await doc(0, "tax_invoice", 270);
+      await job();
+      const [a] = await tasks(paidDoc);
+      const [b] = await tasks(cancelledDoc);
+      for (const t of [a, b]) {
+        const edited = await run(member, (q) => q("update public.tasks set title = 'לדבר עם רואה החשבון', due_at = now() + interval '3 days', priority = 1 where id = $1 returning id", [t.id]));
+        const handed = await run(member, (q) => q("update public.tasks set owner_id = $2 where id = $1 returning id", [t.id, owner.id]));
+        expect([edited.rowCount, handed.rowCount]).toEqual([1, 1]);
+      }
+      await pay(paidDoc, 260);
+      await cancel(cancelledDoc);
+      await job();
+      expect(await state(a.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+      expect(await state(b.id)).toEqual({ status: "done", outcome: "נסגרה: המסמך בוטל" });
+    });
+
+    it("a billed proforma cancelled while its invoice stays active is judged by the invoice, never closed as cancelled", async () => {
+      const proforma = await doc(0, "proforma", 820);
+      await job();
+      const [t] = await tasks(proforma);
+      const invoice = await run(owner, async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, proforma_id) values ($1, $2, 'tax_invoice', $3, current_date, 820, $4) returning id",
+            [org, contact, `CR-${++n}`, proforma],
+          )
+        ).id,
+      );
+      await cancel(proforma);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "open", outcome: null });
+      await pay(invoice, 820);
+      await job();
+      expect(await state(t.id)).toEqual({ status: "done", outcome: "נסגרה: החוב שולם" });
+    });
+
     it("answer (20): a cancelled document is never owed again: no reopen, whatever happens to its payments", async () => {
       // closed as cancelled, then the payment allocated to it fails: stays closed
       const first = await doc(0, "tax_invoice", 400);
