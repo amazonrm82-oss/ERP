@@ -657,6 +657,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `billing_kind` monthly|yearly at their stored recurring amount: monthly as is, yearly / 12 rounded half up per deal; every month of
   the period, by owner, `deals_without_amount`, `deals_with_vat/without_vat` from the deal's lines. Report key `recurring`. Test 64's
   re-run list ends with `_report_recurring_revenue.sql` for `log_export`: a later redefinition is appended there.
+- Document discount in reports (DSC-01 rest, migration 021112): an accepted quote's document discount is not carried to its deal's
+  lines (QUO-13), while the deal's amount is the quote's net (`amount_quote_id`). `report_revenue_by_product`,
+  `report_revenue_by_category` and `report_gross_profit` (all last redefined in 021112, invoker) split the quote's
+  `discount_total_agorot` at read time between the deal's current lines, only while every line is in the quote's VAT mode and the
+  lines' sum equals the quote's `subtotal_agorot` (the lines are still the quote's). The split is `app.discount_split(totals,
+  discount)` (pure: floor shares, largest remainder, ties to the earlier line by position then id; null on bad input) = `discountSplit()`
+  in `src/features/tax/discount-split.ts` (both run `tests/unit/fixtures/discount-split.json`; test 273). Totals carry
+  `deals_with_document_discount` and `document_discount_agorot` (not on profit); the screens say when a discount was split (no amount
+  when VAT modes mix). Stored totals unchanged. Test 64's re-run list ends with `_document_discount_split.sql`.
 - Pipeline cleanup and money waiting (MNY-05/01/02, migrations 0144, 0145): `report_pipeline_cleanup(org, owner)` (security
   invoker) copies `report_stuck_deals`' stuck rule (keep in step; test 93 compares them in two far time zones); overdue =
   expected close date before the org's today; postponed deals left out; each deal once (stuck, else overdue); 300 rows.
