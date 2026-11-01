@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { definedFunctions, rerunClosure } from "../db/rerun";
+import { definedFunctions, definedPolicies, rerunClosure, stalePolicies } from "../db/rerun";
 
 // tests/db/rerun.ts: which later migrations a test re-runs after an older one (the closure).
 describe("rerunClosure", () => {
@@ -36,5 +36,35 @@ describe("rerunClosure", () => {
     // "also" picks a file by its text
     expect(rerunClosure(["0200_c.sql"], (sql) => sql.includes("grant select on public.things"), dir).files).toEqual(["0200_c.sql", "0400_f.sql", "0500_g.sql"]);
     expect(() => rerunClosure(["0999_none.sql"], undefined, dir)).toThrow(/not found/);
+  });
+});
+
+// Policies close the same way: a re-run `alter policy` puts back an old USING / WITH CHECK (the teardown compares them too).
+describe("rerunClosure and stalePolicies over policies", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rerun-policies-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const files: Record<string, string> = {
+    "0100_a.sql": "create policy things_select on public.things for select to authenticated using (true);",
+    // another policy of the same table: not in the set
+    "0150_b.sql": "create policy things_insert on public.things for insert to authenticated with check (true);",
+    // alters a policy of the first file (quoted name, storage schema elsewhere)
+    "0200_c.sql": 'alter policy "things_select" on public.things using (false);\ncreate policy files_delete on storage.objects for delete using (true);',
+    "0300_d.sql": "alter policy files_delete on storage.objects using (false);",
+  };
+  for (const [name, sql] of Object.entries(files)) writeFileSync(join(dir, name), sql);
+
+  it("reads the policies a migration creates or alters", () => {
+    expect([...definedPolicies(files["0200_c.sql"])].sort()).toEqual(["public.things things_select", "storage.objects files_delete"]);
+  });
+
+  it("brings in every later file that sets a policy of the set", () => {
+    expect(rerunClosure(["0100_a.sql"], undefined, dir).files).toEqual(["0100_a.sql", "0200_c.sql", "0300_d.sql"]);
+    expect(rerunClosure(["0150_b.sql"], undefined, dir).files).toEqual(["0150_b.sql"]);
+  });
+
+  it("names a policy a hand-picked list leaves at an older definition", () => {
+    expect(stalePolicies(["0100_a.sql"], dir)).toEqual(["public.things things_select: list ends with 0100_a.sql, latest is 0200_c.sql"]);
+    expect(stalePolicies(["0100_a.sql", "0200_c.sql"], dir)).toEqual(["storage.objects files_delete: list ends with 0200_c.sql, latest is 0300_d.sql"]);
+    expect(stalePolicies(["0100_a.sql", "0200_c.sql", "0300_d.sql"], dir)).toEqual([]);
   });
 });

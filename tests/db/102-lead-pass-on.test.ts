@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, pgError, TEST_DB_URL } from "./helpers";
+import { rerunClosure, stalePolicies } from "./rerun";
 
 afterAll(closePool);
 
@@ -292,20 +293,15 @@ describe("passing a lead on to the next rep (SPD-03)", () => {
       await q(readFileSync(join(dir, files[0]), "utf8"));
       const check = (await q<{ d: string }>("select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'lead_response_settings_action_check'")).rows[0].d;
       expect(check).toContain("pass_on");
-      await q(readFileSync(join(dir, files[1]), "utf8"));
-      // every later migration that redefines a function a re-run file defined runs again too, in
-      // name order (HEB-08, CAP-08: 019100 redefines the job and also intake_submit and others, which
-      // later migrations redefine again), so no later test sees an old body
-      const defined = (sql: string) => [...sql.matchAll(/create\s+or\s+replace\s+function\s+([a-z_]+\.[a-z_0-9]+)\s*\(/gi)].map((m) => m[1].toLowerCase());
-      const names = new Set([...defined(readFileSync(join(dir, files[0]), "utf8")), ...defined(readFileSync(join(dir, files[1]), "utf8"))]);
-      for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql") && f > files[1]).sort()) {
-        const sql = readFileSync(join(dir, f), "utf8");
-        const own = defined(sql);
-        if (own.some((name) => names.has(name))) {
-          await q(sql);
-          for (const name of own) names.add(name);
-        }
-      }
+      // every later migration that redefines a function, resets a grant or sets a policy of a re-run file runs again too, in
+      // name order (HEB-08, CAP-08: 019100 redefines the job and also intake_submit and others, which later migrations
+      // redefine again; 020905 also alters the storage policy record_files_delete, which 020955 alters last), so no later
+      // test sees an old body, grant or policy (the teardown compares all three)
+      const rerun = rerunClosure(files);
+      expect(rerun.files[0]).toBe(files[0]);
+      expect(rerun.files).toContain(files[1]);
+      expect(stalePolicies(rerun.files)).toEqual([]);
+      for (const sql of rerun.sql.slice(1)) await q(sql);
     });
     await setSettings("pass_on", 2);
     const lead = await submit("055-7200011");

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { migrationFile, rerunClosure, staleRestores } from "./rerun";
+import { migrationFile, rerunClosure, stalePolicies, staleRestores } from "./rerun";
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser } from "./helpers";
 
 afterAll(closePool);
@@ -173,6 +173,7 @@ describe("the inquiry log outlives its form (CAP-04)", () => {
     const rerun = rerunClosure([file]);
     expect(rerun.files[0]).toBe(file);
     expect(staleRestores(rerun.files)).toEqual([]);
+    expect(stalePolicies(rerun.files)).toEqual([]);
     const sql = rerun.sql[0];
     // no statement starts with drop (the hosted connector stops on those)
     const statements = sql.replace(/--.*$/gm, "").split(";").map((part) => part.trim().toLowerCase());

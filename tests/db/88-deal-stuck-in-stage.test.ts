@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultPipeline, pgError } from "./helpers";
-import { MIGRATIONS_DIR, migrationFile, staleRestores } from "./rerun";
+import { MIGRATIONS_DIR, migrationFile, stalePolicies, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -398,6 +398,7 @@ describe("stuck deals by time in stage", () => {
       expect(missing).toBe("0");
       expect(await snapshot()).toBe(before);
       expect(staleRestores(RERUN)).toEqual([]);
+      expect(stalePolicies(RERUN)).toEqual([]);
     });
   });
 });

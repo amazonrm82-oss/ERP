@@ -4,7 +4,7 @@ import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, cre
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { MIGRATIONS_DIR, migrationFile, rerunClosure, staleRestores } from "./rerun";
+import { MIGRATIONS_DIR, migrationFile, rerunClosure, stalePolicies, staleRestores } from "./rerun";
 
 // review F5: 020905 alone, run again, must keep 020910's body of app.custom_field_file_drop (and leave every other function
 // it defines as the fresh build made it, which staleRestores checks)
@@ -703,6 +703,8 @@ describe("new custom field types (FLD-06 part B)", () => {
     const rerun = rerunClosure([PART_B]);
     const files = rerun.files.filter((file) => !file.endsWith("_field_file_release.sql"));
     expect(staleRestores(files).filter((line) => !line.startsWith("app.custom_field_file_drop:"))).toEqual([]);
+    // 020905 alters the storage policy record_files_delete; the closure re-runs _quote_pdfs.sql, which alters it last
+    expect(stalePolicies(files)).toEqual([]);
     for (const file of files) await asAdmin((q) => q(readFileSync(join(MIGRATIONS_DIR, file), "utf8")));
     const body = await asAdmin(async (q) => (await q<{ d: string }>("select pg_get_functiondef('app.custom_field_file_drop(uuid, text, uuid, text, uuid)'::regprocedure) as d")).rows[0].d);
     expect(body).toContain("delete from public.files");

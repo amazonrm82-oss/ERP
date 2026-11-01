@@ -4,7 +4,8 @@ import { join } from "node:path";
 // A test that re-runs an older migration puts back that migration's function bodies. Every later migration that
 // redefines one of them must run again after it, and so must every later migration that redefines a function of
 // THOSE files, and so on (a closure), or the tests that run afterwards see an old body. The global teardown
-// (tests/db/global-setup.ts) proves it: every function body must be the one a fresh build made.
+// (tests/db/global-setup.ts) proves it: every function body, policy, RLS switch, grant (table, column, function), trigger
+// and constraint must be the one a fresh build made.
 
 export const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 
@@ -26,6 +27,16 @@ export function grantedTables(sql: string): Set<string> {
   return new Set([...sql.matchAll(GRANT_TABLE)].flatMap((m) => m[1].toLowerCase().split(/\s*,\s*/)));
 }
 
+// create / alter policy <name> on <schema>.<table>: the policies a migration sets (a `create policy` inside an
+// "if not exists" block counts too, which can only add files, never miss one). Policies made from a format string in a
+// `do` loop (0004's generic ones) have no literal name and are not seen.
+const POLICY = /\b(?:create|alter)\s+policy\s+"?([a-z_][a-z0-9_]*)"?\s+on\s+(?:table\s+)?([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)/gi;
+
+/** The policies a migration creates or alters, as "<schema>.<table> <policy>", lower case. */
+export function definedPolicies(sql: string): Set<string> {
+  return new Set([...sql.matchAll(POLICY)].map((m) => `${m[2].toLowerCase()} ${m[1].toLowerCase()}`));
+}
+
 /** The migration file whose name ends with this suffix (the number changes when the lead renumbers it). */
 export function migrationFile(suffix: string): string {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith(suffix));
@@ -39,6 +50,8 @@ export function migrationFile(suffix: string): string {
  * `also` asks for. A file between two given ones is judged by the functions of the files before it.
  * Grants close the same way: a re-run `revoke all … grant (cols)` drops a column grant a later migration added, so every
  * later migration that grants or revokes on a table a file already in the list grants or revokes on joins too.
+ * Policies too: a re-run `alter policy` / `drop … create policy` puts back an old USING or WITH CHECK, so every later
+ * migration that creates or alters a policy a file already in the list sets joins.
  */
 export function rerunClosure(
   files: string[],
@@ -49,17 +62,26 @@ export function rerunClosure(
   const first = [...files].sort()[0];
   const names = new Set<string>();
   const tables = new Set<string>();
+  const policies = new Set<string>();
   const picked: string[] = [];
   const texts: string[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql") && f >= first).sort()) {
     const sql = readFileSync(join(dir, file), "utf8");
     const defines = definedFunctions(sql);
     const grants = grantedTables(sql);
-    if (start.has(file) || [...defines].some((name) => names.has(name)) || [...grants].some((t) => tables.has(t)) || also(sql)) {
+    const sets = definedPolicies(sql);
+    if (
+      start.has(file) ||
+      [...defines].some((name) => names.has(name)) ||
+      [...grants].some((t) => tables.has(t)) ||
+      [...sets].some((p) => policies.has(p)) ||
+      also(sql)
+    ) {
       picked.push(file);
       texts.push(sql);
       for (const name of defines) names.add(name);
       for (const t of grants) tables.add(t);
+      for (const p of sets) policies.add(p);
     }
   }
   const missing = files.filter((file) => !picked.includes(file));
@@ -87,6 +109,27 @@ export function staleRestores(files: string[], dir: string = MIGRATIONS_DIR): st
   return [...lastInList]
     .filter(([name, file]) => latest.get(name) !== file)
     .map(([name, file]) => `${name}: list ends with ${file}, latest is ${latest.get(name)}`);
+}
+
+/**
+ * For a hand-picked list of migrations re-run in the given order: every policy they create or alter whose last definition
+ * in the list is not its latest among all migrations, as "<table> <policy>: list ends with <file>, latest is <file>". The
+ * policy twin of staleRestores; a test that keeps such a list asserts this is empty too.
+ */
+export function stalePolicies(files: string[], dir: string = MIGRATIONS_DIR): string[] {
+  const lastInList = new Map<string, string>();
+  for (const file of files) {
+    for (const policy of definedPolicies(readFileSync(join(dir, file), "utf8"))) lastInList.set(policy, file);
+  }
+  const latest = new Map<string, string>();
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    for (const policy of definedPolicies(readFileSync(join(dir, file), "utf8"))) {
+      if (lastInList.has(policy)) latest.set(policy, file);
+    }
+  }
+  return [...lastInList]
+    .filter(([policy, file]) => latest.get(policy) !== file)
+    .map(([policy, file]) => `${policy}: list ends with ${file}, latest is ${latest.get(policy)}`);
 }
 
 // revoke <privileges> on [table] public.<t> with no column list (`revoke all …`, `revoke insert, update …`): a table-level

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { asAdmin, asService, asUser, closePool, count, createOrg, createUser, pgError } from "./helpers";
-import { migrationFile, staleRestores } from "./rerun";
+import { migrationFile, stalePolicies, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -59,6 +59,7 @@ describe("inquiries of a deleted form are kept 12 months (CAP-04)", () => {
     // its own two migrations directly, which is safe only while they hold the latest body of what they define. A newer
     // migration that redefines one of them fails here by name, not at teardown and not by test order.
     expect(staleRestores([RETENTION_FILE, PURGE_FILE])).toEqual([]);
+    expect(stalePolicies([RETENTION_FILE, PURGE_FILE])).toEqual([]);
   });
 
   it("the connector-applied migration holds no drop statement and no delete, the purge file only its function", () => {

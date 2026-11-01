@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asAnon, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
-import { staleGrants, staleRestores } from "./rerun";
+import { staleGrants, stalePolicies, staleRestores } from "./rerun";
 
 afterAll(closePool);
 
@@ -656,6 +656,8 @@ describe("setup checklist and sample data (USR-04)", () => {
     expect(staleRestores(files, dir)).toEqual([]);
     // and every table whose grants a listed file resets (revoke all) gets back the later migrations' grants
     expect(staleGrants(files, dir)).toEqual([]);
+    // and every policy a listed file alters (record_files_delete of _payment_files.sql) ends at its latest definition
+    expect(stalePolicies(files, dir)).toEqual([]);
     for (const file of files) {
       await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
     }
