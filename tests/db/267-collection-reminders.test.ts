@@ -360,6 +360,136 @@ describe("collection reminders (COL-04)", () => {
     }
   });
 
+  it("021115: a task a rep moved to another record is never moved to the next stage; a new attached task is made instead", async () => {
+    const other = await run(member, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'אחר', $2) returning id", [org, member.id])).id,
+    );
+    const [deal, otherDeal] = await run(owner, async (q) => {
+      const ids: string[] = [];
+      for (const name of ["עסקת שלב", "עסקה אחרת לשלב"]) {
+        ids.push(
+          (
+            await one<{ id: string }>(
+              q,
+              `insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id)
+               select $1, $2, p.id, (select s.id from public.stages s where s.pipeline_id = p.id order by s.position, s.id limit 1), $3
+                 from public.pipelines p where p.organization_id = $1 and p.deleted_at is null order by p.position, p.id limit 1
+               returning id`,
+              [org, name, contact],
+            )
+          ).id,
+        );
+      }
+      return ids;
+    });
+    const contactDoc = await doc(0, "tax_invoice", 310);
+    const dealDoc = await run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, $3, 'tax_invoice', $4, current_date - 40, 320) returning id",
+          [org, deal, contact, `CR-${++n}`],
+        )
+      ).id,
+    );
+    await setDue(dealDoc, 0);
+    const attachedDoc = await doc(0, "tax_invoice", 330);
+    await job();
+    const [a] = await tasks(contactDoc);
+    const [b] = await tasks(dealDoc);
+    const [c] = await tasks(attachedDoc);
+    const dueOf = (task: string) => asAdmin(async (q) => (await one<{ due: string }>(q, "select due_at::text as due from public.tasks where id = $1", [task])).due);
+    const before = { a: await dueOf(a.id), b: await dueOf(b.id) };
+    // the rep moves the first to another contact, the deal's owner the second to another deal (its contact kept); the third
+    // only gets another priority and stays attached
+    expect((await run(member, (q) => q("update public.tasks set contact_id = $2 where id = $1 returning id", [a.id, other]))).rowCount).toBe(1);
+    expect((await run(owner, (q) => q("update public.tasks set deal_id = $2 where id = $1 returning id", [b.id, otherDeal]))).rowCount).toBe(1);
+    expect((await run(member, (q) => q("update public.tasks set priority = 1 where id = $1 returning id", [c.id]))).rowCount).toBe(1);
+    for (const d of [contactDoc, dealDoc, attachedDoc]) await setDue(d, -7);
+    await job();
+    // detached: kept as the rep left it (title, due time, links, open), and a new attached task carries the stage
+    for (const [d, first, due, links] of [
+      [contactDoc, a, before.a, { contact_id: contact, deal_id: null }],
+      [dealDoc, b, before.b, { contact_id: contact, deal_id: deal }],
+    ] as const) {
+      const all = await tasks(d);
+      expect(all, d).toHaveLength(2);
+      const kept = all.find((t) => t.id === first.id)!;
+      expect(kept.title).toBe(first.title);
+      expect(kept.status).toBe("open");
+      expect(await dueOf(first.id)).toBe(due);
+      const made = all.find((t) => t.id !== first.id)!;
+      expect(made.title).toMatch(/· 7 ימים אחרי מועד התשלום$/);
+      expect(made.status).toBe("open");
+      const row = await asAdmin(async (q) => await one<{ contact_id: string | null; deal_id: string | null }>(q, "select contact_id, deal_id from public.tasks where id = $1", [made.id]));
+      expect(row).toEqual(links);
+      expect(await sent(d)).toEqual([
+        { offset_days: 0, task_id: first.id },
+        { offset_days: 7, task_id: made.id },
+      ]);
+    }
+    // attached: moved to the stage, as before
+    const moved = await tasks(attachedDoc);
+    expect(moved).toHaveLength(1);
+    expect(moved[0].id).toBe(c.id);
+    expect(moved[0].title).toMatch(/· 7 ימים אחרי מועד התשלום$/);
+    // the next stage moves the new attached task; the detached one is still left alone
+    await setDue(contactDoc, -14);
+    await job();
+    const later = await tasks(contactDoc);
+    expect(later).toHaveLength(2);
+    expect(later.find((t) => t.id === a.id)!.title).toBe(a.title);
+    expect(later.find((t) => t.id !== a.id)!.title).toMatch(/· 14 ימים אחרי מועד התשלום$/);
+    // the close rules are unchanged: once paid, the attached task closes and the detached one stays the rep's
+    await run(owner, async (q) => {
+      const p = await one<{ id: string }>(q, "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 310, current_date, 'cash') returning id", [org, contact]);
+      await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 310)", [org, p.id, contactDoc]);
+    });
+    await job();
+    const closed = await asAdmin(async (q) =>
+      (await q<{ id: string; status: string; outcome: string | null }>("select id, status::text as status, outcome from public.tasks where collection_document_id = $1", [contactDoc])).rows,
+    );
+    expect(closed.find((t) => t.id === a.id)).toEqual({ id: a.id, status: "open", outcome: null });
+    expect(closed.find((t) => t.id !== a.id)).toMatchObject({ status: "done", outcome: "נסגרה: החוב שולם" });
+  });
+
+  it("021115: the detached rule is one helper, shared by the reminder job and the close job", async () => {
+    const [x, y, z] = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002", "00000000-0000-4000-8000-000000000003"];
+    const at = (t: (string | null)[], d: (string | null)[]) =>
+      asAdmin(async (q) => (await one<{ r: boolean }>(q, "select app.collection_task_attached($1, $2, $3, $4, $5, $6) as r", [...t, ...d])).r);
+    // the deal decides when the document has one (the contact may differ)
+    expect(await at([x, y, null], [x, z, null])).toBe(true);
+    expect(await at([y, z, null], [x, z, null])).toBe(false);
+    expect(await at([null, z, null], [x, z, null])).toBe(false);
+    // else the contact, else the company
+    expect(await at([y, x, null], [null, x, null])).toBe(true);
+    expect(await at([null, y, null], [null, x, null])).toBe(false);
+    expect(await at([null, null, x], [null, null, x])).toBe(true);
+    expect(await at([null, null, y], [null, null, x])).toBe(false);
+    // a document with no link: never attached
+    expect(await at([null, null, null], [null, null, null])).toBe(false);
+    const bodies = await asAdmin(async (q) =>
+      (
+        await q<{ name: string; uses: boolean; inline: boolean }>(
+          `select p.proname as name, p.prosrc like '%app.collection_task_attached(%' as uses,
+                  p.prosrc like '%when d.deal_id is not null then t.deal_id%' as inline
+             from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+            where s.nspname = 'app' and p.proname in ('close_paid_collection_tasks', 'send_collection_reminders') order by 1`,
+        )
+      ).rows,
+    );
+    expect(bodies).toEqual([
+      { name: "close_paid_collection_tasks", uses: true, inline: false },
+      { name: "send_collection_reminders", uses: true, inline: false },
+    ]);
+    // no client may call it
+    expect(
+      await asAdmin(async (q) =>
+        (await one<{ ok: boolean }>(q, "select not has_function_privilege('authenticated', 'app.collection_task_attached(uuid, uuid, uuid, uuid, uuid, uuid)', 'execute') and not has_function_privilege('anon', 'app.collection_task_attached(uuid, uuid, uuid, uuid, uuid, uuid)', 'execute') as ok")).ok,
+      ),
+    ).toBe(true);
+  });
+
   it("nothing while the document's contact is in the recycle bin", async () => {
     const binned = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'בסל', $2) returning id", [org, member.id])).id);
     const invoice = await run(owner, async (q) =>
