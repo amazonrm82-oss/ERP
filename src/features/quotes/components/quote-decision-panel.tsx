@@ -14,7 +14,9 @@ import { SignaturePad } from "./signature-pad";
 
 // ORD-05: the same panel answers a quote (QUO-09) or an order (its own route and DRAFT wording)
 type Subject = "quote" | "order";
-type Props = { token: string; fingerprint: string; subject?: Subject };
+// QUO-08: the customer's choice of optional lines and the total shown for it (quotes only); null = the choice cannot be accepted
+type Choice = { optionalKeys: number[]; acceptedTotalAgorot: number };
+type Props = { token: string; fingerprint: string; subject?: Subject; choice?: Choice | null };
 
 const SUBJECT: Record<Subject, { route: string; wording: string; title: string; decline: string }> = {
   quote: { route: "quote", wording: ACCEPT_WORDING, title: "התשובה שלך להצעה", decline: "דחיית ההצעה" },
@@ -27,7 +29,7 @@ type Mode = "choose" | "accept" | "decline";
  * typed signature, the checkbox) or decline with an optional reason. The answer names the fingerprint of the version shown,
  * so it applies to exactly what the customer read.
  */
-export function QuoteDecisionPanel({ token, fingerprint, subject = "quote" }: Props) {
+export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choice }: Props) {
   const texts = SUBJECT[subject];
   const router = useRouter();
   const ids = useId();
@@ -42,7 +44,7 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote" }: Pr
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const canAccept = name.trim().length >= 2 && agreed && (kind === "typed" || image !== null);
+  const canAccept = name.trim().length >= 2 && agreed && (kind === "typed" || image !== null) && choice !== null;
 
   function submit(body: DecisionBody) {
     setError(null);
@@ -96,6 +98,7 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote" }: Pr
               signatureKind: kind,
               signatureImage: kind === "drawn" ? image : null,
               agreed: true,
+              ...(choice ? { optionalKeys: choice.optionalKeys, acceptedTotalAgorot: choice.acceptedTotalAgorot } : {}),
             });
           }}
         >

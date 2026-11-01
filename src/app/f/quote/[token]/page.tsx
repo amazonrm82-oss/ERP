@@ -9,7 +9,8 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PrintButton } from "@/features/print/components/print-button";
-import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
+import { QuoteAnswerArea } from "@/features/quotes/components/quote-answer-area";
+import { QuoteQuestionForm } from "@/features/quotes/components/quote-question-form";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { getPublicQuote, getPublicQuoteFingerprint } from "@/features/quotes/public-server";
@@ -49,7 +50,8 @@ const MESSAGES = {
 /**
  * QUO-08 (viewing): a sent quote as its customer sees it, through its secret link. No sign-in and no cookies; only
  * what the quote's own document shows (QUO-05), in the business's design and colour. QUO-09: below it the customer
- * accepts and signs, or declines; once answered the page says so. Choosing optional lines and asking a question come next.
+ * accepts and signs, or declines; once answered the page says so. QUO-08: the customer ticks optional lines before
+ * accepting, and may send a question to the rep.
  */
 export default async function PublicQuotePage({ params }: Props) {
   const { token } = await params;
@@ -223,13 +225,16 @@ export default async function PublicQuotePage({ params }: Props) {
         </section>
       ) : null}
       {/* QUO-09: an open quote takes one answer, bound to the version shown (its fingerprint) */}
+      {/* QUO-08: the optional lines the customer ticks go with the acceptance, with the total shown for them */}
       {fingerprint ? (
-        <QuoteDecisionPanel token={token} fingerprint={fingerprint} />
+        <QuoteAnswerArea token={token} fingerprint={fingerprint} quote={page.quote} lines={page.lines} />
       ) : page.quote.status === "rejected" ? (
         <p role="status" className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink-soft print:hidden">
           ההצעה נדחתה. אם משהו השתנה, אפשר לפנות לעסק ששלח אותה.
         </p>
       ) : null}
+      {/* QUO-08: a question to the rep, while the quote is shown in full (open or accepted) */}
+      {page.quote.status === "sent" || page.quote.status === "viewed" || page.quote.status === "accepted" ? <QuoteQuestionForm token={token} /> : null}
       <div className="print:hidden">
         {page.builtWith ? <BuiltWithLine /> : null}
         <AccessibilityLink />

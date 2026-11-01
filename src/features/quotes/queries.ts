@@ -571,6 +571,13 @@ export type QuoteDecision = {
   userAgent: string | null;
   declineReason: string | null;
   erasedAt: string | null;
+  // QUO-08: an acceptance made with the customer's choice of optional lines (null before it): how many were ticked, the
+  // fingerprint of that choice, and the total as sent and as accepted (with VAT)
+  // (absent on an order's decision, which shares this shape)
+  optionalChosen?: number | null;
+  choiceSha256?: string | null;
+  sentTotalAgorot?: number | null;
+  acceptedTotalAgorot?: number | null;
 };
 
 export async function getQuoteDecision(orgId: string, quoteId: string): Promise<QuoteDecision | null> {
@@ -579,7 +586,7 @@ export async function getQuoteDecision(orgId: string, quoteId: string): Promise<
     await supabase
       .from("quote_decisions")
       .select(
-        "decision, decided_at, signer_name, signer_id_number, signature_kind, signature_image, wording_version, content_sha256, ip, user_agent, decline_reason, erased_at",
+        "decision, decided_at, signer_name, signer_id_number, signature_kind, signature_image, wording_version, content_sha256, ip, user_agent, decline_reason, erased_at, optional_line_ids, choice_sha256, sent_total_agorot, accepted_total_agorot",
       )
       .eq("organization_id", orgId)
       .eq("quote_id", quoteId)
@@ -600,6 +607,10 @@ export async function getQuoteDecision(orgId: string, quoteId: string): Promise<
     userAgent: row.user_agent,
     declineReason: row.decline_reason,
     erasedAt: row.erased_at,
+    optionalChosen: row.optional_line_ids ? row.optional_line_ids.length : null,
+    choiceSha256: row.choice_sha256,
+    sentTotalAgorot: row.sent_total_agorot === null ? null : Number(row.sent_total_agorot),
+    acceptedTotalAgorot: row.accepted_total_agorot === null ? null : Number(row.accepted_total_agorot),
   };
 }
 

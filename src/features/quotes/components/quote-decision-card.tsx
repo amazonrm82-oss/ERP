@@ -1,5 +1,5 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 
 import type { QuoteDecision } from "../queries";
 
@@ -21,6 +21,14 @@ export function QuoteDecisionCard({ decision }: Props) {
     { label: "כתובת IP", value: decision.ip, ltr: true },
     { label: "דפדפן", value: decision.userAgent, ltr: true },
     { label: "טביעת הגרסה שנחתמה", value: decision.contentSha256, ltr: true },
+    // QUO-08: the customer's choice of optional lines, and what it changed
+    { label: "שורות רשות שנבחרו", value: decision.optionalChosen == null ? null : String(decision.optionalChosen) },
+    {
+      label: "סכום כפי שנשלח",
+      value: decision.sentTotalAgorot != null && decision.sentTotalAgorot !== decision.acceptedTotalAgorot ? formatMoney(decision.sentTotalAgorot) : null,
+    },
+    { label: "סכום שאושר", value: decision.acceptedTotalAgorot == null ? null : formatMoney(decision.acceptedTotalAgorot) },
+    { label: "טביעת הבחירה שאושרה", value: decision.choiceSha256 ?? null, ltr: true },
   ];
 
   return (

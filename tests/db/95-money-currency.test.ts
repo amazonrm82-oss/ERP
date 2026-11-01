@@ -224,6 +224,12 @@ describe("currency next to every amount", () => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;
         await q("insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, template]);
       },
+      // QUO-08: an acceptance keeps the totals as sent and as accepted
+      quote_decisions: async (q) => {
+        const deal = (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה עם החלטה', $2, $3) returning id", [org, pipe.pipelineId, pipe.stages[0].id])).rows[0].id;
+        const quote = (await q<{ id: string }>("insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה עם החלטה', $2) returning id", [org, deal])).rows[0].id;
+        await q("insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', $3)", [org, quote, "0".repeat(64)]);
+      },
     };
     expect(tables.filter((table) => !(table in SAMPLE_ROWS)), "add a sample row for every table with a currency").toEqual([]);
     await asAdmin(async (q) => {

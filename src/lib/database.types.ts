@@ -2146,6 +2146,18 @@ export type QuoteDecisionRow = {
   decline_reason: string | null;
   erased_at: string | null;
   created_at: string;
+  // QUO-08 (migration quote_page_options_question): the optional lines the customer ticked, the SHA-256 of the version's
+  // fingerprint with that choice, the totals as sent and as accepted (an acceptance made since; null otherwise)
+  optional_line_ids: string[] | null;
+  choice_sha256: string | null;
+  sent_net_total_agorot: number | null;
+  sent_total_agorot: number | null;
+  accepted_subtotal_agorot: number | null;
+  accepted_discount_total_agorot: number | null;
+  accepted_net_total_agorot: number | null;
+  accepted_vat_agorot: number | null;
+  accepted_total_agorot: number | null;
+  currency: string;
 };
 
 // ORD-05: the customer's answer on an order through its link (migration order_links); the shape of QuoteDecisionRow.
@@ -3723,6 +3735,28 @@ export type Database = {
         };
         Returns: Json;
       };
+      // QUO-08: the same answer with the customer's choice of optional lines (places in the page's list) and the total shown
+      quote_public_answer: {
+        Args: {
+          p_token: string;
+          p_decision: string;
+          p_fingerprint: string;
+          p_signer_name?: string | null;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_decline_reason?: string | null;
+          p_ip?: string | null;
+          p_user_agent?: string | null;
+          p_optional_keys?: number[] | null;
+          p_accepted_total_agorot?: number | null;
+        };
+        Returns: Json;
+      };
+      // QUO-08: a question to the rep from the quote's page (service_role only)
+      quote_public_question: { Args: { p_token: string; p_ip_hash?: string | null; p_text?: string | null }; Returns: Json };
       // ORD-05: the customer's link to a numbered order (create returns the token once; status never the hash), its page and
       // its answer (service_role only)
       order_link_create: { Args: { p_org: string; p_order: string }; Returns: string };

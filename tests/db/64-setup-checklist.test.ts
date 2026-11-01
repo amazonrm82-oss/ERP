@@ -646,6 +646,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // DSC-01 redefines public.report_revenue_by_product() of _report_revenue_by_product.sql and report_revenue_by_category() /
       // report_gross_profit() of _report_categories_profit.sql last (an accepted quote's document discount split between the lines)
       "_document_discount_split.sql",
+      // QUO-08 redefines app.quotes_check() of _quote_send.sql, public.quote_public_decide() of _quote_link_expired_lists.sql and
+      // app.audit_erase_core() of _document_details.sql last (the customer's choice of optional lines and question)
+      "_quote_page_options_question.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

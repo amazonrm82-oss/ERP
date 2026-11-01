@@ -1,5 +1,6 @@
 import "server-only";
 
+import { clientIp as senderIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import {
@@ -7,9 +8,13 @@ import {
   DECISION_MESSAGES,
   decisionBodySchema,
   isDecisionStatus,
+  isQuestionStatus,
   publicVersionFingerprint,
+  QUESTION_MESSAGES,
+  questionBodySchema,
   type DecisionBody,
   type DecisionStatus,
+  type QuestionStatus,
 } from "./decision";
 import {
   publicQuoteFrom,
@@ -43,7 +48,8 @@ export async function getPublicQuote(token: string): Promise<PublicQuoteState> {
 }
 
 // QUO-09 ---------------------------------------------------------------------
-// The customer accepts and signs, or declines. Same pattern: the route calls only public.quote_public_decide() (security
+// The customer accepts and signs, or declines. Same pattern: the route calls only public.quote_public_answer() (QUO-08: the
+// answer of public.quote_public_decide() with the customer's choice of optional lines; security
 // definer, service_role only), which checks the token, limits tries per link, decides once on the version the page shows
 // and answers {status}. The full IP and browser go with the decision (owner, 18 October 2026: a signature is evidence).
 
@@ -94,7 +100,7 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
   }
 
   const accepted = parsed.decision === "accepted" ? parsed : null;
-  const { data, error } = await service.rpc("quote_public_decide", {
+  const { data, error } = await service.rpc("quote_public_answer", {
     p_token: token,
     p_decision: parsed.decision,
     p_fingerprint: parsed.fingerprint,
@@ -107,14 +113,66 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
     p_decline_reason: parsed.decision === "rejected" ? parsed.reason || null : null,
     p_ip: clientIp(request.headers),
     p_user_agent: request.headers.get("user-agent")?.slice(0, 500) ?? null,
+    // QUO-08: the ticked optional lines and the total shown, both or neither (the database checks every key and the total)
+    p_optional_keys: accepted?.optionalKeys && accepted.acceptedTotalAgorot !== undefined ? accepted.optionalKeys : null,
+    p_accepted_total_agorot: accepted?.optionalKeys && accepted.acceptedTotalAgorot !== undefined ? accepted.acceptedTotalAgorot : null,
   });
   if (error) {
     if (error.code === "P0002") return reply(404, { ok: false, message: NOT_FOUND });
-    console.error("quote_public_decide failed", error.code, error.message);
+    console.error("quote_public_answer failed", error.code, error.message);
     return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }
   const status = (data as { status?: unknown } | null)?.status;
   if (!isDecisionStatus(status)) return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   const done = status === "accepted" || status === "rejected";
   return reply(done ? 200 : status === "rate_limited" ? 429 : 409, { ok: done, status, message: DECISION_MESSAGES[status] });
+}
+
+// QUO-08 (owner, 1 November 2026, answer (28) א) ------------------------------------------------------------------------
+// A question to the rep. Same pattern: the route calls only public.quote_public_question() (security definer, service_role only),
+// which checks the token like quote_public, limits per link and per sender (the keyed IP hash, scope "quote"; no secret = no
+// hash, the link's own limits still hold), writes one system entry on the quote's deal and contact and tells the quote's
+// recipients. It answers {status} only.
+
+const MAX_QUESTION_BYTES = 8_000;
+
+type QuestionReply = { ok: boolean; status?: QuestionStatus; message: string };
+const questionReply = (status: number, body: QuestionReply) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
+/** POST /api/forms/quote/<token>/question: the page's own script posts {text} as JSON. */
+export async function handleQuoteQuestion(request: Request, token: string): Promise<Response> {
+  if (!QUOTE_LINK_TOKEN.test(token)) return questionReply(404, { ok: false, message: NOT_FOUND });
+  const service = createServiceClient();
+  if (!service) return questionReply(503, { ok: false, message: "ההצעה אינה זמינה כרגע." });
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_QUESTION_BYTES) {
+    return questionReply(413, { ok: false, status: "invalid", message: QUESTION_MESSAGES.invalid });
+  }
+  let text: string;
+  try {
+    const raw = await request.text();
+    if (raw.length > MAX_QUESTION_BYTES) return questionReply(413, { ok: false, status: "invalid", message: QUESTION_MESSAGES.invalid });
+    const body = questionBodySchema.safeParse(JSON.parse(raw));
+    if (!body.success) return questionReply(400, { ok: false, status: "invalid", message: QUESTION_MESSAGES.invalid });
+    text = body.data.text;
+  } catch {
+    return questionReply(400, { ok: false, status: "invalid", message: QUESTION_MESSAGES.invalid });
+  }
+  const { data, error } = await service.rpc("quote_public_question", {
+    p_token: token,
+    p_ip_hash: keyedIpHash(senderIp(request.headers), "quote"),
+    p_text: text,
+  });
+  if (error) {
+    if (error.code === "P0002") return questionReply(404, { ok: false, message: NOT_FOUND });
+    console.error("quote_public_question failed", error.code, error.message);
+    return questionReply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
+  }
+  const status = (data as { status?: unknown } | null)?.status;
+  if (!isQuestionStatus(status)) return questionReply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
+  const sent = status === "sent";
+  return questionReply(sent ? 200 : status === "rate_limited" ? 429 : status === "closed" ? 409 : 400, {
+    ok: sent,
+    status,
+    message: QUESTION_MESSAGES[status],
+  });
 }

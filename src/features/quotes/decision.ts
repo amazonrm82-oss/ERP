@@ -13,6 +13,8 @@ export const ACCEPT_WORDING_VERSION = "draft-2026-10-18";
 export const SIGNATURE_IMAGE = /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/;
 export const SIGNATURE_IMAGE_MAX = 300_000;
 export const REASON_MAX = 1000;
+// a quote holds at most 200 lines (quote_lines:max)
+export const OPTIONAL_KEYS_MAX = 200;
 
 /** What the page posts; the database checks every field again. */
 export const decisionBodySchema = z.discriminatedUnion("decision", [
@@ -24,6 +26,10 @@ export const decisionBodySchema = z.discriminatedUnion("decision", [
     signatureKind: z.enum(["drawn", "typed"]),
     signatureImage: z.string().max(SIGNATURE_IMAGE_MAX).regex(SIGNATURE_IMAGE).nullable(),
     agreed: z.literal(true),
+    // QUO-08 (owner, 1 November 2026): the optional lines ticked, by their 1-based place in the page's list of lines, and the
+    // total the page showed for that choice. Both or neither (an order's page sends neither).
+    optionalKeys: z.array(z.number().int().min(1).max(OPTIONAL_KEYS_MAX)).max(OPTIONAL_KEYS_MAX).optional(),
+    acceptedTotalAgorot: z.number().int().min(0).optional(),
   }),
   z.object({
     decision: z.literal("rejected"),
@@ -43,7 +49,7 @@ export const DECISION_MESSAGES: Record<DecisionStatus, string> = {
   // owner, 19 October 2026: only an open quote is decided; a cancelled or expired one shows its status page
   closed: "ההצעה כבר לא פתוחה לתשובה. רעננו את הדף.",
   changed: "ההצעה התעדכנה בזמן שהיא הייתה פתוחה. בדקו את הגרסה העדכנית ונסו שוב.",
-  invalid: "חלק מהפרטים לא תקינים. בדקו את השם, תעודת הזהות והחתימה.",
+  invalid: "חלק מהפרטים לא תקינים. בדקו את השם, תעודת הזהות, החתימה ושורות הרשות שבחרתם.",
   rate_limited: "היו יותר מדי ניסיונות בזמן קצר. נסו שוב בעוד כמה דקות.",
 };
 
@@ -61,4 +67,24 @@ export function publicVersionFingerprint(data: unknown, shownNumber: string | nu
   const parsed = versionSchema.safeParse(data);
   if (!parsed.success || parsed.data.fingerprint === null || shownNumber === null) return null;
   return parsed.data.number === shownNumber ? parsed.data.fingerprint : null;
+}
+
+// QUO-08 (owner, 1 November 2026, answer (28) א): a question to the rep from the quote's page --------------------------------
+
+export const QUESTION_MAX = 500;
+
+/** What the page posts; the database trims and checks the text again (1..500 characters). */
+export const questionBodySchema = z.object({ text: z.string().trim().min(1).max(QUESTION_MAX) });
+
+export type QuestionStatus = "sent" | "invalid" | "closed" | "rate_limited";
+
+export const QUESTION_MESSAGES: Record<QuestionStatus, string> = {
+  sent: "השאלה נשלחה. נחזור אליך בהקדם.",
+  invalid: `כתבו שאלה של עד ${QUESTION_MAX} תווים.`,
+  closed: "אי אפשר לשלוח שאלה על ההצעה הזאת. אפשר לפנות לעסק ששלח אותה.",
+  rate_limited: "נשלחו יותר מדי שאלות בזמן קצר. נסו שוב מאוחר יותר.",
+};
+
+export function isQuestionStatus(value: unknown): value is QuestionStatus {
+  return typeof value === "string" && Object.hasOwn(QUESTION_MESSAGES, value);
 }
