@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
 
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
+
 import nextConfig from "../../next.config";
 
 describe("content security policy (FXS-05)", () => {
@@ -54,9 +56,8 @@ describe("content security policy (FXS-05)", () => {
     const headersFor = (path: string) => {
       const out: Record<string, string> = {};
       for (const block of blocks) {
-        // the regex sources are plain JS regexes; ":path*" is path-to-regexp for "anything after"
-        const re = new RegExp(`^${block.source.replace("/:path*", "(?:/.*)?")}$`);
-        if (re.test(path)) for (const h of block.headers) out[h.key] = h.value;
+        // Next's own matcher for custom routes (path-to-regexp, as headers() sources are matched)
+        if (getPathMatch(block.source, { removeUnnamedParams: true, strict: true })(path)) for (const h of block.headers) out[h.key] = h.value;
       }
       return out;
     };

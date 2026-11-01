@@ -403,6 +403,34 @@ describe("the customer's statement link (BAL-04)", () => {
     expect(await revoke(keyHolder, { contact: theirs })).toBe(true);
   });
 
+  it("a deputy who reads a customer only through HEB-08's deputy rule cannot make, see or turn off its link (fails closed)", async () => {
+    const away = await addMember(org, owner.id, "member", "st-away");
+    const theirs = await contact("ענבל", null, away.id);
+    await doc("tax_invoice", 800, day(3), { contact: theirs });
+    await create(owner, { contact: theirs });
+    // the absent person's open task links the customer; the key holder is the deputy while the absence lasts
+    await run(owner, (q) => q("insert into public.tasks (organization_id, title, owner_id, contact_id) values ($1, 'לחזור ללקוח', $2, $3)", [org, away.id, theirs]));
+    await run(owner, (q) =>
+      q(
+        `insert into public.member_leaves (organization_id, user_id, starts_on, ends_on, kind, deputy_id)
+         values ($1, $2, (now() at time zone 'Asia/Jerusalem')::date - 1, (now() at time zone 'Asia/Jerusalem')::date + 2, 'vacation', $3)`,
+        [org, away.id, keyHolder.id],
+      ),
+    );
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      // the deputy does read it (RLS), but not by app.user_can_read_record
+      expect(await run(keyHolder, async (q) => (await q("select 1 from public.contacts where id = $1", [theirs])).rowCount)).toBe(1);
+      expect((await pgError(create(keyHolder, { contact: theirs }))).code).toBe("42501");
+      expect((await pgError(status(keyHolder, { contact: theirs }))).code).toBe("42501");
+      expect((await pgError(revoke(keyHolder, { contact: theirs }))).code).toBe("42501");
+      expect(await status(owner, { contact: theirs })).toMatchObject({ active: true });
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+      await asAdmin((q) => q("update public.member_leaves set starts_on = '2000-01-01', ends_on = '2000-01-01', deputy_id = null where organization_id = $1 and user_id = $2", [org, away.id]));
+    }
+  });
+
   it("not found while the plan lacks documents or payments; back when it has them again", async () => {
     const k = await contact("עדי");
     await doc("tax_invoice", 300, day(2), { contact: k });
