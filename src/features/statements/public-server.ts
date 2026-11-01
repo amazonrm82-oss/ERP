@@ -1,8 +1,13 @@
 import "server-only";
 
-import { keyedIpHash } from "@/lib/keyed-ip-hash";
+import { logoPublicUrl } from "@/features/branding/logo";
+import { loadPdfLogo } from "@/features/pdf/logo";
+import { renderPdf } from "@/features/pdf/render";
+import { pdfHeaders } from "@/features/quotes/pdf-fingerprint";
+import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
+import { publicStatementPdfDocument, statementPdfFileName } from "./pdf";
 import { publicStatementFrom, STATEMENT_LINK_TOKEN, type PublicStatement } from "./public";
 
 // BAL-04 (approved pattern for public secret-link pages, owner 8 October 2026; CLAUDE.md hard rule 5): the customer's
@@ -26,4 +31,34 @@ export async function getPublicStatement(token: string, ip: string | null): Prom
     return "rate-limited";
   }
   return publicStatementFrom(data) ?? "not-found";
+}
+
+const text = (status: number, body: string, extra: Record<string, string> = {}) =>
+  new Response(body, {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", ...extra },
+  });
+
+const PDF_MESSAGES = {
+  "not-found": "הקישור אינו זמין. ייתכן שהוא בוטל או שהוחלף בקישור חדש. לקבלת קישור פנו לעסק ששלח אותו.",
+  "rate-limited": "הדף נפתח יותר מדי פעמים בזמן קצר. נסו שוב בעוד כמה דקות.",
+  "not-configured": "דף החשבון אינו זמין כרגע.",
+} as const;
+
+/**
+ * GET /api/forms/statement/<token>/pdf (BAL-04, owner 1 November 2026, answer (2) א): the statement page as a PDF, made here
+ * for this request from the same one call the page makes (public.statement_public, the same limits; a download counts as a
+ * view) and never stored or counted in the PDF quota. No other function, no table, no storage object is read with the key;
+ * the logo comes from its public address. The file holds what the page shows, no ids.
+ */
+export async function handleStatementPdfDownload(request: Request, token: string): Promise<Response> {
+  const state = await getPublicStatement(token, clientIp(request.headers));
+  if (state === "not-found") return text(404, PDF_MESSAGES["not-found"]);
+  if (state === "rate-limited") return text(429, PDF_MESSAGES["rate-limited"], { "Retry-After": "600" });
+  if (state === "not-configured") return text(503, PDF_MESSAGES["not-configured"]);
+  const bytes = await renderPdf(publicStatementPdfDocument(state, await loadPdfLogo(logoPublicUrl(state.logoPath))));
+  return new Response(new Uint8Array(bytes), {
+    status: 200,
+    headers: { ...pdfHeaders(statementPdfFileName(state.customerName, state.today), bytes.length), "X-Robots-Tag": "noindex" },
+  });
 }

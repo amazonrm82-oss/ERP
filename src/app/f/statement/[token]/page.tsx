@@ -4,11 +4,13 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 
 import { AccessibilityLink } from "@/components/accessibility-link";
+import { buttonClasses } from "@/components/ui/button";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { isPreviewBotRequest } from "@/features/link-preview/bot-request";
 import { PrintButton } from "@/features/print/components/print-button";
 import { StatementView } from "@/features/statements/components/statement-view";
+import { publicStatementPdfPath } from "@/features/statements/public";
 import { getPublicStatement } from "@/features/statements/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
@@ -63,8 +65,12 @@ export default async function PublicStatementPage({ params }: Props) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
       {/* data-print-page: print.css leaves only the statement on paper */}
-      <div data-print-page="" className="flex justify-end print:hidden">
-        <PrintButton label="הדפסה או שמירה כ-PDF" />
+      <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
+        {/* BAL-04: made on our server for this download, never stored; counts as one more opening of the page */}
+        <a href={publicStatementPdfPath(token)} rel="nofollow" className={buttonClasses("secondary", "sm")}>
+          הורדת PDF
+        </a>
+        <PrintButton label="הדפסה" />
       </div>
       <StatementView data={page} logoUrl={logoPublicUrl(page.logoPath)} />
       <div className="print:hidden">

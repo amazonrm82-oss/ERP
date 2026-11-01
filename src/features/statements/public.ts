@@ -14,6 +14,9 @@ export const STATEMENT_LINK_TOKEN = /^[A-Za-z0-9_-]{64}$/;
 
 export const publicStatementPath = (token: string) => `/f/statement/${token}`;
 
+/** The customer's PDF of the same statement, made on each request (never stored). */
+export const publicStatementPdfPath = (token: string) => `/api/forms/statement/${token}/pdf`;
+
 /** The debt documents a statement lists (BAL-02): never a receipt, a credit invoice or an invoice-receipt. */
 export const STATEMENT_DOC_TYPES = ["tax_invoice", "proforma", "opening_balance"] as const;
 export type StatementDocType = (typeof STATEMENT_DOC_TYPES)[number];

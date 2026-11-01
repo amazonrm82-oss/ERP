@@ -231,6 +231,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           <StatementLinkCard
             orgId={orgId}
             customer={{ kind: "company", id: company.id }}
+            period={{ from: Array.isArray(lf) ? lf[0] : lf, to: Array.isArray(lt) ? lt[0] : lt }}
             recipient={{ name: company.name, phoneE164: company.phone_e164, email: company.email }}
           />
 
