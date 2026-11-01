@@ -2058,6 +2058,9 @@ that back.
   (base `--mx-*`, roles in `@theme`, dark mode under `[data-theme="dark"]`, also on one element). Screens use role classes
   (`bg-surface`, `text-ink-soft`, `text-on-accent`, `text-md`); lint rejects palette colours, hex/rgb and
   `text-[…]` sizes. A new text/background pair goes into `tests/unit/design-tokens.test.ts` (4.5:1, both themes).
+- Charts (DSN-13, no migration): every bar, meter and progress bar uses `src/components/ui/chart.tsx` (`ChartBar`, `BarList`, `Meter`;
+  math in `chart-logic.ts`) with the roles `--color-chart-track|bar|done|alert` (3:1 against track, card and page in both themes,
+  `design-tokens.test.ts`); `alert` is striped too, so nothing is told by colour alone; a unit test refuses hand-drawn width bars.
 - Components (DSN-07/08): use `src/components/ui/` (Dialog/sheet on native `<dialog>`, Popover pinned to the
   screen edges below `sm`, ConfirmButton instead of `window.confirm`, Toast via `ToastProvider`/`useToast`,
   Tabs, Pagination (`pageCount` or `hasMore`), ReorderButtons, DateField with `src/lib/calendar-grid.ts`, SearchPicker for search-as-you-type
