@@ -8,8 +8,11 @@ import {
   GOAL_METRICS,
   GOAL_PERIODS,
   addMonths,
+  goalFeatureMessage,
   goalMetric,
+  goalMetricChoices,
   goalMetricKeysFor,
+  goalMetricsMissingFeatures,
   isGoalMetric,
   monthStart,
   parseTarget,
@@ -55,6 +58,36 @@ describe("goal metrics", () => {
     expect(isGoalMetric("won_deals")).toBe(true);
     expect(isGoalMetric("collections")).toBe(false);
     expect(goalMetric("meetings_held").kind).toBe("count");
+  });
+
+  it("a collection goal left from before the plan lost a key is offered for removal only", () => {
+    const base = ["won_amount", "won_deals", "leads_handled", "meetings_held"];
+    const all = { payments: true, documents: true, collection: true };
+    const noDocs = { payments: true, documents: false, collection: true };
+    expect(goalMetricsMissingFeatures(all)).toEqual([]);
+    expect(goalMetricsMissingFeatures(noDocs)).toEqual(["collected"]);
+    // no goals left: not offered at all
+    expect(goalMetricChoices(noDocs, [])).toEqual({ metrics: base, removeOnly: [] });
+    // goals left: offered, in the list's own order, as remove only
+    expect(goalMetricChoices(noDocs, ["collected"])).toEqual({ metrics: [...base, "collected"], removeOnly: ["collected"] });
+    for (const lost of ["payments", "documents", "collection"] as const) {
+      expect(goalMetricChoices({ ...all, [lost]: false }, ["collected"]).removeOnly).toEqual(["collected"]);
+    }
+    // with every key it is an ordinary metric, whatever goals exist
+    expect(goalMetricChoices(all, ["collected"])).toEqual({ metrics: GOAL_METRIC_KEYS, removeOnly: [] });
+    expect(goalMetric("collected").removeOnlyNote).toBe("הגבייה לא בחבילה. אפשר להסיר את היעד.");
+  });
+
+  it("a refused collection goal says so in the goals' own words", () => {
+    const text = "יעד גבייה דורש את מודול הגבייה, המסמכים והתשלומים בחבילה.";
+    for (const key of ["payments", "documents", "collection"]) {
+      expect(goalFeatureMessage("collected", { code: "P0001", hint: `feature:${key}` })).toBe(text);
+    }
+    // another hint, another code or another metric keeps the general message
+    expect(goalFeatureMessage("collected", { code: "P0001", hint: "feature:goals_per_rep" })).toBeNull();
+    expect(goalFeatureMessage("collected", { code: "42501", hint: "feature:payments" })).toBeNull();
+    expect(goalFeatureMessage("won_amount", { code: "P0001", hint: "feature:payments" })).toBeNull();
+    expect(goalFeatureMessage("collected", null)).toBeNull();
   });
 
   it("targets: shekels to agorot for money, whole numbers for counts, empty for none", () => {

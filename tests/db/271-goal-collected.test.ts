@@ -243,6 +243,22 @@ describe("collection goals (GOL-01)", () => {
     expect(unknown.code).toBe("23514");
   });
 
+  it("a plan that lost a key: the goals grid's removal passes for a manager too, also without goals_per_rep", async () => {
+    // the grid shows such a goal read only with a remove button, to whoever may write it (GOL-01 follow-up)
+    const id = await addGoal(manager, { scope: "user", user_id: m1.id, period_start: "2027-01-01" });
+    await setFeatures({ ...FEATURES, collection: false, goals_per_rep: false });
+    try {
+      const member = await asUser(m1.id, async (q) => (await q("delete from public.goals where id = $1 returning id", [id])).rowCount);
+      expect(member).toBe(0);
+      const change = await pgError(asUser(manager.id, (q) => q("update public.goals set target = 5 where id = $1", [id])));
+      expect(change.code).toBe("P0001");
+      const removed = await asUser(manager.id, async (q) => (await q("delete from public.goals where id = $1 returning id", [id])).rowCount);
+      expect(removed).toBe(1);
+    } finally {
+      await setFeatures(FEATURES);
+    }
+  });
+
   it("isolates businesses: an outsider gets nothing and cannot write, and their own goals count only their payments", async () => {
     expect(await progress(outsider)).toEqual([]);
     const e = await pgError(addGoal(outsider, { scope: "org", period_start: "2026-12-01" }));

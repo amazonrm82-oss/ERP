@@ -7,7 +7,7 @@ import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { goalColumns, managedTeams, rowKey, type GoalColumn, type GoalGridRow, type GoalValue, type GoalView } from "./grid";
-import type { GoalScope } from "./metrics";
+import type { GoalMetric, GoalScope } from "./metrics";
 
 type GoalReadRow = { scope: string; user_id: string | null; team_id: string | null; period_start: string; target: number };
 
@@ -37,6 +37,19 @@ export async function readGoals(orgId: string, view: Omit<GoalView, "year">, fro
   }));
 }
 
+/** Which of `metrics` hold at least one goal the caller reads (RLS), in the business. */
+export async function metricsWithGoals(orgId: string, metrics: readonly GoalMetric[]): Promise<GoalMetric[]> {
+  if (metrics.length === 0) return [];
+  const supabase = await createClient();
+  const found = await Promise.all(
+    metrics.map(async (metric) => {
+      const rows = must(await supabase.from("goals").select("id").eq("organization_id", orgId).eq("metric", metric).limit(1), "goals");
+      return rows.length > 0 ? [metric] : [];
+    }),
+  );
+  return found.flat();
+}
+
 export type GoalsGrid = {
   columns: GoalColumn[];
   rows: GoalGridRow[];
@@ -46,6 +59,9 @@ export type GoalsGrid = {
   // The database decides either way (goals policies, app.goals_manager_may_write).
   // Without the plan key goals_per_rep only the business row is editable (RVW-22).
   editable: string[];
+  // the rows whose goals the caller may remove: the same rights without the plan key goals_per_rep, which
+  // limits only new and changed goals (trigger goals_per_rep); used for a metric the plan no longer offers
+  removable: string[];
   // whether the plan holds goals per rep and per team (goals_per_rep; the trigger goals_per_rep decides)
   perRep: boolean;
 };
@@ -97,11 +113,11 @@ export async function getGoalsGrid(context: OrgContext, view: GoalView): Promise
   // strict until the owner answers: a manager sets goals only for people whose role is member
   // (never an owner, an admin or another manager), the rule of app.goals_manager_may_write
   const roleOf = new Map(members.map((m) => [m.userId, m.role]));
-  const mayWrite = (row: GoalGridRow) =>
-    (perRep || row.scope === "org") &&
-    (isAdmin ||
+  const mayRemove = (row: GoalGridRow) =>
+    isAdmin ||
     (scope !== null &&
-      ((row.scope === "team" && scope.teams.has(row.subjectId ?? "")) || (row.scope === "user" && scope.people.has(row.subjectId ?? "") && roleOf.get(row.subjectId ?? "") === "member"))));
+      ((row.scope === "team" && scope.teams.has(row.subjectId ?? "")) || (row.scope === "user" && scope.people.has(row.subjectId ?? "") && roleOf.get(row.subjectId ?? "") === "member")));
+  const mayWrite = (row: GoalGridRow) => (perRep || row.scope === "org") && mayRemove(row);
   const withGoals = new Set(values.map(rowKey));
   const rows = isAdmin
     ? all
@@ -109,5 +125,12 @@ export async function getGoalsGrid(context: OrgContext, view: GoalView): Promise
         (row) => row.scope === "org" || (row.scope === "user" && row.subjectId === context.user.id) || withGoals.has(row.key) || mayWrite(row),
       );
 
-  return { columns, rows, values, editable: context.canWrite ? rows.filter(mayWrite).map((r) => r.key) : [], perRep };
+  return {
+    columns,
+    rows,
+    values,
+    editable: context.canWrite ? rows.filter(mayWrite).map((r) => r.key) : [],
+    removable: context.canWrite ? rows.filter(mayRemove).map((r) => r.key) : [],
+    perRep,
+  };
 }

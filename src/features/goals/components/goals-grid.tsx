@@ -3,7 +3,9 @@
 import { useState, useTransition, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Select } from "@/components/ui/field";
+import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber } from "@/lib/format";
 
@@ -20,6 +22,11 @@ type Props = {
   values: GoalValue[];
   // keys of the rows the person may change (the database decides either way)
   editable: string[];
+  // keys of the rows whose goals the person may remove (the same rights, without goals_per_rep)
+  removable: string[];
+  // the plan no longer offers this metric (GOL-01: collection without one of its keys): every cell is read
+  // only, and a goal the person may remove gets a remove button instead of a typed edit the trigger refuses
+  removeOnly: boolean;
   // whether the plan holds goals per rep and per team (RVW-22); without it those rows are read only
   perRep: boolean;
   // the column the copy fills unless another is picked
@@ -46,9 +53,24 @@ function without<T>(map: Record<string, T>, key: string): Record<string, T> {
  * (or quarter, or year). Owners and admins (and managers, in their teams' rows) type a target into a cell; it is saved when the
  * cell loses focus or on Enter (which moves down a row). An empty cell is no goal.
  */
-export function GoalsGrid({ orgId, metric, period, columns, rows, values, editable, perRep, copyTarget, previousLabels, onMessage: setMessage }: Props) {
+export function GoalsGrid({
+  orgId,
+  metric,
+  period,
+  columns,
+  rows,
+  values,
+  editable,
+  removable,
+  removeOnly,
+  perRep,
+  copyTarget,
+  previousLabels,
+  onMessage: setMessage,
+}: Props) {
   const definition = goalMetric(metric);
-  const canEdit = new Set(editable);
+  const canEdit = new Set(removeOnly ? [] : editable);
+  const canRemove = new Set(removeOnly ? removable : []);
   const anyEditable = canEdit.size > 0;
   const [saved, setSaved] = useState<Record<string, number>>(() => Object.fromEntries(values.map((v) => [cellKey(v, v.periodStart), v.target])));
   const [text, setText] = useState<Record<string, string>>({});
@@ -86,6 +108,18 @@ export function GoalsGrid({ orgId, metric, period, columns, rows, values, editab
       setStatus((s) => ({ ...s, [key]: "error" }));
       setMessage({ tone: "error", text: `${row.label}, ${column.label}: ${result.message}` });
     }
+  }
+
+  function removeAction(row: GoalGridRow, column: GoalColumn) {
+    return async (): Promise<ActionResult> => {
+      const result = await saveGoalAction(orgId, { scope: row.scope, subjectId: row.subjectId, period, periodStart: column.start, metric, value: "" });
+      return result.ok ? { ok: true } : result;
+    };
+  }
+
+  function removed(row: GoalGridRow, column: GoalColumn) {
+    setSaved((m) => without(m, cellKey(row, column.start)));
+    setMessage({ tone: "ok", text: `היעד הוסר: ${row.label}, ${column.label}.` });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>, rowIndex: number, columnIndex: number, key: string) {
@@ -171,7 +205,11 @@ export function GoalsGrid({ orgId, metric, period, columns, rows, values, editab
         <table className="w-full min-w-max border-collapse text-md">
           <caption className="sr-only">
             {definition.label}
-            {unit}: {anyEditable ? "הקלידו יעד בתא. Enter שומר ועובר לשורה הבאה, Escape מבטל." : "צפייה בלבד."}
+            {unit}: {removeOnly
+              ? (definition.featureMessage ?? "צפייה בלבד.")
+              : anyEditable
+                ? "הקלידו יעד בתא. Enter שומר ועובר לשורה הבאה, Escape מבטל."
+                : "צפייה בלבד."}
           </caption>
           <thead>
             <tr className="border-b border-line text-sm text-ink-soft">
@@ -194,7 +232,11 @@ export function GoalsGrid({ orgId, metric, period, columns, rows, values, editab
                 <th scope="row" className="sticky start-0 z-10 max-w-40 bg-surface px-3 py-1.5 text-start font-medium">
                   <span className="block truncate">{row.label}</span>
                   {row.hint ? <span className="block text-sm font-normal text-ink-soft">{row.hint}</span> : null}
-                  {!perRep && row.scope !== "org" ? (
+                  {removeOnly ? (
+                    canRemove.has(row.key) && columns.some((c) => saved[cellKey(row, c.start)] !== undefined) ? (
+                      <span className="block text-sm font-normal text-ink-soft">{definition.removeOnlyNote}</span>
+                    ) : null
+                  ) : !perRep && row.scope !== "org" ? (
                     <span className="block text-sm font-normal text-ink-soft">לא כלול בחבילה הנוכחית</span>
                   ) : anyEditable && !canEdit.has(row.key) ? (
                     <span className="block text-sm font-normal text-ink-soft">את היעד הזה קובעים בעלים ומנהלי מערכת</span>
@@ -227,6 +269,19 @@ export function GoalsGrid({ orgId, metric, period, columns, rows, values, editab
                             state === "saving" && "text-ink-soft",
                           )}
                         />
+                      ) : canRemove.has(row.key) && saved[key] !== undefined ? (
+                        <div className="flex w-24 flex-col items-end gap-1">
+                          <span className="block px-2 text-end tabular-nums">{display(saved[key])}</span>
+                          <ConfirmButton
+                            title={`להסיר את היעד של ${row.label}, ${column.label}?`}
+                            description={definition.removeOnlyNote}
+                            confirmLabel="הסרת היעד"
+                            action={removeAction(row, column)}
+                            onDone={() => removed(row, column)}
+                          >
+                            הסרה<span className="sr-only">{` של היעד של ${row.label}, ${column.label}`}</span>
+                          </ConfirmButton>
+                        </div>
                       ) : (
                         <span className="block w-24 px-2 text-end tabular-nums">{display(saved[key])}</span>
                       )}

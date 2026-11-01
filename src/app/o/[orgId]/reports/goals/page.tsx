@@ -4,8 +4,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { GoalsFilters } from "@/features/goals/components/goals-filters";
 import { GoalsPanel } from "@/features/goals/components/goals-panel";
 import { defaultCopyTarget, goalColumns, goalView, previousStart, type GoalValue } from "@/features/goals/grid";
-import { goalMetric, goalMetricKeysFor, GOAL_PERIOD_LABELS } from "@/features/goals/metrics";
-import { getGoalsGrid } from "@/features/goals/queries";
+import { goalMetric, goalMetricChoices, goalMetricsMissingFeatures, GOAL_PERIOD_LABELS } from "@/features/goals/metrics";
+import { getGoalsGrid, metricsWithGoals } from "@/features/goals/queries";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { planHintMessage } from "@/lib/errors";
@@ -55,8 +55,11 @@ export default async function GoalsPage({ params, searchParams }: Props) {
     orgHasFeature(orgId, "documents"),
     orgHasFeature(orgId, "collection"),
   ]);
-  const metrics = goalMetricKeysFor({ payments, documents, collection });
+  // a collection goal set before the plan lost one of those keys stays on the grid, read only, to be removed
+  const features = { payments, documents, collection };
+  const { metrics, removeOnly } = goalMetricChoices(features, await metricsWithGoals(orgId, goalMetricsMissingFeatures(features)));
   const view = goalView({ metric: firstParam(query.metric), period: firstParam(query.period), year: firstParam(query.year) }, today, metrics);
+  const viewRemoveOnly = removeOnly.includes(view.metric);
   const grid = await getGoalsGrid(context, view);
   const definition = goalMetric(view.metric);
 
@@ -79,9 +82,16 @@ export default async function GoalsPage({ params, searchParams }: Props) {
         description={`${definition.label} לפי ${GOAL_PERIOD_LABELS[view.period]}, ${view.year}. ${definition.description}`}
         back={{ href: paths.reports(orgId), label: "דוחות" }}
       />
-      <GoalsFilters metrics={metrics} metric={view.metric} period={view.period} year={view.year} years={years} />
-      <p className="mb-4 text-md text-ink-soft">{accessNote(context.role, context.canWrite, grid.editable.length > 0, grid.perRep)}</p>
-      {grid.perRep ? null : <p className="mb-4 rounded-md border border-line bg-canvas px-3 py-2.5 text-md text-ink-soft">{planHintMessage("feature:goals_per_rep")}</p>}
+      <GoalsFilters metrics={metrics} removeOnly={removeOnly} metric={view.metric} period={view.period} year={view.year} years={years} />
+      {viewRemoveOnly ? (
+        <p className="mb-4 rounded-md border border-line bg-canvas px-3 py-2.5 text-md text-ink-soft">
+          {definition.featureMessage} היעדים שכבר נקבעו מוצגים כאן לצפייה
+          {grid.removable.length > 0 ? ", ואפשר להסיר אותם." : "."}
+        </p>
+      ) : (
+        <p className="mb-4 text-md text-ink-soft">{accessNote(context.role, context.canWrite, grid.editable.length > 0, grid.perRep)}</p>
+      )}
+      {grid.perRep || viewRemoveOnly ? null : <p className="mb-4 rounded-md border border-line bg-canvas px-3 py-2.5 text-md text-ink-soft">{planHintMessage("feature:goals_per_rep")}</p>}
       <GoalsPanel
         gridKey={gridKey(view, grid.values)}
         orgId={orgId}
@@ -91,6 +101,8 @@ export default async function GoalsPage({ params, searchParams }: Props) {
         rows={grid.rows}
         values={grid.values}
         editable={grid.editable}
+        removable={grid.removable}
+        removeOnly={viewRemoveOnly}
         perRep={grid.perRep}
         copyTarget={defaultCopyTarget(grid.columns, view.period, today)}
         previousLabels={previousLabels}

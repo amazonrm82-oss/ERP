@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
 import { copyPlan, previousStart, type GoalValue } from "./grid";
-import { goalMetric, parseTarget } from "./metrics";
+import { goalFeatureMessage, goalMetric, parseTarget } from "./metrics";
 import { readGoals } from "./queries";
 import { goalCellArg, goalCopyArg, goalRowsArg, type GoalCellArg, type GoalCopyArg, type GoalRowsArg } from "./schema";
 
@@ -76,7 +76,7 @@ export async function saveGoalAction(orgId: string, cell: GoalCellArg): Promise<
       .eq("organization_id", orgId)
       .eq("id", existing.data.id)
       .select("id");
-    if (error) return fail(dbErrorMessage(error, SAVE_FAILED));
+    if (error) return fail(goalFeatureMessage(cell.metric, error) ?? dbErrorMessage(error, SAVE_FAILED));
     if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   } else {
     const { error } = await context.supabase.from("goals").insert({
@@ -90,7 +90,11 @@ export async function saveGoalAction(orgId: string, cell: GoalCellArg): Promise<
     });
     if (error) {
       // someone else set this goal a moment ago: refresh the grid rather than overwrite it
-      return fail(error.code === "23505" ? "היעד הזה נשמר עכשיו ממקום אחר. רעננו את הדף." : dbErrorMessage(error, SAVE_FAILED));
+      return fail(
+        error.code === "23505"
+          ? "היעד הזה נשמר עכשיו ממקום אחר. רעננו את הדף."
+          : (goalFeatureMessage(cell.metric, error) ?? dbErrorMessage(error, SAVE_FAILED)),
+      );
     }
   }
   return ok({ target: parsed.value });
@@ -135,7 +139,11 @@ export async function copyGoalsAction(
       })),
     );
     if (insertError) {
-      return fail(insertError.code === "23505" ? "חלק מהיעדים נשמרו עכשיו ממקום אחר. רעננו את הדף ונסו שוב." : dbErrorMessage(insertError));
+      return fail(
+        insertError.code === "23505"
+          ? "חלק מהיעדים נשמרו עכשיו ממקום אחר. רעננו את הדף ונסו שוב."
+          : (goalFeatureMessage(copy.metric, insertError) ?? dbErrorMessage(insertError)),
+      );
     }
   }
   revalidatePath(paths.goals(orgId));

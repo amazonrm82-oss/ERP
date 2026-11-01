@@ -20,6 +20,10 @@ export type GoalMetricDefinition = {
   description: string;
   // the plan keys the metric needs, all of them (offered, saved and counted only with them)
   features?: readonly GoalMetricFeature[];
+  // with `features`: why a goal of this metric cannot be set without them, and the note on a row whose
+  // goal stays from before the plan lost one of them (it can only be removed)
+  featureMessage?: string;
+  removeOnlyNote?: string;
 };
 
 export const GOAL_METRICS = [
@@ -34,6 +38,8 @@ export const GOAL_METRICS = [
     description:
       "סכום התשלומים שנרשמו או אושרו, לפי תאריך התשלום. צ'ק דחוי נספר רק כשמועד הפירעון שלו הגיע או כשנפרע. תשלום נזקף לבעלים של העסקה, ואם אין עסקה, לבעלים של איש הקשר. כמה נגבה רואים רק מי שרשאים לרשום תשלומים.",
     features: ["payments", "documents", "collection"],
+    featureMessage: "יעד גבייה דורש את מודול הגבייה, המסמכים והתשלומים בחבילה.",
+    removeOnlyNote: "הגבייה לא בחבילה. אפשר להסיר את היעד.",
   },
 ] as const satisfies readonly GoalMetricDefinition[];
 
@@ -46,6 +52,39 @@ export function goalMetricKeysFor(features: Record<GoalMetricFeature, boolean>):
   return (GOAL_METRICS as readonly GoalMetricDefinition[])
     .filter((m) => (m.features ?? []).every((f) => features[f]))
     .map((m) => m.key as GoalMetric);
+}
+
+/**
+ * The metrics the goals screen lets the person pick: those the plan offers, and those it no longer offers
+ * but that still hold goals the person reads (`withGoals`). The latter are `removeOnly`: their goals are
+ * shown read only, and can be removed but not set or changed (trigger goals_collected refuses a new or
+ * changed collection goal without the plan keys; removing one stays allowed).
+ */
+export function goalMetricChoices(
+  features: Record<GoalMetricFeature, boolean>,
+  withGoals: readonly GoalMetric[],
+): { metrics: GoalMetric[]; removeOnly: GoalMetric[] } {
+  const offered = goalMetricKeysFor(features);
+  const removeOnly = GOAL_METRIC_KEYS.filter((key) => !offered.includes(key) && withGoals.includes(key));
+  return { metrics: GOAL_METRIC_KEYS.filter((key) => offered.includes(key) || removeOnly.includes(key)), removeOnly };
+}
+
+/** The metrics with plan keys the plan does not hold all of (the ones whose existing goals to look for). */
+export function goalMetricsMissingFeatures(features: Record<GoalMetricFeature, boolean>): GoalMetric[] {
+  const offered = goalMetricKeysFor(features);
+  return GOAL_METRIC_KEYS.filter((key) => !offered.includes(key));
+}
+
+/**
+ * The message for a refused save of a goal: a missing plan key of the metric itself reads in the goals'
+ * own words ("יעד גבייה דורש ..."), not as the general "רישום מסמכים אינו כלול" of that key. Null = use
+ * the general message.
+ */
+export function goalFeatureMessage(metric: GoalMetric, error: { code?: string | null; hint?: string | null } | null | undefined): string | null {
+  const definition = goalMetric(metric);
+  if (!definition.features || !definition.featureMessage || error?.code !== "P0001") return null;
+  const hint = (error.hint ?? "").trim();
+  return definition.features.some((f) => hint === `feature:${f}`) ? definition.featureMessage : null;
 }
 
 export const GOAL_SCOPE_LABELS: Record<GoalScope, string> = { user: "חבר צוות", team: "צוות", org: "כל העסק" };
