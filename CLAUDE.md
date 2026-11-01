@@ -135,6 +135,10 @@ and build this CRM here instead. The old code is preserved on the branch
    `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
    In use (QUO-08 part one, owner 8 October 2026, migration 020290): the customer's quote page (`src/features/quotes/public-server.ts`,
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
+   In use (QUO-08 rest, owner 1 November 2026, migration 021117): the decide route now calls `public.quote_public_answer()` (the
+   customer's ticked optional lines by place, and the total shown; `quote_public_decide` is its thin wrapper), and the question route
+   (`POST /api/forms/quote/<token>/question`, same file) calls only `public.quote_public_question()`; `quote_public_version` answers
+   `pdf_as_sent` (interim label until QUO-09's signed PDF, owner (33) ב).
    In use (QUO-09, owner 18 October 2026, migration 020370): the customer's accept/decline (`src/features/quotes/public-server.ts`, route
    `POST /api/forms/quote/<token>/decide`), which calls only `public.quote_public_decide()` and `public.quote_public_version()`.
    In use (ORD-05, owner 20 October 2026, migration 020625): the customer's order confirmation (`src/features/orders/public-server.ts`, page
@@ -1317,6 +1321,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `net_total_agorot` (before VAT, after the document discount) and `deals.amount_quote_id` ("לפי הצעה מס' X"); trigger
   `deals_amount_quote` (definer, after `deals_amount_auto` by name) keeps the mark only while that accepted quote of this deal equals the
   amount, else clears it. `app.quote_accept_deal` and `public.quote_win_deal` were last redefined in 020510.
+- Quote page choice and question (QUO-08 rest, migration 021117; owner (27) א, (28) א): optional lines start unticked on the page;
+  `quote_public_answer` checks the ticked places and the shown total, stores `quote_decisions.optional_line_ids`, `choice_sha256`
+  (`app.quote_choice_fingerprint`) and the sent and accepted totals (`app.quote_counted_totals`), writes the choice into the lines'
+  `optional_selected`, and `app.quotes_check` recomputes the accepted quote's totals at its frozen rate only while the setting
+  `app.quote_accept_choice` names it and `auth.uid()` is null, so every reader of an accepted quote reads what was accepted.
+  `quote_public_question`: 1..500 cleaned characters on 20 lines; 120/10 min per link shared with the page, 20 per link a day, 5 per
+  sender in 10 minutes (`app.quote_question_counts`); a `system` entry kind `quote_question` and a `quote` notice; erasure keeps
+  "(הטקסט נמחק)". `app.quotes_check`, `quote_public_decide`, `quote_public_version` and `app.audit_erase_core` were last redefined
+  in 021117.
 - Quote templates (QUO-04, migration 020145): `public.quote_templates` and `quote_template_lines` (members read; owners/admins of a
   writable org write; flag `quotes` and quota `max_quote_templates` by definer trigger with the outsider guard; 200 lines). A product
   line saved without a price is priced for the customer when used (PL-03, app side). `public.quote_template_save(org, quote, name)`
