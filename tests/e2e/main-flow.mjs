@@ -1673,6 +1673,10 @@ try {
   // FXA-02: an empty send marks the wrong field, says why next to it, and puts focus there
   await visitor.getByRole("button", { name: "שליחת הפרטים" }).click();
   await visitor.locator('[aria-invalid="true"]').first().waitFor();
+  // focus moves after the error is drawn: wait for it (a fast machine checked before it moved), then judge it
+  await visitor
+    .waitForFunction(() => document.activeElement?.getAttribute("aria-invalid") === "true", null, { timeout: 5000 })
+    .catch(() => {});
   const focused = await visitor.evaluate(() => {
     const el = document.activeElement;
     const said = el?.getAttribute("aria-describedby");
