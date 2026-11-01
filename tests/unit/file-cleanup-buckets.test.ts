@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CLEANUP_BUCKETS, groupOrphans, isCleanupBucket } from "@/features/files/orphans";
+import { latestMigrationText } from "./helpers/migrations";
 
 // USR-01 and FLD-04: the nightly cleanup removes objects only from the three known buckets,
 // whatever bucket name the database answers with.
@@ -40,15 +41,7 @@ describe("file cleanup bucket allow-list (USR-01)", () => {
 
 describe("the database's bucket list matches (FLD-04)", () => {
   it("the latest orphan_files_bucket_check names the same buckets", async () => {
-    const { readdirSync, readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const dir = join(process.cwd(), "supabase/migrations");
-    const sql = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .map((name) => readFileSync(join(dir, name), "utf8"))
-      .filter((text) => text.includes("orphan_files_bucket_check check"))
-      .at(-1);
+    const sql = latestMigrationText("orphan_files_bucket_check check");
     const list = /orphan_files_bucket_check check \(bucket in \(([^)]*)\)\)/.exec(sql ?? "")?.[1] ?? "";
     expect([...list.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort()).toEqual([...CLEANUP_BUCKETS].sort());
   });

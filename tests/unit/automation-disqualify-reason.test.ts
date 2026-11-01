@@ -1,12 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { actionsMissingReason, fromDbRule, REASON_REQUIRED, toDbRule } from "@/features/automations/convert";
 import type { Lookups } from "@/features/automations/queries";
 import { RETIRED_STEP_WARNINGS, STEP_WARNINGS, stepWarningText } from "@/features/automations/describe";
 import { ruleSchema } from "@/features/automations/schema";
+import { latestMigrationText } from "./helpers/migrations";
 
 // RVW-9 (owner, 12 October 2026): an automation that makes a lead "not relevant" gives a reason from the list.
 const OPEN = "11111111-1111-4111-8111-111111111111";
@@ -94,13 +92,7 @@ describe("set_lead_status and the not-relevant reason", () => {
 describe("run log warnings", () => {
   it("every warning the engine writes has a Hebrew text (the latest app.run_automation_actions)", () => {
     // the newest migration that redefines the engine's action runner (0095, then HEB-03, then HEB-08 and its follow-up)
-    const dir = join(process.cwd(), "supabase/migrations");
-    const latest = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.run_automation_actions"))
-      .at(-1)!;
-    const sql = readFileSync(join(dir, latest), "utf8");
+    const sql = latestMigrationText("create or replace function app.run_automation_actions")!;
     // a create_quote step gathers its warnings in a list (AUT-02 follow-up): v_warnings := v_warnings || '<key>'::text
     const written = [
       ...[...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]),

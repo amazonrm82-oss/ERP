@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { createItems, navItems } from "@/features/shell/nav";
@@ -16,14 +13,15 @@ import {
   waitingPlural,
 } from "@/features/terminology/terms";
 import { RECORD_TYPES, recordTypeNames } from "@/lib/record-types";
+import { migrationNames, migrationText } from "./helpers/migrations";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 
 /** The keys a column of public.org_terms accepts, from the last migration that sets it. */
 function keysInMigration(column: string): string[] {
-  const dir = path.join(process.cwd(), "supabase", "migrations");
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort().reverse()) {
-    const sql = readFileSync(path.join(dir, file), "utf8");
+  const files = migrationNames();
+  for (let i = files.length - 1; i >= 0; i--) {
+    const sql = migrationText(files[i]);
     const match = sql.match(new RegExp(`${column}\\s+text check \\(${column} is null or ${column} in \\(([^)]*)\\)\\)`));
     if (match) return [...match[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
   }

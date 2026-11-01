@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -15,17 +12,13 @@ import {
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { FIELD_TYPES } from "@/features/custom-fields/types";
 import { conversionErrorMessage, customFieldMessage, dbErrorMessage, isUniqueFieldClash } from "@/lib/errors";
+import { latestMigration, latestMigrationText } from "./helpers/migrations";
 
 // FLD-07: the app's rules mirror app.field_settings_check() (migration field_settings).
 function latestSettingsCheck(): string {
-  const dir = join(process.cwd(), "supabase/migrations");
-  const latest = readdirSync(dir)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-    .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.field_settings_check"))
-    .pop();
+  const latest = latestMigration("create or replace function app.field_settings_check");
   expect(latest).toBeTruthy();
-  return readFileSync(join(dir, latest!), "utf8");
+  return latest!.sql;
 }
 
 describe("custom field settings (FLD-07)", () => {
@@ -41,7 +34,7 @@ describe("custom field settings (FLD-07)", () => {
   it("empty for the read-only rule: null, absent or blank text; 0, false and [] are values (as app.custom_value_empty)", () => {
     for (const value of [null, undefined, "", "   ", "\t"]) expect(isEmptyCustomValue(value), JSON.stringify(value)).toBe(true);
     for (const value of [0, false, "0", "x", [], " a "]) expect(isEmptyCustomValue(value), JSON.stringify(value)).toBe(false);
-    const sql = readFileSync(join(process.cwd(), "supabase/migrations", readdirSync(join(process.cwd(), "supabase/migrations")).filter((n) => readFileSync(join(process.cwd(), "supabase/migrations", n), "utf8").includes("function app.custom_value_empty")).sort().pop()!), "utf8");
+    const sql = latestMigrationText("function app.custom_value_empty")!;
     expect(sql).toContain("jsonb_typeof(p_value) = 'string' and (p_value #>> '{}') ~ '^[[:space:]]*$'");
   });
 

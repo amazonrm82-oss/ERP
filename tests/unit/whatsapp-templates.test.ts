@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { mentionIds } from "@/features/mentions/token";
@@ -19,6 +16,7 @@ import {
   recordTemplateValues,
   whatsappMessageUrl,
 } from "@/features/whatsapp/templates";
+import { latestMigrationText } from "./helpers/migrations";
 
 describe("WhatsApp templates (WA-01)", () => {
   it("fills the known placeholders that have a value and leaves the rest", () => {
@@ -69,14 +67,10 @@ describe("WhatsApp templates (WA-01)", () => {
   });
 
   it("the defaults equal the latest seed of the migrations, with one meeting reminder and one collection reminder", () => {
-    const dir = path.join(process.cwd(), "supabase/migrations");
     // the latest migration that defines app.seed_whatsapp_templates (COL-04 added the collection reminder)
-    const file = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql") && readFileSync(path.join(dir, name), "utf8").includes("function app.seed_whatsapp_templates("))
-      .sort()
-      .at(-1);
-    expect(file).toBeDefined();
-    const sql = readFileSync(path.join(dir, file!), "utf8");
+    const latest = latestMigrationText("function app.seed_whatsapp_templates(");
+    expect(latest).toBeDefined();
+    const sql = latest!;
     const rows = [...sql.matchAll(/\((\d+), '([^']+)',\s*'([^']+)', (null(?:::text)?|'[a-z_]+')\)/g)].map((m) => ({
       name: m[2],
       body: m[3],

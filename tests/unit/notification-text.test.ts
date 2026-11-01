@@ -1,11 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { leadsWaitingText } from "@/features/notifications/lead-count";
 import { NOT_NOTIFICATION_LITERALS, NOTIFICATION_PATTERNS, notificationText, type NotificationTextRow } from "@/features/notifications/notification-text";
 import { DEFAULT_TERMS, resolveTerms } from "@/features/terminology/terms";
+import { allMigrationTexts } from "./helpers/migrations";
 
 // every word masculine: מתעניין, לקוח, תיק
 const MASCULINE = resolveTerms({ contact: "customer", lead: "prospect", deal: "case" });
@@ -217,7 +215,6 @@ describe("notifications in the business's words (FLD-10 part three)", () => {
 // The guard: every literal with a record word in the latest definition of a function that writes notifications (or of a
 // text helper), and every title of the notify_assignment triggers, must be one the renderer knows, or be listed as not a
 // notification text. A text changed in SQL then fails here instead of silently staying in today's words.
-const MIGRATIONS = join(process.cwd(), "supabase/migrations");
 const TEXT_HELPERS = ["app.follow_title", "app.follow_record", "app.mention_subject", "app.leads_waiting_text", "app.quote_accept_deal",
   // PRV-01: writes its notices through app.lead_retention_notify
   "app.run_lead_retention"];
@@ -248,8 +245,7 @@ export function parseDefinitions(sqls: string[]): { functions: Map<string, strin
 }
 
 function latestDefinitions(): { functions: Map<string, string>; triggerTitles: Map<string, string>; crossed: string[] } {
-  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
-  return parseDefinitions(files.map((file) => readFileSync(join(MIGRATIONS, file), "utf8")));
+  return parseDefinitions(allMigrationTexts());
 }
 
 function recordWordLiterals(): Map<string, string[]> {

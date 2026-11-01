@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
 import { appliedFilter, filterFields } from "@/features/list-filters/server";
 import type { FilterTree } from "@/features/list-filters/model";
+import { latestMigrationText } from "./helpers/migrations";
 
 // RVW-4: the list export logs only the conditions the list applied, and the database keeps a
 // value of a plain choice field only when it is one of the values listed in app.export_choice_values().
@@ -51,13 +50,7 @@ describe("appliedFilter", () => {
 
 describe("the database's list of plain choice values", () => {
   // the latest migration that (re)defines the function (0088, then CON-10's contact_preferences)
-  const dir = new URL("../../supabase/migrations/", import.meta.url);
-  const sql = readdirSync(dir)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-    .map((name) => readFileSync(new URL(name, dir), "utf8"))
-    .filter((text) => text.includes("create or replace function app.export_choice_values()"))
-    .at(-1) ?? "";
+  const sql = latestMigrationText("create or replace function app.export_choice_values()") ?? "";
   const listed = new Set(
     [...(/create or replace function app\.export_choice_values\(\)[\s\S]*?array\[([\s\S]*?)\];/.exec(sql)?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]),
   );

@@ -1,23 +1,17 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { stageSchema } from "@/features/customization/schema";
 import { MAX_ROT_DAYS, STAGE_COLOR_VALUES, STAGE_RULE, stageColor, stageTone } from "@/features/deals/stage-colors";
+import { latestMigrationText } from "./helpers/migrations";
 
 const base = { name: "הצעת מחיר", kind: "open", probability: "50" };
 
 // DEAL-01: a stage's colour and the days a deal may sit in it
 describe("stage settings (DEAL-01)", () => {
   it("the palette is the list of the database constraint", () => {
-    const dir = join(process.cwd(), "supabase/migrations");
-    const files = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .filter((name) => readFileSync(join(dir, name), "utf8").includes("stages_color_token"));
-    expect(files.length).toBeGreaterThan(0);
-    const sql = readFileSync(join(dir, files[files.length - 1]), "utf8");
+    const latest = latestMigrationText("stages_color_token");
+    expect(latest).toBeDefined();
+    const sql = latest!;
     const list = /color in \(([^)]*)\)\) not valid/.exec(sql)?.[1] ?? "";
     const keys = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
     expect(keys).toEqual([...STAGE_COLOR_VALUES]);

@@ -1,24 +1,16 @@
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { MONEY_ENTRY_KINDS, moneyEntryKind, moneyEntryLabel } from "@/features/activities/money-entries";
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schema";
+import { latestMigrationText } from "./helpers/migrations";
 
 // DOC-04: the timeline entry names the document type in Hebrew; app.document_type_label (migration money_timeline) mirrors the
 // screen's labels, and the guard's list of kinds is the screen's list.
-const dir = path.join(process.cwd(), "supabase/migrations");
 
 describe("documents and payments on the timeline (DOC-04)", () => {
   it("app.document_type_label equals DOCUMENT_TYPE_LABELS", () => {
     // its latest redefinition (GAP-12 added the opening balance)
-    const latest = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort()
-      .map((f) => readFileSync(path.join(dir, f), "utf8"))
-      .filter((sql) => sql.includes("function app.document_type_label"))
-      .at(-1)!;
+    const latest = latestMigrationText("function app.document_type_label")!;
     const fn = latest.slice(latest.indexOf("function app.document_type_label"));
     const body = fn.slice(0, fn.indexOf("$$;"));
     const pairs = Object.fromEntries([...body.matchAll(/when '([a-z_]+)' then '((?:[^']|'')*)'/g)].map((m) => [m[1], m[2].replace(/''/g, "'")]));
@@ -26,12 +18,7 @@ describe("documents and payments on the timeline (DOC-04)", () => {
   });
 
   it("the guard and the author trigger name exactly MONEY_ENTRY_KINDS (their latest redefinition)", () => {
-    const latest = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort()
-      .map((f) => readFileSync(path.join(dir, f), "utf8"))
-      .filter((sql) => sql.includes("function app.activities_money_entry_guard"))
-      .at(-1)!;
+    const latest = latestMigrationText("function app.activities_money_entry_guard")!;
     const lists = [...latest.matchAll(/in \(('document_recorded'[^)]*)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
     expect(lists.length).toBeGreaterThanOrEqual(3);
     for (const list of lists) expect(list).toEqual([...MONEY_ENTRY_KINDS]);

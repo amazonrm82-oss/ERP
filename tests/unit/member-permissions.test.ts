@@ -1,6 +1,3 @@
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,15 +10,12 @@ import {
   canManageAutomations,
   hasPermission,
 } from "@/features/permissions/keys";
+import { latestMigrationText } from "./helpers/migrations";
 
-const dir = path.resolve(__dirname, "../../supabase/migrations");
 // the latest migration that defines the keys and the constraint (DOC-01 added `documents` in accounting_documents)
-const migration = readdirSync(dir)
-  .filter((f) => f.endsWith(".sql"))
-  .sort()
-  .map((f) => readFileSync(path.join(dir, f), "utf8"))
-  .filter((text) => text.includes("function app.member_permission_keys()") && text.includes("constraint member_permissions_known check"))
-  .at(-1)!;
+const migration = latestMigrationText(
+  (text) => text.includes("function app.member_permission_keys()") && text.includes("constraint member_permissions_known check"),
+)!;
 
 // PRM-01: the closed list of keys is the same in the app and in the database
 describe("member permission keys", () => {
@@ -71,12 +65,7 @@ describe("member permission screen texts", () => {
 
   it("the built keys match app.member_permission_built_keys()", () => {
     // the latest migration that defines it (a module that is built adds its key there)
-    const latest = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort()
-      .map((f) => readFileSync(path.join(dir, f), "utf8"))
-      .filter((text) => text.includes("function app.member_permission_built_keys()"))
-      .at(-1)!;
+    const latest = latestMigrationText("function app.member_permission_built_keys()")!;
     const fn = latest.match(/function app\.member_permission_built_keys\(\)[\s\S]*?array\[([\s\S]*?)\]::text\[\]/);
     expect(fn && [...fn[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual([...BUILT_MEMBER_PERMISSIONS].sort());
   });

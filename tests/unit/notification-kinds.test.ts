@@ -1,20 +1,17 @@
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { notificationHref } from "@/features/notifications/links";
 import { NOTIFICATION_KINDS, shownNotificationGroups } from "@/features/notifications/settings";
+import { migrationNames, migrationText } from "./helpers/migrations";
 
 // USR-06: the app's list of notification kinds and the database's check
 // constraints must be the same list.
-const MIGRATIONS = path.join(process.cwd(), "supabase", "migrations");
 
 /** The kinds in the last migration that sets the given constraint. */
 function kindsInLastMigration(constraint: string): string[] {
-  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
-  for (const file of files.reverse()) {
-    const sql = readFileSync(path.join(MIGRATIONS, file), "utf8");
+  const files = migrationNames();
+  for (let i = files.length - 1; i >= 0; i--) {
+    const sql = migrationText(files[i]);
     const at = sql.indexOf(`add constraint ${constraint} check`);
     if (at >= 0) {
       const body = sql.slice(at, sql.indexOf(";", at));

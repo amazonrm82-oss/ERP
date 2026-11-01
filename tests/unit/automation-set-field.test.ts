@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { CONTACT_CHANNELS, CONTACT_LOCALES } from "@/features/contacts/preferences";
@@ -11,6 +8,7 @@ import type { Lookups } from "@/features/automations/queries";
 import { ruleSchema } from "@/features/automations/schema";
 import { describeSetField, isDateSetField, relativeOf, setFieldChoices, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "@/features/automations/set-field";
 import type { FieldDefinition, FieldType } from "@/features/custom-fields/types";
+import { latestMigrationText } from "./helpers/migrations";
 
 // AUT-01: the builder's typed value -> the stored JSON value (the same rules as a record form), and back.
 
@@ -281,13 +279,7 @@ describe("set_field values (AUT-01)", () => {
   });
 
   it("the built-in fields and value lists equal the engine's (the latest migration that redefines run_automation_actions)", () => {
-    const dir = join(process.cwd(), "supabase", "migrations");
-    const file = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.run_automation_actions"))
-      .at(-1)!;
-    const sql = readFileSync(join(dir, file), "utf8");
+    const sql = latestMigrationText("create or replace function app.run_automation_actions")!;
     const branch = sql.slice(sql.indexOf("elsif v_type = 'set_field' then"), sql.indexOf("elsif v_type = 'create_deal' then"));
     const engine = [...branch.matchAll(/elsif v_field = '(\w+)' then\s+if p_entity not in \(([^)]*)\) then/g)].map((m) => ({
       key: m[1],
@@ -302,12 +294,7 @@ describe("set_field values (AUT-01)", () => {
     expect(listAfter("preferred_channel")).toEqual([...CONTACT_CHANNELS]);
     expect(listAfter("preferred_locale")).toEqual([...CONTACT_LOCALES]);
     // the relative-date limits of the engine's helper (the latest migration that redefines app.automation_relative_date)
-    const helperFile = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.automation_relative_date"))
-      .at(-1)!;
-    const helper = readFileSync(join(dir, helperFile), "utf8");
+    const helper = latestMigrationText("create or replace function app.automation_relative_date")!;
     expect(helper).toMatch(/\(p_spec ->> 'days'\)::numeric > 365/);
     expect(helper).toMatch(/not in \('calendar', 'business'\)/);
   });

@@ -14,16 +14,11 @@ import {
   isBlocklistChannel,
   splitAddresses,
 } from "@/features/consent-blocklist/model";
+import { latestMigrationText } from "./helpers/migrations";
 
 // the migration that creates public.consent_blocklist
 function blocklistSql(): string {
-  const dir = join(process.cwd(), "supabase/migrations");
-  const sql = readdirSync(dir)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-    .map((name) => readFileSync(join(dir, name), "utf8"))
-    .filter((text) => text.includes("create table if not exists public.consent_blocklist"))
-    .at(-1);
+  const sql = latestMigrationText("create table if not exists public.consent_blocklist");
   expect(sql, "a migration creates public.consent_blocklist").toBeDefined();
   return sql ?? "";
 }

@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { mapLinks } from "@/features/custom-fields/links";
@@ -12,6 +9,7 @@ import { automationSettable } from "@/features/automations/set-field";
 import { boardCatalog } from "@/features/deals/board-fields";
 import { copyCustomFields } from "@/features/deals/copy";
 import { FORM_EXCLUDED_TYPES } from "@/features/intake/fields";
+import { latestMigrationText } from "./helpers/migrations";
 
 const field = (type: FieldType, extra: Partial<FieldDefinition> = {}): FieldDefinition => ({
   id: "f",
@@ -128,13 +126,7 @@ describe("where the new types go (type-decisions.ts)", () => {
   });
 
   it("the database's value check has the same address rule and the same link targets", () => {
-    const dir = join(process.cwd(), "supabase/migrations");
-    const sql = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .map((name) => readFileSync(join(dir, name), "utf8"))
-      .filter((text) => text.includes("field_definitions_link_target_check"))
-      .pop() as string;
+    const sql = latestMigrationText("field_definitions_link_target_check") as string;
     expect(sql).toContain("link_target in ('lead', 'contact', 'company', 'deal')");
     expect(sql).toContain("char_length(v_text) <= 500 and position(chr(10) in v_text) = 0");
   });

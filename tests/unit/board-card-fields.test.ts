@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -14,6 +14,7 @@ import {
   daysSince,
   resolveBoardFields,
 } from "@/features/deals/board-fields";
+import { latestMigrationText } from "./helpers/migrations";
 
 // DEAL-09: which fields a deal card on the board shows
 const catalog = boardCatalog([
@@ -71,12 +72,7 @@ describe("board card fields (DEAL-09)", () => {
   });
 
   it("the database accepts the board's list key (latest list_preferences check)", () => {
-    const dir = join(process.cwd(), "supabase/migrations");
-    const last = readdirSync(dir)
-      .sort()
-      .map((name) => readFileSync(join(dir, name), "utf8"))
-      .filter((sql) => sql.includes("add constraint list_preferences_object_type_check"))
-      .at(-1);
+    const last = latestMigrationText("add constraint list_preferences_object_type_check");
     expect(last).toBeDefined();
     expect(last).toContain(`'${BOARD_PREFERENCE}'`);
   });

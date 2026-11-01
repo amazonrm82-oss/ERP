@@ -16,14 +16,14 @@ import {
   TARGET_MIN,
   targetText,
 } from "@/features/response-target/settings";
+import { latestMigrationText } from "./helpers/migrations";
 
 const dir = join(process.cwd(), "supabase/migrations");
 // the latest migration that sets the action check (SPD-03 widens it)
-const actionCheck = readdirSync(dir)
-  .filter((f) => f.endsWith(".sql"))
-  .sort()
-  .map((f) => readFileSync(join(dir, f), "utf8"))
-  .flatMap((sql) => [...sql.matchAll(/lead_response_settings_action_check check \(breach_action in \(([^)]*)\)\)/g)].map((m) => m[1]))
+const ACTION_CHECK = /lead_response_settings_action_check check \(breach_action in \(([^)]*)\)\)/g;
+// the last match of the latest migration that has one = the last match of all of them in name order
+const actionCheck = [...(latestMigrationText((sql) => [...sql.matchAll(ACTION_CHECK)].length > 0) ?? "").matchAll(ACTION_CHECK)]
+  .map((m) => m[1])
   .at(-1);
 const created = readdirSync(dir)
   .filter((f) => f.endsWith("_response_target.sql"))

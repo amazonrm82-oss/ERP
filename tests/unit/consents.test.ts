@@ -1,6 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,31 +14,18 @@ import {
   isConsentState,
 } from "@/features/consents/model";
 import { manualConsentSchema } from "@/features/consents/schema";
+import { latestMigrationText } from "./helpers/migrations";
 
 // the migration that creates public.consents
 function consentsSql(): string {
-  const dir = join(process.cwd(), "supabase/migrations");
-  const sql = readdirSync(dir)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-    .map((name) => readFileSync(join(dir, name), "utf8"))
-    .filter((text) => text.includes("create table if not exists public.consents"))
-    .at(-1);
+  const sql = latestMigrationText("create table if not exists public.consents");
   expect(sql, "a migration creates public.consents").toBeDefined();
   return sql ?? "";
 }
 
 // the newest migration that defines a check constraint of public.consents
 function latestConstraint(name: string): string {
-  const dir = join(process.cwd(), "supabase/migrations");
-  return (
-    readdirSync(dir)
-      .filter((file) => file.endsWith(".sql"))
-      .sort()
-      .map((file) => readFileSync(join(dir, file), "utf8"))
-      .filter((text) => text.includes(`${name} check (`))
-      .at(-1) ?? ""
-  );
+  return latestMigrationText(`${name} check (`) ?? "";
 }
 
 function checkList(sql: string, constraint: string, column: string): string[] {

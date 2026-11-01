@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
 import { fromDbRule, shekelsToAgorot, toDbRule } from "@/features/automations/convert";
@@ -7,18 +5,12 @@ import { TRIGGERS, triggerOffered } from "@/features/automations/definitions";
 import { describeRule } from "@/features/automations/describe";
 import type { Lookups } from "@/features/automations/queries";
 import { ruleSchema } from "@/features/automations/schema";
+import { latestMigrationText } from "./helpers/migrations";
 
 // PAY-07 part two: the "payment received" trigger: builder values -> stored setting -> builder values, and the texts.
 
 // the latest migration holding a text (found by its content, so renumbering at merge keeps the test)
-const latest = (text: string) =>
-  readFileSync(
-    `supabase/migrations/${readdirSync("supabase/migrations")
-      .sort()
-      .filter((file) => readFileSync(`supabase/migrations/${file}`, "utf8").includes(text))
-      .at(-1)}`,
-    "utf8",
-  );
+const latest = (text: string) => latestMigrationText(text)!;
 // the latest migration that sets the trigger types
 const ENGINE = latest("automations_trigger_type_check check");
 

@@ -21,6 +21,7 @@ import {
 } from "@/features/goals/metrics";
 import { ENTITY_LABELS, FIELD_LABELS, VALUE_LABELS } from "@/features/audit/labels";
 import { EXPORT_README, EXPORT_TABLES } from "@/features/imports/export-build";
+import { latestMigrationText } from "./helpers/migrations";
 
 // GOL-01
 describe("goal metrics", () => {
@@ -31,10 +32,7 @@ describe("goal metrics", () => {
     const list = (name: string, text = sql) =>
       [...(new RegExp(`constraint ${name}\\s+check \\(\\w+ in \\(([^)]*)\\)\\)`).exec(text)?.[1] ?? "").matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     // the latest migration that sets the metric list (GOL-01 collection widened it)
-    const latest = files
-      .map((f) => readFileSync(path.join(dir, f), "utf8"))
-      .filter((text) => list("goals_metric_check", text).length > 0)
-      .at(-1) as string;
+    const latest = latestMigrationText((text) => list("goals_metric_check", text).length > 0) as string;
     expect(latest).toContain("'collected'");
     expect(list("goals_metric_check", latest)).toEqual(GOAL_METRIC_KEYS);
     expect(list("goals_period_check")).toEqual([...GOAL_PERIODS]);

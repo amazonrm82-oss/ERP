@@ -16,6 +16,7 @@ import {
 } from "@/features/deal-contacts/roles";
 import { addDealContactSchema, dealContactRoleArg } from "@/features/deal-contacts/schema";
 import type { RelatedDeal } from "@/features/deals/queries";
+import { latestMigrationText } from "./helpers/migrations";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
@@ -24,14 +25,8 @@ const deal = (id: string): RelatedDeal => ({ id, name: `עסקה ${id}`, amountA
 // CON-03: four fixed roles, stored as keys, mirrored by a check constraint
 describe("roles of contacts in a deal (CON-03)", () => {
   it("the app's list is the list of the database constraint", () => {
-    const dir = join(process.cwd(), "supabase/migrations");
     // the latest migration that sets the constraint wins (file names sort in apply order)
-    const sql = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .map((name) => readFileSync(join(dir, name), "utf8"))
-      .filter((text) => text.includes("add constraint deal_contacts_role_check"))
-      .at(-1);
+    const sql = latestMigrationText("add constraint deal_contacts_role_check");
     expect(sql, "a migration adds deal_contacts_role_check").toBeDefined();
     const list = /deal_contacts_role_check\s+check \(role is null or role in \(([^)]*)\)\)/.exec(sql ?? "")?.[1] ?? "";
     const keys = [...list.matchAll(/'([a-z_]+)'/g)].map((match) => match[1]);

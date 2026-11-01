@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
 import { DOCUMENT_EXPORT_HEADER, documentExportRows } from "@/features/documents/export-table";
@@ -10,6 +8,7 @@ import { filterFields, filterToPostgrest } from "@/features/list-filters/server"
 import { PAYMENT_EXPORT_HEADER, paymentExportRows } from "@/features/payments/export-table";
 import { PAYMENT_DEFAULT_SORT, PAYMENT_SORT_COLUMNS, paymentListFilters, paymentListHref } from "@/features/payments/list";
 import { VIEW_FILTER_KEYS, VIEW_OBJECTS } from "@/features/views/types";
+import { latestMigrationText } from "./helpers/migrations";
 
 // LST-09 for the money lists (owner, 21 October 2026): the accounting documents and the payments, each with its columns,
 // sort, advanced filter, saved views, totals and export rows.
@@ -151,13 +150,7 @@ describe("saved views and the database's lists", () => {
   });
 
   it("the object types match the list_preferences and saved_views constraints", () => {
-    const dir = new URL("../../supabase/migrations/", import.meta.url);
-    const sql = readdirSync(dir)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .map((name) => readFileSync(new URL(name, dir), "utf8"))
-      .filter((text) => text.includes("saved_views_object_type_check"))
-      .at(-1) ?? "";
+    const sql = latestMigrationText("saved_views_object_type_check") ?? "";
     const views = /saved_views_object_type_check\s+check \(object_type in \(([^)]*)\)\)/.exec(sql)?.[1] ?? "";
     expect([...views.matchAll(/'([^']*)'/g)].map((m) => m[1])).toEqual([...VIEW_OBJECTS]);
   });

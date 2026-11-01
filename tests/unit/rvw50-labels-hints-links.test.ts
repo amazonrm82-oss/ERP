@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -7,15 +7,11 @@ import { auditEntryNote } from "@/features/audit/condition-removal";
 import { ACTION_LABELS, ENTITY_LABELS } from "@/features/audit/labels";
 import { notificationHref } from "@/features/notifications/links";
 import { dbErrorMessage } from "@/lib/errors";
+import { allMigrationTexts } from "./helpers/migrations";
 
 // RVW-50: the audit log, the error messages and the notification links know the newer entries, hints and notices.
 
-const MIGRATIONS = join(process.cwd(), "supabase/migrations");
-const sql = readdirSync(MIGRATIONS)
-  .filter((f) => f.endsWith(".sql"))
-  .sort()
-  .map((f) => readFileSync(join(MIGRATIONS, f), "utf8"))
-  .join("\n");
+const sql = allMigrationTexts().join("\n");
 
 describe("audit log labels (RVW-50 א)", () => {
   it("names the person removal and the customer links of quotes and orders", () => {

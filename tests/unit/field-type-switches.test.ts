@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { BASELINE_FIELD_TYPES, FIELD_TYPE_SWITCHES } from "@/features/custom-fields/type-decisions";
 import { FIELD_TYPES } from "@/features/custom-fields/types";
+import { latestMigrationText } from "./helpers/migrations";
 
 // FLD-06 condition: every place that switches on a custom field's type makes a choice for every type added after
 // FLD-01. Adding a type to FIELD_TYPES fails here until each place in type-decisions.ts says "handled" or
@@ -52,15 +53,11 @@ describe("field type decisions (FLD-06)", () => {
   });
 
   it("the database accepts exactly FIELD_TYPES, and its value check handles every added type", () => {
-    const dir = join(root, "supabase/migrations");
-    const files = readdirSync(dir).filter((name) => name.endsWith(".sql")).sort();
-    const withConstraint = files.filter((name) => readFileSync(join(dir, name), "utf8").includes("field_definitions_field_type_check check"));
-    const sql = readFileSync(join(dir, withConstraint[withConstraint.length - 1]), "utf8");
+    const sql = latestMigrationText("field_definitions_field_type_check check")!;
     const list = sql.slice(sql.indexOf("field_definitions_field_type_check check"));
     const types = [...list.slice(0, list.indexOf("));")).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     expect(types).toEqual([...FIELD_TYPES]);
-    const cvo = files.filter((name) => readFileSync(join(dir, name), "utf8").includes("create or replace function app.custom_value_ok"));
-    const body = readFileSync(join(dir, cvo[cvo.length - 1]), "utf8");
+    const body = latestMigrationText("create or replace function app.custom_value_ok")!;
     for (const type of ADDED) expect(body, type).toContain(`'${type}'`);
   });
 });

@@ -7,6 +7,7 @@ import { FEATURE_MISSING, TRIGGERS, triggerFeature, triggerOffered, type Trigger
 import { describeRule, retryLine } from "@/features/automations/describe";
 import type { Lookups } from "@/features/automations/queries";
 import { ruleSchema } from "@/features/automations/schema";
+import { latestMigrationText } from "./helpers/migrations";
 
 // AUT-04: the commercial triggers in the builder: offered and saved only with their plan flag, the same flags as the
 // engine's app.automation_trigger_feature, every type allowed by the constraint and offered by the outbox.
@@ -50,11 +51,7 @@ describe("commercial triggers (AUT-04)", () => {
       expect(outbox, type).toContain(`'${type}'`);
     }
     // every builder trigger is in the latest constraint (a later migration may add types)
-    const latestAllowed = readdirSync("supabase/migrations")
-      .sort()
-      .map((file) => readFileSync(`supabase/migrations/${file}`, "utf8"))
-      .filter((text) => text.includes("automations_trigger_type_check check"))
-      .at(-1)!
+    const latestAllowed = latestMigrationText("automations_trigger_type_check check")!
       .match(/automations_trigger_type_check check \(trigger_type = any \(array\[([^\]]*)\]/)![1];
     for (const trigger of TRIGGERS) expect(latestAllowed, trigger.key).toContain(`'${trigger.type}'`);
   });
