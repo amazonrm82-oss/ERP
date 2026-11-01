@@ -1,3 +1,7 @@
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { redactPublicPath, requestErrorLine } from "@/lib/request-error-log";
@@ -53,6 +57,14 @@ describe("server log line of a request error", () => {
       [`/f/w/${t}.js`, "/f/w/[token]"],
       [`/f/widget/${t}`, "/f/widget/[token]"],
       [`/api/forms/widget/${t}`, "/api/forms/widget/[token]"],
+      // QUO-06 / QUO-08: the customer's quote PDF and question routes
+      [`/api/forms/quote/${t}/pdf`, "/api/forms/quote/[token]/pdf"],
+      [`/api/forms/quote/${t}/question`, "/api/forms/quote/[token]/question"],
+      // ORD-05: a future order PDF route sits under the same prefix
+      [`/api/forms/order/${t}/pdf`, "/api/forms/order/[token]/pdf"],
+      // BAL-04: the statement page and its PDF route
+      [`/f/statement/${t}`, "/f/statement/[token]"],
+      [`/api/forms/statement/${t}/pdf`, "/api/forms/statement/[token]/pdf"],
     ];
     for (const [path, shown] of cases) {
       expect(redactPublicPath(path), path).toBe(shown);
@@ -74,6 +86,7 @@ describe("server log line of a request error", () => {
       "/f/card/",
       "/api/forms/booking/",
       "/api/forms/widget/",
+      "/api/forms/statement/",
       "/f/w/",
       "/f/widget",
       "/api/push/dispatch",
@@ -81,6 +94,26 @@ describe("server log line of a request error", () => {
       "/login",
     ]) {
       expect(redactPublicPath(path), path).toBe(path);
+    }
+  });
+
+  it("hides the token of every public route and page in the app's own tree (src/app/api/forms, src/app/f)", () => {
+    const t = "Zq9_-0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcde";
+    const routes: string[] = [];
+    const walk = (dir: string, url: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(dir, entry.name), `${url}/${entry.name}`);
+        else if (/^(route|page)\.tsx?$/.test(entry.name) && url.includes("[token]")) routes.push(url);
+      }
+    };
+    const app = fileURLToPath(new URL("../../src/app", import.meta.url));
+    walk(join(app, "api/forms"), "/api/forms");
+    walk(join(app, "f"), "/f");
+    expect(routes).toContain("/api/forms/statement/[token]/pdf");
+    for (const route of routes) {
+      const path = route.replace("[token]", t);
+      expect(redactPublicPath(path), route).not.toContain(t);
+      expect(requestErrorLine(new Error("boom"), { path, method: "GET" }, {}), route).not.toContain(t);
     }
   });
 });

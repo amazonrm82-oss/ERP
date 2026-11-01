@@ -94,5 +94,7 @@ describe("sending the statement link (BAL-04)", () => {
 
   it("the token never reaches a log line", () => {
     expect(redactPublicPath(`/f/statement/${"a".repeat(64)}`)).toBe("/f/statement/[token]");
+    // the PDF route of the same link (review: the token must not reach the error log)
+    expect(redactPublicPath(`/api/forms/statement/${"a".repeat(64)}/pdf`)).toBe("/api/forms/statement/[token]/pdf");
   });
 });

@@ -55,6 +55,15 @@ function statement(docs: number, payments: number): PublicStatement {
   };
 }
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/** Review (BAL-04): the file never carries the page's own keys ("doc-1", "pay-1") or any uuid. */
+function expectNoIds(texts: string[]) {
+  const joined = texts.join("\n");
+  expect(joined).not.toMatch(/doc-\d|pay-\d|\d-cod|\d-yap/);
+  expect(joined).not.toMatch(UUID);
+}
+
 const pieces = (pages: ReturnType<typeof pdfText>) => pages.flatMap((page) => page.pieces.map((p) => p.text));
 
 describe("the customer's statement PDF, read back from a real file (BAL-04)", () => {
@@ -91,6 +100,7 @@ describe("the customer's statement PDF, read back from a real file (BAL-04)", ()
     for (const page of docPages) expect(page.pieces.map((p) => p.text)).toContain(visual("לתשלום עד"));
     pages.forEach((page, i) => expect(page.pieces.map((p) => p.text)).toContain(`${pages.length} ךותמ ${i + 1} דומע`));
     expect(all.join("\n")).not.toContain("�");
+    expectNoIds(all);
   });
 
   it("without debts, payments, credit or bank details still makes a valid one-page file", async () => {
@@ -109,6 +119,17 @@ describe("the customer's statement PDF, read back from a real file (BAL-04)", ()
     expect(statementPdfFileName("ישראל ישראלי", "2026-11-01")).toBe("דף חשבון - ישראל ישראלי - 01.11.2026.pdf");
     expect(statementPdfFileName(null, "2026-11-01")).toBe("דף חשבון - 01.11.2026.pdf");
     expect(statementPdfFileName('א/ב "ג"', "2026-11-01")).toBe("דף חשבון - א ב ג - 01.11.2026.pdf");
+  });
+
+  it("drops direction and zero-width characters and cuts a long name by code points, never inside an emoji", () => {
+    // a right-to-left override would show "fdp.exe" as something else; marks and zero-width characters go
+    expect(statementPdfFileName("ישראל\u202eexe.pdf\u202c \u200fכהן\u200b\u2066\ufeff", "2026-11-01")).toBe("דף חשבון - ישראלexe.pdf כהן - 01.11.2026.pdf");
+    // the 100th code point of the name is an emoji (a surrogate pair): kept whole, and the day stays
+    const name = `${"א".repeat(99)}😀😀`;
+    const file = statementPdfFileName(name, "2026-11-01");
+    expect(file).toBe(`דף חשבון - ${"א".repeat(99)}😀 - 01.11.2026.pdf`);
+    expect(file).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/);
+    expect(file).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/);
   });
 });
 
@@ -137,8 +158,8 @@ function ledgerData(lines: number): LedgerStatementData {
       credit_balance: 0,
       lines: Array.from({ length: lines }, (_, i) =>
         i % 2 === 0
-          ? { kind: "document" as const, id: `d${i}`, date: "2026-03-01", type: "tax_invoice", label: `${2000 + i}`, status: "active", invoice_number: null, proforma_number: null, amount: 50000, debit: 50000, credit: 0, balance: 50000 }
-          : { kind: "payment" as const, id: `p${i}`, date: "2026-03-05", type: "cash", label: null, status: "cancelled", invoice_number: null, proforma_number: null, amount: 48000, debit: 0, credit: 0, balance: 50000 },
+          ? { kind: "document" as const, id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, date: "2026-03-01", type: "tax_invoice", label: `${2000 + i}`, status: "active", invoice_number: null, proforma_number: null, amount: 50000, debit: 50000, credit: 0, balance: 50000 }
+          : { kind: "payment" as const, id: `00000000-0000-4000-9000-${String(i).padStart(12, "0")}`, date: "2026-03-05", type: "cash", label: null, status: "cancelled", invoice_number: null, proforma_number: null, amount: 48000, debit: 0, credit: 0, balance: 50000 },
       ),
     },
   };
@@ -162,6 +183,7 @@ describe("the staff's statement PDF (BAL-04, the card's ledger)", () => {
     expect(rowPages.length).toBeGreaterThanOrEqual(2);
     for (const page of rowPages) expect(page.pieces.map((p) => p.text)).toContain(visual("פירוט"));
     expect(all.join("\n")).not.toContain("�");
+    expectNoIds(all);
   });
 
   it("leaves the aging out when nothing is open", () => {

@@ -36,16 +36,27 @@ export type LedgerStatementData = {
   bank: DocumentBank | null;
 };
 
-/** Characters a file system refuses, and a length a download dialog keeps. */
+// direction marks and embeddings/isolates (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069) and zero-width characters
+// (U+200B-U+200D, U+2060, U+FEFF): a name the customer typed could otherwise show a different name or extension
+const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g;
+
+/** Characters a file system refuses, invisible ones, and a length a download dialog keeps (code points, so no half emoji). */
 function fileName(base: string): string {
-  return `${base.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150)}.pdf`;
+  const clean = base
+    .replace(INVISIBLE, "")
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${[...clean].slice(0, 150).join("").trim()}.pdf`;
 }
 
 /** "דף חשבון - <customer> - 01.11.2026.pdf" (the day as DD.MM.YYYY, from the business's today). */
 export function statementPdfFileName(customerName: string | null, today: string): string {
   const [y, m, d] = today.split("-");
   const date = y && m && d ? `${d}.${m}.${y}` : today;
-  return fileName(["דף חשבון", customerName?.trim() || null, date].filter(Boolean).join(" - "));
+  // the customer's part is cut first (by code points, after cleaning), so the day always stays in the name
+  const customer = [...(customerName ?? "").replace(INVISIBLE, "").replace(/\s+/g, " ").trim()].slice(0, 100).join("").trim();
+  return fileName(["דף חשבון", customer || null, date].filter(Boolean).join(" - "));
 }
 
 function letterhead(business: StatementBusiness): PdfLine[] {
