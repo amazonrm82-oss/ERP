@@ -119,6 +119,9 @@ and build this CRM here instead. The old code is preserved on the branch
    (`app.link_preview_ip_counts`, not found included) and 30 per sender and link (`app.link_preview_sender_counts`, scoped by
    `app.link_preview_sender`); the sender is the keyed IP hash with scope `preview`, only bucket numbers are kept. Any other User-Agent
    gets the normal page. In the eslint allow-list.
+   In use (BAL-04, owner 8 October 2026, migration 021114): the customer's statement page (`src/features/statements/public-server.ts`,
+   page `/f/statement/<token>`), which calls only `public.statement_public()`; never framed (`NOT_EMBEDDABLE_PUBLIC_PREFIXES` in
+   `src/lib/csp.ts`, `next.config.ts`), `Referrer-Policy: no-referrer`; in the eslint allow-list.
    In use: the personal calendar feed (`src/features/calendar-feed/feed-server.ts`, route `/api/calendar-feed/<token>.ics`,
    public prefix in `src/lib/supabase/proxy.ts`), which calls only `public.calendar_feed_events()`.
    In use (CAL-10, owner 15 October 2026): the public booking page (`src/features/booking/public-server.ts`, page
@@ -427,7 +430,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 021088 (owner 27 October 2026, answer (ד)+(ה)) a link is never redirected to at once: `qr_scan` (last redefined there) answers
   `{url, campaign, business}` (`organizations.name`) and `/f/q/<token>` serves a page "אתם עוברים לאתר [domain]. [business] אחראי לתוכן
   שלו" (`src/features/qr-codes/interstitial.ts`, every value escaped; a punycode host is shown decoded only when every label is ASCII or
-  Hebrew; never framed: `isEmbeddablePublicPath` in `src/lib/csp.ts` and `next.config.ts` leave `/f/q/` out of `frame-ancestors *`).
+  Hebrew; never framed: `isEmbeddablePublicPath` in `src/lib/csp.ts` and `next.config.ts` leave `/f/q/` and `/f/statement/` out of `frame-ancestors *`).
   Platform emergency switch: `app.qr_external_blocks` (no grants), `public.platform_set_qr_external_block(org, blocked, reason)`
   (owner/support, aal2, logged `qr_external.block|unblock`), `platform_qr_external_block(org)` for the admin card,
   `qr_external_blocked(org)` (a member's boolean, the settings screen says so); while on, a link answers not found and is not counted;
@@ -1426,6 +1429,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   לבעלים ומנהלי מערכת"; each document under one customer (its company, else contact's, else deal's), while cards and lists count it
   under each of its companies (accepted). `public.log_export` was last redefined in 021107 (RPT-01 `recurring`; 021103 COL-06 `collection`). Follow-up: debt columns for payment
   recorders need a per-user kept amount (with PAY-03's).
+- Statement link (BAL-04, migration 021114; owner's answers pending, built (א) to (29)-(32)): `app.statement_links` (one per customer:
+  a contact without a company, or a company; SHA-256 of the token only, no grants; cascade with the record) and
+  `app.statement_link_view_counts`. `public.statement_link_create` (INVOKER: `customer_debt_summary` judges rights and the partial rule
+  under the caller's RLS, hint `statement_link:partial`; a contact of a company `statement_link:company`) hands over to definer
+  `app.statement_link_issue` (granted to authenticated for this wrapper; accepted: a direct call skips only the partial rule, never a
+  customer the caller does not read, `app.statement_customer_readable`, which leaves HEB-08 deputies out, failing closed).
+  `statement_link_status/revoke` (definer, same reader check). The one rule `app.statement_link_usable`: open public pages, keys
+  `balances`+`documents`+`payments`, live customer, a contact still without a company. `public.statement_public(token, ip_hash)`
+  (service_role): 120 views per link + 60 per sender (scope `statement`) in 10 minutes, counted after the token lookup (as ORD-05);
+  answers BAL-02's open debt documents of the customer (500 max, `more`), open/overdue totals and PAY-03 credit separately; no ids,
+  notes or payments. Accepted: a merge drops the duplicate's link; sample removal does not count a link as work. PDF waits for (2).
 - Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
   (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
   `app.can_record_payments` + keys `collection`, `documents`, `payments`): BAL-02's debt, BAL-03's buckets, report_debt_aging's
