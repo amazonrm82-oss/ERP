@@ -38,6 +38,7 @@ import { CustomerHoldCard } from "@/features/customer-holds/components/customer-
 import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
+import { StatementLinkCard } from "@/features/statements/components/statement-link-card";
 import { listRelatedDeals } from "@/features/deals/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { TagPicker } from "@/features/tags/components/tag-picker";
@@ -225,6 +226,12 @@ export default async function CompanyPage({ params, searchParams }: Props) {
             from={(Array.isArray(lf) ? lf[0] : lf)}
             to={(Array.isArray(lt) ? lt[0] : lt)}
             keep={{ tl: (Array.isArray(tl) ? tl[0] : tl) }}
+          />
+          {/* BAL-04: the company's statement link */}
+          <StatementLinkCard
+            orgId={orgId}
+            customer={{ kind: "company", id: company.id }}
+            recipient={{ name: company.name, phoneE164: company.phone_e164, email: company.email }}
           />
 
         </div>

@@ -69,6 +69,7 @@ import { CustomerHoldCard } from "@/features/customer-holds/components/customer-
 import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
+import { StatementLinkCard } from "@/features/statements/components/statement-link-card";
 import { orgHasFeature } from "@/features/settings/queries";
 
 // FLD-10: the tab title in the business's word
@@ -285,6 +286,13 @@ export default async function ContactPage({ params, searchParams }: Props) {
             from={(Array.isArray(lf) ? lf[0] : lf)}
             to={(Array.isArray(lt) ? lt[0] : lt)}
             keep={{ tl: (Array.isArray(tl) ? tl[0] : tl) }}
+          />
+          {/* BAL-04: the customer's statement link (a contact of a company: on the company's card) */}
+          <StatementLinkCard
+            orgId={orgId}
+            customer={{ kind: "contact", id: contact.id }}
+            company={contact.company_id ? { id: contact.company_id, name: contact.companyName } : null}
+            recipient={{ name, phoneE164: contact.phone_e164, email: contact.email }}
           />
 
           <RelatedDealsCard

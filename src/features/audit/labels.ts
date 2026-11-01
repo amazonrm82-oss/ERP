@@ -162,6 +162,8 @@ export const ACTION_LABELS: Record<string, string> = {
   person_erase: "מחיקת אדם מכל מקום (בקשת פרטיות)",
   quote_link: "קישור ללקוח להצעה",
   order_link: "קישור ללקוח להזמנה",
+  // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
+  statement_link: "קישור לדף חשבון",
   // PRV-01: turning the retention policy on, off or changing its months; "keep" on one lead; the count the policy erased
   retention_policy: "מדיניות שמירה",
   retention_keep: "השארה ברשימת מדיניות השמירה",

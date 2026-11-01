@@ -3727,6 +3727,11 @@ export type Database = {
       order_link_status: { Args: { p_org: string; p_order: string }; Returns: Json };
       link_preview_public: { Args: { p_kind: string; p_token: string; p_ip_hash?: string | null }; Returns: Json };
       order_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // BAL-04: the customer's statement link (migration statement_links)
+      statement_link_create: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: string };
+      statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };
+      statement_link_status: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: Json };
+      statement_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       order_public_decide: {
         Args: {
           p_token: string;

@@ -377,6 +377,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "order_money:parent": "מסמך או תשלום של הזמנה נרשם על העסקה או איש הקשר של ההזמנה עצמה.",
   "order_link:cancelled": "להזמנה שבוטלה לא יוצרים קישור חדש.",
   "order_link:customer_deleted": "הלקוח של ההזמנה נמחק, ולכן אין לה קישור.",
+  // BAL-04: the customer's statement link
+  "statement_link:company": "לאיש קשר שמשויך לחברה, דף החשבון הוא של החברה. צרו את הקישור בכרטיס החברה.",
+  "statement_link:deleted": "הלקוח בסל המחזור, ולכן לא יוצרים לו קישור לדף חשבון.",
+  "statement_link:partial": "חלק מהמסמכים או התשלומים של הלקוח מוסתרים מכם, ולכן אי אפשר ליצור קישור לדף החשבון. בעלים או מנהלי מערכת יכולים ליצור אותו.",
   // ORD-04: an order's payment schedule
   "order:schedule_total": "לוח התשלומים צריך להגיע בדיוק ל-100% לפני אישור ההזמנה. תקנו את האחוזים, או מחקו את הלוח.",
   "order_schedule:over": "סך האחוזים בלוח התשלומים עובר 100%. הקטינו אחוז באחד התשלומים.",

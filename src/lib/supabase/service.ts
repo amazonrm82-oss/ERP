@@ -40,6 +40,8 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the customer's order page and its confirmation
  *     (src/features/orders/public-server.ts): public.order_public() and
  *     order_public_decide() only;
+ *   - the customer's statement page (BAL-04)
+ *     (src/features/statements/public-server.ts): public.statement_public() only;
  *   - the QR scan (src/features/qr-codes/scan-server.ts): public.qr_scan() only;
  *   - the site widget (src/features/site-widgets/public-server.ts):
  *     public.site_widget_public() and site_widget_submit() only;

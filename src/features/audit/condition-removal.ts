@@ -28,6 +28,11 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
   const removal = conditionRemovalNote(action, changes);
   if (removal) return removal;
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) return null;
+  if (action === "statement_link") {
+    if (changes.link === "created") return "נוצר קישור חדש לדף החשבון (קישור קודם, אם היה, הפסיק לעבוד)";
+    if (changes.link === "revoked") return "הקישור לדף החשבון בוטל";
+    return null;
+  }
   if (action === "quote_link" || action === "order_link") {
     if (changes.link === "created") return "נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)";
     if (changes.link === "revoked") return "הקישור ללקוח בוטל";

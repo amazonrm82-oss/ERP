@@ -1,0 +1,366 @@
+import { createHash } from "node:crypto";
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { addMember, asAdmin, asAnon, asService, asUser, closePool, createOrg, createUser, pgError, type Query } from "./helpers";
+
+afterAll(closePool);
+
+type U = { id: string; email: string };
+type Doc = { type: string; number: string | null; doc_date: string; due_date: string | null; amount_agorot: number; balance_agorot: number; overdue_days: number };
+type Answer = {
+  business: Record<string, unknown>;
+  brand: Record<string, unknown>;
+  customer: { name: string | null };
+  today: string;
+  currency: string;
+  documents: Doc[];
+  more: number;
+  totals: { open_agorot: number; overdue_agorot: number; credit_agorot: number };
+  built_with: boolean;
+  rate_limited?: boolean;
+};
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
+
+/**
+ * BAL-04: the customer's statement page through a secret link. Made, seen and turned off by whoever records payments (BAL-01's
+ * rule), with the ledger's keys, never while part of the customer's money is hidden from the maker. The page
+ * (public.statement_public, service_role only) answers only the business, the customer's name, today and BAL-02's open debt
+ * documents with their balances, the totals and the credit: no ids, nothing of another customer or business.
+ */
+describe("the customer's statement link (BAL-04)", () => {
+  let owner: U, admin: U, manager: U, member: U, keyHolder: U, viewer: U, outsider: U;
+  let org: string, otherOrg: string;
+  let pipelineId: string, stageId: string;
+  let n = 0;
+  const FEATURES = { documents: true, payments: true, balances: true, granular_permissions: true };
+
+  const run = <T,>(u: U, fn: (q: Query) => Promise<T>) => asUser(u.id, fn);
+  const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+  const setFeatures = (orgId: string, features: Record<string, boolean>) =>
+    asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [orgId, JSON.stringify(features)]));
+  const company = (name: string, orgId = org, u = owner) =>
+    run(u, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, $2, $3) returning id", [orgId, name, u.id])).id);
+  const contact = (name: string, companyId: string | null = null, ownerId: string = owner.id) =>
+    run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, company_id, owner_id) values ($1, $2, $3, $4) returning id", [org, name, companyId, ownerId])).id,
+    );
+  const deal = (contactId: string | null, companyId: string | null, ownerId: string = owner.id) =>
+    run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id, company_id, owner_id) values ($1, 'עבודה', $2, $3, $4, $5, $6) returning id",
+          [org, pipelineId, stageId, contactId, companyId, ownerId],
+        )
+      ).id,
+    );
+  const doc = (type: string, amount: number, due: string | null, on: { deal?: string | null; contact?: string | null }, proforma: string | null = null, u = owner, orgId = org) =>
+    run(u, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date, proforma_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id",
+          [orgId, on.deal ?? null, on.contact ?? null, type, `ST-${++n}`, day(-60), amount, due, proforma],
+        )
+      ).id,
+    );
+  const pay = (amount: number, on: { deal?: string | null; contact?: string | null }) =>
+    run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, $3, $4, $5, 'transfer') returning id",
+          [org, on.deal ?? null, on.contact ?? null, amount, day(-1)],
+        )
+      ).id,
+    );
+  const allocate = (payment: string, document: string, amount: number) =>
+    run(owner, (q) => q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, $4)", [org, payment, document, amount]));
+  const create = (u: U, where: { contact?: string; company?: string }, orgId = org) =>
+    run(u, async (q) => (await one<{ t: string }>(q, "select public.statement_link_create($1, $2, $3) as t", [orgId, where.contact ?? null, where.company ?? null])).t);
+  const revoke = (u: U, where: { contact?: string; company?: string }) =>
+    run(u, async (q) => (await one<{ r: boolean }>(q, "select public.statement_link_revoke($1, $2, $3) as r", [org, where.contact ?? null, where.company ?? null])).r);
+  const status = (u: U, where: { contact?: string; company?: string }) =>
+    run(u, async (q) =>
+      (await one<{ s: { active: boolean; created_at: string | null } }>(q, "select public.statement_link_status($1, $2, $3) as s", [org, where.contact ?? null, where.company ?? null])).s,
+    );
+  const page = (token: string, ip: string | null = null) => asService(async (q) => (await one<{ p: Answer }>(q, "select public.statement_public($1, $2) as p", [token, ip])).p);
+  const notFound = async (token: string) => expect((await pgError(page(token))).code).toBe("P0002");
+  const balances = (p: Answer) => p.documents.map((d) => [d.type, Number(d.amount_agorot), Number(d.balance_agorot)]);
+
+  beforeAll(async () => {
+    owner = await createUser("st-owner");
+    org = await createOrg(owner.id, "עסק דף החשבון");
+    admin = await addMember(org, owner.id, "admin", "st-admin");
+    manager = await addMember(org, owner.id, "manager", "st-manager");
+    member = await addMember(org, owner.id, "member", "st-member");
+    keyHolder = await addMember(org, owner.id, "member", "st-key");
+    viewer = await addMember(org, owner.id, "viewer", "st-viewer");
+    outsider = await createUser("st-outsider");
+    otherOrg = await createOrg(outsider.id, "עסק אחר");
+    await setFeatures(org, FEATURES);
+    await setFeatures(otherOrg, FEATURES);
+    const pipe = await asAdmin((q) =>
+      one<{ p: string; s: string }>(
+        q,
+        "select p.id as p, s.id as s from public.pipelines p join public.stages s on s.pipeline_id = p.id where p.organization_id = $1 and p.is_default and s.kind = 'open' order by s.position limit 1",
+        [org],
+      ),
+    );
+    pipelineId = pipe.p;
+    stageId = pipe.s;
+    await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [org, keyHolder.id]));
+    await run(owner, (q) =>
+      q(
+        `insert into public.org_document_settings (organization_id, vat_status, legal_name, tax_id, phone) values ($1, 'licensed', 'דף החשבון בע"מ', '515555555', '03-5550000')
+         on conflict (organization_id) do update set legal_name = excluded.legal_name, phone = excluded.phone`,
+        [org],
+      ),
+    );
+  });
+
+  it("whoever records payments makes, sees and turns off the link; only the hash is kept; nobody else may", async () => {
+    const a = await contact("אורית");
+    await doc("tax_invoice", 1000, day(5), { contact: a });
+    for (const u of [member, viewer, outsider]) expect((await pgError(create(u, { contact: a }))).code, u.email).toBe("42501");
+    expect((await pgError(asService((q) => q("select public.statement_link_create($1, $2, null)", [org, a])))).code).toBe("42501");
+    expect((await pgError(asAnon((q) => q("select public.statement_link_create($1, $2, null)", [org, a])))).code).toBe("42501");
+    // exactly one customer
+    expect((await pgError(run(owner, (q) => q("select public.statement_link_create($1, null, null)", [org])))).code).toBe("22023");
+
+    const token = await create(keyHolder, { contact: a });
+    expect(token).toMatch(/^[A-Za-z0-9_-]{64}$/);
+    const stored = await asAdmin((q) => one<{ token_hash: string }>(q, "select token_hash from app.statement_links where contact_id = $1", [a]));
+    expect(stored.token_hash).toBe(sha256(token));
+    const audit = await asAdmin(async (q) => (await q<{ changes: unknown }>("select changes from public.audit_log where entity_id = $1 and action = 'statement_link'", [a])).rows);
+    expect(audit.length).toBe(1);
+    expect(JSON.stringify(audit)).not.toContain(token);
+    expect(JSON.stringify(audit)).not.toContain(stored.token_hash);
+    for (const u of [owner, admin, manager, keyHolder]) expect(await status(u, { contact: a }), u.email).toMatchObject({ active: true });
+    for (const u of [member, viewer]) expect((await pgError(status(u, { contact: a }))).code, u.email).toBe("42501");
+    for (const u of [member, outsider]) expect((await pgError(revoke(u, { contact: a }))).code, u.email).toBe("42501");
+
+    // a new link replaces the old one
+    const second = await create(manager, { contact: a });
+    await notFound(token);
+    expect((await page(second)).documents.length).toBe(1);
+    expect(await revoke(keyHolder, { contact: a })).toBe(true);
+    expect(await revoke(keyHolder, { contact: a })).toBe(false);
+    await notFound(second);
+    expect(await status(owner, { contact: a })).toMatchObject({ active: false, created_at: null });
+    // nobody but the service role reads the page; nobody reads the link tables or calls the issuer through the API roles
+    expect((await pgError(run(owner, (q) => q("select public.statement_public($1)", [second])))).code).toBe("42501");
+    expect((await pgError(asAnon((q) => q("select public.statement_public($1)", [second])))).code).toBe("42501");
+    expect((await pgError(asService((q) => q("select * from app.statement_links")))).code).toBe("42501");
+    expect((await pgError(run(owner, (q) => q("select * from app.statement_link_view_counts")))).code).toBe("42501");
+    expect((await pgError(asService((q) => q("select app.statement_link_issue($1, $2, null)", [org, a])))).code).toBe("42501");
+  });
+
+  it("a contact of a company, a customer in the bin, missing keys, a read-only business and hidden money are refused", async () => {
+    const co = await company("חברת הסירוב");
+    const inCo = await contact("בני", co);
+    expect((await pgError(create(owner, { contact: inCo }))).hint).toBe("statement_link:company");
+    const binned = await contact("גילה");
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [binned]));
+    expect((await pgError(create(owner, { contact: binned }))).hint).toBe("statement_link:deleted");
+
+    const c = await contact("דליה");
+    for (const key of ["balances", "documents", "payments"]) {
+      await setFeatures(org, { ...FEATURES, [key]: false });
+      try {
+        expect((await pgError(create(owner, { contact: c }))).hint, key).toBe(`feature:${key}`);
+      } finally {
+        await setFeatures(org, FEATURES);
+      }
+    }
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect((await pgError(create(owner, { contact: c }))).hint).toBe("org:read_only");
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [org]));
+    }
+
+    // a key holder who cannot read a deal of the company (visibility own) cannot make the company's link
+    const part = await company("חברה חלקית", org, keyHolder);
+    await contact("הדר", part, keyHolder.id);
+    const hidden = await deal(null, part, owner.id);
+    await doc("tax_invoice", 9000, day(-15), { deal: hidden });
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      expect((await pgError(create(keyHolder, { company: part }))).hint).toBe("statement_link:partial");
+      // nor a customer they do not read at all
+      const notMine = await contact("ורד");
+      expect((await pgError(create(keyHolder, { contact: notMine }))).code).toBe("42501");
+      expect(await create(owner, { company: part })).toMatch(/^[A-Za-z0-9_-]{64}$/);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
+    // another business's customer
+    const theirs = await run(outsider, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'זר', $2) returning id", [otherOrg, outsider.id])).id);
+    expect((await pgError(create(owner, { contact: theirs }))).code).toBe("42501");
+    expect((await pgError(create(owner, { contact: theirs }, otherOrg))).code).toBe("42501");
+  });
+
+  it("the page holds exactly the allowed keys, no ids; open documents with balances, the overdue part and the credit", async () => {
+    const e = await contact("זהבה");
+    await run(owner, (q) => q("update public.contacts set billing_name = 'זהבה בע\"מ' where id = $1", [e]));
+    const late = await doc("tax_invoice", 10000, day(-10), { contact: e });
+    await doc("tax_invoice", 5000, day(3), { contact: e });
+    // paid in full: not shown
+    const paid = await doc("tax_invoice", 2000, day(-30), { contact: e });
+    // a proforma billed by an invoice: counted once, on the invoice
+    const pro = await doc("proforma", 3000, day(-5), { contact: e });
+    await doc("tax_invoice", 3000, day(-2), { contact: e }, pro);
+    // never debt
+    await doc("receipt", 700, null, { contact: e });
+    await doc("credit_invoice", 600, null, { contact: e });
+    const p1 = await pay(4000, { contact: e });
+    await allocate(p1, late, 4000);
+    const p2 = await pay(2000, { contact: e });
+    await allocate(p2, paid, 2000);
+    // an unallocated payment: credit (its note never reaches the page)
+    const credit = await pay(1500, { contact: e });
+    await run(owner, (q) => q("update public.payments set note = 'הערה פנימית', reference = 'REF-SECRET' where id = $1", [credit]));
+
+    const token = await create(owner, { contact: e });
+    const p = await page(token);
+    expect(Object.keys(p).sort()).toEqual(["brand", "built_with", "business", "currency", "customer", "documents", "more", "today", "totals"]);
+    expect(Object.keys(p.business).sort()).toEqual(["address_line", "city", "email", "legal_name", "name", "phone", "postal_code", "tax_id"]);
+    expect(Object.keys(p.brand).sort()).toEqual(["color", "logo"]);
+    expect(Object.keys(p.totals).sort()).toEqual(["credit_agorot", "open_agorot", "overdue_agorot"]);
+    for (const d of p.documents) expect(Object.keys(d).sort()).toEqual(["amount_agorot", "balance_agorot", "doc_date", "due_date", "number", "overdue_days", "type"]);
+    expect(JSON.stringify(p)).not.toMatch(UUID);
+    expect(JSON.stringify(p)).not.toContain("הערה פנימית");
+    expect(JSON.stringify(p)).not.toContain("REF-SECRET");
+    expect(p.business).toMatchObject({ name: "עסק דף החשבון", legal_name: 'דף החשבון בע"מ', phone: "03-5550000" });
+    expect(p.customer.name).toBe('זהבה בע"מ');
+    expect(p.today).toBe(day(0));
+    expect(p.currency).toBe("ILS");
+    // oldest due first
+    expect(balances(p)).toEqual([
+      ["tax_invoice", 10000, 6000],
+      ["tax_invoice", 3000, 3000],
+      ["tax_invoice", 5000, 5000],
+    ]);
+    expect(p.documents.map((d) => d.overdue_days)).toEqual([10, 2, 0]);
+    expect(p.totals).toEqual({ open_agorot: 14000, overdue_agorot: 9000, credit_agorot: 1500 });
+    expect(p.more).toBe(0);
+    // the same open debt as the card (BAL-02)
+    const card = await run(owner, async (q) => (await one<{ s: { open_debt: number; overdue_debt: number } }>(q, "select public.customer_debt_summary($1, $2, null) as s", [org, e])).s);
+    expect([Number(card.open_debt), Number(card.overdue_debt)]).toEqual([14000, 9000]);
+
+    // the design hides the business details and the logo
+    await run(owner, (q) => q("insert into public.quote_designs (organization_id, show_business_details, show_logo) values ($1, false, false) on conflict (organization_id) do update set show_business_details = false, show_logo = false", [org]));
+    try {
+      const hiddenDetails = await page(token);
+      expect(hiddenDetails.business).toMatchObject({ name: "עסק דף החשבון", legal_name: null, tax_id: null, phone: null });
+      expect(hiddenDetails.brand.logo).toBeNull();
+    } finally {
+      await run(owner, (q) => q("update public.quote_designs set show_business_details = true, show_logo = true where organization_id = $1", [org]));
+    }
+  });
+
+  it("a company's page: its opening balance, its contacts' and deals' documents, nothing of another customer or business", async () => {
+    const co = await company("חברת הדף");
+    const c1 = await contact("חנה", co);
+    const d = await deal(null, co);
+    await doc("tax_invoice", 1000, day(-20), { contact: c1 });
+    await doc("proforma", 2000, day(-3), { deal: d });
+    await run(owner, (q) => q("select public.opening_balance_set($1, null, $2, 4000, $3, $4)", [org, co, day(-200), day(-70)]));
+    // another customer of the same business, a contact without a company, and another business's document
+    const stranger = await contact("טובה");
+    await doc("tax_invoice", 777, day(-1), { contact: stranger });
+    const theirs = await run(outsider, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'אחר', $2) returning id", [otherOrg, outsider.id])).id);
+    await doc("tax_invoice", 888, day(-1), { contact: theirs }, null, outsider, otherOrg);
+
+    const token = await create(admin, { company: co });
+    const p = await page(token);
+    expect(p.customer.name).toBe("חברת הדף");
+    expect(balances(p)).toEqual([
+      ["opening_balance", 4000, 4000],
+      ["tax_invoice", 1000, 1000],
+      ["proforma", 2000, 2000],
+    ]);
+    expect(p.documents[0].number).toBeNull();
+    expect(p.totals).toMatchObject({ open_agorot: 7000, overdue_agorot: 7000 });
+    const amounts = p.documents.map((x) => Number(x.amount_agorot));
+    expect(amounts).not.toContain(777);
+    expect(amounts).not.toContain(888);
+
+    // a negative opening balance of a contact without a company is credit, shown apart
+    const f = await contact("יפה");
+    await doc("tax_invoice", 2500, day(-1), { contact: f });
+    await run(owner, (q) => q("select public.opening_balance_set($1, $2, null, -800, $3, null)", [org, f, day(-100)]));
+    const fp = await page(await create(owner, { contact: f }));
+    expect(fp.totals).toEqual({ open_agorot: 2500, overdue_agorot: 2500, credit_agorot: 800 });
+    expect(balances(fp)).toEqual([["tax_invoice", 2500, 2500]]);
+  });
+
+  it("not found: closed public pages, a missing key, a binned customer, a contact that joined a company; back when it holds again", async () => {
+    const g = await contact("כרמל");
+    await doc("tax_invoice", 500, day(1), { contact: g });
+    const token = await create(owner, { contact: g });
+    expect((await page(token)).documents.length).toBe(1);
+    await notFound("x".repeat(64));
+    await notFound("short");
+
+    await asAdmin((q) => q("update public.organizations set status = 'cancelled' where id = $1", [org]));
+    await notFound(token);
+    await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [org]));
+    await setFeatures(org, { ...FEATURES, balances: false });
+    await notFound(token);
+    expect(await status(owner, { contact: g })).toMatchObject({ active: false });
+    await setFeatures(org, FEATURES);
+    expect((await page(token)).documents.length).toBe(1);
+
+    const co = await company("חברה חדשה");
+    await run(owner, (q) => q("update public.contacts set company_id = $2 where id = $1", [g, co]));
+    await notFound(token);
+    await run(owner, (q) => q("update public.contacts set company_id = null where id = $1", [g]));
+    expect((await page(token)).documents.length).toBe(1);
+
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [g]));
+    await notFound(token);
+    // a purge takes the link with it
+    await asAdmin((q) => q("delete from public.contacts where id = $1", [g]));
+    expect(await asAdmin(async (q) => (await q("select 1 from app.statement_links where contact_id = $1", [g])).rowCount)).toBe(0);
+  });
+
+  it("views are limited per link and per sender (keyed IP hash, scoped to the link); no hash is stored", async () => {
+    const h = await contact("לאה");
+    const token = await create(owner, { contact: h });
+    const hash = "a".repeat(64);
+    for (let i = 0; i < 60; i++) expect((await page(token, hash)).rate_limited, `view ${i + 1}`).toBeUndefined();
+    expect(await page(token, hash)).toEqual({ rate_limited: true });
+    expect((await page(token, "b".repeat(64))).documents).toBeDefined();
+    const stored = await asAdmin(async (q) => JSON.stringify((await q("select v.* from app.statement_link_view_counts v join app.statement_links l on l.id = v.link_id where l.contact_id = $1", [h])).rows));
+    expect(stored).not.toContain(hash);
+    await asAdmin((q) => q("update app.statement_links set window_started_at = now(), window_count = 120 where contact_id = $1", [h]));
+    expect(await page(token, "c".repeat(64))).toEqual({ rate_limited: true });
+  });
+
+  it("grants: the page is for the service role only; the staff functions for signed-in people", async () => {
+    const rows = await asAdmin(async (q) =>
+      (
+        await q<{ f: string; anon: boolean; auth: boolean; service: boolean }>(
+          `select p.proname as f,
+                  has_function_privilege('anon', p.oid, 'execute') as anon,
+                  has_function_privilege('authenticated', p.oid, 'execute') as auth,
+                  has_function_privilege('service_role', p.oid, 'execute') as service
+             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname like 'statement_%' order by 1`,
+        )
+      ).rows,
+    );
+    expect(rows).toEqual([
+      { f: "statement_link_create", anon: false, auth: true, service: true },
+      { f: "statement_link_revoke", anon: false, auth: true, service: true },
+      { f: "statement_link_status", anon: false, auth: true, service: true },
+      { f: "statement_public", anon: false, auth: false, service: true },
+    ]);
+  });
+});
