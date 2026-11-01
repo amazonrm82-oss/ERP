@@ -177,6 +177,8 @@ node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
 Nothing is merged without the browser flow (`test:e2e`) passing on the local stack (owner, 29 October 2026).
+Since OPS-01 (1 November 2026) CI also runs the browser flow (job `e2e`: a local Supabase stack on the runner, CLI 2.121.0, no
+secrets), and `promote` waits for both `checks` and `e2e`; it never forces `production` and ends green when a newer run already moved it.
 `test:db` fails at teardown when a test leaves any app/public function body, or any policy (app, public, storage), RLS switch,
 table/column/function grant, trigger or constraint, different from the fresh build (`tests/db/global-setup.ts`). A test that re-runs a
 migration uses `rerunClosure()` from `tests/db/rerun.ts`, which brings in later migrations that redefine its functions, reset its grants
