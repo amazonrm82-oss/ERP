@@ -76,7 +76,7 @@ describe("report and full exports are written to the audit log (IMP-02)", () => 
 
   it("refuses an unknown format, and the rights checks still come first", async () => {
     const before = (await entries()).length;
-    // RPT-02 (owner, 1 November 2026): 'pdf' is a report format now (test 275), never for the full export
+    // RPT-02 (owner, 1 November 2026): 'pdf' is a report format now (test 278), never for the full export
     for (const format of ["docx", "PDF", "XLSX", "", null]) {
       expect((await pgError(asUser(owner.id, (q) => q("select public.log_export($1, 'report', 'sources', 1, $2)", [org, format])))).code, String(format)).toBe("22023");
     }

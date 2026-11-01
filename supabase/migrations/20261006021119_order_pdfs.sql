@@ -753,7 +753,7 @@ revoke all on function public.order_public(text, text) from public, anon, authen
 grant execute on function public.order_public(text, text) to service_role;
 
 -- ----------------------------------------------------------------------------
--- Privacy erasure: app.audit_erase_core copied exactly from its latest body (021104, DOC-02) with ONE change, marked ORD-05
+-- Privacy erasure: app.audit_erase_core copied exactly from its latest body (021117, QUO-08) with ONE change, marked ORD-05
 -- PDF (inside the ORD-01 block): the detached orders' stored PDF goes through app.order_pdf_drop.
 -- ----------------------------------------------------------------------------
 create or replace function app.audit_erase_core(p_org uuid, p_type text, p_id uuid, p_actor uuid)
@@ -877,6 +877,17 @@ begin
     loop
       v_children := v_children || (v_child.entity_type || ':' || v_child.entity_id);
     end loop;
+    -- QUO-08 (owner, 1 November 2026): the customer's questions on those quotes keep only that a question was asked; the
+    -- entries' audit history (the text included) is erased below with the rest
+    for v_child in
+      update public.activities ac
+         set body = 'שאלה מהלקוח על הצעת מחיר' || coalesce(' ' || (ac.metadata ->> 'number'), '') || ' (הטקסט נמחק)'
+       where ac.organization_id = p_org and ac.type = 'system' and ac.metadata ->> 'kind' = 'quote_question'
+         and ac.metadata ->> 'quote_id' = any (select substr(c, length('quotes:') + 1) from unnest(v_children) c where c like 'quotes:%')
+      returning 'activities'::text as entity_type, ac.id as entity_id
+    loop
+      v_children := v_children || (v_child.entity_type || ':' || v_child.entity_id);
+    end loop;
     -- QUO-09 (owner, 18 October 2026): the customer's decision on those quotes keeps what, when and the fingerprint of the
     -- version; the signer's name, ID, signature, IP, browser and reason go (the table is not audited)
     update public.quote_decisions d
@@ -890,10 +901,11 @@ begin
        set title = case when n.type = 'quote' and n.title like '%: %'
                         then left(n.title, strpos(n.title, ': ') + 1) || 'הצעת מחיר' else n.title end,
            body = case when n.type = 'quote_viewed' then null
-                       else nullif(regexp_replace(n.body, '( · )?סיבה: .*$', ''), '') end
+                       -- QUO-08: a question's text leaves the body like a decline reason
+                       else nullif(regexp_replace(n.body, '( · )?(סיבה|שאלה): .*$', ''), '') end
      where n.organization_id = p_org and n.entity_type = 'quote'
        and n.entity_id = any (select substr(c, length('quotes:') + 1)::uuid from unnest(v_children) c where c like 'quotes:%')
-       and (n.type = 'quote_viewed' or (n.type = 'quote' and (n.title like '%: %' or n.body like '%סיבה: %')));
+       and (n.type = 'quote_viewed' or (n.type = 'quote' and (n.title like '%: %' or n.body like '%סיבה: %' or n.body like '%שאלה: %')));
     -- QUO-06 (review H1, lead's choice until the owner answers): the stored PDF of those quotes holds the customer's name,
     -- details, notes and line texts, so it goes; its object follows through the orphan cleanup (app.orphan_files)
     perform app.quote_pdf_drop(p_org, array(select substr(c, length('quotes:') + 1)::uuid from unnest(v_children) c where c like 'quotes:%'));
