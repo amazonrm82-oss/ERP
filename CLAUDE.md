@@ -1538,7 +1538,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   returns (outcome cleared only while it is the system's own note; only while the owner is an active full-seat non-viewer); never a
   task whose status a person changed (audit actor), a marked task that is open again, or a detached task (answer (21): its link of the
   kind of the document's first link, deal else contact else company, no longer equals the document's; lead's reading, question 22).
-  `app.send_collection_reminders` was last redefined in 021108, `app.close_paid_collection_tasks` in 021113.
+  Since 021116 (owner (22) א) one rule says "attached", `app.collection_task_attached` (pure, no grants), read by both jobs: the
+  reminder job never moves, retitles or re-dates a detached task and makes a new attached one for the stage; a document with no deal,
+  contact or company gets no reminder. `app.send_collection_reminders` and `app.close_paid_collection_tasks` were last redefined in 021116.
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
