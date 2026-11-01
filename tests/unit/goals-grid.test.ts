@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cellKey, copyPlan, managedTeams, defaultCopyTarget, goalColumns, goalView, peopleTotals, previousStart, rowKey, valuesByCell, type GoalValue } from "@/features/goals/grid";
+import { cellKey, copyPlan, managedTeams, defaultCopyTarget, goalColumns, goalView, peopleTotals, perRepRowNote, previousStart, rowKey, valuesByCell, type GoalValue } from "@/features/goals/grid";
 import { goalCellArg, goalCopyArg, goalRowsArg } from "@/features/goals/schema";
 import { validArg } from "@/lib/action-args";
 
@@ -116,5 +116,19 @@ describe("goals grid", () => {
     expect([...managedTeams("boss", teams, members)].sort()).toEqual(["north", "north-west", "north-west-2"]);
     expect([...managedTeams("other", teams, members)]).toEqual(["south"]);
     expect(managedTeams("nobody", teams, members).size).toBe(0);
+  });
+  it("without goals_per_rep a person's or team's row with a goal the person may remove says it can be removed (RVW-22)", () => {
+    const user = { scope: "user" as const, subjectId: A };
+    const team = { scope: "team" as const, subjectId: T };
+    const org = { scope: "org" as const, subjectId: null };
+    expect(perRepRowNote(user, false, true)).toBe("יעד לפי נציג לא בחבילה. אפשר להסיר את היעד.");
+    expect(perRepRowNote(team, false, true)).toBe("יעד לפי צוות לא בחבילה. אפשר להסיר את היעד.");
+    // nothing to remove, or not the person's to remove: only "not in the plan"
+    expect(perRepRowNote(user, false, false)).toBe("לא כלול בחבילה הנוכחית");
+    expect(perRepRowNote(team, false, false)).toBe("לא כלול בחבילה הנוכחית");
+    // the business row and a plan with the key: no note from here
+    expect(perRepRowNote(org, false, true)).toBeNull();
+    expect(perRepRowNote(user, true, true)).toBeNull();
+    expect(perRepRowNote(team, true, false)).toBeNull();
   });
 });

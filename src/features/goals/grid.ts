@@ -119,3 +119,15 @@ export function managedTeams(userId: string, teams: TeamLink[], members: TeamMem
   }
   return result;
 }
+
+/**
+ * The note on a person's or team's row while the plan lacks goals_per_rep (RVW-22): the trigger goals_per_rep
+ * refuses a new or changed goal there but lets an existing one be removed, so a row that still holds a goal
+ * the person may remove says so; any other such row is only "not in the plan". Null for the business row and
+ * whenever the plan holds the key.
+ */
+export function perRepRowNote(row: GoalRowKind, perRep: boolean, removable: boolean): string | null {
+  if (perRep || row.scope === "org") return null;
+  if (!removable) return "לא כלול בחבילה הנוכחית";
+  return row.scope === "team" ? "יעד לפי צוות לא בחבילה. אפשר להסיר את היעד." : "יעד לפי נציג לא בחבילה. אפשר להסיר את היעד.";
+}

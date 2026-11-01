@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 import { copyGoalsAction, saveGoalAction } from "../actions";
-import { cellKey, peopleTotals, type GoalColumn, type GoalGridRow, type GoalValue } from "../grid";
+import { cellKey, peopleTotals, perRepRowNote, type GoalColumn, type GoalGridRow, type GoalValue } from "../grid";
 import { goalMetric, targetText, type GoalMetric, type GoalPeriod } from "../metrics";
 
 type Props = {
@@ -27,7 +27,8 @@ type Props = {
   // the plan no longer offers this metric (GOL-01: collection without one of its keys): every cell is read
   // only, and a goal the person may remove gets a remove button instead of a typed edit the trigger refuses
   removeOnly: boolean;
-  // whether the plan holds goals per rep and per team (RVW-22); without it those rows are read only
+  // whether the plan holds goals per rep and per team (RVW-22); without it those rows are read only, and a
+  // goal left there from before can only be removed (trigger goals_per_rep limits new and changed goals)
   perRep: boolean;
   // the column the copy fills unless another is picked
   copyTarget: string;
@@ -70,7 +71,13 @@ export function GoalsGrid({
 }: Props) {
   const definition = goalMetric(metric);
   const canEdit = new Set(removeOnly ? [] : editable);
-  const canRemove = new Set(removeOnly ? removable : []);
+  // removal only: every row of a metric the plan no longer offers, or (without goals_per_rep) the people's
+  // and teams' rows; the business row stays editable there (canEdit is checked first)
+  const canRemove = new Set(removeOnly ? removable : perRep ? [] : removable.filter((key) => !key.startsWith("org:")));
+  const hasGoal = (row: GoalGridRow) => columns.some((c) => saved[cellKey(row, c.start)] !== undefined);
+  // the note on a row that is removal only, also the remove dialog's description
+  const removeNote = (row: GoalGridRow) =>
+    removeOnly ? (definition.removeOnlyNote ?? null) : perRepRowNote(row, perRep, canRemove.has(row.key) && hasGoal(row));
   const anyEditable = canEdit.size > 0;
   const [saved, setSaved] = useState<Record<string, number>>(() => Object.fromEntries(values.map((v) => [cellKey(v, v.periodStart), v.target])));
   const [text, setText] = useState<Record<string, string>>({});
@@ -233,11 +240,11 @@ export function GoalsGrid({
                   <span className="block truncate">{row.label}</span>
                   {row.hint ? <span className="block text-sm font-normal text-ink-soft">{row.hint}</span> : null}
                   {removeOnly ? (
-                    canRemove.has(row.key) && columns.some((c) => saved[cellKey(row, c.start)] !== undefined) ? (
-                      <span className="block text-sm font-normal text-ink-soft">{definition.removeOnlyNote}</span>
+                    canRemove.has(row.key) && hasGoal(row) ? (
+                      <span className="block text-sm font-normal text-ink-soft">{removeNote(row)}</span>
                     ) : null
                   ) : !perRep && row.scope !== "org" ? (
-                    <span className="block text-sm font-normal text-ink-soft">לא כלול בחבילה הנוכחית</span>
+                    <span className="block text-sm font-normal text-ink-soft">{removeNote(row)}</span>
                   ) : anyEditable && !canEdit.has(row.key) ? (
                     <span className="block text-sm font-normal text-ink-soft">את היעד הזה קובעים בעלים ומנהלי מערכת</span>
                   ) : null}
@@ -274,7 +281,7 @@ export function GoalsGrid({
                           <span className="block px-2 text-end tabular-nums">{display(saved[key])}</span>
                           <ConfirmButton
                             title={`להסיר את היעד של ${row.label}, ${column.label}?`}
-                            description={definition.removeOnlyNote}
+                            description={removeNote(row) ?? undefined}
                             confirmLabel="הסרת היעד"
                             action={removeAction(row, column)}
                             onDone={() => removed(row, column)}

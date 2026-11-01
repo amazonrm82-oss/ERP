@@ -106,6 +106,19 @@ describe("goals per rep and per team need goals_per_rep (RVW-22)", () => {
     expect(await asUser(owner.id, async (q) => (await q("delete from public.goals where id = $1", [oldTeamGoal])).rowCount)).toBe(1);
   });
 
+  it("without the key: a manager removes a goal of a person or team they manage, a member removes none (the goals grid's remove button)", async () => {
+    await setFlag(org, true);
+    const userGoal = await insertGoal(manager.id, org, { scope: "user", user_id: m1.id, period_start: "2026-11-01" });
+    const teamGoal = await insertGoal(manager.id, org, { scope: "team", team_id: team, period_start: "2026-11-01" });
+    await setFlag(org, false);
+    const remove = (userId: string, id: string) =>
+      asUser(userId, async (q) => (await q("delete from public.goals where id = $1 returning id", [id])).rowCount);
+    expect(await remove(m1.id, userGoal)).toBe(0);
+    expect(await remove(m1.id, teamGoal)).toBe(0);
+    expect(await remove(manager.id, userGoal)).toBe(1);
+    expect(await remove(manager.id, teamGoal)).toBe(1);
+  });
+
   it("with the key: goals per rep and per team are written and changed as before", async () => {
     await setFlag(org, true);
     try {
