@@ -651,6 +651,12 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_page_options_question.sql",
       // RPT-02 redefines public.log_export() of _report_recurring_revenue.sql last (a report's PDF, counted in the PDF quota)
       "_report_pdf_export.sql",
+      // ORD-05 PDF redefines app.files_keep_attached() of _quote_pdfs.sql, app.reconcile_pending_files() of
+      // _quote_pdf_server.sql, public.order_public() of _quote_bank_details.sql and app.audit_erase_core() of
+      // _document_details.sql last, and alters the files policies and the storage policies after _quote_pdf_server.sql
+      "_order_pdfs.sql",
+      // the pasted erasure gives app.order_pdf_drop() of _order_pdfs.sql its body (listed for staleRestores)
+      "_order_pdf_erase.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

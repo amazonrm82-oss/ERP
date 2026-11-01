@@ -506,7 +506,8 @@ describe("link previews for preview bots (WAB-05)", () => {
   const REVIEWED_PAGE_BODY_MD5: Record<string, string> = {
     "public.intake_form(text)": "8b5e831bae31f9e3ac0219716823bfdf",
     "public.quote_public(text)": "4ab57d2574970d28e2113b1c31961aee",
-    "public.order_public(text,text)": "1828aa744b854fd4049d6b638b3373b1",
+    // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
+    "public.order_public(text,text)": "8827d9da93d3feb54d452d5d788844eb",
     "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
     "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
     "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",

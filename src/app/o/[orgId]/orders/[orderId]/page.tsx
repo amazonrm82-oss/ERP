@@ -13,6 +13,8 @@ import { OrderLineForm } from "@/features/orders/components/order-line-form";
 import { OrderStatusControl } from "@/features/orders/components/order-status-control";
 import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
 import { ButtonLink } from "@/components/ui/button";
+import { OrderPdfButton } from "@/features/orders/components/order-pdf-button";
+import { getOrderPdfFile, orderPdfStorable } from "@/features/orders/pdf-server";
 import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderMoney, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
 import { OrderMoneyCard } from "@/features/orders/components/order-money-card";
 import { OrderLinkCard } from "@/features/orders/components/order-link-card";
@@ -89,6 +91,9 @@ export default async function OrderPage({ params }: Props) {
         ? { href: paths.company(orgId, order.companyId), label: parties.company ?? "חברה" }
         : { href: ordersPath(orgId), label: "הזמנות" };
   const title = order.numberDisplay ? `הזמנה ${order.numberDisplay}` : "הזמנה בטיוטה";
+  // ORD-05 PDF: the PDF kept when the order got its number; whoever may edit its record keeps a missing one
+  const pdfFile = order.status !== "draft" ? await getOrderPdfFile(supabase, orgId, order.id) : null;
+  const hasOrders = await orgHasFeature(orgId, "orders");
 
   return (
     <div className="max-w-4xl">
@@ -101,13 +106,21 @@ export default async function OrderPage({ params }: Props) {
             <ButtonLink href={orderDocumentPath(orgId, order.id)} variant="secondary" size="sm">
               תצוגה והדפסה
             </ButtonLink>
+            {order.status !== "draft" ? (
+              <OrderPdfButton
+                orgId={orgId}
+                orderId={order.id}
+                href={pdfFile ? paths.file(orgId, pdfFile.id) : null}
+                canStore={hasOrders && orderPdfStorable(order) && mayEdit}
+              />
+            ) : null}
             {mayEdit && order.status === "draft" ? (
               <>
                 <ConfirmButton
                   variant="primary"
                   size="sm"
                   title="לאשר את ההזמנה?"
-                  description="ההזמנה תקבל מספר רץ, והשורות והמחירים שלה יינעלו. מועד האספקה, כתובת המשלוח וההערות נשארים לעריכה. הזמנה שאושרה לא נמחקת, רק מבוטלת."
+                  description="ההזמנה תקבל מספר רץ, והשורות והמחירים שלה יינעלו. מועד האספקה, כתובת המשלוח וההערות נשארים לעריכה. קובץ PDF של ההזמנה נשמר עכשיו פעם אחת, ושינוי מאוחר יותר לא ייכנס אליו. הזמנה שאושרה לא נמחקת, רק מבוטלת."
                   confirmLabel="אישור ההזמנה"
                   action={confirmOrderAction.bind(null, orgId, order.id)}
                 >

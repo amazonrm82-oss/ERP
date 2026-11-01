@@ -9,9 +9,11 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { OrderDocument } from "@/features/orders/components/order-document";
+import { publicOrderPdfPath } from "@/features/orders/public";
 import { getPublicOrder } from "@/features/orders/public-server";
 import { ORDER_STATUS_LABELS } from "@/features/orders/schema";
 import { PrintButton } from "@/features/print/components/print-button";
+import { buttonClasses } from "@/components/ui/button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { formatDate } from "@/lib/format";
@@ -116,8 +118,14 @@ export default async function PublicOrderPage({ params }: Props) {
         </p>
       ) : null}
       {/* data-print-page: print.css leaves only the document on paper */}
-      <div data-print-page="" className="flex justify-end print:hidden">
-        <PrintButton label="הדפסה או שמירה כ-PDF" />
+      <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
+        {/* ORD-05 PDF: the PDF the business kept for this order, only when one exists */}
+        {page.hasPdf ? (
+          <a href={publicOrderPdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
+            הורדת PDF
+          </a>
+        ) : null}
+        <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
       </div>
       <OrderDocument
         data={{

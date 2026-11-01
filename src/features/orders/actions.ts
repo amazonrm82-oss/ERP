@@ -15,6 +15,7 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { orderPath, ordersPath } from "./paths";
+import { storeOrderPdf } from "./pdf-server";
 import { readOrder, readOrderPricing, type Order } from "./queries";
 import { MOVABLE_STATUSES, ORDER_DETAILS_FIELD_NAMES, ORDER_LINE_DESCRIPTION_MAX, ORDER_LINE_FIELD_NAMES, orderDetailsSchema, orderLineSchema } from "./schema";
 
@@ -104,9 +105,34 @@ export async function confirmOrderAction(orgId: string, orderId: string): Promis
   const { error } = await context.supabase.rpc("order_confirm", { p_org: orgId, p_order: orderId });
   if (error) return fail(writeError(error));
   const order = await readOrder(context.supabase, orgId, orderId);
-  if (order) revalidateOrder(orgId, order);
+  if (order) {
+    await keepOrderPdf(context.supabase, orgId, order, context.user.id);
+    revalidateOrder(orgId, order);
+  }
   return ok();
 }
+
+/**
+ * ORD-05 PDF (owner, 1 November 2026, answer (1) ב): a numbered order's PDF is made once and kept. A failure (a full monthly
+ * quota, a render or upload error) never undoes the numbering; the order page then offers to keep it ("שמירת PDF").
+ */
+async function keepOrderPdf(supabase: Parameters<typeof storeOrderPdf>[0], orgId: string, order: Order, userId: string): Promise<void> {
+  await storeOrderPdf(supabase, orgId, order, userId).catch(() => null);
+}
+
+/** ORD-05 PDF: keeps the PDF of a numbered order that has none yet (its PDF failed when it was numbered, or it is older). */
+export async function storeOrderPdfAction(orgId: string, orderId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, orderId);
+  if (!context.ok) return context;
+  const order = await readOrder(context.supabase, orgId, orderId);
+  if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
+  const pdf = await storeOrderPdf(context.supabase, orgId, order, context.user.id).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }));
+  if (!pdf.ok) return fail(pdf.message);
+  revalidatePath(orderPath(orgId, orderId));
+  return ok();
+}
+
+const PDF_NOT_MADE = "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.";
 
 /** A draft is deleted (a numbered order is only cancelled; the database refuses it). */
 export async function deleteOrderAction(orgId: string, orderId: string): Promise<ActionResult> {
@@ -227,6 +253,7 @@ export async function orderFromQuoteAction(orgId: string, quoteId: string): Prom
   if (typeof data !== "string") return fail(FAILED);
   const order = await readOrder(context.supabase, orgId, data);
   if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
+  await keepOrderPdf(context.supabase, orgId, order, context.user.id);
   revalidateOrder(orgId, order);
   revalidatePath(`/o/${orgId}/quotes/${quoteId}`);
   redirect(orderPath(orgId, data));
@@ -241,6 +268,7 @@ export async function orderFromDealAction(orgId: string, dealId: string): Promis
   if (typeof data !== "string") return fail(FAILED);
   const order = await readOrder(context.supabase, orgId, data);
   if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
+  await keepOrderPdf(context.supabase, orgId, order, context.user.id);
   revalidateOrder(orgId, order);
   redirect(orderPath(orgId, data));
 }

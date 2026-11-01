@@ -50,18 +50,25 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the customer's PDF download of a quote (src/features/quotes/pdf-public-server.ts,
  *     route GET /api/forms/quote/<token>/pdf): public.quote_public_pdf() only, and
  *     downloads only the path it answers, compared with its SHA-256;
+ *   - the customer's PDF download of an order (src/features/orders/pdf-public-server.ts,
+ *     route GET /api/forms/order/<token>/pdf): public.order_public_pdf() only, and
+ *     downloads only the path it answers, compared with its SHA-256 (ORD-05 PDF);
  *   - the public subprocessors page (src/features/legal/subprocessors-public-server.ts,
  *     page /legal/subprocessors): public.subprocessors_public_page() only, cached for an hour;
  *   - link previews for preview bots on the closed list of src/lib/preview-bots.ts
  *     (src/features/link-preview/preview-server.ts): public.link_preview_public()
  *     only (the business's display name and logo; no view counted, nothing changed);
  * - the server's write of a quote's PDF (src/features/quotes/pdf-store-server.ts),
- *   the one use inside a signed-in user's request (QUO-06 answer 3): called from
+ *   one of the two uses inside a signed-in user's request (QUO-06 answer 3): called from
  *   pdf-server.ts (a Server Action and the staff file route) only after
  *   public.quote_pdf_allowed() or public.quote_pdf_remake_allowed() passed with
  *   the user's own session; it calls only
  *   public.quote_pdf_store(), which checks the named user again, and uploads
- *   (upsert off) only to the path that function answers.
+ *   (upsert off) only to the path that function answers;
+ * - the server's write of an order's PDF (src/features/orders/pdf-store-server.ts), the
+ *   same pattern (ORD-05 PDF, owner 1 November 2026): called from pdf-server.ts (Server
+ *   Actions) only after public.order_pdf_allowed() passed with the user's own session; it
+ *   calls only public.order_pdf_store() and uploads (upsert off) only to the path it answers.
  * Never import this from any other code that serves a signed-in user.
  * Returns null when the key is not configured.
  */

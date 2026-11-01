@@ -318,6 +318,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_pdf:draft": "לטיוטה אין קובץ PDF. הקובץ נשמר כשההצעה נשלחת.",
   "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה).",
   "quote_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
+  // ORD-05 PDF (migration order_pdfs)
+  "order_pdf:draft": "לטיוטה אין קובץ PDF. הקובץ נשמר כשההזמנה מקבלת מספר.",
+  "order_pdf:closed": "קובץ PDF נשמר רק להזמנה ממוספרת שלא בוטלה.",
+  "order_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
   "quote:frozen": "אי אפשר לשנות מחירים, הנחה או מע\"מ בהצעה שכבר אינה טיוטה.",
   // QUO-16: the timeline entries of a sent, accepted or declined quote are history
   "activity:quote_entry": "רישום של הצעת מחיר בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",

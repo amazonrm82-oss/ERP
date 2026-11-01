@@ -72,6 +72,10 @@ const eslintConfig = defineConfig([
       // customer downloads it from the quote's link (public.quote_public_pdf)
       "src/features/quotes/pdf-store-server.ts",
       "src/features/quotes/pdf-public-server.ts",
+      // ORD-05 PDF (owner, 1 November 2026, answer (1) ב): the server alone writes an order's PDF (public.order_pdf_store),
+      // and the customer downloads it from the order's link (public.order_public_pdf)
+      "src/features/orders/pdf-store-server.ts",
+      "src/features/orders/pdf-public-server.ts",
       // ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page (public.subprocessors_public_page)
       "src/features/legal/subprocessors-public-server.ts",
     ],

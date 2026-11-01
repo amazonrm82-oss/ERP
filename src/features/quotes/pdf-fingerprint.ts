@@ -52,6 +52,8 @@ export function pdfHeaders(name: string, size: number, inline = false): Record<s
 
 /** What staff see when a stored quote PDF no longer matches its fingerprint (never replaced automatically). */
 export const DAMAGED_PDF_MESSAGE = "קובץ ה-PDF של ההצעה פגום ולכן לא נפתח. פנו לתמיכה";
+/** ORD-05 PDF: the same for an order's stored PDF. */
+export const DAMAGED_ORDER_PDF_MESSAGE = "קובץ ה-PDF של ההזמנה פגום ולכן לא נפתח. פנו לתמיכה";
 
 export type StoreAnswer = { status: "upload"; path: string } | { status: "stored"; fileId: string } | { status: "busy" };
 

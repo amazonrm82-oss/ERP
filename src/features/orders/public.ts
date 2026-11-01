@@ -16,6 +16,8 @@ import { isOrderStatus } from "./schema";
 export const ORDER_LINK_TOKEN = /^[A-Za-z0-9_-]{64}$/;
 
 export const publicOrderPath = (token: string) => `/f/order/${token}`;
+/** ORD-05 PDF: the customer's download of the order's stored PDF */
+export const publicOrderPdfPath = (token: string) => `/api/forms/order/${token}/pdf`;
 
 const money = z.coerce.number().int();
 const nullableMoney = z.coerce.number().int().nullable();
@@ -67,6 +69,8 @@ const answerSchema = z.object({
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
   // TAX-02: the bank details stored when the order was numbered, only while the design shows them (absent before 021087)
   bank: z.unknown().optional(),
+  // ORD-05 PDF: a stored, fingerprinted PDF exists for the customer to download (absent before 021119)
+  pdf: z.boolean().optional(),
 });
 
 export type PublicOrder = {
@@ -83,13 +87,15 @@ export type PublicOrder = {
   decision: { decision: "accepted" | "rejected"; decidedAt: string } | null;
   // what an answer must name; null when the order does not wait for one
   fingerprint: string | null;
+  // ORD-05 PDF: the business kept this order's PDF, so the page offers its download
+  hasPdf: boolean;
 };
 
 /** The answer as the page needs it, or null when it does not have the expected shape. */
 export function publicOrderFrom(raw: unknown): PublicOrder | null {
   const parsed = answerSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { order: o, customer, lines, schedule, business, design, brand, built_with, decision, fingerprint, bank } = parsed.data;
+  const { order: o, customer, lines, schedule, business, design, brand, built_with, decision, fingerprint, bank, pdf } = parsed.data;
   const pageDesign: QuoteDesign = {
     headerText: design.header_text,
     footerText: design.footer_text,
@@ -171,6 +177,7 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
     builtWith: built_with,
     decision: decision ? { decision: decision.decision, decidedAt: decision.decided_at } : null,
     fingerprint,
+    hasPdf: pdf === true,
   };
 }
 
