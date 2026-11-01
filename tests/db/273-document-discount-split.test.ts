@@ -155,6 +155,23 @@ describe("document discount split (DSC-01)", () => {
       expect(profit.by_product).toEqual([expect.objectContaining({ revenue: 54000, cost: 20000, profit: 34000 })]);
     });
 
+    it("a line changed after acceptance: the lines are no longer the quote's, so nothing is split (review)", async () => {
+      const line = await asAdmin(async (q) =>
+        one<{ id: string; quantity: string }>(q, "select id, quantity::text from public.deal_lines where deal_id = $1 order by position, id limit 1", [deal]),
+      );
+      await asAdmin((q) => q("update public.deal_lines set quantity = quantity + 1 where id = $1", [line.id]));
+      try {
+        const mark = await asAdmin(async (q) => (await one<{ m: string | null }>(q, "select amount_quote_id as m from public.deals where id = $1", [deal])).m);
+        expect(mark).toBe(quote);
+        const products = await report("report_revenue_by_product");
+        expect(products.totals).toMatchObject({ deals_with_document_discount: 0, document_discount_agorot: 0 });
+      } finally {
+        await asAdmin((q) => q("update public.deal_lines set quantity = $2::numeric where id = $1", [line.id, line.quantity]));
+      }
+      const back = await report("report_revenue_by_product");
+      expect(back.totals).toMatchObject({ deals_with_document_discount: 1, document_discount_agorot: 9000 });
+    });
+
     it("once the amount is no longer the quote's, nothing is split", async () => {
       await asUser(member.id, (q) => q("update public.deals set amount_agorot = 80000 where id = $1", [deal]));
       const products = await report("report_revenue_by_product");

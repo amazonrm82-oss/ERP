@@ -113,7 +113,9 @@ function vatModeNote(totals: Record<string, unknown>): string | null {
 function documentDiscountNote(totals: Record<string, unknown>): string | null {
   const deals = num(totals.deals_with_document_discount);
   if (deals === 0) return null;
-  const amount = numOrNull(totals.document_discount_agorot);
+  // with deals priced with VAT and deals priced before VAT in the same period, one sum would mix the two: leave it out
+  const mixed = num(totals.deals_with_vat) > 0 && num(totals.deals_without_vat) > 0;
+  const amount = mixed ? null : numOrNull(totals.document_discount_agorot);
   const where = deals === 1 ? "בעסקה אחת" : `ב-${formatNumber(deals)} עסקאות`;
   return `${where} הסכום הוא של הצעת מחיר שאושרה עם הנחה על כל ההצעה${amount ? ` (${formatMoney(amount)})` : ""}. ההנחה חולקה בין השורות לפי הסכום של כל שורה.`;
 }

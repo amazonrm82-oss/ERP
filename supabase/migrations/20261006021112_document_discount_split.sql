@@ -14,7 +14,7 @@
 --   app.document_totals takes the document discount off); every line first gets the floor of its exact share, the agorot
 --   left go one each to the largest remainders, a tie to the earlier element (the caller passes the lines by position,
 --   then id). The shares add up to the discount exactly and none is above its line. Null for input it does not take (a
---   null, a negative value, a discount above the sum), never an error, so a report never fails over a stored row.
+--   null, a negative value, a discount above the sum), never an error for the one-dimensional arrays the reports pass, so a report never fails over a stored row.
 --   Mirrors discountSplit() in src/features/tax/discount-split.ts; tests/unit/fixtures/discount-split.json is run by both
 --   (unit test, tests/db/273). Change both together.
 -- * The three reports split at read time, nothing is stored: a won deal whose amount_quote_id names an accepted quote of
@@ -97,7 +97,8 @@ as $$
     -- document discount, which its copied lines do not carry, split between the deal's lines (app.discount_split)
     select g.deal_id, g.ids, app.discount_split(g.totals, g.discount) as shares
       from (
-        select l.deal_id, q.discount_total_agorot as discount,
+        select l.deal_id, q.discount_total_agorot as discount, q.subtotal_agorot as subtotal,
+               sum(l.total_agorot) as line_sum,
                array_agg(l.id order by l.position, l.id) as ids,
                array_agg(l.total_agorot order by l.position, l.id) as totals,
                bool_and(l.price_includes_vat = q.prices_include_vat) as same_mode
@@ -106,8 +107,10 @@ as $$
           join public.quotes q on q.organization_id = p_org and q.id = w.amount_quote_id and q.deal_id = w.id
                               and q.status = 'accepted'
          where l.organization_id = p_org and q.discount_total_agorot > 0
-         group by l.deal_id, q.discount_total_agorot) g
-     where g.same_mode
+         group by l.deal_id, q.discount_total_agorot, q.subtotal_agorot) g
+     -- only while the deal's lines are still the accepted quote's (their sum is the quote's subtotal before its document
+     -- discount): a line added or changed after acceptance never takes a share of a discount it did not have (review)
+     where g.same_mode and g.line_sum = g.subtotal
   ), shares as (
     select s.line_id, s.share
       from split x
@@ -172,7 +175,8 @@ as $$
     -- document discount, which its copied lines do not carry, split between the deal's lines (app.discount_split)
     select g.deal_id, g.ids, app.discount_split(g.totals, g.discount) as shares
       from (
-        select l.deal_id, q.discount_total_agorot as discount,
+        select l.deal_id, q.discount_total_agorot as discount, q.subtotal_agorot as subtotal,
+               sum(l.total_agorot) as line_sum,
                array_agg(l.id order by l.position, l.id) as ids,
                array_agg(l.total_agorot order by l.position, l.id) as totals,
                bool_and(l.price_includes_vat = q.prices_include_vat) as same_mode
@@ -181,8 +185,10 @@ as $$
           join public.quotes q on q.organization_id = p_org and q.id = w.amount_quote_id and q.deal_id = w.id
                               and q.status = 'accepted'
          where l.organization_id = p_org and q.discount_total_agorot > 0
-         group by l.deal_id, q.discount_total_agorot) g
-     where g.same_mode
+         group by l.deal_id, q.discount_total_agorot, q.subtotal_agorot) g
+     -- only while the deal's lines are still the accepted quote's (their sum is the quote's subtotal before its document
+     -- discount): a line added or changed after acceptance never takes a share of a discount it did not have (review)
+     where g.same_mode and g.line_sum = g.subtotal
   ), shares as (
     select s.line_id, s.share
       from split x
@@ -267,7 +273,8 @@ as $$
     -- document discount, which its copied lines do not carry, split between the deal's lines (app.discount_split)
     select g.deal_id, g.ids, app.discount_split(g.totals, g.discount) as shares
       from (
-        select l.deal_id, q.discount_total_agorot as discount,
+        select l.deal_id, q.discount_total_agorot as discount, q.subtotal_agorot as subtotal,
+               sum(l.total_agorot) as line_sum,
                array_agg(l.id order by l.position, l.id) as ids,
                array_agg(l.total_agorot order by l.position, l.id) as totals,
                bool_and(l.price_includes_vat = q.prices_include_vat) as same_mode
@@ -276,8 +283,10 @@ as $$
           join public.quotes q on q.organization_id = p_org and q.id = w.amount_quote_id and q.deal_id = w.id
                               and q.status = 'accepted'
          where l.organization_id = p_org and q.discount_total_agorot > 0
-         group by l.deal_id, q.discount_total_agorot) g
-     where g.same_mode
+         group by l.deal_id, q.discount_total_agorot, q.subtotal_agorot) g
+     -- only while the deal's lines are still the accepted quote's (their sum is the quote's subtotal before its document
+     -- discount): a line added or changed after acceptance never takes a share of a discount it did not have (review)
+     where g.same_mode and g.line_sum = g.subtotal
   ), shares as (
     select s.line_id, s.share
       from split x
