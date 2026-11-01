@@ -658,7 +658,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   month; ended revenue waits for a subscriptions module): `public.report_recurring_revenue(org, from, to, pipeline, owner)` (invoker;
   `report_revenue`'s won rule, keep in step; period bounds and months in the business zone, 3,660 days max, 22023) counts won deals with
   `billing_kind` monthly|yearly at their stored recurring amount: monthly as is, yearly / 12 rounded half up per deal; every month of
-  the period, by owner, `deals_without_amount`, `deals_with_vat/without_vat` from the deal's lines. Report key `recurring`. Test 64's
+  the period, by owner, `deals_without_amount`, `deals_with_vat/without_vat` from the deal's lines. Report key `recurring`. Deals without a VAT mode are counted as they are, with the line "N עסקאות בלי מצב מע"מ" (`noVatModeLine`, owner (19) א). Test 64's
   re-run list ends with `_report_recurring_revenue.sql` for `log_export`: a later redefinition is appended there.
 - Document discount in reports (DSC-01 rest, migration 021112): an accepted quote's document discount is not carried to its deal's
   lines (QUO-13), while the deal's amount is the quote's net (`amount_quote_id`). `report_revenue_by_product`,
@@ -1504,10 +1504,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `collection_reminders_sent.task_title`. Businesses first (`app.collection_reminder_orgs`: writable + the three keys).
   `app.close_paid_collection_tasks` (first step of the job) sets an open marked task without a repeat rule done with outcome
   'נסגרה: החוב שולם' when its document's balance is 0 (billed proforma by its invoice; cheap cut `app.collection_document_paid`),
-  never on a cancelled document (owner's question open); records the close in `app.collection_task_closes.closed_at/outcome`; reopens a
-  system-closed, still-done task with no status change since when the debt returns (outcome cleared only while it is the system's
-  own note; only while the owner is an active full-seat non-viewer); never a task whose status a person changed (audit actor) or a
-  marked task that is open again. `app.send_collection_reminders` was last redefined in 021108.
+  and, since 021113 (owner 1 November 2026, answer (20) א), 'נסגרה: המסמך בוטל' when its document is cancelled (no money read; never
+  reopened); every branch judges a proforma billed by an active invoice by that invoice; records the close in
+  `app.collection_task_closes.closed_at/outcome`; reopens a system-closed, still-done task with no status change since when the debt
+  returns (outcome cleared only while it is the system's own note; only while the owner is an active full-seat non-viewer); never a
+  task whose status a person changed (audit actor), a marked task that is open again, or a detached task (answer (21): its link of the
+  kind of the document's first link, deal else contact else company, no longer equals the document's; lead's reading, question 22).
+  `app.send_collection_reminders` was last redefined in 021108, `app.close_paid_collection_tasks` in 021113.
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
