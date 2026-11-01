@@ -3,7 +3,7 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { BankSection } from "@/features/quotes/components/bank-section";
 import { formatDate, formatMoney } from "@/lib/format";
 
-import { overdueText, type PublicStatement } from "../public";
+import { moreDocumentsText, morePaymentsText, overdueText, type PublicStatement } from "../public";
 
 const day = (iso: string | null) => (iso ? formatDate(`${iso}T12:00:00Z`) : "");
 
@@ -171,7 +171,7 @@ export function StatementView({ data, logoUrl }: { data: PublicStatement; logoUr
                 </tfoot>
               </table>
             </div>
-            {data.more > 0 ? <p className="text-sm text-ink-soft">ועוד {data.more} מסמכים פתוחים שלא מוצגים כאן. הסכומים למעלה כוללים אותם.</p> : null}
+            {moreDocumentsText(data.more) ? <p className="text-sm text-ink-soft">{moreDocumentsText(data.more)}</p> : null}
           </section>
         )}
 
@@ -211,7 +211,7 @@ export function StatementView({ data, logoUrl }: { data: PublicStatement; logoUr
               </table>
             </div>
           )}
-          {data.paymentsMore > 0 ? <p className="text-sm text-ink-soft">ועוד {data.paymentsMore} תשלומים מוקדמים יותר שלא מוצגים כאן.</p> : null}
+          {morePaymentsText(data.paymentsMore) ? <p className="text-sm text-ink-soft">{morePaymentsText(data.paymentsMore)}</p> : null}
         </section>
 
         <BankSection bank={data.bank} id="statement-bank" />

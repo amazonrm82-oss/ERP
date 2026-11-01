@@ -49,7 +49,7 @@ const answerSchema = z.object({
     }),
   ),
   more: z.coerce.number().int().min(0),
-  payments: z.array(z.object({ paid_on: day, method: z.enum(PAYMENT_METHODS), amount_agorot: money })),
+  payments: z.array(z.object({ paid_on: day, method: z.enum(PAYMENT_METHODS), amount_agorot: money.positive() })),
   payments_more: z.coerce.number().int().min(0),
   bank: z.unknown().nullable(),
   totals: z.object({ open_agorot: money, overdue_agorot: money, credit_agorot: money }),
@@ -138,6 +138,20 @@ export function publicStatementFrom(raw: unknown): PublicStatement | null {
     creditAgorot: totals.credit_agorot,
     builtWith: built_with,
   };
+}
+
+/** The note under the documents when more than 500 are open, or null. */
+export function moreDocumentsText(n: number): string | null {
+  if (n <= 0) return null;
+  return n === 1
+    ? "ועוד מסמך פתוח אחד שלא מוצג כאן. הסכומים למעלה כוללים אותו."
+    : `ועוד ${n} מסמכים פתוחים שלא מוצגים כאן. הסכומים למעלה כוללים אותם.`;
+}
+
+/** The note under the payments when more than 500 were received, or null. */
+export function morePaymentsText(n: number): string | null {
+  if (n <= 0) return null;
+  return n === 1 ? "ועוד תשלום אחד מוקדם יותר שלא מוצג כאן." : `ועוד ${n} תשלומים מוקדמים יותר שלא מוצגים כאן.`;
 }
 
 /** "באיחור של 12 ימים" / "באיחור של יום אחד", or null when not late. */

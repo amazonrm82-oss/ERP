@@ -1,8 +1,9 @@
 import { BANK_HEADING, bankRows, type DocumentBank } from "../bank";
 
 /**
- * TAX-02: the business's bank details for a transfer on a customer document (a quote, an order confirmation), as stored
- * on the document when it was sent or numbered. Nothing when there are none or the design hides them.
+ * TAX-02: the business's bank details for a transfer on a customer page: a quote or an order confirmation (the details
+ * stored on the document when it was sent or numbered) and, since BAL-04, the statement page (the business's current
+ * details, read when the customer opens it). Nothing when there are none or the design hides them.
  */
 export function BankSection({ bank, id }: { bank: DocumentBank | null; id: string }) {
   if (!bank) return null;

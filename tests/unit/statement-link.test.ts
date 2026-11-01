@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { overdueText, publicStatementFrom } from "@/features/statements/public";
+import { moreDocumentsText, morePaymentsText, overdueText, publicStatementFrom } from "@/features/statements/public";
 import { statementLinkMessage, statementMailtoHref, statementWhatsappHref } from "@/features/statements/share";
 import { redactPublicPath } from "@/lib/request-error-log";
 
@@ -50,6 +50,18 @@ describe("the statement page's answer (BAL-04)", () => {
     // an unknown method or a missing payments part is not the expected shape
     expect(publicStatementFrom({ ...ANSWER, payments: [{ ...ANSWER.payments[0], method: "crypto" }] })).toBeNull();
     expect(publicStatementFrom({ ...ANSWER, payments: undefined })).toBeNull();
+    // a payment is always a positive amount
+    expect(publicStatementFrom({ ...ANSWER, payments: [{ ...ANSWER.payments[0], amount_agorot: 0 }] })).toBeNull();
+    expect(publicStatementFrom({ ...ANSWER, payments: [{ ...ANSWER.payments[0], amount_agorot: -5 }] })).toBeNull();
+  });
+
+  it("says how many are left out, with the singular for one", () => {
+    expect(moreDocumentsText(0)).toBeNull();
+    expect(moreDocumentsText(1)).toBe("ועוד מסמך פתוח אחד שלא מוצג כאן. הסכומים למעלה כוללים אותו.");
+    expect(moreDocumentsText(3)).toBe("ועוד 3 מסמכים פתוחים שלא מוצגים כאן. הסכומים למעלה כוללים אותם.");
+    expect(morePaymentsText(0)).toBeNull();
+    expect(morePaymentsText(1)).toBe("ועוד תשלום אחד מוקדם יותר שלא מוצג כאן.");
+    expect(morePaymentsText(2)).toBe("ועוד 2 תשלומים מוקדמים יותר שלא מוצגים כאן.");
   });
 
   it("refuses an unexpected shape or a document type that is not debt", () => {

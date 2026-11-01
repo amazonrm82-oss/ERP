@@ -42,7 +42,13 @@ describe("the customer's statement link (BAL-04)", () => {
 
   const run = <T,>(u: U, fn: (q: Query) => Promise<T>) => asUser(u.id, fn);
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
-  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+  // calendar days from today in the business's zone (adding 24-hour steps to now() is a day off near midnight across a DST change)
+  const day = (offset: number) => {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString().slice(0, 10);
+  };
   const setFeatures = (orgId: string, features: Record<string, boolean>) =>
     asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [orgId, JSON.stringify(features)]));
   const company = (name: string, orgId = org, u = owner) =>
@@ -497,7 +503,7 @@ describe("the customer's statement link (BAL-04)", () => {
           await one<{ id: string }>(
             q,
             `insert into public.payments (organization_id, deal_id, contact_id, amount_agorot, paid_on, method${extra ? ", cheque_number, cheque_bank, cheque_branch, cheque_due_date, cheque_status" : ""})
-             values ($1, $2, $3, $4, $5, $6${extra ? ", '778899', '12', '345', $5::date + 30, 'in_hand'" : ""}) returning id`,
+             values ($1, $2, $3, $4, $5, $6${extra ? ", '734591', '12', '345', $5::date + 30, 'in_hand'" : ""}) returning id`,
             [org, on.deal ?? null, on.contact ?? null, amount, paidOn, method],
           )
         ).id,
@@ -529,13 +535,47 @@ describe("the customer's statement link (BAL-04)", () => {
     ]);
     expect(Number(p.payments_more)).toBe(0);
     const text = JSON.stringify(p);
-    for (const secret of ["הערה סודית", "REF-PAY-SECRET", "778899", "345"]) expect(text, secret).not.toContain(secret);
+    // the cheque branch (3 digits) is not searched as text, too short to be unique: each row has exactly three keys
+    for (const x of p.payments) expect(Object.keys(x).sort()).toEqual(["amount_agorot", "method", "paid_on"]);
+    for (const secret of ["הערה סודית", "REF-PAY-SECRET", "734591"]) expect(text, secret).not.toContain(secret);
     expect(text).not.toMatch(UUID);
 
-    // a contact without a company sees only its own payments
+    // a contact without a company sees only its own payments; a payment on its deal with no contact_id is not its own
+    // (the ledger's scope: a contact without a company has no "same deals")
     const solo = await contact("סולו");
     await payOn(1234, { contact: solo }, day(-1));
+    const soloDeal = await deal(solo, null);
+    await payOn(4321, { deal: soloDeal }, day(-1));
     expect((await page(await create(owner, { contact: solo }))).payments).toEqual([{ paid_on: day(-1), method: "transfer", amount_agorot: 1234 }]);
+
+    // a payment on the company's deal whose contact is another customer (a contact without a company) shows on both pages,
+    // as the ledger counts it for both
+    const cross = await contact("לקוח אחר");
+    const crossDeal = await deal(cross, co);
+    await payOn(5678, { deal: crossDeal, contact: cross }, day(-2));
+    expect((await page(await create(owner, { company: co }))).payments.map((x) => Number(x.amount_agorot))).toContain(5678);
+    expect((await page(await create(owner, { contact: cross }))).payments).toEqual([{ paid_on: day(-2), method: "transfer", amount_agorot: 5678 }]);
+
+    // the 12-month window in the business's zone: after today minus 12 months, up to today
+    const edge = await contact("גבול");
+    const bound = await asAdmin(async (q) =>
+      (await one<{ b: string }>(q, "select to_char(((now() at time zone 'Asia/Jerusalem')::date - interval '12 months')::date, 'YYYY-MM-DD') as b")).b,
+    );
+    const after = await asAdmin(async (q) => (await one<{ d: string }>(q, "select to_char($1::date + 1, 'YYYY-MM-DD') as d", [bound])).d);
+    await payOn(101, { contact: edge }, day(-365));
+    await payOn(102, { contact: edge }, day(-366));
+    await payOn(103, { contact: edge }, bound);
+    await payOn(104, { contact: edge }, after);
+    await payOn(105, { contact: edge }, day(1));
+    await payOn(106, { contact: edge }, day(0));
+    const edgeShown = (await page(await create(owner, { contact: edge }))).payments.map((x) => [x.paid_on, Number(x.amount_agorot)]);
+    expect(edgeShown).toContainEqual([day(0), 106]);
+    expect(edgeShown).toContainEqual([after, 104]);
+    // exactly 12 months back, a day before it, and a future date: never shown
+    for (const amount of [102, 103, 105]) expect(edgeShown.map((x) => x[1]), String(amount)).not.toContain(amount);
+    // day(-365) is the boundary itself in a year without 29 February in between, else the day after it
+    expect(edgeShown.map((x) => x[1]).includes(101)).toBe(day(-365) > bound);
+    expect(edgeShown.length).toBe(day(-365) > bound ? 3 : 2);
 
     // at most 500, newest first; payments_more counts the rest
     const many = await contact("הרבה תשלומים");
@@ -578,8 +618,15 @@ describe("the customer's statement link (BAL-04)", () => {
       const hidden = await page(token);
       expect(hidden.bank).toBeNull();
       expect(JSON.stringify(hidden)).not.toContain("99887766");
-      // a member may not change it
-      expect(await run(member, async (q) => (await q("update public.quote_designs set show_bank_details_statement = true where organization_id = $1", [org])).rowCount)).toBe(0);
+      // nobody but the business's owners and admins sets it: a member or viewer changes nothing, a member's insert is
+      // refused, and an admin of another business reaches neither this row nor a new one
+      for (const u of [member, viewer, outsider]) {
+        expect(await run(u, async (q) => (await q("update public.quote_designs set show_bank_details_statement = true where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+      }
+      for (const u of [member, viewer, outsider]) {
+        expect((await pgError(run(u, (q) => q("insert into public.quote_designs (organization_id, show_bank_details_statement) values ($1, true)", [org])))).code, u.email).toBe("42501");
+      }
+      expect((await page(token)).bank).toBeNull();
     } finally {
       await run(owner, (q) => q("update public.quote_designs set show_bank_details_statement = true, show_bank_details_quote = true, show_bank_details_order = true where organization_id = $1", [org]));
     }

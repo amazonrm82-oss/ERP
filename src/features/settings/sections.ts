@@ -121,7 +121,7 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // QUO-04: everyone reads the templates; owners and admins rename and delete them
         { href: quoteTemplatesPath(orgId), label: "תבניות הצעת מחיר", description: "הצעות שמורות עם שורות ותנאים, להתחלה מהירה", icon: FormIcon },
         // QUO-05: everyone sees it; owners and admins change it
-        { href: quoteDesignPath(orgId), label: "עיצוב הצעת מחיר", description: "לוגו, צבע, כותרת עליונה ותחתונה ופרטי העסק", icon: FormIcon },
+        { href: quoteDesignPath(orgId), label: "עיצוב הצעת מחיר", description: "לוגו, צבע, כותרות, פרטי העסק ופרטי הבנק בהצעה, בהזמנה ובדף החשבון ללקוח", icon: FormIcon },
         // PL-01: everyone reads the price lists; owners and admins edit them. Hidden without the capability.
         // QUO-07: kept quotes whose deal and contact were purged; owners, admins and managers by role read them
         ...(access.keptQuotes ?? access.admin

@@ -73,7 +73,7 @@ export function QuoteDesignForm({ orgId, design, brandColor }: Props) {
           name="show_bank_details_statement"
           label="פרטים להעברה בנקאית בדף החשבון ללקוח"
           defaultChecked={design.showBankDetailsStatement}
-          hint="פרטי הבנק שנקבעו בהגדרות, כפי שהם היום."
+          hint="פרטי הבנק שבהגדרות, ברגע שהלקוח פותח את הדף."
         />
       </fieldset>
       <fieldset className="space-y-3">
