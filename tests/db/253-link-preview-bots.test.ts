@@ -296,20 +296,25 @@ describe("link previews for preview bots (WAB-05)", () => {
   it("limits each sender, and all previews together", async () => {
     await clearLimits();
     // fixed senders whose buckets are checked apart, so no call here lands in a bucket another one filled
-    const sender = "lp-sender-a";
-    const otherSender = "lp-sender-b";
     const roamer = "lp-roamer-a";
     const otherRoamer = "lp-roamer-b";
     const unknown = "y".repeat(64);
-    const ipBuckets = await Promise.all([sender, otherSender, roamer, otherRoamer].map(ipBucket));
-    expect(new Set(ipBuckets).size, "IP buckets").toBe(4);
-    const linkBuckets = await Promise.all([
-      linkBucket("card", tokens.card, sender),
-      linkBucket("form", tokens.form, sender),
-      linkBucket("quote", unknown, sender),
-      linkBucket("card", tokens.card, otherSender),
-    ]);
-    expect(new Set(linkBuckets).size, "link buckets").toBe(4);
+    // the link buckets depend on the made tokens (random), so two of them meet about 6 times in 1,024: pick senders whose
+    // IP and link buckets, worked out as the database does, all differ
+    const bucketsOf = async (a: string, b: string) => ({
+      ip: await Promise.all([a, b, roamer, otherRoamer].map(ipBucket)),
+      link: await Promise.all([linkBucket("card", tokens.card, a), linkBucket("form", tokens.form, a), linkBucket("quote", unknown, a), linkBucket("card", tokens.card, b)]),
+    });
+    let sender = "lp-sender-a";
+    let otherSender = "lp-sender-b";
+    let buckets = await bucketsOf(sender, otherSender);
+    for (let i = 0; i < 100 && (new Set(buckets.ip).size < 4 || new Set(buckets.link).size < 4); i++) {
+      sender = `lp-sender-a${i}`;
+      otherSender = `lp-sender-b${i}`;
+      buckets = await bucketsOf(sender, otherSender);
+    }
+    expect(new Set(buckets.ip).size, "IP buckets").toBe(4);
+    expect(new Set(buckets.link).size, "link buckets").toBe(4);
     const limit = await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.link_preview_sender_limit() as n")).n));
     expect(limit).toBe(30);
     for (let i = 0; i < limit; i++) expect(await preview("card", tokens.card, sender)).toMatchObject({ business: DISPLAY });

@@ -40,14 +40,14 @@ describe("automations on a date (AUT-03)", () => {
   const runsOf = (ruleId: string) =>
     asAdmin(async (q) => (await q<{ entity_id: string }>("select entity_id from public.automation_runs where automation_id = $1 order by entity_id", [ruleId])).rows.map((r) => r.entity_id));
   const off = (ruleId: string) => asAdmin((q) => q("update public.automations set is_active = false where id = $1", [ruleId]));
-  // created at noon of the day N days ago in the business's zone, so a clock change (daylight saving) in between never
-  // moves it to another day
-  const lead = (name: string, createdDaysAgo: number) =>
+  // created at noon of the day N days ago in the business's zone (Jerusalem unless a test pins another), so a clock
+  // change (daylight saving) in between never moves it to another day
+  const lead = (name: string, createdDaysAgo: number, zone = "Asia/Jerusalem") =>
     asAdmin(async (q) =>
       (
         await q<{ id: string }>(
-          "insert into public.leads (organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, (((now() at time zone 'Asia/Jerusalem')::date - $5::int) + time '12:00') at time zone 'Asia/Jerusalem') returning id",
-          [org, name, owner.id, status, createdDaysAgo],
+          "insert into public.leads (organization_id, full_name, owner_id, status_id, created_at) values ($1, $2, $3, $4, (((now() at time zone $6)::date - $5::int) + time '12:00') at time zone $6) returning id",
+          [org, name, owner.id, status, createdDaysAgo, zone],
         )
       ).rows[0].id,
     );
@@ -188,14 +188,15 @@ describe("automations on a date (AUT-03)", () => {
   it("waits for the trigger hour in the business's zone", async () => {
     // The business's zone is pinned to one where it is about noon now, so both halves always run (in Jerusalem the
     // "not yet" half was skipped after 23:00), and the "not yet" hour is two ahead, so the clock passing the next full
-    // hour during the test cannot make it due (review of 19 October 2026, RVW-39)
+    // hour during the test cannot make it due (review of 19 October 2026, RVW-39). The lead's day is counted in that
+    // pinned zone too: a Jerusalem day could be one later than the pinned zone's (seen at 22:00 UTC, Jerusalem's midnight)
     const offset = 12 - new Date().getUTCHours();
     const noon = offset === 0 ? "UTC" : offset > 0 ? `Etc/GMT-${offset}` : `Etc/GMT+${-offset}`;
     await asAdmin((q) => q("update public.organizations set timezone = $2 where id = $1", [org, noon]));
     try {
       const hour = await asAdmin(async (q) => (await q<{ h: number }>("select extract(hour from now() at time zone $1)::int as h", [noon])).rows[0].h);
       const r = await rule("lead", { field: "created_at", days: 6, direction: "after" });
-      const due = await lead("שעה", 6);
+      const due = await lead("שעה", 6, noon);
       await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour + 2)]));
       expect(await runsOf(r)).toEqual([]);
       await runDates((q) => q("select set_config('app.date_trigger_hour', $1, true)", [String(hour)]));

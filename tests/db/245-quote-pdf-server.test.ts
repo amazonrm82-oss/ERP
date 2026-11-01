@@ -337,8 +337,17 @@ describe("server-written quote PDFs and the customer's download (QUO-06 follow-u
     await resetWindows(id);
     for (let i = 0; i < 20; i += 1) expect((await download(token, "ip-a")).rate_limited, `try ${i}`).toBeUndefined();
     expect(await download(token, "ip-a")).toEqual({ rate_limited: true });
-    // another sender still downloads; no hash is kept, only buckets
-    expect((await download(token, "ip-b")).sha256).toBe(sha("4"));
+    // another sender still downloads; no hash is kept, only buckets. Two senders share a bucket about once in 1,024
+    // (the bucket depends on the quote's random id), so the other sender is one whose bucket, worked out as
+    // quote_public_pdf does, differs from ip-a's
+    const bucket = (ip: string) =>
+      asAdmin(async (q) =>
+        (await one<{ b: number }>(q, "select ((hashtextextended(app.quote_link_sender($1, $2), 0) % 1024) + 1024) % 1024 as b", [id, ip])).b,
+      );
+    const bucketA = await bucket("ip-a");
+    let sender = "ip-b";
+    for (let i = 0; (await bucket(sender)) === bucketA; i += 1) sender = `ip-b${i}`;
+    expect((await download(token, sender)).sha256).toBe(sha("4"));
     expect(await asAdmin((q) => count(q, "select 1 from app.quote_pdf_download_counts where quote_id = $1", [id]))).toBeGreaterThan(0);
     // the link's window is shared with the page: 120 in 10 minutes
     await resetWindows(id);

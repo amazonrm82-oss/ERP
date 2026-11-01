@@ -237,8 +237,15 @@ describe("the customer's link to an order (ORD-05)", () => {
     const hash = "a".repeat(64);
     for (let i = 0; i < 60; i++) expect((await page(token, hash)).rate_limited, `view ${i + 1}`).toBeUndefined();
     expect((await page(token, hash)).rate_limited).toBe(true);
-    // another sender still sees it
-    expect((await page(token, "b".repeat(64))).order).toBeDefined();
+    // another sender still sees it: one whose bucket, worked out as order_public does, is not the first sender's (two
+    // senders share one of the 1,024 buckets about once in 1,024, since the bucket depends on the order's random id)
+    const bucket = (h: string) =>
+      asAdmin(async (q) =>
+        (await q<{ b: number }>("select (((hashtextextended(app.order_link_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b", [order, h])).rows[0].b,
+      );
+    let second = "b".repeat(64);
+    for (let i = 0; (await bucket(second)) === (await bucket(hash)); i += 1) second = `b${i}`.padEnd(64, "b");
+    expect((await page(token, second)).order).toBeDefined();
     const stored = await asAdmin(async (q) => JSON.stringify((await q("select * from app.order_link_view_counts where order_id = $1", [order])).rows));
     expect(stored).not.toContain(hash);
     // the link's own window

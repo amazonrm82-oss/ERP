@@ -20,7 +20,13 @@ describe("payment promise erasure (COL-03)", () => {
 
   const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
   const run = <T>(fn: (q: Query) => Promise<T>) => asUser(owner.id, fn);
-  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  // calendar days from today in the business's zone (Asia/Jerusalem), as the SQL counts them; a UTC date is a day behind
+  // between midnight in Israel and midnight UTC
+  const day = (offset: number) => {
+    const d = new Date(`${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" })}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString().slice(0, 10);
+  };
   const contact = (name: string) =>
     run(async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, $2) returning id", [org, name])).id);
   const doc = (on: { contact?: string; deal?: string }) =>
