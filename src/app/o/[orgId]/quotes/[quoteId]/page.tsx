@@ -42,7 +42,7 @@ import { QUOTE_STATUS_LABELS, VERSIONABLE_STATUSES } from "@/features/quotes/sch
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
-import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -167,6 +167,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
     mode: acceptMode,
     canEdit: mayMove,
   });
+  // HEB-03: the validity shortcuts count the business's working days (CAP-03 settings), as HEB-02's task shortcuts do
+  const validity = canEdit ? { calendar: await getCalendarSettings(orgId), today: zoneDate(new Date(), context.org.timeZone) } : null;
   const ordersOn = offerMove ? (await getOrdersAccess(orgId)).on : false;
   const moveSetup = offerMove
     ? await Promise.all([listMembers(orgId), getCalendarSettings(orgId)]).then(([members, calendar]) =>
@@ -507,6 +509,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
         chargesVat={pricing.businessRateBp !== null && pricing.businessRateBp > 0}
         canEdit={canEdit}
         features={{ products: hasProducts, discounts: hasDiscounts }}
+        validity={validity}
       />
       {/* GAP-09: the payment schedule, shown on the document and the customer's page too */}
       <div className="mt-5">

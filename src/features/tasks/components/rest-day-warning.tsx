@@ -10,13 +10,30 @@ import { restDayNote } from "@/features/calendar-days/rest-day-note";
  * HEB-02: watches the date field of the same form (named `field`) and, when the
  * chosen day is a rest day or holiday of the business, says so and offers the
  * next working day. Only a warning: the form still saves the date as chosen.
+ * Controlled use (a DateField with value + onChange, HEB-03 quote validity): pass
+ * `day` and `onMove`; the form field is then neither watched nor written.
  */
-export function RestDayWarning({ calendar, field = "due_date", initial = "" }: { calendar: CalendarSettings; field?: string; initial?: string }) {
+export function RestDayWarning({
+  calendar,
+  field = "due_date",
+  initial = "",
+  day: controlled,
+  onMove,
+}: {
+  calendar: CalendarSettings;
+  field?: string;
+  initial?: string;
+  day?: string;
+  onMove?: (day: string) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   // the field's starting value comes in as `initial`; later changes are read from the field
-  const [day, setDay] = useState(initial);
+  const [watched, setDay] = useState(initial);
+  const isControlled = controlled !== undefined;
+  const day = isControlled ? controlled : watched;
 
   useEffect(() => {
+    if (isControlled) return;
     const form = ref.current?.closest("form");
     const input = form?.querySelector<HTMLInputElement>(`input[name="${field}"]`);
     if (!form || !input) return;
@@ -31,12 +48,16 @@ export function RestDayWarning({ calendar, field = "due_date", initial = "" }: {
       input.removeEventListener("change", read);
       form.removeEventListener("reset", reset);
     };
-  }, [field]);
+  }, [field, isControlled]);
 
   const note = restDayNote(day, calendar);
 
   function move() {
     if (!note?.next) return;
+    if (onMove) {
+      onMove(note.next);
+      return;
+    }
     const input = ref.current?.closest("form")?.querySelector<HTMLInputElement>(`input[name="${field}"]`);
     if (!input) return;
     input.value = note.next;

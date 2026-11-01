@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { DateField } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
@@ -27,6 +26,7 @@ import type { Quote, QuoteLine } from "../queries";
 import { NO_VAT_NOTE_MAX, NO_VAT_REASON_LABELS, NO_VAT_REASONS, noVatText, QUOTE_LINE_NAME_MAX, QUOTE_LINES_MAX, QUOTE_NOTES_MAX, QUOTE_TERMS_MAX, QUOTE_TITLE_MAX, type NoVatReason } from "../schema";
 import { groupSubtotals, isCounted, moveBefore, quoteTotals } from "../totals";
 import { QuoteLineForm } from "./quote-line-form";
+import { QuoteValidityField, type ValidityCalendar } from "./quote-validity-field";
 
 /** What the prices of the lines depend on (readQuotePricing), as the page passes it. */
 export type EditorPricing = {
@@ -49,6 +49,8 @@ type Props = {
   chargesVat: boolean;
   canEdit: boolean;
   features: { products: boolean; discounts: boolean };
+  // HEB-03: the business's calendar and today, for the validity shortcuts (null = no shortcuts)
+  validity?: ValidityCalendar | null;
 };
 
 function percentInput(bp: number | null): string {
@@ -68,7 +70,7 @@ function lineDiscountText(line: QuoteLine): string | null {
  * worked out live by the one totals rule while the discount or the VAT choice is being changed. Every
  * change is saved to the draft; nothing is sent to the customer here.
  */
-export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts = [], pricing, chargesVat, canEdit, features }: Props) {
+export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts = [], pricing, chargesVat, canEdit, features, validity = null }: Props) {
   // the order shown while a move is saved; the server's lines replace it when the page refreshes
   const [lines, setLines] = useState(savedLines);
   const [shown, setShown] = useState(savedLines);
@@ -347,14 +349,13 @@ export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts 
               <FormError message={failure?.fieldErrors ? undefined : failure?.message} />
               {state?.ok && state.message ? <FormNotice message={state.message} /> : null}
               <TextField label="כותרת" name="title" required maxLength={QUOTE_TITLE_MAX} defaultValue={failure?.values?.title ?? quote.title} error={errors.title} />
-              <DateField
-                label="בתוקף עד"
-                name="valid_until"
-                defaultValue={failure?.values?.valid_until ?? quote.validUntil ?? ""}
-                min={quote.quoteDate}
-                hint={`תאריך ההצעה: ${formatDate(quote.quoteDate)}`}
+              {/* key: a new starting date (a failed save) starts the field over */}
+              <QuoteValidityField
+                key={failure?.values?.valid_until ?? quote.validUntil ?? ""}
+                initial={failure?.values?.valid_until ?? quote.validUntil ?? ""}
+                quoteDate={quote.quoteDate}
                 error={errors.valid_until}
-                className="sm:max-w-xs"
+                validity={validity}
               />
               {features.discounts || startKind !== "" ? (
                 <div className="grid gap-4 sm:grid-cols-2">
