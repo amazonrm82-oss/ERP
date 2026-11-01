@@ -14,7 +14,7 @@ import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 
 import type { OrderDocumentData } from "./document-server";
-import type { OrderLine } from "./queries";
+import type { Order, OrderLine } from "./queries";
 
 /** The words the order document carries on its face (= NOT_A_TAX_INVOICE of components/order-document.tsx; unit test). */
 export const ORDER_PDF_NOT_A_TAX_INVOICE = "אינו חשבונית מס";
@@ -153,4 +153,13 @@ export function orderPdfDocument(data: OrderDocumentData, logo: PdfLogo | null):
     footerNote: null,
     pageNote: order.numberDisplay ? `אישור הזמנה ${order.numberDisplay} · ${NOT_A_TAX_INVOICE}` : NOT_A_TAX_INVOICE,
   };
+}
+
+/**
+ * Owner's answer (34) ב: the current PDF is out of date when the order's delivery date, shipping address or notes changed after it
+ * was made (orders.pdf_content_changed_at, server-kept); public.order_pdf_store then makes a new version.
+ */
+export function orderPdfOutdated(order: Pick<Order, "pdfContentChangedAt">, file: { createdAt: string } | null): boolean {
+  if (!file || !order.pdfContentChangedAt) return false;
+  return new Date(order.pdfContentChangedAt).getTime() > new Date(file.createdAt).getTime();
 }

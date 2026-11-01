@@ -657,6 +657,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_order_pdfs.sql",
       // the pasted erasure gives app.order_pdf_drop() of _order_pdfs.sql its body (listed for staleRestores)
       "_order_pdf_erase.sql",
+      // the ORD-05 PDF versions redefine app.files_order_pdf(), public.order_pdf_store() and public.order_public_pdf() of
+      // _order_pdfs.sql last (a changed order makes a new version)
+      "_order_pdf_versions.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

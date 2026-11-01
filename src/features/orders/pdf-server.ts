@@ -8,9 +8,11 @@ import type { Database } from "@/lib/database.types";
 import { dbErrorMessage } from "@/lib/errors";
 
 import { getOrderDocumentData } from "./document-server";
-import { orderPdfDocument, orderPdfFileName } from "./pdf";
+import { orderPdfDocument, orderPdfFileName, orderPdfOutdated } from "./pdf";
 import { writeOrderPdfAsServer } from "./pdf-store-server";
 import type { Order } from "./queries";
+
+export { orderPdfOutdated };
 
 type Client = SupabaseClient<Database>;
 
@@ -26,29 +28,52 @@ export function orderPdfStorable(order: Pick<Order, "status" | "customerDeletedA
   return order.status !== "draft" && order.status !== "cancelled" && order.customerDeletedAt === null;
 }
 
-/** The stored PDF of an order (a confirmed file), or null. Read with the user's session: whoever reads the order. */
-export async function getOrderPdfFile(supabase: Client, orgId: string, orderId: string): Promise<{ id: string; name: string } | null> {
+export type OrderPdfFile = { id: string; name: string; createdAt: string };
+
+/**
+ * The stored PDFs of an order (confirmed files), newest first, read with the user's session: whoever reads the order. The first
+ * is the one the customer's link serves; the rest are its earlier versions (owner's answer (34) ב: kept for staff).
+ */
+export async function listOrderPdfFiles(supabase: Client, orgId: string, orderId: string): Promise<OrderPdfFile[]> {
   const { data, error } = await supabase
     .from("files")
-    .select("id, name, unconfirmed_since")
+    .select("id, name, created_at, unconfirmed_since")
     .eq("organization_id", orgId)
     .eq("order_id", orderId)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(100);
   if (error) throw new Error(`order pdf: ${error.message}`);
-  return data && data.unconfirmed_since === null ? { id: data.id, name: data.name } : null;
+  return (data ?? []).filter((row) => row.unconfirmed_since === null).map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at }));
 }
+
+/** The current stored PDF of an order (the newest confirmed version), or null. */
+export async function getOrderPdfFile(supabase: Client, orgId: string, orderId: string): Promise<OrderPdfFile | null> {
+  return (await listOrderPdfFiles(supabase, orgId, orderId))[0] ?? null;
+}
+
 
 /**
  * ORD-05 PDF (owner, 1 November 2026, answer (1) ב): makes the PDF of a numbered order and keeps it, once, counted against
- * max_pdf_per_month (a stored file is never made again). The person's right is asked here with their own session
+ * max_pdf_per_month (a stored file is never made again; since the owner's answer (34) ב a change to the delivery date, the
+ * shipping address or the notes makes a new version, counted the same way, and the earlier one is kept for staff). The person's right is asked here with their own session
  * (public.order_pdf_allowed), the PDF is rendered here from the order document, and the row and the object are written with
  * the service key through public.order_pdf_store alone (pdf-store-server.ts), which checks the user again and keeps the
  * file's SHA-256.
  */
-export async function storeOrderPdf(supabase: Client, orgId: string, order: Order, userId: string): Promise<OrderPdfResult> {
+export async function storeOrderPdf(
+  supabase: Client,
+  orgId: string,
+  order: Order,
+  userId: string,
+  options: { onlyNewVersion?: boolean } = {},
+): Promise<OrderPdfResult> {
   if (order.status === "draft") return { ok: false, message: "לטיוטה אין קובץ PDF. הקובץ נשמר כשההזמנה מקבלת מספר." };
   const existing = await getOrderPdfFile(supabase, orgId, order.id).catch(() => null);
-  if (existing) return { ok: true, fileId: existing.id };
+  // stored once; a new version only after the delivery date, shipping address or notes changed (answer (34) ב)
+  if (existing && !orderPdfOutdated(order, existing)) return { ok: true, fileId: existing.id };
+  // after an edit: only a new version of a PDF that exists (the first one is made when the order is numbered, or by hand)
+  if (options.onlyNewVersion && !existing) return { ok: false, message: NOT_MADE };
   if (!orderPdfStorable(order)) return { ok: false, message: CLOSED };
 
   // the person's own session decides first (writable business, the flag, may edit the order's deal, contact or company)

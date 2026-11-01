@@ -75,6 +75,10 @@ export async function updateOrderDetailsAction(orgId: string, orderId: string, _
     .select("id, deal_id, contact_id, company_id");
   if (error) return fail(writeError(error));
   if (data.length === 0) return fail(CANNOT_EDIT);
+  // ORD-05 PDF (owner's answer (34) ב): a changed delivery date, shipping address or notes of a numbered order makes a new PDF
+  // version (the database knows whether they changed); a failed render never refuses the edit
+  const order = await readOrder(context.supabase, orgId, orderId).catch(() => null);
+  if (order && order.status !== "draft") await storeOrderPdf(context.supabase, orgId, order, context.user.id, { onlyNewVersion: true }).catch(() => null);
   revalidateOrder(orgId, { id: orderId, dealId: data[0].deal_id, contactId: data[0].contact_id, companyId: data[0].company_id });
   return { ok: true, message: "הפרטים נשמרו." };
 }

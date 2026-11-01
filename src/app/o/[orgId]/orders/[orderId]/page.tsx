@@ -14,7 +14,7 @@ import { OrderStatusControl } from "@/features/orders/components/order-status-co
 import { orderDocumentPath, orderPath, ordersPath } from "@/features/orders/paths";
 import { ButtonLink } from "@/components/ui/button";
 import { OrderPdfButton } from "@/features/orders/components/order-pdf-button";
-import { getOrderPdfFile, orderPdfStorable } from "@/features/orders/pdf-server";
+import { listOrderPdfFiles, orderPdfOutdated, orderPdfStorable } from "@/features/orders/pdf-server";
 import { getOrder, getOrderDecision, getOrderLinkStatus, getOrderMoney, getOrderParties, getOrderPricing, listOrderLines, listOrderSchedule } from "@/features/orders/queries";
 import { OrderMoneyCard } from "@/features/orders/components/order-money-card";
 import { OrderLinkCard } from "@/features/orders/components/order-link-card";
@@ -30,7 +30,7 @@ import { priceSourceText } from "@/features/deal-lines/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -92,7 +92,9 @@ export default async function OrderPage({ params }: Props) {
         : { href: ordersPath(orgId), label: "הזמנות" };
   const title = order.numberDisplay ? `הזמנה ${order.numberDisplay}` : "הזמנה בטיוטה";
   // ORD-05 PDF: the PDF kept when the order got its number; whoever may edit its record keeps a missing one
-  const pdfFile = order.status !== "draft" ? await getOrderPdfFile(supabase, orgId, order.id) : null;
+  // owner's answer (34) ב: the newest is the one the customer gets; the earlier versions stay for staff
+  const pdfFiles = order.status !== "draft" ? await listOrderPdfFiles(supabase, orgId, order.id) : [];
+  const pdfFile = pdfFiles[0] ?? null;
   const hasOrders = await orgHasFeature(orgId, "orders");
 
   return (
@@ -112,6 +114,7 @@ export default async function OrderPage({ params }: Props) {
                 orderId={order.id}
                 href={pdfFile ? paths.file(orgId, pdfFile.id) : null}
                 canStore={hasOrders && orderPdfStorable(order) && mayEdit}
+                outdated={orderPdfOutdated(order, pdfFile)}
               />
             ) : null}
             {mayEdit && order.status === "draft" ? (
@@ -225,6 +228,24 @@ export default async function OrderPage({ params }: Props) {
             active={linkStatus.active}
             createdText={linkStatus.createdAt ? formatDate(linkStatus.createdAt) : ""}
           />
+        ) : null}
+
+        {/* ORD-05 PDF (owner's answer (34) ב): the earlier versions of the order's PDF stay for staff; the customer gets the newest */}
+        {pdfFiles.length > 1 ? (
+          <Card aria-labelledby="order-pdf-versions">
+            <CardHeader id="order-pdf-versions" title="גרסאות קודמות של קובץ ה-PDF" />
+            <CardBody>
+              <ul className="space-y-1 text-sm">
+                {pdfFiles.slice(1).map((file) => (
+                  <li key={file.id}>
+                    <a href={paths.file(orgId, file.id)} className="text-accent-strong underline">
+                      {`נוצר ב-${formatDateTime(file.createdAt)}`}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
         ) : null}
 
         {mayEdit && editing.status ? (

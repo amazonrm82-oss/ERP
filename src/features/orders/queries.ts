@@ -55,6 +55,8 @@ export type Order = {
   createdAt: string;
   // TAX-02: the business's bank details as stored when the order got its number (null on a draft and on older orders)
   bankDetails: DocumentBank | null;
+  // ORD-05 PDF versions: when the delivery date, shipping address or notes of the numbered order last changed (server-kept)
+  pdfContentChangedAt?: string | null;
 };
 
 export type OrderLine = {
@@ -107,6 +109,7 @@ function toOrder(row: OrderRow): Order {
     customerDeletedAt: row.customer_deleted_at,
     createdAt: row.created_at,
     bankDetails: bankFromSnapshot(row.bank_details),
+    pdfContentChangedAt: row.pdf_content_changed_at ?? null,
   };
 }
 

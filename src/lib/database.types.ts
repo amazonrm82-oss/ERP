@@ -1820,6 +1820,9 @@ export type OrderRow = {
   customer_deleted_at: string | null;
   // TAX-02: app.document_bank_snapshot() taken when the order got its number (server-only, never changed afterwards)
   bank_details: Json | null;
+  // ORD-05 PDF versions (migration order_pdf_versions): when a numbered order's delivery date, shipping address or notes last
+  // changed (server only); a stored PDF older than it is followed by a new version
+  pdf_content_changed_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { NOT_A_TAX_INVOICE } from "@/features/orders/components/order-document";
 import type { OrderDocumentData } from "@/features/orders/document-server";
-import { ORDER_PDF_NOT_A_TAX_INVOICE, orderPdfDocument, orderPdfFileName } from "@/features/orders/pdf";
+import { ORDER_PDF_NOT_A_TAX_INVOICE, orderPdfDocument, orderPdfFileName, orderPdfOutdated } from "@/features/orders/pdf";
 import { publicOrderPdfPath } from "@/features/orders/public";
 import type { Order, OrderLine } from "@/features/orders/queries";
 import { renderPdf } from "@/features/pdf/render";
@@ -135,5 +135,13 @@ describe("the order confirmation PDF (ORD-05)", () => {
     expect(ORDER_PDF_NOT_A_TAX_INVOICE).toBe(NOT_A_TAX_INVOICE);
     expect(publicOrderPdfPath("a".repeat(64))).toBe(`/api/forms/order/${"a".repeat(64)}/pdf`);
     expect(DAMAGED_ORDER_PDF_MESSAGE).toContain("ההזמנה");
+  });
+
+  it("a PDF is out of date only when the order's content changed after it was made (answer (34) ב)", () => {
+    const file = { createdAt: "2026-11-01T10:00:00Z" };
+    expect(orderPdfOutdated({ pdfContentChangedAt: null }, file)).toBe(false);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T09:59:59Z" }, file)).toBe(false);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01Z" }, file)).toBe(true);
+    expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01Z" }, null)).toBe(false);
   });
 });
