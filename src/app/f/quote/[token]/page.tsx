@@ -1,6 +1,7 @@
 import "@/features/print/print.css";
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { cache } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
@@ -15,17 +16,22 @@ import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
 import { PDF_AS_SENT_PUBLIC } from "@/features/quotes/decision";
 import { getPublicQuote, getPublicQuoteFingerprint, getPublicQuotePdfAsSent } from "@/features/quotes/public-server";
 import { formatDate, formatMoney } from "@/lib/format";
+import { clientIp } from "@/lib/keyed-ip-hash";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
+import { takePublicPageView } from "@/lib/public-sender-server";
 
 type Props = { params: Promise<{ token: string }> };
 
 // WAB-05: the link's preview and the page share ONE read per request (quote_public counts a view and its first view tells
 // the quote's owner), so both go through this cache() of React's request scope
-const loadQuote = cache((token: string) => getPublicQuote(token));
+// OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up; once per request (takePublicPageView)
+const loadQuote = cache(async (token: string) =>
+  (await takePublicPageView()) ? getPublicQuote(token, clientIp(await headers())) : ("rate-limited" as const),
+);
 
 /**
  * WAB-05: the preview a messaging app draws for the link: "הצעת מחיר מאת <business>" and the logo, nothing about the

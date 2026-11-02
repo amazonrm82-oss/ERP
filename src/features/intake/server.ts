@@ -34,7 +34,7 @@ const MIN_FILL_MS = 2000;
 export const MAX_BODY_BYTES = 32 * 1024;
 const MAX_LENGTH: Record<IntakeField, number> = { full_name: 200, phone: 40, email: 254, company_name: 200, message: 5000 };
 
-const CORS_HEADERS = {
+export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",

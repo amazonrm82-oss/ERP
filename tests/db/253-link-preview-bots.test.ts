@@ -508,7 +508,10 @@ describe("link previews for preview bots (WAB-05)", () => {
     // with the x-crm-sender header, which the preview never sends, so every not-found branch is unchanged (rechecked; the limit
     // reads app.form_view_limit() since review M1)
     "public.intake_form(text)": "d5f8f3d6ab40116e8109c489b208b7bc",
-    "public.quote_public(text)": "4ab57d2574970d28e2113b1c31961aee",
+    // OPS-02 (public_sender_limit, owner (41) ב) adds only a per-sender view limit after the link's window, answering
+    // {rate_limited}; it counts only with the x-crm-sender header, which the preview never sends; every not-found branch is
+    // unchanged (rechecked)
+    "public.quote_public(text)": "dda0c98016cda308441736646539cc76",
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     "public.order_public(text,text)": "8827d9da93d3feb54d452d5d788844eb",
     "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",

@@ -61,6 +61,10 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - link previews for preview bots on the closed list of src/lib/preview-bots.ts
  *     (src/features/link-preview/preview-server.ts): public.link_preview_public()
  *     only (the business's display name and logo; no view counted, nothing changed);
+ *   - the shared per-sender limit of every public path (OPS-02, owner's answer (40) ב,
+ *     src/lib/public-sender-server.ts): public.public_sender_take() only, called first
+ *     by the public pages and routes above with the visitor's keyed IP hash (scope
+ *     "public"), before their own function looks the token up;
  * - the server's write of a quote's PDF (src/features/quotes/pdf-store-server.ts),
  *   one of the two uses inside a signed-in user's request (QUO-06 answer 3): called from
  *   pdf-server.ts (a Server Action and the staff file route) only after

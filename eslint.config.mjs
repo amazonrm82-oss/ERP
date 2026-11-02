@@ -80,6 +80,9 @@ const eslintConfig = defineConfig([
       "src/features/orders/pdf-public-server.ts",
       // ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page (public.subprocessors_public_page)
       "src/features/legal/subprocessors-public-server.ts",
+      // OPS-02 (owner, 2 November 2026, answer (40) ב): the shared per-sender limit every public path takes first
+      // (public.public_sender_take)
+      "src/lib/public-sender-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

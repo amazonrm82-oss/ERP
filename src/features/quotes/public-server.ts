@@ -32,17 +32,26 @@ import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
-// which checks the token and answers only what the page shows. No table is reached directly. No IP is used for viewing: the
-// views are limited per link in the database. A decision (QUO-09, below) goes through public.quote_public_version() and public.quote_public_decide().
+// which checks the token and answers only what the page shows. No table is reached directly. Views are limited per link and,
+// since OPS-02 (owner (41) ב), per sender (the keyed IP hash in the x-crm-sender header) in the database. A decision (QUO-09, below) goes through public.quote_public_version() and public.quote_public_decide().
 
 export type PublicQuoteState = PublicQuote | StatusPublicQuote | "not-found" | "rate-limited" | "not-configured";
 
-/** The quote behind a customer's link. */
-export async function getPublicQuote(token: string): Promise<PublicQuoteState> {
+/** The header that hands the sender's keyed IP hash to public.quote_public (app.public_sender_header, OPS-02). */
+const SENDER_HEADER = "x-crm-sender";
+
+/**
+ * The quote behind a customer's link. `ip` is the visitor's address: the view counts against the sender's limit of 60 in 10
+ * minutes (OPS-02, owner's answer (41) ב), as the keyed IP hash with FXS-11 scope "quote" in the x-crm-sender header (the
+ * database scopes it to the quote); without an address or the secret no hash is sent and only the link's limit applies.
+ */
+export async function getPublicQuote(token: string, ip: string | null = null): Promise<PublicQuoteState> {
   if (!QUOTE_LINK_TOKEN.test(token)) return "not-found";
   const service = createServiceClient();
   if (!service) return "not-configured";
-  const { data, error } = await service.rpc("quote_public", { p_token: token });
+  const sender = keyedIpHash(ip, "quote");
+  const call = service.rpc("quote_public", { p_token: token });
+  const { data, error } = await (sender ? call.setHeader(SENDER_HEADER, sender) : call);
   if (error) {
     if (error.code === "P0002") return "not-found";
     throw new Error(`quote_public failed: ${error.code} ${error.message}`);

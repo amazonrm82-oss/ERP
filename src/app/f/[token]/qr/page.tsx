@@ -10,6 +10,7 @@ import { formQrUrl } from "@/features/intake/qr-link";
 import { PrintButton } from "@/features/legal/components/print-button";
 import { encodeQr } from "@/lib/qr";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
+import { takePublicPageView } from "@/lib/public-sender-server";
 import { siteOrigin } from "@/lib/site-origin";
 
 export const metadata: Metadata = { title: "קוד QR לטופס", robots: { index: false, follow: false } };
@@ -22,7 +23,9 @@ type Props = { params: Promise<{ token: string }> };
 // white, so every camera reads it.
 export default async function FormQrPosterPage({ params }: Props) {
   const { token } = await params;
-  const [form, origin] = await Promise.all([getPublicForm(token, await headers()), siteOrigin()]);
+  // OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up
+  const form = (await takePublicPageView()) ? await getPublicForm(token, await headers()) : ("rate-limited" as const);
+  const origin = await siteOrigin();
   const pageUrl = `${origin}/f/${token}`;
 
   const found = form !== null && typeof form === "object" ? form : null;

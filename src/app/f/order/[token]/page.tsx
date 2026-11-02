@@ -21,11 +21,15 @@ import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
+import { takePublicPageView } from "@/lib/public-sender-server";
 
 type Props = { params: Promise<{ token: string }> };
 
 // WAB-05: the link's preview and the page share ONE read per request (order_public counts a view per link and sender)
-const loadOrder = cache(async (token: string) => getPublicOrder(token, clientIp(await headers())));
+// OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up; once per request (takePublicPageView)
+const loadOrder = cache(async (token: string) =>
+  (await takePublicPageView()) ? getPublicOrder(token, clientIp(await headers())) : ("rate-limited" as const),
+);
 
 /**
  * WAB-05: the link's preview: "אישור הזמנה מאת <business>" and the logo, nothing about the customer or the prices. As the

@@ -670,6 +670,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_signed_pdf_billing.sql",
       // OPS-02 redefines public.intake_form() of _form_marketing_consent.sql last (the hosted form's view limit)
       "_public_form_view_limit.sql",
+      // OPS-02 (owner (41) ב) redefines public.quote_public() of _quote_bank_details.sql last (the per-sender view limit)
+      "_public_sender_limit.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

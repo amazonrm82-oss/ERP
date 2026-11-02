@@ -7,6 +7,7 @@ import { PublicWidgetForm } from "@/features/site-widgets/components/public-widg
 import { getPublicWidget } from "@/features/site-widgets/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
+import { takePublicPageView } from "@/lib/public-sender-server";
 
 export const metadata: Metadata = { title: "השאירו פרטים", robots: { index: false, follow: false } };
 
@@ -24,7 +25,8 @@ const MESSAGES = {
  */
 export default async function WidgetFormPage({ params }: Props) {
   const { token } = await params;
-  const widget = await getPublicWidget(token, clientIp(await headers()));
+  // OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up
+  const widget = (await takePublicPageView()) ? await getPublicWidget(token, clientIp(await headers())) : ("rate-limited" as const);
 
   if (typeof widget === "string" || !widget.form) {
     return (
