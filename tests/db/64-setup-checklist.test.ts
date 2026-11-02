@@ -672,6 +672,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_public_form_view_limit.sql",
       // OPS-02 (owner (41) ב) redefines public.quote_public() of _quote_bank_details.sql last (the per-sender view limit)
       "_public_sender_limit.sql",
+      // PRD-09 redefines public.quote_duplicate() of _quote_link_expired_lists.sql, public.quote_public() of
+      // _public_sender_limit.sql and public.order_public() of _order_pdfs.sql last (a bundle line's choice and parts)
+      "_product_bundles.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

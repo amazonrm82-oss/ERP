@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { parseBundleItems } from "@/features/products/bundle";
 import { BILLINGS } from "@/features/products/schema";
 import { bankFromSnapshot } from "@/features/quotes/bank";
 import { quoteColor, type DocumentCustomer, type QuoteDesign } from "@/features/quotes/design";
@@ -58,6 +59,8 @@ const answerSchema = z.object({
       vat_exempt: z.boolean(),
       billing: z.enum(BILLINGS),
       total_agorot: money,
+      // PRD-09: an itemised bundle line's parts (names and quantities per bundle); null on any other line
+      components: z.unknown().optional(),
     }),
   ),
   schedule: z.array(z.object({ name: z.string(), percent_bp: z.number().int(), due_date: text, milestone: text, amount_agorot: money })),
@@ -165,6 +168,8 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
       priceSource: "manual",
       priceListName: null,
       totalAgorot: line.total_agorot,
+      bundleDisplay: Array.isArray(line.components) ? "itemised" : null,
+      bundleParts: parseBundleItems(line.components),
     })),
     schedule: schedule.map((step, index) => ({
       key: `step-${index + 1}`,

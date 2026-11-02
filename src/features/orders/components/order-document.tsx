@@ -1,5 +1,6 @@
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BundleItemsList } from "@/features/products/components/bundle-items-list";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { BankSection } from "@/features/quotes/components/bank-section";
 import { ScheduleSection } from "@/features/quotes/components/schedule-section";
@@ -167,6 +168,7 @@ export function OrderDocument({ data, headingLevel = 1 }: { data: OrderDocumentD
                         </p>
                         {line.description ? <p className="whitespace-pre-line text-ink-soft">{line.description}</p> : null}
                         {billingText(line) ? <p className="text-ink-soft">{billingText(line)}</p> : null}
+                        {line.bundleDisplay === "itemised" ? <BundleItemsList parts={line.bundleParts} lineQuantity={line.quantity} /> : null}
                       </td>
                       <td className="px-2 py-2 text-end tabular-nums">
                         {formatNumber(line.quantity)}
@@ -203,6 +205,7 @@ export function OrderDocument({ data, headingLevel = 1 }: { data: OrderDocumentD
                       {discountText(line) ? `, הנחה ${discountText(line)}` : ""}
                       {billingText(line) ? `, ${billingText(line)}` : ""}
                     </p>
+                    {line.bundleDisplay === "itemised" ? <BundleItemsList parts={line.bundleParts} lineQuantity={line.quantity} /> : null}
                   </li>
                 ),
               )}

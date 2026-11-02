@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { customerPriceList } from "@/features/deal-lines/queries";
 import { conversionRateBp, isDealLineSource, type DealLineSource, type NamedPriceList } from "@/features/deal-lines/pricing";
 import { isBilling } from "@/features/deal-lines/recurring";
+import { isBundleDisplay, parseBundleItems, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
 import type { Billing } from "@/features/products/schema";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
@@ -87,6 +88,9 @@ export type QuoteLine = {
   priceListId: string | null;
   priceListName: string | null;
   totalAgorot: number;
+  // PRD-09: a bundle line's display (null on any other line) and its parts as kept when the line was added
+  bundleDisplay: BundleDisplay | null;
+  bundleParts: BundlePartSnapshot[];
 };
 
 const QUOTE_COLUMNS =
@@ -135,7 +139,7 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
 }
 
 const LINE_COLUMNS =
-  "id, position, kind, product_id, name, description, unit_name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, billing, is_optional, optional_selected, price_source, price_list_id, price_list_name, total_agorot";
+  "id, position, kind, product_id, name, description, unit_name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, billing, is_optional, optional_selected, price_source, price_list_id, price_list_name, total_agorot, bundle_display, bundle_items";
 
 function toLine(row: Pick<LineDbRow, keyof LineDbRow>): QuoteLine {
   return {
@@ -158,6 +162,8 @@ function toLine(row: Pick<LineDbRow, keyof LineDbRow>): QuoteLine {
     priceListId: row.price_list_id,
     priceListName: row.price_list_name,
     totalAgorot: Number(row.total_agorot),
+    bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
+    bundleParts: parseBundleItems(row.bundle_items),
   };
 }
 

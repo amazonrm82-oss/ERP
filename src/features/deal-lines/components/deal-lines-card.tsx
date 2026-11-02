@@ -10,6 +10,7 @@ import { FormError } from "@/components/ui/feedback";
 import { PlusIcon } from "@/components/ui/icons";
 import { ReorderButtons } from "@/components/ui/reorder-buttons";
 import { linesValueNote, monthlyRecurringAgorot } from "@/features/deals/recurring";
+import { BundleLineControl } from "@/features/products/components/bundle-line-control";
 import { LineCost } from "@/features/product-costs/components/line-cost";
 import { linesProfit, marginText } from "@/features/product-costs/margin";
 import { documentVatRateBp } from "@/features/tax/calc";
@@ -156,6 +157,14 @@ export function DealLinesCard({ orgId, dealId, lines, pricing, canEdit, features
                       {lineBillingText(line.billing)}
                     </p>
                     {line.productId ? <p className="text-sm text-ink-soft">{priceSourceText(line.source, line.priceListName)}</p> : null}
+                    {line.bundleDisplay ? (
+                      <BundleLineControl
+                        display={line.bundleDisplay}
+                        parts={line.bundleParts}
+                        lineQuantity={line.quantity}
+                        edit={canEdit ? { orgId, kind: "deal", parentId: dealId, lineId: line.id } : null}
+                      />
+                    ) : null}
                     {costs ? (
                       <LineCost
                         orgId={orgId}

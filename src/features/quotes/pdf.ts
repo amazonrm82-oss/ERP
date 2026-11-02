@@ -3,6 +3,7 @@
 // here), the payment schedule, notes, terms and the design's header and footer texts. Pure, so it is unit tested.
 
 import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo, type PdfRow } from "@/features/pdf/document";
+import { bundlePartsText } from "@/features/products/bundle";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -33,7 +34,12 @@ function lineNotes(line: QuoteLine, accepted: boolean): string | null {
     line.isOptional ? optional : null,
     line.billing !== "one_time" ? BILLING_LABELS[line.billing] : null,
   ].filter(Boolean);
-  const parts = [line.description?.trim() || null, notes.length > 0 ? notes.join(", ") : null].filter(Boolean);
+  const parts = [
+    line.description?.trim() || null,
+    notes.length > 0 ? notes.join(", ") : null,
+    // PRD-09: an itemised bundle lists its parts under the line, without prices
+    bundlePartsText(line.bundleDisplay, line.bundleParts, line.quantity),
+  ].filter(Boolean);
   return parts.length > 0 ? parts.join("\n") : null;
 }
 

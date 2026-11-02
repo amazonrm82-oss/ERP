@@ -162,6 +162,8 @@ describe("the customer's link to a quote (QUO-08)", () => {
       expect(Object.keys(line).sort()).toEqual(
         [
           "billing",
+          // PRD-09: an itemised bundle's parts (names and quantities only); null on any other line
+          "components",
           "description",
           "discount_agorot",
           "discount_bp",

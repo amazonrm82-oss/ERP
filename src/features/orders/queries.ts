@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { customerPriceList } from "@/features/deal-lines/queries";
+import { isBundleDisplay, parseBundleItems, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
 import { bankFromSnapshot, type DocumentBank } from "@/features/quotes/bank";
 import type { QuoteDecision } from "@/features/quotes/queries";
 import type { ScheduleStep } from "@/features/quotes/schedule";
@@ -76,6 +77,9 @@ export type OrderLine = {
   priceSource: string;
   priceListName: string | null;
   totalAgorot: number;
+  // PRD-09: a bundle line's display (null on any other line) and its parts as kept when the line was added
+  bundleDisplay: BundleDisplay | null;
+  bundleParts: BundlePartSnapshot[];
 };
 
 function toOrder(row: OrderRow): Order {
@@ -131,6 +135,8 @@ function toLine(row: OrderLineRow): OrderLine {
     priceSource: row.price_source,
     priceListName: row.price_list_name,
     totalAgorot: Number(row.total_agorot),
+    bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
+    bundleParts: parseBundleItems(row.bundle_items),
   };
 }
 

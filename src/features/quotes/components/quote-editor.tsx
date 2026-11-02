@@ -16,6 +16,7 @@ import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { NamedPriceList } from "@/features/deal-lines/pricing";
 import { DISCOUNT_KIND_LABELS, DISCOUNT_KINDS, type DiscountKind } from "@/features/deal-lines/schema";
 import { agorotInput } from "@/features/deals/recurring";
+import { BundleLineControl } from "@/features/products/components/bundle-line-control";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
 import type { FormState } from "@/lib/action-result";
@@ -286,6 +287,14 @@ export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts 
                         {line.vatExempt && pricing.vat.kind === "rate" ? ', פטור ממע"מ' : ""}
                         {line.billing !== "one_time" ? `, ${BILLING_LABELS[line.billing]}` : ""}
                       </p>
+                      {line.bundleDisplay ? (
+                        <BundleLineControl
+                          display={line.bundleDisplay}
+                          parts={line.bundleParts}
+                          lineQuantity={line.quantity}
+                          edit={canEdit ? { orgId, kind: "quote", parentId: quote.id, lineId: line.id } : null}
+                        />
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-1">
                       <span className={`me-1 font-semibold tabular-nums ${isCounted(line) ? "" : "text-ink-soft line-through"}`}>{formatMoney(line.totalAgorot)}</span>

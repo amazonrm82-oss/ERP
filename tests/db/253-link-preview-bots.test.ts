@@ -511,9 +511,11 @@ describe("link previews for preview bots (WAB-05)", () => {
     // OPS-02 (public_sender_limit, owner (41) ב) adds only a per-sender view limit after the link's window, answering
     // {rate_limited}; it counts only with the x-crm-sender header, which the preview never sends; every not-found branch is
     // unchanged (rechecked)
-    "public.quote_public(text)": "dda0c98016cda308441736646539cc76",
+    // PRD-09 (product_bundles) adds only `components` to each line of the full page; every not-found branch is unchanged (rechecked)
+    "public.quote_public(text)": "ac15f8460f5149554788af11722bdbce",
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
-    "public.order_public(text,text)": "8827d9da93d3feb54d452d5d788844eb",
+    // PRD-09 (product_bundles) adds only `components` to each line of the full page (rechecked)
+    "public.order_public(text,text)": "8dfb0e7e80c09621dc8ef72f36657856",
     "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
     "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
     "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",

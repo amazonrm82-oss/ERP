@@ -89,6 +89,8 @@ const line = (extra: Partial<QuoteLine>): QuoteLine => ({
   priceListId: null,
   priceListName: null,
   totalAgorot: 10000,
+  bundleDisplay: null,
+  bundleParts: [],
   ...extra,
 });
 

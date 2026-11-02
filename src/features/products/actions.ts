@@ -9,6 +9,7 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
+import { copyBundleParts } from "./bundle-server";
 import { productPath, productsPath } from "./paths";
 import { copyName, PRODUCT_FIELD_NAMES, productSchema, type ProductInput } from "./schema";
 
@@ -19,6 +20,8 @@ const SKU_TAKEN = 'המק"ט הזה כבר שייך למוצר אחר.';
 const IN_USE = "המוצר מופיע במסמכים, ולכן אי אפשר למחוק אותו. אפשר להעביר אותו לארכיון: הוא לא יוצע במסמכים חדשים, והמסמכים הקיימים לא ישתנו.";
 // PL-02: a price list line references the product with no on delete action (price_list_lines_product_fk)
 const IN_PRICE_LIST = "המוצר מופיע במחירון, ולכן אי אפשר למחוק אותו. אפשר להסיר אותו מהמחירונים, או להעביר אותו לארכיון: הוא לא יוצע במסמכים חדשים, והמחירים שלו יישמרו.";
+// PRD-09: a bundle part references the product with no on delete action (product_bundle_items_component_fk)
+const IN_BUNDLE = "המוצר הוא רכיב בחבילה, ולכן אי אפשר למחוק אותו. אפשר להסיר אותו מהחבילה, או להעביר אותו לארכיון: החבילות לא ישתנו.";
 // DLI-01: a deal line references the product with no on delete action (deal_lines_product_fk)
 const IN_DEAL = "המוצר מופיע בשורות של עסקאות, ולכן אי אפשר למחוק אותו. אפשר להעביר אותו לארכיון: הוא לא יוצע בשורות חדשות, והשורות הקיימות לא ישתנו.";
 
@@ -105,6 +108,8 @@ export async function duplicateProductAction(orgId: string, productId: string): 
     .select("id")
     .single();
   if (error) return fail(writeError(error, "לא הצלחנו ליצור עותק. נסו שוב."));
+  // PRD-09: a copy of a bundle gets the same parts (a part the rules no longer take is left out)
+  if (source.kind === "bundle") await copyBundleParts(context.supabase, orgId, productId, data.id);
   revalidateProducts(orgId);
   redirect(productPath(orgId, data.id));
 }
@@ -139,6 +144,7 @@ export async function deleteProductAction(orgId: string, productId: string): Pro
   if (error) {
     if (error.code !== "23503") return fail(dbErrorMessage(error));
     if (error.message.includes("price_list_lines_product_fk")) return fail(IN_PRICE_LIST);
+    if (error.message.includes("product_bundle_items_component_fk")) return fail(IN_BUNDLE);
     return fail(error.message.includes("deal_lines_product_fk") ? IN_DEAL : IN_USE);
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);

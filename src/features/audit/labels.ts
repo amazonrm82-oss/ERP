@@ -78,6 +78,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   price_lists: "מחירון",
   // PL-02
   price_list_lines: "מחיר במחירון",
+  // PRD-09
+  product_bundle_items: "רכיב בחבילה",
   // DLI-01
   deal_lines: "שורת מוצר בעסקה",
   // QUO-01, QUO-02

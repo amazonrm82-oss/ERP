@@ -63,6 +63,8 @@ export async function applyDealLinesToQuote(supabase: Client, orgId: string, quo
         ...(line.productId === null ? { vat_exempt: line.vatExempt ?? false, billing: line.billing ?? "one_time" } : {}),
         price_source: line.priceSource,
         price_list_id: line.priceListId,
+        // PRD-09: the database keeps it only on a bundle line, and takes the bundle's parts as they are now
+        ...(line.bundleDisplay ? { bundle_display: line.bundleDisplay } : {}),
       })),
     );
     if (error) return { ok: false, message: error.code === "42501" ? CANNOT_EDIT : dbErrorMessage(error) };

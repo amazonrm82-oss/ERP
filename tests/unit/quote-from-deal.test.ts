@@ -19,6 +19,8 @@ const base: DealLine = {
   priceListId: null,
   priceListName: null,
   billing: null,
+  bundleDisplay: null,
+  bundleParts: [],
 };
 
 const products: Record<string, { offerable: boolean; name: string; description: string | null }> = {

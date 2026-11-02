@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { partsReferenceSum } from "@/features/products/bundle";
+import { readBundleParts } from "@/features/products/bundle-server";
+import { BundlePartsCard } from "@/features/products/components/bundle-parts-card";
 import { ProductActions } from "@/features/products/components/product-actions";
 import { ProductDetails } from "@/features/products/components/product-details";
 import { PriceHistory } from "@/features/products/components/price-history";
@@ -20,6 +23,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
 import { getPricesIncludeVat } from "@/features/tax/queries";
 import { isUuid } from "@/lib/paths";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "מוצר" };
 
@@ -29,6 +33,7 @@ type Props = { params: Promise<{ orgId: string; productId: string }> };
  * PRD-01, PRD-02: one product. Everyone reads it; owners and admins of a writable organization edit, copy, archive and remove.
  * PRD-07: owners and admins also see its price changes (from the audit log).
  * PRD-06: owners, admins, managers and the view_costs grant see its cost and profit; editing the cost also needs the catalog rule.
+ * PRD-09: a bundle shows its parts (catalog editors change them) and their sum for reference.
  */
 export default async function ProductPage({ params }: Props) {
   const { orgId, productId } = await params;
@@ -48,11 +53,17 @@ export default async function ProductPage({ params }: Props) {
     canEdit ? getPricesIncludeVat(orgId) : Promise.resolve(false),
   ]);
   if (!product) notFound();
-  const [priceChanges, costs, costBasis] = await Promise.all([
+  const isBundle = product.kind === "bundle";
+  const [priceChanges, costs, costBasis, parts] = await Promise.all([
     canSeeHistory ? listProductPriceHistory(orgId, product) : Promise.resolve([]),
     canSeeCost ? readProductCosts(orgId, [product.id]) : Promise.resolve(null),
-    canSeeCost ? getCostBasis(orgId, org.timeZone) : Promise.resolve(null),
+    canSeeCost || isBundle ? getCostBasis(orgId, org.timeZone) : Promise.resolve(null),
+    isBundle ? createClient().then((supabase) => readBundleParts(supabase, orgId, product.id)) : Promise.resolve([]),
   ]);
+  // PRD-09: the parts' sum in the bundle's own mode (a bundle that carries no VAT: the parts' net prices)
+  const bundleIncludesVat = product.vatKind === "taxable" && product.priceIncludesVat;
+  const referenceAgorot =
+    isBundle && parts.length > 0 && costBasis ? partsReferenceSum(parts, bundleIncludesVat, costBasis.rateBp) : null;
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -75,6 +86,16 @@ export default async function ProductPage({ params }: Props) {
           />
         </CardBody>
       </Card>
+      {isBundle ? (
+        <BundlePartsCard
+          orgId={orgId}
+          bundleId={product.id}
+          parts={parts.map((part) => ({ id: part.id, name: part.name, sku: part.sku, quantity: part.quantity, unitName: part.unitName, offerable: part.offerable }))}
+          referenceAgorot={referenceAgorot}
+          priceMode={costBasis?.chargesVat === false ? "בלי מע\"מ" : bundleIncludesVat ? "כולל מע\"מ" : "לפני מע\"מ"}
+          canEdit={canEdit}
+        />
+      ) : null}
       {costs && costBasis ? (
         <ProductCostCard
           orgId={orgId}

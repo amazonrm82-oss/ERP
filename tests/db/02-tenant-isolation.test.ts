@@ -186,6 +186,11 @@ describe("tenant isolation", () => {
       ).rows[0].id;
       // PRD-06: the product's cost, in its own table
       await q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 6000)", [orgA, ids.productA]);
+      // PRD-09: a bundle of A made of A's product
+      ids.bundleA = (
+        await q<{ id: string }>("insert into public.products (organization_id, name, kind, price_agorot) values ($1, 'חבילה של א', 'bundle', 15000) returning id", [orgA])
+      ).rows[0].id;
+      await q("insert into public.product_bundle_items (organization_id, bundle_id, component_id, quantity) values ($1, $2, $3, 2)", [orgA, ids.bundleA, ids.productA]);
       ids.priceListA = (
         await q<{ id: string }>("insert into public.price_lists (organization_id, name, valid_from) values ($1, 'מחירון של א', '2026-01-01') returning id", [orgA])
       ).rows[0].id;
@@ -434,6 +439,8 @@ describe("tenant isolation", () => {
     "price_lists",
     // PL-02
     "price_list_lines",
+    // PRD-09
+    "product_bundle_items",
     // DLI-01
     "deal_lines",
     // PRD-06 follow-up: a line's cost
@@ -657,6 +664,7 @@ describe("tenant isolation", () => {
       customer_debt_totals: "open_agorot = open_agorot",
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
+      product_bundle_items: "quantity = quantity",
       deal_lines: "quantity = quantity",
       deal_line_costs: "cost_agorot = cost_agorot",
       quotes: "title = title",
@@ -813,6 +821,7 @@ describe("tenant isolation", () => {
       ["insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 1)", [orgA, ids.productA]],
       ["insert into public.price_lists (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.price_list_lines (organization_id, price_list_id, product_id, min_quantity, discount_bp) values ($1, $2, $3, 5, 100)", [orgA, ids.priceListA, ids.productA]],
+      ["insert into public.product_bundle_items (organization_id, bundle_id, component_id, quantity) values ($1, $2, $3, 1)", [orgA, ids.bundleA, ids.productA]],
       ["insert into public.deal_lines (organization_id, deal_id, description) values ($1, $2, 'x')", [orgA, ids.dealA]],
       ["insert into public.deal_lines (organization_id, deal_id, product_id, description, price_source) values ($1, $2, $3, 'x', 'product')", [orgA, ids.dealA, ids.productA]],
       ["insert into public.deal_line_costs (organization_id, deal_line_id, cost_agorot) values ($1, $2, 1)", [orgA, ids.freeLineA]],
@@ -944,6 +953,7 @@ describe("tenant isolation", () => {
       ["product_costs", "cost_agorot = 777", "cost_agorot = 777"],
       ["price_lists", "is_active = false", "not is_active"],
       ["price_list_lines", "min_quantity = 777", "min_quantity = 777"],
+      ["product_bundle_items", "quantity = 777", "quantity = 777"],
       ["deal_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["deal_line_costs", "cost_agorot = 777", "cost_agorot = 777"],
       ["quotes", "title = 'HACKED'", "title = 'HACKED'"],
@@ -1199,6 +1209,18 @@ describe("tenant isolation", () => {
     const productB = await asUser(b.id, async (q) =>
       (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'מוצר של ב') returning id", [orgB])).rows[0].id,
     );
+    // PRD-09: a bundle part in B's organization cannot point at A's product or A's bundle
+    const bundleB = await asUser(b.id, async (q) =>
+      (await q<{ id: string }>("insert into public.products (organization_id, name, kind) values ($1, 'חבילה של ב', 'bundle') returning id", [orgB])).rows[0].id,
+    );
+    const viaBundlePart = await pgError(
+      asUser(b.id, (q) => q("insert into public.product_bundle_items (organization_id, bundle_id, component_id) values ($1, $2, $3)", [orgB, bundleB, ids.productA])),
+    );
+    expect(viaBundlePart.code).toBe("23503");
+    const viaBundleOf = await pgError(
+      asUser(b.id, (q) => q("insert into public.product_bundle_items (organization_id, bundle_id, component_id) values ($1, $2, $3)", [orgB, ids.bundleA, productB])),
+    );
+    expect(viaBundleOf.code).toBe("23503");
     // PRD-06: a cost in B's organization cannot point at A's product
     const viaCostProduct = await pgError(
       asUser(b.id, (q) => q("insert into public.product_costs (organization_id, product_id, cost_agorot) values ($1, $2, 1)", [orgB, ids.productA])),

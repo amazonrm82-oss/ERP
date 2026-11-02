@@ -1,5 +1,6 @@
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BundleItemsList } from "@/features/products/components/bundle-items-list";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -164,6 +165,7 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
                         {optionalNote(line) || line.billing !== "one_time" ? (
                           <p className="text-ink-soft">{[optionalNote(line), line.billing !== "one_time" ? BILLING_LABELS[line.billing] : null].filter(Boolean).join(", ")}</p>
                         ) : null}
+                        {line.bundleDisplay === "itemised" ? <BundleItemsList parts={line.bundleParts} lineQuantity={line.quantity} /> : null}
                       </td>
                       <td className="px-2 py-2 text-end tabular-nums">
                         {formatNumber(line.quantity)}
@@ -202,6 +204,7 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
                       {optionalNote(line) ? `, ${optionalNote(line)}` : ""}
                       {line.billing !== "one_time" ? `, ${BILLING_LABELS[line.billing]}` : ""}
                     </p>
+                    {line.bundleDisplay === "itemised" ? <BundleItemsList parts={line.bundleParts} lineQuantity={line.quantity} /> : null}
                   </li>
                 ),
               )}

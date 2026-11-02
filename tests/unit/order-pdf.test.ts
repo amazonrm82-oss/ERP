@@ -34,6 +34,8 @@ function line(i: number): OrderLine {
     priceSource: "manual",
     priceListName: null,
     totalAgorot: 135000,
+    bundleDisplay: null,
+    bundleParts: [],
   };
 }
 
@@ -127,6 +129,25 @@ describe("the order confirmation PDF (ORD-05)", () => {
     const all = pages[0].pieces.map((p) => p.text).join("\n");
     expect(all).toContain(reverse("אין שורות בהזמנה."));
     expect(all).not.toContain("87654321");
+  });
+
+  it("lists an itemised bundle's parts under its line, quantities times the line's, and no parts for a single-line bundle (PRD-09)", async () => {
+    const data = sample(0);
+    const parts = [
+      { name: "מזגן", quantity: 2, unitName: null },
+      { name: "צנרת", quantity: 1.5, unitName: "מטר" },
+    ];
+    data.lines = [
+      { ...line(1), name: "חבילת התקנה", bundleDisplay: "itemised", bundleParts: parts },
+      { ...line(2), name: "חבילה סגורה", bundleDisplay: "single", bundleParts: [{ name: "מסנן", quantity: 1, unitName: null }] },
+    ];
+    const all = pdfText(await renderPdf(orderPdfDocument(data, null)))
+      .flatMap((page) => page.pieces.map((p) => p.text))
+      .join("\n");
+    // visual order: line quantity 3 x 2 per bundle, 3 x 1.5 metres
+    expect(all).toContain(`${reverse("מזגן")} 6 ·`);
+    expect(all).toContain(`${reverse("צנרת")} ${reverse("מטר")} 4.5 ·`);
+    expect(all).not.toContain(reverse("מסנן"));
   });
 
   it("names the file after the order's number, keeps the document's wording, and links the customer's download", () => {

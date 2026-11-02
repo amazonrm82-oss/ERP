@@ -1063,6 +1063,14 @@ describe("roles and record visibility", () => {
           where l.organization_id = $1 and l.name = 'מחירון של מנהל' and p.organization_id = $1 and p.name = 'מוצר של מנהל'`,
         [org],
       );
+      // PRD-09: a bundle made of that product
+      await q("insert into public.products (organization_id, name, kind) values ($1, 'חבילה של מנהל', 'bundle')", [org]);
+      await q(
+        `insert into public.product_bundle_items (organization_id, bundle_id, component_id, quantity)
+         select $1, b.id, p.id, 2 from public.products b, public.products p
+          where b.organization_id = $1 and b.name = 'חבילה של מנהל' and p.organization_id = $1 and p.name = 'מוצר של מנהל'`,
+        [org],
+      );
       await q("insert into public.disqualify_reasons (organization_id, name) values ($1, 'סיבה של מנהל')", [org]);
       await q("insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'email', 'filled', 5)", [org]);
       await q("insert into public.record_type_options (organization_id, object_type, name) values ($1, 'company', 'סוג של מנהל')", [org]);
@@ -1108,6 +1116,7 @@ describe("roles and record visibility", () => {
       products: "name = name",
       price_lists: "name = name",
       price_list_lines: "min_quantity = min_quantity",
+      product_bundle_items: "quantity = quantity",
       goals: "target = target",
       field_definitions: "label = label",
       conversion_field_maps: "target_field_id = target_field_id",
@@ -1162,6 +1171,17 @@ describe("roles and record visibility", () => {
         ),
       );
       expect(addPrice.code).toBe("42501");
+      // nor add a part to a bundle (PRD-09)
+      const part = await asAdmin(
+        async (q) =>
+          (await q<{ bundle_id: string; component_id: string }>("select bundle_id, component_id from public.product_bundle_items where organization_id = $1 limit 1", [org])).rows[0],
+      );
+      const addPart = await pgError(
+        asUser(u.id, (q) =>
+          q("insert into public.product_bundle_items (organization_id, bundle_id, component_id, quantity) values ($1, $2, $3, 5)", [org, part.bundle_id, part.component_id]),
+        ),
+      );
+      expect(addPart.code).toBe("42501");
     }
     const pending = await asAdmin((q) =>
       count(q, "select 1 from public.invitations where email = 'pending@example.test' and revoked_at is null"),

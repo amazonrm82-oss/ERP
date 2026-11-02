@@ -27,6 +27,7 @@ import { deliveryContactLabel, orderSourceLabels, shippingAddressHint } from "@/
 import { getOrgTerms } from "@/features/terminology/queries";
 import { quotePath } from "@/features/quotes/paths";
 import { priceSourceText } from "@/features/deal-lines/schema";
+import { BundleLineControl } from "@/features/products/components/bundle-line-control";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
@@ -284,6 +285,14 @@ export default async function OrderPage({ params }: Props) {
                           {line.vatExempt ? ' · פטור ממע"מ' : ""}
                           {line.productId ? ` · ${priceSourceText(line.priceSource, line.priceListName)}` : ""}
                         </p>
+                        {line.bundleDisplay ? (
+                          <BundleLineControl
+                            display={line.bundleDisplay}
+                            parts={line.bundleParts}
+                            lineQuantity={line.quantity}
+                            edit={mayEdit && editing.lines ? { orgId, kind: "order", parentId: order.id, lineId: line.id } : null}
+                          />
+                        ) : null}
                       </div>
                       <span className="flex items-center gap-2">
                         <span className="font-medium whitespace-nowrap tabular-nums">{formatMoney(line.totalAgorot)}</span>

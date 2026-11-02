@@ -64,6 +64,8 @@ function line(i: number, extra: Partial<QuoteLine> = {}): QuoteLine {
     priceListId: null,
     priceListName: null,
     totalAgorot: 246900,
+    bundleDisplay: null,
+    bundleParts: [],
     ...extra,
   };
 }

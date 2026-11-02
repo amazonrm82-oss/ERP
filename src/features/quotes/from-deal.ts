@@ -25,6 +25,8 @@ export type DealLineCopy = {
   billing: Billing | null;
   priceSource: "product" | "price_list" | "manual";
   priceListId: string | null;
+  // PRD-09: a bundle line keeps its display choice (null on any other line)
+  bundleDisplay: "single" | "itemised" | null;
 };
 
 export type DealLinesPlan = { lines: DealLineCopy[]; skipped: string[] };
@@ -66,6 +68,7 @@ export function planDealLines(
       billing: isProduct ? null : (line.billing ?? "one_time"),
       priceSource,
       priceListId: priceSource === "price_list" ? line.priceListId : null,
+      bundleDisplay: isProduct ? line.bundleDisplay : null,
     });
   }
   return { lines: out, skipped };

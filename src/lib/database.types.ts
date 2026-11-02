@@ -1913,6 +1913,9 @@ export type OrderLineRow = {
   price_list_name: string | null;
   total_agorot: number;
   currency: string;
+  // PRD-09: single | itemised on a bundle line (null on any other line); the bundle's parts when the line was added
+  bundle_display: string | null;
+  bundle_items: Json | null;
   created_at: string;
   updated_at: string;
 };
@@ -1928,6 +1931,7 @@ type OrderLineWrite = {
   billing?: string;
   price_source?: string;
   price_list_id?: string | null;
+  bundle_display?: string | null;
 };
 
 // GAP-09: a step of a quote's payment schedule (migration quote_payment_schedule). A date or a milestone at least;
@@ -2299,6 +2303,9 @@ export type QuoteLineRow = {
   price_list_name: string | null;
   total_agorot: number;
   currency: string;
+  // PRD-09: single | itemised on a bundle line (null on any other line); the bundle's parts when the line was added
+  bundle_display: string | null;
+  bundle_items: Json | null;
   created_at: string;
   updated_at: string;
 };
@@ -2333,6 +2340,7 @@ type QuoteLineWrite = {
   price_source?: string;
   price_list_id?: string | null;
   currency?: string;
+  bundle_display?: string | null;
 };
 
 // DLI-01: a product line on a deal (migration deal_lines). total_agorot, price_includes_vat (one mode per deal),
@@ -2358,9 +2366,26 @@ export type DealLineRow = {
   // DLI-04: one_time | monthly | quarterly | yearly (trigger deal_lines_billing: a product line's is its
   // product's; a free line's the person's); null = saved before DLI-04, counts in the deal's own period
   billing: string | null;
+  // PRD-09: single | itemised on a bundle line (null on any other line)
+  bundle_display: string | null;
   created_at: string;
   updated_at: string;
 };
+
+// PRD-09: a part of a bundle (migration product_bundles): another product (never a bundle) and its quantity per one bundle.
+export type ProductBundleItemRow = {
+  id: string;
+  organization_id: string;
+  bundle_id: string;
+  component_id: string;
+  quantity: number;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+// PRD-09: a bundle's part as a quote or order line keeps it in bundle_items (app.bundle_snapshot), per one bundle
+export type BundleItemSnapshot = { name: string; quantity: number; unit_name: string | null };
 
 // PRD-01: the product catalog (migration products). kind, vat_kind and billing are text with check
 // constraints (PRODUCT_KINDS, VAT_KINDS, BILLINGS in src/features/products/schema.ts). archived_at is stamped by trigger.
@@ -3033,6 +3058,12 @@ export type Database = {
         },
         { min_quantity?: number; price_agorot?: number | null; discount_bp?: number | null; currency?: string }
       >;
+      // PRD-09: column grants; the bundle and the part are fixed once inserted
+      product_bundle_items: Table<
+        ProductBundleItemRow,
+        { organization_id: string; bundle_id: string; component_id: string; quantity?: number; position?: number },
+        { quantity?: number; position?: number }
+      >;
       // QUO-05: column grants; no delete (a row is changed, never removed)
       org_terms: Table<
         OrgTermsRow,
@@ -3247,6 +3278,7 @@ export type Database = {
           currency?: string;
           // a free line only; a product line's comes from the product (trigger deal_lines_billing)
           billing?: string | null;
+          bundle_display?: string | null;
         },
         {
           position?: number;
@@ -3260,6 +3292,7 @@ export type Database = {
           price_list_id?: string | null;
           currency?: string;
           billing?: string | null;
+          bundle_display?: string | null;
         }
       >;
       product_units: Table<ProductUnitRow, { organization_id: string; name: string; position?: number }, { name?: string; position?: number }>;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { parseBundleItems } from "@/features/products/bundle";
 import { BILLINGS } from "@/features/products/schema";
 
 import { bankFromSnapshot } from "./bank";
@@ -62,6 +63,8 @@ const answerSchema = z.object({
       is_optional: z.boolean(),
       optional_selected: z.boolean(),
       total_agorot: money,
+      // PRD-09: an itemised bundle line's parts (names and quantities per bundle); null on any other line
+      components: z.unknown().optional(),
     }),
   ),
   business: z.object({
@@ -214,6 +217,8 @@ export function publicQuoteFrom(raw: unknown): PublicQuote | null {
       priceListId: null,
       priceListName: null,
       totalAgorot: line.total_agorot,
+      bundleDisplay: Array.isArray(line.components) ? "itemised" : null,
+      bundleParts: parseBundleItems(line.components),
     })),
     schedule: schedule.map((step, index) => ({
       // no ids in the answer: a key per step, for the page only

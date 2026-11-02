@@ -103,6 +103,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "price_lists", file: "price_lists.csv" },
   // PL-02
   { table: "price_list_lines", file: "price_list_lines.csv" },
+  // PRD-09: the parts of each bundle
+  { table: "product_bundle_items", file: "product_bundle_items.csv" },
   // DLI-01
   { table: "deal_lines", file: "deal_lines.csv" },
   // PRD-06 follow-up: the cost kept with each deal line (the owner sees costs)
@@ -306,6 +308,7 @@ export const EXPORT_README = `ייצוא מלא של נתוני העסק.
 המעמד של העסק במע"מ נמצא ב-document_settings.csv: vat_status הוא licensed (עוסק מורשה או חברה בע"מ), exempt (עוסק פטור), nonprofit (עמותה או מלכ"ר) או other (מעמד אחר, ששמו ב-vat_status_other, ו-other_charges_vat אומר אם הוא גובה מע"מ). legal_form היא צורת ההתאגדות. באותו קובץ פרטי העסק שמופיעים במסמכים: legal_name (שם רשמי), tax_id (מספר עוסק או ח.פ., 9 ספרות), address_line, city ו-postal_code (כתובת), phone ו-email (פרטי קשר במסמכים, והאימייל גם בהזמנות ליומן). פרטי הבנק להעברה נמצאים ב-bank_details.csv: bank_name, bank_branch, bank_account ו-bank_account_name (רק בעלים ומנהלי מערכת רואים אותם במערכת).
 קטגוריות המוצרים נמצאות ב-product_categories.csv (parent_id היא הקטגוריה הראשית של תת-קטגוריה), ויחידות המידה ב-product_units.csv. המוצרים נמצאים ב-products.csv: price_agorot הוא המחיר באגורות כפי שהוקלד, ו-price_includes_vat אומר אם הוא כולל מע"מ; archived_at מסמן מוצר בארכיון. העלות של כל מוצר נמצאת ב-product_costs.csv: product_id הוא המוצר ו-cost_agorot העלות ליחידה באגורות.
 המחירונים נמצאים ב-price_lists.csv: valid_from ו-valid_to הם התאריכים שבהם המחירון בתוקף (ריק = בלי הגבלה), is_active אומר אם הוא פעיל, ו-prices_include_vat אומר אם המחירים הקבועים במחירון כוללים מע"מ. מחירון ברירת המחדל הוא המחיר שבכל מוצר. המחירים שבכל מחירון נמצאים ב-price_list_lines.csv: min_quantity היא הכמות שממנה השורה חלה (0 = כל כמות), ובכל שורה יש מחיר קבוע באגורות (price_agorot; price_includes_vat בשורה מעתיק את ההגדרה של המחירון) או הנחה מהמחיר של המוצר (discount_bp, ב-1/100 של אחוז: 1000 = 10%).
+החבילות הן מוצרים מסוג bundle, והרכיבים של כל חבילה נמצאים ב-product_bundle_items.csv: bundle_id היא החבילה, component_id הוא המוצר שבתוכה, ו-quantity היא הכמות שלו בחבילה אחת.
 פרטי החיוב של חברות ואנשי קשר נמצאים בעמודות של companies.csv ושל contacts.csv: billing_name (שם לחשבונית), billing_tax_id (באנשי קשר: מספר עוסק או ת"ז; בחברה המספר הוא tax_id), billing_address ו-shipping_address (כתובת לחיוב ולמשלוח), billing_email (אימייל לחשבוניות), payment_terms (immediate = מיידי, net = מספר ימים מתאריך המסמך, eom = שוטף + מספר ימים) עם payment_days, ו-price_list_id עם שם המחירון ב-price_list.
 המוצר שליד ביקש נמצא ב-leads.csv: requested_product_id ושם המוצר ב-requested_product.
 טלפונים ומיילים נוספים של אנשי קשר נמצאים ב-contact_channels.csv (kind הוא phone או email, ו-label_name הוא הסוג: נייד, עבודה וכו'). הטלפון והמייל הראשיים נמצאים ב-contacts.csv.

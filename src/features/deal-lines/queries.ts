@@ -3,6 +3,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PriceListLineRule, PricedProduct } from "@/features/price-lists/price";
+import { isBundleDisplay, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
+import { readBundleSnapshots } from "@/features/products/bundle-server";
 import type { Billing, VatKind } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
@@ -34,10 +36,13 @@ export type DealLine = {
   priceListName: string | null;
   // DLI-04: how the line bills; null = saved before DLI-04 (counts in the deal's own period)
   billing: Billing | null;
+  // PRD-09: a bundle line's display (null on any other line) and the bundle's parts as they are now
+  bundleDisplay: BundleDisplay | null;
+  bundleParts: BundlePartSnapshot[];
 };
 
 const LINE_COLUMNS =
-  "id, position, product_id, description, quantity, unit_price_agorot, discount_bp, discount_agorot, total_agorot, price_includes_vat, vat_exempt, price_source, price_list_id, price_list_name, billing";
+  "id, position, product_id, description, quantity, unit_price_agorot, discount_bp, discount_agorot, total_agorot, price_includes_vat, vat_exempt, price_source, price_list_id, price_list_name, billing, bundle_display";
 
 type LineRow = {
   id: string;
@@ -55,6 +60,7 @@ type LineRow = {
   price_list_id: string | null;
   price_list_name: string | null;
   billing: string | null;
+  bundle_display: string | null;
 };
 
 function toLine(row: LineRow): DealLine {
@@ -76,6 +82,8 @@ function toLine(row: LineRow): DealLine {
     priceListName: row.price_list_name,
     // the check constraint holds billing to the four modes
     billing: isBilling(row.billing) ? row.billing : null,
+    bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
+    bundleParts: [],
   };
 }
 
@@ -92,7 +100,12 @@ export async function readDealLines(supabase: Client, orgId: string, dealId: str
       .order("id"),
     "deal_lines",
   );
-  return rows.map(toLine);
+  const lines = rows.map(toLine);
+  // PRD-09: the parts of the bundles on the deal, read live (a deal is not a document sent to the customer)
+  const bundleIds = lines.filter((line) => line.bundleDisplay !== null && line.productId !== null).map((line) => line.productId as string);
+  if (bundleIds.length === 0) return lines;
+  const parts = await readBundleSnapshots(supabase, orgId, bundleIds);
+  return lines.map((line) => (line.bundleDisplay !== null && line.productId ? { ...line, bundleParts: parts.get(line.productId) ?? [] } : line));
 }
 
 export async function listDealLines(orgId: string, dealId: string): Promise<DealLine[]> {

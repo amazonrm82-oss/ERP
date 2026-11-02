@@ -11,7 +11,7 @@ export const PRODUCT_KIND_LABELS: Record<ProductKind, string> = {
   product: "מוצר",
   service: "שירות",
   subscription: "מנוי",
-  // PRD-09 (wave 3) adds what a bundle is made of
+  // PRD-09: a bundle is made of other products (public.product_bundle_items, the product page)
   bundle: "חבילה",
 };
 

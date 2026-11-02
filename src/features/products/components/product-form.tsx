@@ -78,7 +78,15 @@ export function ProductForm({ orgId, product, categories, units, orgPricesInclud
         error={errors.description}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField label="סוג" name="kind" required defaultValue={value("kind", product?.kind ?? "product")} error={errors.kind}>
+        <SelectField
+          label="סוג"
+          name="kind"
+          required
+          defaultValue={value("kind", product?.kind ?? "product")}
+          // PRD-09: what a bundle is made of is set on the product's page
+          hint="חבילה: מחיר משלה, ואת הרכיבים מוסיפים בעמוד המוצר."
+          error={errors.kind}
+        >
           {PRODUCT_KINDS.map((kind) => (
             <option key={kind} value={kind}>
               {PRODUCT_KIND_LABELS[kind]}

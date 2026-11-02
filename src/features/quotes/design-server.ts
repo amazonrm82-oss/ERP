@@ -147,6 +147,8 @@ export async function getSampleDocumentData(orgId: string, displayName: string):
     priceListId: null,
     priceListName: null,
     totalAgorot: Math.round(quantity * price),
+    bundleDisplay: null,
+    bundleParts: [],
     ...extra,
   });
   return {

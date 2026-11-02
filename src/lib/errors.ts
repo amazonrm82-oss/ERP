@@ -304,6 +304,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // PL-01 follow-up (migration price_list_vat): the VAT setting of a list that has prices
   "price_lists:vat_locked": "אי אפשר לשנות את הגדרת המע\"מ של מחירון שיש בו מחירים. כדי לעבוד אחרת, צרו מחירון חדש.",
   "price_list_lines:tiers": "אפשר לשמור עד 20 מדרגות כמות למוצר אחד במחירון. מחקו מדרגה כדי להוסיף חדשה.",
+  // PRD-09 (migration product_bundles)
+  "product_bundle:max": "חבילה מחזיקה עד 50 רכיבים. הסירו רכיב כדי להוסיף אחר.",
+  "product_bundle:nested": "חבילה לא יכולה להיות רכיב בחבילה אחרת, ומוצר שהוא רכיב בחבילה לא יכול להפוך לחבילה.",
+  "product_bundle:not_bundle": "אפשר להוסיף רכיבים רק למוצר מסוג חבילה.",
+  "product_bundle:has_items": "יש בחבילה רכיבים, ולכן אי אפשר לשנות את הסוג שלה. הסירו קודם את הרכיבים.",
+  "product_bundle:component": "המוצר הזה לא פעיל או בארכיון, ולכן אי אפשר להוסיף אותו לחבילה.",
   // SEG-01 (migration segments)
   "segment_member:invalid": "אפשר להוסיף רשומות רק לסגמנט ידני, ורק מהסוג שלו (לידים או אנשי קשר).",
   "segment_members:max": "סגמנט ידני מחזיק עד 10,000 רשומות. הסירו רשומות או צרו סגמנט נוסף.",

@@ -55,6 +55,8 @@ const line: OrderLine = {
   priceSource: "manual",
   priceListName: null,
   totalAgorot: 20000,
+  bundleDisplay: null,
+  bundleParts: [],
 };
 
 const data: OrderDocumentData = {
@@ -100,6 +102,26 @@ describe("order confirmation (ORD-05)", () => {
     expect(html).toContain("30%");
     expect(html).toContain("70.80");
     expect(html).toContain("165.20");
+  });
+
+  it("an itemised bundle lists its parts times the line's quantity, with no prices; a single-line one does not (PRD-09)", () => {
+    const bundle: OrderLine = {
+      ...line,
+      id: "l-2",
+      name: "חבילת התקנה",
+      quantity: 3,
+      bundleDisplay: "itemised",
+      bundleParts: [
+        { name: "מזגן", quantity: 1, unitName: "יחידה" },
+        { name: "צינור", quantity: 2.5, unitName: "מטר" },
+      ],
+    };
+    const html = renderToStaticMarkup(createElement(OrderDocument, { data: { ...data, lines: [bundle] } }));
+    expect(html).toContain("רכיבי החבילה");
+    expect(html).toContain("מזגן");
+    expect(html).toContain("7.5");
+    const single = renderToStaticMarkup(createElement(OrderDocument, { data: { ...data, lines: [{ ...bundle, bundleDisplay: "single" }] } }));
+    expect(single).not.toContain("מזגן");
   });
 
   it("a draft prints without a number", () => {
