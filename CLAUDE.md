@@ -493,6 +493,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   accent roles on customer-facing pages only, corrected to the nearest shade that passes 4.5:1 (`brandPalette`, both themes;
   `BRAND_THEMES` must match globals.css, unit test). `intake_form()` returns `brand {logo, color}`. Never apply the
   business colour inside the app.
+  DSN-17 (no migration): the customer pages are one family: `PublicBrandHeader` (logo + title + optional line; a page's
+  `logoClassName` replaces the default size; alt "" when the business name is written next to it) and `PublicPageFooter` (built-with
+  line by the plan rule, then the accessibility link) in `src/features/branding/components/public-page.tsx`; the quote, order and
+  statement pages sit wholly inside `<BrandScope color={page.color}>`, status pages included. Customer PDFs take `doc.color` (corrected
+  by `brandPalette`) and the logo (QUO-05's show_logo). `tests/unit/dsn17-customer-family.test.ts` pins it; a new customer page joins it.
+  Not branded on purpose: the `/f/q` interstitial (021088). Emails wait for USR-02.
 - Followers (REC-03, migration 0104): `public.record_followers` (one row per user and record; `user_id` from the session;
   cascades with the record and the membership; own rows always visible, others' to whoever reads the record). Triggers
   `*_notify_followers` (status/stage/owner; skipped during `app.bulk_transfer` and for records in the bin) and
