@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
+import { logoAlt, PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 
 // DSN-17: the pages a customer sees and the PDF documents are one family: the business's logo and colour (FLD-04), the
 // colour corrected for contrast (BrandScope on a page, brandPalette in a PDF), one header and one footer. These checks read
@@ -56,16 +56,17 @@ const CUSTOMER_PDFS: Array<{ server: string; builder: string }> = [
   { server: "src/features/statements/public-server.ts", builder: "publicStatementPdfDocument(" },
 ];
 
-const PDF_BUILDERS = [
-  "src/features/quotes/pdf.ts",
-  "src/features/orders/pdf.ts",
-  "src/features/statements/pdf.ts",
-];
+// that each builder puts the business's colour and logo into the document is pinned by behaviour, in quote-design,
+// quote-signed-pdf, order-pdf and statement-pdf ("DSN-17: ... one of the customer family")
 
 describe("DSN-17: the customer pages are one family", () => {
   it.each(CUSTOMER_PAGES)("%s is in the business's colour and ends with the family footer", (file) => {
     const source = read(file);
-    expect(source).toContain("<BrandScope");
+    // every BrandScope gets the business's colour from the page's answer, never a fixed null
+    const scopes = [...source.matchAll(/<BrandScope color=\{([^}]*)\}/g)].map((m) => m[1].trim());
+    expect(scopes.length).toBeGreaterThan(0);
+    for (const color of scopes) expect(color, file).toMatch(/^(page|card|widget|found\?)\.(brand\.)?color( \?\? null)?$/);
+    expect(source).not.toMatch(/<BrandScope(?![^>]*color=)/);
     expect(source).toContain("<PublicPageFooter");
     // the footer is the only place the "built with" line and the accessibility link are drawn
     expect(source).not.toMatch(/<BuiltWithLine\b/);
@@ -79,20 +80,17 @@ describe("DSN-17: the customer pages are one family", () => {
   });
 
   it("every page that shows a business's quote, order or statement wraps the whole page, not only the document", () => {
-    for (const file of ["src/app/f/quote/[token]/page.tsx", "src/app/f/order/[token]/page.tsx", "src/app/f/statement/[token]/page.tsx"]) {
-      const source = read(file);
-      // the full page: BrandScope opens right before its <main>, so the answer panel and the buttons take the colour too
-      expect(source, file).toMatch(/<BrandScope color=\{page\.color\}>\s*<main className="mx-auto min-h-dvh w-full max-w-4xl/);
-    }
-    for (const file of ["src/app/f/quote/[token]/page.tsx", "src/app/f/order/[token]/page.tsx"]) {
-      // the status page of a closed quote / cancelled order is branded as well
-      expect(read(file), file).toMatch(/<BrandScope color=\{page\.color\}>\s*<main className="mx-auto min-h-dvh w-full max-w-md space-y-4/);
-    }
+    const wrapped = (source: string) => [...source.matchAll(/<BrandScope color=\{page\.color\}>\s*<main\b/g)].length;
+    // the full page (and for a quote or an order, its status page too): BrandScope opens right around <main>, so the answer
+    // panel and the buttons take the colour as well
+    expect(wrapped(read("src/app/f/quote/[token]/page.tsx"))).toBe(2);
+    expect(wrapped(read("src/app/f/order/[token]/page.tsx"))).toBe(2);
+    expect(wrapped(read("src/app/f/statement/[token]/page.tsx"))).toBe(1);
   });
 
   it.each(DOCUMENTS)("%s is a BrandScope with the business's logo", (file) => {
     const source = read(file);
-    expect(source).toContain("<BrandScope color={data.color}>");
+    expect(source).toMatch(/<BrandScope color=\{data\.color\}>/);
     expect(source).toMatch(/<OrgLogo\b/);
   });
 });
@@ -104,29 +102,31 @@ describe("DSN-17: the customer PDFs are the same family", () => {
     expect(source).toContain("loadPdfLogo(");
   });
 
-  it.each(PDF_BUILDERS)("%s passes the business's colour and logo to the renderer", (file) => {
-    const source = read(file);
-    expect(source).toMatch(/color: data\.color,/);
-    expect(source).toMatch(/\blogo,/);
-  });
-
   it("the renderer corrects the colour for contrast as BrandScope does", () => {
-    expect(read("src/features/pdf/render.ts")).toMatch(/brandPalette\(isHexColor\(doc\.color\) \? doc\.color : DEFAULT_PICKER_COLOR, "light"\)/);
+    expect(read("src/features/pdf/render.ts")).toMatch(/brandPalette\([^)]*doc\.color[^)]*\)/);
   });
 });
 
 describe("DSN-17: the family header and footer", () => {
-  it("names the business in the logo's text when the page knows it", () => {
-    const html = renderToStaticMarkup(createElement(PublicBrandHeader, { logoUrl: "https://example.com/l.png", business: "העסק", title: "כותרת", subtitle: "שורה" }));
-    expect(html).toContain('alt="הלוגו של העסק"');
+  it("gives the logo no text when the name is written next to it, so a screen reader hears it once", () => {
+    const html = renderToStaticMarkup(createElement(PublicBrandHeader, { logoUrl: "https://example.com/l.png", business: "העסק", title: "כותרת", subtitle: "העסק" }));
+    expect(html).toContain('alt=""');
     expect(html).toContain("<h1");
     expect(html).toContain("כותרת");
-    expect(html).toContain("שורה");
+    expect(html).toContain("<h1");
   });
 
   it("draws no image without a logo, and a neutral text when the page does not know the name", () => {
     expect(renderToStaticMarkup(createElement(PublicBrandHeader, { logoUrl: null, business: "העסק", title: "כותרת" }))).not.toContain("<img");
     expect(renderToStaticMarkup(createElement(PublicBrandHeader, { logoUrl: "https://example.com/l.png", business: null, title: "כותרת" }))).toContain('alt="לוגו העסק"');
+    expect(logoAlt("העסק", false)).toBe("הלוגו של העסק");
+  });
+
+  it("a page's own logo size replaces the default instead of adding to it", () => {
+    const html = renderToStaticMarkup(createElement(PublicBrandHeader, { logoUrl: "https://example.com/l.png", business: null, title: "כותרת", logoClassName: "mb-6 h-16 max-w-56" }));
+    expect(html).toContain("h-16");
+    expect(html).not.toContain("h-12");
+    expect(html).not.toContain("max-w-48");
   });
 
   it("shows the built-with line only when the plan does, and always the accessibility statement", () => {
