@@ -32,9 +32,10 @@ import { getSupabaseEnv } from "@/lib/env";
  * - the background job worker (src/features/jobs/run-server.ts, route /api/jobs/run;
  *   OPS-04, the owner's wave 3 use (1) of 26 October 2026), woken by the database
  *   with the same secret. It calls only public.claim_jobs(), public.finish_job() and
- *   public.job_message_may_send() (the HEB-09 pause and consent check of a message,
- *   answering no personal data); it registers only message.send, through a provider
- *   (only the fake provider exists, which sends nothing);
+ *   public.job_message_may_send() (the business, event time, HEB-09 pause and consent
+ *   check of a message, answering no personal data; owner's conditions (52)-(55)); it
+ *   registers only message.send, through a provider (only the fake provider exists,
+ *   which sends nothing);
  * - the public secret-link pages (owner's approved pattern: one service_role-only
  *   definer function per action that checks the token; no table access):
  *   - the personal calendar feed (src/features/calendar-feed/feed-server.ts):

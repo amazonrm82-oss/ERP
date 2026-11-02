@@ -30,9 +30,10 @@ function target(job: ClaimedJob) {
 /**
  * The message.send handler (OPS-04). Before every send it asks the database ONE question, public.job_message_may_send,
  * which checks the business's pause (HEB-09, app.customer_sending_paused) and the address's consent
- * (app.consent_suppressed; cannot check = no), a closed business, a gone record and a missing address. On "no" the
- * database has already ended the job as refused with its reason, and nothing is sent. A malformed answer is a failed try,
- * never a send.
+ * (app.consent_suppressed; cannot check = no), a business that cannot write, an event time that passed, a gone record
+ * and a missing address. On "no" the database has already ended the job as refused with its reason, or, during a pause
+ * of under 24 hours (owner (52) ג, answer `retry: true`), queued it again uncounted; either way nothing is sent now. A
+ * malformed answer is a failed try, never a send.
  */
 export function createSendHandler(deps: { maySend: MaySendCall; provider: MessagingProvider }): JobHandler {
   return async (job) => {

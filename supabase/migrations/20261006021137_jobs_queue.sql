@@ -24,9 +24,18 @@
 --   is not live answers 'stale' and changes nothing, so an old holder never gets "yes" after a reclaim. It answers
 --   {may_send} or {may_send: false, reason} and never returns an address or a name; a refusal also ends the job
 --   ('refused', last_error 'refused:<reason>') in the same transaction, so nothing is sent for it later.
---   It asks app.customer_sending_paused (HEB-09) and app.consent_suppressed (null = cannot check = refused), and
---   refuses a business that is soft-deleted, suspended or cancelled (app.job_org_sends: app.org_takes_leads' rule
---   without 'suspended', i.e. deleted_at is null and not app.org_status_closed).
+--   Owner's answers 52-55 (DECISIONS.md "תור העבודות ושליחת הודעות ללקוחות", 2 November 2026):
+--   (53) א, (54) ב: a business that cannot write (app.org_writable: soft-deleted, suspended, cancelled or
+--   read-only, the rule app.send_meeting_reminders skips by) sends nothing: 'business_closed', cancelled at once.
+--   An optional payload `event_at` (the meeting, the due date) whose time has passed: 'event_passed', cancelled.
+--   (52) ג: while the business paused sending (HEB-09 app.customer_sending_paused) the job WAITS: the answer is
+--   {may_send: false, reason: 'sending_paused', retry: true}, the job goes back to 'queued' 5 minutes later and
+--   the attempt is not counted; once the pause has lasted more than 24 hours (org_sending_pauses.paused_at) it is
+--   cancelled: 'pause_expired'. Then app.consent_suppressed (null = cannot check = refused).
+--   Every cancellation is counted in app.job_cancel_counts (per business and reason, no job ids) and written to
+--   app.platform_log by app.flush_job_cancellations (each crm-jobs-wake run) as ONE entry per business:
+--   action 'jobs.cancelled', details {counts: {reason: n}, total}; never one entry per job, no personal data.
+--   (55) א: only this function reads customer records, and it answers may_send, reason and retry only.
 -- * app.wake_job_worker(): pg_cron 'crm-jobs-wake' every minute wakes /api/jobs/run through pg_net when queued
 --   work is due, with the push dispatcher's shared secret. Only for a kind a worker asked for in the last day
 --   (app.job_kind_seen.last_claimed_at, stamped by claim_jobs), or at most once an hour per kind otherwise
@@ -45,7 +54,9 @@ as $$ select array['message.send']::text[] $$;
 revoke all on function app.job_kinds() from public, anon, authenticated;
 
 -- A payload holds ids and codes only. message.send: {channel: email|sms|whatsapp} and exactly one of lead_id /
--- contact_id (a lower-case uuid); no other key.
+-- contact_id (a lower-case uuid), and optionally event_at (the time the message is about, ISO 8601 with a zone,
+-- owner (52) ג); no other key.
+-- Adding a job kind needs the owner's approval and its own "In use" line in CLAUDE.md (owner (55) א; test 284).
 create or replace function app.job_payload_ok(p_kind text, p_payload jsonb) returns boolean
 language sql immutable
 set search_path = ''
@@ -54,13 +65,17 @@ as $$
     when p_payload is null or jsonb_typeof(p_payload) <> 'object' then false
     when p_kind = 'message.send' then
       coalesce(
-        (select bool_and(k in ('channel', 'lead_id', 'contact_id')) from jsonb_object_keys(p_payload) k), false)
+        (select bool_and(k in ('channel', 'lead_id', 'contact_id', 'event_at')) from jsonb_object_keys(p_payload) k), false)
       and jsonb_typeof(p_payload -> 'channel') = 'string'
       and (p_payload ->> 'channel') in ('email', 'sms', 'whatsapp')
       and ((p_payload ? 'lead_id') <> (p_payload ? 'contact_id'))
       and jsonb_typeof(coalesce(p_payload -> 'lead_id', p_payload -> 'contact_id')) = 'string'
       and coalesce(p_payload ->> 'lead_id', p_payload ->> 'contact_id')
           ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      and (not (p_payload ? 'event_at')
+           or (jsonb_typeof(p_payload -> 'event_at') = 'string'
+               and (p_payload ->> 'event_at')
+                   ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,6})?)?(Z|[+-][0-9]{2}:[0-9]{2})$'))
     else false
   end
 $$;
@@ -142,17 +157,47 @@ revoke all on app.job_kind_seen from public, anon, authenticated, service_role;
 -- one row per known kind, made here (a new kind adds its row in its migration), so claims only update
 insert into app.job_kind_seen (kind) select k from unnest(app.job_kinds()) k on conflict (kind) do nothing;
 
--- a business whose customers may get automatic messages: not soft-deleted, not suspended or cancelled
-create or replace function app.job_org_sends(p_org uuid) returns boolean
-language sql stable security definer
+-- cancelled message jobs waiting to be counted in app.platform_log (owner (52)-(54): counts only, per business)
+create table if not exists app.job_cancel_counts (
+  organization_id  uuid not null references public.organizations (id) on delete cascade,
+  reason           text not null,
+  pending          integer not null default 0 check (pending >= 0),
+  primary key (organization_id, reason)
+);
+alter table app.job_cancel_counts enable row level security;
+revoke all on app.job_cancel_counts from public, anon, authenticated, service_role;
+
+-- one platform_log entry per business with what was cancelled since the last flush; the counters go back to 0
+create or replace function app.flush_job_cancellations() returns integer
+language plpgsql security definer
 set search_path = ''
 as $$
-  select exists (
-    select 1 from public.organizations o
-     where o.id = p_org and o.deleted_at is null and not app.org_status_closed(o.status)
+declare
+  v_entries integer;
+begin
+  with taken as (
+    select c.organization_id, c.reason, c.pending
+      from app.job_cancel_counts c
+     where c.pending > 0
+     for update skip locked
+  ), zeroed as (
+    update app.job_cancel_counts c set pending = 0
+      from taken t
+     where c.organization_id = t.organization_id and c.reason = t.reason
+    returning t.organization_id, t.reason, t.pending
+  ), logged as (
+    insert into app.platform_log (actor_id, action, organization_id, details)
+    select null, 'jobs.cancelled', z.organization_id,
+           jsonb_build_object('counts', jsonb_object_agg(z.reason, z.pending), 'total', sum(z.pending))
+      from zeroed z
+     group by z.organization_id
+    returning 1
   )
+  select count(*) into v_entries from logged;
+  return v_entries;
+end;
 $$;
-revoke all on function app.job_org_sends(uuid) from public, anon, authenticated;
+revoke all on function app.flush_job_cancellations() from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- Enqueue (server-side SQL only)
@@ -170,6 +215,13 @@ begin
   end if;
   if not app.job_payload_ok(p_kind, p_payload) then
     raise exception 'job payload holds ids and codes only' using errcode = '22023', hint = 'job:payload';
+  end if;
+  if p_payload ? 'event_at' then
+    begin
+      perform (p_payload ->> 'event_at')::timestamptz;
+    exception when others then
+      raise exception 'job payload holds ids and codes only' using errcode = '22023', hint = 'job:payload';
+    end;
   end if;
   insert into app.jobs (organization_id, kind, payload, next_run_at)
   values (p_org, p_kind, p_payload, greatest(coalesce(p_run_at, now()), now()))
@@ -325,6 +377,8 @@ declare
   v_address text;
   v_suppressed boolean;
   v_reason text;
+  v_event_at timestamptz;
+  v_paused_at timestamptz;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
   if not found or v_job.kind <> 'message.send' or v_job.status <> 'running'
@@ -345,10 +399,29 @@ begin
      where c.organization_id = v_job.organization_id and c.id = v_record and c.deleted_at is null;
   end if;
 
-  if not app.job_org_sends(v_job.organization_id) then
+  if v_job.payload ? 'event_at' then
+    begin
+      v_event_at := (v_job.payload ->> 'event_at')::timestamptz;
+    exception when others then
+      v_event_at := '-infinity';
+    end;
+  end if;
+
+  if not app.org_writable(v_job.organization_id) then
     v_reason := 'business_closed';
+  elsif v_event_at is not null and v_event_at < now() then
+    v_reason := 'event_passed';
   elsif app.customer_sending_paused(v_job.organization_id) then
-    v_reason := 'sending_paused';
+    select p.paused_at into v_paused_at from public.org_sending_pauses p where p.organization_id = v_job.organization_id;
+    if coalesce(v_paused_at, now()) < now() - interval '24 hours' then
+      v_reason := 'pause_expired';
+    else
+      -- (52) ג: wait for the business to resume; not refused, the attempt not counted
+      update app.jobs j set status = 'queued', attempts = greatest(j.attempts - 1, 0), lease_id = null, locked_until = null,
+                            next_run_at = now() + interval '5 minutes', last_error = 'waiting:sending_paused'
+       where j.id = p_job;
+      return jsonb_build_object('may_send', false, 'reason', 'sending_paused', 'retry', true);
+    end if;
   elsif not coalesce(v_found, false) then
     v_reason := 'record_gone';
   else
@@ -371,6 +444,9 @@ begin
   update app.jobs j set status = 'refused', lease_id = null, locked_until = null, finished_at = now(),
                         last_error = 'refused:' || v_reason
    where j.id = p_job;
+  insert into app.job_cancel_counts (organization_id, reason, pending)
+  values (v_job.organization_id, v_reason, 1)
+  on conflict (organization_id, reason) do update set pending = app.job_cancel_counts.pending + 1;
   return jsonb_build_object('may_send', false, 'reason', v_reason);
 end;
 $$;
@@ -407,6 +483,7 @@ declare
   v_secret text := nullif((select s.value from app.settings s where s.key = 'push_dispatch_secret'), '');
   v_kinds text[];
 begin
+  perform app.flush_job_cancellations();
   if v_url is null or v_secret is null or not exists (select 1 from pg_extension where extname = 'pg_net') then
     return false;
   end if;

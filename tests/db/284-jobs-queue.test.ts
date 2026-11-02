@@ -26,9 +26,21 @@ const finish = (job: Claimed | { id: string; lease: string }, ok: boolean, error
     async (q) => (await q<{ r: string }>("select public.finish_job($1, $2, $3, $4, $5, $6) as r", [job.id, job.lease, ok, error, final, started])).rows[0].r,
   );
 const expire = (id: string) => asAdmin((q) => q("update app.jobs set locked_until = now() - interval '1 second' where id = $1", [id]));
-const maySend = (job: Claimed) =>
-  asService(async (q) => (await q<{ r: Record<string, unknown> }>("select public.job_message_may_send($1, $2) as r", [job.id, job.lease])).rows[0].r);
+// (55) א 1: the send check answers may_send, reason and retry only, whatever the path
+const maySend = async (job: Claimed) => {
+  const answer = await asService(
+    async (q) => (await q<{ r: Record<string, unknown> }>("select public.job_message_may_send($1, $2) as r", [job.id, job.lease])).rows[0].r,
+  );
+  expect(Object.keys(answer).every((k) => ["may_send", "reason", "retry"].includes(k)), JSON.stringify(answer)).toBe(true);
+  return answer;
+};
 const jobOf = (id: string) => asAdmin(async (q) => (await q<Job>("select * from app.jobs where id = $1", [id])).rows[0]);
+// paused_at is server-kept by a trigger; the test moves it back with triggers off for one transaction
+const backdatePause = (by: string) =>
+  asAdmin(async (q) => {
+    await q("set local session_replication_role = replica");
+    await q("update public.org_sending_pauses set paused_at = now() - $1::interval where paused", [by]);
+  });
 const due = (id: string) => asAdmin((q) => q("update app.jobs set next_run_at = now() - interval '1 second' where id = $1", [id]));
 
 /**
@@ -110,6 +122,10 @@ describe("background job queue (OPS-04)", () => {
       asAdmin((q) => q("insert into app.jobs (organization_id, kind, payload) values ($1, 'message.send', $2)", [org, JSON.stringify({ channel: "sms", lead_id: lead, phone: "0501234567" })])),
     );
     expect(direct.code).toBe("23514");
+    for (const bad of ["tomorrow", "2026-11-02", "2026-11-02T10:00", "2026-13-45T10:00:00Z", 1730000000]) {
+      expect((await pgError(enqueue(org, { channel: "sms", lead_id: lead, event_at: bad }))).hint, String(bad)).toBe("job:payload");
+    }
+    await enqueue(org, { channel: "sms", lead_id: lead, event_at: "2026-11-02T10:00:00+02:00" });
     const ok = await enqueue(org, { channel: "sms", contact_id: lead });
     expect((await jobOf(ok)).status).toBe("queued");
   });
@@ -226,17 +242,52 @@ describe("background job queue (OPS-04)", () => {
     expect(await finish(job2, true)).toBe("stale");
   });
 
-  it("the send check refuses while sending is paused (HEB-09) and ends the job", async () => {
+  it("(52) ג: a job meeting a pause waits uncounted, is sent after resume, and is cancelled after 24 hours of pause or once its event passed", async () => {
     const lead = await insertLead(owner.id, org, { email: "pause@example.test" });
     await asUser(owner.id, (q) => q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [org]));
     try {
       const id = await enqueue(org, send(lead));
       const [job] = await claim();
-      expect(await maySend(job)).toEqual({ may_send: false, reason: "sending_paused" });
-      expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:sending_paused", lease_id: null });
-      // nothing is sent for it later: the lease is gone
+      expect(await maySend(job)).toEqual({ may_send: false, reason: "sending_paused", retry: true });
+      const waiting = await jobOf(id);
+      expect(waiting).toMatchObject({ status: "queued", attempts: 0, lease_id: null, last_error: "waiting:sending_paused" });
+      const wait = await asAdmin(
+        async (q) => (await q<{ m: number }>("select round(extract(epoch from next_run_at - now()) / 60)::int as m from app.jobs where id = $1", [id])).rows[0].m,
+      );
+      expect(wait).toBe(5);
       expect(await finish(job, true)).toBe("stale");
       expect(await claim()).toEqual([]);
+
+      // an event that passed while waiting: cancelled even within the 24 hours
+      const past = await enqueue(org, { ...send(lead), event_at: new Date(Date.now() + 60_000).toISOString() });
+      await asAdmin((q) => q("update app.jobs set payload = jsonb_set(payload, '{event_at}', to_jsonb($2::text)) where id = $1", [past, new Date(Date.now() - 60_000).toISOString()]));
+      const [p] = await claim();
+      expect(p.id).toBe(past);
+      expect(await maySend(p)).toEqual({ may_send: false, reason: "event_passed" });
+
+      // a future event waits like any other
+      const future = await enqueue(org, { ...send(lead), event_at: new Date(Date.now() + 86_400_000).toISOString() });
+      const [f] = await claim();
+      expect(f.id).toBe(future);
+      expect(await maySend(f)).toEqual({ may_send: false, reason: "sending_paused", retry: true });
+
+      // the pause lasts more than 24 hours: cancelled
+      await backdatePause("25 hours");
+      await due(id);
+      const [again] = await claim();
+      expect(again.id).toBe(id);
+      expect(again.attempt).toBe(1);
+      expect(await maySend(again)).toEqual({ may_send: false, reason: "pause_expired" });
+      expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:pause_expired" });
+
+      // within 24 hours and resumed: sent
+      await backdatePause("23 hours");
+      await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+      await due(future);
+      const [resumed] = await claim();
+      expect(resumed.id).toBe(future);
+      expect(await maySend(resumed)).toEqual({ may_send: true });
+      expect(await finish(resumed, true)).toBe("done");
     } finally {
       await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
     }
@@ -333,7 +384,7 @@ describe("background job queue (OPS-04)", () => {
     expect(await finish(last, true)).toBe("done");
   });
 
-  it("the send check refuses a soft-deleted business", async () => {
+  it("(53) א, (54) ב: the send check cancels for a soft-deleted or read-only business", async () => {
     const owner2 = await createUser("jobs-deleted");
     const gone = await createOrg(owner2.id, "עסק שנמחק");
     const lead = await insertLead(owner2.id, gone, { email: "deleted@example.test" });
@@ -343,13 +394,13 @@ describe("background job queue (OPS-04)", () => {
     expect(job.id).toBe(id);
     expect(await maySend(job)).toEqual({ may_send: false, reason: "business_closed" });
     expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:business_closed" });
-    // a read-only business still sends (current rule; owner question open)
+    // (54) ב: a read-only business sends nothing either, like the meeting reminders (app.org_writable)
     const readOnly = await insertLead(owner.id, orgB, { email: "readonly@example.test" });
     await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [orgB]));
     try {
       await enqueue(orgB, send(readOnly));
       const [r] = await claim();
-      expect(await maySend(r)).toEqual({ may_send: true });
+      expect(await maySend(r)).toEqual({ may_send: false, reason: "business_closed" });
     } finally {
       await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [orgB]));
     }
@@ -388,6 +439,79 @@ describe("background job queue (OPS-04)", () => {
     await enqueue(org, send(randomUUID()));
     expect(await asAdmin(async (q) => (await q<{ w: boolean }>("select app.wake_job_worker() as w")).rows[0].w)).toBe(false);
     expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.job_kind_seen where last_woken_at is not null")).rows[0].n)).toBe(0);
+  });
+
+  it("cancellations are counted per business in app.platform_log, one entry per business and run, no job ids", async () => {
+    const flush = () => asAdmin(async (q) => (await q<{ n: number }>("select app.flush_job_cancellations() as n")).rows[0].n);
+    await flush();
+    const before = await asAdmin(async (q) => (await q<{ n: number }>("select max(id)::int as n from app.platform_log")).rows[0].n ?? 0);
+    for (let i = 0; i < 3; i++) await enqueue(org, send(randomUUID()));
+    await enqueue(orgB, send(randomUUID()));
+    for (const job of await claim(10)) await maySend(job);
+    expect(await flush()).toBe(2);
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ organization_id: string; action: string; actor_id: string | null; details: Record<string, unknown> }>(
+            "select organization_id, action, actor_id, details from app.platform_log where id > $1 order by organization_id",
+            [before],
+          )
+        ).rows,
+    );
+    const byOrg = Object.fromEntries(rows.map((r) => [r.organization_id, r]));
+    expect(rows).toHaveLength(2);
+    expect(byOrg[org]).toMatchObject({ action: "jobs.cancelled", actor_id: null, details: { counts: { record_gone: 3 }, total: 3 } });
+    expect(byOrg[orgB]).toMatchObject({ action: "jobs.cancelled", details: { counts: { record_gone: 1 }, total: 1 } });
+    expect(JSON.stringify(rows)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}.*lead|example/);
+    expect(Object.keys(byOrg[org].details).sort()).toEqual(["counts", "total"]);
+    expect(await flush()).toBe(0);
+    // a waiting job (pause) is not a cancellation
+    await asUser(owner.id, (q) => q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'חירום') on conflict (organization_id) do update set paused = true, reason = 'חירום'", [org]));
+    try {
+      await enqueue(org, send(randomUUID()));
+      for (const job of await claim()) await maySend(job);
+      expect(await flush()).toBe(0);
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+    }
+  });
+
+  it("(55) א: claim answers exactly id, lease, kind, organization_id, payload, attempt; finish only its status; only the send check reads records", async () => {
+    await enqueue(org, { ...send(randomUUID()), event_at: "2030-01-01T09:00:00Z" });
+    const [job] = await claim();
+    expect(Object.keys(job).sort()).toEqual(["attempt", "id", "kind", "lease", "organization_id", "payload"]);
+    expect(Object.keys(job.payload).sort()).toEqual(["channel", "event_at", "lead_id"]);
+    const types = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; result: string; src: string }>(
+            `select p.proname as name, pg_get_function_result(p.oid) as result, p.prosrc as src from pg_proc p
+              where p.oid in ('public.claim_jobs(text[],integer,integer)'::regprocedure,
+                              'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)'::regprocedure,
+                              'public.job_message_may_send(uuid,uuid)'::regprocedure)
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(types.map((t) => [t.name, t.result])).toEqual([
+      ["claim_jobs", "jsonb"],
+      ["finish_job", "text"],
+      ["job_message_may_send", "jsonb"],
+    ]);
+    const answers = new Set<string>();
+    answers.add(await finish({ id: randomUUID(), lease: randomUUID() }, true));
+    answers.add(await finish(job, false, null, false, false));
+    for (const a of answers) expect(["done", "failed", "dead", "released", "stale"]).toContain(a);
+    // claim and finish never touch a customer record: no public table in their bodies
+    for (const t of types.filter((x) => x.name !== "job_message_may_send")) expect(t.src, t.name).not.toMatch(/public\./);
+    expect(types.find((t) => t.name === "job_message_may_send")?.src).toMatch(/public\.leads/);
+  });
+
+  // (55) א 3: every job kind needs the owner's own approval and its own "In use" line in CLAUDE.md (hard rule 5).
+  // Adding a kind here without that approval is not allowed.
+  it("(55) א: the job kinds are exactly {message.send}", async () => {
+    const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
+    expect(kinds).toEqual(["message.send"]);
   });
 
   it("the worker is woken only with its settings, pg_net and due work; the cron job is registered where pg_cron exists", async () => {

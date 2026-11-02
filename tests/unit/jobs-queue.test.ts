@@ -24,18 +24,24 @@ const migration = () => {
  * names /api/jobs/run, it must hold this line (whitespace aside), so the two cannot drift.
  */
 const IN_USE_LINE =
-  "In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1), migration `_jobs_queue.sql`): the background job worker " +
-  "(`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in `src/lib/supabase/proxy.ts`), woken by " +
-  "`app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`, else derived from `push_dispatch_url`; " +
-  "secret `push_dispatch_secret`) every minute while due jobs are of a kind a worker asked for in the last day, else at most once an " +
-  "hour per kind (`app.job_kind_seen`, `app.job_wake_kinds`). It checks the secret timing-safe first (`src/lib/shared-secret.ts`) and " +
-  "calls only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()` (the one send check, on a live lease " +
-  "only: a soft-deleted, suspended or cancelled business, HEB-09 `app.customer_sending_paused`, gone record, missing address, " +
-  "`app.consent_suppressed` with null = refused; it answers no personal data and ends a refused job itself). Jobs claimed but not " +
-  "started in time are handed back uncounted; a finish the queue did not take after a send is logged (one redacted line). The queue " +
-  "`app.jobs` (no grants) holds ids and codes only. Only `message.send` is registered, through the provider layer " +
-  "(`src/features/messaging/providers/`), whose only provider is the fake (`MESSAGING_PROVIDER=fake`, refused on a Vercel production " +
-  "or preview deployment; it keeps the last 100 in memory and sends nothing). In the eslint allow-list.";
+  "In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration " +
+  "`_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in " +
+  "`src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`, " +
+  "else derived from `push_dispatch_url`; secret `push_dispatch_secret`) every minute while due jobs are of a kind a worker asked for " +
+  "in the last day, else at most once an hour per kind (`app.job_kind_seen`, `app.job_wake_kinds`). It checks the secret timing-safe " +
+  "first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()`. " +
+  "(55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and retry only; `claim_jobs` answers " +
+  "only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt, `finish_job` only its status; " +
+  "`app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its own In use line (test 284). " +
+  "The send check works on a live lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or " +
+  "read-only, (53) א, (54) ב) or an `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job " +
+  "waits uncounted and is sent after the resume, and is cancelled once the pause has lasted more than 24 hours ((52) ג); then " +
+  "`app.consent_suppressed` with null = cancelled. Cancellations are counted only, one `app.platform_log` entry `jobs.cancelled` per " +
+  "business and run (`app.flush_job_cancellations`). Jobs claimed but not started in time are handed back uncounted; a finish the " +
+  "queue did not take after a send is logged (one redacted line). The queue `app.jobs` (no grants) holds ids and codes only. Only " +
+  "`message.send` is registered, through the provider layer (`src/features/messaging/providers/`), whose only provider is the fake " +
+  "(`MESSAGING_PROVIDER=fake`, refused on a Vercel production or preview deployment; it keeps the last 100 in memory and sends " +
+  "nothing). In the eslint allow-list.";
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -224,6 +230,15 @@ describe("OPS-04: the send handler", () => {
       expect(await handler(job())).toEqual({ status: "ended", reason });
       expect(maySend).toHaveBeenCalledWith(job());
     }
+    expect(fakeSentMessages()).toEqual([]);
+  });
+
+  it("(52) ג: a waiting answer during a pause ends this run without sending (the database queued the job again)", async () => {
+    const handler = createSendHandler({
+      maySend: async () => ({ may_send: false, reason: "sending_paused", retry: true }),
+      provider: createFakeProvider(),
+    });
+    expect(await handler(job())).toEqual({ status: "ended", reason: "sending_paused" });
     expect(fakeSentMessages()).toEqual([]);
   });
 
