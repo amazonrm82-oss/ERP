@@ -56,6 +56,8 @@ export const CARD_LAYOUT_BUILT_IN: Record<CardLayoutType, Array<{ key: string; l
     { key: "preferred_channel", label: "ערוץ מועדף" },
     // CAP-08
     { key: "preferred_locale", label: "שפה מועדפת" },
+    // HEB-01
+    { key: "gender", label: "מגדר" },
     { key: "owner_id", label: "אחראי" },
     { key: "budget", label: "תקציב" },
     { key: "last_contacted_at", label: "מגע אחרון" },
@@ -72,6 +74,8 @@ export const CARD_LAYOUT_BUILT_IN: Record<CardLayoutType, Array<{ key: string; l
     { key: "birth_date", label: "יום הולדת" },
     { key: "preferred_locale", label: "שפה מועדפת" },
     { key: "preferred_channel", label: "ערוץ מועדף" },
+    // HEB-01
+    { key: "gender", label: "מגדר" },
     { key: "source_id", label: "מקור" },
     { key: "owner_id", label: "אחראי" },
     { key: "created_at", label: "נוצר" },

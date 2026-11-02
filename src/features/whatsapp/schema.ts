@@ -3,13 +3,23 @@ import { z } from "zod";
 import { requiredText } from "@/lib/validation";
 
 import { MESSAGE_MAX, TEMPLATE_BODY_MAX, TEMPLATE_NAME_MAX } from "./templates";
+import { templateVariantProblem, VARIANT_PROBLEM_MESSAGES } from "./variants";
 
 // a textarea sends line breaks as "\r\n"; the database keeps "\n"
 const lines = (value: unknown) => (typeof value === "string" ? value.replace(/\r\n?/g, "\n") : value);
 
 export const templateSchema = z.object({
   name: requiredText(TEMPLATE_NAME_MAX, "יש להזין שם לתבנית.", `השם ארוך מדי (עד ${TEMPLATE_NAME_MAX} תווים).`),
-  body: z.preprocess(lines, requiredText(TEMPLATE_BODY_MAX, "יש להזין את נוסח ההודעה.", `הנוסח ארוך מדי (עד ${TEMPLATE_BODY_MAX.toLocaleString("he-IL")} תווים).`)),
+  body: z.preprocess(
+    lines,
+    requiredText(TEMPLATE_BODY_MAX, "יש להזין את נוסח ההודעה.", `הנוסח ארוך מדי (עד ${TEMPLATE_BODY_MAX.toLocaleString("he-IL")} תווים).`).superRefine(
+      (body, ctx) => {
+        // HEB-01: the database refuses the same (trigger whatsapp_templates_variants)
+        const problem = templateVariantProblem(body);
+        if (problem) ctx.addIssue({ code: "custom", message: VARIANT_PROBLEM_MESSAGES[problem] });
+      },
+    ),
+  ),
 });
 
 // what the record button sends after it opened WhatsApp: the text as the person left it,

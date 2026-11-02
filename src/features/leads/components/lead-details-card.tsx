@@ -32,6 +32,9 @@ import { budgetInputValue, LEAD_UTM_KEYS, type LeadUtmKey } from "../schema";
 import { channelDetail, localeLabel } from "@/features/contacts/preferences";
 
 import { LeadCampaignFields } from "./lead-campaign-fields";
+import { GenderField } from "@/features/gender/components/gender-field";
+import { genderLabel } from "@/features/gender/gender";
+
 import { LeadChannelField } from "./lead-channel-field";
 import { LeadLocaleField } from "./lead-locale-field";
 
@@ -64,6 +67,8 @@ export type LeadDetailsView = {
   preferredChannelSource?: string | null;
   // CAP-08: the stored language code
   preferredLocale?: string | null;
+  // HEB-01: the stored gender code
+  gender?: string | null;
   // SEG-02: the latest automatic inquiry's source, campaign, UTM and time; empty when none arrived
   lastSource?: AttributionRow[];
   // DQL-04: the set parts of the first source this user may not change (null: owner or admin, nothing locked)
@@ -126,6 +131,8 @@ export function LeadDetailsCard({ orgId, lead, sources, canWrite, focus, layout 
             // CON-10: "(מטופס)" when the channel came from a public form
             preferred_channel: { value: channelDetail(lead.preferredChannel, lead.preferredChannelSource) },
             preferred_locale: { value: localeLabel(lead.preferredLocale) },
+            // HEB-01
+            gender: { value: genderLabel(lead.gender) },
             owner_id: { value: lead.ownerName },
             budget: { value: lead.budgetAgorot != null ? formatMoney(lead.budgetAgorot) : null },
             last_contacted_at: { value: lead.lastContactText ?? "אין עדיין" },
@@ -271,6 +278,7 @@ function LeadEditForm({ orgId, lead, sources, onDone, terms }: EditProps) {
           ) : null}
           <LeadChannelField value={values?.preferred_channel ?? lead.preferredChannel ?? ""} error={errors.preferred_channel} />
           <LeadLocaleField value={values?.preferred_locale ?? lead.preferredLocale ?? ""} error={errors.preferred_locale} />
+          <GenderField value={values?.gender ?? lead.gender ?? ""} error={errors.gender} className="sm:max-w-xs" />
           <TextareaField
             label="הודעה"
             name="message"

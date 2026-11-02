@@ -91,6 +91,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "email", label: "אימייל", synonyms: EMAIL },
     { key: "company_name", label: "שם החברה", synonyms: COMPANY },
     { key: "job_title", label: "תפקיד", synonyms: JOB },
+    // HEB-01: a closed list (זכר / נקבה / לא ידוע); never guessed from the name
+    { key: "gender", label: "מגדר (זכר, נקבה, לא ידוע)", synonyms: ["מגדר", "מין", "gender", "sex"] },
     { key: "status", label: "סטטוס (לפי שם)", synonyms: ["סטטוס", "מצב", "status", "lead status"] },
     { key: "source", label: "מקור (לפי שם)", synonyms: ["מקור", "source", "lead source", "ערוץ"] },
     { key: "campaign", label: "קמפיין", synonyms: ["קמפיין", "campaign", "utm_campaign"] },
@@ -117,6 +119,8 @@ export const IMPORT_TARGETS: Record<ImportEntityKey, ImportTarget[]> = {
     { key: "job_title", label: "תפקיד", synonyms: JOB },
     { key: "company", label: "חברה (לפי שם, תיווצר אם חסרה)", synonyms: COMPANY },
     { key: "birth_date", label: "יום הולדת", synonyms: ["תאריך לידה", "יום הולדת", "birthday", "birth date", "date of birth", "dob"] },
+    // HEB-01: a closed list (זכר / נקבה / לא ידוע); never guessed from the name
+    { key: "gender", label: "מגדר (זכר, נקבה, לא ידוע)", synonyms: ["מגדר", "מין", "gender", "sex"] },
     { key: "owner", label: "אחראי (אימייל או שם)", synonyms: OWNER },
     // CNS-05
     ...CONSENT_TARGETS,

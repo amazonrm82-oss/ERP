@@ -137,7 +137,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
           callLog={context.canWrite ? { orgId, subject: { kind: "lead", id: lead.id }, name } : undefined}
           whatsappLog={
             context.canWrite
-              ? { orgId, subject: { kind: "lead", id: lead.id }, name, values: recordTemplateValues({ fullName: lead.full_name }, context) }
+              ? { orgId, subject: { kind: "lead", id: lead.id }, name, values: recordTemplateValues({ fullName: lead.full_name, gender: lead.gender }, context) }
               : undefined
           }
           preferred={preferredContactChannel(lead.preferred_channel)}
@@ -267,6 +267,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
               preferredChannel: lead.preferred_channel,
               preferredChannelSource: lead.preferred_channel_source,
               preferredLocale: lead.preferred_locale,
+              gender: lead.gender,
               // SEG-02 / DQL-04
               lastSource: lead.last_source_at
                 ? sourceRows({

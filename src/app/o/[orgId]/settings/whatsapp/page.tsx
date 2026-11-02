@@ -8,6 +8,7 @@ import { getOrgContext } from "@/features/shell/queries";
 import { AddTemplateForm, TemplateList } from "@/features/whatsapp/components/templates-editor";
 import { listWhatsappTemplates } from "@/features/whatsapp/queries";
 import { PLACEHOLDERS, TEMPLATES_PER_ORG } from "@/features/whatsapp/templates";
+import { VARIANT_EXAMPLE } from "@/features/whatsapp/variants";
 
 export const metadata: Metadata = { title: "תבניות WhatsApp" };
 
@@ -38,6 +39,11 @@ export default async function WhatsappTemplatesPage({ params }: Props) {
           ))}
         </dl>
         <p className="text-sm">תאריך ושעה מתמלאים רק בתזכורת לפגישה. בכרטיס רשומה הנציג משלים אותם לפני השליחה.</p>
+        {/* HEB-01 */}
+        <p>נוסח לפי מגדר: כותבים בסוגריים נוסח לזכר, לנקבה ונוסח ניטרלי, והמערכת בוחרת לפי המגדר ברשומה. כשהמגדר לא ידוע נשלח הנוסח הניטרלי, ולכן חובה לכתוב אותו.</p>
+        <p className="rounded-md bg-canvas px-3 py-2 text-sm text-ink">
+          {VARIANT_EXAMPLE}
+        </p>
       </CardBody>
       {templates.length > 0 ? (
         <div className="mt-3 border-t border-line">

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { optionalDate, optionalEmail, optionalId, optionalPhone, optionalText } from "@/lib/validation";
 
+import { GENDERS } from "@/features/gender/gender";
+
 import { CONTACT_CHANNELS, CONTACT_LOCALES } from "./preferences";
 
 export const CONTACT_FIELD_NAMES = [
@@ -14,6 +16,7 @@ export const CONTACT_FIELD_NAMES = [
   "birth_date",
   "preferred_locale",
   "preferred_channel",
+  "gender",
 ] as const;
 
 /** A choice from a closed list: "" (or a missing field) becomes null. */
@@ -37,6 +40,8 @@ export const contactSchema = z
     // CON-10
     preferred_locale: optionalChoice(CONTACT_LOCALES, "השפה שנבחרה אינה ברשימה."),
     preferred_channel: optionalChoice(CONTACT_CHANNELS, "הערוץ שנבחר אינו ברשימה."),
+    // HEB-01
+    gender: optionalChoice(GENDERS, "המגדר שנבחר אינו ברשימה."),
   })
   .refine((contact) => Boolean(contact.first_name || contact.last_name || contact.phone || contact.email), {
     path: ["first_name"],

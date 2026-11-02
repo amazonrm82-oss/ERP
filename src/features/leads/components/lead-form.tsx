@@ -19,6 +19,8 @@ import { createLeadAction, createLeadStayAction } from "../actions";
 import { RequestedProductPicker } from "@/features/requested-product/components/requested-product-picker";
 
 import { LeadCampaignFields } from "./lead-campaign-fields";
+import { GenderField } from "@/features/gender/components/gender-field";
+
 import { LeadChannelField } from "./lead-channel-field";
 import { LeadLocaleField } from "./lead-locale-field";
 import type { LeadSourceOption, LeadStatusOption } from "../queries";
@@ -157,6 +159,7 @@ export function LeadForm({ orgId, statuses, sources, fields, reasons, products =
       {products ? <RequestedProductPicker orgId={orgId} initial={null} error={errors.requested_product_id} /> : null}
       <LeadChannelField value={values.preferred_channel ?? ""} error={errors.preferred_channel} />
       <LeadLocaleField value={values.preferred_locale ?? ""} error={errors.preferred_locale} />
+      <GenderField value={values.gender ?? ""} error={errors.gender} className="sm:max-w-xs" />
       <LeadCampaignFields values={values} errors={errors} />
       <TextareaField
         label="הודעה או הערה ראשונה"

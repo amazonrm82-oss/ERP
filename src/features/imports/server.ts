@@ -1,5 +1,6 @@
 import "server-only";
 
+import { importGender } from "@/features/gender/gender";
 import { randomUUID } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -79,6 +80,8 @@ type Lookups = {
 // REC-03: the request header that marks an import's update (app.import_write_running reads it)
 export const IMPORT_HEADER = "x-crm-import";
 
+// HEB-01
+export const GENDER_NOT_ON_LIST = (value: string) => `המגדר "${value}" לא מוכר ולא נשמר (אפשר: זכר, נקבה, לא ידוע). השורה יובאה בלעדיו.`;
 export const REASON_NOT_ON_LIST = (reason: string) => `הסיבה "${reason}" לא ברשימת הסיבות ולא נשמרה. השורה יובאה בלעדיה.`;
 export const REASON_NEEDED_TO_DISQUALIFY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה מרשימת הסיבות.';
 export const REASON_LIST_EMPTY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה, אבל רשימת הסיבות ריקה. אפשר להוסיף סיבות בהגדרות, בעמוד "סיבות לליד לא רלוונטי".';
@@ -323,6 +326,13 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
       ? importOpening(raw.opening_balance, raw.opening_balance_date, raw.opening_balance_due, today)
       : { opening: null, warning: null };
   warning = joinWarnings(warning, original.warning, noted.warning, opened.warning);
+
+  // HEB-01: a gender from the closed list (leads and contacts); any other value is reported, never guessed
+  if ((ctx.entity === "lead" || ctx.entity === "contact") && raw.gender) {
+    const gender = importGender(raw.gender);
+    if (gender === "invalid") warning = joinWarnings(warning, GENDER_NOT_ON_LIST(raw.gender));
+    else if (gender) values.gender = gender;
+  }
 
   const mappedFields = ctx.definitions.filter((d) => ctx.mapping.includes(`${CUSTOM_PREFIX}${d.key}`));
   if (mappedFields.length > 0) {

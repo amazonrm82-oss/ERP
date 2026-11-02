@@ -175,7 +175,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
                   orgId,
                   subject: { kind: "contact", id: contact.id },
                   name,
-                  values: recordTemplateValues({ firstName: contact.first_name, fullName: contact.full_name }, context),
+                  values: recordTemplateValues({ firstName: contact.first_name, fullName: contact.full_name, gender: contact.gender }, context),
                 }
               : undefined
           }

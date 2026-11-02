@@ -1,5 +1,6 @@
 "use server";
 
+import { genderFromForm } from "@/features/gender/gender";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -100,6 +101,11 @@ async function saveNewLead(orgId: string, formData: FormData): Promise<Created> 
   if (!locale.ok) {
     return fail(locale.message, { fieldErrors: { preferred_locale: locale.message }, values: formValues(formData) });
   }
+  // HEB-01: the gender (only when the form has the field)
+  const gender = genderFromForm(formData);
+  if (!gender.ok) {
+    return fail(gender.message, { fieldErrors: { gender: gender.message }, values: formValues(formData) });
+  }
 
   // A repeat lead (same phone or email as a lead or contact the user can see)
   // is pointed out first; the user may still create a new one.
@@ -124,6 +130,7 @@ async function saveNewLead(orgId: string, formData: FormData): Promise<Created> 
       ...product.patch,
       ...channel.patch,
       ...locale.patch,
+      ...gender.patch,
       ...customFieldsPatch(custom.customFields),
     })
     .select("id")
@@ -178,10 +185,15 @@ export async function updateLeadAction(
   if (!locale.ok) {
     return fail(locale.message, { fieldErrors: { preferred_locale: locale.message }, values: formValues(formData) });
   }
+  // HEB-01: the gender (only when the form has the field)
+  const gender = genderFromForm(formData);
+  if (!gender.ok) {
+    return fail(gender.message, { fieldErrors: { gender: gender.message }, values: formValues(formData) });
+  }
 
   const { data, error } = await context.supabase
     .from("leads")
-    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...channel.patch, ...locale.patch, ...customFieldsPatch(custom.customFields) })
+    .update({ ...parsed.data, ...campaignPatch, ...product.patch, ...channel.patch, ...locale.patch, ...gender.patch, ...customFieldsPatch(custom.customFields) })
     .eq("organization_id", orgId)
     .eq("id", leadId)
     .is("deleted_at", null)

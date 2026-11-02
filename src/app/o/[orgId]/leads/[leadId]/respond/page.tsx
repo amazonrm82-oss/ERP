@@ -106,7 +106,7 @@ export default async function RespondLeadPage({ params, searchParams }: Props) {
                 orgId={orgId}
                 subject={subject}
                 name={lead.name}
-                values={recordTemplateValues({ fullName: lead.fullName }, context)}
+                values={recordTemplateValues({ fullName: lead.fullName, gender: lead.gender }, context)}
                 wide
                 autoStart={act === "whatsapp"}
               />

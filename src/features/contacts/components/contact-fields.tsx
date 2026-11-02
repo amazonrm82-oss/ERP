@@ -1,5 +1,6 @@
 import { SelectField, TextField } from "@/components/ui/field";
 import type { CompanyOption } from "@/features/companies/queries";
+import { GenderField } from "@/features/gender/components/gender-field";
 import { RecordTypeField } from "@/features/record-type-options/components/type-field";
 import type { RecordType } from "@/features/record-type-options/schema";
 
@@ -18,6 +19,8 @@ export type ContactValues = {
   // CON-10
   preferred_locale?: string | null;
   preferred_channel?: string | null;
+  // HEB-01
+  gender?: string | null;
   // CON-02
   type_id?: string | null;
   // CON-01: the primary's types and the further phones and emails as stored ...
@@ -142,6 +145,7 @@ export function ContactFields({ values, errors, companies, types, legacyType }: 
             </option>
           ))}
         </SelectField>
+        <GenderField value={values.gender ?? ""} error={errors.gender} />
       </div>
       <p className="text-sm text-ink-soft">חובה למלא לפחות אחד: שם, טלפון או אימייל.</p>
     </>

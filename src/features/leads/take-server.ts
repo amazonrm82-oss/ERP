@@ -30,6 +30,8 @@ export type RespondLead = {
   id: string;
   name: string;
   fullName: string | null;
+  // HEB-01: picks the template wording
+  gender: string | null;
   companyName: string | null;
   phone: string | null;
   phoneE164: string | null;
@@ -48,7 +50,7 @@ export async function getRespondLead(orgId: string, leadId: string): Promise<Res
   const lead = must(
     await supabase
       .from("leads")
-      .select("id, full_name, email, phone, phone_e164, company_name, message, source_id, owner_id, taken_at, created_at, converted_at")
+      .select("id, full_name, email, phone, phone_e164, company_name, gender, message, source_id, owner_id, taken_at, created_at, converted_at")
       .eq("organization_id", orgId)
       .eq("id", leadId)
       .is("deleted_at", null)
@@ -66,6 +68,7 @@ export async function getRespondLead(orgId: string, leadId: string): Promise<Res
     id: lead.id,
     name: lead.full_name || lead.company_name || lead.phone || lead.email || "ליד ללא שם",
     fullName: lead.full_name,
+    gender: lead.gender,
     companyName: lead.full_name ? lead.company_name : null,
     phone: lead.phone,
     phoneE164: lead.phone_e164,

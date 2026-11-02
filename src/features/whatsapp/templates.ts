@@ -1,5 +1,8 @@
 import type { TimelineSubject } from "@/features/activities/schema";
+import { isGender, type Gender } from "@/features/gender/gender";
 import { mentionAt, mentionIds } from "@/features/mentions/token";
+
+import { pickVariants } from "./variants";
 
 // WA-01: WhatsApp text templates, sent one by one through a wa.me link (no provider).
 // Pure functions only: used by the record button, the settings page, and GAP-03
@@ -36,7 +39,8 @@ export const PLACEHOLDERS = {
 } as const;
 
 export type PlaceholderKey = keyof typeof PLACEHOLDERS;
-export type TemplateValues = Partial<Record<PlaceholderKey, string | null>>;
+// HEB-01: the record's gender picks the wording of each {זכר: … | נקבה: … | ניטרלי: …} block; none = neutral
+export type TemplateValues = Partial<Record<PlaceholderKey, string | null>> & { gender?: Gender | null };
 
 const TOKEN_KEYS = new Map<string, PlaceholderKey>(
   (Object.keys(PLACEHOLDERS) as PlaceholderKey[]).map((key) => [PLACEHOLDERS[key].token, key]),
@@ -44,11 +48,12 @@ const TOKEN_KEYS = new Map<string, PlaceholderKey>(
 const TOKEN_PATTERN = /\{[^{}\n]{1,20}\}/g;
 
 /**
- * Replaces every known placeholder that has a value. A placeholder without a value,
+ * Picks each gender block's wording (HEB-01: by values.gender, the neutral one when it is not male or
+ * female), then replaces every known placeholder that has a value. A placeholder without a value,
  * and any other text in braces, stays as it is, so the person sees what to complete.
  */
 export function fillTemplate(text: string, values: TemplateValues): string {
-  return text.replace(TOKEN_PATTERN, (token) => {
+  return pickVariants(text, values.gender).replace(TOKEN_PATTERN, (token) => {
     const key = TOKEN_KEYS.get(token);
     const value = key ? values[key]?.trim() : undefined;
     return value ? value : token;
@@ -115,10 +120,12 @@ export const DEFAULT_TEMPLATES: ReadonlyArray<{ name: string; body: string; kind
  * name. A first name that is not stored separately is the first word of the full name.
  */
 export function recordTemplateValues(
-  person: { firstName?: string | null; fullName: string | null },
+  person: { firstName?: string | null; fullName: string | null; gender?: string | null },
   context: { user: { displayName: string }; org: { name: string } },
 ): TemplateValues {
   return {
+    // HEB-01: only a stored code; none = the neutral wording
+    ...(isGender(person.gender) ? { gender: person.gender } : {}),
     firstName: person.firstName?.trim() || firstNameOf(person.fullName),
     fullName: person.fullName,
     userName: context.user.displayName,
@@ -138,14 +145,14 @@ export type WhatsappLog = { orgId: string; subject: TimelineSubject; name: strin
  */
 export function listWhatsappLog(
   context: WhatsappListContext | null,
-  row: { subject: TimelineSubject; name: string; phoneE164: string | null; firstName?: string | null; fullName: string | null },
+  row: { subject: TimelineSubject; name: string; phoneE164: string | null; firstName?: string | null; fullName: string | null; gender?: string | null },
 ): WhatsappLog | undefined {
   if (!context || !row.phoneE164) return undefined;
   return {
     orgId: context.orgId,
     subject: row.subject,
     name: row.name,
-    values: recordTemplateValues({ firstName: row.firstName, fullName: row.fullName }, { user: { displayName: context.userName }, org: { name: context.businessName } }),
+    values: recordTemplateValues({ firstName: row.firstName, fullName: row.fullName, gender: row.gender }, { user: { displayName: context.userName }, org: { name: context.businessName } }),
   };
 }
 

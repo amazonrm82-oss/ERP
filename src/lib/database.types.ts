@@ -1291,6 +1291,8 @@ export type ContactRow = {
   birth_date: string | null;
   // CON-10: null or ContactLocale / ContactChannel (src/features/contacts/preferences.ts), check constraints
   preferred_locale: string | null;
+  // HEB-01: null | male | female | unknown (GENDERS in src/features/gender/gender.ts), check constraint
+  gender: string | null;
   preferred_channel: string | null;
   // CON-10: form | manual, null while the channel is empty (server only, app.preferred_channel_source())
   preferred_channel_source: string | null;
@@ -1417,6 +1419,8 @@ export type ContactInsert = {
   birth_date?: string | null;
   // CON-10
   preferred_locale?: string | null;
+  // HEB-01: null | male | female | unknown (GENDERS in src/features/gender/gender.ts), check constraint
+  gender?: string | null;
   preferred_channel?: string | null;
   owner_id?: string | null;
   team_id?: string | null;
@@ -1489,6 +1493,8 @@ export type LeadRow = {
   preferred_channel_source: string | null;
   // CAP-08: null or ContactLocale (check constraint), copied to the contact on conversion when empty
   preferred_locale: string | null;
+  // HEB-01: null | male | female | unknown (GENDERS in src/features/gender/gender.ts), check constraint
+  gender: string | null;
   // SEG-02: the latest automatic inquiry (form, card, widget, booking page); server only. source_id/campaign/utm are the
   // first source, locked once set (DQL-04, owners/admins change it)
   last_source_id: string | null;
@@ -1528,6 +1534,8 @@ export type LeadInsert = {
   preferred_channel?: string | null;
   // CAP-08: he | ar | en | ru | am | fr | es (CONTACT_LOCALES)
   preferred_locale?: string | null;
+  // HEB-01: null | male | female | unknown (GENDERS in src/features/gender/gender.ts), check constraint
+  gender?: string | null;
 };
 
 // DEAL-03: the reasons an organization offers when a deal is lost (migration deal_loss_reasons)

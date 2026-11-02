@@ -1,4 +1,5 @@
 import { MENTION_MAX } from "@/features/mentions/token";
+import { VARIANT_PROBLEM_MESSAGES } from "@/features/whatsapp/variants";
 import { SUPPORT_LINE } from "@/lib/support-phone";
 
 // Maps Postgres / PostgREST / Supabase Auth errors to short Hebrew messages.
@@ -425,6 +426,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "org:closed": `העסק סגור, ולכן אי אפשר ליצור בו מסמך חדש. לבירור: ${SUPPORT_LINE}.`,
   // WA-01 (migration whatsapp_templates)
   "whatsapp_templates:max": "אפשר לשמור עד 50 תבניות. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
+  // HEB-01 (migration gender)
+  "whatsapp_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
+  "whatsapp_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
   // CAL-08 (migration meeting_types)
   "meeting_types:max": "אפשר לשמור עד 50 סוגי פגישה. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
   "meeting_type:product": "השירות שנבחר כבר לא פעיל בקטלוג. בחרו שירות פעיל, או השאירו בלי שירות.",

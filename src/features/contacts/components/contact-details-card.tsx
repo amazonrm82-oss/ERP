@@ -22,6 +22,8 @@ import { Detail, DetailList } from "@/components/detail-list";
 import { paths } from "@/lib/paths";
 import type { AttributionRow } from "@/features/intake/attribution";
 
+import { genderLabel } from "@/features/gender/gender";
+
 import { updateContactAction } from "../actions";
 import { channelTypeLabel, draftsFrom, type ChannelKind } from "../channels";
 import { channelDetail, localeLabel } from "../preferences";
@@ -112,6 +114,8 @@ export function ContactDetailsCard({ orgId, contact, companies, types, canEdit, 
             preferred_locale: { value: localeLabel(contact.preferred_locale) },
             // CON-10: "(מטופס)" when the channel came from a public form
             preferred_channel: { value: channelDetail(contact.preferred_channel, contact.preferred_channel_source) },
+            // HEB-01
+            gender: { value: genderLabel(contact.gender) },
             source_id: { value: contact.sourceName },
             owner_id: { value: contact.ownerName },
             created_at: { value: contact.createdAtText },
