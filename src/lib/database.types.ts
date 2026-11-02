@@ -726,6 +726,23 @@ export type OrgModulesRow = {
   updated_at: string;
 };
 
+// HEB-09: the business's pause of automatic sending to customers (migration customer_sending_pause); no row = not paused.
+export type OrgSendingPausesRow = {
+  id: string;
+  organization_id: string;
+  paused: boolean;
+  // required while paused (1..500), null otherwise (check constraint)
+  reason: string | null;
+  // server-kept by app.org_sending_pauses_stamp
+  paused_at: string | null;
+  paused_by: string | null;
+  resumed_at: string | null;
+  resumed_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MembershipRow = {
   id: string;
   organization_id: string;
@@ -3027,6 +3044,12 @@ export type Database = {
         OrgModulesRow,
         { organization_id: string; leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null },
         { leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null }
+      >;
+      // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
+      org_sending_pauses: Table<
+        OrgSendingPausesRow,
+        { organization_id: string; paused?: boolean; reason?: string | null },
+        { paused?: boolean; reason?: string | null }
       >;
       // ORD-01: column grants; a person inserts a manual draft; status is the only state column a person writes
       orders: Table<OrderRow, OrderWrite & { organization_id: string; deal_id?: string | null; currency?: string }, OrderWrite & { status?: OrderStatus }>;

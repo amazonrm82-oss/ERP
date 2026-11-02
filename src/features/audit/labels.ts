@@ -109,6 +109,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_terms: "מונחים",
   // LEAD-08
   org_modules: "מודולים",
+  // HEB-09
+  org_sending_pauses: "עצירת שליחה ללקוחות",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08

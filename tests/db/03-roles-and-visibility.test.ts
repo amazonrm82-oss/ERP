@@ -975,6 +975,45 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.org_modules set leads_enabled = true, companies_enabled = true where organization_id = $1", [org]));
   });
 
+  it("the sending pause: everyone reads it, owners and admins pause and resume it even read-only, never while closed (HEB-09)", async () => {
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'x')", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.org_sending_pauses where organization_id = $1 and paused", [org])), u.email).toBe(1);
+    }
+    // the stamps are the server's: who paused, and when
+    const row = await asAdmin(async (q) => (await q<{ by: string; at: string | null }>("select paused_by as by, paused_at as at from public.org_sending_pauses where organization_id = $1", [org])).rows[0]);
+    expect(row.by).toBe(admin.id);
+    expect(row.at).not.toBeNull();
+    for (const col of ["paused_by = null", "paused_at = now()", "resumed_by = null"]) {
+      expect((await pgError(asUser(owner.id, (q) => q(`update public.org_sending_pauses set ${col} where organization_id = $1`, [org])))).code, col).toBe("42501");
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    // a pause needs its reason
+    expect((await pgError(asUser(owner.id, (q) => q("update public.org_sending_pauses set reason = null where organization_id = $1", [org])))).code).toBe("23514");
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.org_sending_pauses where organization_id = $1", [org])))).code).toBe("42501");
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    try {
+      // read-only still takes leads, so the brake works there
+      await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+      expect(await asUser(owner.id, async (q) => (await q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org])).rowCount)).toBe(1);
+      const resumed = await asAdmin(async (q) => (await q<{ by: string; pby: string }>("select resumed_by as by, paused_by as pby from public.org_sending_pauses where organization_id = $1", [org])).rows[0]);
+      expect(resumed).toEqual({ by: owner.id, pby: admin.id });
+      // a closed business: nobody changes it (the owner keeps a role there for the plan screen)
+      await asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [org]));
+      expect(await asUser(owner.id, async (q) => (await q("update public.org_sending_pauses set paused = true, reason = 'x' where organization_id = $1", [org])).rowCount)).toBe(0);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);
