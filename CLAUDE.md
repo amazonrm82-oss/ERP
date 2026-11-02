@@ -194,10 +194,15 @@ npm run stack:start    # local Supabase stack (Docker); the CLI is pinned to 2.1
 npm run test:e2e       # browser flow; needs `npm run stack:start` + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy
 node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of the main screens with sample data (DSN-14)
+node tests/visual/run.mjs compare|update [--dry]   # DSN-18 screenshot comparison (34 shots); baselines come from CI only
 ```
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
 Nothing is merged without the browser flow (`test:e2e`) passing on the local stack (owner, 29 October 2026).
+Since DSN-18 (2 November 2026) job `e2e` also compares 34 screenshots (16 main screens + the gallery, 360 and 1280) with
+`tests/visual/baseline/` (0.1% of pixels, tolerance 24/255; changing text masked by `tests/visual/stabilize.mjs`); a change fails `e2e`, so
+`promote` waits. No baseline = compare nothing and upload the shots. Refresh: Actions, CI, Run workflow with `screenshots = update`, then
+commit the artifact's `actual/*.png` into `tests/visual/baseline/`; never commit baselines made on this machine (`tests/visual/README.md`).
 Since OPS-01 (1 November 2026) CI also runs the browser flow (job `e2e`: a local Supabase stack on the runner, CLI 2.121.0, no
 secrets), and `promote` waits for both `checks` and `e2e`; it never forces `production` and ends green when a newer run already moved it.
 `test:db` fails at teardown when a test leaves any app/public function body, or any policy (app, public, storage), RLS switch,
