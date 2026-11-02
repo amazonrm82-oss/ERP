@@ -11,6 +11,7 @@ import { RememberOrg } from "@/features/shortcuts/components/remember-org";
 import { withOrdersPlan } from "@/features/modules/modules";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
+import { SystemBanners } from "@/features/system-banners/components/system-banners";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
 import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
 import { createClient } from "@/lib/supabase/server";
@@ -196,6 +197,9 @@ export default async function OrgLayout({ children, params }: Props) {
           )}
         </p>
       ) : null}
+
+      {/* ADM-04: the platform's messages */}
+      <SystemBanners orgId={org.id} />
 
       {/* bottom padding leaves room for the phone navigation bar */}
       <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:px-6 sm:pt-7 md:pb-12">

@@ -289,6 +289,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "subprocessor:notice": SUBPROCESSOR_NOTICE,
   // ADM-01: an end day on or before the start day (guard, ahead of the table's check)
   "subprocessor:end_before_start": "תאריך הסיום צריך להיות אחרי תאריך התחילה.",
+  // ADM-04 (migration system_banners): a warning the platform marked as staying on screen
+  "banner:not_dismissable": "את ההודעה הזו אי אפשר לסגור. היא תיעלם לבד בסוף התקופה שלה.",
   // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
   "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
   // PRD-04 (migration product_lists)

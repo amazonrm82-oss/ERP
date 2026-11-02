@@ -37,6 +37,9 @@ export const ACTION_LABELS: Record<string, string> = {
   "vat_rate.remove": "הסרת שיעור מע\"מ עתידי",
   "qr_external.block": "כיבוי הקישורים החיצוניים בקודי QR",
   "qr_external.unblock": "החזרת הקישורים החיצוניים בקודי QR",
+  // ADM-04
+  "banner.add": "הודעת מערכת חדשה",
+  "banner.end": "הסרת הודעת מערכת",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

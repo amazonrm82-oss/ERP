@@ -3884,6 +3884,25 @@ export type Database = {
       platform_end_subprocessor: { Args: { p_id: string; p_ends_on: string | null }; Returns: undefined };
       // every entry, removed ones included, for all platform staff
       platform_list_subprocessors: { Args: Record<string, never>; Returns: SubprocessorRow[] };
+      // ADM-04: system banners (platform owner/support add and end; every platform role lists; members read their business's)
+      platform_add_system_banner: {
+        Args: {
+          p_body: string;
+          p_severity: string;
+          p_dismissable: boolean;
+          p_starts_at: string | null;
+          p_ends_at: string;
+          p_target_kind: string;
+          p_orgs: string[] | null;
+          p_plan: string | null;
+        };
+        Returns: string;
+      };
+      platform_end_system_banner: { Args: { p_id: string }; Returns: undefined };
+      platform_list_system_banners: { Args: Record<string, never>; Returns: Json };
+      // [{ id, body, severity: info | warning, dismissable }], at most 3; [] to a non-member
+      system_banners_for: { Args: { p_org: string }; Returns: Json };
+      system_banner_dismiss: { Args: { p_org: string; p_banner: string }; Returns: undefined };
       // how many notices an announcement sends now (one per business per active owner); platform owner
       platform_subprocessor_audience: { Args: Record<string, never>; Returns: number };
       // service_role only (the public page): { entries: [{ name, purpose, country, data_categories, effective_from, ends_on }],

@@ -99,6 +99,12 @@ export const paths = {
   adminVat: "/admin/vat",
   adminSubprocessors: "/admin/subprocessors",
   adminDesign: "/admin/design",
+  // ADM-04 system banners, ADM-05 support requests
+  adminBanners: "/admin/banners",
+  adminSupport: "/admin/support",
+  // USR-12: what's new, and the support request form
+  whatsNew: (orgId: string) => `/o/${orgId}/whats-new`,
+  support: (orgId: string) => `/o/${orgId}/support`,
 } as const;
 
 // Only same-origin paths are accepted as a post-login destination; anything
