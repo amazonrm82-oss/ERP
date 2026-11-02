@@ -283,6 +283,13 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     for (const leak of ["משלוח 1", "משלוח 2", "own@contact.example", "כתובת החברה", "כתובת זרה", "stranger@x.example", "000000018", contactId, companyId]) {
       expect(text, leak).not.toContain(leak);
     }
+    // review: a company in the bin behind a live contact gives nothing; the contact's own value stays
+    await asAdmin((q) => q("update public.companies set deleted_at = now() where id = $1", [companyId]));
+    try {
+      expect((await source(token)).billing).toEqual({ address: "רחוב הרצל 5, חיפה", email: null, tax_id: null });
+    } finally {
+      await asAdmin((q) => q("update public.companies set deleted_at = null where id = $1", [companyId]));
+    }
     // the contact's own tax id wins over its company's
     await asAdmin((q) => q("update public.contacts set billing_tax_id = '000000018', billing_email = 'mine@contact.example' where id = $1", [contactId]));
     expect((await source(token)).billing).toEqual({ address: "רחוב הרצל 5, חיפה", email: "mine@contact.example", tax_id: "000000018" });
@@ -313,6 +320,41 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     const companyToken = await link(member, onCompany);
     expect((await accept(companyToken)).status).toBe("accepted");
     expect((await source(companyToken)).billing).toEqual({ address: "כתובת החברה", email: "billing@acme.example", tax_id: "000000026" });
+    // review: a company quote whose company is in the bin prints none
+    await asAdmin((q) => q("update public.companies set deleted_at = now() where id = $1", [companyId]));
+    try {
+      expect((await source(companyToken)).billing).toEqual({ address: null, email: null, tax_id: null });
+    } finally {
+      await asAdmin((q) => q("update public.companies set deleted_at = null where id = $1", [companyId]));
+    }
+
+    // owner (37) ב: a member who reads the record gets the acceptance time through getQuoteAcceptedAt's query (the record's
+    // column, `@>` on metadata, the user's session); someone who does not read it gets nothing
+    const acceptedAt = (u: U, column: "deal_id" | "contact_id", quoteId: string) =>
+      asUser(u.id, async (q) =>
+        (
+          await q<{ created_at: Date }>(
+            `select created_at from public.activities
+              where organization_id = $1 and ${column} = (select ${column} from public.quotes where id = $2)
+                and type = 'system' and metadata @> jsonb_build_object('kind', 'quote_accepted', 'quote_id', $2::uuid)
+              order by created_at desc limit 1`,
+            [org, quoteId],
+          )
+        ).rows[0]?.created_at ?? null,
+      );
+    for (const [column, quoteId] of [
+      ["contact_id", onContact],
+      ["deal_id", onCompany],
+    ] as const) {
+      const decided = (await asAdmin((q) => one<{ d: Date }>(q, "select decided_at as d from public.quote_decisions where quote_id = $1", [quoteId]))).d;
+      const seen = await acceptedAt(member, column, quoteId);
+      expect(seen, column).not.toBeNull();
+      expect(Math.abs(seen!.getTime() - decided.getTime()), column).toBeLessThan(5000);
+      // the member does not read quote_decisions
+      expect(await asUser(member.id, (q) => count(q, "select 1 from public.quote_decisions where quote_id = $1", [quoteId])), column).toBe(0);
+      // another member under own visibility reads neither the record nor the entry
+      expect(await acceptedAt(other, column, quoteId), column).toBeNull();
+    }
     // the helper is internal: no API role runs it
     const can = async (role: string) =>
       (await asAdmin((q) => one<{ c: boolean }>(q, "select has_function_privilege($1, 'app.quote_customer_billing(public.quotes)', 'execute') as c", [role]))).c;

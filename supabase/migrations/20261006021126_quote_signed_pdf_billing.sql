@@ -14,8 +14,8 @@
 -- * public.quote_signed_pdf_public: the body of 021122 with `billing` added to the final answer only (the done, unavailable and
 --   rate_limited answers are unchanged). service_role only, as before.
 -- This widens what the service-role path returns only into the PDF the customer receives: their own details, which the PDF as
--- sent already holds. Hard rule 5's QUO-09 conditions are unchanged. Every statement is safe to run twice; no drop, no row
--- removal.
+-- sent already holds. Hard rule 5's QUO-09 conditions are unchanged. Every statement is safe to run twice; nothing is
+-- removed.
 -- =============================================================================
 
 create or replace function app.quote_customer_billing(p_quote public.quotes) returns jsonb

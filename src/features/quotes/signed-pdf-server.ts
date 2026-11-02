@@ -16,7 +16,7 @@ import { quoteSignedPdfDocument, readSignature, signedPdfBillingFrom, signedQuot
 // alone writes an accepted quote's signed PDF, with the service key, through two service_role functions and nothing else:
 // * the customer's decide route, right after public.quote_public_answer answered 'accepted' (no staff session: the link's token
 //   is the right): public.quote_signed_pdf_public(token) answers what to render (the page's own answer, no view counted, plus
-//   the signature block and, since 021124, the customer's billing details), and public.quote_signed_pdf_public_store(token, ...) writes it;
+//   the signature block and, since 021126, the customer's billing details), and public.quote_signed_pdf_public_store(token, ...) writes it;
 // * staff ("יצירת PDF חתום"), after public.quote_signed_pdf_allowed answered the signature block with the person's own session
 //   (pdf-server.ts): public.quote_signed_pdf_store(org, quote, user, ...), which checks that user again.
 // Both upload (upsert off) only to the path the database answered, then name that path again to confirm the row. A failure never
