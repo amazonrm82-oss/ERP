@@ -31,10 +31,10 @@
 --   (52) ג: while the business paused sending (HEB-09 app.customer_sending_paused) the job WAITS: the answer is
 --   {may_send: false, reason: 'sending_paused', retry: true}, the job goes back to 'queued' 5 minutes later and
 --   the attempt is not counted; once the pause has lasted more than 24 hours (org_sending_pauses.paused_at) it is
---   cancelled: 'pause_expired'. The business's other message jobs due within the 5 minutes are moved with it in one
---   update. After the resume, a job that waited through a pause of more than 24 hours (marked waiting, made during
---   it, or made before it and due by its end) is cancelled as 'pause_expired' too, even if it was never checked
---   during the pause. Then app.consent_suppressed (null = cannot check = refused).
+--   cancelled: 'pause_expired'. The business's other message jobs already due are moved with it in one update.
+--   After the resume, a job that waited through a pause of more than 24 hours (marked waiting, or made before the
+--   resume and due by it) is cancelled as 'pause_expired' too, even if it was never checked during the pause; a job
+--   scheduled for after the resume is sent. Then app.consent_suppressed (null = cannot check = refused).
 --   Every cancellation is counted in app.job_cancel_counts (per business and reason, no job ids) and written to
 --   app.platform_log by app.flush_job_cancellations (each crm-jobs-wake run) as ONE entry per business:
 --   action 'jobs.cancelled', details {counts: {reason: n}, total}; never one entry per job, no personal data.
