@@ -96,6 +96,17 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   In use (OPS-02, owner 2 November 2026, answers (40) ב, (42) ד, (43) א, migration 021128): the shared per-sender limit of the
+   secret-link pages (`src/lib/public-sender-server.ts`, `guardPublicPage` / `guardPublicRoute`), used by the customer's quote, order
+   and statement pages, their decide/question/pdf routes and the booking-manage link with its route. It calls only
+   `public.public_sender_check()` before the page's own function looks the token up (a read; refused once the sender had 120 "not
+   found" answers in 10 minutes across these pages) and `public.public_sender_miss()` after a "not found" (one upsert; a route counts
+   only a response its handler marked with `markNotFound`, `src/lib/public-not-found.ts`; a malformed database answer is an error,
+   never a miss). Found answers never count. The sender is the keyed IP hash with scope `public`, an IPv6 visitor by its /64
+   (`src/lib/ip-prefix.ts`); only bucket numbers are kept (`app.public_sender_counts`, 65,536 buckets); no hash = nothing checked or
+   counted. Left out: the lead form, widget, booking page and business card ((42) ד; the card by the lead's call), the calendar feed,
+   intake webhook and QR scan ((43) א). Accepted: the cap is soft (burst in flight); a shared address (CGNAT) can refuse real customers
+   after someone else's misses. In the eslint allow-list.
    In use (ORD-05 PDF, owner 1 November 2026, answers (1) ב and (34) ב, migrations 021119-021121): the server writes an order's PDF
    (`src/features/orders/pdf-store-server.ts`, after `public.order_pdf_allowed` with the user's session), calling only
    `public.order_pdf_store()` (8 arguments; the content stamp its render read); the customer's download
@@ -528,8 +539,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   in `app.form_view_counts` (1,024 reused buckets, no hash). The sender is the keyed IP hash (scope `intake` + token) the server
   sends in request header `x-crm-sender`, read by `app.public_sender_header()` (64 hex or null); no header = not counted (the
   submission's own read; no `INTAKE_IP_HASH_SECRET` = no hash, fail open as the other pages). Verified end to end on the local
-  stack (the header reaches `request.headers` through the gateway). Open: not-found tokens are never counted (question 40); the
-  quote page has no per-sender view limit (question 41).
+  stack (the header reaches `request.headers` through the gateway). Owner 2 November 2026: (39) ב keeps 300; (40)+(42)+(43): the shared
+  not-found limit of the secret-link pages (hard rule 5, "In use (OPS-02 …)", migration 021128); (41) ב: `public.quote_public` (last
+  redefined in 021128, same signature) also limits 60 views per sender in 10 minutes after the link's 120 (`app.quote_link_view_counts`,
+  1,024 buckets per quote, sender scope `quote` in `x-crm-sender`; no header = not counted, e.g. the signed PDF's read). Test 64's re-run
+  list ends with `_public_sender_limit.sql`; test 253 pins the new `quote_public` md5.
 - Link previews (WAB-05, no migration; 27 October 2026): the six customer pages (`/f/[token]`, `/f/quote`, `/f/order`, `/f/book`,
   `/f/book/manage`, `/f/card`) build Open Graph / Twitter metadata in `generateMetadata` through `src/lib/link-preview.ts` (business
   display fields only: never the customer's name, a price, a number or a time; logo from `org-logos`, else no image, never the app's
