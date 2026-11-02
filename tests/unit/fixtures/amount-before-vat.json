@@ -1,0 +1,12 @@
+[
+  { "amount": 11800, "rate_bp": 1800, "expected": 10000 },
+  { "amount": 59, "rate_bp": 1800, "expected": 50 },
+  { "amount": 100, "rate_bp": 1800, "expected": 85 },
+  { "amount": 1, "rate_bp": 1800, "expected": 1 },
+  { "amount": 12345, "rate_bp": 1700, "expected": 10551 },
+  { "amount": 1000, "rate_bp": 0, "expected": 1000 },
+  { "amount": 3, "rate_bp": 10000, "expected": 2 },
+  { "amount": 5, "rate_bp": 10000, "expected": 3 },
+  { "amount": 100000000000, "rate_bp": 1800, "expected": 84745762712 },
+  { "amount": 1000, "rate_bp": -1, "expected": null }
+]

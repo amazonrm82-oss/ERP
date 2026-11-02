@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; campaign_roi: SEG-03; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -13,8 +13,8 @@ export type ReportDefinition = {
   ownerLabel?: string;
   // DLI-06: shown, opened and exported only by those who may see costs (canViewCosts); the SQL answers nothing to others
   costs?: true;
-  // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it
-  feature?: "quotes";
+  // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it (SEG-03: campaign_costs)
+  feature?: "quotes" | "campaign_costs";
   // BAL-03: shown, opened and exported only by those who open a customer's ledger (BAL-01: owners, admins, managers and
   // holders of record_payments) with the balances, documents and payments keys; the SQL answers {allowed: false} to others
   balances?: true;
@@ -42,6 +42,15 @@ export const REPORTS: ReportDefinition[] = [
     title: "הכנסה לפי מקור וקמפיין",
     description: "הכנסה מעסקאות שנסגרו, לפי המקור הראשון והקמפיין של הליד או איש הקשר שממנו הגיעו.",
     filters: ["period", "owner", "pipeline"],
+  },
+  // SEG-03: the costs entered by hand against the leads and the won revenue of each first source and campaign
+  {
+    key: "campaign_roi",
+    title: "עלות קמפיינים והחזר השקעה",
+    description: "עלות לליד והחזר על ההשקעה לכל מקור וקמפיין, לפי העלויות שהוזנו והעסקאות שנסגרו.",
+    filters: ["period"],
+    // owner (61) ב: the plans that hold lead_distribution
+    feature: "campaign_costs",
   },
   // RPT-01
   { key: "products", title: "הכנסה לפי מוצר", description: "מה נמכר בעסקאות שנסגרו: כמות, מספר עסקאות וסכום לכל מוצר.", filters: ["period", "owner", "pipeline"] },
@@ -126,6 +135,8 @@ export function reportTexts(report: ReportDefinition, terms: OrgTerms = DEFAULT_
         title: report.title,
         description: `הכנסה מ${closed}, לפי המקור הראשון והקמפיין של ה${lead.singular} או ${contact.theSingular} שממנו הגיעו.`,
       };
+    case "campaign_roi":
+      return { title: report.title, description: `עלות ל${lead.singular} והחזר על ההשקעה לכל מקור וקמפיין, לפי העלויות שהוזנו וה${closed}.` };
     case "products":
       return { title: report.title, description: `מה נמכר ב${closed}: כמות, מספר ${deal.plural} וסכום לכל מוצר.` };
     case "recurring":

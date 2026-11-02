@@ -45,7 +45,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
   it("the TS mirror equals the seed with the later changes, and the latest app.plan_key_defaults()", () => {
     const seed = quoted(migration("_plan_pricing.sql"), "seed") as Values;
     // every later change of the plans, in name order (plan_trial_built_with, then a key per capability, e.g. CAP-08)
-    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql"]) {
+    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql", "_campaign_costs_plan.sql"]) {
       const delta = quoted(migration(suffix), "delta") as Values;
       for (const [plan, change] of Object.entries(delta)) {
         seed[plan].limits = { ...seed[plan].limits, ...change.limits };
@@ -54,7 +54,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     }
     expect(seed).toEqual(PLAN_VALUES);
     // the latest app.plan_key_defaults()
-    expect(quoted(migration("_lead_distribution_plan.sql"), "json")).toEqual(PLAN_KEY_FALLBACK);
+    expect(quoted(migration("_campaign_costs_plan.sql"), "json")).toEqual(PLAN_KEY_FALLBACK);
   });
 
   it("a wave 2 key a plan does not hold falls back to the most restrictive value", () => {

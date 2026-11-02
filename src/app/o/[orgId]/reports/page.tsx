@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
-import { toCompletePath } from "@/features/data-quality/paths";
+import { canSeeCleanup } from "@/features/data-quality/cleanup";
+import { cleanupPath, toCompletePath } from "@/features/data-quality/paths";
 import { documentsPath } from "@/features/documents/paths";
 import { paymentsPath } from "@/features/payments/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
@@ -65,6 +66,12 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
             <ButtonLink href={toCompletePath(orgId)} variant="secondary" size="sm">
               רשומות להשלמה
             </ButtonLink>
+            {/* DQL-03 */}
+            {canSeeCleanup(role) ? (
+              <ButtonLink href={cleanupPath(orgId)} variant="secondary" size="sm">
+                הצעות ניקוי
+              </ButtonLink>
+            ) : null}
             {hasDocuments ? (
               <ButtonLink href={documentsPath(orgId)} variant="secondary" size="sm">
                 מסמכים חשבונאיים

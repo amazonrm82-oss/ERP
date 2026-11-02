@@ -2445,6 +2445,46 @@ describe("segments by role", () => {
   });
 });
 
+// SEG-03, owner (65) ד: campaign costs follow the rule of product costs (app.can_view_costs): owners, admins and managers by
+// role, or a member with the PRM-01 grant view_costs, read them and write them in a writable business (the rest is in
+// 285-campaign-costs)
+describe("campaign costs by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("ccrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `ccrole-${role}`);
+    }
+    people.granted = await addMember(org, owner.id, "member", "ccrole-granted");
+    await asUser(owner.id, (q) => q("select public.set_member_permissions($1, $2, $3)", [org, people.granted.id, ["view_costs"]]));
+  });
+
+  it("owners, admins, managers and the view_costs grant read and write; a member without it and a viewer neither", async () => {
+    const allowed = ["owner", "admin", "manager", "granted"];
+    for (const [role, user] of Object.entries(people)) {
+      const insert = asUser(user.id, (q) =>
+        q("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, $2, '2026-10-01', 1000)", [org, `של ${role}`]),
+      );
+      if (allowed.includes(role)) await insert;
+      else expect((await pgError(insert)).code, role).toBe("42501");
+    }
+    for (const [role, user] of Object.entries(people)) {
+      const seen = await asUser(user.id, (q) => count(q, "select 1 from public.campaign_costs where organization_id = $1", [org]));
+      expect(seen, role).toBe(allowed.includes(role) ? 4 : 0);
+      const changed = await asUser(user.id, async (q) => (await q("update public.campaign_costs set note = note where organization_id = $1", [org])).rowCount);
+      expect(changed, role).toBe(allowed.includes(role) ? 4 : 0);
+    }
+    for (const role of ["member", "viewer"]) {
+      expect(await asUser(people[role].id, async (q) => (await q("delete from public.campaign_costs where organization_id = $1", [org])).rowCount), role).toBe(0);
+    }
+    expect(await asUser(people.manager.id, async (q) => (await q("delete from public.campaign_costs where organization_id = $1 and campaign = 'של owner'", [org])).rowCount)).toBe(1);
+  });
+});
+
 // BIZ-02: a business card is its rep's; owners and admins manage every card (the rest is in 142-business-cards)
 describe("business cards by role", () => {
   let org: string;

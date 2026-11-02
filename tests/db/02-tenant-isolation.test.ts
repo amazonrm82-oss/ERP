@@ -175,6 +175,8 @@ describe("tenant isolation", () => {
         await q<{ id: string }>("insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'סגמנט של א') returning id", [orgA])
       ).rows[0].id;
       await q("insert into public.segment_members (organization_id, segment_id, lead_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.leadA]);
+      // SEG-03: a campaign cost of A
+      await q("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'קמפיין של א', '2026-10-01', 50000)", [orgA]);
       // BIZ-02: a's business card (its form is made by the card's trigger)
       await q("insert into public.business_cards (organization_id, user_id, job_title) values ($1, $2, 'יועץ')", [orgA, a.id]);
       // BIZ-03: a QR code of A that opens A's form
@@ -421,6 +423,8 @@ describe("tenant isolation", () => {
     // SEG-01
     "segments",
     "segment_members",
+    // SEG-03
+    "campaign_costs",
     // BIZ-02
     "business_cards",
     // BIZ-03
@@ -654,6 +658,7 @@ describe("tenant isolation", () => {
       segments: "name = name",
       // no update grant at all: a permission error is the expected outcome
       segment_members: "lead_id = lead_id",
+      campaign_costs: "note = note",
       business_cards: "job_title = job_title",
       qr_codes: "name = name",
       site_widgets: "name = name",
@@ -817,6 +822,7 @@ describe("tenant isolation", () => {
       ["insert into public.booking_pages (organization_id, user_id, title) values ($1, $2, 'x')", [orgA, a.id]],
       ["insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'x')", [orgA]],
       ["insert into public.segment_members (organization_id, segment_id, contact_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.contactA]],
+      ["insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'x', '2026-10-01', 100)", [orgA]],
       ["insert into public.business_cards (organization_id, user_id) values ($1, $2)", [orgA, a.id]],
       ["insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'x', 'form', $2)", [orgA, ids.formA]],
       ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
@@ -949,6 +955,7 @@ describe("tenant isolation", () => {
       ["booking_pages", "title = 'HACKED'", "title = 'HACKED'"],
       ["segments", "name = 'HACKED'", "name = 'HACKED'"],
       ["segment_members", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
+      ["campaign_costs", "amount_agorot = 777", "amount_agorot = 777"],
       ["business_cards", "job_title = 'HACKED'", "job_title = 'HACKED'"],
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],

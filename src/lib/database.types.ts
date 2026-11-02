@@ -445,6 +445,31 @@ export type SegmentInsert = {
   filter?: Json | null;
 };
 
+// SEG-03: a campaign cost entered by hand (a source and/or a campaign name, a month's first day, agorot in ILS)
+export type CampaignCostRow = {
+  id: string;
+  organization_id: string;
+  source_id: string | null;
+  campaign: string | null;
+  month: string;
+  amount_agorot: number;
+  amount_includes_vat: boolean;
+  currency: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CampaignCostWrite = {
+  source_id?: string | null;
+  campaign?: string | null;
+  month?: string;
+  amount_agorot?: number;
+  amount_includes_vat?: boolean;
+  note?: string | null;
+};
+
 export type SegmentMemberRow = {
   id: string;
   organization_id: string;
@@ -3336,6 +3361,8 @@ export type Database = {
       booking_pages: Table<BookingPageRow, BookingPageInsert, Partial<Omit<BookingPageInsert, "organization_id">>>;
       segments: Table<SegmentRow, SegmentInsert, { name?: string; filter?: Json | null }>;
       segment_members: Table<SegmentMemberRow, SegmentMemberInsert, Record<string, never>>;
+      // SEG-03: owners, admins and managers write; everyone in the business reads; column grants
+      campaign_costs: Table<CampaignCostRow, CampaignCostWrite & { organization_id: string; month: string; amount_agorot: number; currency?: string }, CampaignCostWrite>;
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
       // BIZ-03: owners and admins only; column grants (token made by the database)
@@ -3442,6 +3469,7 @@ export type Database = {
       report_revenue_by_source: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // RPT-01: new recurring revenue (MRR) of the recurring deals won in the period (from/to: business days, inclusive)
       report_recurring_revenue: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
+      report_campaign_roi: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       // DLI-06
       report_revenue_by_category: { Args: { p_org: string; p_from: string; p_to: string; p_pipeline?: string | null; p_owner?: string | null }; Returns: Json };
       // BAL-01: the customer's ledger (invoker; {"allowed": false} without the keys or membership)
@@ -3473,6 +3501,8 @@ export type Database = {
       // LEAD-05 (security invoker): { score, matched: [{ id, points }] }, or null when the lead cannot be read
       lead_score_breakdown: { Args: { p_org: string; p_lead: string }; Returns: Json };
       incomplete_records: { Args: { p_org: string; p_type: string; p_owner: string; p_limit?: number }; Returns: Json };
+      // DQL-03: cleanup suggestions (invoker; RLS decides what is counted)
+      cleanup_suggestions: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // computed field 0..100 on leads, contacts, companies and deals: used as `order=completeness`, not called as an RPC
       completeness: { Args: Record<string, never>; Returns: number | null };
       // computed field on leads, contacts, companies, deals, tasks and products (FXC-11): the normalized text the lists

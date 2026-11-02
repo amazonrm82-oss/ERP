@@ -1,0 +1,74 @@
+{
+  "totals": {
+    "roi": 5.6667,
+    "cost": 30000,
+    "deals": 5,
+    "leads": 3,
+    "revenue": 200000,
+    "cost_entries": 2,
+    "cost_per_lead": 10000
+  },
+  "allowed": true,
+  "partial": false,
+  "by_source": [
+    {
+      "roi": null,
+      "cost": 5000,
+      "kind": "unsourced_costs",
+      "deals": 0,
+      "leads": 0,
+      "revenue": 0,
+      "source_id": null,
+      "source_name": null,
+      "cost_per_lead": null
+    },
+    {
+      "roi": 3,
+      "cost": 25000,
+      "kind": "source",
+      "deals": 1,
+      "leads": 2,
+      "revenue": 100000,
+      "source_id": "00000000-0000-4000-8000-000000000001",
+      "source_name": "WhatsApp",
+      "cost_per_lead": 12500
+    },
+    {
+      "roi": null,
+      "cost": 0,
+      "kind": "source",
+      "deals": 4,
+      "leads": 1,
+      "revenue": 100000,
+      "source_id": null,
+      "source_name": null,
+      "cost_per_lead": null
+    }
+  ],
+  "by_campaign": [
+    {
+      "roi": 3,
+      "cost": 25000,
+      "kind": "source",
+      "deals": 1,
+      "leads": 2,
+      "revenue": 100000,
+      "campaign": "חורף",
+      "source_id": "00000000-0000-4000-8000-000000000001",
+      "source_name": "WhatsApp",
+      "cost_per_lead": 12500
+    },
+    {
+      "roi": -1,
+      "cost": 5000,
+      "kind": "all_sources",
+      "deals": 0,
+      "leads": 0,
+      "revenue": 0,
+      "campaign": "שלט",
+      "source_id": null,
+      "source_name": null,
+      "cost_per_lead": null
+    }
+  ]
+}

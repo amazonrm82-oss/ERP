@@ -64,7 +64,13 @@ export default async function ReportPage({ params, searchParams }: Props) {
 
   const [view, members, pipelines] = await Promise.all([
     // COL-06: the link to the debt aging report only for those who may open it
-    withReportShape(async () => buildReport(orgId, definition.key, filters, { balances: definition.collection ? await seesBalances(orgId) : false })),
+    withReportShape(async () =>
+      buildReport(orgId, definition.key, filters, {
+        balances: definition.collection ? await seesBalances(orgId) : false,
+        // SEG-03, owner (65) ד: the link to the campaign costs page for those who may view costs
+        costs: definition.key === "campaign_roi" ? canViewCosts(context.role, granted) : false,
+      }),
+    ),
     definition.filters.includes("owner") ? listMembers(orgId) : Promise.resolve([]),
     definition.filters.includes("pipeline") ? listPipelines(orgId) : Promise.resolve([]),
   ]);

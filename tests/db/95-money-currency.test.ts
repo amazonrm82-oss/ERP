@@ -110,6 +110,10 @@ describe("currency next to every amount", () => {
       leads: async (q) => {
         await q("insert into public.leads (organization_id, status_id, full_name) values ($1, $2, 'ליד לבדיקת מטבע')", [org, status]);
       },
+      // SEG-03
+      campaign_costs: async (q) => {
+        await q("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'קמפיין', '2026-10-01', 1000)", [org]);
+      },
       deals: async (q) => {
         await q("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה לבדיקת מטבע', $2, $3)", [org, pipe.pipelineId, pipe.stages[0].id]);
       },

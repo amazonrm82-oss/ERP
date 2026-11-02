@@ -683,6 +683,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_dormant_customers.sql",
       // RET-01 (64) ג redefines app.scheduled_customer_dormant() of _dormant_customers.sql last (the rule's start point)
       "_dormant_activation.sql",
+      // SEG-03 redefines public.log_export() of _report_pdf_export.sql last (the campaign_roi report key)
+      "_campaign_costs.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

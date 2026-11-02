@@ -41,6 +41,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // CAL-10
   booking_pages: "דף קביעת תור",
   segments: "סגמנט",
+  // SEG-03
+  campaign_costs: "עלות קמפיין",
   business_cards: "כרטיס ביקור",
   // BIZ-03
   qr_codes: "קוד QR",
@@ -293,6 +295,9 @@ export const FIELD_LABELS: Record<string, string> = {
   scope: "יעד של",
   message: "הודעה",
   campaign: "קמפיין",
+  // SEG-03: a campaign cost's month and note
+  month: "חודש",
+  note: "הערה",
   // LEAD-01: budget and the UTM values of a lead (a utm change is listed key by key)
   budget_agorot: "תקציב",
   utm: "פרמטרי UTM",

@@ -1,7 +1,7 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
-// plan_review_fixes (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan and campaign_costs_plan (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -94,6 +94,7 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   // basic and up
   auto_reassign: BASIC_UP, // SPD-03
   lead_distribution: BASIC_UP, // CAP-08 (owner, 14 October 2026)
+  campaign_costs: BASIC_UP, // SEG-03 (owner, 2 November 2026, answer (61) ב: the plans of lead_distribution)
   orders: BASIC_UP,
   api: BASIC_UP,
   custom_reports: BASIC_UP,
@@ -155,6 +156,8 @@ const WAVE2_FEATURE_LIST = [
   "goals_per_rep", "booking_team_pages",
   // CAP-08 (migration lead_distribution_plan)
   "lead_distribution",
+  // SEG-03 (migration campaign_costs_plan)
+  "campaign_costs",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

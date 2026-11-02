@@ -403,6 +403,55 @@ export const REPORT_SCHEMAS = {
     by_source: z.array(z.object({ source_id: id, source_name: text, deals: count, amount })),
     by_campaign: z.array(z.object({ source_id: id, source_name: text, campaign: text, deals: count, amount })),
   }),
+  // SEG-03: leads created, deals won (SEG-02's first-source rule) and the costs entered by hand, per first source and per
+  // source and campaign; cost per lead and ROI are null without a cost (and cost per lead without leads)
+  report_campaign_roi: z.union([
+    z.object({ allowed: z.literal(false) }),
+    z.object({
+      allowed: z.literal(true),
+      // BAL/COL's partial rule: no cost, cost per lead or ROI when the caller does not read every counted lead and won deal,
+      // or may not read the costs (owners and admins)
+      partial: z.boolean(),
+      totals: z.object({
+        leads: count,
+        deals: count,
+        revenue: amount,
+        cost: amount.nullable(),
+        cost_entries: count.nullable(),
+        cost_per_lead: decimal,
+        roi: decimal,
+      }),
+      // kind 'unsourced_costs': the costs entered with no source, a row of their own
+      by_source: z.array(
+        z.object({
+          kind: z.enum(["source", "unsourced_costs"]),
+          source_id: id,
+          source_name: text,
+          leads: count,
+          deals: count,
+          revenue: amount,
+          cost: amount.nullable(),
+          cost_per_lead: decimal,
+          roi: decimal,
+        }),
+      ),
+      // kind 'all_sources': a cost with a campaign and no source, against that campaign's leads and revenue of every source
+      by_campaign: z.array(
+        z.object({
+          kind: z.enum(["source", "all_sources"]),
+          source_id: id,
+          source_name: text,
+          campaign: z.string(),
+          leads: count,
+          deals: count,
+          revenue: amount,
+          cost: amount.nullable(),
+          cost_per_lead: decimal,
+          roi: decimal,
+        }),
+      ),
+    }),
+  ]),
   // CON-06: referrals made in the period, by the contact who referred
   report_referrals: z.object({
     totals: z.object({ referrals: count, referrers: count, customers: count, won_amount: amount }),

@@ -11,6 +11,7 @@ import {
   requiredPerDayValue,
 } from "@/features/goals/progress";
 import { getGoalProgress } from "@/features/goals/progress-queries";
+import { campaignCostsPath } from "@/features/campaign-costs/paths";
 import { productPath } from "@/features/products/paths";
 import { BILLING_LABELS, type Billing } from "@/features/products/schema";
 import { getUserNames } from "@/features/shell/queries";
@@ -64,6 +65,11 @@ function billingFigureHint(billing: string | null): string {
   if (billing === "quarterly") return "סכום לרבעון אחד של השורות הרבעוניות.";
   if (billing === "yearly") return "סכום לשנה אחת של השורות השנתיות.";
   return "שורות שנשמרו לפני שהיה לשורה סוג חיוב; סכומן לפי תקופת העסקה.";
+}
+
+// SEG-03: the ROI the database answers as a ratio (0.25), shown as a percent with one decimal (25%)
+export function roiPercent(roi: number | null): number | null {
+  return roi === null ? null : Math.round(roi * 1000) / 10;
 }
 
 // RPT-01: the count of recurring deals with no stored VAT mode (no lines), as the owner worded it
@@ -211,7 +217,7 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
   return { sections, note: null };
 }
 
-export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean; balances?: boolean } = {}): Promise<ReportView> {
+export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean; balances?: boolean; costs?: boolean } = {}): Promise<ReportView> {
   // FLD-10 part two: titles and column headers name leads and deals in the business's own words (notes and empty texts
   // keep today's words)
   const terms = await getOrgTerms(orgId);
@@ -914,6 +920,94 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           },
         ],
       };
+    }
+
+    // SEG-03: leads, won revenue (SEG-02's first source) and the costs entered by hand, per source and per campaign
+    case "campaign_roi": {
+      const data = parseReportData("report_campaign_roi", await rpc("report_campaign_roi", range));
+      if (!data.allowed) {
+        return { kpis: [], sections: [], note: "עלויות קמפיינים ודוח ההחזר על ההשקעה אינם כלולים בחבילה הנוכחית." };
+      }
+      const { totals, partial } = data;
+      const sourceName = (r: { kind: string; source_id: string | null; source_name: string | null }) =>
+        r.kind === "unsourced_costs" ? "עלויות בלי מקור" : r.kind === "all_sources" ? "כל המקורות" : r.source_id ? (r.source_name ?? "מקור") : "ללא מקור";
+      const costColumns: ReportColumn[] = partial
+        ? []
+        : [
+            { key: "cost", label: "עלות", kind: "money" },
+            { key: "cost_per_lead", label: `עלות ל${L.singular}`, kind: "money" },
+          ];
+      const columns: ReportColumn[] = [
+        { key: "leads", label: L.plural, kind: "number" },
+        ...costColumns,
+        { key: "deals", label: `${D.plural} שנסגרו`, kind: "number" },
+        { key: "revenue", label: "הכנסה", kind: "money" },
+        ...(partial ? [] : [{ key: "roi", label: "החזר על ההשקעה", kind: "percent" } as ReportColumn]),
+      ];
+      const figures = (r: { leads: number; cost: number | null; cost_per_lead: number | null; deals: number; revenue: number; roi: number | null }): ReportRow => ({
+        leads: r.leads,
+        cost: r.cost,
+        cost_per_lead: r.cost_per_lead,
+        deals: r.deals,
+        revenue: r.revenue,
+        roi: roiPercent(r.roi),
+      });
+      const totalRoi = roiPercent(totals.roi);
+      const partialNote = `דוח חלקי: מוצגים רק ה${L.plural} וה${D.plural} שיש לך גישה אליהם, ולכן אין עלות, עלות ל${L.singular} והחזר על ההשקעה. הדוח המלא זמין למי שרואה עלויות ורואה את כל ה${L.plural} וה${D.plural}.`;
+      const kpis = partial
+        ? [
+            { label: L.plural, value: formatNumber(totals.leads), hint: "חדשים בתקופה" },
+            { label: "הכנסה", value: formatMoney(totals.revenue), hint: `${formatNumber(totals.deals)} ${D.plural} שנסגרו` },
+          ]
+        : [
+            { label: "עלות", value: formatMoney(totals.cost ?? 0), hint: `${formatNumber(totals.cost_entries ?? 0)} רישומי עלות בתקופה` },
+            {
+              label: `עלות ל${L.singular}`,
+              value: totals.cost_per_lead === null ? "—" : formatMoney(totals.cost_per_lead),
+              hint: `${formatNumber(totals.leads)} ${L.plural} חדשים`,
+            },
+            { label: "הכנסה", value: formatMoney(totals.revenue), hint: `${formatNumber(totals.deals)} ${D.plural} שנסגרו` },
+            { label: "החזר על ההשקעה", value: totalRoi === null ? "—" : `${formatNumber(totalRoi)}%` },
+          ];
+      const sections: ReportSection[] = [
+        {
+          title: "לפי מקור ראשון",
+          columns: [{ key: "source", label: "מקור", kind: "text" }, ...columns],
+          rows: data.by_source.map((r): ReportRow => ({ source: sourceName(r), ...figures(r) })),
+          bar: partial ? "revenue" : "cost",
+          empty: `אין בתקופה הזו ${L.plural} חדשים, ${D.plural} שנסגרו או עלויות.`,
+          note: [
+            `${L.plural} נספרים לפי תאריך היצירה, ${D.plural} לפי תאריך הסגירה, ו${D.singular} ${byGender(D, "משויך", "משויכת")} למקור הראשון של ה${L.singular} או של ${terms.contact.theSingular} שממנו ${byGender(D, "הגיע", "הגיעה")}, כמו בדוח "הכנסה לפי מקור וקמפיין".`,
+            partial ? null : "עלות של חודש נספרת כשהיום הראשון שלו בתוך התקופה. עלויות שהוזנו בלי מקור מופיעות בשורה \"עלויות בלי מקור\". החזר על ההשקעה = (הכנסה פחות עלות) חלקי עלות; בלי עלות אין חישוב.",
+            // owner (63) ב: a cost typed with VAT is converted at its month's rate; deal amounts are net
+            'הסכומים בדוח לפני מע"מ: עלות שהוזנה כולל מע"מ מחושבת לפני מע"מ לפי השיעור בחודש שלה.',
+          ]
+            .filter(Boolean)
+            .join(" "),
+        },
+        {
+          title: "לפי מקור וקמפיין",
+          columns: [{ key: "source", label: "מקור", kind: "text" }, { key: "campaign", label: "קמפיין", kind: "text" }, ...columns],
+          rows: data.by_campaign.map((r): ReportRow => ({ source: sourceName(r), campaign: r.campaign, ...figures(r) })),
+          empty: "אין בתקופה הזו נתונים עם שם קמפיין.",
+          note: partial
+            ? undefined
+            : 'שם הקמפיין מושווה בלי הבדל בין אותיות גדולות וקטנות ובלי רווחים בקצוות. עלות שנרשמה לקמפיין בלי מקור מופיעה בשורה "כל המקורות", מול כל ה' +
+              `${L.plural} וההכנסה של הקמפיין מכל המקורות (הם מופיעים גם בשורות לפי מקור). עלות שנרשמה למקור בלי קמפיין מופיעה רק בטבלה של המקורות.`,
+        },
+      ];
+      // owner (65) ד: the costs page is for those who may view costs (canViewCosts); the export leaves the link out
+      if (options.costs) {
+        sections.push({
+          title: "עלויות הקמפיינים",
+          columns: [{ key: "where", label: "איפה מזינים", kind: "text" }],
+          rows: [{ _href: campaignCostsPath(orgId), where: "עלויות קמפיינים" }],
+          empty: "",
+          note: "את העלויות מזינים ורואים בעלים, מנהלי מערכת, מנהלים ומי שקיבל הרשאה לראות עלויות, לכל חודש, לפי מקור או שם קמפיין.",
+          exported: false,
+        });
+      }
+      return { kpis, sections, note: partial ? partialNote : undefined };
     }
 
     // RPT-01: the lines of the deals won in the period, by product and billing (stored line totals)

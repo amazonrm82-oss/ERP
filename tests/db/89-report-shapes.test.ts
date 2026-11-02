@@ -244,6 +244,15 @@ describe("report result shapes (FXC-12)", () => {
       await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 5000)", [org, payment, paidDoc]);
     });
 
+    // SEG-03: a cost of this month for the winter campaign of the source the converted lead came from, and one with a campaign
+    // and no source (an 'all_sources' campaign row and the 'unsourced_costs' source row)
+    await asUser(owner.id, (q) =>
+      q(
+        "insert into public.campaign_costs (organization_id, source_id, campaign, month, amount_agorot) values ($1, $2, 'חורף', date_trunc('month', now() at time zone 'Asia/Jerusalem')::date, 25000), ($1, null, 'שלט', date_trunc('month', now() at time zone 'Asia/Jerusalem')::date, 5000)",
+        [org, sourceId],
+      ),
+    );
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -260,6 +269,10 @@ describe("report result shapes (FXC-12)", () => {
       report_revenue: ["public.report_revenue($1, $2, $3)", range],
       report_revenue_by_product: ["public.report_revenue_by_product($1, $2, $3)", range],
       report_revenue_by_source: ["public.report_revenue_by_source($1, $2, $3)", range],
+      report_campaign_roi: [
+        "public.report_campaign_roi($1, (date_trunc('month', now() at time zone 'Asia/Jerusalem')) at time zone 'Asia/Jerusalem', now() + interval '1 day')",
+        [org],
+      ],
       report_revenue_by_category: ["public.report_revenue_by_category($1, $2, $3)", range],
       report_gross_profit: ["public.report_gross_profit($1, $2, $3)", range],
       report_summary: ["public.report_summary($1, $2, $3, $4, $5)", [...range, new Date(Date.now() - 30 * 86_400_000).toISOString(), from()]],

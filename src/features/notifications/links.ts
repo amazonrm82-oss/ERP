@@ -1,4 +1,5 @@
 import { calendarPath } from "@/features/calendar/range";
+import { cleanupPath } from "@/features/data-quality/paths";
 import { retentionListPath } from "@/features/lead-retention/paths";
 import { orderPath } from "@/features/orders/paths";
 import { quotePath } from "@/features/quotes/paths";
@@ -52,6 +53,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // USR-12 / ADM-05: support changed the status of a request; the support page lists it
     case "support_request":
       return paths.support(orgId);
+    // DQL-03: the weekly cleanup suggestions (the id is the business)
+    case "cleanup_suggestions":
+      return cleanupPath(orgId);
     default:
       return null;
   }

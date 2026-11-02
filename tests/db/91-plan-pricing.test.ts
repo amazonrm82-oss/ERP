@@ -156,6 +156,7 @@ describe("plan prices and states", () => {
       await q(pricing);
       await q(later);
       await q(migration("_lead_distribution_plan.sql"));
+      await q(migration("_campaign_costs_plan.sql"));
       expect(await snapshot(false)).toEqual(values);
       await q("rollback to savepoint s");
     });

@@ -16,6 +16,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
   // LEAD-05 (owner, 14 October 2026): core, open in every plan
   { feature: "lead_scoring", label: "ציון ליד לפי כללים", built: true, core: true },
+  // DQL-03 (owner, 2 November 2026, answer (60) א): core, open in every plan
+  { feature: "cleanup_suggestions", label: "הצעות ניקוי שבועיות: כפילויות, רשומות בלי אחראי ובלי דרך קשר", built: true, core: true },
   // CAL-08: a managed list of the calendar, no plan key (owner, 15 October 2026)
   { feature: "meeting_types", label: "סוגי פגישה עם משך, מרווח וצבע", built: true, core: true },
   // DLI-01..02, PL-03: product lines in a deal sit under the products flag (owner, 14 October 2026)
@@ -45,6 +47,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
   { feature: "whatsapp_inbox", label: "תיבת WhatsApp (ההודעות מהארנק)", built: false },
   { feature: "goals", label: "יעד לעסק", built: true },
+  // SEG-03 (owner, 2 November 2026, answer (61) ב): the plans that hold lead_distribution
+  { feature: "campaign_costs", label: "עלויות קמפיינים, עלות לליד והחזר על ההשקעה", built: true },
   // SEG-01
   { feature: "segments", label: "סגמנטים של לידים ואנשי קשר", built: true },
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },
