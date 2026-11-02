@@ -726,6 +726,17 @@ export type OrgModulesRow = {
   updated_at: string;
 };
 
+// CON-11: after how many months without a purchase a customer is dormant, then former (migration customer_status); no row = 6 and 18.
+export type CustomerStatusSettingsRow = {
+  id: string;
+  organization_id: string;
+  dormant_months: number;
+  former_months: number;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // HEB-09: the business's pause of automatic sending to customers (migration customer_sending_pause); no row = not paused.
 export type OrgSendingPausesRow = {
   id: string;
@@ -3076,6 +3087,12 @@ export type Database = {
         { organization_id: string; leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null },
         { leads_enabled?: boolean; companies_enabled?: boolean; orders_enabled?: boolean; orders_offer_closed_at?: string | null }
       >;
+      // CON-11: column grants (the two thresholds); no delete
+      customer_status_settings: Table<
+        CustomerStatusSettingsRow,
+        { organization_id: string; dormant_months?: number; former_months?: number },
+        { dormant_months?: number; former_months?: number }
+      >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<
         OrgSendingPausesRow,
@@ -3586,6 +3603,15 @@ export type Database = {
       overdue_debt: { Args: Record<string, never>; Returns: number | null };
       has_debt: { Args: Record<string, never>; Returns: boolean };
       has_overdue_debt: { Args: Record<string, never>; Returns: boolean };
+      // CON-11: computed fields on contacts and companies (null = not a customer, or the caller's view of its won deals is partial)
+      customer_status: { Args: Record<string, never>; Returns: "active" | "dormant" | "former" | null };
+      customer_value: { Args: Record<string, never>; Returns: number | null };
+      // RET-01: the last purchase day (a won deal's close day or a counted payment's day); null as above
+      customer_last_purchase: { Args: Record<string, never>; Returns: string | null };
+      // CON-11: a contact's or company's status, purchases and value (invoker; BAL-01's partial rule)
+      customer_summary: { Args: { p_org: string; p_contact: string | null; p_company: string | null }; Returns: Json };
+      // RET-01: dormant contacts or companies from the kept facts (owners and admins; {allowed: false} otherwise)
+      dormant_customers: { Args: { p_org: string; p_kind: string; p_limit?: number }; Returns: Json };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

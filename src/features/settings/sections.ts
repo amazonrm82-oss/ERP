@@ -36,6 +36,7 @@ import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { numberingSettingsPath } from "@/features/numbering/paths";
 import { responseSettingsPath } from "@/features/response-target/paths";
+import { customerStatusSettingsPath } from "@/features/customer-status/paths";
 import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { checklistTemplatesPath } from "@/features/task-checklists/paths";
@@ -117,6 +118,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // CAL-08: everyone reads the list; owners and admins edit it
         { href: meetingTypesPath(orgId), label: "סוגי פגישה", description: "משך, מיקום, מרווח וצבע לכל סוג של פגישה", icon: CalendarIcon },
         { href: documentSettingsPath(orgId), label: 'מע"מ ופרטים למסמכים', description: 'המעמד במע"מ, והפרטים שמופיעים בהצעות ובמסמכים', icon: FormIcon },
+        // CON-11: everyone reads it; owners and admins change it
+        { href: customerStatusSettingsPath(orgId), label: "סטטוס לקוח", description: "אחרי כמה חודשים בלי קנייה לקוח נחשב רדום, ואחרי כמה לשעבר", icon: UsersIcon },
         // QUO-03: everyone reads it; owners and admins change it
         { href: numberingSettingsPath(orgId), label: "מספור הצעות והזמנות", description: "קידומת ומספר התחלתי למספרים של הצעות מחיר והזמנות", icon: FormIcon },
         // QUO-04: everyone reads the templates; owners and admins rename and delete them

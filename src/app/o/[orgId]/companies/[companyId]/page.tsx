@@ -37,6 +37,7 @@ import { CompanyOpeningCard } from "@/features/documents/components/company-open
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
+import { CustomerStatusSummary } from "@/features/customer-status/components/customer-status-summary";
 import { LedgerCard } from "@/features/balances/components/ledger-card";
 import { StatementLinkCard } from "@/features/statements/components/statement-link-card";
 import { listRelatedDeals } from "@/features/deals/queries";
@@ -115,6 +116,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
       />
       {/* BAL-02: the company's open and overdue debt, for whoever opens its ledger */}
       <DebtSummary orgId={orgId} where={{ contact: null, company: company.id }} />
+      {/* CON-11: the customer status by the last won deal, and the cumulative value */}
+      <CustomerStatusSummary orgId={orgId} where={{ contact: null, company: company.id }} />
       <div className="mb-5 print:hidden">
         <ContactActions
           phone={company.phone}

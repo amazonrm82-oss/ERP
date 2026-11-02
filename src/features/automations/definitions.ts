@@ -29,7 +29,9 @@ export type TriggerType =
   // AUT-03 (rest): a public form created or matched the record; a fixed schedule; the card's manual button
   | "form_submitted"
   | "schedule"
-  | "manual";
+  | "manual"
+  // RET-01: a contact or company became a dormant customer (CON-11's status; a scheduled scan)
+  | "customer_dormant";
 
 /** AUT-04: the plan flags a trigger may need (app.automation_trigger_feature). */
 export type TriggerFeature = "payments" | "quotes" | "documents";
@@ -136,6 +138,9 @@ export const TRIGGERS: TriggerOption[] = [
   { key: "contact:manual", label: "כפתור בכרטיס איש הקשר", entity: "contact", type: "manual", manual: true },
   { key: "company:manual", label: "כפתור בכרטיס החברה", entity: "company", type: "manual", manual: true },
   { key: "deal:manual", label: "כפתור בכרטיס העסקה", entity: "deal", type: "manual", manual: true },
+  // RET-01: once per customer and the day it became dormant (the business's thresholds, CON-11), from 08:00
+  { key: "contact:customer_dormant", label: "איש קשר הפך ללקוח רדום", entity: "contact", type: "customer_dormant" },
+  { key: "company:customer_dormant", label: "חברה הפכה ללקוח רדום", entity: "company", type: "customer_dormant" },
 ];
 
 /** The most days after the due date a debt rule may wait (app.scheduled_debt_overdue). */

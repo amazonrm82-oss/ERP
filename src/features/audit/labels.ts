@@ -111,6 +111,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_terms: "מונחים",
   // LEAD-08
   org_modules: "מודולים",
+  // CON-11
+  customer_status_settings: "סטטוס לקוח",
   // HEB-09
   org_sending_pauses: "עצירת שליחה ללקוחות",
   // DQL-01
@@ -221,6 +223,9 @@ export const FIELD_LABELS: Record<string, string> = {
   // CAP-10
   target_minutes: "יעד בדקות",
   breach_action: "פעולה בחריגה",
+  // CON-11
+  dormant_months: "חודשים עד לקוח רדום",
+  former_months: "חודשים עד לקוח לשעבר",
   // CAP-08
   method: "שיטת חלוקה",
   weights: "משקלים",

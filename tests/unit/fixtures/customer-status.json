@@ -1,0 +1,19 @@
+{
+  "_comment": "CON-11: app.customer_status_rule (SQL) and customerStatusRule() (src/features/customer-status/status.ts) must both answer these. Month steps clamp to the month's end, as PostgreSQL's date + interval does.",
+  "cases": [
+    { "name": "bought today", "last": "2026-11-02", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "active" },
+    { "name": "the day before dormant", "last": "2026-05-03", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "active" },
+    { "name": "dormant on the day", "last": "2026-05-02", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "dormant" },
+    { "name": "dormant in between", "last": "2025-06-01", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "dormant" },
+    { "name": "former on the day", "last": "2025-05-02", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "former" },
+    { "name": "former long ago", "last": "2019-01-15", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "former" },
+    { "name": "end of month clamps (31 Aug + 6 = 28 Feb)", "last": "2025-08-31", "today": "2026-02-28", "dormant": 6, "former": 18, "status": "dormant" },
+    { "name": "end of month clamps, a day before", "last": "2025-08-31", "today": "2026-02-27", "dormant": 6, "former": 18, "status": "active" },
+    { "name": "leap day clamps (29 Feb + 12 = 28 Feb)", "last": "2024-02-29", "today": "2025-02-28", "dormant": 12, "former": 24, "status": "dormant" },
+    { "name": "leap year end of month (31 Aug + 6 = 29 Feb)", "last": "2027-08-31", "today": "2028-02-28", "dormant": 6, "former": 18, "status": "active" },
+    { "name": "one month", "last": "2026-01-31", "today": "2026-02-28", "dormant": 1, "former": 2, "status": "dormant" },
+    { "name": "two months", "last": "2026-01-31", "today": "2026-03-31", "dormant": 1, "former": 2, "status": "former" },
+    { "name": "a purchase in the future counts as active", "last": "2026-12-01", "today": "2026-11-02", "dormant": 6, "former": 18, "status": "active" },
+    { "name": "no purchase", "last": null, "today": "2026-11-02", "dormant": 6, "former": 18, "status": null }
+  ]
+}

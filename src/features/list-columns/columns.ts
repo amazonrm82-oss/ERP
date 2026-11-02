@@ -64,6 +64,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       // BAL-02: the customer's open and overdue debt, only where the business sees balances (DEBT_COLUMNS)
       { key: "debt", label: "יתרת חוב" },
       { key: "overdue_debt", label: "חוב באיחור" },
+      // CON-11: computed when read (null = not a customer, or the user's view of its won deals is partial)
+      { key: "customer_status", label: "סטטוס לקוח" },
+      { key: "customer_value", label: "ערך מצטבר" },
     ],
     defaults: ["phone", "email", "company", "owner", "created"],
   },
@@ -83,6 +86,9 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       // BAL-02
       { key: "debt", label: "יתרת חוב" },
       { key: "overdue_debt", label: "חוב באיחור" },
+      // CON-11: computed when read (null = not a customer, or the user's view of its won deals is partial)
+      { key: "customer_status", label: "סטטוס לקוח" },
+      { key: "customer_value", label: "ערך מצטבר" },
     ],
     defaults: ["phone", "city", "owner", "created"],
   },
@@ -189,6 +195,9 @@ export const PRODUCT_COLUMN = "product";
 export const CREDIT_COLUMN = "credit";
 // BAL-02: the contacts' and companies' debt columns, offered only with the balances keys (balances, documents, payments)
 export const DEBT_COLUMNS: readonly string[] = ["debt", "overdue_debt"];
+// CON-11: the contacts' and companies' customer status and value columns (every plan; owners and admins, since they read
+// the business-wide kept facts: app.customer_kept_status / _value answer null to anyone else)
+export const CUSTOMER_COLUMNS: readonly string[] = ["customer_status", "customer_value"];
 
 /**
  * Every column a list can show: the built-in ones, then the organization's custom fields.
@@ -198,20 +207,21 @@ export const DEBT_COLUMNS: readonly string[] = ["debt", "overdue_debt"];
 export function catalogFor(
   object: ListObject,
   fields: Array<{ key: string; label: string }>,
-  options: { products?: boolean; money?: boolean; debt?: boolean } = {},
+  options: { products?: boolean; money?: boolean; debt?: boolean; customer?: boolean } = {},
 ): CatalogColumn[] {
   const builtIn = BUILT_IN[object].columns.filter(
     (column) =>
       (object !== "lead" || column.key !== PRODUCT_COLUMN || options.products === true) &&
       (column.key !== CREDIT_COLUMN || options.money === true) &&
-      (!DEBT_COLUMNS.includes(column.key) || options.debt === true),
+      (!DEBT_COLUMNS.includes(column.key) || options.debt === true) &&
+      (!CUSTOMER_COLUMNS.includes(column.key) || options.customer === true),
   );
   return [...builtIn, ...fields.map((field) => ({ key: `${CUSTOM_PREFIX}${field.key}`, label: field.label }))];
 }
 
 /** PAY-03, BAL-02: a list's sort keys without the money columns the list does not offer (people who do not see money). */
 export function offeredSortKeys(keys: string[], catalog: CatalogColumn[]): string[] {
-  const gated = [CREDIT_COLUMN, ...DEBT_COLUMNS];
+  const gated = [CREDIT_COLUMN, ...DEBT_COLUMNS, ...CUSTOMER_COLUMNS];
   return keys.filter((key) => !gated.includes(key) || catalog.some((column) => column.key === key));
 }
 

@@ -14,7 +14,8 @@ import { getCreditNumbers } from "@/features/allocations/queries";
 import { getDebtNumbers } from "@/features/balances/queries";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
+import { getCustomerNumbers } from "@/features/customer-status/queries";
+import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { withFieldRefs } from "@/features/custom-fields/refs";
@@ -76,6 +77,8 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
   // BAL-02: the debt only when a debt column is shown (in the catalog only for people who see balances)
   const debt = shownColumns.some((c) => DEBT_COLUMNS.includes(c.key)) ? await getDebtNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
+  // CON-11: the customer status and value only when one of the two columns is shown
+  const customer = shownColumns.some((c) => CUSTOMER_COLUMNS.includes(c.key)) ? await getCustomerNumbers(orgId, "companies", companies.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -187,6 +190,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               tags={tags}
               credit={credit}
               debt={debt}
+              customer={customer}
             />
           </div>
         </>

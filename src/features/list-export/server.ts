@@ -3,6 +3,8 @@ import "server-only";
 import { sourceLine } from "@/features/attribution/source";
 import { getCreditNumbers } from "@/features/allocations/queries";
 import { getDebtNumbers } from "@/features/balances/queries";
+import { getCustomerNumbers, type CustomerNumbers } from "@/features/customer-status/queries";
+import { CUSTOMER_STATUS_LABELS } from "@/features/customer-status/status";
 import { listCompanies, COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS } from "@/features/companies/queries";
 import { contactDisplayName } from "@/features/contacts/display";
 import { channelLabel, localeLabel } from "@/features/contacts/preferences";
@@ -16,7 +18,7 @@ import { displayCustomFields } from "@/features/custom-fields/values";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
-import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
+import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
 import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -104,6 +106,12 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   // BAL-02: the debt columns are read only when one is exported (in the catalog only for people who see balances)
   const withDebt = columns.some((column) => DEBT_COLUMNS.includes(column.key));
   const money = (value: number | undefined) => (value === undefined ? null : formatMoney(value));
+  // CON-11: the customer status and value are read only when one of them is exported
+  const withCustomer = columns.some((column) => CUSTOMER_COLUMNS.includes(column.key));
+  const customerCells = (value: CustomerNumbers | undefined) => ({
+    customer_status: value?.status ? CUSTOMER_STATUS_LABELS[value.status] : null,
+    customer_value: value?.value === null || value?.value === undefined ? null : formatMoney(value.value),
+  });
 
   // one page of the list as export rows; read page after page until a short page (RVW-2: a read
   // returns at most 1,000 rows, so asking for more and stopping when fewer came back lost rows)
@@ -140,6 +148,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
       const scores = withScores ? await getScoreNumbers(orgId, "contact", page.contacts.map((contact) => contact.id)) : null;
       const credits = withCredit ? await getCreditNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
       const debts = withDebt ? await getDebtNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
+      const customers = withCustomer ? await getCustomerNumbers(orgId, "contacts", page.contacts.map((contact) => contact.id)) : null;
       for (const contact of page.contacts) {
         rows.push({
           name: contactDisplayName(contact),
@@ -163,6 +172,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             credit: money(credits?.get(contact.id)),
             debt: money(debts?.get(contact.id)?.open),
             overdue_debt: money(debts?.get(contact.id)?.overdue),
+            ...customerCells(customers?.get(contact.id)),
           },
         });
       }
@@ -211,6 +221,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
       const page = await listCompanies(orgId, { ...options, chunk });
       const credits = withCredit ? await getCreditNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
       const debts = withDebt ? await getDebtNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
+      const customers = withCustomer ? await getCustomerNumbers(orgId, "companies", page.companies.map((company) => company.id)) : null;
       for (const company of page.companies) {
         rows.push({
           name: company.name,
@@ -226,6 +237,7 @@ export async function exportList(request: Request, orgId: string, object: Exclud
             credit: money(credits?.get(company.id)),
             debt: money(debts?.get(company.id)?.open),
             overdue_debt: money(debts?.get(company.id)?.overdue),
+            ...customerCells(customers?.get(company.id)),
           },
         });
       }

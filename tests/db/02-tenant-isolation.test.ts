@@ -115,6 +115,8 @@ describe("tenant isolation", () => {
       await q("insert into public.org_terms (organization_id, contact_term) values ($1, 'patient')", [orgA]);
       // LEAD-08
       await q("insert into public.org_modules (organization_id, leads_enabled) values ($1, false)", [orgA]);
+      // CON-11
+      await q("insert into public.customer_status_settings (organization_id, dormant_months, former_months) values ($1, 4, 10)", [orgA]);
       // HEB-09
       await q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [orgA]);
       await q("insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)", [orgA]);
@@ -386,6 +388,8 @@ describe("tenant isolation", () => {
     "org_terms",
     // LEAD-08
     "org_modules",
+    // CON-11
+    "customer_status_settings",
     // HEB-09
     "org_sending_pauses",
     "org_bank_details",
@@ -622,6 +626,8 @@ describe("tenant isolation", () => {
       // no delete grant at all: a permission error is the expected outcome for the delete
       org_modules: "leads_enabled = leads_enabled",
       // no delete grant at all: a permission error is the expected outcome for the delete
+      customer_status_settings: "dormant_months = dormant_months",
+      // no delete grant at all: a permission error is the expected outcome for the delete
       org_sending_pauses: "reason = reason",
       lead_response_settings: "target_minutes = target_minutes",
       // no delete grant at all: a permission error is the expected outcome for the delete
@@ -788,6 +794,7 @@ describe("tenant isolation", () => {
       ["insert into public.quote_designs (organization_id, header_text) values ($1, 'x')", [orgA]],
       ["insert into public.org_terms (organization_id, deal_term) values ($1, 'case')", [orgA]],
       ["insert into public.org_modules (organization_id, companies_enabled) values ($1, false)", [orgA]],
+      ["insert into public.customer_status_settings (organization_id, dormant_months) values ($1, 2)", [orgA]],
       ["insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'x')", [orgA]],
       ["insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 90)", [orgA]],
       ["insert into public.number_sequences (organization_id, kind) values ($1, 'order')", [orgA]],
@@ -922,6 +929,7 @@ describe("tenant isolation", () => {
       ["quote_designs", "header_text = 'HACKED'", "header_text = 'HACKED'"],
       ["org_terms", "lead_term = 'prospect'", "lead_term = 'prospect'"],
       ["org_modules", "companies_enabled = false", "companies_enabled = false"],
+      ["customer_status_settings", "dormant_months = 9", "dormant_months = 9"],
       ["org_sending_pauses", "reason = 'HACKED'", "reason = 'HACKED'"],
       ["lead_response_settings", "target_minutes = 777", "target_minutes = 777"],
       ["number_sequences", "prefix = 'HACKED'", "prefix = 'HACKED'"],

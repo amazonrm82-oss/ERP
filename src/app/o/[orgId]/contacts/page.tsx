@@ -16,7 +16,9 @@ import { getDebtNumbers } from "@/features/balances/queries";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/features/contacts/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
-import { CUSTOM_PREFIX, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
+import { dormantCustomersPath } from "@/features/customer-status/paths";
+import { getCustomerNumbers } from "@/features/customer-status/queries";
+import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
 import { withFieldRefs } from "@/features/custom-fields/refs";
@@ -95,6 +97,8 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const credit = shownColumns.some((c) => c.key === "credit") ? await getCreditNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
   // BAL-02: the debt only when a debt column is shown (in the catalog only for people who see balances)
   const debt = shownColumns.some((c) => DEBT_COLUMNS.includes(c.key)) ? await getDebtNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
+  // CON-11: the customer status and value only when one of the two columns is shown
+  const customer = shownColumns.some((c) => CUSTOMER_COLUMNS.includes(c.key)) ? await getCustomerNumbers(orgId, "contacts", contacts.map((c) => c.id)) : undefined;
 
   const listHref = (target: number, sortParam: string) => {
     const next = new URLSearchParams();
@@ -128,6 +132,12 @@ export default async function ContactsPage({ params, searchParams }: Props) {
             <ButtonLink href={segmentsPath(orgId)} variant="secondary">
               סגמנטים
             </ButtonLink>
+            {/* RET-01: owners and admins (the list reads the business-wide kept facts) */}
+            {context.role === "owner" || context.role === "admin" ? (
+              <ButtonLink href={dormantCustomersPath(orgId)} variant="secondary">
+                לקוחות רדומים
+              </ButtonLink>
+            ) : null}
             {newContactButton}
           </>
         }
@@ -226,6 +236,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               completeness={completeness}
               credit={credit}
               debt={debt}
+              customer={customer}
               whatsapp={whatsappListContext(context)}
               segments={segmentOptions}
             />

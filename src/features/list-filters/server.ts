@@ -10,6 +10,7 @@ import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES } from "@/features/documents/schem
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
 import { QUOTE_STATUS_LABELS, QUOTE_STATUSES } from "@/features/quotes/schema";
 import { TASK_TYPE_OPTIONS } from "@/features/tasks/components/task-fields";
+import { CUSTOMER_STATUS_OPTIONS } from "@/features/customer-status/status";
 import { TIME_ZONE } from "@/lib/app";
 import { zoneDate, zonedIso } from "@/lib/format";
 
@@ -70,6 +71,8 @@ type Lookups = {
   money?: boolean;
   // BAL-02: contacts and companies offer "יש חוב פתוח" / "יש חוב באיחור" only where the business sees balances
   debt?: boolean;
+  // CON-11: contacts and companies offer "סטטוס לקוח" only to owners and admins (the business-wide kept facts)
+  customer?: boolean;
   members: Option[];
   tags: Option[];
   fields: FieldDefinition[];
@@ -98,6 +101,9 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
         ]
       : []),
   ];
+
+  // CON-11: the computed field public.customer_status (owners and admins); "ריק" = not a customer
+  const customerStatus: ServerField = { key: "customer_status", label: "סטטוס לקוח", kind: "select", column: "customer_status", plain: true, options: [...CUSTOMER_STATUS_OPTIONS] };
 
   const builtIn: Record<FilterObject, ServerField[]> = {
     lead: [
@@ -144,6 +150,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       tag,
       { key: "birthday", label: "יום הולדת", kind: "day", column: "birth_date" },
       ...credit,
+      ...(lookups.customer ? [customerStatus] : []),
       created,
       originalCreated,
       lastContact,
@@ -162,6 +169,7 @@ export function filterFields(object: FilterObject, lookups: Lookups): ServerFiel
       owner,
       tag,
       ...credit,
+      ...(lookups.customer ? [customerStatus] : []),
       created,
       originalCreated,
     ],

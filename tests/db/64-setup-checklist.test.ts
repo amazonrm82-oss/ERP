@@ -676,6 +676,11 @@ describe("setup checklist and sample data (USR-04)", () => {
       // _public_sender_limit.sql, public.order_public() of _order_pdfs.sql, app.quote_fingerprint() of _quote_decisions.sql
       // and app.order_fingerprint() of _order_links.sql last (a bundle line's choice and parts)
       "_product_bundles.sql",
+      // CON-11 redefines app.export_choice_values() of _opening_balance.sql last (the customer status filter's codes)
+      "_customer_status.sql",
+      // RET-01 redefines app.automation_event_matches() of _automation_more_triggers.sql and app.automation_run_facts() /
+      // app.automation_event_still_holds() of _share_note_rules.sql last (the customer_dormant trigger)
+      "_dormant_customers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
