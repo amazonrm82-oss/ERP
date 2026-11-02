@@ -2057,8 +2057,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   the business zone, writable only, 200 runs per business a pass, scan cursor; run key `dormant:<id>:<last_purchase_on>`, once
   per customer and last purchase; a former customer never runs it; no outbox event, so `app.process_outbox` is unchanged).
   `app.automation_event_matches` (and the trigger-type constraint), `app.automation_run_facts` and
-  `app.automation_event_still_holds` were last redefined in 021139; `app.export_choice_values` in 021138. Question 64 (switching
-  a rule on runs it for everyone already dormant, (א) as built) waits for the owner. The advisor's findings on
+  `app.automation_event_still_holds` were last redefined in 021139; `app.export_choice_values` in 021138.
+  Owner (64) ג (migration 021140): `automations.dormant_from` and `dormant_from_months` (server only, trigger
+  `automations_dormant_from`) are the business day a customer_dormant rule was switched on and the dormant months in force that
+  day; the scan (`app.scheduled_customer_dormant`, last redefined in 021140) and the backfill skip customers whose
+  `app.dormant_day(last, dormant_from_months)` is before it, so a later change of the months never hides a newly dormant
+  customer. `public.dormant_customer_count(org, kind)` and `public.run_dormant_backfill(org, automation)` (definer,
+  `can_manage_automations` and writable; the scan's run key; `app.execute_automation`, so AUT-07 counts every run; at most 200
+  runs and 500 customers examined a call, cursor in `app.dormant_backfills`, `more`; a quota skip stops it, resumable; one audit
+  `dormant_backfill` per call; done per start point, then `{ok:false, reason:'done'}`). The rule page asks after save or
+  switch-on (`?dormant_ask=1`, box unticked, one call per click). Accepted: a customer whose dormancy day is the switch-on day
+  is run by the scan, not asked; the count reaches PRM-01 `manage_automations` grantees; a customer who enters the dormant list
+  below the backfill's cursor while it runs is not run; an active dormant rule without a start point (made under 021139; none on
+  hosted) counts from each day. Test 64's and 88's re-run lists end with `_dormant_activation.sql`; the advisor's findings on the
+  two definer functions are expected. The advisor's findings on
   `dormant_customers` (definer), on the three inlined computed fields and on `app.customer_purchase_facts` are expected.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
