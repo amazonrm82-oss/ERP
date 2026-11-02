@@ -15,7 +15,7 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
-// a secret), the file cleanup (same), the service worker, the offline page, the app manifest, the help
+// a secret), the file cleanup and the job worker (same), the service worker, the offline page, the app manifest, the help
 // center, the legal documents, and robots.txt / sitemap.xml for search engines (LND-11).
 const PUBLIC_PREFIXES = [
   "/auth/",
@@ -24,6 +24,8 @@ const PUBLIC_PREFIXES = [
   "/api/in/",
   "/api/push/dispatch",
   "/api/files/cleanup",
+  // OPS-04: the background job worker, woken by the database with the same secret
+  "/api/jobs/run",
   // CAL-07: calendar apps fetch the personal feed with no session; the route checks its own secret token
   "/api/calendar-feed/",
   "/sw.js",

@@ -83,6 +83,9 @@ const eslintConfig = defineConfig([
       // OPS-02 (owner, 2 November 2026, answers (40) ב, (42) ד): the secret-link pages' shared per-sender limit of "not found"
       // answers (public.public_sender_check, public.public_sender_miss)
       "src/lib/public-sender-server.ts",
+      // OPS-04 (owner, 26 October 2026, wave 3 use (1)): the background job worker woken by the database with the shared
+      // secret (public.claim_jobs, public.finish_job, public.job_message_may_send)
+      "src/features/jobs/run-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

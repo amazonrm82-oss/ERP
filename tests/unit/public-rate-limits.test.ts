@@ -235,6 +235,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   },
   "/api/push/dispatch": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute", refusal: "401" },
   "/api/files/cleanup": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken nightly by pg_cron", refusal: "401" },
+  "/api/jobs/run": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute while jobs are due", refusal: "401" },
 };
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
