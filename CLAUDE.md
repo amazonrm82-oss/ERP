@@ -106,9 +106,12 @@ and build this CRM here instead. The old code is preserved on the branch
    `src/features/quotes/signed-pdf-server.ts` calls only `public.quote_signed_pdf_public()` and `quote_signed_pdf_public_store()` from
    the customer's decide route after an acceptance (the token is the right: link rule, shown version, accepted, decision not erased, not
    signed yet; once per quote), and only `public.quote_signed_pdf_store()` for staff after `quote_signed_pdf_allowed` with the user's
-   session; it uploads (upsert off) only to the path the function answers; in the eslint allow-list. Until the owner answers question 37
-   the signed PDF and the signature are for owners and admins only (`files_select`, `quote_signed_pdf_allowed`/`_store`); the
-   advisor's finding on `quote_signed_pdf_allowed` is expected.
+   session; it uploads (upsert off) only to the path the function answers; in the eslint allow-list. Owner (37) ב: the signed PDF
+   and the signature are for owners and admins only (`files_select`, `quote_signed_pdf_allowed`/`_store`); every other reader sees
+   "נחתמה ב-[date]" from the `quote_accepted` timeline entry (deal, else contact). Owner (38) ב (migration 021126): the signed PDF
+   prints the customer's billing name, address, email and tax id (`app.quote_customer_billing`, definer, no grants; a contact's empty
+   field takes its live company's, as `effectiveBilling()`), answered as `billing` by `quote_signed_pdf_public`. The advisor's finding on
+   `quote_signed_pdf_allowed` is expected.
    In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
    (`src/features/quotes/pdf-store-server.ts`, called from `pdf-server.ts` after `public.quote_pdf_allowed` with the user's session),
    which calls only `public.quote_pdf_store()` and uploads (upsert off) only to the path it answers, with the service key; in the
