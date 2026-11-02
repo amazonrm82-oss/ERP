@@ -21,7 +21,8 @@ const BANK = { bank_name: "בנק הצוות", bank_branch: "321", bank_account:
  * BAL-04 (owner, 2 November 2026, answers (35) א and (36) ב): the staff's statement PDF holds exactly what the customer's page
  * holds. public.statement_staff_view (security invoker, the user's session) answers public.statement_public's content for one
  * customer under BAL-01's rights, keys and partial rule; the bank details only for owners and admins while the statement's
- * switch is on, otherwise `bank_elsewhere` (the PDF prints a line in their place).
+ * switch is on; anyone else then gets `bank_elsewhere` (the PDF prints a line in their place). With the switch off nobody gets
+ * either (lead's decision, 2 November 2026: the line only where it is true).
  */
 describe("the staff's statement view (BAL-04)", () => {
   let owner: U, admin: U, member: U, keyHolder: U, viewer: U, outsider: U;
@@ -186,17 +187,18 @@ describe("the staff's statement view (BAL-04)", () => {
     expect((await pgError(view(owner, {}))).code).toBe("22023");
   });
 
-  it("an admin gets the details while the statement's switch is on and the line while it is off", async () => {
+  it("an admin gets the details while the statement's switch is on; with it off nobody gets the details or the line", async () => {
     const f = await contact("פזית");
     await doc("tax_invoice", 1500, day(2), { contact: f });
     await run(owner, (q) =>
       q("insert into public.quote_designs (organization_id, show_bank_details_statement) values ($1, false) on conflict (organization_id) do update set show_bank_details_statement = false", [org]),
     );
     try {
-      for (const u of [owner, admin]) {
+      for (const u of [owner, admin, keyHolder]) {
         const v = await view(u, { contact: f });
+        expect(v.allowed, u.email).toBe(true);
         expect(v.bank, u.email).toBeNull();
-        expect(v.bank_elsewhere, u.email).toBe(true);
+        expect(v.bank_elsewhere, u.email).toBe(false);
       }
     } finally {
       await run(owner, (q) => q("update public.quote_designs set show_bank_details_statement = true where organization_id = $1", [org]));
@@ -204,6 +206,24 @@ describe("the staff's statement view (BAL-04)", () => {
     const on = await view(admin, { contact: f });
     expect(on.bank).toEqual(BANK);
     expect(on.bank_elsewhere).toBe(false);
+    const recorder = await view(keyHolder, { contact: f });
+    expect(recorder.bank).toBeNull();
+    expect(recorder.bank_elsewhere).toBe(true);
+  });
+
+  it("an owner or admin of a business without a bank account gets neither the details nor the line", async () => {
+    const g = await contact("שירה");
+    await doc("tax_invoice", 700, day(1), { contact: g });
+    await run(owner, (q) => q("update public.org_bank_details set bank_account = null where organization_id = $1", [org]));
+    try {
+      for (const u of [owner, admin]) {
+        const v = await view(u, { contact: g });
+        expect(v.bank, u.email).toBeNull();
+        expect(v.bank_elsewhere, u.email).toBe(false);
+      }
+    } finally {
+      await run(owner, (q) => q("update public.org_bank_details set bank_account = $2 where organization_id = $1", [org, BANK.bank_account]));
+    }
   });
 
   it("refuses a partial view, a contact of a company, a binned or unknown customer and missing keys", async () => {

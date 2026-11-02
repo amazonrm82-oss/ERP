@@ -5,7 +5,8 @@
 //   details per the design). The answer holds no ids, and neither does the file.
 // - the staff's (owner, 2 November 2026, answer (36) ב): exactly the customer's document, from public.statement_staff_view (the
 //   same answer read with the user's session); the bank details only for owners and admins while the statement's switch is on
-//   (answer (35) א), else the line STATEMENT_BANK_ELSEWHERE in their place.
+//   (answer (35) א); anyone else gets the line STATEMENT_BANK_ELSEWHERE in their place while the switch is on; with the switch
+//   off neither (lead's decision, 2 November 2026: the line only where it is true).
 // Pure, so it is unit tested (tests/unit/statement-pdf.test.ts reads a real file back).
 
 import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo, type PdfRow } from "@/features/pdf/document";

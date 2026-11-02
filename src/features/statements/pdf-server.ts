@@ -16,7 +16,8 @@ import { staffStatementFrom } from "./staff";
 // the customer's document ((36) ב): public.statement_staff_view (security invoker) answers public.statement_public's content
 // for the customer under RLS, BAL-01's rights and keys; a view that is partial (a row of the customer the user does not read)
 // makes no file. The bank details print only for owners and admins while the statement's switch is on ((35) א); anyone else
-// gets STATEMENT_BANK_ELSEWHERE in their place. No service key.
+// gets STATEMENT_BANK_ELSEWHERE in their place while the switch is on (the customer's page shows them then); with the switch
+// off nobody gets either (lead's decision, 2 November 2026). No service key.
 
 const text = (status: number, body: string) =>
   new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });

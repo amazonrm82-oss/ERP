@@ -15,8 +15,9 @@
 --     keep in step): with a full view the caller reads every row statement_public reads, so the answers are equal
 --     (tests/db/275-statement-staff-view.test.ts compares them).
 --   - `bank`: public.org_bank_details read under RLS (owners and admins only), only while show_bank_details_statement is on
---     and app.is_admin(org); never app.document_bank_snapshot (service_role only). `bank_elsewhere` is true when the caller
---     gets no details because of the role or the switch (the PDF prints "פרטי הבנק מופיעים בדף שהלקוח רואה").
+--     and app.is_admin(org); never app.document_bank_snapshot (service_role only). `bank_elsewhere` is true only for a
+--     reader who is not an owner or admin while the switch is on (the customer's page shows any details then; the PDF prints
+--     "פרטי הבנק מופיעים בדף שהלקוח רואה"); with the switch off nobody gets the details or the line (lead's decision, 2 November 2026).
 --   - `built_with` is false: the staff's file never prints the line (app.show_built_with is not the caller's to read).
 -- Every statement is safe to run twice. No drops, no row removal.
 
@@ -36,6 +37,8 @@ declare
   v_live boolean;
   v_show_details boolean;
   v_show_logo boolean;
+  v_switch boolean;
+  v_admin boolean;
   v_show_bank boolean;
   v_docs uuid[];
   v_rows jsonb;
@@ -159,7 +162,9 @@ begin
 
   -- BAL-04 answer (35) (א): the bank details for owners and admins only, while the statement's switch is on; read under
   -- RLS (org_bank_details_select = app.is_admin), in app.document_bank_snapshot's shape (keep in step)
-  v_show_bank := coalesce(v_design.show_bank_details_statement, true) and app.is_admin(p_org);
+  v_switch := coalesce(v_design.show_bank_details_statement, true);
+  v_admin := app.is_admin(p_org);
+  v_show_bank := v_switch and v_admin;
   if v_show_bank then
     select jsonb_build_object(
              'bank_name', b.bank_name,
@@ -193,7 +198,7 @@ begin
     'payments', v_pays.rows,
     'payments_more', v_pays.more,
     'bank', v_bank,
-    'bank_elsewhere', not v_show_bank,
+    'bank_elsewhere', v_switch and not v_admin,
     'totals', jsonb_build_object('open_agorot', v_totals.open_agorot, 'overdue_agorot', v_totals.overdue_agorot,
                                  'credit_agorot', v_credit),
     'built_with', false);

@@ -4,8 +4,8 @@ import { publicStatementFrom, type PublicStatement } from "./public";
 
 // BAL-04 (owner, 2 November 2026, answers (35) א and (36) ב): the staff's statement, from public.statement_staff_view(org,
 // contact, company) (security invoker, the user's session): public.statement_public's answer for one customer under BAL-01's
-// rights, keys and partial rule, plus `bank_elsewhere` (no bank details for this reader: not an owner or admin, or the
-// statement's switch is off). Pure, so it is unit tested.
+// rights, keys and partial rule, plus `bank_elsewhere` (true only for a reader who is not an owner or admin while the
+// statement's switch is on: the customer's page shows the details, this reader may not; switch off = no details, no line). Pure, so it is unit tested.
 
 export type StaffStatement =
   | { state: "not-allowed" }
