@@ -29,6 +29,7 @@ describe("the status answer of the customer's page", () => {
       validUntil: null,
       business: "עסק",
       logoPath: null,
+      color: "#112233",
       phone: "03-5555555",
       replaced: null,
       draftVersion: false,

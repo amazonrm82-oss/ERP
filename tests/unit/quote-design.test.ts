@@ -220,3 +220,13 @@ describe("bank details on a quote (TAX-02)", () => {
     expect(renderToStaticMarkup(createElement(QuoteDocument, { data: bankQuote }))).toContain(BANK_HEADING);
   });
 });
+
+describe("DSN-17: the quote PDF is one of the customer family", () => {
+  it("carries the business's colour and logo as the page does", () => {
+    const logo = { data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0]), kind: "png" as const };
+    const d = data();
+    const doc = quotePdfDocument(d, logo);
+    expect(doc.color).toBe(d.color);
+    expect(doc.logo).toBe(logo);
+  });
+});

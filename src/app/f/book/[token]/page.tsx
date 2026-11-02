@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { cache } from "react";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
 import { BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { PublicBookingForm } from "@/features/booking/components/public-booking-form";
@@ -12,9 +11,8 @@ import { addDays, fromParam, slotsByDay } from "@/features/booking/public";
 import { getPublicBooking } from "@/features/booking/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
@@ -64,7 +62,7 @@ export default async function PublicBookingPage({ params, searchParams }: Props)
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[page]}
         </p>
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={false} />
       </main>
     );
   }
@@ -87,12 +85,12 @@ export default async function PublicBookingPage({ params, searchParams }: Props)
     // FLD-04 / DSN-17: the business's colour (corrected for contrast) on its own page
     <BrandScope color={page.brand.color}>
       <main className="mx-auto min-h-dvh w-full max-w-xl px-5 py-10 sm:py-16">
-        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="mb-5 h-12 max-w-48" /> : null}
-        <h1 className="text-2xl font-semibold">{page.title}</h1>
-        <p className="mt-1 text-md text-ink-soft">
-          {page.business}
-          {page.rep && page.rep !== page.business ? ` · עם ${page.rep}` : ""}
-        </p>
+        <PublicBrandHeader
+          logoUrl={logoUrl}
+          business={page.business}
+          title={page.title}
+          subtitle={`${page.business}${page.rep && page.rep !== page.business ? ` · עם ${page.rep}` : ""}`}
+        />
         <p className="mt-1 text-md text-ink-soft">{details.join(" · ")}</p>
         {page.intro ? <p className="mt-3 whitespace-pre-wrap">{page.intro}</p> : null}
 
@@ -152,8 +150,7 @@ export default async function PublicBookingPage({ params, searchParams }: Props)
             <p className="text-sm text-ink-soft">השעות לפי שעון {page.timeZone === "Asia/Jerusalem" ? "ישראל" : page.timeZone}.</p>
           </section>
         )}
-        {page.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={page.builtWith} />
       </main>
     </BrandScope>
   );

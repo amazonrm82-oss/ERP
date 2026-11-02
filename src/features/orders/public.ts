@@ -188,6 +188,8 @@ export type StatusPublicOrder = {
   number: string | null;
   business: string;
   logoPath: string | null;
+  // DSN-17: the colour the full page uses (the quote design's own, else the business's), for the status page too
+  color: string | null;
   phone: string | null;
 };
 
@@ -207,7 +209,7 @@ export function statusOrderFrom(raw: unknown): StatusPublicOrder | null {
   const parsed = statusSchema.safeParse(raw);
   if (!parsed.success) return null;
   const p = parsed.data.status_page;
-  return { statusPage: true, state: p.state, number: p.number, business: p.business, logoPath: p.logo, phone: p.phone };
+  return { statusPage: true, state: p.state, number: p.number, business: p.business, logoPath: p.logo, color: p.color, phone: p.phone };
 }
 
 /**

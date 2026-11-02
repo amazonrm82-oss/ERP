@@ -3,11 +3,10 @@ import "@/features/print/print.css";
 import type { Metadata } from "next";
 import { cache } from "react";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BrandScope } from "@/features/branding/components/brand-scope";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteAnswerArea } from "@/features/quotes/components/quote-answer-area";
 import { QuoteQuestionForm } from "@/features/quotes/components/quote-question-form";
@@ -66,7 +65,7 @@ export default async function PublicQuotePage({ params }: Props) {
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[page]}
         </p>
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={false} />
       </main>
     );
   }
@@ -74,60 +73,59 @@ export default async function PublicQuotePage({ params }: Props) {
   // owner, 19 October 2026: the newest sent version is not open (accepted, declined, cancelled, expired): its state only, no
   // prices, lines or signing
   if ("statusPage" in page) {
-    const logoUrl = logoPublicUrl(page.logoPath);
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
-        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="h-12 max-w-40" /> : null}
-        <h1 className="text-lg font-semibold">
-          <bdi>{page.title}</bdi>
-        </h1>
-        {page.replaced ? (
-          <p className="text-sm text-ink-soft">
-            זו הגרסה החדשה של ההצעה
-            {page.replaced.number ? (
+      // DSN-17: the family header and the business's colour, as on the full page
+      <BrandScope color={page.color}>
+        <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
+          <PublicBrandHeader logoUrl={logoPublicUrl(page.logoPath)} business={page.business} title={<bdi>{page.title}</bdi>} subtitle={<bdi>{page.business}</bdi>} />
+          {page.replaced ? (
+            <p className="text-sm text-ink-soft">
+              זו הגרסה החדשה של ההצעה
+              {page.replaced.number ? (
+                <>
+                  {" "}
+                  <span dir="ltr" className="tabular-nums">
+                    {page.replaced.number}
+                  </span>
+                </>
+              ) : null}
+              .
+            </p>
+          ) : null}
+          <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+            {page.number ? (
+              <>
+                הצעה{" "}
+                <span dir="ltr" className="tabular-nums">
+                  {page.number}
+                </span>
+                :{" "}
+              </>
+            ) : null}
+            {STATUS_PAGE_TEXT[page.state]}
+            {page.state === "expired" && page.validUntil ? <> היא הייתה בתוקף עד {formatDate(page.validUntil)}.</> : null}
+          </p>
+          {page.draftVersion ? (
+            <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong">
+              גרסה מעודכנת בהכנה.
+            </p>
+          ) : null}
+          <p className="text-sm text-ink">
+            לפרטים פנו אל <bdi>{page.business}</bdi>
+            {page.phone ? (
               <>
                 {" "}
-                <span dir="ltr" className="tabular-nums">
-                  {page.replaced.number}
-                </span>
+                בטלפון{" "}
+                <a href={`tel:${page.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="font-medium text-accent-strong underline-offset-4 hover:underline">
+                  {page.phone}
+                </a>
               </>
             ) : null}
             .
           </p>
-        ) : null}
-        <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          {page.number ? (
-            <>
-              הצעה{" "}
-              <span dir="ltr" className="tabular-nums">
-                {page.number}
-              </span>
-              :{" "}
-            </>
-          ) : null}
-          {STATUS_PAGE_TEXT[page.state]}
-          {page.state === "expired" && page.validUntil ? <> היא הייתה בתוקף עד {formatDate(page.validUntil)}.</> : null}
-        </p>
-        {page.draftVersion ? (
-          <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong">
-            גרסה מעודכנת בהכנה.
-          </p>
-        ) : null}
-        <p className="text-sm text-ink">
-          לפרטים פנו אל <bdi>{page.business}</bdi>
-          {page.phone ? (
-            <>
-              {" "}
-              בטלפון{" "}
-              <a href={`tel:${page.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="font-medium text-accent-strong underline-offset-4 hover:underline">
-                {page.phone}
-              </a>
-            </>
-          ) : null}
-          .
-        </p>
-        <AccessibilityLink />
-      </main>
+          <PublicPageFooter builtWith={false} />
+        </main>
+      </BrandScope>
     );
   }
 
@@ -138,110 +136,110 @@ export default async function PublicQuotePage({ params }: Props) {
   const pdfAsSent = page.quote.status === "accepted" && page.hasPdf ? await getPublicQuotePdfAsSent(token, page.quote.numberDisplay) : false;
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
-      {/* data-print-page: print.css leaves only the document on paper */}
-      {/* QUO-12: the link was made for an earlier version; this page now shows the newer one */}
-      {page.replaced ? (
-        <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
-          קיימת גרסה חדשה של ההצעה, והיא מוצגת כאן.
-          {page.replaced.number ? (
-            <>
-              {" "}
-              ההצעה{" "}
-              <span dir="ltr" className="tabular-nums">
-                {page.replaced.number}
-              </span>{" "}
-              הוחלפה בה.
-            </>
-          ) : null}
-        </p>
-      ) : null}
-      {/* QUO-12 (owner, 19 October 2026): a newer version is being prepared; this one is still the one on offer */}
-      {page.draftVersion ? (
-        <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
-          גרסה מעודכנת בהכנה.
-        </p>
-      ) : null}
-      {/* owner, 19 October 2026: an accepted quote is shown in full, with the day it was accepted and no way to decide */}
-      {page.quote.status === "accepted" ? (
-        <p role="status" className="rounded-md bg-success-soft px-3 py-2.5 text-sm text-success">
-          {page.acceptedOn ? <>אושרה ב-{formatDate(page.acceptedOn)}.</> : "ההצעה אושרה."}
-        </p>
-      ) : null}
-      {/* GAP-10: this quote adds work to a quote the customer already accepted */}
-      {page.addendumOf ? (
-        <p className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink">
-          תוספת להצעה
-          {page.addendumOf.number ? (
-            <>
-              {" "}
-              <span dir="ltr" className="tabular-nums">
-                {page.addendumOf.number}
-              </span>
-            </>
-          ) : null}
-          , שכבר אושרה.
-        </p>
-      ) : null}
-      <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
-        {/* QUO-06 follow-up: the PDF the business kept for this version, only when one exists */}
-        {page.hasPdf ? (
-          <a href={publicQuotePdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
-            {pdfAsSent ? PDF_AS_SENT_PUBLIC : "הורדת PDF"}
-          </a>
+    // DSN-17: the whole page in the business's colour (the answer area and the question form too, not only the document)
+    <BrandScope color={page.color}>
+      <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
+        {/* data-print-page: print.css leaves only the document on paper */}
+        {/* QUO-12: the link was made for an earlier version; this page now shows the newer one */}
+        {page.replaced ? (
+          <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
+            קיימת גרסה חדשה של ההצעה, והיא מוצגת כאן.
+            {page.replaced.number ? (
+              <>
+                {" "}
+                ההצעה{" "}
+                <span dir="ltr" className="tabular-nums">
+                  {page.replaced.number}
+                </span>{" "}
+                הוחלפה בה.
+              </>
+            ) : null}
+          </p>
         ) : null}
-        <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
-      </div>
-      <QuoteDocument
-        data={{
-          design: page.design,
-          color: page.color,
-          logoUrl: logoPublicUrl(page.logoPath),
-          business: page.business,
-          customer: page.customer,
-          quote: page.quote,
-          lines: page.lines,
-          schedule: page.schedule,
-        }}
-      />
-      {/* GAP-10: the addenda the customer accepted on top of this quote */}
-      {page.addenda.length > 0 ? (
-        <section aria-labelledby="quote-addenda" className="rounded-lg border border-line bg-surface p-4 print:hidden sm:p-6">
-          <h2 id="quote-addenda" className="mb-2 text-base font-semibold text-ink">
-            תוספות שאושרו להצעה הזאת
-          </h2>
-          <ul className="divide-y divide-line text-sm">
-            {page.addenda.map((a) => (
-              <li key={a.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
-                <span>
-                  {a.number ? (
-                    <span dir="ltr" className="tabular-nums">
-                      {a.number}
-                    </span>
-                  ) : null}{" "}
-                  <bdi>{a.title}</bdi>
+        {/* QUO-12 (owner, 19 October 2026): a newer version is being prepared; this one is still the one on offer */}
+        {page.draftVersion ? (
+          <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
+            גרסה מעודכנת בהכנה.
+          </p>
+        ) : null}
+        {/* owner, 19 October 2026: an accepted quote is shown in full, with the day it was accepted and no way to decide */}
+        {page.quote.status === "accepted" ? (
+          <p role="status" className="rounded-md bg-success-soft px-3 py-2.5 text-sm text-success">
+            {page.acceptedOn ? <>אושרה ב-{formatDate(page.acceptedOn)}.</> : "ההצעה אושרה."}
+          </p>
+        ) : null}
+        {/* GAP-10: this quote adds work to a quote the customer already accepted */}
+        {page.addendumOf ? (
+          <p className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink">
+            תוספת להצעה
+            {page.addendumOf.number ? (
+              <>
+                {" "}
+                <span dir="ltr" className="tabular-nums">
+                  {page.addendumOf.number}
                 </span>
-                <span className="tabular-nums text-ink">{formatMoney(a.totalAgorot)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {/* QUO-09: an open quote takes one answer, bound to the version shown (its fingerprint) */}
-      {/* QUO-08: the optional lines the customer ticks go with the acceptance, with the total shown for them */}
-      {fingerprint ? (
-        <QuoteAnswerArea token={token} fingerprint={fingerprint} quote={page.quote} lines={page.lines} />
-      ) : page.quote.status === "rejected" ? (
-        <p role="status" className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink-soft print:hidden">
-          ההצעה נדחתה. אם משהו השתנה, אפשר לפנות לעסק ששלח אותה.
-        </p>
-      ) : null}
-      {/* QUO-08: a question to the rep, while the quote is shown in full (open or accepted) */}
-      {page.quote.status === "sent" || page.quote.status === "viewed" || page.quote.status === "accepted" ? <QuoteQuestionForm token={token} /> : null}
-      <div className="print:hidden">
-        {page.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
-      </div>
-    </main>
+              </>
+            ) : null}
+            , שכבר אושרה.
+          </p>
+        ) : null}
+        <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
+          {/* QUO-06 follow-up: the PDF the business kept for this version, only when one exists */}
+          {page.hasPdf ? (
+            <a href={publicQuotePdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
+              {pdfAsSent ? PDF_AS_SENT_PUBLIC : "הורדת PDF"}
+            </a>
+          ) : null}
+          <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
+        </div>
+        <QuoteDocument
+          data={{
+            design: page.design,
+            color: page.color,
+            logoUrl: logoPublicUrl(page.logoPath),
+            business: page.business,
+            customer: page.customer,
+            quote: page.quote,
+            lines: page.lines,
+            schedule: page.schedule,
+          }}
+        />
+        {/* GAP-10: the addenda the customer accepted on top of this quote */}
+        {page.addenda.length > 0 ? (
+          <section aria-labelledby="quote-addenda" className="rounded-lg border border-line bg-surface p-4 print:hidden sm:p-6">
+            <h2 id="quote-addenda" className="mb-2 text-base font-semibold text-ink">
+              תוספות שאושרו להצעה הזאת
+            </h2>
+            <ul className="divide-y divide-line text-sm">
+              {page.addenda.map((a) => (
+                <li key={a.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+                  <span>
+                    {a.number ? (
+                      <span dir="ltr" className="tabular-nums">
+                        {a.number}
+                      </span>
+                    ) : null}{" "}
+                    <bdi>{a.title}</bdi>
+                  </span>
+                  <span className="tabular-nums text-ink">{formatMoney(a.totalAgorot)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {/* QUO-09: an open quote takes one answer, bound to the version shown (its fingerprint) */}
+        {/* QUO-08: the optional lines the customer ticks go with the acceptance, with the total shown for them */}
+        {fingerprint ? (
+          <QuoteAnswerArea token={token} fingerprint={fingerprint} quote={page.quote} lines={page.lines} />
+        ) : page.quote.status === "rejected" ? (
+          <p role="status" className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink-soft print:hidden">
+            ההצעה נדחתה. אם משהו השתנה, אפשר לפנות לעסק ששלח אותה.
+          </p>
+        ) : null}
+        {/* QUO-08: a question to the rep, while the quote is shown in full (open or accepted) */}
+        {page.quote.status === "sent" || page.quote.status === "viewed" || page.quote.status === "accepted" ? <QuoteQuestionForm token={token} /> : null}
+        <PublicPageFooter builtWith={page.builtWith} className="print:hidden" />
+      </main>
+    </BrandScope>
   );
 }

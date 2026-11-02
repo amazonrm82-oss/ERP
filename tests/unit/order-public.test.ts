@@ -73,6 +73,7 @@ describe("the customer's order page (ORD-05)", () => {
       number: "ORD-7",
       business: "העסק",
       logoPath: null,
+      color: null,
       phone: "03-1",
     });
     expect(statusOrderFrom(answer)).toBeNull();

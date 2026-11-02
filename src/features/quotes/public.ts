@@ -248,6 +248,8 @@ export type StatusPublicQuote = {
   validUntil: string | null;
   business: string;
   logoPath: string | null;
+  // DSN-17: the colour the full page uses (the quote design's own, else the business's), for the status page too
+  color: string | null;
   phone: string | null;
   // the number the link was made for, when this is a newer version of it
   replaced: { number: string | null } | null;
@@ -283,6 +285,7 @@ export function statusQuoteFrom(raw: unknown): StatusPublicQuote | null {
     validUntil: p.valid_until,
     business: p.business,
     logoPath: p.logo,
+    color: p.color,
     phone: p.phone,
     replaced: p.replaced ? { number: p.replaced.number } : null,
     draftVersion: p.draft_version,

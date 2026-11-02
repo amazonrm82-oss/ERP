@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { QrImage } from "@/features/intake/components/qr-image";
 import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
@@ -36,8 +35,8 @@ export default async function FormQrPosterPage({ params }: Props) {
           </p>
         ) : (
           <>
-            {logoUrl ? <OrgLogo url={logoUrl} alt="לוגו העסק" className="mb-6 h-16 max-w-56" /> : null}
-            <h1 className="text-2xl font-semibold text-balance">{found.title}</h1>
+            {/* DSN-17: the family header, bigger and centred on a sheet meant for printing */}
+            <PublicBrandHeader logoUrl={logoUrl} business={null} title={found.title} logoClassName="mb-6 h-16 max-w-56" className="flex flex-col items-center text-balance" />
             <span aria-hidden="true" className="mt-4 block h-1 w-16 rounded-full bg-accent" />
             <p className="mt-4 text-lead text-ink-soft">סורקים את הקוד במצלמה של הטלפון וממלאים את הפרטים</p>
             <QrImage code={encodeQr(formQrUrl(pageUrl))} label={`קוד QR לטופס ${found.title}`} className="mt-8 aspect-square w-full max-w-80 rounded-lg" />
@@ -50,7 +49,8 @@ export default async function FormQrPosterPage({ params }: Props) {
             </div>
           </>
         )}
-        <AccessibilityLink className="print:hidden" />
+        {/* a sheet to print: no "built with" line, as before */}
+        <PublicPageFooter builtWith={false} className="print:hidden" />
       </main>
     </BrandScope>
   );

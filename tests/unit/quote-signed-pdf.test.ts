@@ -280,3 +280,13 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(readSignature({ ...block, decided_at: "x" })).toEqual({ problem: "shape" });
   });
 });
+
+describe("DSN-17: the signed quote PDF is one of the customer family", () => {
+  it("carries the business's colour and logo as the page does", () => {
+    const logo = { data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0]), kind: "png" as const };
+    const data = sample(1);
+    const doc = quoteSignedPdfDocument(data, logo, signature());
+    expect(doc.color).toBe(data.color);
+    expect(doc.logo).toBe(logo);
+  });
+});

@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
+import { PublicPageFooter } from "@/features/branding/components/public-page";
 import { PublicWidgetForm } from "@/features/site-widgets/components/public-widget-form";
 import { getPublicWidget } from "@/features/site-widgets/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
@@ -43,8 +42,7 @@ export default async function WidgetFormPage({ params }: Props) {
         <h1 className="text-lead font-semibold break-words">השאירו פרטים</h1>
         <p className="mt-1 mb-4 text-md text-ink-soft break-words">{widget.business} יחזרו אליכם בהקדם.</p>
         <PublicWidgetForm token={token} business={widget.business} />
-        {widget.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={widget.builtWith} />
       </main>
     </BrandScope>
   );

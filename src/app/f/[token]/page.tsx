@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import { cache } from "react";
 
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { OrgLogo } from "@/features/branding/components/org-logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
 import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { cn } from "@/lib/cn";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
@@ -59,17 +57,17 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
           </p>
         ) : (
           <>
-            {logoUrl ? <OrgLogo url={logoUrl} alt="לוגו העסק" className="mb-5 h-12 max-w-48" /> : null}
-            <h1 className="text-2xl font-semibold">{found.title}</h1>
-            {found.intro ? <p className="mt-1 whitespace-pre-wrap text-ink-soft">{found.intro}</p> : null}
+            {/* DSN-17: the family header; intake_form() answers the logo and colour, not the business's name */}
+            <PublicBrandHeader logoUrl={logoUrl} business={null} title={found.title}>
+              {found.intro ? <p className="mt-1 whitespace-pre-wrap text-ink-soft">{found.intro}</p> : null}
+            </PublicBrandHeader>
             <div className="mt-6">
               <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} whatsappUrl={found.thanks.whatsappUrl} callback={found.callback} channelChoice={found.channelChoice} localeChoice={found.localeChoice} products={found.products} marketingConsent={found.marketingConsent} />
             </div>
           </>
         )}
         {/* FLD-04: the small "נבנה ב-Mexuz" line, unless the business's plan removes it */}
-        {found?.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink newTab={embed} />
+        <PublicPageFooter builtWith={found?.builtWith === true} newTab={embed} />
       </main>
     </BrandScope>
   );

@@ -146,3 +146,13 @@ describe("the order confirmation PDF (ORD-05)", () => {
     expect(orderPdfOutdated({ pdfContentChangedAt: "2026-11-01T10:00:01+00:00" }, null)).toBe(false);
   });
 });
+
+describe("DSN-17: the order PDF is one of the customer family", () => {
+  it("carries the business's colour and logo as the page does", () => {
+    const logo = { data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0]), kind: "png" as const };
+    const data = sample(1);
+    const doc = orderPdfDocument(data, logo);
+    expect(doc.color).toBe(data.color);
+    expect(doc.logo).toBe(logo);
+  });
+});

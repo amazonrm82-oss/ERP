@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
 import { ChatIcon, MailIcon, PhoneIcon } from "@/components/ui/icons";
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { PublicCardForm } from "@/features/business-cards/components/public-card-form";
 import { cardVCardPath } from "@/features/business-cards/paths";
 import { getPublicCard } from "@/features/business-cards/public-server";
@@ -55,7 +53,7 @@ export default async function PublicCardPage({ params }: Props) {
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[card]}
         </p>
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={false} />
       </main>
     );
   }
@@ -65,9 +63,7 @@ export default async function PublicCardPage({ params }: Props) {
     // FLD-04 / DSN-17: the business's colour (corrected for contrast) on its own page
     <BrandScope color={card.brand.color}>
       <main className="mx-auto min-h-dvh w-full max-w-md px-5 py-10 sm:py-16">
-        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${card.business}`} className="mb-5 h-12 max-w-48" /> : null}
-        <h1 className="text-2xl font-semibold break-words">{card.name}</h1>
-        <p className="mt-1 text-md text-ink-soft">{[card.jobTitle, card.business].filter(Boolean).join(" · ")}</p>
+        <PublicBrandHeader logoUrl={logoUrl} business={card.business} title={card.name} subtitle={[card.jobTitle, card.business].filter(Boolean).join(" · ")} />
         {card.about ? <p className="mt-3 whitespace-pre-wrap break-words">{card.about}</p> : null}
 
         <ul className="mt-6 grid gap-2" aria-label="דרכים ליצירת קשר">
@@ -121,8 +117,7 @@ export default async function PublicCardPage({ params }: Props) {
             <PublicCardForm token={token} rep={card.name} />
           </section>
         ) : null}
-        {card.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={card.builtWith} />
       </main>
     </BrandScope>
   );

@@ -199,3 +199,13 @@ describe("the staff's statement PDF (BAL-04, owner 2 November 2026: the customer
     expect(publicStatementPdfDocument(data, null, null)).toEqual(publicStatementPdfDocument(data, null));
   });
 });
+
+describe("DSN-17: the statement PDF is one of the customer family", () => {
+  it("carries the business's colour and logo as the page does", () => {
+    const logo = { data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0]), kind: "png" as const };
+    const data = statement(1, 1);
+    const doc = publicStatementPdfDocument(data, logo);
+    expect(doc.color).toBe(data.color);
+    expect(doc.logo).toBe(logo);
+  });
+});

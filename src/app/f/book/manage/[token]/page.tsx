@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { cache } from "react";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
 import { buttonClasses } from "@/components/ui/button";
 import { BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { BookingManageCancel, BookingManageChange } from "@/features/booking/components/booking-manage-actions";
@@ -12,9 +11,8 @@ import { addDays, fromParam, localDate, slotsByDay } from "@/features/booking/pu
 import { getBookingManage } from "@/features/booking/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { BrandScope } from "@/features/branding/components/brand-scope";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { MEETING_TYPE_LABEL } from "@/features/meetings/schema";
 import { longDay } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
@@ -76,7 +74,7 @@ export default async function BookingManagePage({ params, searchParams }: Props)
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[page]}
         </p>
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={false} />
       </main>
     );
   }
@@ -95,8 +93,7 @@ export default async function BookingManagePage({ params, searchParams }: Props)
   return (
     <BrandScope color={page.brand.color}>
       <main className="mx-auto min-h-dvh w-full max-w-xl px-5 py-10 sm:py-16">
-        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="mb-5 h-12 max-w-48" /> : null}
-        <h1 className="text-2xl font-semibold">הפגישה שלך ב{page.business}</h1>
+        <PublicBrandHeader logoUrl={logoUrl} business={page.business} title={`הפגישה שלך ב${page.business}`} />
         <div className="mt-4 rounded-lg border border-line bg-surface p-4">
           <p className={page.status === "cancelled" ? "text-lead font-semibold line-through" : "text-lead font-semibold"}>{when}</p>
           <p className="mt-1 text-md text-ink-soft">{details.join(" · ")}</p>
@@ -186,8 +183,7 @@ export default async function BookingManagePage({ params, searchParams }: Props)
             ) : null}
           </div>
         ) : null}
-        {page.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={page.builtWith} />
       </main>
     </BrandScope>
   );

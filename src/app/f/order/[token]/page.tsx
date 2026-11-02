@@ -4,10 +4,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { AccessibilityLink } from "@/components/accessibility-link";
-import { OrgLogo } from "@/features/branding/components/org-logo";
+import { BrandScope } from "@/features/branding/components/brand-scope";
+import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
-import { BuiltWithLine } from "@/features/built-with/components/built-with-line";
 import { OrderDocument } from "@/features/orders/components/order-document";
 import { publicOrderPdfPath } from "@/features/orders/public";
 import { getPublicOrder } from "@/features/orders/public-server";
@@ -65,86 +64,87 @@ export default async function PublicOrderPage({ params }: Props) {
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
           {MESSAGES[page]}
         </p>
-        <AccessibilityLink />
+        <PublicPageFooter builtWith={false} />
       </main>
     );
   }
 
   if ("statusPage" in page) {
-    const logoUrl = logoPublicUrl(page.logoPath);
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
-        {logoUrl ? <OrgLogo url={logoUrl} alt={`הלוגו של ${page.business}`} className="h-12 max-w-40" /> : null}
-        <h1 className="text-lg font-semibold">אישור הזמנה</h1>
-        <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          {page.number ? (
-            <>
-              הזמנה{" "}
-              <span dir="ltr" className="tabular-nums">
-                {page.number}
-              </span>
-              :{" "}
-            </>
-          ) : null}
-          ההזמנה בוטלה על ידי העסק.
-        </p>
-        <p className="text-sm text-ink">
-          לפרטים פנו אל <bdi>{page.business}</bdi>
-          {page.phone ? (
-            <>
-              {" "}
-              בטלפון{" "}
-              <a href={`tel:${page.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="font-medium text-accent-strong underline-offset-4 hover:underline">
-                {page.phone}
-              </a>
-            </>
-          ) : null}
-          .
-        </p>
-        <AccessibilityLink />
-      </main>
+      // DSN-17: the family header and the business's colour, as on the full page
+      <BrandScope color={page.color}>
+        <main className="mx-auto min-h-dvh w-full max-w-md space-y-4 px-5 py-10 sm:py-16">
+          <PublicBrandHeader logoUrl={logoPublicUrl(page.logoPath)} business={page.business} title="אישור הזמנה" subtitle={<bdi>{page.business}</bdi>} />
+          <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+            {page.number ? (
+              <>
+                הזמנה{" "}
+                <span dir="ltr" className="tabular-nums">
+                  {page.number}
+                </span>
+                :{" "}
+              </>
+            ) : null}
+            ההזמנה בוטלה על ידי העסק.
+          </p>
+          <p className="text-sm text-ink">
+            לפרטים פנו אל <bdi>{page.business}</bdi>
+            {page.phone ? (
+              <>
+                {" "}
+                בטלפון{" "}
+                <a href={`tel:${page.phone.replace(/[^\d+]/g, "")}`} dir="ltr" className="font-medium text-accent-strong underline-offset-4 hover:underline">
+                  {page.phone}
+                </a>
+              </>
+            ) : null}
+            .
+          </p>
+          <PublicPageFooter builtWith={false} />
+        </main>
+      </BrandScope>
     );
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
-      {page.decision ? (
-        <p role="status" className={`rounded-md px-3 py-2.5 text-sm print:hidden ${page.decision.decision === "accepted" ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>
-          {page.decision.decision === "accepted" ? "אישרת את ההזמנה" : "דחית את ההזמנה"} ב-{formatDate(page.decision.decidedAt)}.
-        </p>
-      ) : page.order.status !== "new" ? (
-        <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
-          מצב ההזמנה: {ORDER_STATUS_LABELS[page.order.status]}.
-        </p>
-      ) : null}
-      {/* data-print-page: print.css leaves only the document on paper */}
-      <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
-        {/* ORD-05 PDF: the PDF the business kept for this order, only when one exists */}
-        {page.hasPdf ? (
-          <a href={publicOrderPdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
-            הורדת PDF
-          </a>
+    // DSN-17: the whole page in the business's colour (the answer panel too, not only the document)
+    <BrandScope color={page.color}>
+      <main className="mx-auto min-h-dvh w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-10">
+        {page.decision ? (
+          <p role="status" className={`rounded-md px-3 py-2.5 text-sm print:hidden ${page.decision.decision === "accepted" ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>
+            {page.decision.decision === "accepted" ? "אישרת את ההזמנה" : "דחית את ההזמנה"} ב-{formatDate(page.decision.decidedAt)}.
+          </p>
+        ) : page.order.status !== "new" ? (
+          <p role="status" className="rounded-md bg-accent-soft px-3 py-2.5 text-sm text-accent-strong print:hidden">
+            מצב ההזמנה: {ORDER_STATUS_LABELS[page.order.status]}.
+          </p>
         ) : null}
-        <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
-      </div>
-      <OrderDocument
-        data={{
-          design: page.design,
-          color: page.color,
-          logoUrl: logoPublicUrl(page.logoPath),
-          business: page.business,
-          customer: page.customer,
-          order: page.order,
-          lines: page.lines,
-          schedule: page.schedule,
-        }}
-      />
-      {/* a new order waits for one answer, bound to what the page shows (its fingerprint) */}
-      {page.fingerprint ? <QuoteDecisionPanel token={token} fingerprint={page.fingerprint} subject="order" /> : null}
-      <div className="print:hidden">
-        {page.builtWith ? <BuiltWithLine /> : null}
-        <AccessibilityLink />
-      </div>
-    </main>
+        {/* data-print-page: print.css leaves only the document on paper */}
+        <div data-print-page="" className="flex flex-wrap justify-end gap-2 print:hidden">
+          {/* ORD-05 PDF: the PDF the business kept for this order, only when one exists */}
+          {page.hasPdf ? (
+            <a href={publicOrderPdfPath(token)} rel="nofollow noreferrer" className={buttonClasses("secondary", "sm")}>
+              הורדת PDF
+            </a>
+          ) : null}
+          <PrintButton label={page.hasPdf ? "הדפסה" : "הדפסה או שמירה כ-PDF"} />
+        </div>
+        <OrderDocument
+          data={{
+            design: page.design,
+            color: page.color,
+            logoUrl: logoPublicUrl(page.logoPath),
+            business: page.business,
+            customer: page.customer,
+            order: page.order,
+            lines: page.lines,
+            schedule: page.schedule,
+          }}
+        />
+        {/* a new order waits for one answer, bound to what the page shows (its fingerprint) */}
+        {page.fingerprint ? <QuoteDecisionPanel token={token} fingerprint={page.fingerprint} subject="order" /> : null}
+        <PublicPageFooter builtWith={page.builtWith} className="print:hidden" />
+      </main>
+    </BrandScope>
   );
 }
