@@ -47,8 +47,17 @@ export async function runJobsRoute(request: Request): Promise<Response> {
           if (error) throw new Error("claim failed");
           return data;
         },
-        finish: async (job, ok, error, final) => {
-          await supabase.rpc("finish_job", { p_job: job.id, p_lease: job.lease, p_ok: ok, p_error: error ?? undefined, p_final: final });
+        finish: async (job, report) => {
+          const { data, error } = await supabase.rpc("finish_job", {
+            p_job: job.id,
+            p_lease: job.lease,
+            p_ok: report.ok,
+            p_error: report.error ?? undefined,
+            p_final: report.final,
+            p_started: report.started,
+          });
+          if (error) return null;
+          return data === "done" || data === "failed" || data === "dead" || data === "released" || data === "stale" ? data : null;
         },
       },
       registry,

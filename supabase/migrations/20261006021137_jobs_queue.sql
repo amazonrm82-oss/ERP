@@ -15,15 +15,23 @@
 -- * public.claim_jobs(kinds, limit, lease_seconds) (service_role only): fair per business (each business's
 --   earliest due job first, then each one's second, ...), FOR UPDATE SKIP LOCKED, a lease per claim, a job whose
 --   lease ran out is claimable again and a lease that ran out on the last try makes it dead.
--- * public.finish_job(job, lease, ok, error, final) (service_role only): only the holder of the live lease
---   finishes ('stale' otherwise); a failure waits app.job_backoff(attempts) (1, 4, 16, 64 minutes, at most 6
---   hours) and is dead after app.job_max_attempts() tries (5) or when final.
--- * public.job_message_may_send(job, lease) (service_role only): the ONE check of the send handler. It answers
+-- * public.finish_job(job, lease, ok, error, final, started) (service_role only): only the holder of a LIVE
+--   lease (the lease id and locked_until > now()) finishes; anything else answers 'stale' and changes nothing.
+--   A failure waits app.job_backoff(attempts) (1, 4, 16, 64 minutes, at most 6 hours) and is dead after
+--   app.job_max_attempts() tries (5) or when final. started = false hands a claimed job back untried: queued
+--   again at once, the attempt not counted ('released').
+-- * public.job_message_may_send(job, lease) (service_role only): the ONE check of the send handler; a lease that
+--   is not live answers 'stale' and changes nothing, so an old holder never gets "yes" after a reclaim. It answers
 --   {may_send} or {may_send: false, reason} and never returns an address or a name; a refusal also ends the job
 --   ('refused', last_error 'refused:<reason>') in the same transaction, so nothing is sent for it later.
---   It asks app.customer_sending_paused (HEB-09) and app.consent_suppressed (null = cannot check = refused).
+--   It asks app.customer_sending_paused (HEB-09) and app.consent_suppressed (null = cannot check = refused), and
+--   refuses a business that is soft-deleted, suspended or cancelled (app.job_org_sends: app.org_takes_leads' rule
+--   without 'suspended', i.e. deleted_at is null and not app.org_status_closed).
 -- * app.wake_job_worker(): pg_cron 'crm-jobs-wake' every minute wakes /api/jobs/run through pg_net when queued
---   work is due, with the push dispatcher's shared secret. The URL is app.settings 'jobs_run_url', or derived
+--   work is due, with the push dispatcher's shared secret. Only for a kind a worker asked for in the last day
+--   (app.job_kind_seen.last_claimed_at, stamped by claim_jobs), or at most once an hour per kind otherwise
+--   (last_woken_at): a kind with no ready handler (no provider configured) wakes the route hourly, not every
+--   minute, and a kind that becomes ready is picked up within the hour (app.job_wake_kinds). The URL is app.settings 'jobs_run_url', or derived
 --   from 'push_dispatch_url'. The owner fills app.settings; this migration writes none.
 -- Every statement is safe to run twice.
 
@@ -122,6 +130,30 @@ create index if not exists jobs_due_idx on app.jobs (next_run_at) where status i
 create index if not exists jobs_org_idx on app.jobs (organization_id, next_run_at);
 create index if not exists jobs_lease_idx on app.jobs (locked_until) where status = 'running';
 
+-- per kind: when a worker last asked for it (claim_jobs) and when the database last woke the worker for it
+create table if not exists app.job_kind_seen (
+  kind             text primary key,
+  last_claimed_at  timestamptz,
+  last_woken_at    timestamptz,
+  constraint job_kind_seen_known check (kind = any (app.job_kinds()))
+);
+alter table app.job_kind_seen enable row level security;
+revoke all on app.job_kind_seen from public, anon, authenticated, service_role;
+-- one row per known kind, made here (a new kind adds its row in its migration), so claims only update
+insert into app.job_kind_seen (kind) select k from unnest(app.job_kinds()) k on conflict (kind) do nothing;
+
+-- a business whose customers may get automatic messages: not soft-deleted, not suspended or cancelled
+create or replace function app.job_org_sends(p_org uuid) returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.organizations o
+     where o.id = p_org and o.deleted_at is null and not app.org_status_closed(o.status)
+  )
+$$;
+revoke all on function app.job_org_sends(uuid) from public, anon, authenticated;
+
 -- ----------------------------------------------------------------------------
 -- Enqueue (server-side SQL only)
 -- ----------------------------------------------------------------------------
@@ -163,6 +195,14 @@ begin
   if p_kinds is null or cardinality(p_kinds) = 0 then
     return '[]'::jsonb;
   end if;
+
+  -- a worker asked for these kinds now (app.job_wake_kinds wakes it every minute for them); at most once a minute
+  -- per kind, and never waiting on another worker's open claim (skip locked)
+  update app.job_kind_seen s set last_claimed_at = now()
+   where s.kind in (select x.kind from app.job_kind_seen x
+                     where x.kind = any (p_kinds)
+                       and (x.last_claimed_at is null or x.last_claimed_at < now() - interval '1 minute')
+                     for update skip locked);
 
   -- a lease that ran out on the last try: the job is dead
   update app.jobs j
@@ -226,7 +266,8 @@ grant execute on function public.claim_jobs(text[], integer, integer) to service
 -- ----------------------------------------------------------------------------
 -- Finish: only the live lease; backoff; dead after the last try
 -- ----------------------------------------------------------------------------
-create or replace function public.finish_job(p_job uuid, p_lease uuid, p_ok boolean, p_error text default null, p_final boolean default false)
+create or replace function public.finish_job(p_job uuid, p_lease uuid, p_ok boolean, p_error text default null,
+                                             p_final boolean default false, p_started boolean default true)
 returns text
 language plpgsql volatile security definer
 set search_path = ''
@@ -235,8 +276,15 @@ declare
   v_job app.jobs%rowtype;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
-  if not found or v_job.status <> 'running' or p_lease is null or v_job.lease_id is distinct from p_lease then
+  if not found or v_job.status <> 'running' or p_lease is null or v_job.lease_id is distinct from p_lease
+     or not (v_job.locked_until > now()) then
     return 'stale';
+  end if;
+  if not coalesce(p_started, true) then
+    -- claimed but never started: back to the queue at once, the attempt not counted
+    update app.jobs j set status = 'queued', attempts = greatest(j.attempts - 1, 0), lease_id = null, locked_until = null
+     where j.id = p_job;
+    return 'released';
   end if;
   if coalesce(p_ok, false) then
     update app.jobs j set status = 'done', lease_id = null, locked_until = null, finished_at = now(), last_error = null
@@ -256,8 +304,8 @@ begin
   return 'failed';
 end;
 $$;
-revoke all on function public.finish_job(uuid, uuid, boolean, text, boolean) from public, anon, authenticated;
-grant execute on function public.finish_job(uuid, uuid, boolean, text, boolean) to service_role;
+revoke all on function public.finish_job(uuid, uuid, boolean, text, boolean, boolean) from public, anon, authenticated;
+grant execute on function public.finish_job(uuid, uuid, boolean, text, boolean, boolean) to service_role;
 
 -- ----------------------------------------------------------------------------
 -- The send check: may this message.send job go out now? (no personal data in the answer)
@@ -280,7 +328,7 @@ declare
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
   if not found or v_job.kind <> 'message.send' or v_job.status <> 'running'
-     or p_lease is null or v_job.lease_id is distinct from p_lease then
+     or p_lease is null or v_job.lease_id is distinct from p_lease or not (v_job.locked_until > now()) then
     return jsonb_build_object('may_send', false, 'reason', 'stale');
   end if;
 
@@ -297,7 +345,7 @@ begin
      where c.organization_id = v_job.organization_id and c.id = v_record and c.deleted_at is null;
   end if;
 
-  if app.org_closed(v_job.organization_id) then
+  if not app.job_org_sends(v_job.organization_id) then
     v_reason := 'business_closed';
   elsif app.customer_sending_paused(v_job.organization_id) then
     v_reason := 'sending_paused';
@@ -332,6 +380,22 @@ grant execute on function public.job_message_may_send(uuid, uuid) to service_rol
 -- ----------------------------------------------------------------------------
 -- Waking the worker
 -- ----------------------------------------------------------------------------
+-- the kinds to wake the worker for now: due work of a kind a worker asked for in the last day, or of any kind
+-- whose last wake was more than an hour ago (or never)
+create or replace function app.job_wake_kinds() returns text[]
+language sql stable security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(d.kind order by d.kind), '{}'::text[])
+    from (select distinct j.kind from app.jobs j
+           where (j.status in ('queued', 'failed') and j.next_run_at <= now())
+              or (j.status = 'running' and j.locked_until < now())) d
+    left join app.job_kind_seen s on s.kind = d.kind
+   where s.last_claimed_at > now() - interval '1 day'
+      or s.last_woken_at is null or s.last_woken_at <= now() - interval '1 hour'
+$$;
+revoke all on function app.job_wake_kinds() from public, anon, authenticated;
+
 create or replace function app.wake_job_worker() returns boolean
 language plpgsql security definer
 set search_path = ''
@@ -341,14 +405,16 @@ declare
     nullif((select s.value from app.settings s where s.key = 'jobs_run_url'), ''),
     replace(nullif((select s.value from app.settings s where s.key = 'push_dispatch_url'), ''), '/api/push/dispatch', '/api/jobs/run'));
   v_secret text := nullif((select s.value from app.settings s where s.key = 'push_dispatch_secret'), '');
+  v_kinds text[];
 begin
-  if v_url is null or v_secret is null
-     or not exists (select 1 from pg_extension where extname = 'pg_net')
-     or not exists (select 1 from app.jobs j
-                     where (j.status in ('queued', 'failed') and j.next_run_at <= now())
-                        or (j.status = 'running' and j.locked_until < now())) then
+  if v_url is null or v_secret is null or not exists (select 1 from pg_extension where extname = 'pg_net') then
     return false;
   end if;
+  v_kinds := app.job_wake_kinds();
+  if cardinality(v_kinds) = 0 then
+    return false;
+  end if;
+  update app.job_kind_seen s set last_woken_at = now() where s.kind = any (v_kinds);
   execute 'select net.http_post(url := $1, body := ''{}''::jsonb, headers := $2)'
     using v_url, jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || v_secret);
   return true;

@@ -21,8 +21,11 @@ const enqueue = (org: string, payload: Record<string, unknown>, runAt: string | 
   asAdmin(async (q) => (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2, $3) as id", [org, JSON.stringify(payload), runAt])).rows[0].id);
 const claim = (limit = 20, kinds = ["message.send"]) =>
   asService(async (q) => (await q<{ r: Claimed[] }>("select public.claim_jobs($1, $2) as r", [kinds, limit])).rows[0].r);
-const finish = (job: Claimed | { id: string; lease: string }, ok: boolean, error: string | null = null, final = false) =>
-  asService(async (q) => (await q<{ r: string }>("select public.finish_job($1, $2, $3, $4, $5) as r", [job.id, job.lease, ok, error, final])).rows[0].r);
+const finish = (job: Claimed | { id: string; lease: string }, ok: boolean, error: string | null = null, final = false, started = true) =>
+  asService(
+    async (q) => (await q<{ r: string }>("select public.finish_job($1, $2, $3, $4, $5, $6) as r", [job.id, job.lease, ok, error, final, started])).rows[0].r,
+  );
+const expire = (id: string) => asAdmin((q) => q("update app.jobs set locked_until = now() - interval '1 second' where id = $1", [id]));
 const maySend = (job: Claimed) =>
   asService(async (q) => (await q<{ r: Record<string, unknown> }>("select public.job_message_may_send($1, $2) as r", [job.id, job.lease])).rows[0].r);
 const jobOf = (id: string) => asAdmin(async (q) => (await q<Job>("select * from app.jobs where id = $1", [id])).rows[0]);
@@ -56,21 +59,22 @@ describe("background job queue (OPS-04)", () => {
       const rights = await asAdmin(
         async (q) =>
           (
-            await q<{ t: boolean; enqueue: boolean; wake: boolean }>(
+            await q<{ t: boolean; enqueue: boolean; wake: boolean; seen: boolean }>(
               `select has_table_privilege($1, 'app.jobs', 'select,insert,update,delete') as t,
                       has_function_privilege($1, 'app.enqueue_job(uuid,text,jsonb,timestamptz)', 'execute') as enqueue,
-                      has_function_privilege($1, 'app.wake_job_worker()', 'execute') as wake`,
+                      has_function_privilege($1, 'app.wake_job_worker()', 'execute') as wake,
+                      has_table_privilege($1, 'app.job_kind_seen', 'select,insert,update,delete') as seen`,
               [role],
             )
           ).rows[0],
       );
-      expect(rights, role).toEqual({ t: false, enqueue: false, wake: false });
+      expect(rights, role).toEqual({ t: false, enqueue: false, wake: false, seen: false });
       const publics = await asAdmin(
         async (q) =>
           (
             await q<{ c: boolean; f: boolean; m: boolean }>(
               `select has_function_privilege($1, 'public.claim_jobs(text[],integer,integer)', 'execute') as c,
-                      has_function_privilege($1, 'public.finish_job(uuid,uuid,boolean,text,boolean)', 'execute') as f,
+                      has_function_privilege($1, 'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)', 'execute') as f,
                       has_function_privilege($1, 'public.job_message_may_send(uuid,uuid)', 'execute') as m`,
               [role],
             )
@@ -293,6 +297,97 @@ describe("background job queue (OPS-04)", () => {
     await enqueue(orgC, send(lead));
     const [s] = await claim();
     expect(await maySend(s)).toEqual({ may_send: false, reason: "business_closed" });
+  });
+
+  it("an expired lease is stale for the send check and for finish, before and after a reclaim, and changes nothing", async () => {
+    const lead = await insertLead(owner.id, org, { email: "lease@example.test" });
+    const id = await enqueue(org, send(lead));
+    const [old] = await claim();
+    await expire(id);
+    // not reclaimed yet: the old holder still gets nothing
+    expect(await maySend(old)).toEqual({ may_send: false, reason: "stale" });
+    expect(await finish(old, true)).toBe("stale");
+    expect(await finish(old, false, "x", false, false)).toBe("stale");
+    expect(await jobOf(id)).toMatchObject({ status: "running", attempts: 1, last_error: null });
+    // reclaimed: the new holder may send, the old one never
+    const [fresh] = await claim();
+    expect(fresh.id).toBe(id);
+    expect(await maySend(old)).toEqual({ may_send: false, reason: "stale" });
+    expect(await maySend(fresh)).toEqual({ may_send: true });
+    expect(await finish(old, true)).toBe("stale");
+    expect(await finish(fresh, true)).toBe("done");
+  });
+
+  it("a job claimed but not started is handed back at once, its attempt not counted, and never goes dead untried", async () => {
+    const id = await enqueue(org, send(randomUUID()));
+    await asAdmin((q) => q("update app.jobs set attempts = 4 where id = $1", [id]));
+    for (let i = 0; i < 3; i++) {
+      const [job] = await claim();
+      expect(job.attempt).toBe(5);
+      expect(await finish(job, false, null, false, false)).toBe("released");
+      expect(await jobOf(id)).toMatchObject({ status: "queued", attempts: 4, lease_id: null, locked_until: null });
+      expect(await finish(job, true)).toBe("stale");
+    }
+    const [last] = await claim();
+    expect(last.id).toBe(id);
+    expect(await finish(last, true)).toBe("done");
+  });
+
+  it("the send check refuses a soft-deleted business", async () => {
+    const owner2 = await createUser("jobs-deleted");
+    const gone = await createOrg(owner2.id, "עסק שנמחק");
+    const lead = await insertLead(owner2.id, gone, { email: "deleted@example.test" });
+    await asAdmin((q) => q("update public.organizations set deleted_at = now() where id = $1", [gone]));
+    const id = await enqueue(gone, send(lead));
+    const [job] = await claim();
+    expect(job.id).toBe(id);
+    expect(await maySend(job)).toEqual({ may_send: false, reason: "business_closed" });
+    expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:business_closed" });
+    // a read-only business still sends (current rule; owner question open)
+    const readOnly = await insertLead(owner.id, orgB, { email: "readonly@example.test" });
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [orgB]));
+    try {
+      await enqueue(orgB, send(readOnly));
+      const [r] = await claim();
+      expect(await maySend(r)).toEqual({ may_send: true });
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [orgB]));
+    }
+  });
+
+  it("wakes every minute only for kinds a worker asked for in the last day, else at most once an hour", async () => {
+    const kinds = () => asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_wake_kinds() as k")).rows[0].k);
+    const seen = (claimed: string | null, woken: string | null) =>
+      asAdmin((q) =>
+        q("update app.job_kind_seen set last_claimed_at = now() - $1::interval, last_woken_at = now() - $2::interval where kind = 'message.send'", [
+          claimed,
+          woken,
+        ]),
+      );
+    expect(await kinds()).toEqual([]);
+    await enqueue(org, send(randomUUID()));
+    await seen(null, null);
+    expect(await kinds()).toEqual(["message.send"]); // never asked for, never woken: wake once
+    await seen(null, "1 minute");
+    expect(await kinds()).toEqual([]); // no worker asks for it: not again within the hour
+    await seen("2 days", "59 minutes");
+    expect(await kinds()).toEqual([]);
+    await seen("2 days", "61 minutes");
+    expect(await kinds()).toEqual(["message.send"]);
+    await seen("23 hours", "1 minute");
+    expect(await kinds()).toEqual(["message.send"]); // asked for in the last day: every minute
+    // claim_jobs stamps the kinds it was asked for, even when it claims nothing new
+    await asAdmin((q) => q("update app.job_kind_seen set last_claimed_at = null, last_woken_at = now()"));
+    await claim(20);
+    const stamped = await asAdmin(
+      async (q) => (await q<{ ok: boolean }>("select last_claimed_at > now() - interval '1 minute' as ok from app.job_kind_seen where kind = 'message.send'")).rows[0].ok,
+    );
+    expect(stamped).toBe(true);
+    // without pg_net the wake writes nothing
+    await asAdmin((q) => q("update app.job_kind_seen set last_woken_at = null"));
+    await enqueue(org, send(randomUUID()));
+    expect(await asAdmin(async (q) => (await q<{ w: boolean }>("select app.wake_job_worker() as w")).rows[0].w)).toBe(false);
+    expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.job_kind_seen where last_woken_at is not null")).rows[0].n)).toBe(0);
   });
 
   it("the worker is woken only with its settings, pg_net and due work; the cron job is registered where pg_cron exists", async () => {

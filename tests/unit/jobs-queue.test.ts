@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runJobsRoute } from "@/features/jobs/run-server";
 import { createRegistry, JOB_KINDS, parseClaimed, redactJobError, type ClaimedJob, type JobHandler } from "@/features/jobs/registry";
-import { runJobs, type QueueCalls } from "@/features/jobs/runner";
-import { clearFakeSentMessages, createFakeProvider, fakeSentMessages } from "@/features/messaging/providers/fake";
+import { runJobs, type FinishAnswer, type QueueCalls } from "@/features/jobs/runner";
+import { clearFakeSentMessages, createFakeProvider, FAKE_SENT_KEPT, fakeSentMessages } from "@/features/messaging/providers/fake";
 import { messagingProvider } from "@/features/messaging/providers/select";
 import { createSendHandler } from "@/features/messaging/send-handler";
 import { bearerSecretMatches } from "@/lib/shared-secret";
@@ -25,14 +25,17 @@ const migration = () => {
  */
 const IN_USE_LINE =
   "In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1), migration `_jobs_queue.sql`): the background job worker " +
-  "(`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in `src/lib/supabase/proxy.ts`), woken every minute " +
-  "while jobs are due by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`, else derived from " +
-  "`push_dispatch_url`; secret `push_dispatch_secret`), which checks the secret timing-safe first (`src/lib/shared-secret.ts`) and calls " +
-  "only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()` (the one send check: closed business, HEB-09 " +
-  "`app.customer_sending_paused`, gone record, missing address, `app.consent_suppressed` with null = refused; it answers no personal " +
-  "data and ends a refused job itself). The queue `app.jobs` (no grants) holds ids and codes only. Only `message.send` is registered, " +
-  "through the provider layer (`src/features/messaging/providers/`), whose only provider is the fake (`MESSAGING_PROVIDER=fake`, " +
-  "refused when `VERCEL_ENV=production`; it records in memory only and sends nothing). In the eslint allow-list.";
+  "(`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in `src/lib/supabase/proxy.ts`), woken by " +
+  "`app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`, else derived from `push_dispatch_url`; " +
+  "secret `push_dispatch_secret`) every minute while due jobs are of a kind a worker asked for in the last day, else at most once an " +
+  "hour per kind (`app.job_kind_seen`, `app.job_wake_kinds`). It checks the secret timing-safe first (`src/lib/shared-secret.ts`) and " +
+  "calls only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()` (the one send check, on a live lease " +
+  "only: a soft-deleted, suspended or cancelled business, HEB-09 `app.customer_sending_paused`, gone record, missing address, " +
+  "`app.consent_suppressed` with null = refused; it answers no personal data and ends a refused job itself). Jobs claimed but not " +
+  "started in time are handed back uncounted; a finish the queue did not take after a send is logged (one redacted line). The queue " +
+  "`app.jobs` (no grants) holds ids and codes only. Only `message.send` is registered, through the provider layer " +
+  "(`src/features/messaging/providers/`), whose only provider is the fake (`MESSAGING_PROVIDER=fake`, refused on a Vercel production " +
+  "or preview deployment; it keeps the last 100 in memory and sends nothing). In the eslint allow-list.";
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -124,24 +127,33 @@ describe("OPS-04: the registry", () => {
 });
 
 describe("OPS-04: the runner", () => {
-  const calls = (batches: unknown[]) => {
-    const finished: Array<{ id: string; ok: boolean; error: string | null; final: boolean }> = [];
+  type Finished = { id: string; ok: boolean; error: string | null; final: boolean; started: boolean };
+  const calls = (batches: unknown[], answer: (f: Finished) => FinishAnswer | Error = (f) => (!f.started ? "released" : f.ok ? "done" : f.final ? "dead" : "failed")) => {
+    const finished: Finished[] = [];
     const claims: string[][] = [];
     const queue: QueueCalls = {
       claim: async (kinds) => {
         claims.push(kinds);
         return batches.shift() ?? [];
       },
-      finish: async (j, ok, error, final) => {
-        finished.push({ id: j.id, ok, error, final });
+      finish: async (j, report) => {
+        const f = { id: j.id, ...report };
+        finished.push(f);
+        const a = answer(f);
+        if (a instanceof Error) throw a;
+        return a;
       },
     };
     return { queue, finished, claims };
   };
+  const quiet = () => {
+    const lines: string[] = [];
+    return { lines, log: (line: string) => lines.push(line) };
+  };
 
   it("claims nothing when no kind is ready", async () => {
     const { queue, claims } = calls([[job()]]);
-    expect(await runJobs(queue, createRegistry({}))).toEqual({ claimed: 0, done: 0, failed: 0, ended: 0 });
+    expect(await runJobs(queue, createRegistry({}))).toEqual({ claimed: 0, done: 0, failed: 0, ended: 0, released: 0, unconfirmed: 0 });
     expect(claims).toEqual([]);
   });
 
@@ -158,26 +170,47 @@ describe("OPS-04: the runner", () => {
     };
     const ids = ["a", "b", "c", "d"].map((x) => job({ id: x }));
     const { queue, finished, claims } = calls([ids]);
-    const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { batch: 20 });
-    expect(summary).toEqual({ claimed: 4, done: 1, failed: 2, ended: 1 });
+    const { lines, log } = quiet();
+    const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { batch: 20, log });
+    expect(summary).toEqual({ claimed: 4, done: 1, failed: 2, ended: 1, released: 0, unconfirmed: 0 });
     expect(claims).toEqual([["message.send"]]);
     expect(finished).toEqual([
-      { id: "a", ok: true, error: null, final: false },
-      { id: "b", ok: false, error: "to [email]", final: true },
-      { id: "d", ok: false, error: "boom [number]", final: false },
+      { id: "a", ok: true, error: null, final: false, started: true },
+      { id: "b", ok: false, error: "to [email]", final: true, started: true },
+      { id: "d", ok: false, error: "boom [number]", final: false, started: true },
     ]);
+    expect(lines).toEqual([]);
   });
 
-  it("stops at the time budget and leaves the rest to their leases", async () => {
+  it("hands back the jobs it did not start before the time budget, uncounted", async () => {
     let clock = 0;
     const handler: JobHandler = async () => {
       clock += 30_000;
       return { status: "done" };
     };
-    const { queue, finished } = calls([[job({ id: "a" }), job({ id: "b" }), job({ id: "c" })]]);
-    const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { budgetMs: 40_000, now: () => clock });
-    expect(finished.map((f) => f.id)).toEqual(["a", "b"]);
-    expect(summary.done).toBe(2);
+    const { queue, finished } = calls([[job({ id: "a" }), job({ id: "b" }), job({ id: "c" }), job({ id: "d" })]]);
+    const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { budgetMs: 40_000, now: () => clock, log: quiet().log });
+    expect(finished.map((f) => [f.id, f.started])).toEqual([
+      ["a", true],
+      ["b", true],
+      ["c", false],
+      ["d", false],
+    ]);
+    expect(summary).toMatchObject({ claimed: 4, done: 2, released: 2, unconfirmed: 0 });
+  });
+
+  it("logs one redacted line, never success, when the queue does not take a finish after a send", async () => {
+    const handler: JobHandler = async () => ({ status: "done" });
+    for (const answer of ["stale" as const, null, new Error("network to dani@example.com")]) {
+      const { queue } = calls([[job({ id: "a" })]], () => answer);
+      const { lines, log } = quiet();
+      const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { log });
+      expect(summary).toMatchObject({ done: 1, unconfirmed: 1 });
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("job a");
+      expect(lines[0]).toContain(answer === "stale" ? "answer stale" : "answer error");
+      expect(lines[0]).not.toMatch(/dani|example|lead_id|channel/);
+    }
   });
 });
 
@@ -224,7 +257,18 @@ describe("OPS-04: the send handler", () => {
     expect(messagingProvider({})).toBeNull();
     expect(messagingProvider({ MESSAGING_PROVIDER: "real" })).toBeNull();
     expect(messagingProvider({ MESSAGING_PROVIDER: "fake" })?.name).toBe("fake");
+    expect(messagingProvider({ MESSAGING_PROVIDER: "fake", VERCEL_ENV: "development" })?.name).toBe("fake");
     expect(messagingProvider({ MESSAGING_PROVIDER: "fake", VERCEL_ENV: "production" })).toBeNull();
+    expect(messagingProvider({ MESSAGING_PROVIDER: "fake", VERCEL_ENV: "preview" })).toBeNull();
+  });
+
+  it("the fake keeps only the last 100 messages", async () => {
+    const fake = createFakeProvider();
+    for (let i = 0; i < FAKE_SENT_KEPT + 5; i++) {
+      await fake.send({ jobId: `j${i}`, organizationId: "o", channel: "sms", recordType: "lead", recordId: "r" });
+    }
+    expect(fakeSentMessages()).toHaveLength(FAKE_SENT_KEPT);
+    expect(fakeSentMessages()[0].jobId).toBe("j5");
   });
 });
 
