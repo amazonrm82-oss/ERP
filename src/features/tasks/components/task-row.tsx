@@ -67,6 +67,8 @@ export type TaskRowView = {
   parent: { id: string; title: string | null } | null;
   // COL-04: a collection reminder task (made by the server) names its document; the row offers a WhatsApp reminder
   collectionDocumentId?: string | null;
+  // HEB-09: made while customer sending was paused (the button says so)
+  collectionPaused?: boolean;
 };
 
 type Props = {
@@ -168,7 +170,7 @@ export function TaskRow({ orgId, task, canEdit, showOwner, assignees, businessDa
         </p>
         {task.collectionDocumentId && whatsapp && canEdit && !task.done ? (
           <div className="mt-2">
-            <CollectionWhatsapp orgId={orgId} taskId={task.id} context={whatsapp} />
+            <CollectionWhatsapp orgId={orgId} taskId={task.id} context={whatsapp} paused={task.collectionPaused === true} />
           </div>
         ) : null}
         <TaskChecklist orgId={orgId} taskId={task.id} taskTitle={task.title} steps={task.checklist ?? []} canEdit={canEdit} templates={templates} />

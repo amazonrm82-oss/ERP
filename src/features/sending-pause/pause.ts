@@ -64,3 +64,13 @@ export function pauseTimeText(iso: string | null | undefined, timeZone: string):
   }
 }
 
+/**
+ * The line a collection reminder task carries in its description when the job made it while sending to customers was
+ * paused (owner, answer (45) א; migration collection_reminder_paused_line writes it). The task's WhatsApp button shows it.
+ */
+export const COLLECTION_PAUSED_LINE = "השליחה ללקוחות עצורה";
+
+/** True for a collection reminder task the job made during a pause. */
+export function madeWhilePaused(description: string | null | undefined): boolean {
+  return (description ?? "").includes(COLLECTION_PAUSED_LINE);
+}

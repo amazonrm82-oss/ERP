@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { NOT_PAUSED, pauseBannerText, pauseFromRow, pauseSchema, pauseTimeText, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
+import { COLLECTION_PAUSED_LINE, madeWhilePaused, NOT_PAUSED, pauseBannerText, pauseFromRow, pauseSchema, pauseTimeText, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
 
 // HEB-09: found by its suffix (the lead renumbers migrations at merge)
 const dir = new URL("../../supabase/migrations/", import.meta.url);
@@ -38,4 +38,13 @@ describe("sending pause (HEB-09)", () => {
     expect(pauseTimeText(null, "Asia/Jerusalem")).toBe("");
     expect(pauseTimeText(at, "Not/AZone")).not.toBe("");
   });
+
+  it("owner's answer (45): the collection task's line equals the migration's, and marks only such a task", () => {
+    const line = readFileSync(new URL(readdirSync(dir).find((name) => name.endsWith("_collection_reminder_paused_line.sql")) ?? "missing", dir), "utf8");
+    expect(line).toContain(`then '${COLLECTION_PAUSED_LINE}' end`);
+    expect(madeWhilePaused(COLLECTION_PAUSED_LINE)).toBe(true);
+    expect(madeWhilePaused(null)).toBe(false);
+    expect(madeWhilePaused("הערה אחרת")).toBe(false);
+  });
 });
+

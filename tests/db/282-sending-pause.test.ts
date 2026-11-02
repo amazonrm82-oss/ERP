@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { COLLECTION_PAUSED_LINE } from "@/features/sending-pause/pause";
+
 import { asAdmin, asUser, closePool, createOrg, createUser, pgError } from "./helpers";
 
 afterAll(closePool);
@@ -54,4 +56,58 @@ describe("sending pause (HEB-09)", () => {
     );
     expect(JSON.stringify(last)).toContain("חירום");
   });
+
+  it("owner's answer (45): a collection reminder task made during a pause says so; one made otherwise does not", async () => {
+    const boss = await createUser("pause-collect");
+    const shop = await createOrg(boss.id);
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [
+        shop,
+        JSON.stringify({ documents: true, payments: true, balances: true, collection: true }),
+      ]),
+    );
+    // a zone where it is between 08:00 and 23:59 now (the job's 08:00 rule), and no rest days (no moved reminders)
+    const zone = await asAdmin(async (q) =>
+      (
+        await q<{ z: string }>(
+          `select z from unnest(array['Asia/Jerusalem', 'Asia/Tokyo', 'Pacific/Kiritimati', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Asia/Kolkata', 'Pacific/Honolulu']) z
+            where extract(hour from now() at time zone z) between 8 and 23 limit 1`,
+        )
+      ).rows[0].z,
+    );
+    await asAdmin((q) => q("update public.organizations set timezone = $2 where id = $1", [shop, zone]));
+    await asUser(boss.id, (q) =>
+      q("insert into public.org_calendar_settings (organization_id, rest_weekdays, holidays_rest, holiday_eves_rest, rest_occasions) values ($1, '{}', false, false, '{}')", [shop]),
+    );
+    const contact = await asUser(boss.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'חייב') returning id", [shop])).rows[0].id,
+    );
+    const due = async (number: string) => {
+      const id = await asUser(boss.id, async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', $3, current_date - 10, 1000) returning id",
+            [shop, contact, number],
+          )
+        ).rows[0].id,
+      );
+      // due today in the business's zone: offset 0 is reached
+      await asAdmin((q) => q("update public.accounting_documents set due_date = (now() at time zone $2)::date where id = $1", [id, zone]));
+      return id;
+    };
+    const description = (document: string) =>
+      asAdmin(async (q) => (await q<{ d: string | null }>("select description as d from public.tasks where organization_id = $1 and collection_document_id = $2", [shop, document])).rows);
+    const job = () => asAdmin((q) => q("select app.send_collection_reminders($1::uuid[])", [[shop]]));
+
+    await asUser(boss.id, (q) => q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [shop]));
+    const during = await due("P-1");
+    await job();
+    expect(await description(during)).toEqual([{ d: COLLECTION_PAUSED_LINE }]);
+
+    await asUser(boss.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [shop]));
+    const after = await due("P-2");
+    await job();
+    expect(await description(after)).toEqual([{ d: null }]);
+  });
 });
+

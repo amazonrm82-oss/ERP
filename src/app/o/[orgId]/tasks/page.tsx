@@ -201,6 +201,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       })),
       parent: task.parentId ? { id: task.parentId, title: parentTitles.get(task.parentId) ?? null } : null,
       collectionDocumentId: task.collectionDocumentId,
+      collectionPaused: task.collectionPaused,
       teamTask:
         task.ownerId === null && task.teamId !== null && task.completedAt === null
           ? { teamName: teams.names.get(task.teamId) ?? "", canTake: teams.rights.has(task.teamId) }
