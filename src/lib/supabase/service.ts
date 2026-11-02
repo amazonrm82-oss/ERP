@@ -68,7 +68,15 @@ import { getSupabaseEnv } from "@/lib/env";
  * - the server's write of an order's PDF (src/features/orders/pdf-store-server.ts), the
  *   same pattern (ORD-05 PDF, owner 1 November 2026): called from pdf-server.ts (Server
  *   Actions) only after public.order_pdf_allowed() passed with the user's own session; it
- *   calls only public.order_pdf_store() and uploads (upsert off) only to the path it answers.
+ *   calls only public.order_pdf_store() and uploads (upsert off) only to the path it answers;
+ * - the signed PDF of an accepted quote (src/features/quotes/signed-pdf-server.ts; QUO-09,
+ *   owner 1 November 2026, answers (3) א and (33) ב), the same pattern: the customer's decide
+ *   route, after public.quote_public_answer() accepted, calls only
+ *   public.quote_signed_pdf_public() and public.quote_signed_pdf_public_store() (the link's
+ *   token is the right); staff's write, called from pdf-server.ts only after
+ *   public.quote_signed_pdf_allowed() answered with the user's own session, calls only
+ *   public.quote_signed_pdf_store(), which checks the named user again; both upload (upsert
+ *   off) only to the path the function answers.
  * Never import this from any other code that serves a signed-in user.
  * Returns null when the key is not configured.
  */

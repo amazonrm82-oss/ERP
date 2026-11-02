@@ -72,6 +72,8 @@ const eslintConfig = defineConfig([
       // customer downloads it from the quote's link (public.quote_public_pdf)
       "src/features/quotes/pdf-store-server.ts",
       "src/features/quotes/pdf-public-server.ts",
+      // QUO-09 signed PDF (owner (3) א, (33) ב): the customer's route and staff's write of an accepted quote's signed PDF
+      "src/features/quotes/signed-pdf-server.ts",
       // ORD-05 PDF (owner, 1 November 2026, answer (1) ב): the server alone writes an order's PDF (public.order_pdf_store),
       // and the customer downloads it from the order's link (public.order_public_pdf)
       "src/features/orders/pdf-store-server.ts",

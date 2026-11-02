@@ -318,6 +318,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_pdf:draft": "לטיוטה אין קובץ PDF. הקובץ נשמר כשההצעה נשלחת.",
   "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה).",
   "quote_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
+  // QUO-09 signed PDF
+  "quote_pdf:not_accepted": "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה.",
+  "quote_pdf:version": "קובץ ה-PDF של ההצעה לא נשמר. נסו שוב בעוד רגע.",
   // ORD-05 PDF (migration order_pdfs)
   "order_pdf:draft": "לטיוטה אין קובץ PDF. הקובץ נשמר כשההזמנה מקבלת מספר.",
   "order_pdf:closed": "קובץ PDF נשמר רק להזמנה ממוספרת שלא בוטלה.",

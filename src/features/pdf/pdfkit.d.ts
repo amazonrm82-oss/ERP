@@ -29,6 +29,10 @@ declare module "pdfkit" {
     moveTo(x: number, y: number): this;
     lineTo(x: number, y: number): this;
     stroke(): this;
+    // QUO-09: the slanted typed signature (a skew around one line)
+    save(): this;
+    restore(): this;
+    transform(m11: number, m12: number, m21: number, m22: number, dx: number, dy: number): this;
     text(text: string, x: number, y: number, options?: TextOptions): this;
     widthOfString(text: string, options?: TextOptions): number;
     image(src: Buffer, x: number, y: number, options?: ImageOptions): this;

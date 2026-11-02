@@ -12,6 +12,8 @@ import { getQuoteDocumentData } from "./design-server";
 import { quotePdfDocument, quotePdfFileName, remadeNote } from "./pdf";
 import { writeQuotePdfAsServer } from "./pdf-store-server";
 import type { Quote } from "./queries";
+import { signatureFrom, signedQuotePdfFileName } from "./signed-pdf";
+import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
 
 type Client = SupabaseClient<Database>;
 
@@ -41,6 +43,8 @@ export async function getQuotePdfFile(
     .select("id, name, unconfirmed_since, sha256")
     .eq("organization_id", orgId)
     .eq("quote_id", quoteId)
+    // QUO-09: the PDF as sent (a signed version after it is its own row)
+    .is("quote_signed", null)
     .maybeSingle();
   if (error) throw new Error(`quote pdf: ${error.message}`);
   return data && data.unconfirmed_since === null ? { id: data.id, name: data.name, fingerprinted: data.sha256 !== null } : null;
@@ -99,5 +103,54 @@ export async function storeQuotePdf(supabase: Client, orgId: string, quote: Quot
 
   const stored = await writeQuotePdfAsServer({ orgId, quoteId: quote.id, userId, bytes, name: quotePdfFileName(quote.numberDisplay, quote.title) });
   if (!stored.ok) return { ok: false, message: stored.busy ? IN_PROGRESS : stored.message };
+  return { ok: true, fileId: stored.fileId };
+}
+
+// QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב) ---------------------------------------------------------
+
+/** The accepted quote's signed PDF (a confirmed file), or null. Read with the user's session: whoever reads the quote. */
+export async function getSignedQuotePdfFile(supabase: Client, orgId: string, quoteId: string): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from("files")
+    .select("id, name, unconfirmed_since")
+    .eq("organization_id", orgId)
+    .eq("quote_id", quoteId)
+    .eq("quote_signed", true)
+    .maybeSingle();
+  if (error) throw new Error(`signed quote pdf: ${error.message}`);
+  return data && data.unconfirmed_since === null ? { id: data.id, name: data.name } : null;
+}
+
+const SIGNED_NOT_MADE = "קובץ ה-PDF החתום לא נשמר. נסו שוב בעוד רגע.";
+const SIGNED_IN_PROGRESS = "קובץ ה-PDF החתום בהכנה. נסו שוב בעוד כמה דקות.";
+const SIGNED_NOT_PERMITTED = "אין לכם הרשאה לשמור את ה-PDF החתום של ההצעה הזאת.";
+
+/**
+ * "יצירת PDF חתום": the signed PDF of an accepted quote whose file was not made at the acceptance (a full monthly quota, a
+ * render error). The person's right and the signature block come from public.quote_signed_pdf_allowed with their own
+ * session; the document is read with it too, rendered here, and written with the service key for that user (checked again).
+ */
+export async function storeSignedQuotePdf(supabase: Client, orgId: string, quote: Quote, userId: string): Promise<QuotePdfResult> {
+  if (quote.status !== "accepted") return { ok: false, message: "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה." };
+  const existing = await getSignedQuotePdfFile(supabase, orgId, quote.id).catch(() => null);
+  if (existing) return { ok: true, fileId: existing.id };
+  const allowed = await supabase.rpc("quote_signed_pdf_allowed", { p_org: orgId, p_quote: quote.id });
+  if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };
+  if (allowed.data === null) return { ok: false, message: SIGNED_NOT_PERMITTED };
+  const signature = signatureFrom(allowed.data);
+  if (!signature) return { ok: false, message: SIGNED_NOT_MADE };
+  const org = await supabase.from("organizations").select("name").eq("id", orgId).maybeSingle();
+  if (org.error || !org.data) return { ok: false, message: SIGNED_NOT_MADE };
+  const data = await getQuoteDocumentData(orgId, quote, org.data.name);
+  const bytes = await renderSignedQuotePdf(data, signature);
+  const stored = await writeSignedQuotePdfAsServer({
+    orgId,
+    quoteId: quote.id,
+    userId,
+    bytes,
+    name: signedQuotePdfFileName(quote.numberDisplay, quote.title),
+    fingerprint: signature.fingerprint,
+  });
+  if (!stored.ok) return { ok: false, message: stored.busy ? SIGNED_IN_PROGRESS : stored.message };
   return { ok: true, fileId: stored.fileId };
 }

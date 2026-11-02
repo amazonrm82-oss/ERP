@@ -20,9 +20,17 @@ function discountText(line: QuoteLine): string {
   return "";
 }
 
-function lineNotes(line: QuoteLine): string | null {
+function lineNotes(line: QuoteLine, accepted: boolean): string | null {
+  // QUO-09: on the signed PDF an optional line says whether the customer chose it
+  const optional = accepted
+    ? line.optionalSelected
+      ? "רשות, נבחרה על ידי הלקוח"
+      : "רשות, לא נבחרה"
+    : line.optionalSelected
+      ? "רשות, כלולה בסיכום"
+      : "רשות, לא כלולה בסיכום";
   const notes = [
-    line.isOptional ? (line.optionalSelected ? "רשות, כלולה בסיכום" : "רשות, לא כלולה בסיכום") : null,
+    line.isOptional ? optional : null,
     line.billing !== "one_time" ? BILLING_LABELS[line.billing] : null,
   ].filter(Boolean);
   const parts = [line.description?.trim() || null, notes.length > 0 ? notes.join(", ") : null].filter(Boolean);
@@ -53,7 +61,13 @@ export function bankPdfText(bank: DocumentBank): string {
     .join("\n");
 }
 
-export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, options: { remadeNote?: string | null } = {}): PdfDocument {
+export function quotePdfDocument(
+  data: QuoteDocumentData,
+  logo: PdfLogo | null,
+  // accepted: QUO-09's signed PDF (the lines and totals as the customer accepted them)
+  options: { remadeNote?: string | null; accepted?: boolean } = {},
+): PdfDocument {
+  const accepted = options.accepted === true;
   const { design, business, customer, quote, lines } = data;
   const schedule = data.schedule ?? [];
   const sums = groupSubtotals(lines);
@@ -99,7 +113,7 @@ export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, 
       ? { group: true, cells: [line.name, formatMoney(sums.get(line.id) ?? 0)] }
       : {
           cells: [
-            { text: line.name, bold: true, sub: lineNotes(line) ?? undefined },
+            { text: line.name, bold: true, sub: lineNotes(line, accepted) ?? undefined },
             `${formatNumber(line.quantity)}${line.unitName ? ` ${line.unitName}` : ""}`,
             formatMoney(line.unitPriceAgorot),
             discountText(line),
@@ -128,7 +142,7 @@ export function quotePdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, 
   totals.push({ label: 'סה"כ לתשלום', value: formatMoney(quote.totalAgorot), strong: true });
   const notes = [
     quote.noVatReason ? noVatText(quote.noVatReason, quote.noVatNote) : null,
-    optionalOut ? "שורות רשות שלא סומנו אינן כלולות בסיכום." : null,
+    optionalOut ? (accepted ? "שורות רשות שהלקוח לא בחר אינן כלולות בסיכום." : "שורות רשות שלא סומנו אינן כלולות בסיכום.") : null,
   ].filter((note): note is string => note !== null);
   blocks.push({ kind: "totals", rows: totals, notes });
 

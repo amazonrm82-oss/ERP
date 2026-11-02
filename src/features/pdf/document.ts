@@ -47,7 +47,10 @@ export type PdfBlock =
   | { kind: "section"; title: string; text: string }
   // a title that stays with what follows it (a table's name)
   | { kind: "heading"; text: string }
-  | { kind: "rule" };
+  | { kind: "rule" }
+  // QUO-09: the customer's signature under an accepted quote: the drawn image (PNG) or the typed name in a slanted hand, a line
+  // under it, then the facts (who, when, the wording, the fingerprint). Kept on one page.
+  | { kind: "signature"; title: string; image?: PdfLogo | null; typedName?: string | null; lines: PdfLine[] };
 
 export type PdfLogo = { data: Uint8Array; kind: "png" | "jpeg" };
 

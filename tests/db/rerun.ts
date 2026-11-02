@@ -37,6 +37,21 @@ export function definedPolicies(sql: string): Set<string> {
   return new Set([...sql.matchAll(POLICY)].map((m) => `${m[2].toLowerCase()} ${m[1].toLowerCase()}`));
 }
 
+// create [unique] index [if not exists] <name> / drop index [if exists] [public.]<name>: an index a migration makes, and one
+// a later migration removes (QUO-09: 20261006021123 removes 020955's files_quote_pdf_one, which a re-run of 020955 brings back)
+const INDEX_CREATE = /\bcreate\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?/gi;
+const INDEX_DROP = /\bdrop\s+index\s+(?:concurrently\s+)?(?:if\s+exists\s+)?(?:[a-z_][a-z0-9_]*\.)?"?([a-z_][a-z0-9_]*)"?/gi;
+
+/** The indexes a migration creates, lower case. */
+export function createdIndexes(sql: string): Set<string> {
+  return new Set([...sql.matchAll(INDEX_CREATE)].map((m) => m[1].toLowerCase()));
+}
+
+/** The indexes a migration drops, lower case. */
+export function droppedIndexes(sql: string): Set<string> {
+  return new Set([...sql.matchAll(INDEX_DROP)].map((m) => m[1].toLowerCase()));
+}
+
 /** The migration file whose name ends with this suffix (the number changes when the lead renumbers it). */
 export function migrationFile(suffix: string): string {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith(suffix));
@@ -52,6 +67,8 @@ export function migrationFile(suffix: string): string {
  * later migration that grants or revokes on a table a file already in the list grants or revokes on joins too.
  * Policies too: a re-run `alter policy` / `drop … create policy` puts back an old USING or WITH CHECK, so every later
  * migration that creates or alters a policy a file already in the list sets joins.
+ * Indexes too: a re-run `create index if not exists` brings back an index a later migration dropped, so every later
+ * migration that drops an index a file already in the list creates joins.
  */
 export function rerunClosure(
   files: string[],
@@ -63,6 +80,7 @@ export function rerunClosure(
   const names = new Set<string>();
   const tables = new Set<string>();
   const policies = new Set<string>();
+  const indexes = new Set<string>();
   const picked: string[] = [];
   const texts: string[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql") && f >= first).sort()) {
@@ -70,11 +88,13 @@ export function rerunClosure(
     const defines = definedFunctions(sql);
     const grants = grantedTables(sql);
     const sets = definedPolicies(sql);
+    const drops = droppedIndexes(sql);
     if (
       start.has(file) ||
       [...defines].some((name) => names.has(name)) ||
       [...grants].some((t) => tables.has(t)) ||
       [...sets].some((p) => policies.has(p)) ||
+      [...drops].some((i) => indexes.has(i)) ||
       also(sql)
     ) {
       picked.push(file);
@@ -82,6 +102,7 @@ export function rerunClosure(
       for (const name of defines) names.add(name);
       for (const t of grants) tables.add(t);
       for (const p of sets) policies.add(p);
+      for (const i of createdIndexes(sql)) indexes.add(i);
     }
   }
   const missing = files.filter((file) => !picked.includes(file));

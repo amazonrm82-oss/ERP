@@ -24,7 +24,7 @@ import { publicQuotePath, QUOTE_LINK_TOKEN } from "./public";
 import { readQuote, readQuoteLines, readQuotePricing, type Quote, type QuotePricing } from "./queries";
 import { applyDealLinesToQuote } from "./from-deal-server";
 import { applyTemplateToQuote } from "./template-server";
-import { storeQuotePdf } from "./pdf-server";
+import { storeQuotePdf, storeSignedQuotePdf } from "./pdf-server";
 import {
   DEFAULT_VALID_DAYS,
   defaultQuoteTitle,
@@ -485,6 +485,23 @@ export async function storeQuotePdfAction(orgId: string, quoteId: string): Promi
   revalidatePath(quotePath(orgId, quoteId));
   return ok();
 }
+
+/**
+ * QUO-09 signed PDF: keeps the signed PDF of an accepted quote when it was not made at the acceptance. Whoever may edit the
+ * quote's deal or contact asks; the database decides again.
+ */
+export async function storeSignedQuotePdfAction(orgId: string, quoteId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, quoteId);
+  if (!context.ok) return context;
+  const quote = await readQuote(context.supabase, orgId, quoteId);
+  if (!quote) return fail(NOT_FOUND_OR_FORBIDDEN);
+  const pdf = await storeSignedQuotePdf(context.supabase, orgId, quote, context.user.id).catch(() => ({ ok: false as const, message: SIGNED_PDF_NOT_MADE }));
+  if (!pdf.ok) return fail(pdf.message);
+  revalidatePath(quotePath(orgId, quoteId));
+  return ok();
+}
+
+const SIGNED_PDF_NOT_MADE = "קובץ ה-PDF החתום לא נשמר. נסו שוב בעוד רגע.";
 
 // QUO-12 ---------------------------------------------------------------------
 

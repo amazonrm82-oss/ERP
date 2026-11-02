@@ -660,6 +660,12 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the ORD-05 PDF versions redefine app.files_order_pdf(), public.order_pdf_store() and public.order_public_pdf() of
       // _order_pdfs.sql last (a changed order makes a new version)
       "_order_pdf_versions.sql",
+      // QUO-09 signed PDF redefines app.files_quote_pdf() of _quote_pdfs.sql, public.quote_pdf_store() of _quote_pdf_remake.sql,
+      // public.quote_public_pdf() of _quote_pdf_server.sql, public.quote_public_version() of _quote_page_options_question.sql and
+      // app.quote_mark_viewed() of _quote_notice_recipients.sql last (the signed version of an accepted quote's PDF)
+      "_quote_signed_pdf.sql",
+      // the pasted index file removes files_quote_pdf_one again, which a re-run of _quote_pdfs.sql brings back
+      "_quote_signed_pdf_index.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

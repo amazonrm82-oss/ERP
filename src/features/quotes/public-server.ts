@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import { clientIp as senderIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -24,6 +26,7 @@ import {
   type PublicQuote,
   type StatusPublicQuote,
 } from "./public";
+import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
@@ -143,6 +146,9 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
   const status = (data as { status?: unknown } | null)?.status;
   if (!isDecisionStatus(status)) return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   const done = status === "accepted" || status === "rejected";
+  // QUO-09 signed PDF (owner (3) א, (33) ב): after the acceptance committed, the server keeps the signed PDF; a failure never
+  // touches the acceptance (staff make it later from the quote's screen)
+  if (status === "accepted") after(() => storeSignedQuotePdfForCustomer(token));
   return reply(done ? 200 : status === "rate_limited" ? 429 : 409, { ok: done, status, message: DECISION_MESSAGES[status] });
 }
 

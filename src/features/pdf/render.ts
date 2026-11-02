@@ -104,7 +104,7 @@ export async function renderPdf(doc: PdfDocument): Promise<Uint8Array> {
     return top - y;
   };
   const heightOf = (lines: Styled[]) => lines.reduce((sum, line) => sum + lineHeight(line.style), 0);
-  const rule = (y: number, color: string, weight: number, x = PAGE.marginX, width = CONTENT) => {
+  const rule = (y: number, color: string, weight: number, x: number = PAGE.marginX, width: number = CONTENT) => {
     pdf.moveTo(x, y).lineTo(x + width, y).lineWidth(weight).strokeColor(color).stroke();
   };
   const linesOf = (items: PdfLine[], width: number) => items.flatMap((item) => wrap(item.text, width, item));
@@ -223,6 +223,39 @@ export async function renderPdf(doc: PdfDocument): Promise<Uint8Array> {
         for (const note of block.notes ?? []) {
           textPieces(wrap(note, boxWidth, { muted: true, size: 8.5 }), 2, PAGE.marginX, boxWidth, "start");
         }
+        return;
+      }
+      case "signature": {
+        const title = wrap(block.title, CONTENT, { bold: true });
+        const facts = linesOf(block.lines, CONTENT);
+        const box = { width: 200, height: 70 };
+        const typedStyle: PdfTextStyle = { size: 22 };
+        const typed = block.image ? [] : wrap(block.typedName ?? "", box.width * 1.6, typedStyle);
+        const height = heightOf(title) + 6 + box.height + 8 + heightOf(facts);
+        pieces.push({
+          height,
+          gapBefore: gap + 6,
+          draw: (y) => {
+            let top = y + writeLines(title, PAGE.marginX, y, CONTENT, "start") + 6;
+            const right = PAGE.width - PAGE.marginX;
+            if (block.image) {
+              // at the start (right) edge, like the logo; a broken image throws and the file is not made
+              pdf.image(Buffer.from(block.image.data), right - box.width, top, { fit: [box.width, box.height], align: "right", valign: "bottom" });
+            } else if (typed.length > 0) {
+              // the typed name, slanted like handwriting (a skew about the line's middle keeps it in its place)
+              const lineTop = top + box.height - lineHeight(typedStyle);
+              const middle = lineTop + lineHeight(typedStyle) / 2;
+              const skew = -0.25;
+              pdf.save();
+              pdf.transform(1, 0, skew, 1, -skew * middle, 0);
+              write(typed[0], right - box.width * 1.6, lineTop, box.width * 1.6, "start");
+              pdf.restore();
+            }
+            top += box.height + 2;
+            rule(top, PDF_COLORS.lineStrong, 0.75, right - box.width * 1.6, box.width * 1.6);
+            writeLines(facts, PAGE.marginX, top + 6, CONTENT, "start");
+          },
+        });
         return;
       }
       case "table": {

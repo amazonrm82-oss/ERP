@@ -37,7 +37,9 @@ import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-c
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { QuotePdfButton } from "@/features/quotes/components/quote-pdf-button";
 import { PDF_AS_SENT_STAFF } from "@/features/quotes/decision";
-import { getQuotePdfFile, quotePdfStorable } from "@/features/quotes/pdf-server";
+import { getQuotePdfFile, getSignedQuotePdfFile, quotePdfStorable } from "@/features/quotes/pdf-server";
+import { QuoteSignedPdfButton } from "@/features/quotes/components/quote-signed-pdf-button";
+import { AS_SENT_PDF_LABEL } from "@/features/quotes/signed-pdf";
 import { currentNameIfChanged } from "@/features/quotes/share";
 import { QUOTE_STATUS_LABELS, VERSIONABLE_STATUSES } from "@/features/quotes/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -222,7 +224,12 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const pdfFile = quote.status !== "draft" ? await getQuotePdfFile(supabase, orgId, quote.id) : null;
   // QUO-08 (interim): the stored PDF shows the quote as sent. Owners/admins read the decision and see whether the customer's
   // choice changed it; for others an accepted quote with optional lines may have changed, so its PDF is named "as sent" too.
+  // QUO-09 (owner (33) ב): the accepted quote's signed PDF; once it exists the earlier file is the one "as sent"
+  const signedFile = quote.status === "accepted" ? await getSignedQuotePdfFile(supabase, orgId, quote.id) : null;
+  const canStoreSigned =
+    hasQuotes && quote.status === "accepted" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const pdfAsSent =
+    signedFile === null &&
     quote.status === "accepted" &&
     (decision
       ? decision.sentTotalAgorot != null && decision.acceptedTotalAgorot != null && decision.sentTotalAgorot !== decision.acceptedTotalAgorot
@@ -242,7 +249,16 @@ export default async function QuotePage({ params, searchParams }: Props) {
               תצוגה והדפסה
             </ButtonLink>
             {quote.status !== "draft" ? (
-              <QuotePdfButton orgId={orgId} quoteId={quote.id} href={pdfFile ? paths.file(orgId, pdfFile.id) : null} canStore={canStorePdf} label={pdfAsSent ? PDF_AS_SENT_STAFF : undefined} />
+              <QuotePdfButton
+                orgId={orgId}
+                quoteId={quote.id}
+                href={pdfFile ? paths.file(orgId, pdfFile.id) : null}
+                canStore={canStorePdf}
+                label={signedFile ? AS_SENT_PDF_LABEL : pdfAsSent ? PDF_AS_SENT_STAFF : undefined}
+              />
+            ) : null}
+            {quote.status === "accepted" ? (
+              <QuoteSignedPdfButton orgId={orgId} quoteId={quote.id} href={signedFile ? paths.file(orgId, signedFile.id) : null} canStore={canStoreSigned} />
             ) : null}
             {/* QUO-07: the draft gets its number and is locked; QUO-08: its link and the WhatsApp and email buttons with it.
                 Mounted for every quote so the window survives the refresh that turns the draft into a sent quote. */}
