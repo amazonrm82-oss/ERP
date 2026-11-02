@@ -535,12 +535,13 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
     }
   });
 
-  it("stays security invoker with its signature and grants", async () => {
+  it("stays security invoker with its signature and grants, and runs with jit off", async () => {
     const fn = await asAdmin(async (q) =>
-      one<{ definer: boolean; args: string; auth: boolean; anon: boolean }>(
+      one<{ definer: boolean; args: string; auth: boolean; anon: boolean; config: string[] }>(
         q,
         `select p.prosecdef as definer, pg_get_function_identity_arguments(p.oid) as args,
-                has_function_privilege('authenticated', p.oid, 'execute') as auth, has_function_privilege('anon', p.oid, 'execute') as anon
+                has_function_privilege('authenticated', p.oid, 'execute') as auth, has_function_privilege('anon', p.oid, 'execute') as anon,
+                p.proconfig as config
            from pg_proc p where p.oid = 'public.report_money_waiting(uuid, uuid)'::regprocedure`,
       ),
     );
@@ -549,6 +550,8 @@ describe("money waiting: quotes, debts and renewals (MNY-01)", () => {
       args: "p_org uuid, p_owner uuid",
       auth: true,
       anon: false,
+      // 021144: with analyzed tables the cost estimate passes the JIT thresholds and compiling took seconds
+      config: ['search_path=""', "jit=off"],
     });
   });
 });
@@ -588,6 +591,10 @@ describe("money waiting: many paid overdue invoices (MNY-01 review)", () => {
            join (select id, row_number() over (order by id) as n from public.accounting_documents where organization_id = $1) d on d.n = p.n`,
         [org],
       );
+    });
+    // real table statistics, as autovacuum keeps them on the hosted database: the plan must stay fast with them
+    await asAdmin(async (q) => {
+      await q("analyze public.accounting_documents, public.payments, public.payment_allocations");
     });
   });
 
