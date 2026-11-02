@@ -18,7 +18,7 @@ const setKey = (value: string | null) =>
 const REVIEWED_MD5 = {
   claim_jobs: "de918761f4f48c2c50254db26f65011f",
   finish_job: "50078fb665234f8655dd361ef51ceefb",
-  job_message_may_send: "7d7702499878eebf9044debdbc85d7b0",
+  job_message_may_send: "6af4771a06c407b475af238f2756552d",
 };
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
@@ -324,7 +324,7 @@ describe("background job queue (OPS-04)", () => {
     try {
       // made during the pause and never checked (worker down): no "waiting" mark
       during = await enqueue(org, send(lead));
-      // made during the pause with a run_at after it
+      // made during the pause, due later during it (its time is set before the resume below)
       later = await enqueue(org, send(lead), new Date(Date.now() + 1_000).toISOString());
       await backdatePause("30 hours");
       // made before the pause and due by its end
@@ -333,7 +333,7 @@ describe("background job queue (OPS-04)", () => {
     } finally {
       await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
     }
-    await due(later);
+    await asAdmin((q) => q("update app.jobs set next_run_at = now() - interval '1 hour' where id = $1", [later]));
     const jobs = await claim(10);
     expect(jobs.map((j) => j.id).sort()).toEqual([during, later, before].sort());
     for (const job of jobs) expect(await maySend(job)).toEqual({ may_send: false, reason: "pause_expired" });
@@ -375,6 +375,7 @@ describe("background job queue (OPS-04)", () => {
     const ids: string[] = [];
     for (let i = 0; i < 5; i++) ids.push(await enqueue(org, send(lead)));
     const other = await enqueue(orgB, send(randomUUID()));
+    const soon = await enqueue(org, send(lead), new Date(Date.now() + 180_000).toISOString());
     await asUser(owner.id, (q) =>
       q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'חירום') on conflict (organization_id) do update set paused = true, reason = 'חירום'", [org]),
     );
@@ -386,6 +387,8 @@ describe("background job queue (OPS-04)", () => {
         expect(await jobOf(id), id).toMatchObject({ status: "queued", attempts: 0, last_error: "waiting:sending_paused" });
         expect((await jobOf(id)).next_run_at.getTime()).toBeGreaterThan(Date.now() + 4 * 60_000);
       }
+      // a job not due yet is left alone and carries no mark (one due after a resume must not be cancelled by it)
+      expect(await jobOf(soon)).toMatchObject({ status: "queued", last_error: null });
       // another business is untouched; nothing of the paused one is claimable now
       expect(await jobOf(other)).toMatchObject({ status: "queued", last_error: null });
       expect((await claim(10)).map((j) => j.id)).toEqual([other]);

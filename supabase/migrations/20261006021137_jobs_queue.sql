@@ -429,11 +429,12 @@ begin
       update app.jobs j set status = 'queued', attempts = greatest(j.attempts - 1, 0), lease_id = null, locked_until = null,
                             next_run_at = now() + interval '5 minutes', last_error = 'waiting:sending_paused'
        where j.id = p_job;
-      -- the business's other message jobs due within those 5 minutes wait with it, in one update (no attempt is
-      -- counted: they were not claimed), so a paused business does not churn the queue one job at a time
+      -- the business's other message jobs already due wait with it, in one update (no attempt is counted: they were
+      -- not claimed), so a paused business does not churn the queue one job at a time. Only jobs already due: a job
+      -- due later is marked when its own time comes, so one due after the resume never carries the mark (review)
       update app.jobs j set next_run_at = now() + interval '5 minutes', last_error = 'waiting:sending_paused'
        where j.organization_id = v_job.organization_id and j.kind = 'message.send' and j.id <> p_job
-         and j.status in ('queued', 'failed') and j.next_run_at < now() + interval '5 minutes';
+         and j.status in ('queued', 'failed') and j.next_run_at <= now();
       return jsonb_build_object('may_send', false, 'reason', 'sending_paused', 'retry', true);
     end if;
   end if;
