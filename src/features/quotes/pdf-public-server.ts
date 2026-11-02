@@ -2,6 +2,7 @@ import "server-only";
 
 import { FILES_BUCKET } from "@/features/files/types";
 import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
+import { rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { matchesFingerprint, pdfHeaders, publicPdfAnswerFrom } from "./pdf-fingerprint";
@@ -35,7 +36,7 @@ export async function handleQuotePdfDownload(request: Request, token: string): P
   }
   const answer = publicPdfAnswerFrom(data);
   if (!answer) return text(500, "משהו השתבש. נסו שוב בעוד רגע.");
-  if (answer.kind === "rate-limited") return text(429, "יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.", { "Retry-After": "600" });
+  if (answer.kind === "rate-limited") return rateLimitedText();
   if (answer.kind === "unavailable") return text(404, UNAVAILABLE);
 
   const object = await service.storage.from(FILES_BUCKET).download(answer.path);

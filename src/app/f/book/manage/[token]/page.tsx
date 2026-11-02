@@ -20,6 +20,7 @@ import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-p
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
+import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -43,7 +44,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 const MESSAGES = {
   "not-found": "הקישור לא נמצא או שכבר אינו פעיל.",
   unavailable: "אי אפשר לשנות פגישות כרגע.",
-  "rate-limited": "הדף נפתח יותר מדי פעמים בזמן קצר. נסו שוב בעוד כמה דקות.",
+  "rate-limited": RATE_LIMITED_PAGE_TEXT,
   "not-configured": "קביעת התורים אינה זמינה כרגע.",
 } as const;
 

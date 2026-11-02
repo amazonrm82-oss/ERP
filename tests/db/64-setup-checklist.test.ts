@@ -668,6 +668,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_signed_pdf_index.sql",
       // owner (38) ב redefines public.quote_signed_pdf_public() of _quote_signed_pdf.sql last (the customer's billing block)
       "_quote_signed_pdf_billing.sql",
+      // OPS-02 redefines public.intake_form() of _form_marketing_consent.sql last (the hosted form's view limit)
+      "_public_form_view_limit.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

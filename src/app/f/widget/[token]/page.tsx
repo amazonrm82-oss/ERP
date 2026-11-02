@@ -6,6 +6,7 @@ import { PublicPageFooter } from "@/features/branding/components/public-page";
 import { PublicWidgetForm } from "@/features/site-widgets/components/public-widget-form";
 import { getPublicWidget } from "@/features/site-widgets/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
 
 export const metadata: Metadata = { title: "השאירו פרטים", robots: { index: false, follow: false } };
 
@@ -13,7 +14,7 @@ type Props = { params: Promise<{ token: string }> };
 
 const MESSAGES = {
   "not-found": "הטופס לא נמצא או שאינו פעיל.",
-  "rate-limited": "הטופס נפתח יותר מדי פעמים בזמן קצר. נסו שוב בעוד כמה דקות.",
+  "rate-limited": RATE_LIMITED_PAGE_TEXT,
   "not-configured": "הטופס אינו זמין כרגע.",
 } as const;
 

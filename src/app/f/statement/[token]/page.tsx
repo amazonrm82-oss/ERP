@@ -14,6 +14,7 @@ import { publicStatementPdfPath } from "@/features/statements/public";
 import { getPublicStatement } from "@/features/statements/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
+import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
 
 type Props = { params: Promise<{ token: string }> };
 
@@ -29,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const MESSAGES = {
   "not-found": "הקישור אינו זמין. ייתכן שהוא בוטל או שהוחלף בקישור חדש. לקבלת קישור פנו לעסק ששלח אותו.",
-  "rate-limited": "הדף נפתח יותר מדי פעמים בזמן קצר. נסו שוב בעוד כמה דקות.",
+  "rate-limited": RATE_LIMITED_PAGE_TEXT,
   "not-configured": "דף החשבון אינו זמין כרגע.",
 } as const;
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { cache } from "react";
 
 import { BrandScope } from "@/features/branding/components/brand-scope";
@@ -11,6 +12,7 @@ import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-p
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { genericPreview, linkPreviewMetadata, PREVIEW_TEXTS } from "@/lib/link-preview";
+import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -18,7 +20,8 @@ type Props = {
 };
 
 // WAB-05: the link's preview and the page share ONE read per request
-const loadForm = cache((token: string) => getPublicForm(token));
+// OPS-02: the view counts against the sender's limit (60 in 10 minutes per form)
+const loadForm = cache(async (token: string) => getPublicForm(token, await headers()));
 
 /**
  * WAB-05: the link's preview: the form's own title and intro (written by the business) and its logo. intake_form() does
@@ -30,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (await isPreviewBotRequest()) return botPreviewMetadata("form", await loadBotPreview("form", (await params).token));
   const form = await loadForm((await params).token);
   const t = PREVIEW_TEXTS.form;
-  if (form === null || form === "inactive" || form === "not-configured") return genericPreview(t.what, t.description);
+  if (typeof form !== "object" || form === null) return genericPreview(t.what, t.description);
   return linkPreviewMetadata(
     { title: form.title || t.what, description: form.intro ?? t.description, business: null, logoUrl: logoPublicUrl(form.brand.logoPath) },
     { absoluteTitle: true },
@@ -44,7 +47,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
   // WAB-05 follow-up: a listed preview bot gets one line, and nothing of the page is read or counted
   if (await isPreviewBotRequest()) return <BotPreviewPage kind="form" state={await loadBotPreview("form", token)} />;
   const form = await loadForm(token);
-  const found = form !== null && form !== "not-configured" && form !== "inactive" ? form : null;
+  const found = form !== null && typeof form === "object" ? form : null;
   const logoUrl = found ? logoPublicUrl(found.brand.logoPath) : null;
 
   return (
@@ -53,7 +56,7 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
       <main className={cn("mx-auto w-full max-w-md px-5", embed ? "py-4" : "min-h-dvh py-10 sm:py-16")}>
         {!found ? (
           <p role="alert" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
-            {form === "inactive" ? INACTIVE_FORM_TEXT : form === null ? "הטופס לא נמצא או שאינו פעיל כרגע." : "הטופס אינו זמין כרגע."}
+            {form === "inactive" ? INACTIVE_FORM_TEXT : form === "rate-limited" ? RATE_LIMITED_PAGE_TEXT : form === null ? "הטופס לא נמצא או שאינו פעיל כרגע." : "הטופס אינו זמין כרגע."}
           </p>
         ) : (
           <>

@@ -4,6 +4,7 @@ import { parseAttribution } from "@/features/intake/attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD } from "@/features/intake/fields";
 import type { Json } from "@/lib/database.types";
 import { clientIp, keyedIpHash as keyedHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_TEXT, rateLimitedJson, rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildVCard, vcardDisposition } from "@/lib/vcard";
 
@@ -47,7 +48,7 @@ const MESSAGES = {
   tooLarge: "הפרטים שנשלחו ארוכים מדי.",
   missing: "יש לכתוב שם ומספר טלפון או אימייל.",
   email: "כתובת האימייל אינה תקינה.",
-  rateLimited: "נשלחו יותר מדי פניות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rateLimited: RATE_LIMITED_TEXT,
   error: "משהו השתבש. נסו שוב בעוד רגע.",
 } as const;
 
@@ -97,7 +98,7 @@ export async function handleCardSubmit(request: Request, token: string): Promise
   });
   if (error) {
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
-    if (error.hint === "rate_limited") return json(429, { ok: false, message: MESSAGES.rateLimited });
+    if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.code === "22023") return json(400, { ok: false, message: /email/i.test(error.message) ? MESSAGES.email : MESSAGES.missing });
     console.error("business_card_submit failed", error.code, error.message);
     return json(500, { ok: false, message: MESSAGES.error });
@@ -109,7 +110,7 @@ export async function handleCardSubmit(request: Request, token: string): Promise
 /** GET /api/forms/card/<token>/vcard: the card as a contact file, with the shown fields only (a view of the card). */
 export async function handleCardVCard(request: Request, token: string): Promise<Response> {
   const card = await getPublicCard(token, clientIp(request.headers));
-  if (card === "rate-limited") return new Response(MESSAGES.rateLimited, { status: 429, headers: { "Cache-Control": "no-store" } });
+  if (card === "rate-limited") return rateLimitedText(MESSAGES.rateLimited);
   if (typeof card === "string") return new Response(MESSAGES.notFound, { status: 404, headers: { "Cache-Control": "no-store" } });
   const vcard = buildVCard({
     name: card.name,

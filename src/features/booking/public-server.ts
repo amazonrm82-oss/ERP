@@ -4,6 +4,7 @@ import { parseAttribution } from "@/features/intake/attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD } from "@/features/intake/fields";
 import type { Json } from "@/lib/database.types";
 import { clientIp, keyedIpHash as keyedHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { bookingManageFrom, confirmationFrom, MANAGE_TOKEN, publicBookingFrom, type BookingManage, type PublicBooking } from "./public";
@@ -20,6 +21,8 @@ const keyedIpHash = (ip: string | null) => keyedHash(ip, "booking");
 // a human needs more than this to pick a time and fill in the details
 const MIN_FILL_MS = 2000;
 export const MAX_BODY_BYTES = 16 * 1024;
+// 200 failed attempts within an hour close the page for an hour (app.booking_page_closures)
+const CLOSED_SECONDS = 3600;
 
 export type PublicBookingState = PublicBooking | "not-found" | "unavailable" | "rate-limited" | "not-configured";
 
@@ -50,7 +53,7 @@ const MESSAGES = {
   badRequest: "לא הצלחנו לקרוא את הפרטים שנשלחו.",
   tooLarge: "הפרטים שנשלחו ארוכים מדי.",
   slotTaken: "הזמן הזה כבר לא פנוי. בחרו זמן אחר.",
-  rateLimited: "נשלחו יותר מדי בקשות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rateLimited: RATE_LIMITED_TEXT,
   closed: "קביעת התורים בדף הזה סגורה זמנית. נסו שוב בעוד שעה.",
   tooLate: "כבר אי אפשר לבטל או לשנות את הפגישה כאן. לביטול יש להתקשר לעסק.",
   error: "משהו השתבש. נסו שוב בעוד רגע.",
@@ -120,9 +123,9 @@ export async function handleBooking(request: Request, token: string): Promise<Re
   });
   if (error) {
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
-    if (error.hint === "rate_limited") return json(429, { ok: false, message: MESSAGES.rateLimited });
+    if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     // 200 failed attempts within an hour close the page for an hour (owner, 15 October 2026)
-    if (error.hint === "booking:closed") return json(429, { ok: false, message: MESSAGES.closed });
+    if (error.hint === "booking:closed") return rateLimitedJson({ ok: false, message: MESSAGES.closed }, { retryAfterSeconds: CLOSED_SECONDS });
     if (error.hint === "booking:unavailable") return json(403, { ok: false, message: MESSAGES.unavailable });
     const fieldError = error.hint ? FIELD_ERRORS[error.hint] : undefined;
     if (fieldError) return json(400, { ok: false, message: fieldError.message, field: fieldError.field });
@@ -199,8 +202,8 @@ export async function handleBookingManage(request: Request, token: string): Prom
   const { data, error } = result;
   if (error) {
     if (error.code === "P0002") return manageJson(404, { ok: false, message: MESSAGES.notFound });
-    if (error.hint === "rate_limited") return manageJson(429, { ok: false, message: MESSAGES.rateLimited });
-    if (error.hint === "booking:closed") return manageJson(429, { ok: false, message: MESSAGES.closed });
+    if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
+    if (error.hint === "booking:closed") return rateLimitedJson({ ok: false, message: MESSAGES.closed }, { retryAfterSeconds: CLOSED_SECONDS });
     if (error.hint === "booking:too_late") return manageJson(409, { ok: false, message: MESSAGES.tooLate, tooLate: true });
     if (error.hint === "booking:unavailable") return manageJson(403, { ok: false, message: MESSAGES.unavailable });
     console.error("booking_manage failed", error.code, error.message);

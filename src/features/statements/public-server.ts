@@ -5,6 +5,7 @@ import { loadPdfLogo } from "@/features/pdf/logo";
 import { renderPdf } from "@/features/pdf/render";
 import { pdfHeaders } from "@/features/quotes/pdf-fingerprint";
 import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_PAGE_TEXT, rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { publicStatementPdfDocument, statementPdfFileName } from "./pdf";
@@ -41,7 +42,7 @@ const text = (status: number, body: string, extra: Record<string, string> = {}) 
 
 const PDF_MESSAGES = {
   "not-found": "הקישור אינו זמין. ייתכן שהוא בוטל או שהוחלף בקישור חדש. לקבלת קישור פנו לעסק ששלח אותו.",
-  "rate-limited": "הדף נפתח יותר מדי פעמים בזמן קצר. נסו שוב בעוד כמה דקות.",
+  "rate-limited": RATE_LIMITED_PAGE_TEXT,
   "not-configured": "דף החשבון אינו זמין כרגע.",
 } as const;
 
@@ -54,7 +55,7 @@ const PDF_MESSAGES = {
 export async function handleStatementPdfDownload(request: Request, token: string): Promise<Response> {
   const state = await getPublicStatement(token, clientIp(request.headers));
   if (state === "not-found") return text(404, PDF_MESSAGES["not-found"]);
-  if (state === "rate-limited") return text(429, PDF_MESSAGES["rate-limited"], { "Retry-After": "600" });
+  if (state === "rate-limited") return rateLimitedText(PDF_MESSAGES["rate-limited"], { headers: { "Referrer-Policy": "no-referrer" } });
   if (state === "not-configured") return text(503, PDF_MESSAGES["not-configured"]);
   const bytes = await renderPdf(publicStatementPdfDocument(state, await loadPdfLogo(logoPublicUrl(state.logoPath))));
   return new Response(new Uint8Array(bytes), {

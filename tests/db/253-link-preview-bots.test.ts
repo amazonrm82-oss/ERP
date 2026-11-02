@@ -504,7 +504,9 @@ describe("link previews for preview bots (WAB-05)", () => {
   // of one of them changes its md5 and fails here: check that public.link_preview_public still answers not found exactly when
   // that page shows no business (the matrix above), then update the value.
   const REVIEWED_PAGE_BODY_MD5: Record<string, string> = {
-    "public.intake_form(text)": "8b5e831bae31f9e3ac0219716823bfdf",
+    // OPS-02 (public_form_view_limit) adds only the view limit after the not-found and closed-business answers; it counts only
+    // with the x-crm-sender header, which the preview never sends, so every not-found branch is unchanged (rechecked)
+    "public.intake_form(text)": "718f53526bb9d5109afe56116e93bf56",
     "public.quote_public(text)": "4ab57d2574970d28e2113b1c31961aee",
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     "public.order_public(text,text)": "8827d9da93d3feb54d452d5d788844eb",

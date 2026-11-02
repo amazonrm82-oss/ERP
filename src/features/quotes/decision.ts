@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RATE_LIMITED_TEXT } from "@/lib/public-rate-limit";
+
 // QUO-09 (owner, 18 October 2026, answer 18): the customer accepts and signs, or declines, on the quote's page.
 
 /**
@@ -52,7 +54,7 @@ export const DECISION_MESSAGES: Record<DecisionStatus, string> = {
   closed: "ההצעה כבר לא פתוחה לתשובה. רעננו את הדף.",
   changed: "ההצעה התעדכנה בזמן שהיא הייתה פתוחה. בדקו את הגרסה העדכנית ונסו שוב.",
   invalid: "חלק מהפרטים לא תקינים. בדקו את השם, תעודת הזהות, החתימה ושורות הרשות שבחרתם.",
-  rate_limited: "היו יותר מדי ניסיונות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rate_limited: RATE_LIMITED_TEXT,
 };
 
 export function isDecisionStatus(value: unknown): value is DecisionStatus {

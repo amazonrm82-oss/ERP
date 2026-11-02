@@ -35,7 +35,7 @@ const PUBLIC_PREFIXES = [
   "/legal/",
 ];
 
-function isPublicPath(pathname: string): boolean {
+export function isPublicPath(pathname: string): boolean {
   // "/" is the public landing page (LND-01)
   return pathname === "/" || AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }

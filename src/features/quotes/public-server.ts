@@ -3,6 +3,7 @@ import "server-only";
 import { after } from "next/server";
 
 import { clientIp as senderIp, keyedIpHash } from "@/lib/keyed-ip-hash";
+import { rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import {
@@ -155,7 +156,9 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
   // QUO-09 signed PDF (owner (3) א, (33) ב): after the acceptance committed, the server keeps the signed PDF; a failure never
   // touches the acceptance (staff make it later from the quote's screen)
   if (status === "accepted") after(() => storeSignedQuotePdfForCustomer(token));
-  return reply(done ? 200 : status === "rate_limited" ? 429 : 409, { ok: done, status, message: DECISION_MESSAGES[status] });
+  // OPS-02: the shared 429 (Retry-After, never cached)
+  if (status === "rate_limited") return rateLimitedJson({ ok: false, status, message: DECISION_MESSAGES[status] });
+  return reply(done ? 200 : 409, { ok: done, status, message: DECISION_MESSAGES[status] });
 }
 
 // QUO-08 (owner, 1 November 2026, answer (28) א) ------------------------------------------------------------------------
@@ -200,7 +203,8 @@ export async function handleQuoteQuestion(request: Request, token: string): Prom
   const status = (data as { status?: unknown } | null)?.status;
   if (!isQuestionStatus(status)) return questionReply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   const sent = status === "sent";
-  return questionReply(sent ? 200 : status === "rate_limited" ? 429 : status === "closed" ? 409 : 400, {
+  if (status === "rate_limited") return rateLimitedJson({ ok: false, status, message: QUESTION_MESSAGES[status] });
+  return questionReply(sent ? 200 : status === "closed" ? 409 : 400, {
     ok: sent,
     status,
     message: QUESTION_MESSAGES[status],

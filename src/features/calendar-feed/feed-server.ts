@@ -1,6 +1,7 @@
 import "server-only";
 
 import { APP_NAME } from "@/lib/app";
+import { RATE_LIMITED_TEXT, rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { buildIcs, isFeedToken, type IcsEvent } from "./ics";
@@ -46,7 +47,7 @@ export async function calendarFeedResponse(file: string): Promise<Response> {
   const result = data as FeedResult | null;
   if (!result || !result.ok) {
     if (result?.reason === "rate") {
-      return new Response("too many requests", { status: 429, headers: { ...PLAIN, "Retry-After": "600" } });
+      return rateLimitedText(RATE_LIMITED_TEXT, { headers: { "X-Robots-Tag": "noindex" } });
     }
     return new Response("not found", { status: 404, headers: PLAIN });
   }

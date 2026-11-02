@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Json } from "@/lib/database.types";
 import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseAttribution, safeText } from "./attribution";
@@ -165,7 +166,7 @@ const MESSAGES = {
   tooLarge: "הפרטים שנשלחו ארוכים מדי.",
   notFound: "הטופס לא נמצא או שאינו פעיל.",
   invalid: "חלק מהפרטים חסרים או לא תקינים. יש למלא שם, טלפון או אימייל, ואת כל שדות החובה.",
-  rateLimited: "נשלחו יותר מדי פניות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rateLimited: RATE_LIMITED_TEXT,
   unavailable: "לא ניתן לשלוח את הטופס כרגע.",
   error: "משהו השתבש. נסו שוב בעוד רגע.",
   thanks: "תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם.",
@@ -185,6 +186,8 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     }
     return Response.json(reply, { status, headers: kind === "form" ? CORS_HEADERS : undefined });
   };
+  // OPS-02: every rate refusal of a public path is the same answer (429, Retry-After, never cached)
+  const rateLimited = () => rateLimitedJson({ ok: false, message: MESSAGES.rateLimited }, { headers: kind === "form" ? CORS_HEADERS : undefined });
 
   if (!/^[0-9a-f]{32}$/.test(token)) {
     return respond(404, { ok: false, message: MESSAGES.notFound });
@@ -222,6 +225,10 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     // a business whose public pages are closed: refused before intake_submit, so nothing is stored
     if (form === "inactive") {
       return respond(403, { ok: false, message: `${INACTIVE_FORM_TEXT}.` });
+    }
+    // never for this read (it sends no sender), kept so every answer of intake_form has its reply
+    if (form === "rate-limited") {
+      return rateLimited();
     }
     if (!form) {
       return respond(404, { ok: false, message: MESSAGES.notFound });
@@ -267,7 +274,7 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     if (error.hint === "callback:invalid") return respond(400, { ok: false, message: MESSAGES.callbackInvalid, field: CALLBACK_INPUT });
     if (error.hint === "requested_product:invalid") return respond(400, { ok: false, message: PRODUCT_INVALID, field: PRODUCT_INPUT });
     if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid, field: wrongField(error.message) });
-    if (error.code === "P0001" && error.hint === "rate_limited") return respond(429, { ok: false, message: MESSAGES.rateLimited });
+    if (error.code === "P0001" && error.hint === "rate_limited") return rateLimited();
     if (error.code === "P0001") return respond(403, { ok: false, message: MESSAGES.unavailable });
     console.error("intake_submit failed", error.code, error.message);
     return respond(500, { ok: false, message: MESSAGES.error });

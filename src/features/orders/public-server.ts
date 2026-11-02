@@ -2,6 +2,7 @@ import "server-only";
 
 import { decisionBodySchema, type DecisionBody, type DecisionStatus, isDecisionStatus } from "@/features/quotes/decision";
 import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { ORDER_ACCEPT_WORDING_VERSION, ORDER_LINK_TOKEN, publicOrderFrom, statusOrderFrom, type PublicOrder, type StatusPublicOrder } from "./public";
@@ -40,7 +41,7 @@ export const ORDER_DECISION_MESSAGES: Record<DecisionStatus, string> = {
   closed: "ההזמנה כבר לא מחכה לתשובה. רעננו את הדף.",
   changed: "פרטי ההזמנה התעדכנו בזמן שהדף היה פתוח. בדקו את הפרטים העדכניים ונסו שוב.",
   invalid: "חלק מהפרטים לא תקינים. בדקו את השם, תעודת הזהות והחתימה.",
-  rate_limited: "היו יותר מדי ניסיונות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rate_limited: RATE_LIMITED_TEXT,
 };
 
 type DecisionReply = { ok: true; status: DecisionStatus; message: string } | { ok: false; status?: DecisionStatus; message: string };
@@ -87,5 +88,7 @@ export async function handleOrderDecision(request: Request, token: string): Prom
   const status = (data as { status?: unknown } | null)?.status;
   if (!isDecisionStatus(status)) return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   const done = status === "accepted" || status === "rejected";
-  return reply(done ? 200 : status === "rate_limited" ? 429 : 409, { ok: done, status, message: ORDER_DECISION_MESSAGES[status] });
+  // OPS-02: the shared 429 (Retry-After, never cached)
+  if (status === "rate_limited") return rateLimitedJson({ ok: false, status, message: ORDER_DECISION_MESSAGES[status] });
+  return reply(done ? 200 : 409, { ok: done, status, message: ORDER_DECISION_MESSAGES[status] });
 }

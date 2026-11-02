@@ -5,6 +5,7 @@ import { parseAttribution } from "@/features/intake/attribution";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD } from "@/features/intake/fields";
 import type { Json } from "@/lib/database.types";
 import { clientIp, keyedIpHash as keyedHash } from "@/lib/keyed-ip-hash";
+import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { isWidgetToken, widgetFormPath } from "./paths";
@@ -76,7 +77,7 @@ const MESSAGES = {
   tooLarge: "הפרטים שנשלחו ארוכים מדי.",
   missing: "יש לכתוב שם ומספר טלפון או אימייל.",
   email: "כתובת האימייל אינה תקינה.",
-  rateLimited: "נשלחו יותר מדי פניות בזמן קצר. נסו שוב בעוד כמה דקות.",
+  rateLimited: RATE_LIMITED_TEXT,
   error: "משהו השתבש. נסו שוב בעוד רגע.",
 } as const;
 
@@ -126,7 +127,7 @@ export async function handleWidgetSubmit(request: Request, token: string): Promi
   });
   if (error) {
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
-    if (error.hint === "rate_limited") return json(429, { ok: false, message: MESSAGES.rateLimited });
+    if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.code === "22023") return json(400, { ok: false, message: /email/i.test(error.message) ? MESSAGES.email : MESSAGES.missing });
     console.error("site_widget_submit failed", error.code, error.message);
     return json(500, { ok: false, message: MESSAGES.error });

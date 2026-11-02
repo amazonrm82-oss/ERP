@@ -6,6 +6,7 @@ import { isLogoPath } from "@/features/branding/logo";
 import { isFieldType } from "@/features/custom-fields/types";
 import type { Json } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
+import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { callbackOfferFrom, type CallbackOffer } from "./callback";
@@ -108,9 +109,26 @@ export function publicFormFrom(data: Json): PublicForm | null {
   };
 }
 
-/** The form by its public token, through public.intake_form() (display settings only). */
-export async function readPublicForm(service: ServiceClient, token: string): Promise<PublicForm | null | "inactive"> {
-  const data = must(await service.rpc("intake_form", { p_token: token }), "intake_form");
+/** The header that carries the sender's keyed IP hash to public.intake_form() (app.public_sender_header, OPS-02). */
+export const SENDER_HEADER = "x-crm-sender";
+
+/** intake_form() answers {rate_limited: true} when the sender opened the form too often (OPS-02). */
+export function isRateLimitedForm(data: Json): boolean {
+  return !!data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true;
+}
+
+/**
+ * The form by its public token, through public.intake_form() (display settings only). `sender` is the keyed IP hash of a
+ * page view (counted: 60 per sender in 10 minutes per form, OPS-02); the submission route reads without one (not counted).
+ */
+export async function readPublicForm(
+  service: ServiceClient,
+  token: string,
+  sender: string | null = null,
+): Promise<PublicForm | null | "inactive" | "rate-limited"> {
+  const call = service.rpc("intake_form", { p_token: token });
+  const data = must(await (sender ? call.setHeader(SENDER_HEADER, sender) : call), "intake_form");
+  if (isRateLimitedForm(data)) return "rate-limited";
   return isInactiveForm(data) ? "inactive" : publicFormFrom(data);
 }
 
@@ -118,9 +136,13 @@ export async function readPublicForm(service: ServiceClient, token: string): Pro
  * What the hosted form shows, by its public token. Only display settings are
  * read, plus the organization's logo and colour (FLD-04) and, when the form
  * turns it on, the WhatsApp number of the thank-you page (CAP-05); nothing else about
- * the organization or its data leaves the server.
+ * the organization or its data leaves the server. `headers` are the visitor's request headers: the view counts against the
+ * sender's limit (keyed IP hash, FXS-11 scope "intake" and the form's token, the value intake_submit gets).
  */
-export async function getPublicForm(token: string): Promise<PublicForm | null | "inactive" | "not-configured"> {
+export async function getPublicForm(
+  token: string,
+  headers: Headers | null,
+): Promise<PublicForm | null | "inactive" | "rate-limited" | "not-configured"> {
   if (!/^[0-9a-f]{32}$/.test(token)) {
     return null;
   }
@@ -128,5 +150,5 @@ export async function getPublicForm(token: string): Promise<PublicForm | null | 
   if (!service) {
     return "not-configured";
   }
-  return readPublicForm(service, token);
+  return readPublicForm(service, token, headers ? keyedIpHash(clientIp(headers), "intake", token) : null);
 }
