@@ -174,6 +174,8 @@ export const ACTION_LABELS: Record<string, string> = {
   retention_policy: "מדיניות שמירה",
   retention_keep: "השארה ברשימת מדיניות השמירה",
   retention_purge: "מחיקה לפי מדיניות השמירה",
+  // RET-01 (64) ג: a dormant rule run once on the customers already dormant when it was switched on (the counts)
+  dormant_backfill: "הרצת כלל לקוח רדום על לקוחות רדומים קיימים",
   // PRV-01: one lead's details erased from the log by the policy (app.lead_retention_erase renames the core's 'erase' row)
   retention: "נמחק לפי מדיניות השמירה",
   // QUO-06 follow-up (answer 1 (ג)): the server made a quote PDF kept without a fingerprint again, once (sizes only)

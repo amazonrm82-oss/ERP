@@ -1035,6 +1035,10 @@ export type AutomationRow = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  // RET-01 (64) ג: the day a customer_dormant rule was switched on (server only, set by trigger)
+  dormant_from: string | null;
+  // and the dormant months in force that day (server only, set by the same trigger)
+  dormant_from_months: number | null;
 };
 
 export type AutomationRunRow = {
@@ -3612,6 +3616,9 @@ export type Database = {
       customer_summary: { Args: { p_org: string; p_contact: string | null; p_company: string | null }; Returns: Json };
       // RET-01: dormant contacts or companies from the kept facts (owners and admins; {allowed: false} otherwise)
       dormant_customers: { Args: { p_org: string; p_kind: string; p_limit?: number }; Returns: Json };
+      // RET-01 (64) ג: the question's number, and the opt-in run over customers already dormant (managers of automations)
+      dormant_customer_count: { Args: { p_org: string; p_kind: string }; Returns: number };
+      run_dormant_backfill: { Args: { p_org: string; p_automation: string }; Returns: Json };
       // a page's organization context in one call (migration 0028)
       org_context: { Args: { p_org: string }; Returns: Json };
       // plan, limits and usage of a business, members only (migration 0046, FXU-04)

@@ -37,6 +37,8 @@ const RERUN = [
   migrationFile("_collection_reminder_import_undo.sql"),
   // RET-01 redefines app.automation_run_facts() / app.automation_event_still_holds() of _share_note_rules.sql last
   migrationFile("_dormant_customers.sql"),
+  // RET-01 (64) ג redefines app.scheduled_customer_dormant() of _dormant_customers.sql last (the rule's start point)
+  migrationFile("_dormant_activation.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

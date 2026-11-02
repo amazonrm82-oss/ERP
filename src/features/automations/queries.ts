@@ -137,6 +137,8 @@ export type AutomationSummary = {
   // PRM-01: who made the rule and who changed it last (server-set)
   createdBy: string | null;
   updatedBy: string | null;
+  // RET-01 (64) ג: the business day a customer_dormant rule was switched on (server-set)
+  dormantFrom: string | null;
 };
 
 function objects(value: unknown): Array<Record<string, unknown>> {
@@ -147,7 +149,7 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("automations")
-    .select("id, name, is_active, template_key, entity_type, trigger_type, trigger_config, conditions, actions, created_by, updated_by")
+    .select("id, name, is_active, template_key, entity_type, trigger_type, trigger_config, conditions, actions, created_by, updated_by, dormant_from")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false });
   if (error) {
@@ -176,6 +178,7 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
     triggerType: row.trigger_type,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
+    dormantFrom: row.dormant_from,
     triggerConfig: row.trigger_config && typeof row.trigger_config === "object" && !Array.isArray(row.trigger_config) ? row.trigger_config : {},
     conditions: objects(row.conditions),
     actions: objects(row.actions),
@@ -261,4 +264,18 @@ export async function listTestRecords(orgId: string, entity: string): Promise<Ar
     .order("created_at", { ascending: false })
     .limit(30), "data");
   return ((data ?? []) as unknown as Array<Record<string, string | null>>).map((row) => ({ id: String(row.id), name: row[column] || "ללא שם" }));
+}
+
+/**
+ * RET-01 (64) ג: how many customers of the kind are dormant already (managers of automations). Null when not allowed or when
+ * the read fails: the page then simply does not ask (the rule keeps to customers who become dormant from now).
+ */
+export async function getDormantCount(orgId: string, kind: string): Promise<number | null> {
+  if (kind !== "contact" && kind !== "company") return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("dormant_customer_count", { p_org: orgId, p_kind: kind });
+  if (error) {
+    return null;
+  }
+  return typeof data === "number" ? data : null;
 }

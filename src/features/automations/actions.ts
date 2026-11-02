@@ -10,6 +10,7 @@ import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors"
 import { isUuid, paths } from "@/lib/paths";
 
 import { toDbRule } from "./convert";
+import { backfillMessage, DORMANT_ASK_PARAM, DORMANT_TRIGGER, parseBackfillAnswer, sumBackfill } from "./dormant-activation";
 import { readLookups } from "./queries";
 import { ruleSchema } from "./schema";
 import { TEMPLATES } from "./templates";
@@ -21,7 +22,12 @@ const RUN_MESSAGES: Record<string, string> = {
   skipped: "דולג: האוטומציה כבר רצה 20 פעמים היום על הרשומה הזו.",
 };
 
-async function insertRule(orgId: string, raw: unknown, templateKey: string | null): Promise<ActionResult<{ id: string }>> {
+/** RET-01 (64) ג: the rule's page, asking about customers already dormant when a dormant rule was just switched on. */
+function rulePage(orgId: string, id: string, askDormant: boolean): string {
+  return askDormant ? `${paths.settingsAutomation(orgId, id)}?${DORMANT_ASK_PARAM}=1` : paths.settingsAutomation(orgId, id);
+}
+
+async function insertRule(orgId: string, raw: unknown, templateKey: string | null): Promise<ActionResult<{ id: string; dormant: boolean }>> {
   const context = await actionContext(orgId);
   if (!context.ok) {
     return context;
@@ -41,13 +47,13 @@ async function insertRule(orgId: string, raw: unknown, templateKey: string | nul
   const { data, error } = await context.supabase
     .from("automations")
     .insert({ organization_id: orgId, template_key: templateKey, ...rule })
-    .select("id")
+    .select("id, trigger_type, is_active")
     .single();
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור את האוטומציה. נסו שוב."));
   }
   revalidatePath(paths.settingsAutomations(orgId));
-  return ok({ id: data.id });
+  return ok({ id: data.id, dormant: data.is_active && data.trigger_type === DORMANT_TRIGGER });
 }
 
 /** From the builder: the rule arrives as JSON in the "rule" field. */
@@ -62,7 +68,7 @@ export async function createAutomationAction(orgId: string, _prev: FormState, fo
   if (!result.ok) {
     return result;
   }
-  redirect(paths.settingsAutomation(orgId, result.data!.id));
+  redirect(rulePage(orgId, result.data!.id, result.data!.dormant));
 }
 
 /** Saves changes to an existing rule. Its record type stays (the database does not let it change). */
@@ -89,7 +95,7 @@ export async function updateAutomationAction(orgId: string, id: string, _prev: F
   if (typeof rule === "string") {
     return fail(rule);
   }
-  const { data: current, error: currentError } = await context.supabase.from("automations").select("entity_type").eq("organization_id", orgId).eq("id", id).maybeSingle();
+  const { data: current, error: currentError } = await context.supabase.from("automations").select("entity_type, trigger_type, is_active").eq("organization_id", orgId).eq("id", id).maybeSingle();
   if (currentError) return fail(dbErrorMessage(currentError));
   if (!current) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
@@ -111,7 +117,8 @@ export async function updateAutomationAction(orgId: string, id: string, _prev: F
   }
   revalidatePath(paths.settingsAutomations(orgId));
   revalidatePath(paths.settingsAutomation(orgId, id));
-  redirect(paths.settingsAutomation(orgId, id));
+  // an active rule changed into a dormant rule starts today: ask about the customers already dormant
+  redirect(rulePage(orgId, id, current.is_active && current.trigger_type !== DORMANT_TRIGGER && rule.trigger_type === DORMANT_TRIGGER));
 }
 
 export async function createFromTemplateAction(orgId: string, templateKey: string): Promise<ActionResult> {
@@ -131,7 +138,7 @@ export async function createFromTemplateAction(orgId: string, templateKey: strin
   if (!result.ok) {
     return result;
   }
-  redirect(paths.settingsAutomation(orgId, result.data!.id));
+  redirect(rulePage(orgId, result.data!.id, result.data!.dormant));
 }
 
 export async function setAutomationActiveAction(orgId: string, id: string, active: boolean): Promise<ActionResult> {
@@ -145,7 +152,7 @@ export async function setAutomationActiveAction(orgId: string, id: string, activ
     .update({ is_active: active === true })
     .eq("organization_id", orgId)
     .eq("id", id)
-    .select("id");
+    .select("id, trigger_type");
   if (error) {
     return fail(dbErrorMessage(error));
   }
@@ -154,7 +161,33 @@ export async function setAutomationActiveAction(orgId: string, id: string, activ
   }
   revalidatePath(paths.settingsAutomations(orgId));
   revalidatePath(paths.settingsAutomation(orgId, id));
+  if (active === true && data[0].trigger_type === DORMANT_TRIGGER) {
+    // RET-01 (64) ג: switched on today; the page asks about the customers already dormant
+    redirect(rulePage(orgId, id, true));
+  }
   return ok();
+}
+
+/**
+ * RET-01 (64) ג: the owner's "yes": runs a dormant rule on the customers already dormant when it was switched on. One short
+ * server call per click (at most 200 runs and 500 customers examined); "להמשיך" on the screen makes the next one.
+ */
+export async function runDormantBackfillAction(orgId: string, id: string): Promise<ActionResult<{ more: boolean }>> {
+  const context = await actionContext(orgId, id);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase.rpc("run_dormant_backfill", { p_org: orgId, p_automation: id });
+  if (error) {
+    return fail(dbErrorMessage(error, "לא הצלחנו להריץ את הכלל. נסו שוב."));
+  }
+  const answer = parseBackfillAnswer(data);
+  if (!answer) {
+    return fail("לא הצלחנו להריץ את הכלל. נסו שוב.");
+  }
+  revalidatePath(paths.settingsAutomation(orgId, id));
+  const total = sumBackfill([answer]);
+  return { ok: true, message: backfillMessage(total), data: { more: total.more } };
 }
 
 export async function deleteAutomationAction(orgId: string, id: string): Promise<ActionResult> {

@@ -431,8 +431,9 @@ describe("customer status and value (CON-11)", () => {
           await q("select set_config('app.date_trigger_hour', '0', true)");
           return (await one<{ n: number }>(q, "select app.run_dormant_automations() as n")).n;
         });
-      const rule = (entity: "contact" | "company", title: string) =>
-        asUser(owner.id, async (q) =>
+      // a rule whose start point (021140, owner (64) ג) lies far back, so the scan takes every dormant customer
+      const rule = async (entity: "contact" | "company", title: string) => {
+        const id = await asUser(owner.id, async (q) =>
           (
             await one<{ id: string }>(
               q,
@@ -441,6 +442,9 @@ describe("customer status and value (CON-11)", () => {
             )
           ).id,
         );
+        await asAdmin((q) => q("update public.automations set dormant_from = '2000-01-01' where id = $1", [id]));
+        return id;
+      };
       const runsOf = (auto: string) =>
         asAdmin(async (q) => (await q<{ entity_id: string; run_key: string }>("select entity_id, run_key from public.automation_runs where automation_id = $1 order by run_key", [auto])).rows);
 

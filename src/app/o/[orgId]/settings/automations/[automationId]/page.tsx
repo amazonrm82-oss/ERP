@@ -8,21 +8,26 @@ import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { BackIcon } from "@/components/ui/icons";
 import { deleteAutomationAction, setAutomationActiveAction } from "@/features/automations/actions";
+import { DormantActivationDialog } from "@/features/automations/components/dormant-activation-dialog";
 import { TestRunForm } from "@/features/automations/components/test-run-form";
+import { DORMANT_ASK_PARAM, DORMANT_TRIGGER, shouldAskDormant } from "@/features/automations/dormant-activation";
 import { ACTION_LABELS, type ActionType } from "@/features/automations/definitions";
 import { actionsMissingReason } from "@/features/automations/convert";
 import { describeRule, quotaSkipLabel, retryLine, STEP_ERRORS, stepWarningTexts } from "@/features/automations/describe";
-import { getAutomation, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
+import { getAutomation, getDormantCount, getLookups, listRuns, listTestRecords } from "@/features/automations/queries";
 import { canManageAutomations } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { ruleAuthorshipLine } from "@/features/automations/authorship";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "אוטומציה" };
 
-type Props = { params: Promise<{ orgId: string; automationId: string }> };
+type Props = {
+  params: Promise<{ orgId: string; automationId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 const RUN_STATUS = {
   success: { label: "הצליחה", tone: "success" },
@@ -33,9 +38,10 @@ const RUN_STATUS = {
 
 const RECORD_PATH = { lead: paths.lead, contact: paths.contact, company: paths.company, deal: paths.deal } as const;
 
-export default async function AutomationPage({ params }: Props) {
+export default async function AutomationPage({ params, searchParams }: Props) {
   const { orgId, automationId } = await params;
-  const { role, canWrite } = await getOrgContext(orgId);
+  const query = await searchParams;
+  const { role, canWrite, org } = await getOrgContext(orgId);
   // PRM-01: a member with the automations permission manages them too
   if (!canManageAutomations(role, await getMyPermissions(orgId)) || !isUuid(automationId)) {
     notFound();
@@ -52,6 +58,18 @@ export default async function AutomationPage({ params }: Props) {
     getUserNames([automation.createdBy, automation.updatedBy].filter((id): id is string => !!id)),
   ]);
   const description = describeRule(automation, lookups);
+  // RET-01 (64) ג: right after a dormant rule is switched on, ask about the customers already dormant
+  const today = zoneDate(new Date(), org.timeZone);
+  const asked = query[DORMANT_ASK_PARAM] === "1" && canWrite && automation.isActive && automation.triggerType === DORMANT_TRIGGER;
+  const dormantCount = asked ? await getDormantCount(orgId, automation.entity) : null;
+  const askDormant = shouldAskDormant({
+    asked,
+    isActive: automation.isActive,
+    triggerType: automation.triggerType,
+    dormantFrom: automation.dormantFrom,
+    today,
+    count: dormantCount,
+  });
   const missingReason = actionsMissingReason(automation.actions, lookups);
 
   return (
@@ -68,6 +86,8 @@ export default async function AutomationPage({ params }: Props) {
         {/* PRM-01: an unknown last editor reads "לא ידוע" (owner) */}
         <p className="mt-1 text-sm text-ink-soft">{ruleAuthorshipLine(automation.createdBy, automation.updatedBy, people)}</p>
       </div>
+
+      {askDormant && dormantCount ? <DormantActivationDialog orgId={orgId} automationId={automation.id} count={dormantCount} /> : null}
 
       {missingReason.length > 0 ? (
         <p role="note" className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
@@ -111,6 +131,9 @@ export default async function AutomationPage({ params }: Props) {
                 ))}
               </ul>
             </div>
+          ) : null}
+          {automation.triggerType === DORMANT_TRIGGER && automation.isActive && automation.dormantFrom ? (
+            <p className="text-sm text-ink-soft">רצה על לקוחות שהפכו לרדומים מ-{formatDate(`${automation.dormantFrom}T12:00:00Z`)}, יום ההפעלה.</p>
           ) : null}
           <div>
             <p className="font-semibold">אז</p>

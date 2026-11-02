@@ -681,6 +681,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // RET-01 redefines app.automation_event_matches() of _automation_more_triggers.sql and app.automation_run_facts() /
       // app.automation_event_still_holds() of _share_note_rules.sql last (the customer_dormant trigger)
       "_dormant_customers.sql",
+      // RET-01 (64) ג redefines app.scheduled_customer_dormant() of _dormant_customers.sql last (the rule's start point)
+      "_dormant_activation.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
