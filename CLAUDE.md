@@ -1467,6 +1467,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   zone, the ledger's scope; date, method code, amount only; 500 max, `payments_more`) and `bank` (`app.document_bank_snapshot` read at
   view time while `quote_designs.show_bank_details_statement`, default true, is on; never stored). `public.statement_public` was last
   redefined in 021115; keep its document and payment scopes in step with `customer_ledger`. The PDF is made per request (owner (24) א).
+  Staff PDF (021125, owner (35) א, (36) ב): the staff's file is the customer's document, from `public.statement_staff_view(org, contact,
+  company)` (INVOKER, the caller's RLS; `customer_debt_summary`'s rights, keys and partial rule; copies `statement_public`'s selection,
+  keep in step, test 275 compares the answers and pins `statement_public`'s md5); `bank` only for owners/admins while the switch is
+  on (read from `org_bank_details` under RLS), `bank_elsewhere` (the line "פרטי הבנק מופיעים בדף שהלקוח רואה") for anyone else while it
+  is on. Accepted: that line shows even when the business has no account; an HEB-08 deputy may get the staff PDF.
 - Collection screen and payment promises (COL-01, COL-03; migrations 021098, 021099, 021100; owner 28 October 2026, answers
   (1) ג (2) א+notice (3) ב (4) א): `public.collection_documents(org, owner, overdue, bucket, customer kind, customer id)` (invoker;
   `app.can_record_payments` + keys `collection`, `documents`, `payments`): BAL-02's debt, BAL-03's buckets, report_debt_aging's
