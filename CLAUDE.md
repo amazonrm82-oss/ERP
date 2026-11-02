@@ -514,6 +514,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   caller's own running update-mode job of that type created within 2 hours; notes are always told. `import_jobs.status` is
   one-way (trigger `import_jobs_status_one_way`, hint `import:status`). `app.notify_followers_of_change/_of_entry` were last
   redefined in 0199. Accepted risk: an importer (manager and up) can mute their own change notices for one job's window.
+- Public rate limits (OPS-02, migration 021127; 2 November 2026): every public page and route is listed, with its function and
+  limit, in `tests/unit/public-rate-limits.test.ts` (fails on an unlisted public page/route, a route that does not call its named
+  function, or a 429 written outside the helper). Refusals go through `src/lib/public-rate-limit.ts` (`rateLimitedJson` /
+  `rateLimitedText`: 429, `Retry-After`, no-store, one Hebrew text; pages show `RATE_LIMITED_PAGE_TEXT` with HTTP 200, the App
+  Router cannot set 429 from a page). The hosted form `/f/<token>` (and `/qr`) is limited by `public.intake_form` (now VOLATILE,
+  same signature): `app.form_view_limit()` (300, lead's interim choice, owner question 39) views per sender per form in 10 minutes
+  in `app.form_view_counts` (1,024 reused buckets, no hash). The sender is the keyed IP hash (scope `intake` + token) the server
+  sends in request header `x-crm-sender`, read by `app.public_sender_header()` (64 hex or null); no header = not counted (the
+  submission's own read; no `INTAKE_IP_HASH_SECRET` = no hash, fail open as the other pages). Verified end to end on the local
+  stack (the header reaches `request.headers` through the gateway). Open: not-found tokens are never counted (question 40); the
+  quote page has no per-sender view limit (question 41).
 - Link previews (WAB-05, no migration; 27 October 2026): the six customer pages (`/f/[token]`, `/f/quote`, `/f/order`, `/f/book`,
   `/f/book/manage`, `/f/card`) build Open Graph / Twitter metadata in `generateMetadata` through `src/lib/link-preview.ts` (business
   display fields only: never the customer's name, a price, a number or a time; logo from `org-logos`, else no image, never the app's
