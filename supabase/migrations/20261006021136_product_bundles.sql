@@ -44,6 +44,16 @@
 --                    quantity x the line's quantity, no prices of their own.
 -- A deal line keeps only the choice: the deal page reads the parts live (a deal is
 -- not a document).
+-- When a quote is sent or an order numbered, its bundle lines take the parts again
+-- from the catalog (app.quotes_bundle_refresh / app.orders_bundle_refresh, server
+-- writes), except a version's lines copied from the previous version and an order
+-- made from a quote, which keep the parts the customer already saw. After that the
+-- parts never change. The fingerprint of what the customer signs (app.quote_fingerprint,
+-- app.order_fingerprint) includes a bundle line's choice and parts; a line without a
+-- bundle adds nothing, so every existing document keeps its hash.
+-- Lines saved before this migration: a draft's bundle line may take a choice (the
+-- parts are taken then), and the migration sets 'single' on drafts' and deals'
+-- bundle lines whose column is still empty; sent quotes and numbered orders keep none.
 -- The totals rule is unchanged: a bundle line is priced like any line, at the
 -- bundle's own price (PL-03 included). Reports by product count the bundle as
 -- itself and never split it into its parts.
@@ -308,18 +318,32 @@ begin
     return new;
   end if;
   if tg_op = 'UPDATE' then
-    -- the product of a line never changes (quote_lines_check), and neither do its parts, for every writer
-    new.bundle_items := old.bundle_items;
-    if old.bundle_display is null then
-      new.bundle_display := null;
+    select q.status into v_status from public.quotes q where q.organization_id = new.organization_id and q.id = new.quote_id;
+    -- the refresh when the quote is sent (app.quotes_bundle_refresh, a server write): the parts as the catalog holds them now
+    if old.bundle_display is not null
+       and coalesce(current_setting('app.bundle_refresh', true), '') = 'quote:' || new.quote_id::text then
+      new.bundle_display := old.bundle_display;
+      new.bundle_items := coalesce(app.bundle_snapshot(new.organization_id, new.product_id), old.bundle_items);
       return new;
     end if;
-    new.bundle_display := coalesce(new.bundle_display, old.bundle_display);
-    if new.bundle_display is distinct from old.bundle_display then
-      select q.status into v_status from public.quotes q where q.organization_id = new.organization_id and q.id = new.quote_id;
-      if v_status is distinct from 'draft' then
-        raise exception 'a sent quote does not change' using errcode = 'P0001', hint = 'quote:frozen';
+    if old.bundle_display is null then
+      -- a bundle line saved before this migration (or whose product became a bundle later) takes a choice on a draft only,
+      -- and the parts with it
+      if new.bundle_display is not null and v_status = 'draft' and new.product_id is not null
+         and exists (select 1 from public.products p
+                      where p.organization_id = new.organization_id and p.id = new.product_id and p.kind = 'bundle') then
+        new.bundle_items := app.bundle_snapshot(new.organization_id, new.product_id);
+      else
+        new.bundle_display := null;
+        new.bundle_items := old.bundle_items;
       end if;
+      return new;
+    end if;
+    -- the product of a line never changes (quote_lines_check), and neither do its parts, for every writer
+    new.bundle_items := old.bundle_items;
+    new.bundle_display := coalesce(new.bundle_display, old.bundle_display);
+    if new.bundle_display is distinct from old.bundle_display and v_status is distinct from 'draft' then
+      raise exception 'a sent quote does not change' using errcode = 'P0001', hint = 'quote:frozen';
     end if;
     return new;
   end if;
@@ -367,17 +391,30 @@ begin
     return new;
   end if;
   if tg_op = 'UPDATE' then
-    new.bundle_items := old.bundle_items;
-    if old.bundle_display is null then
-      new.bundle_display := null;
+    select * into v_order from public.orders o where o.organization_id = new.organization_id and o.id = new.order_id;
+    -- the refresh when the order is numbered (app.orders_bundle_refresh, a server write): the parts as the catalog holds them now
+    if old.bundle_display is not null
+       and coalesce(current_setting('app.bundle_refresh', true), '') = 'order:' || new.order_id::text then
+      new.bundle_display := old.bundle_display;
+      new.bundle_items := coalesce(app.bundle_snapshot(new.organization_id, new.product_id), old.bundle_items);
       return new;
     end if;
-    new.bundle_display := coalesce(new.bundle_display, old.bundle_display);
-    if new.bundle_display is distinct from old.bundle_display then
-      select * into v_order from public.orders o where o.organization_id = new.organization_id and o.id = new.order_id;
-      if v_order.status is distinct from 'draft' then
-        raise exception 'a numbered order does not change' using errcode = 'P0001', hint = 'order:frozen';
+    if old.bundle_display is null then
+      -- a bundle line saved before this migration takes a choice on a draft only, and the parts with it
+      if new.bundle_display is not null and v_order.status = 'draft' and new.product_id is not null
+         and exists (select 1 from public.products p
+                      where p.organization_id = new.organization_id and p.id = new.product_id and p.kind = 'bundle') then
+        new.bundle_items := app.bundle_snapshot(new.organization_id, new.product_id);
+      else
+        new.bundle_display := null;
+        new.bundle_items := old.bundle_items;
       end if;
+      return new;
+    end if;
+    new.bundle_items := old.bundle_items;
+    new.bundle_display := coalesce(new.bundle_display, old.bundle_display);
+    if new.bundle_display is distinct from old.bundle_display and v_order.status is distinct from 'draft' then
+      raise exception 'a numbered order does not change' using errcode = 'P0001', hint = 'order:frozen';
     end if;
     return new;
   end if;
@@ -391,6 +428,8 @@ begin
   end if;
   if new.bundle_display is null and new.bundle_items is null then
     select * into v_order from public.orders o where o.organization_id = new.organization_id and o.id = new.order_id;
+    -- order_from_quote copies the quote's lines with their positions (020620), so a line is matched to the quote line of the
+    -- same place and product; order_from_deal copies the deal lines the same way (020585)
     if v_order.source = 'quote' and v_order.quote_id is not null then
       select l.bundle_display, l.bundle_items into v_display, v_items from public.quote_lines l
        where l.organization_id = new.organization_id and l.quote_id = v_order.quote_id
@@ -414,6 +453,151 @@ revoke all on function app.order_lines_bundle() from public, anon, authenticated
 
 create or replace trigger order_lines_bundle before insert or update on public.order_lines
   for each row execute function app.order_lines_bundle();
+
+-- -----------------------------------------------------------------------------
+-- Sending a quote / numbering an order: the parts are taken again from the catalog, so the customer gets the bundle as it
+-- is on the day it was sent (a draft may wait for weeks). Server writes, inside the sending transaction; frozen afterwards.
+-- A new version keeps the previous version's parts (a line of the same place and product as on the previous quote): a
+-- version shows the bundle as the customer saw it. An order made from a quote keeps the quote's parts (never refreshed).
+-- -----------------------------------------------------------------------------
+create or replace function app.quotes_bundle_refresh() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  if old.status is distinct from 'draft' or new.status = 'draft' then
+    return null;
+  end if;
+  perform set_config('app.bundle_refresh', 'quote:' || new.id::text, true);
+  update public.quote_lines l
+     set bundle_items = app.bundle_snapshot(l.organization_id, l.product_id)
+   where l.organization_id = new.organization_id and l.quote_id = new.id
+     and l.bundle_display is not null and l.product_id is not null
+     and l.bundle_items is distinct from app.bundle_snapshot(l.organization_id, l.product_id)
+     and not (new.previous_id is not null
+              and exists (select 1 from public.quote_lines p
+                           where p.organization_id = new.organization_id and p.quote_id = new.previous_id
+                             and p.position = l.position and p.product_id = l.product_id));
+  perform set_config('app.bundle_refresh', '', true);
+  return null;
+end;
+$$;
+revoke all on function app.quotes_bundle_refresh() from public, anon, authenticated;
+
+create or replace trigger quotes_bundle_refresh after update of status on public.quotes
+  for each row execute function app.quotes_bundle_refresh();
+
+create or replace function app.orders_bundle_refresh() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_server text := coalesce(current_setting('app.order_server', true), '');
+begin
+  if old.status is distinct from 'draft' or new.status = 'draft' or new.source = 'quote' then
+    return null;
+  end if;
+  perform set_config('app.bundle_refresh', 'order:' || new.id::text, true);
+  -- a server write: a numbered order's lines otherwise refuse every change (order_lines_check)
+  perform set_config('app.order_server', 'on', true);
+  update public.order_lines l
+     set bundle_items = app.bundle_snapshot(l.organization_id, l.product_id)
+   where l.organization_id = new.organization_id and l.order_id = new.id
+     and l.bundle_display is not null and l.product_id is not null
+     and l.bundle_items is distinct from app.bundle_snapshot(l.organization_id, l.product_id);
+  perform set_config('app.order_server', v_server, true);
+  perform set_config('app.bundle_refresh', '', true);
+  return null;
+end;
+$$;
+revoke all on function app.orders_bundle_refresh() from public, anon, authenticated;
+
+create or replace trigger orders_bundle_refresh after update of status on public.orders
+  for each row execute function app.orders_bundle_refresh();
+
+-- -----------------------------------------------------------------------------
+-- What the customer signs (QUO-09 / ORD-05): a bundle line's choice and parts are part of the fingerprint. Only lines with
+-- a bundle_display add them, so every document without a bundle keeps exactly the hash it had. Bodies of 020370 and 020625
+-- with only that line part changed; every caller (page, decide, version, signed PDF) calls these one functions.
+-- -----------------------------------------------------------------------------
+create or replace function app.quote_fingerprint(p_quote public.quotes) returns text
+language sql stable security definer
+set search_path = ''
+as $$
+  select encode(sha256(convert_to(jsonb_build_object(
+    'number', p_quote.number_display,
+    'title', p_quote.title,
+    'customer', jsonb_build_array(p_quote.customer_name, p_quote.customer_contact_name),
+    'dates', jsonb_build_array(p_quote.quote_date, p_quote.valid_until, p_quote.sent_at),
+    'vat', jsonb_build_array(p_quote.prices_include_vat, p_quote.no_vat_reason, p_quote.no_vat_note, p_quote.vat_rate_bp),
+    'discount', jsonb_build_array(p_quote.discount_bp, p_quote.discount_agorot),
+    'totals', jsonb_build_array(p_quote.subtotal_agorot, p_quote.discount_total_agorot, p_quote.net_total_agorot,
+                                p_quote.vat_agorot, p_quote.total_agorot, p_quote.currency),
+    'texts', jsonb_build_array(p_quote.notes, p_quote.terms),
+    'lines', coalesce((select jsonb_agg(jsonb_build_array(l.position, l.kind, l.name, l.description, l.unit_name, l.quantity,
+                                                          l.unit_price_agorot, l.discount_bp, l.discount_agorot, l.vat_exempt,
+                                                          l.billing, l.is_optional, l.optional_selected, l.total_agorot)
+                                      -- PRD-09: a bundle line's choice and parts; nothing for any other line
+                                      || case when l.bundle_display is not null
+                                              then jsonb_build_array(l.bundle_display, l.bundle_items) else '[]'::jsonb end
+                                      order by l.position, l.id)
+                         from public.quote_lines l
+                        where l.organization_id = p_quote.organization_id and l.quote_id = p_quote.id), '[]'::jsonb),
+    'schedule', coalesce((select jsonb_agg(jsonb_build_array(s.position, s.name, s.percent_bp, s.due_date, s.milestone)
+                                         order by s.position, s.id)
+                            from public.quote_payment_steps s
+                           where s.organization_id = p_quote.organization_id and s.quote_id = p_quote.id), '[]'::jsonb)
+  )::text, 'UTF8')), 'hex');
+$$;
+revoke all on function app.quote_fingerprint(public.quotes) from public, anon, authenticated, service_role;
+
+create or replace function app.order_fingerprint(p_order public.orders) returns text
+language sql stable security definer
+set search_path = ''
+as $$
+  select encode(sha256(convert_to(jsonb_build_object(
+    'number', p_order.number_display,
+    'customer', p_order.customer_name,
+    'dates', jsonb_build_array(p_order.order_date, p_order.delivery_date),
+    'shipping', p_order.shipping_address,
+    'notes', p_order.notes,
+    'vat', jsonb_build_array(p_order.prices_include_vat, p_order.no_vat_reason, p_order.no_vat_note, p_order.vat_rate_bp),
+    'discount', jsonb_build_array(p_order.discount_bp, p_order.discount_agorot),
+    'totals', jsonb_build_array(p_order.subtotal_agorot, p_order.discount_total_agorot, p_order.net_total_agorot,
+                                p_order.vat_agorot, p_order.total_agorot, p_order.currency),
+    'lines', coalesce((select jsonb_agg(jsonb_build_array(l.position, l.kind, l.name, l.description, l.unit_name, l.quantity,
+                                                          l.unit_price_agorot, l.discount_bp, l.discount_agorot, l.vat_exempt,
+                                                          l.billing, l.total_agorot)
+                                      -- PRD-09: a bundle line's choice and parts; nothing for any other line
+                                      || case when l.bundle_display is not null
+                                              then jsonb_build_array(l.bundle_display, l.bundle_items) else '[]'::jsonb end
+                                      order by l.position, l.id)
+                         from public.order_lines l
+                        where l.organization_id = p_order.organization_id and l.order_id = p_order.id), '[]'::jsonb),
+    'schedule', coalesce((select jsonb_agg(jsonb_build_array(s.position, s.name, s.percent_bp, s.due_date, s.milestone)
+                                         order by s.position, s.id)
+                            from public.order_payment_steps s
+                           where s.organization_id = p_order.organization_id and s.order_id = p_order.id), '[]'::jsonb)
+  )::text, 'UTF8')), 'hex');
+$$;
+revoke all on function app.order_fingerprint(public.orders) from public, anon, authenticated, service_role;
+
+-- -----------------------------------------------------------------------------
+-- Bundle lines saved before this migration, on drafts only: 'single' with the parts as the catalog holds them now (the
+-- triggers above take the snapshot). Sent quotes and numbered orders stay as they were sent. Deal lines get 'single'.
+-- Only rows of bundle products whose new column is still empty; safe to run twice.
+-- -----------------------------------------------------------------------------
+update public.deal_lines l set bundle_display = 'single'
+ where l.bundle_display is null and l.product_id is not null
+   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle');
+update public.quote_lines l set bundle_display = 'single'
+ where l.bundle_display is null and l.product_id is not null
+   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
+   and exists (select 1 from public.quotes q where q.organization_id = l.organization_id and q.id = l.quote_id and q.status = 'draft');
+update public.order_lines l set bundle_display = 'single'
+ where l.bundle_display is null and l.product_id is not null
+   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
+   and exists (select 1 from public.orders o where o.organization_id = l.organization_id and o.id = l.order_id and o.status = 'draft');
 
 -- -----------------------------------------------------------------------------
 -- Duplicating a quote (QUO-15): 020550's body, with only the line's bundle_display copied

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { partsReferenceSum } from "@/features/products/bundle";
+import { partsReferenceSum, partsSkippedNotice } from "@/features/products/bundle";
 import { readBundleParts } from "@/features/products/bundle-server";
 import { BundlePartsCard } from "@/features/products/components/bundle-parts-card";
 import { ProductActions } from "@/features/products/components/product-actions";
@@ -27,7 +27,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "מוצר" };
 
-type Props = { params: Promise<{ orgId: string; productId: string }> };
+type Props = {
+  params: Promise<{ orgId: string; productId: string }>;
+  // PRD-09: parts_skipped = the parts a copy of a bundle left out
+  searchParams: Promise<{ parts_skipped?: string | string[] }>;
+};
 
 /**
  * PRD-01, PRD-02: one product. Everyone reads it; owners and admins of a writable organization edit, copy, archive and remove.
@@ -35,8 +39,8 @@ type Props = { params: Promise<{ orgId: string; productId: string }> };
  * PRD-06: owners, admins, managers and the view_costs grant see its cost and profit; editing the cost also needs the catalog rule.
  * PRD-09: a bundle shows its parts (catalog editors change them) and their sum for reference.
  */
-export default async function ProductPage({ params }: Props) {
-  const { orgId, productId } = await params;
+export default async function ProductPage({ params, searchParams }: Props) {
+  const [{ orgId, productId }, { parts_skipped: partsSkipped }] = await Promise.all([params, searchParams]);
   const { role, canWrite, org } = await getOrgContext(orgId);
   if (!isUuid(productId)) notFound();
   const granted = await getMyPermissions(orgId);
@@ -72,6 +76,11 @@ export default async function ProductPage({ params }: Props) {
         back={{ href: productsPath(orgId), label: "מוצרים" }}
         actions={canEdit ? <ProductActions orgId={orgId} productId={product.id} name={product.name} archived={product.archivedAt !== null} /> : null}
       />
+      {product.kind === "bundle" && partsSkippedNotice(partsSkipped) ? (
+        <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
+          {partsSkippedNotice(partsSkipped)}
+        </p>
+      ) : null}
       {product.archivedAt ? (
         <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
           המוצר בארכיון: הוא לא מוצע במסמכים חדשים, ומסמכים קיימים לא משתנים.

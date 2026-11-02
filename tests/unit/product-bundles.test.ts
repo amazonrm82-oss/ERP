@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { BUNDLE_DISPLAYS, BUNDLE_PARTS_MAX, parseBundleItems, partQuantity, partsReferenceSum } from "@/features/products/bundle";
+import { BUNDLE_DISPLAYS, BUNDLE_PARTS_MAX, parseBundleItems, partQuantity, partsReferenceSum, partsSkippedNotice } from "@/features/products/bundle";
 import { BundleItemsList } from "@/features/products/components/bundle-items-list";
 
 const migrationFile = readdirSync("supabase/migrations").find((f) => f.endsWith("_product_bundles.sql")) as string;
@@ -54,5 +54,15 @@ describe("bundles (PRD-09)", () => {
     expect(html).toContain("יחידה");
     expect(html).not.toContain("₪");
     expect(renderToStaticMarkup(createElement(BundleItemsList, { parts: [], lineQuantity: 1 }))).toBe("");
+  });
+
+  it("a copy that left parts out says how many (?parts_skipped)", () => {
+    expect(partsSkippedNotice(undefined)).toBeNull();
+    expect(partsSkippedNotice("0")).toBeNull();
+    expect(partsSkippedNotice("1")).toBe("רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון.");
+    expect(partsSkippedNotice(["3"])).toBe("3 רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.");
+    expect(partsSkippedNotice("-1")).toBe("לא הצלחנו להעתיק את רכיבי החבילה. אפשר להוסיף אותם כאן.");
+    expect(partsSkippedNotice("abc")).toBeNull();
+    expect(partsSkippedNotice("12345")).toBeNull();
   });
 });

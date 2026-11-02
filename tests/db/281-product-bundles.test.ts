@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asService, asUser, closePool, createOrg, createUser, defaultPipeline, pgError, type Query } from "./helpers";
@@ -309,5 +312,166 @@ describe("bundles (PRD-09)", () => {
     expect(line.i.length).toBe(2);
     const err = await pgError(asAdmin((q) => q("update public.order_lines set bundle_display = 'single' where order_id = $1", [order])));
     expect([err.code, err.hint]).toEqual(["P0001", "order:frozen"]);
+  });
+  // the fingerprint expression as it was before PRD-09 (020370 / 020625), read from the migration that defined it
+  const oldFingerprint = (suffix: string, fn: string, param: string) => {
+    const dir = path.join(process.cwd(), "supabase/migrations");
+    const sql = readFileSync(path.join(dir, readdirSync(dir).find((f) => f.endsWith(suffix)) as string), "utf8");
+    const start = sql.indexOf(`create or replace function ${fn}`);
+    const body = sql.slice(sql.indexOf("as $$", start) + 5, sql.indexOf("$$;", start)).trim().replace(/;$/, "");
+    expect(body.startsWith("select encode(")).toBe(true);
+    // the old body reads its argument by name; a table alias of the same name stands in for it
+    return `${body} as h from public.${param === "p_quote" ? "quotes" : "orders"} ${param} where ${param}.id = $1`;
+  };
+  const partsNow = () =>
+    asAdmin(async (q) => (await one<{ s: Part[] }>(q, "select app.bundle_snapshot($1, $2) as s", [org, bundle])).s);
+
+  it("the fingerprint covers a bundle line's choice and parts; a document without a bundle keeps its old hash", async () => {
+    const deal = await newDeal();
+    const [plain, withBundle] = await run(member, async (q) => {
+      const a = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, valid_until) values ($1, 'רגילה', $2, current_date + 14) returning id", [org, deal])).id;
+      await q("insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source) values ($1, $2, 0, $3, 'מזגן', 10000, 'product')", [org, a, part1]);
+      const b = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, valid_until) values ($1, 'חבילה', $2, current_date + 14) returning id", [org, deal])).id;
+      await q(
+        "insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source, bundle_display) values ($1, $2, 0, $3, 'חבילת התקנה', 50000, 'product', 'single')",
+        [org, b, bundle],
+      );
+      return [a, b];
+    });
+    const fp = (id: string) => asAdmin(async (q) => (await one<{ h: string }>(q, "select app.quote_fingerprint(q) as h from public.quotes q where q.id = $1", [id])).h);
+    const before = await asAdmin(async (q) => (await one<{ h: string }>(q, oldFingerprint("_quote_decisions.sql", "app.quote_fingerprint", "p_quote"), [plain])).h);
+    expect(await fp(plain)).toBe(before);
+
+    // the choice counts
+    const single = await fp(withBundle);
+    await run(member, (q) => q("update public.quote_lines set bundle_display = 'itemised' where quote_id = $1", [withBundle]));
+    const itemised = await fp(withBundle);
+    expect(itemised).not.toBe(single);
+    // the parts count: the catalog changes, and sending takes the parts again (a draft may wait for weeks)
+    await run(owner, (q) => q("update public.product_bundle_items set quantity = 11 where bundle_id = $1 and component_id = $2", [bundle, part1]));
+    await run(member, (q) => q("select public.quote_send($1, $2)", [org, withBundle]));
+    const sent = await asAdmin(async (q) => one<{ i: Part[] }>(q, "select bundle_items as i from public.quote_lines where quote_id = $1", [withBundle]));
+    expect(sent.i).toEqual(await partsNow());
+    expect(sent.i.find((p) => p.name === "מזגן")?.quantity).toBe(11);
+    expect(await fp(withBundle)).not.toBe(itemised);
+    // after sending the parts never change, whatever the catalog does
+    await run(owner, (q) => q("update public.product_bundle_items set quantity = 12 where bundle_id = $1 and component_id = $2", [bundle, part1]));
+    const kept = await asAdmin(async (q) => one<{ i: Part[] }>(q, "select bundle_items as i from public.quote_lines where quote_id = $1", [withBundle]));
+    expect(kept.i).toEqual(sent.i);
+
+    // an order without a bundle keeps its old hash too
+    const order = await run(member, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח', $2) returning id", [org, member.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id;
+      await q("insert into public.order_lines (organization_id, order_id, product_id, name, unit_price_agorot, price_source) values ($1, $2, $3, 'מזגן', 10000, 'product')", [org, id, part1]);
+      await q("select public.order_confirm($1, $2)", [org, id]);
+      return id;
+    });
+    const orderNow = await asAdmin(async (q) => (await one<{ h: string }>(q, "select app.order_fingerprint(o) as h from public.orders o where o.id = $1", [order])).h);
+    const orderBefore = await asAdmin(async (q) => (await one<{ h: string }>(q, oldFingerprint("_order_links.sql", "app.order_fingerprint", "p_order"), [order])).h);
+    expect(orderNow).toBe(orderBefore);
+  });
+
+  it("numbering a draft order takes the parts again; a version keeps the parts of the version before it, also when sent", async () => {
+    const contact = await run(member, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח', $2) returning id", [org, member.id])).id,
+    );
+    const order = await run(member, async (q) => {
+      const id = (await one<{ id: string }>(q, "insert into public.orders (organization_id, contact_id) values ($1, $2) returning id", [org, contact])).id;
+      await q(
+        "insert into public.order_lines (organization_id, order_id, product_id, name, unit_price_agorot, price_source, bundle_display) values ($1, $2, $3, 'חבילת התקנה', 50000, 'product', 'itemised')",
+        [org, id, bundle],
+      );
+      return id;
+    });
+    await run(owner, (q) => q("update public.product_bundle_items set quantity = 13 where bundle_id = $1 and component_id = $2", [bundle, part1]));
+    await run(member, (q) => q("select public.order_confirm($1, $2)", [org, order]));
+    const line = await asAdmin(async (q) => one<{ i: Part[] }>(q, "select bundle_items as i from public.order_lines where order_id = $1", [order]));
+    expect(line.i.find((p) => p.name === "מזגן")?.quantity).toBe(13);
+
+    const deal = await newDeal();
+    const first = await run(member, async (q) => {
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, valid_until) values ($1, 'הצעה', $2, current_date + 14) returning id", [org, deal])).id;
+      await q(
+        "insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source, bundle_display) values ($1, $2, 0, $3, 'חבילת התקנה', 50000, 'product', 'itemised')",
+        [org, id, bundle],
+      );
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return id;
+    });
+    const seen = await asAdmin(async (q) => one<{ i: Part[] }>(q, "select bundle_items as i from public.quote_lines where quote_id = $1", [first]));
+    await run(owner, (q) => q("update public.product_bundle_items set quantity = 14 where bundle_id = $1 and component_id = $2", [bundle, part1]));
+    const version = await run(member, async (q) => {
+      const id = (await one<{ id: string }>(q, "select public.quote_new_version($1, $2) as id", [org, first])).id;
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return id;
+    });
+    const versionLine = await asAdmin(async (q) => one<{ i: Part[] }>(q, "select bundle_items as i from public.quote_lines where quote_id = $1", [version]));
+    expect(versionLine.i).toEqual(seen.i);
+  });
+
+  it("an order made from a quote matches each line to the quote line of the same place and product", async () => {
+    const deal = await newDeal();
+    const quote = await run(member, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח', $2) returning id", [org, member.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, contact_id, valid_until) values ($1, 'הצעה', $2, $3, current_date + 14) returning id", [org, deal, contact])).id;
+      // the same bundle twice, shown differently
+      await q(
+        "insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source, bundle_display) values ($1, $2, 0, $3, 'חבילה א', 50000, 'product', 'single')",
+        [org, id, bundle],
+      );
+      await q(
+        "insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source, bundle_display) values ($1, $2, 1, $3, 'חבילה ב', 50000, 'product', 'itemised')",
+        [org, id, bundle],
+      );
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return id;
+    });
+    await asAdmin((q) => q("update public.quotes set status = 'accepted' where id = $1", [quote]));
+    const order = await run(member, async (q) => (await one<{ id: string }>(q, "select public.order_from_quote($1, $2) as id", [org, quote])).id);
+    const rows = await asAdmin(async (q) => (await q<{ n: string; d: string }>("select name as n, bundle_display as d from public.order_lines where order_id = $1 order by position", [order])).rows);
+    expect(rows).toEqual([
+      { n: "חבילה א", d: "single" },
+      { n: "חבילה ב", d: "itemised" },
+    ]);
+  });
+
+  it("a bundle line saved before bundles: a draft's line takes a choice and its parts; the migration fills drafts only", async () => {
+    const deal = await newDeal();
+    const [draft, sent] = await run(member, async (q) => {
+      const ids: string[] = [];
+      for (const title of ["טיוטה", "נשלחה"]) {
+        const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id, valid_until) values ($1, $2, $3, current_date + 14) returning id", [org, title, deal])).id;
+        await q("insert into public.quote_lines (organization_id, quote_id, position, product_id, name, unit_price_agorot, price_source) values ($1, $2, 0, $3, 'חבילה', 50000, 'product')", [org, id, bundle]);
+        ids.push(id);
+      }
+      await q("select public.quote_send($1, $2)", [org, ids[1]]);
+      return ids;
+    });
+    // as a line saved before this migration: no choice, no parts (triggers held back for the setup only)
+    const clear = () =>
+      asAdmin(async (q) => {
+        await q("set local session_replication_role = replica");
+        await q("update public.quote_lines set bundle_display = null, bundle_items = null where quote_id = any($1)", [[draft, sent]]);
+      });
+    await clear();
+    // a person picks a choice on the draft: the parts come with it; the sent quote's line takes none
+    await run(member, (q) => q("update public.quote_lines set bundle_display = 'itemised' where quote_id = $1", [draft]));
+    const picked = await asAdmin(async (q) => one<{ d: string; i: Part[] }>(q, "select bundle_display as d, bundle_items as i from public.quote_lines where quote_id = $1", [draft]));
+    expect(picked).toEqual({ d: "itemised", i: await partsNow() });
+    await asAdmin((q) => q("update public.quote_lines set bundle_display = 'itemised' where quote_id = $1", [sent]));
+    const untouched = await asAdmin(async (q) => one<{ d: string | null; i: Part[] | null }>(q, "select bundle_display as d, bundle_items as i from public.quote_lines where quote_id = $1", [sent]));
+    expect(untouched).toEqual({ d: null, i: null });
+
+    // the migration's own fill: 'single' and the parts on the draft, nothing on the sent quote
+    await clear();
+    const dir = path.join(process.cwd(), "supabase/migrations");
+    const file = readdirSync(dir).find((f) => f.endsWith("_product_bundles.sql")) as string;
+    await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
+    const filled = await asAdmin(async (q) =>
+      (await q<{ id: string; d: string | null; i: Part[] | null }>("select quote_id as id, bundle_display as d, bundle_items as i from public.quote_lines where quote_id = any($1)", [[draft, sent]])).rows,
+    );
+    expect(filled.find((r) => r.id === draft)).toEqual({ id: draft, d: "single", i: await partsNow() });
+    expect(filled.find((r) => r.id === sent)).toEqual({ id: sent, d: null, i: null });
   });
 });

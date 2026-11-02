@@ -112,9 +112,10 @@ export async function readBundleSnapshots(supabase: Client, orgId: string, bundl
 
 /**
  * A copy of a bundle (PRD-02's copy) gets the same parts, one by one with the user's session; a part the rules no longer
- * take (archived, switched off) is left out. Never throws: the copy itself is made already.
+ * take (archived, switched off) is left out. Never throws: the copy itself is made already. Answers how many parts were
+ * not copied (a failed read counts every part as not copied: -1 = unknown).
  */
-export async function copyBundleParts(supabase: Client, orgId: string, fromId: string, toId: string): Promise<void> {
+export async function copyBundleParts(supabase: Client, orgId: string, fromId: string, toId: string): Promise<number> {
   const { data, error } = await supabase
     .from("product_bundle_items")
     .select("component_id, quantity, position")
@@ -122,10 +123,13 @@ export async function copyBundleParts(supabase: Client, orgId: string, fromId: s
     .eq("bundle_id", fromId)
     .order("position")
     .order("id");
-  if (error || !data) return;
+  if (error || !data) return -1;
+  let skipped = 0;
   for (const row of data) {
-    await supabase
+    const { error: insertError } = await supabase
       .from("product_bundle_items")
       .insert({ organization_id: orgId, bundle_id: toId, component_id: row.component_id, quantity: Number(row.quantity), position: row.position });
+    if (insertError) skipped += 1;
   }
+  return skipped;
 }

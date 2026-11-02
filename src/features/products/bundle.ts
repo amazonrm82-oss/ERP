@@ -67,3 +67,14 @@ export function bundlePartsText(display: BundleDisplay | null, parts: BundlePart
     .map((part) => `· ${formatNumber(partQuantity(part.quantity, lineQuantity))}${part.unitName ? ` ${part.unitName}` : ""} ${part.name}`)
     .join("\n");
 }
+
+/** The notice after copying a bundle whose parts were not all copied (?parts_skipped=N; -1 = the parts could not be read). */
+export function partsSkippedNotice(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === undefined || !/^-?\d{1,3}$/.test(raw)) return null;
+  const count = Number(raw);
+  if (count === -1) return "לא הצלחנו להעתיק את רכיבי החבילה. אפשר להוסיף אותם כאן.";
+  if (count === 1) return "רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון.";
+  if (count > 1) return `${count} רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.`;
+  return null;
+}
