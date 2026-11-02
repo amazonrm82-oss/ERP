@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,7 +25,7 @@ type Guard =
 
 type Entry = {
   guard: Guard;
-  /** the public SQL functions it calls (database guard only) */
+  /** the public SQL functions its page or route calls through `.rpc("<name>"` (database guard only; checked by the test) */
   functions?: string[];
   /** the limit as it stands, in words (window, per link / per sender / in total, before or after the token lookup) */
   limit: string;
@@ -57,7 +57,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   "/f/[token]": {
     guard: "database",
     functions: ["intake_form", "link_preview_public"],
-    limit: "OPS-02: 60 views per sender per form in 10 min (app.form_view_counts), counted after the token lookup; " + PREVIEW,
+    limit: "OPS-02: 300 views per sender per form in 10 min (app.form_view_limit, app.form_view_counts), counted after the token lookup; " + PREVIEW,
     refusal: PAGE_TEXT,
   },
   "/f/[token]/qr": { guard: "database", functions: ["intake_form"], limit: "the form page's view limit (shared counter)", refusal: PAGE_TEXT },
@@ -100,8 +100,8 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   },
   "/api/forms/card/[token]": {
     guard: "database",
-    functions: ["business_card_submit", "intake_submit"],
-    limit: "intake_submit's limits on the card's own form (sender scoped per card)",
+    functions: ["business_card_submit"],
+    limit: "business_card_submit goes through intake_submit in the database: its limits on the card's own form (sender scoped per card)",
     refusal: JSON_429,
   },
   "/api/forms/card/[token]/vcard": { guard: "database", functions: ["business_card_public"], limit: "a view of the card (same counter)", refusal: TEXT_429 },
@@ -114,8 +114,8 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   },
   "/api/forms/widget/[token]": {
     guard: "database",
-    functions: ["site_widget_submit", "intake_submit"],
-    limit: "intake_submit's limits on the widget's own form (sender scoped per widget)",
+    functions: ["site_widget_submit"],
+    limit: "site_widget_submit goes through intake_submit in the database: its limits on the widget's own form (sender scoped per widget)",
     refusal: JSON_429,
   },
   "/f/quote/[token]": {
@@ -202,6 +202,45 @@ function appEntries(): string[] {
   return out.sort();
 }
 
+/** The page or route file of a URL pattern (route groups searched too). */
+function entryFile(pattern: string): string {
+  const files: string[] = [];
+  const walk = (dir: string, url: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path, /^\(.*\)$/.test(entry.name) ? url : `${url}/${entry.name}`);
+      else if (/^(page|route)\.tsx?$/.test(entry.name) && (url === "" ? "/" : url) === pattern) files.push(path);
+    }
+  };
+  walk(APP, "");
+  if (files.length !== 1) throw new Error(`${pattern}: ${files.length} files`);
+  return files[0];
+}
+
+const IMPORT = /\bfrom\s+"(@\/[^"]+|\.{1,2}\/[^"]+)"/g;
+
+/** The file and every file of src/ it imports, directly or not (the code a request to it can run). */
+function importClosure(start: string): Map<string, string> {
+  const seen = new Map<string, string>();
+  const resolve = (spec: string, from: string): string | null => {
+    const base = spec.startsWith("@/") ? join(ROOT, "src", spec.slice(2)) : join(from, "..", spec);
+    const candidates = [base, `${base}.ts`, `${base}.tsx`, join(base, "index.ts"), join(base, "index.tsx")];
+    return candidates.find((candidate) => /\.tsx?$/.test(candidate) && existsSync(candidate) && statSync(candidate).isFile()) ?? null;
+  };
+  const stack = [start];
+  while (stack.length > 0) {
+    const file = stack.pop() as string;
+    if (seen.has(file)) continue;
+    const text = readFileSync(file, "utf8");
+    seen.set(file, text);
+    for (const match of text.matchAll(IMPORT)) {
+      const next = resolve(match[1], file);
+      if (next && !seen.has(next)) stack.push(next);
+    }
+  }
+  return seen;
+}
+
 /** A sample address of a pattern, so the proxy's prefix rule can judge it. */
 const sample = (pattern: string) => pattern.replace(/\[[^\]]+\]/g, "x0");
 
@@ -235,7 +274,10 @@ describe("OPS-02: every public path has a named limit", () => {
         continue;
       }
       expect(entry.functions?.length, path).toBeGreaterThan(0);
+      const code = [...importClosure(entryFile(path)).values()].join("\n");
       for (const fn of entry.functions ?? []) {
+        // the page or route really reaches it: an .rpc("<fn>" call in the file or in what it imports
+        expect(new RegExp(`\\.rpc\\(\\s*"${fn}"`).test(code), `${path} calls .rpc("${fn}"`).toBe(true);
         expect(migrations, `${path}: public.${fn}`).toMatch(new RegExp(`function public\\.${fn}\\s*\\(`));
         expect(migrations, `${path}: public.${fn} granted to service_role`).toMatch(
           new RegExp(`grant execute on function public\\.${fn}\\s*\\([^)]*\\) to service_role`),
@@ -245,7 +287,8 @@ describe("OPS-02: every public path has a named limit", () => {
   });
 
   it("no code answers 429 by hand: every rate refusal goes through src/lib/public-rate-limit.ts", () => {
-    // reading a 429 (Supabase Auth's answer) is fine; the staff report export answers the PDF quota refusal of RPT-02
+    // any 429 outside a comment counts (a literal status, a named constant, a ternary): only the helper holds one. Reading a
+    // 429 (Supabase Auth's answer) is fine in these files; the staff report export answers the PDF quota refusal of RPT-02
     const allowed = new Set([
       "src/lib/public-rate-limit.ts",
       "src/lib/auth-transient.ts",
@@ -259,7 +302,7 @@ describe("OPS-02: every public path has a named limit", () => {
       .filter((file) =>
         readFileSync(join(ROOT, file), "utf8")
           .split("\n")
-          .some((line) => !/^\s*(\/\/|\*)/.test(line) && /(status:\s*429|\(\s*429\b|\?\s*429\b|:\s*429\s*[,)])/.test(line)),
+          .some((line) => !/^\s*(\/\/|\*|\/\*)/.test(line) && /\b429\b/.test(line.replace(/\/\/.*$/, ""))),
       );
     expect(offenders).toEqual([]);
   });

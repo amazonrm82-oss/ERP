@@ -16,7 +16,10 @@ import { getSupabaseEnv } from "@/lib/env";
  * - the lead intake (src/features/intake/server.ts and
  *   src/features/intake/public-form.ts), where a
  *   stranger's form submission arrives with no session. It only calls
- *   public.intake_submit() and reads a form's public settings by token;
+ *   public.intake_submit() and reads a form's public settings by token
+ *   (public.intake_form(); since OPS-02 a page view also hands over the
+ *   visitor's keyed IP hash in the x-crm-sender header, so the function counts
+ *   the view against the form's per-sender limit);
  * - the push dispatcher (src/features/notifications/push-server.ts), woken by
  *   the database with a shared secret. It calls public.claim_push_notifications()
  *   and reads and prunes push_subscriptions;

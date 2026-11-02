@@ -5,8 +5,9 @@
 -- its own service_role function (FXS-11 keyed IP hash, per link and per sender), except one: the hosted web form
 -- /f/<token> (and its printable QR page /f/<token>/qr) read public.intake_form() with no limit at all, while the form's
 -- token is public by design (it sits in the embed code on the business's own site). This file gives that read the limit
--- every other public view has (BIZ-02 cards, SPD-07 widgets, CAL-10 booking pages): 60 views per sender in 10 minutes
--- per form, counted after the token lookup like them, in a fixed set of 1,024 reused buckets per form (no row per view,
+-- every other public view has (BIZ-02 cards, SPD-07 widgets, CAL-10 booking pages), with a higher number: 300 views per
+-- sender in 10 minutes per form (app.form_view_limit; the lead's interim decision until the owner answers, see there),
+-- counted after the token lookup like them, in a fixed set of 1,024 reused buckets per form (no row per view,
 -- no hash stored; app.form_view_counts, cascades with the form).
 --
 -- * public.intake_form(text) keeps its signature (a second argument would leave a second overload behind whenever an
@@ -35,6 +36,18 @@ create table if not exists app.form_view_counts (
 );
 alter table app.form_view_counts enable row level security;
 revoke all on app.form_view_counts from public, anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- The limit: views per sender per form in 10 minutes. 300, not the 60 of cards, widgets and booking pages, because the
+-- form is the business's main lead page: it sits in an iframe on the business's own site, on a QR poster at events, and
+-- many visitors arrive from one address (an office, an event's Wi-Fi, a mobile carrier's CGNAT). Lead's interim decision
+-- (OPS-02 review M1) until the owner answers; changing it is a new migration that replaces this one function.
+-- ----------------------------------------------------------------------------
+create or replace function app.form_view_limit() returns integer
+language sql immutable
+set search_path = ''
+as $$ select 300 $$;
+revoke all on function app.form_view_limit() from public, anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- The sender a public read was given by our server: the request header x-crm-sender, when it is a keyed IP hash
@@ -92,11 +105,11 @@ begin
     return jsonb_build_object('inactive', true);
   end if;
 
-  -- OPS-02: the view limit of the hosted form page, as the other public pages (BIZ-02, SPD-07, CAL-10): 60 per sender in
-  -- 10 minutes, then "try again later" and nothing of the form. Counted after the token lookup, like them. The sender is
-  -- the server's keyed IP hash (FXS-11, scope "intake" and the form's token), handed over in the request header
-  -- x-crm-sender (app.public_sender_header); no header, no count (the submission's own read, a direct SQL caller). Only a
-  -- bucket number is kept, never the hash.
+  -- OPS-02: the view limit of the hosted form page, as the other public pages (BIZ-02, SPD-07, CAL-10) but with its own
+  -- number, app.form_view_limit() per sender in 10 minutes, then "try again later" and nothing of the form. Counted
+  -- after the token lookup, like them. The sender is the server's keyed IP hash (FXS-11, scope "intake" and the form's
+  -- token), handed over in the request header x-crm-sender (app.public_sender_header); no header, no count (the
+  -- submission's own read, a direct SQL caller). Only a bucket number is kept, never the hash.
   v_sender := app.public_sender_header();
   if v_sender is not null then
     v_bucket := ((hashtextextended(v_sender, 0) % 1024) + 1024) % 1024;
@@ -106,7 +119,7 @@ begin
       set window_start = case when vc.window_start > now() - interval '10 minutes' then vc.window_start else now() end,
           views = case when vc.window_start > now() - interval '10 minutes' then vc.views + 1 else 1 end
     returning vc.views into v_views;
-    if v_views > 60 then
+    if v_views > app.form_view_limit() then
       return jsonb_build_object('rate_limited', true);
     end if;
   end if;

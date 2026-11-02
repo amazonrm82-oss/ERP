@@ -505,8 +505,9 @@ describe("link previews for preview bots (WAB-05)", () => {
   // that page shows no business (the matrix above), then update the value.
   const REVIEWED_PAGE_BODY_MD5: Record<string, string> = {
     // OPS-02 (public_form_view_limit) adds only the view limit after the not-found and closed-business answers; it counts only
-    // with the x-crm-sender header, which the preview never sends, so every not-found branch is unchanged (rechecked)
-    "public.intake_form(text)": "718f53526bb9d5109afe56116e93bf56",
+    // with the x-crm-sender header, which the preview never sends, so every not-found branch is unchanged (rechecked; the limit
+    // reads app.form_view_limit() since review M1)
+    "public.intake_form(text)": "d5f8f3d6ab40116e8109c489b208b7bc",
     "public.quote_public(text)": "4ab57d2574970d28e2113b1c31961aee",
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     "public.order_public(text,text)": "8827d9da93d3feb54d452d5d788844eb",

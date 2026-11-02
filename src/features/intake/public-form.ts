@@ -119,7 +119,7 @@ export function isRateLimitedForm(data: Json): boolean {
 
 /**
  * The form by its public token, through public.intake_form() (display settings only). `sender` is the keyed IP hash of a
- * page view (counted: 60 per sender in 10 minutes per form, OPS-02); the submission route reads without one (not counted).
+ * page view (counted: app.form_view_limit() = 300 per sender in 10 minutes per form, OPS-02); the submission route reads without one (not counted).
  */
 export async function readPublicForm(
   service: ServiceClient,

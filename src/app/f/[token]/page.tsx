@@ -20,7 +20,7 @@ type Props = {
 };
 
 // WAB-05: the link's preview and the page share ONE read per request
-// OPS-02: the view counts against the sender's limit (60 in 10 minutes per form)
+// OPS-02: the view counts against the sender's limit (300 in 10 minutes per form, app.form_view_limit)
 const loadForm = cache(async (token: string) => getPublicForm(token, await headers()));
 
 /**
