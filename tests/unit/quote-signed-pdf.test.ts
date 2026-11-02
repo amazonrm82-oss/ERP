@@ -4,7 +4,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
 import { renderPdf } from "@/features/pdf/render";
-import { ACCEPT_WORDING_VERSION } from "@/features/quotes/decision";
+import { ACCEPT_WORDING_VERSION, signedOnText } from "@/features/quotes/decision";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
 import {
@@ -16,6 +16,7 @@ import {
   signaturePng,
   signatureSizeOk,
   signedAtText,
+  signedPdfBillingFrom,
   signedQuotePdfFileName,
   type QuoteSignature,
 } from "@/features/quotes/signed-pdf";
@@ -171,9 +172,25 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(text.some((p) => /^₪\s145,678\.08$/.test(p))).toBe(true);
     // the drawn signature is an image in the file
     expect(images(bytes)).toBe(1);
-    // the customer's billing details are not on it (the names as sent only)
-    expect(all).not.toContain("billing@acme.example");
+    // owner (38) ב: the customer's billing address, email and tax id, like the PDF as sent
+    expect(all).toContain("billing@acme.example");
+    expect(all).toContain("516000000");
+    expect(all).toContain(reverse("מספר מזהה:"));
+    expect(all).toContain(reverse("דרך מנחם בגין 1, תל אביב"));
     expect(all).not.toContain("�");
+  });
+
+  it("owner (38) ב: reads the customer route's billing block field by field, and prints only what it holds", async () => {
+    expect(signedPdfBillingFrom({ address: "רחוב א 1", email: "a@b.co", tax_id: "516000000" })).toEqual({ address: "רחוב א 1", email: "a@b.co", taxId: "516000000" });
+    expect(signedPdfBillingFrom({ address: null, email: 5, tax_id: "" })).toEqual({ address: null, email: null, taxId: null });
+    expect(signedPdfBillingFrom(undefined)).toEqual({ address: null, email: null, taxId: null });
+    expect(signedPdfBillingFrom(["x"])).toEqual({ address: null, email: null, taxId: null });
+    const data = sample(1);
+    const none = { ...data, customer: data.customer ? { ...data.customer, address: null, email: null, taxId: null } : null };
+    const all = pieces(await renderPdf(quoteSignedPdfDocument(none, null, signature()))).join("\n");
+    expect(all).toContain("Acme Ltd.");
+    expect(all).not.toContain("billing@acme.example");
+    expect(all).not.toContain(reverse("מספר מזהה:"));
   });
 
   it("a typed signature prints the name in the signature box and no image", async () => {
@@ -199,6 +216,9 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(signaturePng("data:image/jpeg;base64,AAAA")).toBeNull();
     expect(signedAtText("2026-06-30T21:30:00Z", "Asia/Jerusalem")).toBe("01.07.2026 בשעה 00:30");
     expect(signedQuotePdfFileName("Q-1001", "x")).toBe("הצעת מחיר Q-1001 - חתומה.pdf");
+    // owner (37) ב: the staff line, the day in the business's zone (21:30 UTC on 30 June is 1 July in Israel)
+    expect(signedOnText("2026-06-30T21:30:00Z", "Asia/Jerusalem")).toBe("נחתמה ב-01.07.2026");
+    expect(signedOnText("2026-06-30T21:30:00Z", "UTC")).toBe("נחתמה ב-30.06.2026");
   });
 
   it("review (medium): refuses a PNG whose header declares a huge image (a PNG bomb) before the renderer sees it", () => {

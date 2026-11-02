@@ -29,14 +29,14 @@ import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { fromDealText } from "@/features/quotes/from-deal";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
+import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAcceptedAt, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { QuotePdfButton } from "@/features/quotes/components/quote-pdf-button";
-import { AS_SENT_PDF_LABEL, PDF_AS_SENT_STAFF } from "@/features/quotes/decision";
+import { AS_SENT_PDF_LABEL, PDF_AS_SENT_STAFF, signedOnText } from "@/features/quotes/decision";
 import { getQuotePdfFile, getSignedQuotePdfFile, quotePdfStorable } from "@/features/quotes/pdf-server";
 import { QuoteSignedPdfButton } from "@/features/quotes/components/quote-signed-pdf-button";
 import { currentNameIfChanged } from "@/features/quotes/share";
@@ -139,6 +139,10 @@ export default async function QuotePage({ params, searchParams }: Props) {
   // QUO-09: the customer's answer with its evidence, owners/admins only (RLS decides again)
   const decision =
     (quote.status === "accepted" || quote.status === "rejected") && isAdminRole(context.role) ? await getQuoteDecision(orgId, quote.id) : null;
+  // QUO-09 (owner, 2 November 2026, answer (37) ב): an accepted quote says when it was signed, for every reader: owners and admins
+  // from the decision, everyone else from the quote_accepted timeline entry
+  const signedAt =
+    quote.status !== "accepted" ? null : decision?.decision === "accepted" ? decision.decidedAt : await getQuoteAcceptedAt(orgId, quote);
   // QUO-11: a sent, viewed or expired quote may be cancelled by whoever may edit its record; never an accepted one (open question)
   const canCancel =
     hasQuotes &&
@@ -360,6 +364,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
           </span>
         ) : null}
         {quote.sentAt ? <span>נשלחה {formatDate(quote.sentAt)}</span> : null}
+        {signedAt ? <span>{signedOnText(signedAt, context.org.timeZone)}</span> : null}
         {views ? (
           // QUO-10: the customer's views (first, count, last)
           <span>

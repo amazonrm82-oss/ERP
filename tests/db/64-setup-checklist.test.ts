@@ -666,6 +666,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_signed_pdf.sql",
       // the pasted index file removes files_quote_pdf_one again, which a re-run of _quote_pdfs.sql brings back
       "_quote_signed_pdf_index.sql",
+      // owner (38) ב redefines public.quote_signed_pdf_public() of _quote_signed_pdf.sql last (the customer's billing block)
+      "_quote_signed_pdf_billing.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

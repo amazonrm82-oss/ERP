@@ -192,6 +192,8 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     // never the ID number, the IP or the browser
     expect(JSON.stringify(src)).not.toContain("192.0.2.10");
     expect(JSON.stringify(src)).not.toContain("Mozilla");
+    // owner (38) ב: a deal with neither contact nor company has no billing details
+    expect((src as unknown as { billing: unknown }).billing).toEqual({ address: null, email: null, tax_id: null });
 
     // a render that printed another decision's fingerprint writes nothing
     expect(await publicStore(token, sha("c"), null, sha("f"))).toEqual({ status: "changed" });
@@ -245,6 +247,76 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     expect(
       await asService(async (q) => (await one<{ r: Store }>(q, "select public.quote_pdf_store($1, $2, $3, 20000, $4, 'הצעה.pdf') as r", [org, quoteId, member.id, sha("e")])).r),
     ).toEqual({ status: "stored", file_id: sent.id });
+  });
+
+  it("owner (38) ב: the customer's route answers the quote's own customer's billing address, email and tax id, and nothing else", async () => {
+    // a company and its contact, plus another contact of the same business whose details must never appear
+    const { companyId, contactId, strangerId } = await asUser(member.id, async (q) => {
+      const company = (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'חברת אקמה', $2) returning id", [org, member.id])).id;
+      const contact = (
+        await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id, company_id) values ($1, 'דנה כהן', $2, $3) returning id", [org, member.id, company])
+      ).id;
+      const stranger = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'זר', $2) returning id", [org, member.id])).id;
+      return { companyId: company, contactId: contact, strangerId: stranger };
+    });
+    await asAdmin(async (q) => {
+      // the contact's own address; email and tax id come from its company (CON-08's effectiveBilling)
+      await q("update public.contacts set billing_address = 'רחוב הרצל 5, חיפה', billing_name = 'שם לחיוב', shipping_address = 'משלוח 1', email = 'own@contact.example' where id = $1", [contactId]);
+      await q("update public.companies set billing_address = 'כתובת החברה', billing_email = 'billing@acme.example', tax_id = '000000026', shipping_address = 'משלוח 2' where id = $1", [companyId]);
+      await q("update public.contacts set billing_address = 'כתובת זרה', billing_email = 'stranger@x.example', billing_tax_id = '000000018' where id = $1", [strangerId]);
+    });
+    const onContact = await asUser(member.id, async (q) => {
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, contact_id) values ($1, 'הצעה לדנה', $2) returning id", [org, contactId])).id;
+      await q("insert into public.quote_lines (organization_id, quote_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return id;
+    });
+    const token = await link(member, onContact);
+    expect((await accept(token)).status).toBe("accepted");
+    const src = await source(token);
+    expect(src.billing).toEqual({ address: "רחוב הרצל 5, חיפה", email: "billing@acme.example", tax_id: "000000026" });
+    // the billing block holds exactly three fields; the name stays as printed when sent (customer.name, the page's own answer)
+    expect(Object.keys(src.billing as object).sort()).toEqual(["address", "email", "tax_id"]);
+    expect((src.customer as { name: string }).name).toBe("שם לחיוב");
+    // no other customer field, nor another customer's
+    const text = JSON.stringify(src);
+    for (const leak of ["משלוח 1", "משלוח 2", "own@contact.example", "כתובת החברה", "כתובת זרה", "stranger@x.example", "000000018", contactId, companyId]) {
+      expect(text, leak).not.toContain(leak);
+    }
+    // the contact's own tax id wins over its company's
+    await asAdmin((q) => q("update public.contacts set billing_tax_id = '000000018', billing_email = 'mine@contact.example' where id = $1", [contactId]));
+    expect((await source(token)).billing).toEqual({ address: "רחוב הרצל 5, חיפה", email: "mine@contact.example", tax_id: "000000018" });
+    // a contact in the bin prints none, as the staff read does
+    await asAdmin((q) => q("update public.contacts set deleted_at = now() where id = $1", [contactId]));
+    try {
+      expect((await source(token)).billing).toEqual({ address: null, email: null, tax_id: null });
+    } finally {
+      await asAdmin((q) => q("update public.contacts set deleted_at = null where id = $1", [contactId]));
+    }
+
+    // a deal quote whose deal has a company and no contact: the company's own details
+    const onCompany = await asUser(member.id, async (q) => {
+      const deal = (
+        await one<{ id: string }>(q, "insert into public.deals (organization_id, name, pipeline_id, stage_id, owner_id, company_id) values ($1, 'עסקה לחברה', $2, $3, $4, $5) returning id", [
+          org,
+          pipe.pipelineId,
+          pipe.stageId,
+          member.id,
+          companyId,
+        ])
+      ).id;
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, deal_id) values ($1, 'הצעה לחברה', $2) returning id", [org, deal])).id;
+      await q("insert into public.quote_lines (organization_id, quote_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return id;
+    });
+    const companyToken = await link(member, onCompany);
+    expect((await accept(companyToken)).status).toBe("accepted");
+    expect((await source(companyToken)).billing).toEqual({ address: "כתובת החברה", email: "billing@acme.example", tax_id: "000000026" });
+    // the helper is internal: no API role runs it
+    const can = async (role: string) =>
+      (await asAdmin((q) => one<{ c: boolean }>(q, "select has_function_privilege($1, 'app.quote_customer_billing(public.quotes)', 'execute') as c", [role]))).c;
+    for (const role of ["anon", "authenticated", "service_role"]) expect(await can(role), role).toBe(false);
   });
 
   it("a quote with no PDF as sent gets the signed one as its first file", async () => {

@@ -139,6 +139,21 @@ export function signatureFrom(raw: unknown): QuoteSignature | null {
   return "signature" in read ? read.signature : null;
 }
 
+/** The customer's billing details on the signed PDF (owner (38) ב), as public.quote_signed_pdf_public answers them. */
+export type SignedPdfBilling = { address: string | null; email: string | null; taxId: string | null };
+
+const billingText = (max: number) => z.string().min(1).max(max);
+
+/** The answer's billing block, field by field; a field of another shape prints nothing (no block = no billing details). */
+export function signedPdfBillingFrom(raw: unknown): SignedPdfBilling {
+  const r = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const field = (value: unknown, max: number) => {
+    const parsed = billingText(max).safeParse(value);
+    return parsed.success ? parsed.data : null;
+  };
+  return { address: field(r.address, 300), email: field(r.email, 254), taxId: field(r.tax_id, 200) };
+}
+
 /** What staff read when the stored decision's signature cannot be put on a PDF. */
 export const SIGNATURE_INVALID_MESSAGE = "החתימה השמורה אינה תקינה, לא ניתן ליצור PDF חתום.";
 
@@ -165,12 +180,12 @@ export function signedQuotePdfFileName(numberDisplay: string | null, title: stri
 
 /**
  * The signed document: the quote as accepted (its stored totals are the accepted ones since QUO-08), the customer named as
- * printed when it was sent, and the signature block at the end.
+ * printed when it was sent with their billing details, and the signature block at the end.
  */
 export function quoteSignedPdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, signature: QuoteSignature): PdfDocument {
-  // the customer as printed on the quote when it was sent (QUO-07); both routes render the same document
-  const customer = data.customer ? { ...data.customer, address: null, email: null, taxId: null } : null;
-  const base = quotePdfDocument({ ...data, customer }, logo, { accepted: true });
+  // owner (38) ב: the customer named as printed when the quote was sent (QUO-07) with their billing address, email and tax id,
+  // like the PDF as sent; staff read them with their session, the customer's route from quote_signed_pdf_public's `billing`
+  const base = quotePdfDocument(data, logo, { accepted: true });
   const when = signedAtText(signature.decidedAt, signature.timeZone);
   const wording =
     signature.wordingVersion === ACCEPT_WORDING_VERSION

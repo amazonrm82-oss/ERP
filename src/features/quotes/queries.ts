@@ -629,6 +629,33 @@ export async function getQuoteViews(orgId: string, quoteId: string): Promise<Quo
   return row ? { firstViewedAt: row.first_viewed_at, lastViewedAt: row.last_viewed_at, count: row.view_count } : null;
 }
 
+/**
+ * QUO-09 (owner, 2 November 2026, answer (37) ב): when the customer accepted the quote, for staff who do not read
+ * quote_decisions (owners and admins only). The source is QUO-16's `quote_accepted` timeline entry, written when the status
+ * moved to accepted, on the quote's deal, else its contact; it is read with the user's session, so whoever reads that record
+ * reads it. Looked up through the record's column (an index condition under RLS), the metadata kept as a filter only (020695).
+ * Null when there is no such entry the user reads (a quote with neither deal nor contact, an unreadable record).
+ */
+export async function getQuoteAcceptedAt(orgId: string, quote: Pick<Quote, "id" | "dealId" | "contactId">): Promise<string | null> {
+  const column = quote.dealId ? "deal_id" : quote.contactId ? "contact_id" : null;
+  const id = quote.dealId ?? quote.contactId;
+  if (!column || !id) return null;
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("activities")
+      .select("created_at")
+      .eq("organization_id", orgId)
+      .eq(column, id)
+      .eq("type", "system")
+      .contains("metadata", { kind: "quote_accepted", quote_id: quote.id })
+      .order("created_at", { ascending: false })
+      .limit(1),
+    "quote accepted entry",
+  );
+  return rows[0]?.created_at ?? null;
+}
+
 /** QUO-13: what an accepted quote does to its deal; no row = 'ask'. Every member reads the setting. */
 export async function getQuoteAcceptDeal(orgId: string): Promise<QuoteAcceptDeal> {
   const supabase = await createClient();

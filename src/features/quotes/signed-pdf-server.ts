@@ -10,13 +10,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 import type { QuoteDocumentData } from "./design-server";
 import { isQuotePdfPath, sha256Hex } from "./pdf-fingerprint";
 import { publicQuoteFrom, QUOTE_LINK_TOKEN } from "./public";
-import { quoteSignedPdfDocument, readSignature, signedQuotePdfFileName, type QuoteSignature } from "./signed-pdf";
+import { quoteSignedPdfDocument, readSignature, signedPdfBillingFrom, signedQuotePdfFileName, type QuoteSignature } from "./signed-pdf";
 
 // QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב; CLAUDE.md hard rule 5, QUO-06's pattern): the server
 // alone writes an accepted quote's signed PDF, with the service key, through two service_role functions and nothing else:
 // * the customer's decide route, right after public.quote_public_answer answered 'accepted' (no staff session: the link's token
 //   is the right): public.quote_signed_pdf_public(token) answers what to render (the page's own answer, no view counted, plus
-//   the signature block), and public.quote_signed_pdf_public_store(token, ...) writes it;
+//   the signature block and, since 021124, the customer's billing details), and public.quote_signed_pdf_public_store(token, ...) writes it;
 // * staff ("יצירת PDF חתום"), after public.quote_signed_pdf_allowed answered the signature block with the person's own session
 //   (pdf-server.ts): public.quote_signed_pdf_store(org, quote, user, ...), which checks that user again.
 // Both upload (upsert off) only to the path the database answered, then name that path again to confirm the row. A failure never
@@ -117,12 +117,14 @@ export async function storeSignedQuotePdfForCustomer(token: string): Promise<voi
       console.error("QUO-09 signed PDF: the source had another shape");
       return;
     }
+    // owner (38) ב: the customer's own billing details, as the PDF as sent prints them
+    const billing = signedPdfBillingFrom(raw.billing);
     const doc: QuoteDocumentData = {
       design: page.design,
       color: page.color,
       logoUrl: logoPublicUrl(page.logoPath),
       business: page.business,
-      customer: page.customer,
+      customer: page.customer ? { ...page.customer, ...billing } : null,
       quote: page.quote,
       lines: page.lines,
       schedule: page.schedule,

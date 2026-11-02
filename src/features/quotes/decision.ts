@@ -146,3 +146,13 @@ export const PDF_AS_SENT_STAFF = "הורדת PDF (כפי שנשלח)";
 /** QUO-09 signed PDF: what staff call the two versions of an accepted quote's PDF. */
 export const SIGNED_PDF_LABEL = "הורדת PDF חתום";
 export const AS_SENT_PDF_LABEL = "הורדת PDF (כפי שנשלח)";
+
+/**
+ * QUO-09 (owner, 2 November 2026, answer (37) ב): the staff line of an accepted quote, "נחתמה ב-[תאריך]", with the day of the
+ * acceptance in the business's zone. Owners and admins also read the decision's card; everyone else sees only this line.
+ */
+export function signedOnText(at: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(new Date(at));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `נחתמה ב-${part("day")}.${part("month")}.${part("year")}`;
+}
