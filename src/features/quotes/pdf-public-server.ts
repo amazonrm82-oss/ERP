@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { matchesFingerprint, pdfHeaders, publicPdfAnswerFrom } from "./pdf-fingerprint";
 import { QUOTE_LINK_TOKEN } from "./public";
+import { markNotFound } from "@/lib/public-not-found";
 
 // QUO-06 follow-up, answer (1) (owner, 26 October 2026; CLAUDE.md hard rule 5): the customer downloads the stored PDF of
 // the quote their link shows. The route calls only public.quote_public_pdf (security definer, service_role only), which
@@ -22,7 +23,7 @@ const UNAVAILABLE = "קובץ PDF של ההצעה אינו זמין כרגע.";
 
 /** GET /api/forms/quote/<token>/pdf */
 export async function handleQuotePdfDownload(request: Request, token: string): Promise<Response> {
-  if (!QUOTE_LINK_TOKEN.test(token)) return text(404, NOT_FOUND);
+  if (!QUOTE_LINK_TOKEN.test(token)) return markNotFound(text(404, NOT_FOUND));
   const service = createServiceClient();
   if (!service) return text(503, UNAVAILABLE);
   const { data, error } = await service.rpc("quote_public_pdf", {
@@ -30,7 +31,7 @@ export async function handleQuotePdfDownload(request: Request, token: string): P
     p_ip_hash: keyedIpHash(clientIp(request.headers), "quote"),
   });
   if (error) {
-    if (error.code === "P0002") return text(404, NOT_FOUND);
+    if (error.code === "P0002") return markNotFound(text(404, NOT_FOUND));
     console.error("quote_public_pdf failed", error.code, error.message);
     return text(500, "משהו השתבש. נסו שוב בעוד רגע.");
   }

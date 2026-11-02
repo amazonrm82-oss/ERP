@@ -7,74 +7,57 @@ import { asAdmin, asAnon, asService, asUser, closePool, createOrg, createUser, d
 afterAll(closePool);
 
 // OPS-02, the owner's answers of 2 November 2026.
-// (40) ב: every public page and route counts the request against ONE limit per sender before it looks its token up: 120 in
-//     10 minutes across all public pages together (public.public_sender_take, service_role only, 65,536 reused buckets, no
-//     hash kept). The app calls it first (src/lib/public-sender-server.ts), so a made-up token counts like a real one.
+// (40) ב + (42) ד: the secret-link pages (quote, order, statement, the booking-manage link) share ONE limit per sender against
+//     guessed links: once a sender had 120 "not found" answers in 10 minutes across them, public.public_sender_check refuses
+//     BEFORE the token is looked up. public.public_sender_miss records one miss (atomic upsert) after a "not found"; found
+//     answers are never counted. Both service_role only, 65,536 reused buckets, no hash kept. The form, widget, booking page
+//     and card never take it (src/lib/public-sender-server.ts; the unit inventory pins who calls it).
 // (41) ב: the quote page also limits each sender to 60 views in 10 minutes (as order_public / statement_public), counted after
 //     the lookup, the sender scoped to the quote, handed over in the x-crm-sender header (app.public_sender_header).
 
 const sender = (label: string) => createHash("sha256").update(label).digest("hex");
 const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
+const check = (hash: string | null) => asService(async (q) => (await one<{ ok: boolean }>(q, "select public.public_sender_check($1) as ok", [hash])).ok);
+const miss = (hash: string | null) => asService(async (q) => (await one<{ n: number | null }>(q, "select public.public_sender_miss($1) as n", [hash])).n);
+const BUCKET = "((hashtextextended($1, 0) % 65536) + 65536) % 65536";
+const bucketMisses = (hash: string) =>
+  asAdmin(async (q) => (await q<{ misses: number }>(`select misses from app.public_sender_counts where bucket = ${BUCKET}`, [hash])).rows[0]?.misses ?? 0);
+const expire = (hash: string) =>
+  asAdmin((q) => q(`update app.public_sender_counts set window_start = now() - interval '11 minutes' where bucket = ${BUCKET}`, [hash]));
 
-describe("OPS-02 (40): one limit per sender before the token lookup (public.public_sender_take)", () => {
-  const take = (hash: string | null) => asService(async (q) => (await one<{ ok: boolean }>(q, "select public.public_sender_take($1) as ok", [hash])).ok);
-  const bucketRow = (hash: string) =>
-    asAdmin(async (q) =>
-      one<{ requests: number }>(
-        q,
-        "select requests from app.public_sender_counts where bucket = ((hashtextextended($1, 0) % 65536) + 65536) % 65536",
-        [hash],
-      ),
-    );
-  const expire = (hash: string) =>
-    asAdmin((q) =>
-      q(
-        "update app.public_sender_counts set window_start = now() - interval '11 minutes' where bucket = ((hashtextextended($1, 0) % 65536) + 65536) % 65536",
-        [hash],
-      ),
-    );
-
-  it("the limit is one named number: 120, closed to every client role", async () => {
+describe("OPS-02 (40), (42): the secret-link pages' shared limit of not-found answers per sender", () => {
+  it("the limit is one named number: 120", async () => {
     expect(await asAdmin(async (q) => (await one<{ n: number }>(q, "select app.public_sender_limit() as n")).n)).toBe(120);
   });
 
-  it("120 requests per sender in 10 minutes across all pages together; the 121st is refused; the window passes", async () => {
+  it("120 misses per sender in 10 minutes, then refused before any lookup; the check itself counts nothing; the window passes", async () => {
     const a = sender("ops02b-a");
     const b = sender("ops02b-b");
     // the two senders do not share a bucket (fixed labels, checked once here)
     expect(
-      await asAdmin(async (q) =>
-        (await one<{ same: boolean }>(q, "select (hashtextextended($1, 0) % 65536 + 65536) % 65536 = (hashtextextended($2, 0) % 65536 + 65536) % 65536 as same", [a, b])).same,
-      ),
+      await asAdmin(async (q) => (await one<{ same: boolean }>(q, `select ${BUCKET} = ${BUCKET.replaceAll("$1", "$2")} as same`, [a, b])).same),
     ).toBe(false);
     await expire(a);
-    // 60 requests on one page and 60 on another (the app takes the same scope 'public' everywhere): one count
-    for (let i = 0; i < 120; i += 1) expect(await take(a), `request ${i + 1}`).toBe(true);
-    expect((await bucketRow(a))?.requests).toBe(120);
-    expect(await take(a)).toBe(false);
-    expect(await take(a)).toBe(false);
+    for (let i = 0; i < 119; i += 1) expect(await miss(a)).toBe(i + 1);
+    // checks only read: any number of them leaves the count alone
+    for (let i = 0; i < 5; i += 1) expect(await check(a)).toBe(true);
+    expect(await bucketMisses(a)).toBe(119);
+    expect(await miss(a)).toBe(120);
+    expect(await check(a)).toBe(false);
     // another sender is counted apart
-    expect(await take(b)).toBe(true);
+    expect(await check(b)).toBe(true);
     await expire(a);
-    expect(await take(a)).toBe(true);
-    expect((await bucketRow(a))?.requests).toBe(1);
+    expect(await check(a)).toBe(true);
+    expect(await miss(a)).toBe(1);
   });
 
-  it("is counted before the token is looked up: a made-up token counts like a real one", async () => {
-    // the page's flow: take first, then its own function, which answers not found
-    const c = sender("ops02b-not-found");
-    await expire(c);
-    for (let i = 0; i < 120; i += 1) {
-      expect(await take(c)).toBe(true);
-      expect((await pgError(asService((q) => q("select public.quote_public($1)", ["x".repeat(64)])))).code).toBe("P0002");
+  it("anything but a keyed hash is neither checked nor counted (no secret = no hash: fail open)", async () => {
+    const before = await asAdmin(async (q) => (await one<{ n: string }>(q, "select coalesce(sum(misses), 0) as n from app.public_sender_counts")).n);
+    for (const value of [null, "", "not-a-hash", sender("upper").toUpperCase(), sender("short").slice(0, 63)]) {
+      expect(await check(value)).toBe(true);
+      expect(await miss(value)).toBeNull();
     }
-    expect(await take(c)).toBe(false);
-  });
-
-  it("anything but a keyed hash is not counted (no secret = no hash: fail open)", async () => {
-    const before = await asAdmin(async (q) => (await one<{ n: string }>(q, "select coalesce(sum(requests), 0) as n from app.public_sender_counts")).n);
-    for (const value of [null, "", "not-a-hash", sender("upper").toUpperCase(), sender("short").slice(0, 63)]) expect(await take(value)).toBe(true);
-    const after = await asAdmin(async (q) => (await one<{ n: string }>(q, "select coalesce(sum(requests), 0) as n from app.public_sender_counts")).n);
+    const after = await asAdmin(async (q) => (await one<{ n: string }>(q, "select coalesce(sum(misses), 0) as n from app.public_sender_counts")).n);
     expect(after).toBe(before);
   });
 
@@ -83,34 +66,39 @@ describe("OPS-02 (40): one limit per sender before the token lookup (public.publ
       await asAdmin(async (q) =>
         (await q<{ c: string }>("select column_name as c from information_schema.columns where table_schema = 'app' and table_name = 'public_sender_counts' order by 1")).rows.map((r) => r.c),
       ),
-    ).toEqual(["bucket", "requests", "window_start"]);
+    ).toEqual(["bucket", "misses", "window_start"]);
     const rights = await asAdmin(async (q) =>
       (
-        await q<{ r: string; t: boolean; lim: boolean; take: boolean }>(
+        await q<{ r: string; t: boolean; lim: boolean; chk: boolean; mis: boolean }>(
           `select r, has_table_privilege(r, 'app.public_sender_counts', 'select') as t,
                   has_function_privilege(r, 'app.public_sender_limit()', 'execute') as lim,
-                  has_function_privilege(r, 'public.public_sender_take(text)', 'execute') as take
+                  has_function_privilege(r, 'public.public_sender_check(text)', 'execute') as chk,
+                  has_function_privilege(r, 'public.public_sender_miss(text)', 'execute') as mis
              from unnest(array['anon', 'authenticated', 'service_role']) r order by r`,
         )
       ).rows,
     );
     expect(rights).toEqual([
-      { r: "anon", t: false, lim: false, take: false },
-      { r: "authenticated", t: false, lim: false, take: false },
-      { r: "service_role", t: false, lim: false, take: true },
+      { r: "anon", t: false, lim: false, chk: false, mis: false },
+      { r: "authenticated", t: false, lim: false, chk: false, mis: false },
+      { r: "service_role", t: false, lim: false, chk: true, mis: true },
     ]);
     const user = await createUser("ops02b-user");
-    expect((await pgError(asUser(user.id, (q) => q("select public.public_sender_take($1)", [sender("u")])))).code).toBe("42501");
-    expect((await pgError(asAnon((q) => q("select public.public_sender_take($1)", [sender("u")])))).code).toBe("42501");
-    // definer with a pinned search_path, one signature
-    const fn = await asAdmin(async (q) =>
+    for (const fn of ["public_sender_check", "public_sender_miss"]) {
+      expect((await pgError(asUser(user.id, (q) => q(`select public.${fn}($1)`, [sender("u")])))).code, fn).toBe("42501");
+      expect((await pgError(asAnon((q) => q(`select public.${fn}($1)`, [sender("u")])))).code, fn).toBe("42501");
+    }
+    const fns = await asAdmin(async (q) =>
       (
         await q<{ sig: string; def: boolean; cfg: string[] }>(
-          "select p.oid::regprocedure::text as sig, p.prosecdef as def, p.proconfig as cfg from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'public_sender_take'",
+          "select p.oid::regprocedure::text as sig, p.prosecdef as def, p.proconfig as cfg from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'public_sender_%' order by 1",
         )
       ).rows,
     );
-    expect(fn).toEqual([{ sig: "public_sender_take(text)", def: true, cfg: ["search_path=\"\""] }]);
+    expect(fns).toEqual([
+      { sig: "public_sender_check(text)", def: true, cfg: ['search_path=""'] },
+      { sig: "public_sender_miss(text)", def: true, cfg: ['search_path=""'] },
+    ]);
   });
 });
 
@@ -161,6 +149,46 @@ describe("OPS-02 (41): the quote page's per-sender view limit (public.quote_publ
         [org],
       ),
     );
+  });
+
+  /** a secret-link page's flow, as src/lib/public-sender-server.ts runs it: check, the page's own function, a miss on not found */
+  const pageView = async (token: string, publicHash: string) => {
+    if (!(await check(publicHash))) return "refused";
+    try {
+      return await view(token, null);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "P0002") throw error;
+      await miss(publicHash);
+      return "not-found";
+    }
+  };
+
+  it("(40): guessed tokens count before the lookup; after 120 misses even a real link is refused for that sender", async () => {
+    const link = await newLink();
+    const guesser = sender("ops02b-guesser");
+    await expire(guesser);
+    for (let i = 0; i < 120; i += 1) expect(await pageView(`${i}`.padStart(64, "z"), guesser), `guess ${i + 1}`).toBe("not-found");
+    expect(await bucketMisses(guesser)).toBe(120);
+    expect(await pageView(link.token, guesser)).toBe("refused");
+    expect(await pageView("q".repeat(64), guesser)).toBe("refused");
+    // the refused requests never reached the lookup, so they counted nothing more
+    expect(await bucketMisses(guesser)).toBe(120);
+    // another sender still opens the link
+    expect(limited((await pageView(link.token, sender("ops02b-other"))) as Record<string, unknown>)).toBe(false);
+  });
+
+  it("(40), (42): found answers never count: a customer opens a real quote 200 times and is never refused by the shared limit", async () => {
+    const link = await newLink();
+    const customer = sender("ops02b-customer");
+    await expire(customer);
+    for (let i = 0; i < 200; i += 1) {
+      // only the link's own window may stop them; reset it as ten minutes passing would
+      if (i % 100 === 0) await asAdmin((q) => q("update app.quote_links set window_count = 0 where quote_id = $1", [link.quote]));
+      const answer = await pageView(link.token, customer);
+      expect(answer, `view ${i + 1}`).not.toBe("refused");
+      expect(limited(answer as Record<string, unknown>), `view ${i + 1}`).toBe(false);
+    }
+    expect(await bucketMisses(customer)).toBe(0);
   });
 
   it("60 views per sender in 10 minutes, then rate_limited; another sender, and the same sender on another quote, go on", async () => {

@@ -15,7 +15,7 @@ import { getPublicStatement } from "@/features/statements/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
-import { takePublicPageView } from "@/lib/public-sender-server";
+import { guardPublicPage } from "@/lib/public-sender-server";
 
 type Props = { params: Promise<{ token: string }> };
 
@@ -50,8 +50,8 @@ export default async function PublicStatementPage({ params }: Props) {
       </main>
     );
   }
-  // OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up
-  const page = (await takePublicPageView()) ? await getPublicStatement(token, clientIp(await headers())) : ("rate-limited" as const);
+  // OPS-02 (owner (40) ב, (42) ד): the shared per-sender limit of the secret-link pages first; a "not found" counts one miss
+  const page = await guardPublicPage(async () => getPublicStatement(token, clientIp(await headers())));
 
   if (typeof page === "string") {
     return (

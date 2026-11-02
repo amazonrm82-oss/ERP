@@ -21,7 +21,7 @@ import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
-import { takePublicPageView } from "@/lib/public-sender-server";
+import { guardPublicPage } from "@/lib/public-sender-server";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -29,9 +29,10 @@ type Props = {
 };
 
 // WAB-05: the link's preview and the page share ONE read per request (booking_manage_public counts a view per sender)
-// OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up; once per request (takePublicPageView)
+// OPS-02 (owner (40) ב, (42) ד): the shared per-sender limit of the secret-link pages first (a sender over 120 "not found"
+// answers in 10 minutes reads nothing), and a "not found" answer counts as one miss; once per request (this cache())
 const loadManage = cache(async (token: string, from: string | null) =>
-  (await takePublicPageView()) ? getBookingManage(token, from, clientIp(await headers())) : ("rate-limited" as const),
+  guardPublicPage(async () => getBookingManage(token, from, clientIp(await headers()))),
 );
 
 /** WAB-05: the link's preview: "הפגישה שלך אצל <business>" and the logo; never the meeting's time or the customer. */

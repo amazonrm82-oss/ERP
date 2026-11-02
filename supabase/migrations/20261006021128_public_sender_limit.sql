@@ -1,26 +1,28 @@
 -- =============================================================================
--- OPS-02 (owner's answers of 2 November 2026): one limit per sender before any token is looked up, and the quote page's
+-- OPS-02 (owner's answers of 2 November 2026): one limit per sender against guessed secret links, and the quote page's
 -- per-sender view limit
 -- =============================================================================
--- (40) ב: every public page and route that reads the database by a token or code first counts the request against ONE limit
--- per sender, across all public pages together: 120 requests in 10 minutes, then "too many requests". It is counted BEFORE the
--- token is looked up, so a made-up or guessed token counts like a real one (the shape of WAB-05's app.link_preview_ip_counts).
--- Not the Vercel firewall (owner).
+-- (40) ב and (42) ד: the secret-link pages (the customer's quote, order and statement pages, all their decide/question/pdf routes,
+-- and the personal booking-manage link with its route) share ONE limit per sender against guessing links: 120 "not found"
+-- answers in 10 minutes across all of them, then "too many requests" BEFORE the token is looked up. Owner (42) ד: the lead form,
+-- the widget, the booking page and (lead's call) the business card are published to everyone and keep only their own limits;
+-- (43) א: the calendar feed, the intake webhook and the QR scan stay out. Only "not found" answers count, so a customer who opens
+-- a real link many times is never refused here (their page keeps its own per-link and per-sender limits). Not the Vercel firewall.
 --
--- * public.public_sender_take(p_sender text) returns boolean (security definer, service_role only; the approved pattern of
---   CLAUDE.md hard rule 5: one definer function, no table access, used by the existing public secret-link paths, owner's
---   answer (40)). p_sender is the server's keyed IP hash (src/lib/keyed-ip-hash.ts, FXS-11 scope 'public': one value per
---   visitor across all pages). true = go on, false = refused (over app.public_sender_limit() in the window). A sender that is
---   not 64 lower-case hex characters (null: no secret set, no address) is not counted and answers true (fail open, as every
---   other public limit: no secret = no hash).
--- * app.public_sender_counts: 65,536 reused buckets keyed by the hash alone (window start + count). Only the bucket number is
+-- * public.public_sender_check(p_sender text) returns boolean: reads the sender's bucket only; false while the bucket's window
+--   is current and its count has reached app.public_sender_limit(). public.public_sender_miss(p_sender text) returns integer: one
+--   atomic upsert (+1, or 1 when the window passed), the new count. Both security definer, service_role only (the approved
+--   pattern of CLAUDE.md hard rule 5, used by the existing secret-link paths, owner's answers (40) and (42)). p_sender is the
+--   server's keyed IP hash (src/lib/keyed-ip-hash.ts, FXS-11 scope 'public': one value per visitor across the pages); a value
+--   that is not 64 lower-case hex characters (null: no secret set, no address) is neither checked (true) nor counted (null):
+--   fail open, as every other public limit (no secret = no hash).
+-- * app.public_sender_counts: 65,536 reused buckets keyed by the hash alone (window start + misses). Only the bucket number is
 --   kept, never the hash, so there is nothing to clear (as app.link_preview_ip_counts); two senders that share a bucket share
 --   its count (accepted, as WAB-05; 65,536 buckets keep that rare).
--- * The app calls it first (src/lib/public-sender-server.ts, takePublicRequest / takePublicPageView, once per page view), on
---   every page and route of the inventory tests/unit/public-rate-limits.test.ts that reads by a token, except: the QR scan
---   (a counter only, no IP: owner's rule for scans), the calendar feed and the intake webhook (servers on shared addresses
---   fetch them for many businesses), preview bots (WAB-05 counts them before the lookup with its own limits), the cached
---   subprocessors page and the secret-guarded routes.
+-- * The app (src/lib/public-sender-server.ts): a page checks inside its cache()d loader, runs its own function, records a miss
+--   when that answered not found; a route checks, runs its handler, records a miss when the handler marked its 404 as "not
+--   found" (src/lib/public-not-found.ts; a real link's "file unavailable" 404 is not a miss). Preview bots never reach it
+--   (WAB-05 counts them first with its own limits).
 --
 -- (41) ב: the customer's quote page also limits each sender to 60 views in 10 minutes, as order_public and statement_public:
 -- counted after the token lookup and the link's 120 window, the sender scoped to the link's quote by app.quote_link_sender,
@@ -33,47 +35,69 @@
 -- Safe to run twice; nothing is removed; backward compatible (the live code sends no sender: nothing is counted).
 
 -- ----------------------------------------------------------------------------
--- (40) The counters: one row per bucket, reused by the next window (an update, never a delete)
+-- (40) The counters: one row per bucket, reused by the next window (an update, never a row removal)
 -- ----------------------------------------------------------------------------
 create table if not exists app.public_sender_counts (
   bucket       integer primary key check (bucket between 0 and 65535),
   window_start timestamptz not null,
-  requests     integer not null
+  misses       integer not null
 );
 alter table app.public_sender_counts enable row level security;
 revoke all on app.public_sender_counts from public, anon, authenticated, service_role;
 
--- requests per sender in 10 minutes across all public pages (owner, 2 November 2026, answer (40) ב)
+-- "not found" answers per sender in 10 minutes across the secret-link pages (owner, 2 November 2026, answers (40) ב, (42) ד)
 create or replace function app.public_sender_limit() returns integer
 language sql immutable
 set search_path = ''
 as $$ select 120 $$;
 revoke all on function app.public_sender_limit() from public, anon, authenticated, service_role;
 
-create or replace function public.public_sender_take(p_sender text) returns boolean
+-- The bucket of a keyed hash, or null for anything that is not one
+create or replace function app.public_sender_bucket(p_sender text) returns integer
+language sql immutable
+set search_path = ''
+as $$
+  select case when p_sender ~ '^[0-9a-f]{64}$' then ((hashtextextended(p_sender, 0) % 65536) + 65536) % 65536 end
+$$;
+revoke all on function app.public_sender_bucket(text) from public, anon, authenticated, service_role;
+
+-- Before the lookup: may this sender go on? A read only
+create or replace function public.public_sender_check(p_sender text) returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select not exists (
+    select 1 from app.public_sender_counts sc
+     where sc.bucket = app.public_sender_bucket(p_sender)
+       and sc.window_start > now() - interval '10 minutes'
+       and sc.misses >= app.public_sender_limit())
+$$;
+revoke all on function public.public_sender_check(text) from public, anon, authenticated;
+grant execute on function public.public_sender_check(text) to service_role;
+
+-- After a "not found": one miss, one atomic upsert; answers the new count (null = not a keyed hash, not counted)
+create or replace function public.public_sender_miss(p_sender text) returns integer
 language plpgsql volatile security definer
 set search_path = ''
 as $$
 declare
-  v_bucket integer;
-  v_requests integer;
+  v_bucket integer := app.public_sender_bucket(p_sender);
+  v_misses integer;
 begin
-  -- not a keyed IP hash (no secret, no address): not counted
-  if p_sender is null or p_sender !~ '^[0-9a-f]{64}$' then
-    return true;
+  if v_bucket is null then
+    return null;
   end if;
-  v_bucket := ((hashtextextended(p_sender, 0) % 65536) + 65536) % 65536;
-  insert into app.public_sender_counts as sc (bucket, window_start, requests)
+  insert into app.public_sender_counts as sc (bucket, window_start, misses)
   values (v_bucket, now(), 1)
   on conflict (bucket) do update
     set window_start = case when sc.window_start > now() - interval '10 minutes' then sc.window_start else now() end,
-        requests = case when sc.window_start > now() - interval '10 minutes' then sc.requests + 1 else 1 end
-  returning sc.requests into v_requests;
-  return v_requests <= app.public_sender_limit();
+        misses = case when sc.window_start > now() - interval '10 minutes' then sc.misses + 1 else 1 end
+  returning sc.misses into v_misses;
+  return v_misses;
 end;
 $$;
-revoke all on function public.public_sender_take(text) from public, anon, authenticated;
-grant execute on function public.public_sender_take(text) to service_role;
+revoke all on function public.public_sender_miss(text) from public, anon, authenticated;
+grant execute on function public.public_sender_miss(text) to service_role;
 
 -- ----------------------------------------------------------------------------
 -- (41) The quote page's per-sender view counters (as app.order_link_view_counts, with the quote's tenant key)

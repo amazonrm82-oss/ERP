@@ -6,6 +6,7 @@ import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { ORDER_ACCEPT_WORDING_VERSION, ORDER_LINK_TOKEN, publicOrderFrom, statusOrderFrom, type PublicOrder, type StatusPublicOrder } from "./public";
+import { markNotFound } from "@/lib/public-not-found";
 
 // ORD-05 (owner, 20 October 2026): the customer's page of a numbered order, in the approved pattern for secret-link pages
 // (CLAUDE.md hard rule 5): the server reads only through public.order_public() and decides only through
@@ -50,7 +51,7 @@ const NOT_FOUND = "ההזמנה לא נמצאה, או שהקישור כבר לא
 
 /** POST /api/forms/order/<token>/decide: the page's own script posts the decision as JSON. */
 export async function handleOrderDecision(request: Request, token: string): Promise<Response> {
-  if (!ORDER_LINK_TOKEN.test(token)) return reply(404, { ok: false, message: NOT_FOUND });
+  if (!ORDER_LINK_TOKEN.test(token)) return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
   const service = createServiceClient();
   if (!service) return reply(503, { ok: false, message: "ההזמנה אינה זמינה כרגע." });
   if (Number(request.headers.get("content-length") ?? 0) > MAX_DECISION_BYTES) return reply(413, { ok: false, message: ORDER_DECISION_MESSAGES.invalid });
@@ -81,7 +82,7 @@ export async function handleOrderDecision(request: Request, token: string): Prom
     p_user_agent: request.headers.get("user-agent")?.slice(0, 500) ?? null,
   });
   if (error) {
-    if (error.code === "P0002") return reply(404, { ok: false, message: NOT_FOUND });
+    if (error.code === "P0002") return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
     console.error("order_public_decide failed", error.code, error.message);
     return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }

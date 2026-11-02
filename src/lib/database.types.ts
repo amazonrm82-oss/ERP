@@ -3557,8 +3557,9 @@ export type Database = {
       // BIZ-02: the public business card and its "leave details" form; service_role only
       // BIZ-03: the scan (service_role only): {path, campaign} or P0002; the counts per code (owners/admins)
       qr_scan: { Args: { p_token: string }; Returns: Json };
-      // OPS-02 (owner (40) ב): the shared per-sender limit before a token is looked up (service_role only)
-      public_sender_take: { Args: { p_sender: string }; Returns: boolean };
+      // OPS-02 (owner (40) ב, (42) ד): the secret-link pages' shared per-sender limit of "not found" answers (service_role only)
+      public_sender_check: { Args: { p_sender: string }; Returns: boolean };
+      public_sender_miss: { Args: { p_sender: string }; Returns: number | null };
       // SPD-07: the site widget's display settings and its short form (service_role only)
       site_widget_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       site_widget_submit: {

@@ -10,6 +10,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { publicStatementPdfDocument, statementPdfFileName } from "./pdf";
 import { publicStatementFrom, STATEMENT_LINK_TOKEN, type PublicStatement } from "./public";
+import { markNotFound } from "@/lib/public-not-found";
 
 // BAL-04 (approved pattern for public secret-link pages, owner 8 October 2026; CLAUDE.md hard rule 5): the customer's
 // statement page reads only through public.statement_public() (security definer, service_role only), which checks the token
@@ -54,7 +55,7 @@ const PDF_MESSAGES = {
  */
 export async function handleStatementPdfDownload(request: Request, token: string): Promise<Response> {
   const state = await getPublicStatement(token, clientIp(request.headers));
-  if (state === "not-found") return text(404, PDF_MESSAGES["not-found"]);
+  if (state === "not-found") return markNotFound(text(404, PDF_MESSAGES["not-found"]));
   if (state === "rate-limited") return rateLimitedText(PDF_MESSAGES["rate-limited"], { headers: { "Referrer-Policy": "no-referrer" } });
   if (state === "not-configured") return text(503, PDF_MESSAGES["not-configured"]);
   const bytes = await renderPdf(publicStatementPdfDocument(state, await loadPdfLogo(logoPublicUrl(state.logoPath))));

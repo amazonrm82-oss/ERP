@@ -29,6 +29,7 @@ import {
 } from "./public";
 import { signaturePng } from "./signed-pdf";
 import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
+import { markNotFound } from "@/lib/public-not-found";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
@@ -115,7 +116,7 @@ const NOT_FOUND = "ההצעה לא נמצאה, או שהקישור כבר לא �
 
 /** POST /api/forms/quote/<token>/decide: the page's own script posts the decision as JSON. */
 export async function handleQuoteDecision(request: Request, token: string): Promise<Response> {
-  if (!QUOTE_LINK_TOKEN.test(token)) return reply(404, { ok: false, message: NOT_FOUND });
+  if (!QUOTE_LINK_TOKEN.test(token)) return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
   const service = createServiceClient();
   if (!service) return reply(503, { ok: false, message: "ההצעה אינה זמינה כרגע." });
   if (Number(request.headers.get("content-length") ?? 0) > MAX_DECISION_BYTES) return reply(413, { ok: false, message: DECISION_MESSAGES.invalid });
@@ -155,7 +156,7 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
     p_accepted_total_agorot: accepted?.acceptedTotalAgorot ?? null,
   });
   if (error) {
-    if (error.code === "P0002") return reply(404, { ok: false, message: NOT_FOUND });
+    if (error.code === "P0002") return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
     console.error("quote_public_answer failed", error.code, error.message);
     return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }
@@ -183,7 +184,7 @@ const questionReply = (status: number, body: QuestionReply) => Response.json(bod
 
 /** POST /api/forms/quote/<token>/question: the page's own script posts {text} as JSON. */
 export async function handleQuoteQuestion(request: Request, token: string): Promise<Response> {
-  if (!QUOTE_LINK_TOKEN.test(token)) return questionReply(404, { ok: false, message: NOT_FOUND });
+  if (!QUOTE_LINK_TOKEN.test(token)) return markNotFound(questionReply(404, { ok: false, message: NOT_FOUND }));
   const service = createServiceClient();
   if (!service) return questionReply(503, { ok: false, message: "ההצעה אינה זמינה כרגע." });
   if (Number(request.headers.get("content-length") ?? 0) > MAX_QUESTION_BYTES) {
@@ -205,7 +206,7 @@ export async function handleQuoteQuestion(request: Request, token: string): Prom
     p_text: text,
   });
   if (error) {
-    if (error.code === "P0002") return questionReply(404, { ok: false, message: NOT_FOUND });
+    if (error.code === "P0002") return markNotFound(questionReply(404, { ok: false, message: NOT_FOUND }));
     console.error("quote_public_question failed", error.code, error.message);
     return questionReply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }

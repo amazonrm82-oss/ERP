@@ -22,15 +22,16 @@ import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
-import { takePublicPageView } from "@/lib/public-sender-server";
+import { guardPublicPage } from "@/lib/public-sender-server";
 
 type Props = { params: Promise<{ token: string }> };
 
 // WAB-05: the link's preview and the page share ONE read per request (quote_public counts a view and its first view tells
 // the quote's owner), so both go through this cache() of React's request scope
-// OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up; once per request (takePublicPageView)
+// OPS-02 (owner (40) ב, (42) ד): the shared per-sender limit of the secret-link pages first (a sender over 120 "not found"
+// answers in 10 minutes reads nothing), and a "not found" answer counts as one miss; once per request (this cache())
 const loadQuote = cache(async (token: string) =>
-  (await takePublicPageView()) ? getPublicQuote(token, clientIp(await headers())) : ("rate-limited" as const),
+  guardPublicPage(async () => getPublicQuote(token, clientIp(await headers()))),
 );
 
 /**

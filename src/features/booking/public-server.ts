@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { bookingManageFrom, confirmationFrom, MANAGE_TOKEN, publicBookingFrom, type BookingManage, type PublicBooking } from "./public";
 import { BOOKING_ANSWER_MAX } from "./schema";
+import { markNotFound } from "@/lib/public-not-found";
 
 // CAL-10: the public booking page, in the approved pattern for secret-link pages (owner, 8 October 2026; hard rule 5):
 // the server reads and books only through public.booking_page_public() / public.booking_submit() (security definer,
@@ -174,7 +175,7 @@ const manageJson = (status: number, reply: BookingManageReply) => Response.json(
 
 /** POST /api/forms/booking/manage/<token>: {"action": "cancel"} or {"action": "change", "starts_at": "…"}. */
 export async function handleBookingManage(request: Request, token: string): Promise<Response> {
-  if (!MANAGE_TOKEN.test(token)) return manageJson(404, { ok: false, message: MESSAGES.notFound });
+  if (!MANAGE_TOKEN.test(token)) return markNotFound(manageJson(404, { ok: false, message: MESSAGES.notFound }));
   const service = createServiceClient();
   if (!service) return manageJson(503, { ok: false, message: MESSAGES.notConfigured });
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return manageJson(413, { ok: false, message: MESSAGES.tooLarge });
@@ -201,7 +202,7 @@ export async function handleBookingManage(request: Request, token: string): Prom
   }
   const { data, error } = result;
   if (error) {
-    if (error.code === "P0002") return manageJson(404, { ok: false, message: MESSAGES.notFound });
+    if (error.code === "P0002") return markNotFound(manageJson(404, { ok: false, message: MESSAGES.notFound }));
     if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.hint === "booking:closed") return rateLimitedJson({ ok: false, message: MESSAGES.closed }, { retryAfterSeconds: CLOSED_SECONDS });
     if (error.hint === "booking:too_late") return manageJson(409, { ok: false, message: MESSAGES.tooLate, tooLate: true });

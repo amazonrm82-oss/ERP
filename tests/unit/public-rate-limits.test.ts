@@ -32,9 +32,10 @@ type Entry = {
   /** what the visitor gets when refused */
   refusal: string;
   /**
-   * OPS-02 (owner (40) ב): "first" = the page or route takes the shared per-sender limit (public.public_sender_take, 120 per
-   * sender in 10 minutes across all public pages) before anything that reads its token; else why it is left out (database
-   * guard only; checked by the test)
+   * OPS-02 (owner (40) ב, (42) ד): "first" = the page or route checks the secret-link pages' shared per-sender limit
+   * (public.public_sender_check: 120 "not found" answers per sender in 10 minutes across them) before anything that reads its
+   * token, and records a miss after a "not found" (public.public_sender_miss); else why it is left out (database guard only;
+   * checked by the test)
    */
   sender?: "first" | { leftOut: string };
 };
@@ -42,7 +43,8 @@ type Entry = {
 const PAGE_TEXT = "page text RATE_LIMITED_PAGE_TEXT (HTTP 200: a page cannot answer 429)";
 const JSON_429 = "429 JSON {ok:false, message: RATE_LIMITED_TEXT}, Retry-After 600";
 const TEXT_429 = "429 text, Retry-After 600";
-const SENDER = "OPS-02: first 120 requests per sender in 10 min across all public pages (public_sender_take), counted BEFORE the token lookup (not found included); ";
+const SENDER = "OPS-02: first the shared limit of the secret-link pages: refused BEFORE the token lookup once the sender had 120 \"not found\" answers in 10 min across them (public_sender_check / public_sender_miss); found answers never count; ";
+const OUT_42 = "(42) ד: published to everyone (lead form, widget, booking page; the business card by the lead's call), so only its own limits apply";
 const PREVIEW = "a listed preview bot (src/lib/preview-bots.ts) gets only link_preview_public: 300/min in total, 120 per sender across all links and 30 per sender and link in 10 min, counted BEFORE the lookup (not found included); refused = the generic preview";
 
 export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
@@ -64,155 +66,155 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   "/f/embed.js": { guard: "static", limit: "the same script for everyone, cached a day by browsers and CDNs", refusal: "none" },
   "/f/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "intake_form", "link_preview_public"],
-    limit: SENDER + "300 views per sender per form in 10 min (app.form_view_limit, app.form_view_counts), counted after the token lookup; " + PREVIEW,
+    functions: ["intake_form", "link_preview_public"],
+    limit: "300 views per sender per form in 10 min (app.form_view_limit, app.form_view_counts), counted after the token lookup; " + PREVIEW,
     refusal: PAGE_TEXT,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
-  "/f/[token]/qr": { guard: "database", functions: ["public_sender_take", "intake_form"], limit: SENDER + "the form page's view limit (shared counter)", refusal: PAGE_TEXT, sender: "first" },
+  "/f/[token]/qr": { guard: "database", functions: ["intake_form"], limit: "the form page's view limit (shared counter)", refusal: PAGE_TEXT, sender: { leftOut: OUT_42 } },
   "/api/forms/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "intake_form", "intake_submit"],
-    limit: SENDER + "10 per sender per form in 10 min and 500 per form an hour (spam and too-large bodies counted), after the token lookup",
+    functions: ["intake_form", "intake_submit"],
+    limit: "10 per sender per form in 10 min and 500 per form an hour (spam and too-large bodies counted), after the token lookup",
     refusal: JSON_429 + " (CORS headers kept)",
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/api/in/[token]": {
     guard: "database",
     functions: ["intake_submit"],
     limit: "intake_submit's limits (webhook kind)",
     refusal: JSON_429,
-    sender: { leftOut: "server-to-server webhook (Zapier, Make, plugins): their servers post for many businesses from shared addresses; the token is a secret" },
+    sender: { leftOut: "(43) א: server-to-server webhook (Zapier, Make, plugins): their servers post for many businesses from shared addresses; the token is a secret" },
   },
   "/f/book/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "booking_page_public", "link_preview_public"],
-    limit: SENDER + "60 views per sender per page in 10 min, after the lookup; views never close a page; " + PREVIEW,
+    functions: ["booking_page_public", "link_preview_public"],
+    limit: "60 views per sender per page in 10 min, after the lookup; views never close a page; " + PREVIEW,
     refusal: PAGE_TEXT,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/api/forms/booking/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "booking_submit"],
-    limit: SENDER + "5 per sender per page in 10 min (spam and invalid times included); 200 real races in an hour close the page for an hour",
+    functions: ["booking_submit"],
+    limit: "5 per sender per page in 10 min (spam and invalid times included); 200 real races in an hour close the page for an hour",
     refusal: JSON_429 + "; closed page: 429 with its own message and Retry-After 3600",
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/f/book/manage/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "booking_manage_public", "link_preview_public"],
+    functions: ["public_sender_check", "public_sender_miss", "booking_manage_public", "link_preview_public"],
     limit: SENDER + "the booking page's view counter (60 per sender in 10 min); " + PREVIEW,
     refusal: PAGE_TEXT,
     sender: "first",
   },
   "/api/forms/booking/manage/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "booking_manage_cancel", "booking_manage_change"],
+    functions: ["public_sender_check", "public_sender_miss", "booking_manage_cancel", "booking_manage_change"],
     limit: SENDER + "app.booking_manage_begin: 5 per sender per page in 10 min, shared with bookings; the page closure applies",
     refusal: JSON_429 + "; closed page: Retry-After 3600",
     sender: "first",
   },
   "/f/card/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "business_card_public", "link_preview_public"],
-    limit: SENDER + "60 views per sender per card in 10 min, after the lookup; " + PREVIEW,
+    functions: ["business_card_public", "link_preview_public"],
+    limit: "60 views per sender per card in 10 min, after the lookup; " + PREVIEW,
     refusal: PAGE_TEXT,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/api/forms/card/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "business_card_submit"],
-    limit: SENDER + "business_card_submit goes through intake_submit in the database: its limits on the card's own form (sender scoped per card)",
+    functions: ["business_card_submit"],
+    limit: "business_card_submit goes through intake_submit in the database: its limits on the card's own form (sender scoped per card)",
     refusal: JSON_429,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/api/forms/card/[token]/vcard": {
     guard: "database",
-    functions: ["public_sender_take", "business_card_public"],
-    limit: SENDER + "a view of the card (same counter)",
+    functions: ["business_card_public"],
+    limit: "a view of the card (same counter)",
     refusal: TEXT_429,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/f/widget/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "site_widget_public"],
-    limit: SENDER + "60 views per sender per widget in 10 min, after the lookup",
+    functions: ["site_widget_public"],
+    limit: "60 views per sender per widget in 10 min, after the lookup",
     refusal: PAGE_TEXT,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/f/w/[file]": {
     guard: "database",
-    functions: ["public_sender_take", "site_widget_public"],
-    limit: SENDER + "no per-link count (the same script for everyone): cached 5 min by browsers and CDNs (not found 1 min), so only requests that reach the server count",
-    refusal: TEXT_429,
-    sender: "first",
+    functions: ["site_widget_public"],
+    limit: "not counted per visitor on purpose (the same script for everyone): cached 5 min by browsers and CDNs (not found 1 min)",
+    refusal: "none",
+    sender: { leftOut: OUT_42 },
   },
   "/api/forms/widget/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "site_widget_submit"],
-    limit: SENDER + "site_widget_submit goes through intake_submit in the database: its limits on the widget's own form (sender scoped per widget)",
+    functions: ["site_widget_submit"],
+    limit: "site_widget_submit goes through intake_submit in the database: its limits on the widget's own form (sender scoped per widget)",
     refusal: JSON_429,
-    sender: "first",
+    sender: { leftOut: OUT_42 },
   },
   "/f/quote/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "quote_public", "quote_public_version", "link_preview_public"],
+    functions: ["public_sender_check", "public_sender_miss", "quote_public", "quote_public_version", "link_preview_public"],
     limit: SENDER + "120 views per link and (owner (41) ב) 60 per sender in 10 min (x-crm-sender, scope quote, app.quote_link_view_counts), after the lookup; " + PREVIEW,
     refusal: PAGE_TEXT,
     sender: "first",
   },
   "/api/forms/quote/[token]/decide": {
     guard: "database",
-    functions: ["public_sender_take", "quote_public_answer", "quote_signed_pdf_public", "quote_signed_pdf_public_store"],
+    functions: ["public_sender_check", "public_sender_miss", "quote_public_answer", "quote_signed_pdf_public", "quote_signed_pdf_public_store"],
     limit: SENDER + "10 tries per link in 10 min plus the link's 120-view window; the signed PDF only once after an acceptance",
     refusal: JSON_429 + " (with status)",
     sender: "first",
   },
   "/api/forms/quote/[token]/question": {
     guard: "database",
-    functions: ["public_sender_take", "quote_public_question"],
+    functions: ["public_sender_check", "public_sender_miss", "quote_public_question"],
     limit: SENDER + "the link's 120 in 10 min, 20 per link a day, 5 per sender in 10 min",
     refusal: "429 JSON with the question's own message (the window may be a day), Retry-After 600",
     sender: "first",
   },
   "/api/forms/quote/[token]/pdf": {
     guard: "database",
-    functions: ["public_sender_take", "quote_public_pdf"],
+    functions: ["public_sender_check", "public_sender_miss", "quote_public_pdf"],
     limit: SENDER + "the link's 120-view window plus 20 downloads per sender in 10 min",
     refusal: TEXT_429,
     sender: "first",
   },
   "/f/order/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "order_public", "link_preview_public"],
+    functions: ["public_sender_check", "public_sender_miss", "order_public", "link_preview_public"],
     limit: SENDER + "120 views per link and 60 per sender in 10 min, after the lookup; " + PREVIEW,
     refusal: PAGE_TEXT,
     sender: "first",
   },
   "/api/forms/order/[token]/decide": {
     guard: "database",
-    functions: ["public_sender_take", "order_public_decide"],
+    functions: ["public_sender_check", "public_sender_miss", "order_public_decide"],
     limit: SENDER + "10 tries per link in 10 min plus the link's 120-view window",
     refusal: JSON_429 + " (with status)",
     sender: "first",
   },
   "/api/forms/order/[token]/pdf": {
     guard: "database",
-    functions: ["public_sender_take", "order_public_pdf"],
+    functions: ["public_sender_check", "public_sender_miss", "order_public_pdf"],
     limit: SENDER + "the link's 120-view window plus 20 downloads per sender in 10 min",
     refusal: TEXT_429,
     sender: "first",
   },
   "/f/statement/[token]": {
     guard: "database",
-    functions: ["public_sender_take", "statement_public"],
+    functions: ["public_sender_check", "public_sender_miss", "statement_public"],
     limit: SENDER + "120 views per link and 60 per sender in 10 min, after the lookup; a preview bot gets a generic page and no read",
     refusal: PAGE_TEXT,
     sender: "first",
   },
   "/api/forms/statement/[token]/pdf": {
     guard: "database",
-    functions: ["public_sender_take", "statement_public"],
+    functions: ["public_sender_check", "public_sender_miss", "statement_public"],
     limit: SENDER + "a view of the statement (same counters)",
     refusal: TEXT_429,
     sender: "first",
@@ -222,14 +224,14 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     functions: ["qr_scan"],
     limit: "a counter only (owner: no IP, device or visitor id): 60 counted scans per code a minute, more still redirect uncounted",
     refusal: "none (redirect or the page before an external link)",
-    sender: { leftOut: "scans are a counter only by the owner's rule (BIZ-03, 13 October 2026): no IP, device or visitor id, so no sender is counted" },
+    sender: { leftOut: "(43) א: scans are a counter only by the owner's rule (BIZ-03, 13 October 2026): no IP, device or visitor id, so no sender is counted" },
   },
   "/api/calendar-feed/[file]": {
     guard: "database",
     functions: ["calendar_feed_events"],
     limit: "60 fetches per feed in 10 min, after the lookup",
     refusal: TEXT_429,
-    sender: { leftOut: "fetched by calendar servers (Google, Apple, Outlook) that poll many people's feeds from shared addresses; the token is a secret" },
+    sender: { leftOut: "(43) א: fetched by calendar servers (Google, Apple, Outlook) that poll many people's feeds from shared addresses; the token is a secret" },
   },
   "/api/push/dispatch": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute", refusal: "401" },
   "/api/files/cleanup": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken nightly by pg_cron", refusal: "401" },
@@ -338,9 +340,9 @@ describe("OPS-02: every public path has a named limit", () => {
     }
   });
 
-  it("OPS-02 (40): every token-reading page and route takes the shared sender limit before anything that reads the database", () => {
+  it("OPS-02 (40), (42): every secret-link page and route takes the shared sender limit before anything that reads the database", () => {
     // the helpers of src/lib/public-sender-server.ts; the preview-bot path is left out on purpose (WAB-05 counts it first)
-    const HELPERS = ["takePublicPageView", "refusePublicRequest"];
+    const HELPERS = ["guardPublicPage", "guardPublicRoute"];
     const PREVIEW_PATH = new Set(["isPreviewBotRequest", "loadBotPreview", "botPreviewMetadata", "BotPreviewPage"]);
     const resolve = (spec: string, from: string): string | null => {
       const base = spec.startsWith("@/") ? join(ROOT, "src", spec.slice(2)) : join(from, "..", spec);
@@ -356,12 +358,17 @@ describe("OPS-02: every public path has a named limit", () => {
       const helperAt = Math.min(...HELPERS.map((h) => body.indexOf(`${h}(`)).filter((i) => i >= 0));
       if (entry.sender !== "first") {
         expect((entry.sender as { leftOut: string }).leftOut.length, path).toBeGreaterThan(20);
-        expect(entry.functions, `${path} is left out: it does not name public_sender_take`).not.toContain("public_sender_take");
+        expect(entry.functions, `${path} is left out: it does not name the shared limit`).not.toContain("public_sender_check");
         expect(Number.isFinite(helperAt), `${path} is left out but calls the helper`).toBe(false);
         continue;
       }
-      expect(entry.functions, path).toContain("public_sender_take");
-      expect(Number.isFinite(helperAt), `${path} calls takePublicPageView() or refusePublicRequest()`).toBe(true);
+      expect(entry.functions, path).toEqual(expect.arrayContaining(["public_sender_check", "public_sender_miss"]));
+      expect(Number.isFinite(helperAt), `${path} calls guardPublicPage() or guardPublicRoute()`).toBe(true);
+      // a route counts a miss only for a response its handler marked "not found" (src/lib/public-not-found.ts)
+      if (file.endsWith("route.ts")) {
+        const reached = [...importClosure(file).entries()].filter(([f]) => !f.endsWith("public-not-found.ts")).map(([, code]) => code);
+        expect(reached.some((code) => /markNotFound\(/.test(code)), `${path} marks its "not found" answer`).toBe(true);
+      }
       // every function imported from a module that reaches the database (.rpc) is first called after the helper
       for (const match of text.matchAll(IMPORTS)) {
         const source = resolve(match[2], file);

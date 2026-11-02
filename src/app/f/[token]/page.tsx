@@ -13,7 +13,6 @@ import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
 import { genericPreview, linkPreviewMetadata, PREVIEW_TEXTS } from "@/lib/link-preview";
 import { RATE_LIMITED_PAGE_TEXT } from "@/lib/public-rate-limit";
-import { takePublicPageView } from "@/lib/public-sender-server";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -22,10 +21,7 @@ type Props = {
 
 // WAB-05: the link's preview and the page share ONE read per request
 // OPS-02: the view counts against the sender's limit (300 in 10 minutes per form, app.form_view_limit)
-// OPS-02 (owner (40) ב): the shared per-sender limit first, before the token is looked up; once per request (takePublicPageView)
-const loadForm = cache(async (token: string) =>
-  (await takePublicPageView()) ? getPublicForm(token, await headers()) : ("rate-limited" as const),
-);
+const loadForm = cache(async (token: string) => getPublicForm(token, await headers()));
 
 /**
  * WAB-05: the link's preview: the form's own title and intro (written by the business) and its logo. intake_form() does

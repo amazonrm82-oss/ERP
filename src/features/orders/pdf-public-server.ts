@@ -7,6 +7,7 @@ import { rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { ORDER_LINK_TOKEN } from "./public";
+import { markNotFound } from "@/lib/public-not-found";
 
 // ORD-05 PDF (owner, 1 November 2026, answer (1) ב; CLAUDE.md hard rule 5, QUO-06's pattern): the customer downloads the
 // stored PDF of the order their link opens. The route calls only public.order_public_pdf (security definer, service_role
@@ -22,7 +23,7 @@ const UNAVAILABLE = "קובץ PDF של ההזמנה אינו זמין כרגע."
 
 /** GET /api/forms/order/<token>/pdf */
 export async function handleOrderPdfDownload(request: Request, token: string): Promise<Response> {
-  if (!ORDER_LINK_TOKEN.test(token)) return text(404, NOT_FOUND);
+  if (!ORDER_LINK_TOKEN.test(token)) return markNotFound(text(404, NOT_FOUND));
   const service = createServiceClient();
   if (!service) return text(503, UNAVAILABLE);
   const { data, error } = await service.rpc("order_public_pdf", {
@@ -30,7 +31,7 @@ export async function handleOrderPdfDownload(request: Request, token: string): P
     p_ip_hash: keyedIpHash(clientIp(request.headers), "order"),
   });
   if (error) {
-    if (error.code === "P0002") return text(404, NOT_FOUND);
+    if (error.code === "P0002") return markNotFound(text(404, NOT_FOUND));
     console.error("order_public_pdf failed", error.code, error.message);
     return text(500, "משהו השתבש. נסו שוב בעוד רגע.");
   }
