@@ -788,7 +788,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   review of 27 October 2026) `public.money_allocation_state` (last redefined there; same signature, invoker, answer) reads each table
   once, set-based, with `set jit = off` and `set enable_nestloop = off` (test 260 compares it with the 021077 body as four roles;
   `scripts/perf/money-allocation-state*.sql` measure it: one document 7.8 s -> 0.08 s locally). JIT is off and unavailable on the
-  hosted project (checked 28 October 2026), so locally only an invoker report under RLS may still pay JIT (`report_money_waiting`).
+  hosted project (checked 28 October 2026), and since 021144 `report_money_waiting` (last redefined there: the 021089 body plus `set jit = off`) runs without JIT too: with
+  analyzed tables its estimate passed every JIT threshold and compiling took 6.6 s of a 60 ms call (test 257 analyzes its bulk fixture;
+  `scripts/perf/money-waiting*.sql`). Rule: a large invoker report under RLS carries `set jit = off`, and a perf test analyzes its bulk
+  fixture first, because unanalyzed estimates hide JIT.
 - Stage-required built-in fields (DEAL-05, migration 020475): `stages.required_fields` (subset of amount | expected_close_date |
   contact_id, constraint `stages_required_fields_known`, mirrored by `STAGE_REQUIRED_FIELDS` in `src/features/deals/stage-required.ts`).
   App-only like FLD-09's "require": `requiredForMove` / `missingAfterChange` add pseudo fields `builtin:*` ahead of the custom ones,
