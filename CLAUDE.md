@@ -661,6 +661,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   against `max_products`. Since 0159 (PRD-05) products import like leads (`import_jobs.entity_type` 'product', `products.import_job_id`
   guarded by `app.guard_import_tag('product')`, `product_sku_matches()` invoker; owners/admins only; undo archives a product a
   document uses) and export through `log_list_export('product')`. PRD-07 price history reads `audit_log` (owners/admins).
+- Bundles (PRD-09, migration 021136; owner (51) א for the draft backfill): a product of `kind = 'bundle'` with parts in
+  `public.product_bundle_items` (catalog rights, `products` flag, one level only, never itself, at most 50, a part FK with no on
+  delete action so a part can only be archived; `app.product_bundle_items_check` definer, outsider guard first, both products FOR
+  SHARE; `app.products_bundle_kind` keeps a bundle with parts a bundle and a part from becoming one). Its price is its own; reports
+  count it as itself. Lines get `bundle_display` single|itemised (deal, quote, order; null on non-bundle lines; the app reads null on
+  a bundle line as 'single') and quote/order lines a server-only snapshot `bundle_items` [{name, quantity, unit_name}]
+  (`app.bundle_snapshot`, definer, no grants): taken when the line is added, refreshed from the catalog when the quote is sent or
+  the order numbered (`app.quotes_bundle_refresh` / `app.orders_bundle_refresh`, server writes; not for a version's copied lines or an
+  order from a quote), then frozen for every writer (`quote:frozen` / `order:frozen`). A version and an order from a quote match lines
+  by position and product. `app.quote_fingerprint` and `app.order_fingerprint` (last redefined in 021136) add a bundle line's choice
+  and parts only, so every document without a bundle keeps its hash. `public.quote_public`, `public.order_public` (021136: an itemised
+  line's `components`, names and quantities only) and `public.quote_duplicate` (keeps the choice, takes the parts fresh) were last
+  redefined in 021136; test 253 pins them. Lead's decisions: templates do not store the choice; deal lines from an accepted quote
+  start as 'single'.
 - Quotes table (LST-09 for quotes, migration 020600): `list_preferences` and `saved_views` take `quote`; sort fields `sort_owner(quotes)`,
   `sort_customer(quotes)` (invoker); `log_list_export('quote')` and `/o/[org]/quotes/export`; no inline edit or bulk change (a quote changes
   only on its own screen; bulk refuses `quote` except export). `public.log_list_export` and `app.export_choice_values` were last redefined in 020600 (then 020690).
