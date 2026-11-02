@@ -102,6 +102,13 @@ and build this CRM here instead. The old code is preserved on the branch
    (`src/features/orders/pdf-public-server.ts`, route `GET /api/forms/order/<token>/pdf`) calls only `public.order_public_pdf()` and
    compares the bytes with the SHA-256; both in the eslint allow-list. The PDF prints the customer's own billing details (as the quote PDF). The statement PDF (BAL-04) and report PDFs (RPT-02) are made per request with the
    user's session (or the statement page's own definer answer) and never stored: no new service-key use.
+   In use (QUO-09 signed PDF, owner 1 November 2026, answers (3) א and (33) ב, migration 021122; 021123 pasted by hand):
+   `src/features/quotes/signed-pdf-server.ts` calls only `public.quote_signed_pdf_public()` and `quote_signed_pdf_public_store()` from
+   the customer's decide route after an acceptance (the token is the right: link rule, shown version, accepted, decision not erased, not
+   signed yet; once per quote), and only `public.quote_signed_pdf_store()` for staff after `quote_signed_pdf_allowed` with the user's
+   session; it uploads (upsert off) only to the path the function answers; in the eslint allow-list. Until the owner answers question 37
+   the signed PDF and the signature are for owners and admins only (`files_select`, `quote_signed_pdf_allowed`/`_store`); the
+   advisor's finding on `quote_signed_pdf_allowed` is expected.
    In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
    (`src/features/quotes/pdf-store-server.ts`, called from `pdf-server.ts` after `public.quote_pdf_allowed` with the user's session),
    which calls only `public.quote_pdf_store()` and uploads (upsert off) only to the path it answers, with the service key; in the
