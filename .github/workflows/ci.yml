@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  # DSN-18: run by hand (Actions > CI > Run workflow) with screenshots = update to get fresh
+  # screenshot baselines made on the runner; they come back as the artifact screenshots-<run>.
+  # A run started by hand never promotes (promote runs on a push to main only).
+  workflow_dispatch:
+    inputs:
+      screenshots:
+        description: "Screenshots: compare with tests/visual/baseline, or update (hand over fresh baselines)"
+        type: choice
+        options: [compare, update]
+        default: compare
 
 # FXS-06: the job only reads the code
 permissions:
@@ -121,6 +131,23 @@ jobs:
           echo "::error::the app did not answer on port 3000"; cat "$E2E_ARTIFACTS/app.log"; exit 1
       - name: Browser flow
         run: npm run test:e2e
+      # DSN-18: the main screens and the design gallery at 360px and 1280px against the baselines
+      # committed in tests/visual/baseline (made by this job on the runner); same stack and server.
+      # A change in appearance fails the job, so promote does not move production.
+      - name: Screenshot comparison
+        id: visual
+        env:
+          VISUAL_MODE: ${{ inputs.screenshots || 'compare' }}
+          VISUAL_OUT: ${{ github.workspace }}/e2e-artifacts/visual
+        run: node tests/visual/run.mjs "$VISUAL_MODE"
+      - name: Upload the screenshots
+        if: always() && steps.visual.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: e2e-artifacts/visual/
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Collect the stack's logs
         if: failure()
         run: |
