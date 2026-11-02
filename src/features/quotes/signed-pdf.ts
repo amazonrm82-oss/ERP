@@ -1,8 +1,10 @@
 // QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב): after the customer accepts a quote on its page, the
 // server keeps a new PDF of the accepted quote: the lines as accepted (optional lines as chosen), the accepted totals of the
 // quote row, the signer's name, the drawn signature or the typed name, the date and time in the business's zone, the wording
-// version and the fingerprint of the decision. Pure: the document is built here from the quote's document data
+// version and the fingerprint of the decision. Server-side (node:zlib), no I/O: the document is built here from the quote's document data
 // (src/features/quotes/pdf.ts) plus a signature block, so it is unit tested.
+
+import { inflateSync } from "node:zlib";
 
 import { z } from "zod";
 
@@ -43,11 +45,11 @@ export const SIGNATURE_MAX_WIDTH = 4000;
 export const SIGNATURE_MAX_HEIGHT = 2000;
 export const SIGNATURE_MAX_PIXELS = 4_000_000;
 
-/** The width and height a PNG's header (IHDR, always the first chunk) declares, or null when it has none. */
+/** The width and height a PNG's header (IHDR, always the first chunk, 13 bytes long) declares, or null when it has none. */
 export function pngSize(bytes: Uint8Array): { width: number; height: number } | null {
-  if (bytes.length < 24 || PNG_MAGIC.some((b, i) => bytes[i] !== b)) return null;
-  if (String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]) !== "IHDR") return null;
+  if (bytes.length < 33 || PNG_MAGIC.some((b, i) => bytes[i] !== b)) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(8) !== 13 || String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]) !== "IHDR") return null;
   return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
@@ -63,27 +65,82 @@ export function signatureSizeOk(size: { width: number; height: number } | null):
   );
 }
 
-/** The bytes of a `data:image/png;base64,…` signature, or null when they are not a PNG of a signature's size. */
-export function signaturePng(dataUrl: string): Uint8Array | null {
-  if (!SIGNATURE_IMAGE.test(dataUrl)) return null;
-  const bytes = new Uint8Array(Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"));
-  if (!signatureSizeOk(pngSize(bytes))) return null;
-  return bytes;
+/** Why a signature image is refused: not a PNG data URL, no proper header, a size no signature has, image data that inflates
+ * past what the header allows (or does not inflate). */
+export type SignatureProblem = "format" | "header" | "size" | "data";
+
+/** The image data (every IDAT chunk, in order) of a PNG whose chunks are well formed, or null. */
+function idatData(bytes: Uint8Array): Uint8Array | null {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const parts: Uint8Array[] = [];
+  let at = PNG_MAGIC.length;
+  for (let chunks = 0; at + 12 <= bytes.length && chunks < 10_000; chunks++) {
+    const length = view.getUint32(at);
+    const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
+    const end = at + 12 + length;
+    if (end > bytes.length) return null;
+    if (type === "IDAT") parts.push(bytes.subarray(at + 8, at + 8 + length));
+    if (type === "IEND") return parts.length > 0 ? Buffer.concat(parts) : null;
+    at = end;
+  }
+  return null;
 }
 
-/** The answer's signature block, or null when it has another shape (a drawn one without a PNG included). */
-export function signatureFrom(raw: unknown): QuoteSignature | null {
+/**
+ * Review: the checks a drawn signature passes before the PDF renderer sees it. The header must be a real IHDR (length 13) of a
+ * signature's size, and the image data must inflate to no more than the header allows for 8-bit RGBA rows
+ * (height x (1 + width x 4)), so a small file cannot unpack into a huge one.
+ */
+export function checkSignaturePng(dataUrl: string): { bytes: Uint8Array } | { problem: SignatureProblem } {
+  if (!SIGNATURE_IMAGE.test(dataUrl)) return { problem: "format" };
+  const bytes = new Uint8Array(Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"));
+  const size = pngSize(bytes);
+  if (!size) return { problem: "header" };
+  if (!signatureSizeOk(size)) return { problem: "size" };
+  const data = idatData(bytes);
+  if (!data) return { problem: "data" };
+  try {
+    inflateSync(data, { maxOutputLength: size.height * (1 + size.width * 4) + 1024 });
+  } catch {
+    return { problem: "data" };
+  }
+  return { bytes };
+}
+
+/** The bytes of a `data:image/png;base64,…` signature, or null when it fails checkSignaturePng. */
+export function signaturePng(dataUrl: string): Uint8Array | null {
+  const checked = checkSignaturePng(dataUrl);
+  return "bytes" in checked ? checked.bytes : null;
+}
+
+/**
+ * The answer's signature block, or why it cannot be used: "shape" (not the expected answer) or the drawn image's problem.
+ */
+export function readSignature(raw: unknown): { signature: QuoteSignature } | { problem: "shape" | SignatureProblem } {
   const parsed = blockSchema.safeParse(raw);
-  if (!parsed.success) return null;
+  if (!parsed.success) return { problem: "shape" };
   const b = parsed.data;
-  if (Number.isNaN(Date.parse(b.decided_at))) return null;
+  if (Number.isNaN(Date.parse(b.decided_at))) return { problem: "shape" };
   let image: Uint8Array | null = null;
   if (b.kind === "drawn") {
-    image = b.image ? signaturePng(b.image) : null;
-    if (!image) return null;
+    if (!b.image) return { problem: "format" };
+    const checked = checkSignaturePng(b.image);
+    if ("problem" in checked) return checked;
+    image = checked.bytes;
   }
-  return { signerName: b.signer_name, kind: b.kind, image, decidedAt: b.decided_at, timeZone: b.time_zone, wordingVersion: b.wording_version, fingerprint: b.fingerprint };
+  return {
+    signature: { signerName: b.signer_name, kind: b.kind, image, decidedAt: b.decided_at, timeZone: b.time_zone, wordingVersion: b.wording_version, fingerprint: b.fingerprint },
+  };
 }
+
+/** The answer's signature block, or null when it cannot be used. */
+export function signatureFrom(raw: unknown): QuoteSignature | null {
+  const read = readSignature(raw);
+  return "signature" in read ? read.signature : null;
+}
+
+/** What staff read when the stored decision's signature cannot be put on a PDF. */
+export const SIGNATURE_INVALID_MESSAGE = "החתימה השמורה אינה תקינה, לא ניתן ליצור PDF חתום.";
 
 /** "DD.MM.YYYY בשעה HH:MM" in the business's zone. */
 export function signedAtText(at: string, timeZone: string): string {
@@ -105,9 +162,6 @@ export function signedQuotePdfFileName(numberDisplay: string | null, title: stri
   return quotePdfFileName(numberDisplay, title).replace(/\.pdf$/, " - חתומה.pdf");
 }
 
-/** What staff call the two versions of a quote's PDF. */
-export const SIGNED_PDF_LABEL = "הורדת PDF חתום";
-export const AS_SENT_PDF_LABEL = "הורדת PDF (כפי שנשלח)";
 
 /**
  * The signed document: the quote as accepted (its stored totals are the accepted ones since QUO-08), the customer named as

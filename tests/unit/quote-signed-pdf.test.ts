@@ -8,8 +8,10 @@ import { ACCEPT_WORDING_VERSION } from "@/features/quotes/decision";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
 import {
+  checkSignaturePng,
   pngSize,
   quoteSignedPdfDocument,
+  readSignature,
   signatureFrom,
   signaturePng,
   signatureSizeOk,
@@ -220,5 +222,41 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(signatureSizeOk({ width: 0, height: 10 })).toBe(false);
     expect(signatureSizeOk(null)).toBe(false);
     expect(pngSize(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+
+  it("review: the IHDR is 13 bytes long, and the image data never inflates past what the header allows", () => {
+    const url = (bytes: Uint8Array) => `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`;
+    // a 1 x 1 PNG whose image data is 10 MB of zeros, compressed to a few kilobytes
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(1, 0);
+    header.writeUInt32BE(1, 4);
+    header[8] = 8;
+    header[9] = 6;
+    const chunk = (type: string, data: Buffer, length = data.length) => {
+      const len = Buffer.alloc(4);
+      len.writeUInt32BE(length);
+      return Buffer.concat([len, Buffer.from(type, "latin1"), data, Buffer.alloc(4)]);
+    };
+    const magic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const big = deflateSync(Buffer.alloc(10_000_000));
+    expect(big.length).toBeLessThan(50_000);
+    const bomb = new Uint8Array(Buffer.concat([magic, chunk("IHDR", header), chunk("IDAT", big), chunk("IEND", Buffer.alloc(0))]));
+    expect(pngSize(bomb)).toEqual({ width: 1, height: 1 });
+    expect(checkSignaturePng(url(bomb))).toEqual({ problem: "data" });
+    expect(signaturePng(url(bomb))).toBeNull();
+    const block = { signer_name: "נועה", kind: "drawn", image: url(bomb), decided_at: "2026-11-01T10:00:00Z", time_zone: "UTC", wording_version: "v", fingerprint: FP };
+    expect(readSignature(block)).toEqual({ problem: "data" });
+    // the same PNG with its real 1 x 1 pixel passes
+    const pixel = new Uint8Array(Buffer.concat([magic, chunk("IHDR", header), chunk("IDAT", deflateSync(Buffer.from([0, 1, 2, 3, 4]))), chunk("IEND", Buffer.alloc(0))]));
+    expect("bytes" in checkSignaturePng(url(pixel))).toBe(true);
+    expect("signature" in readSignature({ ...block, image: url(pixel) })).toBe(true);
+    // an IHDR whose length field is not 13, data that does not inflate, and no image data are refused
+    const longHeader = new Uint8Array(Buffer.concat([magic, chunk("IHDR", Buffer.concat([header, Buffer.alloc(1)])), chunk("IDAT", deflateSync(Buffer.from([0, 1, 2, 3, 4]))), chunk("IEND", Buffer.alloc(0))]));
+    expect(checkSignaturePng(url(longHeader))).toEqual({ problem: "header" });
+    const garbage = new Uint8Array(Buffer.concat([magic, chunk("IHDR", header), chunk("IDAT", Buffer.from("not zlib")), chunk("IEND", Buffer.alloc(0))]));
+    expect(checkSignaturePng(url(garbage))).toEqual({ problem: "data" });
+    const noData = new Uint8Array(Buffer.concat([magic, chunk("IHDR", header), chunk("IEND", Buffer.alloc(0))]));
+    expect(checkSignaturePng(url(noData))).toEqual({ problem: "data" });
+    expect(readSignature({ ...block, decided_at: "x" })).toEqual({ problem: "shape" });
   });
 });

@@ -6,7 +6,7 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 
 import { storeSignedQuotePdfAction } from "../actions";
-import { SIGNED_PDF_LABEL } from "../signed-pdf";
+import { SIGNED_PDF_LABEL } from "../decision";
 
 type Props = {
   orgId: string;

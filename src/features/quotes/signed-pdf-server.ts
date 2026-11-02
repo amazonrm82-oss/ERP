@@ -10,7 +10,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import type { QuoteDocumentData } from "./design-server";
 import { isQuotePdfPath, sha256Hex } from "./pdf-fingerprint";
 import { publicQuoteFrom, QUOTE_LINK_TOKEN } from "./public";
-import { quoteSignedPdfDocument, signatureFrom, signedQuotePdfFileName, type QuoteSignature } from "./signed-pdf";
+import { quoteSignedPdfDocument, readSignature, signedQuotePdfFileName, type QuoteSignature } from "./signed-pdf";
 
 // QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב; CLAUDE.md hard rule 5, QUO-06's pattern): the server
 // alone writes an accepted quote's signed PDF, with the service key, through two service_role functions and nothing else:
@@ -106,8 +106,14 @@ export async function storeSignedQuotePdfForCustomer(token: string): Promise<voi
     const raw = data as Record<string, unknown> | null;
     if (!raw || raw.done === true || raw.unavailable === true || raw.rate_limited === true) return;
     const page = publicQuoteFrom(raw);
-    const signature = signatureFrom(raw.signature);
-    if (!page || !signature || page.quote.status !== "accepted") {
+    const read = readSignature(raw.signature);
+    if ("problem" in read) {
+      // one line with the reason code (shape|format|header|size|data), never the token or the signature
+      console.error("QUO-09 signed PDF: the stored signature was refused", read.problem);
+      return;
+    }
+    const signature = read.signature;
+    if (!page || page.quote.status !== "accepted") {
       console.error("QUO-09 signed PDF: the source had another shape");
       return;
     }

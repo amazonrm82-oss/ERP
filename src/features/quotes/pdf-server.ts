@@ -12,7 +12,7 @@ import { getQuoteDocumentData } from "./design-server";
 import { quotePdfDocument, quotePdfFileName, remadeNote } from "./pdf";
 import { writeQuotePdfAsServer } from "./pdf-store-server";
 import type { Quote } from "./queries";
-import { signatureFrom, signedQuotePdfFileName } from "./signed-pdf";
+import { readSignature, SIGNATURE_INVALID_MESSAGE, signedQuotePdfFileName } from "./signed-pdf";
 import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
 
 type Client = SupabaseClient<Database>;
@@ -139,8 +139,10 @@ export async function storeSignedQuotePdf(supabase: Client, orgId: string, quote
   if (allowed.error?.code === "42501") return { ok: false, message: SIGNED_NOT_PERMITTED };
   if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };
   if (allowed.data === null) return { ok: false, message: SIGNED_NOT_PERMITTED };
-  const signature = signatureFrom(allowed.data);
-  if (!signature) return { ok: false, message: SIGNED_NOT_MADE };
+  const read = readSignature(allowed.data);
+  // a stored signature that fails the image checks gets its own message (no retry helps)
+  if ("problem" in read) return { ok: false, message: read.problem === "shape" ? SIGNED_NOT_MADE : SIGNATURE_INVALID_MESSAGE };
+  const signature = read.signature;
   const org = await supabase.from("organizations").select("name").eq("id", orgId).maybeSingle();
   if (org.error || !org.data) return { ok: false, message: SIGNED_NOT_MADE };
   const data = await getQuoteDocumentData(orgId, quote, org.data.name);

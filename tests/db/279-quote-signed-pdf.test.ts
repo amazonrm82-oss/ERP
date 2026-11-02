@@ -397,7 +397,8 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
       await q("delete from public.contacts where id = $1", [contactId]);
     });
     expect((await pgError(publicStore(deletedToken, sha("4"), null, deletedFp))).code).toBe("P0002");
-    expect((await pgError(staffStore(owner, quoteId, sha("4"), null, deletedFp))).code).toMatch(/^(42501|P0001)$/);
+    // the detached quote has no deal or contact left, so app.quote_pdf_user_may refuses the named user
+    expect((await pgError(staffStore(owner, quoteId, sha("4"), null, deletedFp))).code).toBe("42501");
 
     // the plan without quotes: the link answers not found; staff are refused by the flag
     const flagged = await newQuote(member);
@@ -431,7 +432,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     expect(await views(quoteId)).toBe(before + 1);
   });
 
-  it("a declined quote and an erased decision have nothing to sign", async () => {
+  it("a declined quote has nothing to sign", async () => {
     const quoteId = await newQuote(member);
     const token = await link(member, quoteId);
     const fp = (await version(token)).fingerprint!;

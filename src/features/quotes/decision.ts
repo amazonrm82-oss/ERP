@@ -142,3 +142,7 @@ export function publicVersionPdfAsSent(data: unknown, shownNumber: string | null
 /** The customer's and the staff's link text for the stored PDF when it is not what was accepted. */
 export const PDF_AS_SENT_PUBLIC = "המסמך כפי שנשלח (לפני הבחירה שלכם)";
 export const PDF_AS_SENT_STAFF = "הורדת PDF (כפי שנשלח)";
+
+/** QUO-09 signed PDF: what staff call the two versions of an accepted quote's PDF. */
+export const SIGNED_PDF_LABEL = "הורדת PDF חתום";
+export const AS_SENT_PDF_LABEL = "הורדת PDF (כפי שנשלח)";
