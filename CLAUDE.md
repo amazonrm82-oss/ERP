@@ -2072,6 +2072,31 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   hosted) counts from each day. Test 64's and 88's re-run lists end with `_dormant_activation.sql`; the advisor's findings on the
   two definer functions are expected. The advisor's findings on
   `dormant_customers` (definer), on the three inlined computed fields and on `app.customer_purchase_facts` are expected.
+- Cleanup suggestions (DQL-03, migration 021141; owner (60) א every plan, (62) א): `public.cleanup_suggestions(org, limit)`
+  (invoker, `jit = off`; `{allowed:false}` to anyone but owners, admins and managers, `canSeeCleanup`; the job, no session,
+  counts the whole business): new duplicates (30 days; leads/contacts by phone_e164 or email, contacts also by CON-01 channels,
+  companies by tax id, phone, email or name; the oldest holder per key), unowned open leads, records with no phone or email,
+  select options held by fewer than 2 records once 50 hold the field. Set-based: each table read once under RLS, hash joins on
+  plain keys (measured at 20k leads and 20k contacts: owner about 5-7 s, a team manager about 7 s, the job 0.3 s;
+  `scripts/perf/cleanup-suggestions*.sql`). The page maps a statement timeout (57014) or a read error to a Hebrew line
+  (`cleanupLoadMessage`); the 8 s hosted limit stays a risk for very large businesses. pg_cron `crm-cleanup-suggestions`
+  (hourly :35, `app.send_cleanup_suggestions`): one `system` notice a week to active owners/admins with the four counts, due
+  from Sunday 09:00 in the business zone or 09:00 on the next working day when Sunday is a rest day (`app.cleanup_week_due`, a
+  calendar read error logs one warning and skips that business), businesses in turn, 100 a run, a 60 s budget judged after
+  each business (`app.cleanup_suggestion_budget`), 3 failures a week then skipped.
+- Campaign costs and ROI (SEG-03, migrations 021142, 021143; owner (61) ב, (63) ב, (65) ד): `public.campaign_costs` (month,
+  amount in agorot, source and/or campaign, note, `amount_includes_vat`; audited) read and written by `app.can_view_costs` (the
+  rule of PRD-06 product costs; writes also `org_writable`, `app.campaign_costs_writable`), plan key `campaign_costs` (the plans
+  of `lead_distribution`; definer trigger, outsider guard first, hint `feature:campaign_costs`; removal allowed;
+  `app.plan_key_defaults` was last redefined in 021143). A VAT-inclusive cost only in a business that charges VAT (hint
+  `campaign_cost:vat`), converted by `app.amount_before_vat` at the cost month's rate (= `amountBeforeVat()`, shared fixture).
+  `public.report_campaign_roi(org, from, to)` (invoker; `{allowed:false}` without the key or to a non-member): per first
+  source (SEG-02's attribution, keep in step) and per source and campaign; cost per lead and ROI, everything before VAT;
+  costs with no source in their own row ('unsourced_costs'), a campaign cost with no source meets that campaign's leads of
+  every source ('all_sources', overlapping). Partial (no cost of any kind) unless the caller has `can_view_costs` and reads
+  every lead and won deal that `app.campaign_roi_counts` (definer, counts only, members) counts. Accepted: a full answer can
+  attribute a deal by its own source when its contact is hidden from the caller. Report key `campaign_roi`;
+  `public.log_export` was last redefined in 021142. SEG-02's revenue by source stays in every plan.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
