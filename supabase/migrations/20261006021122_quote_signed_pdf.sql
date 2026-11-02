@@ -27,10 +27,10 @@
 --       public.quote_signed_pdf_public_store(token, ...) writes, under the same token checks. No user: the token is the right,
 --       and only an accepted quote with its decision and no signed PDF is written.
 --   (2) staff ("יצירת PDF חתום", when (1) failed: a full quota, a render error): public.quote_signed_pdf_allowed(org, quote)
---       with the person's own session (security definer: a member who may edit the quote does not read quote_decisions under
---       RLS, so it answers the signature block itself, only when app.can_write (the two-step rule), a writable business with the
---       `quotes` flag and app.quote_editable hold, the quote is accepted with its decision and no signed PDF); then
---       public.quote_signed_pdf_store(org, quote, user, ...) (service_role) checks that user again (app.quote_pdf_user_may).
+--       with the person's own session (security definer; owners and admins only, 42501 otherwise: app.is_admin, the two-step
+--       rule; then a writable business with the `quotes` flag, app.quote_editable, the quote accepted with its decision and no
+--       signed PDF, else null); then public.quote_signed_pdf_store(org, quote, user, ...) (service_role) checks that user again:
+--       an active owner or admin of the business (42501 otherwise) and app.quote_pdf_user_may.
 --   Both write through app.quote_signed_pdf_write (no grants): accepted, the customer not erased, the decision accepted and not
 --   erased, the fingerprint the render printed equal to the decision's (else {status: changed}, nothing written), the flag,
 --   then QUO-06's upload/stored/busy with the two-minute takeover and abandoned paths queued for the orphan cleanup.
@@ -42,8 +42,15 @@
 -- * Erasure: app.quote_pdf_drop (pasted 020960) removes every files row of the erased customer's detached quotes, the signed
 --   version included; unchanged.
 -- Redefined from their latest bodies: app.files_quote_pdf (020955), public.quote_pdf_store (021015), public.quote_public_pdf
--- (020995), public.quote_public_version (021117), app.quote_mark_viewed (020455). Every statement is safe to run twice. No drops,
--- no row removal.
+-- (020995), public.quote_public_version (021117), app.quote_mark_viewed (020455); the files_select policy (021119's text, one
+-- condition added). Every statement is safe to run twice. No statement starts with drop (one `alter table ... drop constraint if
+-- exists` re-adds files_quote_pdf_shape; the index drop is in the pasted 021123), no row removal.
+--
+-- Review (high), until the owner answers question 37, the safe side (ב): only owners and admins read quote_decisions, so only
+-- they read the signed PDF's files row (files_select: quote_signed rows need app.is_admin), only they are answered the signature
+-- block (public.quote_signed_pdf_allowed refuses anyone else with 42501) and only they are written for
+-- (public.quote_signed_pdf_store refuses a named user who is not an active owner or admin). Everyone else keeps reading the PDF
+-- as sent only. The customer's own download is unchanged (it is the customer's signature).
 
 alter table public.files add column if not exists quote_signed boolean;
 
@@ -68,6 +75,33 @@ create unique index if not exists files_quote_pdf_root on public.files (organiza
 -- one signed PDF per quote
 create unique index if not exists files_quote_signed_one on public.files (organization_id, quote_id)
   where quote_signed;
+
+-- ----------------------------------------------------------------------------
+-- files_select: 021119's text with one condition (review, high): a quote's signed PDF holds the signer's name and signature,
+-- which only owners and admins read (quote_decisions), so its row follows the quote AND needs app.is_admin
+-- ----------------------------------------------------------------------------
+alter policy files_select on public.files
+  using (app.is_member(organization_id)
+         and case when accounting_document_id is not null
+                  then exists (select 1 from public.accounting_documents d
+                                where d.organization_id = files.organization_id and d.id = files.accounting_document_id)
+                  when payment_id is not null
+                  then exists (select 1 from public.payments pm
+                                where pm.organization_id = files.organization_id and pm.id = files.payment_id)
+                  when quote_id is not null
+                  then exists (select 1 from public.quotes qu
+                                where qu.organization_id = files.organization_id and qu.id = files.quote_id)
+                       -- QUO-09: the signed PDF for owners and admins only
+                       and (quote_signed is not true or app.is_admin(organization_id))
+                  -- ORD-05: an order's PDF follows the order (orders_select)
+                  when order_id is not null
+                  then exists (select 1 from public.orders od
+                                where od.organization_id = files.organization_id and od.id = files.order_id)
+                  else app.can_read_activity_subject(lead_id, contact_id, company_id, deal_id)
+                       and (activity_id is null
+                            or exists (select 1 from public.activities a
+                                        where a.organization_id = files.organization_id and a.id = files.activity_id))
+             end);
 
 -- ----------------------------------------------------------------------------
 -- 020955's app.files_quote_pdf, plus the signed version
@@ -188,12 +222,10 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('quote_pdf:' || p_quote_id::text, 0));
   select * into v_quote from public.quotes q where q.organization_id = p_org and q.id = p_quote_id;
   if not found or v_quote.status <> 'accepted' or v_quote.customer_deleted_at is not null then
-    perform app.quote_pdf_abandon(p_org, p_path);
     raise exception 'a signed PDF is made for an accepted quote' using errcode = 'P0001', hint = 'quote_pdf:not_accepted';
   end if;
   v_block := app.quote_signature_block(v_quote);
   if v_block is null then
-    perform app.quote_pdf_abandon(p_org, p_path);
     raise exception 'a signed PDF is made for an accepted quote' using errcode = 'P0001', hint = 'quote_pdf:not_accepted';
   end if;
   -- the render printed this decision
@@ -202,7 +234,6 @@ begin
     return jsonb_build_object('status', 'changed');
   end if;
   if not app.org_has_feature(p_org, 'quotes') then
-    perform app.quote_pdf_abandon(p_org, p_path);
     raise exception 'quotes are not in the plan' using errcode = 'P0001', hint = 'feature:quotes';
   end if;
 
@@ -358,7 +389,11 @@ as $$
 declare
   v_quote public.quotes;
 begin
-  if p_org is null or p_quote is null or not app.can_write(p_org) then
+  -- review (high), the safe side until the owner answers: the signature is read by owners and admins only
+  if p_org is null or not app.is_admin(p_org) then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+  if p_quote is null or not app.can_write(p_org) then
     return null;
   end if;
   select * into v_quote from public.quotes q where q.organization_id = p_org and q.id = p_quote;
@@ -384,7 +419,11 @@ declare
   v_quote public.quotes;
 begin
   select * into v_quote from public.quotes q where q.organization_id = p_org and q.id = p_quote;
-  if not found or not app.quote_pdf_user_may(p_org, p_user, v_quote.deal_id, v_quote.contact_id) then
+  -- review (high): written for an active owner or admin only, who may also edit the quote (app.quote_pdf_user_may)
+  if not found
+     or not exists (select 1 from public.memberships m
+                     where m.organization_id = p_org and m.user_id = p_user and m.status = 'active' and m.role in ('owner', 'admin'))
+     or not app.quote_pdf_user_may(p_org, p_user, v_quote.deal_id, v_quote.contact_id) then
     raise exception 'not permitted' using errcode = '42501';
   end if;
   return app.quote_signed_pdf_write(p_quote, p_org, p_size, p_sha256, p_name, p_path, p_fingerprint);

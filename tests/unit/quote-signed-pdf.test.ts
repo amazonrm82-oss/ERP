@@ -7,7 +7,16 @@ import { renderPdf } from "@/features/pdf/render";
 import { ACCEPT_WORDING_VERSION } from "@/features/quotes/decision";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
-import { quoteSignedPdfDocument, signatureFrom, signaturePng, signedAtText, signedQuotePdfFileName, type QuoteSignature } from "@/features/quotes/signed-pdf";
+import {
+  pngSize,
+  quoteSignedPdfDocument,
+  signatureFrom,
+  signaturePng,
+  signatureSizeOk,
+  signedAtText,
+  signedQuotePdfFileName,
+  type QuoteSignature,
+} from "@/features/quotes/signed-pdf";
 
 import { pdfText } from "./pdf-text";
 
@@ -188,5 +197,28 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(signaturePng("data:image/jpeg;base64,AAAA")).toBeNull();
     expect(signedAtText("2026-06-30T21:30:00Z", "Asia/Jerusalem")).toBe("01.07.2026 בשעה 00:30");
     expect(signedQuotePdfFileName("Q-1001", "x")).toBe("הצעת מחיר Q-1001 - חתומה.pdf");
+  });
+
+  it("review (medium): refuses a PNG whose header declares a huge image (a PNG bomb) before the renderer sees it", () => {
+    // a real small PNG, then the same file with its header saying 100,000 x 100,000 pixels (the CRC is not checked here)
+    const real = png(4, 2, [0, 0, 0]);
+    expect(pngSize(real)).toEqual({ width: 4, height: 2 });
+    const bomb = new Uint8Array(real);
+    const view = new DataView(bomb.buffer);
+    view.setUint32(16, 100_000);
+    view.setUint32(20, 100_000);
+    expect(pngSize(bomb)).toEqual({ width: 100_000, height: 100_000 });
+    const url = (bytes: Uint8Array) => `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`;
+    expect(signaturePng(url(real))).not.toBeNull();
+    expect(signaturePng(url(bomb))).toBeNull();
+    expect(signatureFrom({ signer_name: "נועה", kind: "drawn", image: url(bomb), decided_at: "2026-11-01T10:00:00Z", time_zone: "UTC", wording_version: "v", fingerprint: FP })).toBeNull();
+    // the limits: a pad 4 times the device pixel ratio fits; too wide, too tall, too many pixels, zero do not
+    expect(signatureSizeOk({ width: 2400, height: 640 })).toBe(true);
+    expect(signatureSizeOk({ width: 4001, height: 10 })).toBe(false);
+    expect(signatureSizeOk({ width: 10, height: 2001 })).toBe(false);
+    expect(signatureSizeOk({ width: 4000, height: 2000 })).toBe(false);
+    expect(signatureSizeOk({ width: 0, height: 10 })).toBe(false);
+    expect(signatureSizeOk(null)).toBe(false);
+    expect(pngSize(new Uint8Array([1, 2, 3]))).toBeNull();
   });
 });

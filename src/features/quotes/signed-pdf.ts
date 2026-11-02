@@ -37,11 +37,37 @@ const blockSchema = z.object({
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-/** The bytes of a `data:image/png;base64,…` signature, or null when they are not a PNG. */
+// Review (medium): a small file may declare a huge image (a "PNG bomb") that the PDF renderer would inflate. A signature
+// drawn on the page's pad (160 CSS pixels high, the device's pixel ratio up to 4) stays far below these.
+export const SIGNATURE_MAX_WIDTH = 4000;
+export const SIGNATURE_MAX_HEIGHT = 2000;
+export const SIGNATURE_MAX_PIXELS = 4_000_000;
+
+/** The width and height a PNG's header (IHDR, always the first chunk) declares, or null when it has none. */
+export function pngSize(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length < 24 || PNG_MAGIC.some((b, i) => bytes[i] !== b)) return null;
+  if (String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]) !== "IHDR") return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return { width: view.getUint32(16), height: view.getUint32(20) };
+}
+
+/** True when a PNG header declares a size a signature may have. */
+export function signatureSizeOk(size: { width: number; height: number } | null): boolean {
+  return (
+    size !== null &&
+    size.width >= 1 &&
+    size.height >= 1 &&
+    size.width <= SIGNATURE_MAX_WIDTH &&
+    size.height <= SIGNATURE_MAX_HEIGHT &&
+    size.width * size.height <= SIGNATURE_MAX_PIXELS
+  );
+}
+
+/** The bytes of a `data:image/png;base64,…` signature, or null when they are not a PNG of a signature's size. */
 export function signaturePng(dataUrl: string): Uint8Array | null {
   if (!SIGNATURE_IMAGE.test(dataUrl)) return null;
   const bytes = new Uint8Array(Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"));
-  if (bytes.length <= PNG_MAGIC.length || PNG_MAGIC.some((b, i) => bytes[i] !== b)) return null;
+  if (!signatureSizeOk(pngSize(bytes))) return null;
   return bytes;
 }
 

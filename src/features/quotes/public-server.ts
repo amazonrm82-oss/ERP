@@ -26,6 +26,7 @@ import {
   type PublicQuote,
   type StatusPublicQuote,
 } from "./public";
+import { signaturePng } from "./signed-pdf";
 import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
@@ -120,6 +121,11 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
   }
 
   const accepted = parsed.decision === "accepted" ? parsed : null;
+  // QUO-09 review (medium): a drawn signature must be a PNG whose header declares a signature's size (no "PNG bomb"); checked
+  // here, before the database, because the signed PDF is rendered from it
+  if (accepted?.signatureKind === "drawn" && (!accepted.signatureImage || signaturePng(accepted.signatureImage) === null)) {
+    return reply(400, { ok: false, status: "invalid", message: DECISION_MESSAGES.invalid });
+  }
   const { data, error } = await service.rpc("quote_public_answer", {
     p_token: token,
     p_decision: parsed.decision,

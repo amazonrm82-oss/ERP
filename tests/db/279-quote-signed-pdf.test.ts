@@ -20,7 +20,7 @@ const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
  * max_pdf_per_month; the customer downloads the newest confirmed version; staff read both; erasure removes every version.
  */
 describe("the signed PDF of an accepted quote (QUO-09)", () => {
-  let owner: U, admin: U, member: U, other: U, viewer: U, outsider: U;
+  let owner: U, admin: U, manager: U, member: U, other: U, viewer: U, outsider: U;
   let org: string, outsiderOrg: string;
   let pipe: { pipelineId: string; stageId: string };
 
@@ -124,6 +124,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     owner = await createUser("qsg-owner");
     org = await createOrg(owner.id, "עסק החתימות");
     admin = await addMember(org, owner.id, "admin", "qsg-admin");
+    manager = await addMember(org, owner.id, "manager", "qsg-manager");
     member = await addMember(org, owner.id, "member", "qsg-member");
     other = await addMember(org, owner.id, "member", "qsg-other");
     viewer = await addMember(org, owner.id, "viewer", "qsg-viewer");
@@ -212,10 +213,30 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     // the customer gets the signed one, and the interim label is gone
     expect(await download(token)).toMatchObject({ path: signed.path, sha256: sha("c"), name: "הצעה חתומה.pdf" });
     expect((await version(token)).pdf_as_sent).toBeUndefined();
-    // staff who read the quote see both; another member neither
-    expect(await asUser(member.id, (q) => count(q, "select 1 from public.files where quote_id = $1", [quoteId]))).toBe(2);
-    expect(await asUser(owner.id, (q) => count(q, "select 1 from public.files where quote_id = $1", [quoteId]))).toBe(2);
-    expect(await asUser(other.id, (q) => count(q, "select 1 from public.files where quote_id = $1", [quoteId]))).toBe(0);
+    // review (high), the safe side until the owner answers: owners and admins read both versions; anyone else who reads the
+    // quote reads the PDF as sent only (a member who owns it; a viewer and a manager under org visibility), never the signed row
+    // nor its object; another member under own visibility neither
+    const rows = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.files where quote_id = $1", [quoteId]));
+    const signedRows = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.files where quote_id = $1 and quote_signed", [quoteId]));
+    const signedObject = (u: U) => asUser(u.id, (q) => count(q, "select 1 from storage.objects where bucket_id = 'record-files' and name = $1", [signed.path]));
+    for (const u of [owner, admin]) {
+      expect(await rows(u), u.email).toBe(2);
+      expect(await signedObject(u), u.email).toBe(1);
+    }
+    expect(await rows(member)).toBe(1);
+    expect(await signedRows(member)).toBe(0);
+    expect(await signedObject(member)).toBe(0);
+    expect(await rows(other)).toBe(0);
+    await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    try {
+      for (const u of [viewer, manager, other]) {
+        expect(await rows(u), u.email).toBe(1);
+        expect(await signedRows(u), u.email).toBe(0);
+        expect(await signedObject(u), u.email).toBe(0);
+      }
+    } finally {
+      await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    }
     // kept: nobody deletes either version
     for (const id of [sent.id, signed.id]) {
       expect((await pgError(asAdmin((q) => q("delete from public.files where id = $1", [id])))).hint).toBe("file:kept");
@@ -268,22 +289,30 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     ).toBe("42501");
   });
 
-  it("staff: the right is asked with their own session, checked again for that user; a full month refuses, the acceptance stays", async () => {
+  it("staff: owners and admins only (review, high): the block and the write; checked again for that user; a full month refuses, the acceptance stays", async () => {
     const quoteId = await newQuote(member);
     const sent = await storeSent(member, quoteId);
     const token = await link(member, quoteId);
-    expect(await staffAllowed(member, quoteId)).toBeNull();
+    expect(await staffAllowed(admin, quoteId)).toBeNull();
     expect((await accept(token)).status).toBe("accepted");
-    // whoever may edit the quote gets the block to render; a viewer, another member and an outsider do not
-    const block = await staffAllowed(member, quoteId);
+    // owners and admins get the block to render
+    const block = await staffAllowed(admin, quoteId);
     expect(block).toMatchObject({ signer_name: "נועה לוי", kind: "drawn" });
     expect(await staffAllowed(owner, quoteId)).not.toBeNull();
-    expect(await staffAllowed(admin, quoteId)).not.toBeNull();
-    for (const u of [other, viewer, outsider]) expect(await staffAllowed(u, quoteId), u.email).toBeNull();
+    // anyone else is refused, the member who owns the quote and a manager included, under org visibility too
+    await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    try {
+      for (const u of [member, manager, viewer, other, outsider]) expect((await pgError(staffAllowed(u, quoteId))).code, u.email).toBe("42501");
+    } finally {
+      await asUser(owner.id, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    }
+    // an owner of another business is answered nothing about this business's quote
     expect(await staffAllowed(outsider, quoteId, outsiderOrg)).toBeNull();
-    // the write checks the named user again
-    for (const u of [other, viewer, outsider]) expect((await pgError(staffStore(u, quoteId, sha("5"), null, block!.fingerprint))).code, u.email).toBe("42501");
-    expect((await pgError(staffStore(member, quoteId, sha("5"), null, block!.fingerprint, outsiderOrg))).code).toBe("42501");
+    // the write checks the named user again: an active owner or admin only
+    for (const u of [member, manager, viewer, other, outsider]) {
+      expect((await pgError(staffStore(u, quoteId, sha("5"), null, block!.fingerprint))).code, u.email).toBe("42501");
+    }
+    expect((await pgError(staffStore(admin, quoteId, sha("5"), null, block!.fingerprint, outsiderOrg))).code).toBe("42501");
 
     // a full month refuses the signed PDF; the quote stays accepted
     const counted = await produced();
@@ -291,23 +320,115 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
       q("update public.subscriptions set limit_overrides = limit_overrides || jsonb_build_object('max_pdf_per_month', $2::numeric) where organization_id = $1", [org, counted]),
     );
     try {
-      expect((await pgError(staffStore(member, quoteId, sha("5"), null, block!.fingerprint))).hint).toBe("limit:max_pdf_per_month");
+      expect((await pgError(staffStore(admin, quoteId, sha("5"), null, block!.fingerprint))).hint).toBe("limit:max_pdf_per_month");
     } finally {
       await asAdmin((q) => q("update public.subscriptions set limit_overrides = limit_overrides || '{\"max_pdf_per_month\": 1000}'::jsonb where organization_id = $1", [org]));
     }
     expect(await asAdmin((q) => one<{ status: string }>(q, "select status from public.quotes where id = $1", [quoteId]))).toEqual({ status: "accepted" });
     expect(await download(token)).toMatchObject({ sha256: sha("a") });
 
-    // then staff make it
-    const first = await staffStore(member, quoteId, sha("6"), null, block!.fingerprint);
+    // then an admin makes it
+    const first = await staffStore(admin, quoteId, sha("6"), null, block!.fingerprint);
     expect(first.status).toBe("upload");
     // while it waits the customer still gets the PDF as sent
     expect(await download(token)).toMatchObject({ path: sent.path });
     await putObject(first.path!);
-    const second = await staffStore(member, quoteId, sha("6"), first.path!, block!.fingerprint);
+    const second = await staffStore(admin, quoteId, sha("6"), first.path!, block!.fingerprint);
     expect(second.status).toBe("stored");
     expect(await download(token)).toMatchObject({ sha256: sha("6") });
-    expect(await staffAllowed(member, quoteId)).toBeNull();
+    expect(await staffAllowed(admin, quoteId)).toBeNull();
+  });
+
+  it("busy and takeover on the signed row: another render waits two minutes, then takes it over to a fresh path", async () => {
+    const quoteId = await newQuote(member);
+    const token = await link(member, quoteId);
+    expect((await accept(token)).status).toBe("accepted");
+    const fp = await decisionFingerprint(quoteId);
+    const first = await publicStore(token, sha("1"), null, fp);
+    expect(first.status).toBe("upload");
+    expect(await publicStore(token, sha("2"), null, fp)).toEqual({ status: "busy" });
+    await asAdmin((q) => q("update public.files set upload_checked_at = now() - interval '3 minutes' where quote_id = $1 and quote_signed", [quoteId]));
+    const taken = await publicStore(token, sha("2"), null, fp);
+    expect(taken.status).toBe("upload");
+    expect(taken.path).not.toBe(first.path);
+    // the first attempt's path goes to the orphan cleanup; its late second call confirms nothing
+    expect(await asAdmin((q) => count(q, "select 1 from app.orphan_files where storage_path = $1", [first.path]))).toBe(1);
+    await putObject(first.path!);
+    expect((await publicStore(token, sha("1"), first.path!, fp)).status).toBe("busy");
+    await putObject(taken.path!);
+    const stored = await publicStore(token, sha("2"), taken.path!, fp);
+    expect(stored.status).toBe("stored");
+    expect(await files(quoteId)).toEqual([{ id: stored.file_id, previous_id: null, quote_signed: true, sha256: sha("2") }]);
+  });
+
+  it("refused: an erased decision, a revoked link, a deleted customer, the plan without quotes", async () => {
+    // an erased decision: nothing to sign for anyone
+    const erased = await newQuote(member);
+    const erasedToken = await link(member, erased);
+    expect((await accept(erasedToken)).status).toBe("accepted");
+    const fp = await decisionFingerprint(erased);
+    await asAdmin((q) => q("update public.quote_decisions set erased_at = now() where quote_id = $1", [erased]));
+    expect(await source(erasedToken)).toEqual({ unavailable: true });
+    expect((await pgError(publicStore(erasedToken, sha("3"), null, fp))).hint).toBe("quote_pdf:not_accepted");
+    expect(await staffAllowed(admin, erased)).toBeNull();
+    expect((await pgError(staffStore(admin, erased, sha("3"), null, fp))).hint).toBe("quote_pdf:not_accepted");
+
+    // a revoked link: not found
+    const revoked = await newQuote(member);
+    const revokedToken = await link(member, revoked);
+    expect((await accept(revokedToken)).status).toBe("accepted");
+    await asUser(member.id, (q) => q("select public.quote_link_revoke($1, $2)", [org, revoked]));
+    expect((await pgError(source(revokedToken))).code).toBe("P0002");
+    expect((await pgError(publicStore(revokedToken, sha("3"), null, await decisionFingerprint(revoked)))).code).toBe("P0002");
+
+    // a deleted customer: the quote is detached; not found by the link, not accepted for staff
+    const { contactId, quoteId } = await asUser(member.id, async (q) => {
+      const contact = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'דנה', $2) returning id", [org, member.id])).id;
+      const id = (await one<{ id: string }>(q, "insert into public.quotes (organization_id, title, contact_id) values ($1, 'הצעה לדנה', $2) returning id", [org, contact])).id;
+      await q("insert into public.quote_lines (organization_id, quote_id, name, quantity, unit_price_agorot) values ($1, $2, 'עבודה', 1, 10000)", [org, id]);
+      await q("select public.quote_send($1, $2)", [org, id]);
+      return { contactId: contact, quoteId: id };
+    });
+    const deletedToken = await link(member, quoteId);
+    expect((await accept(deletedToken)).status).toBe("accepted");
+    const deletedFp = await decisionFingerprint(quoteId);
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [contactId]);
+      await q("delete from public.contacts where id = $1", [contactId]);
+    });
+    expect((await pgError(publicStore(deletedToken, sha("4"), null, deletedFp))).code).toBe("P0002");
+    expect((await pgError(staffStore(owner, quoteId, sha("4"), null, deletedFp))).code).toMatch(/^(42501|P0001)$/);
+
+    // the plan without quotes: the link answers not found; staff are refused by the flag
+    const flagged = await newQuote(member);
+    const flaggedToken = await link(member, flagged);
+    expect((await accept(flaggedToken)).status).toBe("accepted");
+    const flaggedFp = await decisionFingerprint(flagged);
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"quotes\": false}'::jsonb where organization_id = $1", [org]));
+    try {
+      expect((await pgError(publicStore(flaggedToken, sha("5"), null, flaggedFp))).code).toBe("P0002");
+      expect(await staffAllowed(admin, flagged)).toBeNull();
+      expect((await pgError(staffStore(admin, flagged, sha("5"), null, flaggedFp))).hint).toBe("feature:quotes");
+    } finally {
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = feature_overrides - 'quotes' where organization_id = $1", [org]));
+    }
+    expect(await files(flagged)).toEqual([]);
+  });
+
+  it("the quiet read hides only the quote it names: another quote's view still counts", async () => {
+    const quoteId = await newQuote(member);
+    const token = await link(member, quoteId);
+    const before = await views(quoteId);
+    await asService(async (q) => {
+      await q("select set_config('app.quote_view_quiet', $1, true)", ["00000000-0000-0000-0000-000000000000"]);
+      await q("select public.quote_public($1)", [token]);
+    });
+    expect(await views(quoteId)).toBe(before + 1);
+    await asService(async (q) => {
+      await q("select set_config('app.quote_view_quiet', $1, true)", [quoteId]);
+      await q("select public.quote_public($1)", [token]);
+    });
+    expect(await views(quoteId)).toBe(before + 1);
   });
 
   it("a declined quote and an erased decision have nothing to sign", async () => {

@@ -135,6 +135,8 @@ export async function storeSignedQuotePdf(supabase: Client, orgId: string, quote
   const existing = await getSignedQuotePdfFile(supabase, orgId, quote.id).catch(() => null);
   if (existing) return { ok: true, fileId: existing.id };
   const allowed = await supabase.rpc("quote_signed_pdf_allowed", { p_org: orgId, p_quote: quote.id });
+  // owners and admins only (review, until the owner answers question 37)
+  if (allowed.error?.code === "42501") return { ok: false, message: SIGNED_NOT_PERMITTED };
   if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };
   if (allowed.data === null) return { ok: false, message: SIGNED_NOT_PERMITTED };
   const signature = signatureFrom(allowed.data);

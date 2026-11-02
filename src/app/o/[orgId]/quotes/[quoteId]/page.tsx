@@ -224,10 +224,12 @@ export default async function QuotePage({ params, searchParams }: Props) {
   const pdfFile = quote.status !== "draft" ? await getQuotePdfFile(supabase, orgId, quote.id) : null;
   // QUO-08 (interim): the stored PDF shows the quote as sent. Owners/admins read the decision and see whether the customer's
   // choice changed it; for others an accepted quote with optional lines may have changed, so its PDF is named "as sent" too.
-  // QUO-09 (owner (33) ב): the accepted quote's signed PDF; once it exists the earlier file is the one "as sent"
+  // QUO-09 (owner (33) ב): the accepted quote's signed PDF; once it exists the earlier file is the one "as sent". Until the
+  // owner answers question 37 only owners and admins read it (it holds the signature): for anyone else the read finds no row
+  // and they keep the PDF as sent
   const signedFile = quote.status === "accepted" ? await getSignedQuotePdfFile(supabase, orgId, quote.id) : null;
   const canStoreSigned =
-    hasQuotes && quote.status === "accepted" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+    hasQuotes && quote.status === "accepted" && isAdminRole(context.role) && context.canWrite && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const pdfAsSent =
     signedFile === null &&
     quote.status === "accepted" &&
