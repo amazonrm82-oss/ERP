@@ -2058,7 +2058,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   per customer and last purchase; a former customer never runs it; no outbox event, so `app.process_outbox` is unchanged).
   `app.automation_event_matches` (and the trigger-type constraint), `app.automation_run_facts` and
   `app.automation_event_still_holds` were last redefined in 021139; `app.export_choice_values` in 021138. Question 64 (switching
-  a rule on runs it for everyone already dormant, (א) as built) waits for the owner.
+  a rule on runs it for everyone already dormant, (א) as built) waits for the owner. The advisor's findings on
+  `dormant_customers` (definer), on the three inlined computed fields and on `app.customer_purchase_facts` are expected.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
