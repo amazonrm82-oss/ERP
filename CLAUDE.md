@@ -2036,6 +2036,29 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   counted in `app.job_cancel_counts` and flushed to `app.platform_log` (`jobs.cancelled`). pg_cron `crm-jobs-wake`
   (`app.wake_job_worker`, every minute). Follow-up: retention of finished jobs needs a hand-pasted delete. HEB-09's
   `app.customer_sending_paused` is asked by this check, the first automatic sender to customers.
+- Customer status and dormant customers (CON-11, RET-01, migrations 021138, 021139; owner 2 November 2026, answers (56)-(59),
+  every plan, no key): a purchase is a won deal (report_revenue's won rule; keep in step) or a recorded/confirmed payment;
+  opening balances never count; a payment moves only the last-purchase day; value = the sum of won deals' `amount_agorot`; a
+  payment on a deal in the bin counts for no customer. The rule is `app.customer_purchases(org, contact, company)` (invoker,
+  plpgsql, one index-driven branch per kind). Status = pure `app.customer_status_rule` (= `customerStatusRule()`, shared
+  fixture) over the last day, `public.customer_status_settings` (dormant 6, former 18 months; owners/admins write) and today in
+  the business zone. The card `public.customer_summary` (every member, invoker) keeps BAL-01's partial rule through
+  `app.customer_purchase_count` (definer, count only). The lists read kept facts in `app.customer_purchase_facts` (no grants,
+  one row per contact/company), refreshed by the deferred constraint triggers `deals_customer_facts`, `payments_customer_facts`
+  (every update, early return on unchanged columns, so BEFORE-derived status/amount count) and `contacts_customer_facts` (update
+  or delete: the old company), under PAY-03's lock `customer_credit:<org>`. The computed fields `customer_status`,
+  `customer_value`, `customer_last_purchase` (contacts, companies) answer only to an active owner/admin by a plain membership
+  read (the fields run only on rows RLS returned; test 284 pins that no public function returns contacts/companies rows: a new
+  one needs that read replaced by `app.membership_role`). Accepted: a false partial on a company card; the count tells a member
+  hidden purchases exist; only the primary company (CON-05) gathers company-less deals; a time-zone change moves kept days
+  lazily; a rare 40P01 between a contact delete and a refresh. RET-01: page `/o/[org]/contacts/dormant` and
+  `public.dormant_customers(org, kind, limit)` (definer, `app.is_admin`) over `app.dormant_customer_rows`; trigger type
+  `customer_dormant` (contact and company rules; pg_cron `crm-dormant-automations`, `app.run_dormant_automations`, from 08:00 in
+  the business zone, writable only, 200 runs per business a pass, scan cursor; run key `dormant:<id>:<last_purchase_on>`, once
+  per customer and last purchase; a former customer never runs it; no outbox event, so `app.process_outbox` is unchanged).
+  `app.automation_event_matches` (and the trigger-type constraint), `app.automation_run_facts` and
+  `app.automation_event_still_holds` were last redefined in 021139; `app.export_choice_values` in 021138. Question 64 (switching
+  a rule on runs it for everyone already dormant, (א) as built) waits for the owner.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
