@@ -265,6 +265,50 @@ describe("the staff's statement view (BAL-04)", () => {
     }
   });
 
+  it("more customers: a negative opening balance (credit), a company read by a payment recorder, a binned company", async () => {
+    // a contact without a company whose opening balance is negative: credit, shown apart, equal to the page
+    const h = await contact("הילה");
+    await doc("tax_invoice", 2500, day(-1), { contact: h });
+    await run(owner, (q) => q("select public.opening_balance_set($1, $2, null, -800, $3, null)", [org, h, day(-100)]));
+    const hPage = withoutBuiltWith(await publicPage({ contact: h }));
+    const hView = await view(owner, { contact: h });
+    expect(content(hView)).toEqual(hPage);
+    expect(hView.totals).toEqual({ open_agorot: 2500, overdue_agorot: 2500, credit_agorot: 800 });
+
+    // a company customer read by a member who records payments (the key holder): the page's content, no bank details
+    const co = await company("חברת המקליט");
+    const c1 = await contact("ליאת", co);
+    const d = await deal(co);
+    await doc("tax_invoice", 3000, day(-8), { contact: c1 });
+    await doc("proforma", 1000, day(4), { deal: d });
+    await pay(500, { deal: d }, day(-3));
+    const coPage = withoutBuiltWith(await publicPage({ company: co }));
+    const coView = await view(keyHolder, { company: co });
+    expect(coView.allowed).toBe(true);
+    expect(coView.partial).toBe(false);
+    expect(coView.bank).toBeNull();
+    expect(coView.bank_elsewhere).toBe(true);
+    expect({ ...content(coView), bank: coPage.bank }).toEqual(coPage);
+    expect((coView.documents as unknown[]).length).toBe(2);
+    expect((coView.payments as unknown[]).length).toBe(1);
+
+    // a binned company is not found
+    const gone = await company("חברה בסל");
+    await run(owner, (q) => q("update public.companies set deleted_at = now() where id = $1", [gone]));
+    expect(await view(owner, { company: gone })).toEqual({ allowed: true, partial: false, refused: "not_found" });
+    expect(await view(keyHolder, { company: gone })).toEqual({ allowed: true, partial: false, refused: "not_found" });
+  });
+
+  // statement_staff_view copies public.statement_public's selection (keep in step). The customer's page function's body as it
+  // was compared with the staff view (the pattern of test 253): a redefinition of statement_public changes its md5 and fails
+  // here. Then check statement_staff_view against it again (and the comparison tests above), and update the value.
+  const REVIEWED_STATEMENT_PUBLIC_MD5 = "744feb1c44509fea6e4960ffcf7cec2f";
+
+  it("statement_public is the body the staff view was checked against", async () => {
+    const h = await asAdmin((q) => one<{ h: string }>(q, "select md5(p.prosrc) as h from pg_proc p where p.oid = 'public.statement_public(text,text)'::regprocedure"));
+    expect(h.h).toBe(REVIEWED_STATEMENT_PUBLIC_MD5);
+  });
+
   it("is security invoker, granted to signed-in people only", async () => {
     const row = await asAdmin((q) =>
       one<{ definer: boolean; anon: boolean; auth: boolean }>(

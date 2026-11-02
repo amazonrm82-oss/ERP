@@ -4,6 +4,7 @@ import { logoPublicUrl } from "@/features/branding/logo";
 import { loadPdfLogo } from "@/features/pdf/logo";
 import { renderPdf } from "@/features/pdf/render";
 import { pdfHeaders } from "@/features/quotes/pdf-fingerprint";
+import { getOrgContext } from "@/features/shell/queries";
 import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,6 +38,9 @@ export function staffStatementPdfPath(orgId: string, customer: StatementCustomer
 /** GET /o/<org>/statement/<contact|company>/<id>/pdf */
 export async function handleStaffStatementPdf(orgId: string, kind: string, id: string): Promise<Response> {
   if (!isUuid(orgId) || !isUuid(id) || (kind !== "contact" && kind !== "company")) return text(404, NOT_FOUND);
+  // the business's gate before any read: the agreement, a closed business and two-step verification send the user where the
+  // pages do (as the route did before the owner's answers of 2 November 2026)
+  await getOrgContext(orgId);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("statement_staff_view", {
     p_org: orgId,

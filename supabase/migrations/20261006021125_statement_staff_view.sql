@@ -18,6 +18,12 @@
 --     and app.is_admin(org); never app.document_bank_snapshot (service_role only). `bank_elsewhere` is true only for a
 --     reader who is not an owner or admin while the switch is on (the customer's page shows any details then; the PDF prints
 --     "פרטי הבנק מופיעים בדף שהלקוח רואה"); with the switch off nobody gets the details or the line (lead's decision, 2 November 2026).
+--     Accepted (lead, review of 2 November 2026): `bank_elsewhere` is true for such a reader even when the business has no
+--     account at all; answering whether an account exists would tell a non-admin something org_bank_details' RLS hides.
+--   - Accepted (lead, review of 2 November 2026): an HEB-08 deputy may get this answer (and the PDF) while
+--     statement_link_create refuses them: RLS here includes the deputy's reads (app.deputy_readable), while the link's
+--     app.statement_customer_readable leaves deputies out. The partial rule still fails closed for any row the deputy
+--     does not read.
 --   - `built_with` is false: the staff's file never prints the line (app.show_built_with is not the caller's to read).
 -- Every statement is safe to run twice. No drops, no row removal.
 
