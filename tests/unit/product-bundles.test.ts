@@ -56,11 +56,13 @@ describe("bundles (PRD-09)", () => {
     expect(renderToStaticMarkup(createElement(BundleItemsList, { parts: [], lineQuantity: 1 }))).toBe("");
   });
 
-  it("a copy that left parts out says how many (?parts_skipped)", () => {
+  it("a copy that left parts out says how many (?parts_skipped), with the reason only when it is known", () => {
     expect(partsSkippedNotice(undefined)).toBeNull();
     expect(partsSkippedNotice("0")).toBeNull();
-    expect(partsSkippedNotice("1")).toBe("רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון.");
-    expect(partsSkippedNotice(["3"])).toBe("3 רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.");
+    expect(partsSkippedNotice("1", "inactive")).toBe("רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון.");
+    expect(partsSkippedNotice("1")).toBe("רכיב אחד לא הועתק.");
+    expect(partsSkippedNotice(["3"], ["inactive"])).toBe("3 רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.");
+    expect(partsSkippedNotice("3", "other")).toBe("3 רכיבים לא הועתקו.");
     expect(partsSkippedNotice("-1")).toBe("לא הצלחנו להעתיק את רכיבי החבילה. אפשר להוסיף אותם כאן.");
     expect(partsSkippedNotice("abc")).toBeNull();
     expect(partsSkippedNotice("12345")).toBeNull();

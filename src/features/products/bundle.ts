@@ -68,13 +68,17 @@ export function bundlePartsText(display: BundleDisplay | null, parts: BundlePart
     .join("\n");
 }
 
-/** The notice after copying a bundle whose parts were not all copied (?parts_skipped=N; -1 = the parts could not be read). */
-export function partsSkippedNotice(value: string | string[] | undefined): string | null {
+/**
+ * The notice after copying a bundle whose parts were not all copied (?parts_skipped=N; -1 = the parts could not be read).
+ * The reason is named only when every left-out part was refused as inactive or archived (?parts_why=inactive).
+ */
+export function partsSkippedNotice(value: string | string[] | undefined, why?: string | string[]): string | null {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === undefined || !/^-?\d{1,3}$/.test(raw)) return null;
   const count = Number(raw);
+  const inactive = (Array.isArray(why) ? why[0] : why) === "inactive";
   if (count === -1) return "לא הצלחנו להעתיק את רכיבי החבילה. אפשר להוסיף אותם כאן.";
-  if (count === 1) return "רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון.";
-  if (count > 1) return `${count} רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.`;
+  if (count === 1) return inactive ? "רכיב אחד לא הועתק, כי הוא לא פעיל או בארכיון." : "רכיב אחד לא הועתק.";
+  if (count > 1) return inactive ? `${count} רכיבים לא הועתקו, כי הם לא פעילים או בארכיון.` : `${count} רכיבים לא הועתקו.`;
   return null;
 }

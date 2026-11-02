@@ -30,7 +30,7 @@ export const metadata: Metadata = { title: "מוצר" };
 type Props = {
   params: Promise<{ orgId: string; productId: string }>;
   // PRD-09: parts_skipped = the parts a copy of a bundle left out
-  searchParams: Promise<{ parts_skipped?: string | string[] }>;
+  searchParams: Promise<{ parts_skipped?: string | string[]; parts_why?: string | string[] }>;
 };
 
 /**
@@ -40,7 +40,7 @@ type Props = {
  * PRD-09: a bundle shows its parts (catalog editors change them) and their sum for reference.
  */
 export default async function ProductPage({ params, searchParams }: Props) {
-  const [{ orgId, productId }, { parts_skipped: partsSkipped }] = await Promise.all([params, searchParams]);
+  const [{ orgId, productId }, { parts_skipped: partsSkipped, parts_why: partsWhy }] = await Promise.all([params, searchParams]);
   const { role, canWrite, org } = await getOrgContext(orgId);
   if (!isUuid(productId)) notFound();
   const granted = await getMyPermissions(orgId);
@@ -76,9 +76,9 @@ export default async function ProductPage({ params, searchParams }: Props) {
         back={{ href: productsPath(orgId), label: "מוצרים" }}
         actions={canEdit ? <ProductActions orgId={orgId} productId={product.id} name={product.name} archived={product.archivedAt !== null} /> : null}
       />
-      {product.kind === "bundle" && partsSkippedNotice(partsSkipped) ? (
+      {product.kind === "bundle" && partsSkippedNotice(partsSkipped, partsWhy) ? (
         <p role="status" className="rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
-          {partsSkippedNotice(partsSkipped)}
+          {partsSkippedNotice(partsSkipped, partsWhy)}
         </p>
       ) : null}
       {product.archivedAt ? (

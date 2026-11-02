@@ -6,6 +6,7 @@ import { customerPriceList } from "@/features/deal-lines/queries";
 import { conversionRateBp, isDealLineSource, type DealLineSource, type NamedPriceList } from "@/features/deal-lines/pricing";
 import { isBilling } from "@/features/deal-lines/recurring";
 import { isBundleDisplay, parseBundleItems, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
+import { withBundleDefaults } from "@/features/products/bundle-server";
 import type { Billing } from "@/features/products/schema";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
 import { documentVat, type DocumentVat, type VatRate } from "@/features/tax/rates";
@@ -183,7 +184,12 @@ export async function readQuoteLines(supabase: Client, orgId: string, quoteId: s
     await supabase.from("quote_lines").select(LINE_COLUMNS).eq("organization_id", orgId).eq("quote_id", quoteId).order("position").order("created_at").order("id"),
     "quote lines",
   );
-  return rows.map((row) => toLine(row as LineDbRow));
+  // PRD-09: a bundle line saved before bundles reads as one line
+  return withBundleDefaults(
+    supabase,
+    orgId,
+    rows.map((row) => toLine(row as LineDbRow)),
+  );
 }
 
 export async function listQuoteLines(orgId: string, quoteId: string): Promise<QuoteLine[]> {

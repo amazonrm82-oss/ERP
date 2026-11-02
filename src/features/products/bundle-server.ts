@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { must } from "@/lib/db-read";
 
-import type { BundlePartSnapshot } from "./bundle";
+import type { BundleDisplay, BundlePartSnapshot } from "./bundle";
 import type { ProductPrice } from "./price";
 import type { VatKind } from "./schema";
 
@@ -112,10 +112,10 @@ export async function readBundleSnapshots(supabase: Client, orgId: string, bundl
 
 /**
  * A copy of a bundle (PRD-02's copy) gets the same parts, one by one with the user's session; a part the rules no longer
- * take (archived, switched off) is left out. Never throws: the copy itself is made already. Answers how many parts were
- * not copied (a failed read counts every part as not copied: -1 = unknown).
+ * take is left out. Never throws: the copy itself is made already. Answers how many parts were not copied (-1 = the parts
+ * could not be read) and whether every one of them was refused as inactive or archived (hint product_bundle:component).
  */
-export async function copyBundleParts(supabase: Client, orgId: string, fromId: string, toId: string): Promise<number> {
+export async function copyBundleParts(supabase: Client, orgId: string, fromId: string, toId: string): Promise<{ skipped: number; inactiveOnly: boolean }> {
   const { data, error } = await supabase
     .from("product_bundle_items")
     .select("component_id, quantity, position")
@@ -123,13 +123,34 @@ export async function copyBundleParts(supabase: Client, orgId: string, fromId: s
     .eq("bundle_id", fromId)
     .order("position")
     .order("id");
-  if (error || !data) return -1;
+  if (error || !data) return { skipped: -1, inactiveOnly: false };
   let skipped = 0;
+  let inactiveOnly = true;
   for (const row of data) {
     const { error: insertError } = await supabase
       .from("product_bundle_items")
       .insert({ organization_id: orgId, bundle_id: toId, component_id: row.component_id, quantity: Number(row.quantity), position: row.position });
-    if (insertError) skipped += 1;
+    if (insertError) {
+      skipped += 1;
+      if (insertError.hint !== "product_bundle:component") inactiveOnly = false;
+    }
   }
-  return skipped;
+  return { skipped, inactiveOnly };
+}
+
+/**
+ * A bundle line saved before PRD-09 (or whose product became a bundle later) has no display choice yet: it reads as
+ * 'single' (the database fills its parts when a person picks a choice on a draft). Reads the kinds of those lines'
+ * products only; lines that already carry a choice, or have no product, are returned as they are.
+ */
+export async function withBundleDefaults<T extends { productId: string | null; bundleDisplay: BundleDisplay | null }>(
+  supabase: Client,
+  orgId: string,
+  lines: T[],
+): Promise<T[]> {
+  const ids = [...new Set(lines.filter((line) => line.bundleDisplay === null && line.productId !== null).map((line) => line.productId as string))];
+  if (ids.length === 0) return lines;
+  const rows = must(await supabase.from("products").select("id").eq("organization_id", orgId).eq("kind", "bundle").in("id", ids), "products");
+  const bundles = new Set(rows.map((row) => row.id));
+  return lines.map((line) => (line.bundleDisplay === null && line.productId !== null && bundles.has(line.productId) ? { ...line, bundleDisplay: "single" } : line));
 }

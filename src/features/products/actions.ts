@@ -109,10 +109,14 @@ export async function duplicateProductAction(orgId: string, productId: string): 
     .single();
   if (error) return fail(writeError(error, "לא הצלחנו ליצור עותק. נסו שוב."));
   // PRD-09: a copy of a bundle gets the same parts (a part the rules no longer take is left out)
-  const skipped = source.kind === "bundle" ? await copyBundleParts(context.supabase, orgId, productId, data.id) : 0;
+  const copied = source.kind === "bundle" ? await copyBundleParts(context.supabase, orgId, productId, data.id) : { skipped: 0, inactiveOnly: false };
   revalidateProducts(orgId);
-  // the copy's page says when some parts were left out
-  redirect(skipped === 0 ? productPath(orgId, data.id) : `${productPath(orgId, data.id)}?parts_skipped=${skipped}`);
+  // the copy's page says when some parts were left out (and why, when every one was inactive or archived)
+  redirect(
+    copied.skipped === 0
+      ? productPath(orgId, data.id)
+      : `${productPath(orgId, data.id)}?parts_skipped=${copied.skipped}${copied.inactiveOnly ? "&parts_why=inactive" : ""}`,
+  );
 }
 
 /** Archive (hidden by default, never offered for new documents) or restore. */

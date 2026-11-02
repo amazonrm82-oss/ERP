@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PriceListLineRule, PricedProduct } from "@/features/price-lists/price";
 import { isBundleDisplay, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
-import { readBundleSnapshots } from "@/features/products/bundle-server";
+import { readBundleSnapshots, withBundleDefaults } from "@/features/products/bundle-server";
 import type { Billing, VatKind } from "@/features/products/schema";
 import { orgHasFeature } from "@/features/settings/queries";
 import { chargesVat, isVatStatus } from "@/features/tax/status";
@@ -100,7 +100,8 @@ export async function readDealLines(supabase: Client, orgId: string, dealId: str
       .order("id"),
     "deal_lines",
   );
-  const lines = rows.map(toLine);
+  // a bundle line saved before bundles (display null) reads as one line; deal_lines_bundle sets it on its next update
+  const lines = await withBundleDefaults(supabase, orgId, rows.map(toLine));
   // PRD-09: the parts of the bundles on the deal, read live (a deal is not a document sent to the customer)
   const bundleIds = lines.filter((line) => line.bundleDisplay !== null && line.productId !== null).map((line) => line.productId as string);
   if (bundleIds.length === 0) return lines;

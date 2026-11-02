@@ -51,9 +51,10 @@
 -- parts never change. The fingerprint of what the customer signs (app.quote_fingerprint,
 -- app.order_fingerprint) includes a bundle line's choice and parts; a line without a
 -- bundle adds nothing, so every existing document keeps its hash.
--- Lines saved before this migration: a draft's bundle line may take a choice (the
--- parts are taken then), and the migration sets 'single' on drafts' and deals'
--- bundle lines whose column is still empty; sent quotes and numbered orders keep none.
+-- Lines saved before this migration keep bundle_display null; the app reads null on
+-- a bundle line as 'single'. On a draft quote or order a person may pick a choice
+-- (the parts are taken then); a deal line takes 'single' on its next update. The
+-- optional fill of drafts is the last block of this file (waits for the owner).
 -- The totals rule is unchanged: a bundle line is priced like any line, at the
 -- bundle's own price (PL-03 included). Reports by product count the bundle as
 -- itself and never split it into its parts.
@@ -473,6 +474,8 @@ begin
      set bundle_items = app.bundle_snapshot(l.organization_id, l.product_id)
    where l.organization_id = new.organization_id and l.quote_id = new.id
      and l.bundle_display is not null and l.product_id is not null
+     -- a product that stopped being a bundle has no parts to take (null): its row is not touched
+     and app.bundle_snapshot(l.organization_id, l.product_id) is not null
      and l.bundle_items is distinct from app.bundle_snapshot(l.organization_id, l.product_id)
      and not (new.previous_id is not null
               and exists (select 1 from public.quote_lines p
@@ -504,6 +507,8 @@ begin
      set bundle_items = app.bundle_snapshot(l.organization_id, l.product_id)
    where l.organization_id = new.organization_id and l.order_id = new.id
      and l.bundle_display is not null and l.product_id is not null
+     -- a product that stopped being a bundle has no parts to take (null): its row is not touched
+     and app.bundle_snapshot(l.organization_id, l.product_id) is not null
      and l.bundle_items is distinct from app.bundle_snapshot(l.organization_id, l.product_id);
   perform set_config('app.order_server', v_server, true);
   perform set_config('app.bundle_refresh', '', true);
@@ -581,23 +586,6 @@ as $$
   )::text, 'UTF8')), 'hex');
 $$;
 revoke all on function app.order_fingerprint(public.orders) from public, anon, authenticated, service_role;
-
--- -----------------------------------------------------------------------------
--- Bundle lines saved before this migration, on drafts only: 'single' with the parts as the catalog holds them now (the
--- triggers above take the snapshot). Sent quotes and numbered orders stay as they were sent. Deal lines get 'single'.
--- Only rows of bundle products whose new column is still empty; safe to run twice.
--- -----------------------------------------------------------------------------
-update public.deal_lines l set bundle_display = 'single'
- where l.bundle_display is null and l.product_id is not null
-   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle');
-update public.quote_lines l set bundle_display = 'single'
- where l.bundle_display is null and l.product_id is not null
-   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
-   and exists (select 1 from public.quotes q where q.organization_id = l.organization_id and q.id = l.quote_id and q.status = 'draft');
-update public.order_lines l set bundle_display = 'single'
- where l.bundle_display is null and l.product_id is not null
-   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
-   and exists (select 1 from public.orders o where o.organization_id = l.organization_id and o.id = l.order_id and o.status = 'draft');
 
 -- -----------------------------------------------------------------------------
 -- Duplicating a quote (QUO-15): 020550's body, with only the line's bundle_display copied
@@ -1085,3 +1073,20 @@ end;
 $$;
 revoke all on function public.order_public(text, text) from public, anon, authenticated;
 grant execute on function public.order_public(text, text) to service_role;
+
+-- =============================================================================
+-- OPTIONAL BLOCK (owner's go-ahead pending, question 51; hard rule 3: it rewrites existing rows).
+-- Bundle lines saved before this migration, on DRAFT quotes and orders only: 'single' with the parts as the catalog holds
+-- them now (the line triggers above take the snapshot). Sent quotes, numbered orders and deal lines are not touched.
+-- Only rows of bundle products whose new column is still empty; safe to run twice. Removing this block changes nothing
+-- else: the app reads a null choice on a bundle line as 'single'.
+-- =============================================================================
+update public.quote_lines l set bundle_display = 'single'
+ where l.bundle_display is null and l.product_id is not null
+   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
+   and exists (select 1 from public.quotes q where q.organization_id = l.organization_id and q.id = l.quote_id and q.status = 'draft');
+update public.order_lines l set bundle_display = 'single'
+ where l.bundle_display is null and l.product_id is not null
+   and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
+   and exists (select 1 from public.orders o where o.organization_id = l.organization_id and o.id = l.order_id and o.status = 'draft');
+-- END OF OPTIONAL BLOCK

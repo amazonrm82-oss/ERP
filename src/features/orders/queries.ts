@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { customerPriceList } from "@/features/deal-lines/queries";
 import { isBundleDisplay, parseBundleItems, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
+import { withBundleDefaults } from "@/features/products/bundle-server";
 import { bankFromSnapshot, type DocumentBank } from "@/features/quotes/bank";
 import type { QuoteDecision } from "@/features/quotes/queries";
 import type { ScheduleStep } from "@/features/quotes/schedule";
@@ -154,7 +155,8 @@ export async function listOrderLines(orgId: string, orderId: string): Promise<Or
     await supabase.from("order_lines").select("*").eq("organization_id", orgId).eq("order_id", orderId).order("position").order("id").limit(200),
     "order_lines",
   );
-  return rows.map(toLine);
+  // PRD-09: a bundle line saved before bundles reads as one line
+  return withBundleDefaults(supabase, orgId, rows.map(toLine));
 }
 
 /** ORD-04: the order's payment schedule, in order (RLS: whoever reads the order). */
