@@ -3935,6 +3935,12 @@ export type Database = {
       // [{ id, body, severity: info | warning, dismissable }], at most 3; [] to a non-member
       system_banners_for: { Args: { p_org: string }; Returns: Json };
       system_banner_dismiss: { Args: { p_org: string; p_banner: string }; Returns: undefined };
+      // ADM-05: support requests on the platform panel (platform owner and support)
+      // { total, counts: { open, in_progress, closed }, rows: [{ id, organization_id, organization_name, requester_*, category,
+      //   subject, message, page_path, status, created_at, status_changed_at, notes: [{ id, body, author_name, created_at }] }] }
+      platform_list_support_requests: { Args: { p_status?: string | null; p_limit?: number; p_offset?: number }; Returns: Json };
+      platform_set_support_request_status: { Args: { p_id: string; p_status: string }; Returns: undefined };
+      platform_add_support_request_note: { Args: { p_id: string; p_body: string }; Returns: string };
       // how many notices an announcement sends now (one per business per active owner); platform owner
       platform_subprocessor_audience: { Args: Record<string, never>; Returns: number };
       // service_role only (the public page): { entries: [{ name, purpose, country, data_categories, effective_from, ends_on }],

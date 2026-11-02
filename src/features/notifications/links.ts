@@ -49,6 +49,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // PRV-01: the round moved its leads to the recycle bin, where they can be restored
     case "lead_retention_binned":
       return paths.settingsTrash(orgId);
+    // USR-12 / ADM-05: support changed the status of a request; the support page lists it
+    case "support_request":
+      return paths.support(orgId);
     default:
       return null;
   }

@@ -40,6 +40,9 @@ export const ACTION_LABELS: Record<string, string> = {
   // ADM-04
   "banner.add": "הודעת מערכת חדשה",
   "banner.end": "הסרת הודעת מערכת",
+  // ADM-05
+  "support_request.status": "שינוי מצב של פנייה לתמיכה",
+  "support_request.note": "הערה פנימית בפנייה לתמיכה",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */
