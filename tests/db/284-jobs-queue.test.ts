@@ -14,11 +14,11 @@ const setKey = (value: string | null) =>
       : q("insert into app.settings (key, value) values ('consent_hash_key', $1) on conflict (key) do update set value = excluded.value", [value]),
   );
 
-// md5(prosrc) of the worker's three functions as reviewed (see the (55) test)
+// md5 of the worker's three functions as reviewed: body, security definer, settings and arguments (see the (55) test)
 const REVIEWED_MD5 = {
-  claim_jobs: "222d06984dd871dd2755e15e8f01b57a",
-  finish_job: "59ca6274e4fefc013df7f5247ca634a3",
-  job_message_may_send: "3ea4ba945116f6163861bc5afd25ea3d",
+  claim_jobs: "de918761f4f48c2c50254db26f65011f",
+  finish_job: "50078fb665234f8655dd361ef51ceefb",
+  job_message_may_send: "7d7702499878eebf9044debdbc85d7b0",
 };
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
@@ -253,6 +253,11 @@ describe("background job queue (OPS-04)", () => {
     await asAdmin((q) => q("update app.jobs set attempts = 5 where id = $1", [id3]));
     expect(await claim()).toEqual([]);
     expect(await jobOf(id3)).toMatchObject({ status: "queued", attempts: 5 });
+    // and it never takes the place of a due job behind it (review L-b)
+    const id4 = await enqueue(org, send(randomUUID()));
+    const [job4] = await claim(1);
+    expect(job4.id).toBe(id4);
+    expect(await finish(job4, true)).toBe("done");
   });
 
   it("(52) ג: a job meeting a pause waits uncounted, is sent after resume, and is cancelled after 24 hours of pause or once its event passed", async () => {
@@ -334,6 +339,18 @@ describe("background job queue (OPS-04)", () => {
     for (const job of jobs) expect(await maySend(job)).toEqual({ may_send: false, reason: "pause_expired" });
     for (const id of [during, later, before]) expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:pause_expired" });
     expect(await flushed()).toBe(1);
+
+    // made during that long pause for a time after the resume: it never waited, so it is sent (review M-1)
+    await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = true, reason = 'חירום' where organization_id = $1", [org]));
+    const scheduled = await enqueue(org, send(lead), new Date(Date.now() + 3_600_000).toISOString());
+    await backdatePause("30 hours");
+    await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+    // its time comes after the resume
+    await asAdmin((q) => q("update app.jobs set next_run_at = now() where id = $1", [scheduled]));
+    const [sch] = await claim();
+    expect(sch.id).toBe(scheduled);
+    expect(await maySend(sch)).toEqual({ may_send: true });
+    expect(await finish(sch, true)).toBe("done");
 
     // a job made after the resume is sent normally
     const after = await enqueue(org, send(lead));
@@ -599,7 +616,9 @@ describe("background job queue (OPS-04)", () => {
       async (q) =>
         (
           await q<{ name: string; md5: string }>(
-            `select p.proname as name, md5(p.prosrc) as md5 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            `select p.proname as name,
+                    md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'public' and p.proname in ('claim_jobs', 'finish_job', 'job_message_may_send') order by 1`,
           )
         ).rows,

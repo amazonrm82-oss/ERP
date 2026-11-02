@@ -274,6 +274,8 @@ begin
      where j.kind = any (p_kinds)
        and ((j.status in ('queued', 'failed') and j.next_run_at <= now())
             or (j.status = 'running' and j.locked_until < now()))
+       -- never past the last try (review L-b): such a job never takes a place another business's or job's turn needs
+       and j.attempts < app.job_max_attempts()
      group by j.organization_id
      order by first_at
      limit 500
@@ -287,6 +289,7 @@ begin
            and j.kind = any (p_kinds)
            and ((j.status in ('queued', 'failed') and j.next_run_at <= now())
                 or (j.status = 'running' and j.locked_until < now()))
+           and j.attempts < app.job_max_attempts()
          order by j.next_run_at, j.id
          limit v_limit
       ) c
@@ -436,15 +439,16 @@ begin
   end if;
 
   -- (52) ג after the resume: the business's latest pause lasted more than 24 hours and this job waited through it
-  -- (it was told to wait, was made during the pause, or was made before it and due by its end) = cancelled, even
-  -- when no check happened during the pause (worker down, hourly wake, a later run_at)
+  -- (it was told to wait, or it was made before the resume and due by its end) = cancelled, even when no check
+  -- happened during the pause (worker down, hourly wake). A job made during the pause for a time after the resume
+  -- never waited and is sent (review M-1). Only the latest pause is known: a re-pause before an older long pause's
+  -- backlog drained forgets it (review L-a, accepted)
   if v_reason is null then
     select * into v_pause from public.org_sending_pauses p where p.organization_id = v_job.organization_id;
     if found and not v_pause.paused and v_pause.paused_at is not null and v_pause.resumed_at is not null
        and v_pause.resumed_at - v_pause.paused_at > interval '24 hours'
        and (v_job.last_error = 'waiting:sending_paused'
-            or v_job.created_at between v_pause.paused_at and v_pause.resumed_at
-            or (v_job.created_at < v_pause.paused_at and v_job.next_run_at <= v_pause.resumed_at)) then
+            or (v_job.created_at <= v_pause.resumed_at and v_job.next_run_at <= v_pause.resumed_at)) then
       v_reason := 'pause_expired';
     end if;
   end if;
