@@ -14,6 +14,13 @@ const setKey = (value: string | null) =>
       : q("insert into app.settings (key, value) values ('consent_hash_key', $1) on conflict (key) do update set value = excluded.value", [value]),
   );
 
+// md5(prosrc) of the worker's three functions as reviewed (see the (55) test)
+const REVIEWED_MD5 = {
+  claim_jobs: "222d06984dd871dd2755e15e8f01b57a",
+  finish_job: "59ca6274e4fefc013df7f5247ca634a3",
+  job_message_may_send: "3ea4ba945116f6163861bc5afd25ea3d",
+};
+
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };
 
@@ -240,6 +247,12 @@ describe("background job queue (OPS-04)", () => {
     expect(await claim()).toEqual([]);
     expect(await jobOf(id2)).toMatchObject({ status: "dead", last_error: "lease expired" });
     expect(await finish(job2, true)).toBe("stale");
+
+    // a job at the last try is never claimed past it, even when the dead-on-last-try update did not reach it
+    const id3 = await enqueue(org, send(randomUUID()));
+    await asAdmin((q) => q("update app.jobs set attempts = 5 where id = $1", [id3]));
+    expect(await claim()).toEqual([]);
+    expect(await jobOf(id3)).toMatchObject({ status: "queued", attempts: 5 });
   });
 
   it("(52) ג: a job meeting a pause waits uncounted, is sent after resume, and is cancelled after 24 hours of pause or once its event passed", async () => {
@@ -288,6 +301,77 @@ describe("background job queue (OPS-04)", () => {
       expect(resumed.id).toBe(future);
       expect(await maySend(resumed)).toEqual({ may_send: true });
       expect(await finish(resumed, true)).toBe("done");
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+    }
+  });
+
+  it("(52) ג: after a resume, a job that waited through a pause of more than 24 hours is cancelled, never sent; a later job is sent", async () => {
+    const lead = await insertLead(owner.id, org, { email: "longpause@example.test" });
+    const flushed = () => asAdmin(async (q) => (await q<{ n: number }>("select app.flush_job_cancellations() as n")).rows[0].n);
+    await flushed();
+    await asUser(owner.id, (q) =>
+      q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'חירום') on conflict (organization_id) do update set paused = true, reason = 'חירום'", [org]),
+    );
+    let during = "";
+    let later = "";
+    let before = "";
+    try {
+      // made during the pause and never checked (worker down): no "waiting" mark
+      during = await enqueue(org, send(lead));
+      // made during the pause with a run_at after it
+      later = await enqueue(org, send(lead), new Date(Date.now() + 1_000).toISOString());
+      await backdatePause("30 hours");
+      // made before the pause and due by its end
+      before = await enqueue(org, send(lead));
+      await asAdmin((q) => q("update app.jobs set created_at = now() - interval '31 hours', next_run_at = now() - interval '31 hours' where id = $1", [before]));
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+    }
+    await due(later);
+    const jobs = await claim(10);
+    expect(jobs.map((j) => j.id).sort()).toEqual([during, later, before].sort());
+    for (const job of jobs) expect(await maySend(job)).toEqual({ may_send: false, reason: "pause_expired" });
+    for (const id of [during, later, before]) expect(await jobOf(id)).toMatchObject({ status: "refused", last_error: "refused:pause_expired" });
+    expect(await flushed()).toBe(1);
+
+    // a job made after the resume is sent normally
+    const after = await enqueue(org, send(lead));
+    const [a] = await claim();
+    expect(a.id).toBe(after);
+    expect(await maySend(a)).toEqual({ may_send: true });
+    expect(await finish(a, true)).toBe("done");
+
+    // a short pause (under 24 hours) that ended: its waiting jobs are sent
+    await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = true, reason = 'קצר' where organization_id = $1", [org]));
+    const short = await enqueue(org, send(lead));
+    const [w] = await claim();
+    expect(await maySend(w)).toEqual({ may_send: false, reason: "sending_paused", retry: true });
+    await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
+    await due(short);
+    const [sent] = await claim();
+    expect(await maySend(sent)).toEqual({ may_send: true });
+  });
+
+  it("a pause moves all of the business's due message jobs back in one step, without counting attempts", async () => {
+    const lead = await insertLead(owner.id, org, { email: "bulk@example.test" });
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) ids.push(await enqueue(org, send(lead)));
+    const other = await enqueue(orgB, send(randomUUID()));
+    await asUser(owner.id, (q) =>
+      q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'חירום') on conflict (organization_id) do update set paused = true, reason = 'חירום'", [org]),
+    );
+    try {
+      const [first] = await claim(1);
+      expect(ids).toContain(first.id);
+      expect(await maySend(first)).toMatchObject({ reason: "sending_paused", retry: true });
+      for (const id of ids) {
+        expect(await jobOf(id), id).toMatchObject({ status: "queued", attempts: 0, last_error: "waiting:sending_paused" });
+        expect((await jobOf(id)).next_run_at.getTime()).toBeGreaterThan(Date.now() + 4 * 60_000);
+      }
+      // another business is untouched; nothing of the paused one is claimable now
+      expect(await jobOf(other)).toMatchObject({ status: "queued", last_error: null });
+      expect((await claim(10)).map((j) => j.id)).toEqual([other]);
     } finally {
       await asUser(owner.id, (q) => q("update public.org_sending_pauses set paused = false, reason = null where organization_id = $1", [org]));
     }
@@ -505,6 +589,22 @@ describe("background job queue (OPS-04)", () => {
     // claim and finish never touch a customer record: no public table in their bodies
     for (const t of types.filter((x) => x.name !== "job_message_may_send")) expect(t.src, t.name).not.toMatch(/public\./);
     expect(types.find((t) => t.name === "job_message_may_send")?.src).toMatch(/public\.leads/);
+  });
+
+  // (55) א: the three functions the worker calls were reviewed against the owner's conditions (only the send check reads
+  // customer records and answers may_send/reason/retry; claim and finish answer only what sending needs). A change to any
+  // of their bodies fails here until it gets a fresh independent review against those conditions; then update the md5.
+  it("(55) א: the bodies of claim_jobs, finish_job and job_message_may_send are the reviewed ones", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; md5: string }>(
+            `select p.proname as name, md5(p.prosrc) as md5 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname in ('claim_jobs', 'finish_job', 'job_message_may_send') order by 1`,
+          )
+        ).rows,
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual(REVIEWED_MD5);
   });
 
   // (55) א 3: every job kind needs the owner's own approval and its own "In use" line in CLAUDE.md (hard rule 5).

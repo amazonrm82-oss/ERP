@@ -32,10 +32,12 @@ const IN_USE_LINE =
   "first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()`. " +
   "(55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and retry only; `claim_jobs` answers " +
   "only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt, `finish_job` only its status; " +
-  "`app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its own In use line (test 284). " +
+  "`app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its own In use line; the three " +
+  "bodies are pinned by md5 and a change needs a fresh review (test 284). " +
   "The send check works on a live lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or " +
   "read-only, (53) א, (54) ב) or an `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job " +
-  "waits uncounted and is sent after the resume, and is cancelled once the pause has lasted more than 24 hours ((52) ג); then " +
+  "waits uncounted (with the business's other due message jobs, in one step) and is sent after the resume, and is cancelled once " +
+  "the pause has lasted more than 24 hours, also after the resume when it waited through such a pause ((52) ג); then " +
   "`app.consent_suppressed` with null = cancelled. Cancellations are counted only, one `app.platform_log` entry `jobs.cancelled` per " +
   "business and run (`app.flush_job_cancellations`). Jobs claimed but not started in time are handed back uncounted; a finish the " +
   "queue did not take after a send is logged (one redacted line). The queue `app.jobs` (no grants) holds ids and codes only. Only " +

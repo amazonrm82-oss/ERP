@@ -31,7 +31,10 @@
 --   (52) ג: while the business paused sending (HEB-09 app.customer_sending_paused) the job WAITS: the answer is
 --   {may_send: false, reason: 'sending_paused', retry: true}, the job goes back to 'queued' 5 minutes later and
 --   the attempt is not counted; once the pause has lasted more than 24 hours (org_sending_pauses.paused_at) it is
---   cancelled: 'pause_expired'. Then app.consent_suppressed (null = cannot check = refused).
+--   cancelled: 'pause_expired'. The business's other message jobs due within the 5 minutes are moved with it in one
+--   update. After the resume, a job that waited through a pause of more than 24 hours (marked waiting, made during
+--   it, or made before it and due by its end) is cancelled as 'pause_expired' too, even if it was never checked
+--   during the pause. Then app.consent_suppressed (null = cannot check = refused).
 --   Every cancellation is counted in app.job_cancel_counts (per business and reason, no job ids) and written to
 --   app.platform_log by app.flush_job_cancellations (each crm-jobs-wake run) as ONE entry per business:
 --   action 'jobs.cancelled', details {counts: {reason: n}, total}; never one entry per job, no personal data.
@@ -293,6 +296,8 @@ begin
       join cand c on c.id = j.id
      where ((j.status in ('queued', 'failed') and j.next_run_at <= now())
             or (j.status = 'running' and j.locked_until < now()))
+       -- never past the last try: a job the dead-on-last-try update skipped (locked) waits for the next claim
+       and j.attempts < app.job_max_attempts()
      order by c.rn, c.next_run_at, c.id
      limit v_limit
      for update of j skip locked
@@ -379,6 +384,7 @@ declare
   v_reason text;
   v_event_at timestamptz;
   v_paused_at timestamptz;
+  v_pause public.org_sending_pauses%rowtype;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
   if not found or v_job.kind <> 'message.send' or v_job.status <> 'running'
@@ -420,8 +426,31 @@ begin
       update app.jobs j set status = 'queued', attempts = greatest(j.attempts - 1, 0), lease_id = null, locked_until = null,
                             next_run_at = now() + interval '5 minutes', last_error = 'waiting:sending_paused'
        where j.id = p_job;
+      -- the business's other message jobs due within those 5 minutes wait with it, in one update (no attempt is
+      -- counted: they were not claimed), so a paused business does not churn the queue one job at a time
+      update app.jobs j set next_run_at = now() + interval '5 minutes', last_error = 'waiting:sending_paused'
+       where j.organization_id = v_job.organization_id and j.kind = 'message.send' and j.id <> p_job
+         and j.status in ('queued', 'failed') and j.next_run_at < now() + interval '5 minutes';
       return jsonb_build_object('may_send', false, 'reason', 'sending_paused', 'retry', true);
     end if;
+  end if;
+
+  -- (52) ג after the resume: the business's latest pause lasted more than 24 hours and this job waited through it
+  -- (it was told to wait, was made during the pause, or was made before it and due by its end) = cancelled, even
+  -- when no check happened during the pause (worker down, hourly wake, a later run_at)
+  if v_reason is null then
+    select * into v_pause from public.org_sending_pauses p where p.organization_id = v_job.organization_id;
+    if found and not v_pause.paused and v_pause.paused_at is not null and v_pause.resumed_at is not null
+       and v_pause.resumed_at - v_pause.paused_at > interval '24 hours'
+       and (v_job.last_error = 'waiting:sending_paused'
+            or v_job.created_at between v_pause.paused_at and v_pause.resumed_at
+            or (v_job.created_at < v_pause.paused_at and v_job.next_run_at <= v_pause.resumed_at)) then
+      v_reason := 'pause_expired';
+    end if;
+  end if;
+
+  if v_reason is not null then
+    null;
   elsif not coalesce(v_found, false) then
     v_reason := 'record_gone';
   else
