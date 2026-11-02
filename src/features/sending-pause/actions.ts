@@ -8,11 +8,7 @@ import { fail, invalid, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
-import { pauseSchema } from "./pause";
-
-const NOT_ADMIN = "רק בעלים ומנהלי מערכת יכולים לעצור ולחדש את השליחה ללקוחות.";
-// review L-4: the owner keeps a role in a closed business, but the switch is frozen there
-const CLOSED = "העסק סגור כרגע, ולכן אי אפשר לעצור או לחדש את השליחה.";
+import { pauseRefusalMessage, pauseSchema } from "./pause";
 
 type PauseValues = { paused: boolean; reason: string | null };
 
@@ -35,10 +31,10 @@ async function save(orgId: string, values: PauseValues): Promise<FormState> {
   );
   if (!result.ok) {
     if (result.error?.code !== "42501") return fail(dbErrorMessage(result.error));
-    // refused by RLS: say why when the business is closed to the caller (public.closed_orgs, the caller's own businesses)
-    const closed = await supabase.rpc("closed_orgs");
-    const closedHere = !closed.error && Array.isArray(closed.data) && closed.data.some((row) => typeof row === "object" && row !== null && "id" in row && row.id === orgId);
-    return fail(closedHere ? CLOSED : NOT_ADMIN);
+    // refused by RLS: say why. The owner of a closed business still reads its row (app.membership_role keeps the
+    // owner's role there), so its status tells "closed" from "not an owner or admin"; a failed read says the latter
+    const org = await supabase.from("organizations").select("status").eq("id", orgId).maybeSingle();
+    return fail(pauseRefusalMessage(org.error ? null : org.data?.status));
   }
   // the banner sits in the business layout: every screen shows or drops it
   revalidatePath(`/o/${orgId}`, "layout");

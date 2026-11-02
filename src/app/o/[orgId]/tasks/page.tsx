@@ -22,6 +22,7 @@ import { taskChoiceValue, taskKindLabel } from "@/features/activity-types/types"
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { listMembers } from "@/features/settings/queries";
+import { getSendingPauseQuiet } from "@/features/sending-pause/queries";
 import { getOrgContext, type OrgContext } from "@/features/shell/queries";
 import { NewTaskPanel } from "@/features/tasks/components/new-task-panel";
 import { TaskForm } from "@/features/tasks/components/task-form";
@@ -127,7 +128,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
     return <TasksTableView orgId={orgId} context={context} query={query} showAll={showAll} />;
   }
 
-  const [groups, members, calendar, covering, teams] = await Promise.all([
+  const [groups, members, calendar, covering, teams, sendingPause] = await Promise.all([
     listTaskGroups(orgId, showAll ? null : user.id),
     listMembers(orgId),
     // HEB-02: always read, so every row's snooze label knows the rest days
@@ -136,6 +137,8 @@ export default async function TasksPage({ params, searchParams }: Props) {
     showAll ? Promise.resolve([]) : listCoveringTasks(orgId, user.id, context.org.timeZone),
     // TASK-07: teams for "team, no owner" on the form, and the user's own teams
     listTaskTeams(orgId, user.id, context.role),
+    // HEB-09: one read of the business's pause; a reminder task's line shows only while sending is still paused
+    getSendingPauseQuiet(orgId),
   ]);
   // TASK-07: "mine" also shows the open tasks of the user's teams that nobody took yet ("all" has them in its groups)
   const teamTasks = showAll ? [] : await listOpenTeamTasks(orgId, teams.mine);
@@ -201,7 +204,7 @@ export default async function TasksPage({ params, searchParams }: Props) {
       })),
       parent: task.parentId ? { id: task.parentId, title: parentTitles.get(task.parentId) ?? null } : null,
       collectionDocumentId: task.collectionDocumentId,
-      collectionPaused: task.collectionPaused,
+      collectionPaused: task.collectionPaused && sendingPause.paused,
       teamTask:
         task.ownerId === null && task.teamId !== null && task.completedAt === null
           ? { teamName: teams.names.get(task.teamId) ?? "", canTake: teams.rights.has(task.teamId) }

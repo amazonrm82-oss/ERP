@@ -74,3 +74,14 @@ export const COLLECTION_PAUSED_LINE = "השליחה ללקוחות עצורה";
 export function madeWhilePaused(description: string | null | undefined): boolean {
   return (description ?? "").includes(COLLECTION_PAUSED_LINE);
 }
+
+export const PAUSE_NOT_ADMIN = "רק בעלים ומנהלי מערכת יכולים לעצור ולחדש את השליחה ללקוחות.";
+// the owner keeps a role in a closed business (and reads its row), but the switch is frozen there
+export const PAUSE_CLOSED = "העסק סגור כרגע, ולכן אי אפשר לעצור או לחדש את השליחה.";
+// the rule of app.org_status_closed (and CLOSED_STATUSES in src/features/shell/queries.ts)
+const CLOSED_ORG_STATUSES: readonly string[] = ["suspended", "cancelled"];
+
+/** What a refused pause or resume says, by the business status the caller could read (null = not readable). */
+export function pauseRefusalMessage(status: string | null | undefined): string {
+  return status && CLOSED_ORG_STATUSES.includes(status) ? PAUSE_CLOSED : PAUSE_NOT_ADMIN;
+}

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { COLLECTION_PAUSED_LINE, madeWhilePaused, NOT_PAUSED, pauseBannerText, pauseFromRow, pauseSchema, pauseTimeText, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
+import { COLLECTION_PAUSED_LINE, madeWhilePaused, NOT_PAUSED, PAUSE_CLOSED, PAUSE_NOT_ADMIN, pauseRefusalMessage, pauseBannerText, pauseFromRow, pauseSchema, pauseTimeText, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
 
 // HEB-09: found by its suffix (the lead renumbers migrations at merge)
 const dir = new URL("../../supabase/migrations/", import.meta.url);
@@ -45,6 +45,14 @@ describe("sending pause (HEB-09)", () => {
     expect(madeWhilePaused(COLLECTION_PAUSED_LINE)).toBe(true);
     expect(madeWhilePaused(null)).toBe(false);
     expect(madeWhilePaused("הערה אחרת")).toBe(false);
+  });
+
+  it("a refused pause says the business is closed only for a closed status (review L-1)", () => {
+    expect(pauseRefusalMessage("suspended")).toBe(PAUSE_CLOSED);
+    expect(pauseRefusalMessage("cancelled")).toBe(PAUSE_CLOSED);
+    expect(pauseRefusalMessage("read_only")).toBe(PAUSE_NOT_ADMIN);
+    expect(pauseRefusalMessage("active")).toBe(PAUSE_NOT_ADMIN);
+    expect(pauseRefusalMessage(null)).toBe(PAUSE_NOT_ADMIN);
   });
 });
 

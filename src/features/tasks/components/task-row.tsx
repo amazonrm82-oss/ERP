@@ -67,7 +67,7 @@ export type TaskRowView = {
   parent: { id: string; title: string | null } | null;
   // COL-04: a collection reminder task (made by the server) names its document; the row offers a WhatsApp reminder
   collectionDocumentId?: string | null;
-  // HEB-09: made while customer sending was paused (the button says so)
+  // HEB-09: made while customer sending was paused, and it still is (the button says so)
   collectionPaused?: boolean;
 };
 
