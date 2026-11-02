@@ -5,7 +5,8 @@
 --
 -- app.system_banners is a platform table in schema app (no API role reads or writes it; RLS on, no policies, like
 -- every app table). A banner has a text of up to 300 characters (one line: whitespace collapsed), a severity
--- (info | warning), a window (starts_at .. ends_at, at most 366 days) and a target:
+-- (info | warning), a window (starts_at .. ends_at, at most 367 days: the screen
+-- offers a start day and an end day up to a year later, in Israel time, so a clock change may add an hour to 366 days) and a target:
 --   all   every business
 --   orgs  a list of 1..200 business ids
 --   plan  every business whose subscription is on that plan (read when shown, so a business that moves plan
@@ -20,7 +21,11 @@
 --   platform_list_system_banners()   every banner, for every platform role (read only)
 -- Members read through one definer function:
 --   system_banners_for(org)          the banners that apply to this business now, minus the ones the caller dismissed;
---                                    an empty list to anyone who is not a member (or in an open support session)
+--                                    an empty list to anyone who is neither a member nor platform staff in an
+--                                    open support session (app.role_in): staff in a session see the business's
+--                                    banners, as its people do, and may close one for themselves (their own row in
+--                                    app.system_banner_dismissals, never anyone else's). The owner of a closed
+--                                    business keeps the owner's role, so a banner to "all" reaches them too
 --   system_banner_dismiss(org, id)   per person, kept in app.system_banner_dismissals (the database, not the
 --                                    browser, so a dismissal holds on every device); a non-dismissable banner is
 --                                    refused with hint 'banner:not_dismissable'
@@ -43,7 +48,7 @@ create table if not exists app.system_banners (
   ended_at     timestamptz,
   created_by   uuid references auth.users (id) on delete set null,
   created_at   timestamptz not null default now(),
-  constraint system_banners_window check (ends_at > starts_at and ends_at <= starts_at + interval '366 days'),
+  constraint system_banners_window check (ends_at > starts_at and ends_at <= starts_at + interval '367 days'),
   -- only a warning may stay on screen
   constraint system_banners_dismissable check (dismissable or severity = 'warning'),
   constraint system_banners_target check (
@@ -113,7 +118,7 @@ begin
   if p_severity is null or p_severity not in ('info', 'warning') then
     raise exception 'unknown severity' using errcode = '22023';
   end if;
-  if p_ends_at is null or p_ends_at <= v_starts or p_ends_at > v_starts + interval '366 days' then
+  if p_ends_at is null or p_ends_at <= v_starts or p_ends_at > v_starts + interval '367 days' then
     raise exception 'the end must come after the start, within a year' using errcode = '22023';
   end if;
   if p_target_kind = 'all' then

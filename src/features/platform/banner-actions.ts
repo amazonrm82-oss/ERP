@@ -6,7 +6,7 @@ import { fail, formValues, type ActionResult, type FormState } from "@/lib/actio
 import { sessionCheck } from "@/lib/auth";
 import { isCalendarDate } from "@/lib/calendar-date";
 import { SESSION_EXPIRED } from "@/lib/errors";
-import { zonedIso, zoneDate } from "@/lib/format";
+import { formatDate, zonedIso, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -41,7 +41,9 @@ export async function addBannerAction(_prev: FormState, formData: FormData): Pro
   const endDay = text(formData, "ends_on");
   if (!isCalendarDate(startDay) || startDay < today) return fail("תאריך ההתחלה צריך להיות היום או אחריו.", { values });
   if (!isCalendarDate(endDay) || endDay < startDay) return fail("יש לבחור תאריך סיום, לא לפני תאריך ההתחלה.", { values });
-  if (endDay > addDays(startDay, 365)) return fail("הודעה מוצגת עד שנה לכל היותר.", { values });
+  // a year at most: the last day is a year after the start day (the database allows a clock change's extra hour)
+  const lastDay = addDays(startDay, 365);
+  if (endDay > lastDay) return fail(`הודעה מוצגת עד שנה. תאריך הסיום האחרון האפשרי הוא ${formatDate(lastDay)}.`, { values });
 
   const target = text(formData, "target");
   let orgs: string[] | null = null;

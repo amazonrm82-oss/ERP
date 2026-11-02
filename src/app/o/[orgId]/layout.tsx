@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
@@ -86,6 +86,10 @@ export default async function OrgLayout({ children, params }: Props) {
             </UserMenu>
           </div>
         </header>
+        {/* ADM-04: a banner to "all" reaches the owner of a closed business too */}
+        <Suspense fallback={null}>
+          <SystemBanners orgId={org.id} />
+        </Suspense>
         <main id="main" className="mx-auto w-full max-w-3xl px-4 pt-5 pb-12 sm:px-6 sm:pt-7">
           {children}
         </main>
@@ -203,8 +207,10 @@ export default async function OrgLayout({ children, params }: Props) {
         </p>
       ) : null}
 
-      {/* ADM-04: the platform's messages */}
-      <SystemBanners orgId={org.id} />
+      {/* ADM-04: the platform's messages (streamed: they never hold the page) */}
+      <Suspense fallback={null}>
+        <SystemBanners orgId={org.id} />
+      </Suspense>
 
       {/* bottom padding leaves room for the phone navigation bar */}
       <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:px-6 sm:pt-7 md:pb-12">

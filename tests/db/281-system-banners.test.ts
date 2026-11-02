@@ -162,6 +162,27 @@ describe("ADM-04: system banners", () => {
     expect(await asAdmin((q) => count(q, "select 1 from app.platform_log where action = 'banner.end' and details->>'id' = $1", [id]))).toBe(1);
   });
 
+  it("a closed business: its owner still sees a banner to all businesses, its other people do not", async () => {
+    const all = await add(owner.id, { body: "לכל העסקים, גם הסגורים", severity: "warning" });
+    await asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [orgA]));
+    try {
+      expect(ids(await shown(alice.id, orgA))).toContain(all);
+      expect(await shown(carol.id, orgA)).toEqual([]);
+      await asUser(alice.id, (q) => q("select public.system_banner_dismiss($1, $2)", [orgA, all]));
+      expect(ids(await shown(alice.id, orgA))).not.toContain(all);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = 'active' where id = $1", [orgA]));
+    }
+  });
+
+  it("the window allows a year plus a clock change's hour, not more", async () => {
+    const bad = (interval: string) =>
+      pgError(asMfaUser(owner.id, (q) => q(`select public.platform_add_system_banner('x', 'info', true, now() + interval '1 day', now() + interval '1 day' + interval '${interval}', 'all', null, null)`)));
+    const ok = await add(owner.id, { starts: new Date(Date.now() + 86_400_000).toISOString(), ends: new Date(Date.now() + 86_400_000 * 367 + 3_600_000).toISOString() });
+    expect(ok).toBeTruthy();
+    expect((await bad("367 days 1 minute")).code).toBe("22023");
+  });
+
   it("every platform role lists banners; members cannot", async () => {
     const list = await asMfaUser(finance.id, async (q) => (await q<{ l: { id: string; target_orgs: { name: string }[] }[] }>("select public.platform_list_system_banners() as l")).rows[0].l);
     expect(list.length).toBeGreaterThan(0);
