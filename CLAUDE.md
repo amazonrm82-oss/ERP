@@ -1978,6 +1978,26 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (logged once per session), and `app.support_session()` is true only while that row's grant is live (not revoked, not
   expired); then `app.role_in()` returns `viewer` (`app.membership_role()` is the plain membership). A grant alone gives nothing.
   The panel is `src/app/admin` + `src/features/platform/`.
+- System banners, what's new and support requests (ADM-04, USR-12, ADM-05; migrations 021130-021132; owner 2 November 2026, answers
+  (47) א (48) ג (49) א (50) א): `app.system_banners` (platform table, RLS on, no grants; text 1..300 one line, info|warning, a warning may
+  be non-dismissable, window at most 367 days, target all | 1..200 org ids | a plan read when shown) written only by
+  `platform_add/end_system_banner` (owner/support, aal2, logged `banner.add|end`), listed by `platform_list_system_banners` (every
+  platform role). Members read `public.system_banners_for(org)` (definer, `app.role_in`; at most 3, warnings first, minus their own
+  dismissals in `app.system_banner_dismissals`, kept in the database so they hold on every device) and close one with
+  `system_banner_dismiss` (hint `banner:not_dismissable`). Shown in both business frames (closed too: the owner keeps the role), inside
+  `<Suspense>`. What's new: a static list in `src/features/whats-new/entries.ts` (owner-approved wording; a new entry goes on top) and
+  `profiles.whats_new_seen_on` (own column grant; never marked in a support session); a dot on the account menu. Support requests:
+  `public.support_requests` (category closed list, subject 1..120, message 1..2,000, optional same-site page path that never starts
+  with `//` or `/\`; requester and status set by the definer trigger `app.support_requests_check`, outsider guard first; 5 per person
+  per hour across businesses under an advisory lock, hint `support:rate`; members insert their own through `app.membership_role`, so a
+  support session cannot and a closed business's owner can; the requester reads theirs, owners/admins all; no update/delete; not
+  audited, LEFT_OUT of the full export). Platform (owner/support only, aal2): `platform_list_support_requests` (VOLATILE),
+  `platform_set_support_request_status` (logged; one `system` notice naming nothing to the requester while an active member),
+  `platform_add_support_request_note` (`app.support_request_notes`, never shown to the business, logged by length) and
+  `platform_support_request_counts` (dashboard counter). Owner (50) א: support staff read requests WITHOUT a support session (FXS-08),
+  only the request itself (text, page, business, requester) and no record of the business; opening any business record still needs a
+  session; each request is logged once per staff member (`app.support_request_reads`, one `support_request.read` entry, id only).
+  Email to the support team waits for an email provider (owner (48)).
 - Imports (migration 0012): `import_jobs` plus `import_job_id` on leads/contacts/companies (guarded:
   only a running job of the same user and type, set on insert, never changed). `emit_event` marks such
   inserts `origin: 'import'`; `process_outbox` skips origins `automation` and `import`;
