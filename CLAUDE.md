@@ -96,6 +96,26 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
+   `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
+   `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
+   else derived from `push_dispatch_url`; secret `push_dispatch_secret`) every minute while due jobs are of a kind a worker asked
+   for in the last day, else at most once an hour per kind (`app.job_kind_seen`, `app.job_wake_kinds`). It checks the secret
+   timing-safe first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and
+   `public.job_message_may_send()`. (55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and
+   retry only; `claim_jobs` answers only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt,
+   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its
+   own In use line; the three bodies are pinned by md5 and a change needs a fresh review (test 284). The send check works on a live
+   lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or read-only, (53) א, (54) ב) or an
+   `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job waits uncounted (with the
+   business's other due message jobs, in one step) and is sent after the resume, and is cancelled once the pause has lasted more
+   than 24 hours, also after the resume when it waited through such a pause ((52) ג); then `app.consent_suppressed` with null =
+   cancelled. Cancellations are counted only, one `app.platform_log` entry `jobs.cancelled` per business and run
+   (`app.flush_job_cancellations`). Jobs claimed but not started in time are handed back uncounted; a finish the queue did not take
+   after a send is logged (one redacted line). The queue `app.jobs` (no grants) holds ids and codes only. Only `message.send` is
+   registered, through the provider layer (`src/features/messaging/providers/`), whose only provider is the fake
+   (`MESSAGING_PROVIDER=fake`, refused on a Vercel production or preview deployment; it keeps the last 100 in memory and sends
+   nothing). In the eslint allow-list.
    In use (OPS-02, owner 2 November 2026, answers (40) ב, (42) ד, (43) א, migration 021128): the shared per-sender limit of the
    secret-link pages (`src/lib/public-sender-server.ts`, `guardPublicPage` / `guardPublicRoute`), used by the customer's quote, order
    and statement pages, their decide/question/pdf routes and the booking-manage link with its route. It calls only
@@ -2001,6 +2021,21 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `whatsapp_templates_variants` (invoker, every writer, skips a body over 1,000 so the check constraint refuses it; hints
   `whatsapp_template:variant|neutral`); `fillTemplate` picks by gender (unknown/none = neutral). Record pages, tomorrow's reminders and
   the collection reminder pass the gender; lists, My day and the money report still send neutral (follow-up).
+- Job queue (OPS-04, migration 021137; owner 26 October 2026 answer (א), 2 November 2026 answers (52) ג, (53) א, (54) ב, (55) א):
+  `app.jobs` (no grants; ids and codes only; kinds from `app.job_kinds()` = `message.send` only) filled by `app.enqueue_job(org, kind,
+  payload, run_at)` (definer, no grants; `app.job_payload_ok`). The worker route and its three service_role functions are in hard
+  rule 5 ("In use (OPS-04 …)"); their md5 (body, definer, settings, arguments) is pinned by test 284 and a change needs a fresh
+  review. Claims are fair per business (oldest due first, 20 per business, skip locked), never past the last try
+  (`app.job_max_attempts()` = 5, also in the candidate pass), lease 30..900 s; a lease that ran out on the last try = dead.
+  The send check (`job_message_may_send`) in order: event passed, business not writable, HEB-09 pause (waits uncounted 5
+  minutes with the business's other jobs already due, `waiting:sending_paused`; over 24 hours = `pause_expired`), after a
+  resume from a pause of more than 24 hours a job that waited through it (marked, or made before the resume and due by it)
+  = `pause_expired` (a job scheduled for after the resume is sent), then the record and `app.consent_suppressed` (null =
+  cancelled). Accepted (review): only the latest pause is known, so a re-pause before an older long pause's backlog drained
+  forgets it; two overlapping runs on a paused business can rarely meet in 40P01 (one counted failure). Cancellations are
+  counted in `app.job_cancel_counts` and flushed to `app.platform_log` (`jobs.cancelled`). pg_cron `crm-jobs-wake`
+  (`app.wake_job_worker`, every minute). Follow-up: retention of finished jobs needs a hand-pasted delete. HEB-09's
+  `app.customer_sending_paused` is asked by this check, the first automatic sender to customers.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
