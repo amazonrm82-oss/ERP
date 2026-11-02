@@ -15,3 +15,13 @@ export async function listAdminSupportRequests(status: string | null, page: numb
     ),
   );
 }
+
+export type SupportCounts = { open: number; inProgress: number };
+
+/** ADM-05 (owner (48) ג): the dashboard's counter. */
+export async function getSupportRequestCounts(): Promise<SupportCounts> {
+  const supabase = await createClient();
+  const data = must(await supabase.rpc("platform_support_request_counts"), "platform_support_request_counts");
+  const row = data !== null && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+  return { open: Number(row.open) || 0, inProgress: Number(row.in_progress) || 0 };
+}

@@ -15,10 +15,14 @@
 --   platform_add_support_request_note(id, body)  an internal note (1..2,000), app.support_request_notes; never shown to
 --       the business; logged 'support_request.note' with its length only
 --
--- No support session (FXS-08) is needed to read a request: the customer wrote it TO the platform's support, on
--- purpose, knowing who reads it (the form says so). A support session guards the business's own CRM data, which a
--- request does not open: the screen shows the request and links to the business's admin card, nothing more.
--- Reading is limited to the platform owner and support, and every change is logged.
+--   platform_support_request_counts()  {open, in_progress}: the counter on the panel's dashboard (counts only)
+--
+-- No support session (FXS-08) is needed to read a request (owner's answer (50) א, 2 November 2026): the customer wrote
+-- it TO the platform's support, on purpose (the form says so). Staff read only the request itself (text, page, business,
+-- requester) and no record of the business: opening any business record still needs a session. Reading is limited to
+-- the platform owner and support, and logged ONCE per request per staff member: the list function records each request
+-- it returns in app.support_request_reads (primary key request + staff member) and writes one app.platform_log entry
+-- 'support_request.read' (the request id, never its text) only when that row is new. Every change is logged too.
 -- Every statement is safe to run twice. No drops, no deletes.
 
 create table if not exists app.support_request_notes (
@@ -36,21 +40,37 @@ create index if not exists support_request_notes_request_idx on app.support_requ
 alter table app.support_request_notes enable row level security;
 revoke all on app.support_request_notes from public, anon, authenticated;
 
+-- Which staff member has read which request (the first read only): the read is logged once per pair.
+create table if not exists app.support_request_reads (
+  organization_id uuid not null,
+  request_id      uuid not null,
+  staff_user_id   uuid not null references auth.users (id) on delete cascade,
+  read_at         timestamptz not null default now(),
+  primary key (request_id, staff_user_id),
+  foreign key (organization_id, request_id) references public.support_requests (organization_id, id) on delete cascade
+);
+create index if not exists support_request_reads_request_idx on app.support_request_reads (organization_id, request_id);
+create index if not exists support_request_reads_staff_idx on app.support_request_reads (staff_user_id);
+
+alter table app.support_request_reads enable row level security;
+revoke all on app.support_request_reads from public, anon, authenticated;
+
 create or replace function public.platform_list_support_requests(
   p_status text default null, p_limit integer default 100, p_offset integer default 0
 ) returns jsonb
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path = ''
 as $$
 declare
   v_limit integer := least(greatest(coalesce(p_limit, 100), 1), 200);
   v_offset integer := greatest(coalesce(p_offset, 0), 0);
+  v_answer jsonb;
 begin
   perform app.require_platform(array['support']);
   if p_status is not null and p_status not in ('open', 'in_progress', 'closed') then
     raise exception 'unknown status' using errcode = '22023';
   end if;
-  return jsonb_build_object(
+  v_answer := jsonb_build_object(
     'total', (select count(*) from public.support_requests r where p_status is null or r.status = p_status),
     'counts', jsonb_build_object(
       'open', (select count(*) from public.support_requests r where r.status = 'open'),
@@ -78,6 +98,22 @@ begin
         join public.organizations o on o.id = r.organization_id
         left join public.profiles p on p.id = r.user_id
     ), '[]'::jsonb));
+
+  -- owner's answer (50): each request this staff member reads is logged once
+  with shown as (
+    select (x->>'organization_id')::uuid as organization_id, (x->>'id')::uuid as request_id
+      from jsonb_array_elements(v_answer->'rows') x
+  ), fresh as (
+    insert into app.support_request_reads (organization_id, request_id, staff_user_id)
+    select s.organization_id, s.request_id, auth.uid() from shown s
+    on conflict (request_id, staff_user_id) do nothing
+    returning organization_id, request_id
+  )
+  insert into app.platform_log (actor_id, action, organization_id, details)
+  select auth.uid(), 'support_request.read', f.organization_id, jsonb_build_object('id', f.request_id)
+    from fresh f;
+
+  return v_answer;
 end;
 $$;
 revoke all on function public.platform_list_support_requests(text, integer, integer) from public, anon;
@@ -149,3 +185,18 @@ end;
 $$;
 revoke all on function public.platform_add_support_request_note(uuid, text) from public, anon;
 grant execute on function public.platform_add_support_request_note(uuid, text) to authenticated;
+
+-- The dashboard's counter: open and in-progress requests, counts only (no text, so no read is logged).
+create or replace function public.platform_support_request_counts() returns jsonb
+language plpgsql stable security definer
+set search_path = ''
+as $$
+begin
+  perform app.require_platform(array['support']);
+  return jsonb_build_object(
+    'open', (select count(*) from public.support_requests r where r.status = 'open'),
+    'in_progress', (select count(*) from public.support_requests r where r.status = 'in_progress'));
+end;
+$$;
+revoke all on function public.platform_support_request_counts() from public, anon;
+grant execute on function public.platform_support_request_counts() to authenticated;

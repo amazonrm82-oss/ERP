@@ -69,6 +69,33 @@ describe("ADM-05: support requests on the platform panel", () => {
     expect((await pgError(asMfaUser(support.id, (q) => q("select public.platform_list_support_requests('nonsense')")))).code).toBe("22023");
   });
 
+  it("each read is logged once per request and staff member, never with its text (owner's answer 50)", async () => {
+    const support2 = await createUser("adm05-support2");
+    await makeStaff(support2.id, "support");
+    const reads = () => asAdmin((q) => count(q, "select 1 from app.platform_log where action = 'support_request.read' and details->>'id' = $1", [requestId]));
+    const base = await reads();
+    await list(support.id);
+    await list(support.id);
+    await list(support.id, "open");
+    expect(await reads()).toBe(Math.max(base, 1));
+    await list(support2.id);
+    expect(await reads()).toBe(Math.max(base, 1) + 1);
+    const entry = await asAdmin(async (q) => (await q<{ organization_id: string; details: object }>("select organization_id, details from app.platform_log where action = 'support_request.read' and details->>'id' = $1 limit 1", [requestId])).rows[0]);
+    expect(entry.organization_id).toBe(orgA);
+    expect(entry.details).toEqual({ id: requestId });
+    // a request the list does not return is not logged
+    await asMfaUser(support2.id, (q) => q("select public.platform_list_support_requests('closed', 200, 0)"));
+    expect(await reads()).toBe(Math.max(base, 1) + 1);
+  });
+
+  it("the dashboard counter: open and in progress, for the owner and support only", async () => {
+    const counts = await asMfaUser(support.id, async (q) => (await q<{ c: { open: number; in_progress: number } }>("select public.platform_support_request_counts() as c")).rows[0].c);
+    expect(counts.open + counts.in_progress).toBeGreaterThanOrEqual(1);
+    for (const u of [finance, readonly, alice]) {
+      expect((await pgError(asMfaUser(u.id, (q) => q("select public.platform_support_request_counts()")))).code).toBe("42501");
+    }
+  });
+
   it("a status change is logged and tells only the requester, naming nothing", async () => {
     expect((await pgError(asMfaUser(finance.id, (q) => q("select public.platform_set_support_request_status($1, 'closed')", [requestId])))).code).toBe("42501");
     await asMfaUser(support.id, (q) => q("select public.platform_set_support_request_status($1, 'in_progress')", [requestId]));

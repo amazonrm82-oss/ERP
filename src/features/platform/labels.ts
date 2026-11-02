@@ -43,6 +43,8 @@ export const ACTION_LABELS: Record<string, string> = {
   // ADM-05
   "support_request.status": "שינוי מצב של פנייה לתמיכה",
   "support_request.note": "הערה פנימית בפנייה לתמיכה",
+  // owner's answer (50): reading a request without a support session, logged once per request and staff member
+  "support_request.read": "קריאת פנייה לתמיכה",
 };
 
 /** How support checked who is asking before a two-step verification reset (platform_reset_mfa). */

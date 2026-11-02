@@ -3941,6 +3941,8 @@ export type Database = {
       platform_list_support_requests: { Args: { p_status?: string | null; p_limit?: number; p_offset?: number }; Returns: Json };
       platform_set_support_request_status: { Args: { p_id: string; p_status: string }; Returns: undefined };
       platform_add_support_request_note: { Args: { p_id: string; p_body: string }; Returns: string };
+      // ADM-05 / owner (48) ג: the dashboard's counter { open, in_progress } (platform owner and support)
+      platform_support_request_counts: { Args: Record<string, never>; Returns: Json };
       // how many notices an announcement sends now (one per business per active owner); platform owner
       platform_subprocessor_audience: { Args: Record<string, never>; Returns: number };
       // service_role only (the public page): { entries: [{ name, purpose, country, data_categories, effective_from, ends_on }],

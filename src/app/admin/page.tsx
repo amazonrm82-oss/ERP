@@ -1,8 +1,12 @@
+import Link from "next/link";
+
 import { Card, CardHeader } from "@/components/ui/card";
 import { BarList } from "@/components/ui/chart";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { consentHealthWarnings, getConsentHealth, getPlatformMetrics, platformReady } from "@/features/platform/queries";
+import { getSupportRequestCounts } from "@/features/platform/support-queries";
+import { paths } from "@/lib/paths";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 type Obj = Record<string, unknown>;
@@ -14,6 +18,8 @@ export default async function AdminHomePage() {
   const m = await getPlatformMetrics();
   // the consent alert is for the platform owner and support (the function refuses other roles)
   const warnings = me.role === "owner" || me.role === "support" ? consentHealthWarnings(await getConsentHealth()) : [];
+  // ADM-05 (owner (48) ג): open support requests, for the platform owner and support only
+  const support = me.role === "owner" || me.role === "support" ? await getSupportRequestCounts() : null;
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;
   const ended = n(conversion.ended);
@@ -50,6 +56,14 @@ export default async function AdminHomePage() {
             ))}
           </ul>
         </section>
+      ) : null}
+      {support ? (
+        <p className="mb-5 rounded-lg border border-line bg-surface px-4 py-3 text-md sm:px-5">
+          <Link href={paths.adminSupport} className="font-medium text-accent-strong underline underline-offset-4">
+            פניות תמיכה פתוחות: <span className="tabular-nums">{formatNumber(support.open)}</span>
+          </Link>
+          <span className="text-ink-soft"> · בטיפול: <span className="tabular-nums">{formatNumber(support.inProgress)}</span></span>
+        </p>
       ) : null}
       <dl className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tiles.map((t) => (
