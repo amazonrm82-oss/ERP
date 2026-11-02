@@ -32,7 +32,10 @@ export async function getPublicStatement(token: string, ip: string | null): Prom
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";
   }
-  return publicStatementFrom(data) ?? "not-found";
+  // OPS-02 review: a malformed answer is an error, never "not found" (which would count as a miss of the shared sender limit)
+  const shaped = publicStatementFrom(data);
+  if (!shaped) throw new Error("statement_public answered an unexpected shape");
+  return shaped;
 }
 
 const text = (status: number, body: string, extra: Record<string, string> = {}) =>

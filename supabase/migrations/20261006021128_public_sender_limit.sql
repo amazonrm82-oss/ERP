@@ -23,6 +23,10 @@
 --   when that answered not found; a route checks, runs its handler, records a miss when the handler marked its 404 as "not
 --   found" (src/lib/public-not-found.ts; a real link's "file unavailable" 404 is not a miss). Preview bots never reach it
 --   (WAB-05 counts them first with its own limits).
+-- * The cap is soft: the check runs before the lookup and the miss is written after it, so a burst already in flight can pass
+--   120 by a few. A shared address (an office, a mobile carrier's CGNAT) is one sender: someone else's misses can refuse a real
+--   customer behind it for the rest of the window (accepted by the lead under answers (40) and (42)). An IPv6 visitor is
+--   counted by its /64 (src/lib/ip-prefix.ts, this scope only), so rotating inside it does not reset the count.
 --
 -- (41) ב: the customer's quote page also limits each sender to 60 views in 10 minutes, as order_public and statement_public:
 -- counted after the token lookup and the link's 120 window, the sender scoped to the link's quote by app.quote_link_sender,

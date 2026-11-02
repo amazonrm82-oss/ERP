@@ -2,6 +2,7 @@ import "server-only";
 
 import { headers } from "next/headers";
 
+import { publicSenderAddress } from "@/lib/ip-prefix";
 import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { isMarkedNotFound } from "@/lib/public-not-found";
 import { RATE_LIMITED_TEXT, rateLimitedJson, rateLimitedText } from "@/lib/public-rate-limit";
@@ -13,12 +14,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 // public.public_sender_check); after its function answered "not found" the server records one miss
 // (public.public_sender_miss, one upsert). A real customer's views are never counted here; their pages keep their own
 // per-link and per-sender limits. Both functions are service_role only and keep bucket numbers, never the hash. The sender is
-// the keyed IP hash of FXS-11 with the scope "public" (one value per visitor on every page). No secret or no address = no
+// the keyed IP hash of FXS-11 with the scope "public" (one value per visitor on every page; an IPv6 visitor counted by its /64). No secret or no address = no
 // hash = nothing checked or counted (fail open, as every other public limit); a failed call is logged and lets the request
 // through. Which paths take it, and why the others do not: tests/unit/public-rate-limits.test.ts.
 
+/** The sender: the keyed hash of the address, an IPv6 one reduced to its /64 (src/lib/ip-prefix.ts; this scope only). */
 function senderOf(requestHeaders: Headers): string | null {
-  return keyedIpHash(clientIp(requestHeaders), "public");
+  return keyedIpHash(publicSenderAddress(clientIp(requestHeaders)), "public");
 }
 
 /** true = go on; false = this sender already had too many "not found" answers in the window. */

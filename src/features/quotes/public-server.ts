@@ -60,7 +60,10 @@ export async function getPublicQuote(token: string, ip: string | null = null): P
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";
   }
-  return statusQuoteFrom(data) ?? publicQuoteFrom(data) ?? "not-found";
+  // OPS-02 review: a malformed answer is an error, never "not found" (which would count as a miss of the shared sender limit)
+  const shaped = statusQuoteFrom(data) ?? publicQuoteFrom(data);
+  if (!shaped) throw new Error("quote_public answered an unexpected shape");
+  return shaped;
 }
 
 // QUO-09 ---------------------------------------------------------------------

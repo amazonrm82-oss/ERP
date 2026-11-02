@@ -29,7 +29,10 @@ export async function getPublicOrder(token: string, ip: string | null): Promise<
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";
   }
-  return statusOrderFrom(data) ?? publicOrderFrom(data) ?? "not-found";
+  // OPS-02 review: a malformed answer is an error, never "not found" (which would count as a miss of the shared sender limit)
+  const shaped = statusOrderFrom(data) ?? publicOrderFrom(data);
+  if (!shaped) throw new Error("order_public answered an unexpected shape");
+  return shaped;
 }
 
 const MAX_DECISION_BYTES = 350_000;

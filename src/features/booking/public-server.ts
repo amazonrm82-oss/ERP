@@ -163,7 +163,10 @@ export async function getBookingManage(token: string, from: string | null, ip: s
     if ((data as { unavailable?: unknown }).unavailable === true) return "unavailable";
     if ((data as { rate_limited?: unknown }).rate_limited === true) return "rate-limited";
   }
-  return bookingManageFrom(data) ?? "not-found";
+  // OPS-02 review: a malformed answer is an error, never "not found" (which would count as a miss of the shared sender limit)
+  const shaped = bookingManageFrom(data);
+  if (!shaped) throw new Error("booking_manage_public answered an unexpected shape");
+  return shaped;
 }
 
 export type BookingManageReply =

@@ -101,6 +101,13 @@ describe("OPS-02: the shared per-sender limit of the secret-link pages", () => {
     expect(calls[0]).toMatchObject({ name: "public_sender_check", args: { p_sender: keyedIpHash("198.51.100.7", "public") } });
     expect(calls[0].args.p_sender).toMatch(HEX64);
     expect(calls[0].args.p_sender).not.toBe(keyedIpHash("198.51.100.7", "quote"));
+    // an IPv6 visitor is one sender across its /64; the page scopes still hash the full address
+    calls.length = 0;
+    await publicSenderAllowed(new Headers({ "x-forwarded-for": "2001:db8:0:1::aaaa" }));
+    await publicSenderAllowed(new Headers({ "x-forwarded-for": "2001:db8:0:1:ffff::1" }));
+    expect(calls[0].args.p_sender).toBe(keyedIpHash("2001:db8:0:1::/64", "public"));
+    expect(calls[1].args.p_sender).toBe(calls[0].args.p_sender);
+    expect(keyedIpHash("2001:db8:0:1::aaaa", "quote")).not.toBe(keyedIpHash("2001:db8:0:1:ffff::1", "quote"));
     replies.public_sender_check = { data: false, error: null };
     expect(await publicSenderAllowed(headers)).toBe(false);
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -163,6 +170,41 @@ describe("OPS-02: the shared per-sender limit of the secret-link pages", () => {
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({ ok: false, status: "rate_limited", message: RATE_LIMITED_TEXT });
     expect(names()).toEqual(["public_sender_check"]);
+  });
+
+  it("every secret-link route marks its P0002 answer: one miss after the lookup", async () => {
+    const FINGERPRINT = "a".repeat(64);
+    const rejected = JSON.stringify({ decision: "rejected", fingerprint: FINGERPRINT, reason: null });
+    type Route = { POST?: (r: Request, c: { params: Promise<{ token: string }> }) => Promise<Response>; GET?: (r: Request, c: { params: Promise<{ token: string }> }) => Promise<Response> };
+    const cases: Array<[string, () => Promise<unknown>, "POST" | "GET", string | null, string]> = [
+      ["quote decide", () => import("@/app/api/forms/quote/[token]/decide/route"), "POST", rejected, "quote_public_answer"],
+      ["quote question", () => import("@/app/api/forms/quote/[token]/question/route"), "POST", JSON.stringify({ text: "שאלה קצרה" }), "quote_public_question"],
+      ["quote pdf", () => import("@/app/api/forms/quote/[token]/pdf/route"), "GET", null, "quote_public_pdf"],
+      ["order decide", () => import("@/app/api/forms/order/[token]/decide/route"), "POST", rejected, "order_public_decide"],
+      ["order pdf", () => import("@/app/api/forms/order/[token]/pdf/route"), "GET", null, "order_public_pdf"],
+      ["statement pdf", () => import("@/app/api/forms/statement/[token]/pdf/route"), "GET", null, "statement_public"],
+      ["booking manage", () => import("@/app/api/forms/booking/manage/[token]/route"), "POST", JSON.stringify({ action: "cancel" }), "booking_manage_cancel"],
+    ];
+    for (const [label, load, method, body, read] of cases) {
+      calls.length = 0;
+      const route = (await load()) as Route;
+      const request = new Request("https://example.test/api/forms/x", {
+        method,
+        headers: { "x-forwarded-for": "198.51.100.7", "content-type": "application/json" },
+        ...(body === null ? {} : { body }),
+      });
+      const response = await route[method]!(request, { params: Promise.resolve({ token: TOKEN64 }) });
+      expect(response.status, label).toBe(404);
+      expect(names(), label).toEqual(["public_sender_check", read, "public_sender_miss"]);
+    }
+  });
+
+  it("a malformed answer is an error, never a miss", async () => {
+    replies.quote_public = { data: { unexpected: true }, error: null };
+    const { getPublicQuote } = await import("@/features/quotes/public-server");
+    const { guardPublicPage } = await import("@/lib/public-sender-server");
+    await expect(guardPublicPage(() => getPublicQuote(TOKEN64, null))).rejects.toThrow(/unexpected shape/);
+    expect(names()).toEqual(["public_sender_check", "quote_public"]);
   });
 
   it("the quote page: a found quote is never a miss; quote_public gets the quote-scoped sender (41)", async () => {
