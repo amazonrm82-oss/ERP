@@ -674,6 +674,26 @@ export type ProfileRow = {
   signature: string | null;
   // USR-07: null = by the device, else 'light' | 'dark'
   theme: string | null;
+  // USR-12: the date of the newest "what's new" entry this person has seen; null = never opened
+  whats_new_seen_on: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// USR-12: a support request sent from inside a business (migration support_requests). Status changes only through
+// platform_* (ADM-05). Category mirrors SUPPORT_CATEGORIES in src/features/support-requests/categories.ts.
+export type SupportRequestRow = {
+  id: string;
+  organization_id: string;
+  user_id: string | null;
+  // question | bug | billing | feature | other (a text check, not an enum)
+  category: string;
+  subject: string;
+  message: string;
+  page_path: string | null;
+  // open | in_progress | closed
+  status: string;
+  status_changed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2641,6 +2661,7 @@ export type Database = {
           working_hours?: Json | null;
           signature?: string | null;
           theme?: string | null;
+          whats_new_seen_on?: string | null;
         }
       >;
       memberships: Table<
@@ -3270,6 +3291,17 @@ export type Database = {
       subprocessors: Table<SubprocessorRow, Record<string, never>, Record<string, never>>;
       // PRM-01: read only; written by set_member_permissions()
       member_permissions: Table<MemberPermissionsRow, Record<string, never>, Record<string, never>>;
+      support_requests: Table<
+        SupportRequestRow,
+        {
+          organization_id: string;
+          category: string;
+          subject: string;
+          message: string;
+          page_path?: string | null;
+        },
+        Record<string, never>
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {

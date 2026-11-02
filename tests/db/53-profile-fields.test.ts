@@ -66,8 +66,8 @@ describe("personal profile (USR-01)", () => {
         )
       ).rows.map((r) => r.column_name),
     );
-    // USR-07 adds theme (light, dark or by the device)
-    expect(grants).toEqual(["avatar_url", "full_name", "locale", "phone", "signature", "theme", "timezone", "working_hours"]);
+    // USR-07 adds theme (light, dark or by the device); USR-12 the date of the newest "what's new" entry seen
+    expect(grants).toEqual(["avatar_url", "full_name", "locale", "phone", "signature", "theme", "timezone", "whats_new_seen_on", "working_hours"]);
   });
 
   it("working hours must have the exact shape", async () => {

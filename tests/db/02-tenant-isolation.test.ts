@@ -118,6 +118,8 @@ describe("tenant isolation", () => {
       await q("insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)", [orgA]);
       await q("insert into public.number_sequences (organization_id, kind, prefix) values ($1, 'quote', 'Q-')", [orgA]);
       await q("insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק', '800', '1234567')", [orgA]);
+      // USR-12
+      await q("insert into public.support_requests (organization_id, category, subject, message) values ($1, 'question', 'שאלה', 'איך מייבאים?')", [orgA]);
       ids.meetingA = (
         await q<{ id: string }>(
           "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id) values ($1, 'פגישת היכרות', now() + interval '1 day', now() + interval '1 day 1 hour', $2) returning id",
@@ -488,6 +490,8 @@ describe("tenant isolation", () => {
     "lead_routing_rules",
     // PRM-01
     "member_permissions",
+    // USR-12
+    "support_requests",
   ];
   // filled in by the "every table, every verb" test and re-checked for reads there
   const lateTables = ["team_members", "deal_contacts", "saved_views"];
@@ -689,6 +693,8 @@ describe("tenant isolation", () => {
       lead_routing_rules: "position = position",
       // no write grant at all (set_member_permissions() writes): a permission error is the expected outcome
       member_permissions: "permissions = permissions",
+      // USR-12: no update or delete grant at all (staff change the status through platform_*)
+      support_requests: "status = status",
     };
     await asUser(a.id, async (q) => {
       const team = (await q<{ id: string }>("select id from public.teams where organization_id = $1 limit 1", [orgA])).rows[0].id;
@@ -828,6 +834,7 @@ describe("tenant isolation", () => {
       ["insert into public.member_leaves (organization_id, user_id, starts_on, ends_on) values ($1, $2, current_date + 44, current_date + 45)", [orgA, a.id]],
       ["insert into public.conversion_field_maps (organization_id, lead_field_id, target_type, mode) values ($1, $2, 'deal', 'none')", [orgA, ids.leadFieldA]],
       ["insert into public.card_layouts (organization_id, object_type, groups) values ($1, 'deal', '[]')", [orgA]],
+      ["insert into public.support_requests (organization_id, category, subject, message) values ($1, 'bug', 'x', 'x')", [orgA]],
       ["insert into public.lead_score_rules (organization_id, field, op, points) values ($1, 'phone', 'filled', 1)", [orgA]],
       ["insert into public.lead_distribution_settings (organization_id) values ($1)", [orgA]],
       ["insert into public.lead_routing_rules (organization_id, is_active, product_id, team_id) values ($1, false, $2, $3)", [orgA, ids.productA, team]],
@@ -964,6 +971,7 @@ describe("tenant isolation", () => {
       ["lead_distribution_settings", "weights = '{}'", "weights = '{}'"],
       ["lead_routing_rules", "position = 777", "position = 777"],
       ["member_permissions", "permissions = '{}'", "permissions = '{}'"],
+      ["support_requests", "status = 'closed'", "status = 'closed'"],
     ];
     // which rows of each table belong to alice's organization
     const scope = (table: string): [string, unknown[]] =>

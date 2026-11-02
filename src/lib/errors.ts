@@ -291,6 +291,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "subprocessor:end_before_start": "תאריך הסיום צריך להיות אחרי תאריך התחילה.",
   // ADM-04 (migration system_banners): a warning the platform marked as staying on screen
   "banner:not_dismissable": "את ההודעה הזו אי אפשר לסגור. היא תיעלם לבד בסוף התקופה שלה.",
+  // USR-12 (migration support_requests): 5 requests per person per hour
+  "support:rate": `שלחתם כבר 5 פניות בשעה האחרונה. נסו שוב מאוחר יותר, או פנו אלינו ישירות: ${SUPPORT_LINE}.`,
   // TAX-05 (migration tax_calc, app.document_totals); the app checks first with documentTotals() and its own texts
   "totals:invalid": "אי אפשר לחשב את הסכומים. בדקו את הכמויות, המחירים וההנחות.",
   // PRD-04 (migration product_lists)

@@ -7,7 +7,8 @@ import { ChevronDownIcon } from "@/components/ui/icons";
 
 import { InstallApp } from "./install-app";
 
-type MenuLink = { href: string; label: string };
+// dot: something new behind the link (USR-12, "what's new")
+type MenuLink = { href: string; label: string; dot?: boolean };
 
 type Props = {
   name: string;
@@ -60,8 +61,9 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-10 items-center gap-2 rounded-md px-1.5 hover:bg-canvas"
       >
-        <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent-strong">
+        <span aria-hidden="true" className="relative grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent-strong">
           {initial}
+          {links.some((link) => link.dot) ? <span className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-accent" /> : null}
         </span>
         <span className="hidden max-w-40 truncate text-md sm:block">{name}</span>
         <span className="sr-only sm:hidden">{name}</span>
@@ -91,6 +93,12 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
                   className="flex min-h-10 items-center px-4 text-md hover:bg-canvas"
                 >
                   {link.label}
+                  {link.dot ? (
+                    <>
+                      <span aria-hidden="true" className="ms-2 size-2 rounded-full bg-accent" />
+                      <span className="sr-only"> (יש חדש)</span>
+                    </>
+                  ) : null}
                 </Link>
               </li>
             ))}

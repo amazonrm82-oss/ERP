@@ -12,6 +12,7 @@ import { withOrdersPlan } from "@/features/modules/modules";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { SystemBanners } from "@/features/system-banners/components/system-banners";
+import { getWhatsNewUnread } from "@/features/whats-new/queries";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
 import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
 import { createClient } from "@/lib/supabase/server";
@@ -91,7 +92,7 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules, quickSale] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules, quickSale, whatsNewUnread] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
@@ -103,6 +104,8 @@ export default async function OrgLayout({ children, params }: Props) {
     getOrgModules(org.id),
     // GAP-08: the quick sale in the "+" menu, for whoever records payments
     context.canWrite ? quickSaleOffered(org.id) : Promise.resolve(false),
+    // USR-12: the dot on "what's new"
+    getWhatsNewUnread(user.id),
   ]);
   // ORD-01: orders show only while the plan holds them too; asked only when the business switched them on, and a failed
   // read hides them (the menu never breaks the page)
@@ -163,6 +166,8 @@ export default async function OrgLayout({ children, params }: Props) {
               { href: paths.settingsAccount(org.id), label: "החשבון שלי" },
               { href: paths.home, label: "החלפת עסק" },
               { href: paths.help, label: "מרכז עזרה" },
+              { href: paths.whatsNew(org.id), label: "מה חדש", dot: whatsNewUnread },
+              { href: paths.support(org.id), label: "פנייה לתמיכה" },
             ]}
           >
             {context.role === "viewer" ? null : (

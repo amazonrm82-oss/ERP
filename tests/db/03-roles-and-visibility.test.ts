@@ -1752,6 +1752,28 @@ describe("roles and record visibility", () => {
     await set(owner.id, manager.id, "{}");
   });
 
+  it("support requests: every member sends their own; the requester reads theirs, owners and admins all; nobody changes them (USR-12)", async () => {
+    const send = (u: U, subject: string) =>
+      asUser(u.id, (q) => q("insert into public.support_requests (organization_id, category, subject, message) values ($1, 'question', $2, 'טקסט')", [org, subject]));
+    for (const u of [owner, admin, manager, m1, viewer]) await send(u, `usr12-${u.email}`);
+    const mine = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.support_requests where organization_id = $1 and subject like 'usr12-%'", [org]));
+    expect(await mine(owner)).toBe(5);
+    expect(await mine(admin)).toBe(5);
+    for (const u of [manager, m1, viewer]) expect(await mine(u), u.email).toBe(1);
+    expect(await mine(m2)).toBe(0);
+    // the requester is the session, whoever is named; another person's id is not taken
+    const row = await asUser(m2.id, async (q) =>
+      (await q<{ user_id: string; status: string }>("insert into public.support_requests (organization_id, category, subject, message) values ($1, 'bug', 'usr12-x', 'x') returning user_id, status", [org])).rows[0],
+    );
+    expect(row).toEqual({ user_id: m2.id, status: "open" });
+    expect((await pgError(asUser(m2.id, (q) => q("insert into public.support_requests (organization_id, user_id, category, subject, message) values ($1, $2, 'bug', 'x', 'x')", [org, owner.id])))).code).toBe("42501");
+    expect((await pgError(asUser(m2.id, (q) => q("insert into public.support_requests (organization_id, category, subject, message, status) values ($1, 'bug', 'x', 'x', 'closed')", [org])))).code).toBe("42501");
+    for (const u of [owner, admin, m1]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.support_requests set status = 'closed' where organization_id = $1", [org])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.support_requests where organization_id = $1", [org])))).code, u.email).toBe("42501");
+    }
+  });
+
   it("everyone reads the card layout; only owners and admins write it, and nobody deletes it (FLD-08)", async () => {
     const layout = JSON.stringify([{ title: "קשר", columns: 2, fields: ["phone", "email"] }]);
     for (const u of [manager, m1, viewer]) {
