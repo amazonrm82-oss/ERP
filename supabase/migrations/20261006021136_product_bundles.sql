@@ -1075,7 +1075,7 @@ revoke all on function public.order_public(text, text) from public, anon, authen
 grant execute on function public.order_public(text, text) to service_role;
 
 -- =============================================================================
--- OPTIONAL BLOCK (owner's go-ahead pending, question 51; hard rule 3: it rewrites existing rows).
+-- BACKFILL BLOCK (hard rule 3: it rewrites existing rows; owner's go-ahead, question 51 (א), 2 November 2026).
 -- Bundle lines saved before this migration, on DRAFT quotes and orders only: 'single' with the parts as the catalog holds
 -- them now (the line triggers above take the snapshot). Sent quotes, numbered orders and deal lines are not touched.
 -- Only rows of bundle products whose new column is still empty; safe to run twice. Removing this block changes nothing
@@ -1089,4 +1089,4 @@ update public.order_lines l set bundle_display = 'single'
  where l.bundle_display is null and l.product_id is not null
    and exists (select 1 from public.products p where p.organization_id = l.organization_id and p.id = l.product_id and p.kind = 'bundle')
    and exists (select 1 from public.orders o where o.organization_id = l.organization_id and o.id = l.order_id and o.status = 'draft');
--- END OF OPTIONAL BLOCK
+-- END OF BACKFILL BLOCK
