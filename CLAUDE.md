@@ -102,14 +102,14 @@ and build this CRM here instead. The old code is preserved on the branch
    (`src/features/orders/pdf-public-server.ts`, route `GET /api/forms/order/<token>/pdf`) calls only `public.order_public_pdf()` and
    compares the bytes with the SHA-256; both in the eslint allow-list. The PDF prints the customer's own billing details (as the quote PDF). The statement PDF (BAL-04) and report PDFs (RPT-02) are made per request with the
    user's session (or the statement page's own definer answer) and never stored: no new service-key use.
-   In use (QUO-09 signed PDF, owner 1 November 2026, answers (3) א and (33) ב, migration 021122; 021123 pasted by hand):
+   In use (QUO-09 signed PDF, owner 1 November 2026, answers (3) א and (33) ב, migrations 021122, 021126; 021123 pasted by hand 2 November 2026):
    `src/features/quotes/signed-pdf-server.ts` calls only `public.quote_signed_pdf_public()` and `quote_signed_pdf_public_store()` from
    the customer's decide route after an acceptance (the token is the right: link rule, shown version, accepted, decision not erased, not
    signed yet; once per quote), and only `public.quote_signed_pdf_store()` for staff after `quote_signed_pdf_allowed` with the user's
    session; it uploads (upsert off) only to the path the function answers; in the eslint allow-list. Owner (37) ב: the signed PDF
    and the signature are for owners and admins only (`files_select`, `quote_signed_pdf_allowed`/`_store`); every other reader sees
    "נחתמה ב-[date]" from the `quote_accepted` timeline entry (deal, else contact). Owner (38) ב (migration 021126): the signed PDF
-   prints the customer's billing name, address, email and tax id (`app.quote_customer_billing`, definer, no grants; a contact's empty
+   prints the customer's name as sent and their billing address, email and tax id (`app.quote_customer_billing`, definer, no grants; a contact's empty
    field takes its live company's, as `effectiveBilling()`), answered as `billing` by `quote_signed_pdf_public`. The advisor's finding on
    `quote_signed_pdf_allowed` is expected.
    In use (QUO-06 answer 3, owner 26 October 2026, migration 020995): the server writes a quote's PDF
