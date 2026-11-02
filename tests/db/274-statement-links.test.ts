@@ -663,6 +663,7 @@ describe("the customer's statement link (BAL-04)", () => {
       { f: "statement_link_revoke", anon: false, auth: true, service: true },
       { f: "statement_link_status", anon: false, auth: true, service: true },
       { f: "statement_public", anon: false, auth: false, service: true },
+      { f: "statement_staff_view", anon: false, auth: true, service: true },
     ]);
   });
 });

@@ -3,12 +3,11 @@
 // - the customer's: exactly what the statement page shows (public.statement_public's answer: the open debt documents, the
 //   payments of the last 12 months, the totals, the credit, the bank details while the design shows them, the business's
 //   details per the design). The answer holds no ids, and neither does the file.
-// - the staff's: the customer's ledger (BAL-01) and debt summary (BAL-02/03) as the contact or company card shows them, read
-//   with the user's session; only a full view (never a partial one) becomes a file.
+// - the staff's (owner, 2 November 2026, answer (36) ב): exactly the customer's document, from public.statement_staff_view (the
+//   same answer read with the user's session); the bank details only for owners and admins while the statement's switch is on
+//   (answer (35) א), else the line STATEMENT_BANK_ELSEWHERE in their place.
 // Pure, so it is unit tested (tests/unit/statement-pdf.test.ts reads a real file back).
 
-import { AGING_BUCKETS, type Aging } from "@/features/balances/debt";
-import { lineMuted, lineNote, lineTitle, type Ledger } from "@/features/balances/ledger";
 import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo, type PdfRow } from "@/features/pdf/document";
 import { BANK_HEADING, type DocumentBank } from "@/features/quotes/bank";
 import { bankPdfText } from "@/features/quotes/pdf";
@@ -21,20 +20,8 @@ const day = (iso: string | null) => (iso ? formatDate(`${iso}T12:00:00Z`) : "");
 /** The business's details on the letterhead, as the statement page shows them (the design already decided what is there). */
 export type StatementBusiness = PublicStatement["business"];
 
-export type FullLedger = Extract<Ledger, { allowed: true; partial: false }>;
-
-/** The staff's statement: what the contact's or company's card shows of the customer's money, with every balance. */
-export type LedgerStatementData = {
-  business: StatementBusiness;
-  color: string | null;
-  customerName: string | null;
-  today: string;
-  ledger: FullLedger;
-  overdueAgorot: number;
-  // BAL-03: the open debt by days late; null when nothing is open
-  aging: Aging | null;
-  bank: DocumentBank | null;
-};
+/** The staff's file in place of the bank details they may not see (owner, 2 November 2026, answer (35) א). */
+export const STATEMENT_BANK_ELSEWHERE = "פרטי הבנק מופיעים בדף שהלקוח רואה";
 
 // direction marks and embeddings/isolates (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069) and zero-width characters
 // (U+200B-U+200D, U+2060, U+FEFF): a name the customer typed could otherwise show a different name or extension
@@ -82,8 +69,10 @@ function documentName(title: string, number: string | null): string {
   return number ? `${title} ${ltr(number)}` : title;
 }
 
-function bankBlock(bank: DocumentBank | null): PdfBlock[] {
-  return bank ? [{ kind: "section", title: BANK_HEADING, text: bankPdfText(bank) }] : [];
+/** The bank details, or (the staff's file only) the line that stands in their place; nothing when there is neither. */
+function bankBlock(bank: DocumentBank | null, line: string | null): PdfBlock[] {
+  if (bank) return [{ kind: "section", title: BANK_HEADING, text: bankPdfText(bank) }];
+  return line ? [{ kind: "section", title: BANK_HEADING, text: line }] : [];
 }
 
 const STATEMENT_COLUMNS = [
@@ -95,8 +84,11 @@ const STATEMENT_COLUMNS = [
   { title: "איחור", width: 18, align: "start" as const },
 ];
 
-/** The customer's statement page as a PDF: the same content, the same words, no ids. */
-export function publicStatementPdfDocument(data: PublicStatement, logo: PdfLogo | null): PdfDocument {
+/**
+ * The customer's statement page as a PDF: the same content, the same words, no ids. The staff's file is the same document;
+ * `bankLine` stands in for bank details the reader may not see (only when `data.bank` is null).
+ */
+export function publicStatementPdfDocument(data: PublicStatement, logo: PdfLogo | null, bankLine: string | null = null): PdfDocument {
   const blocks: PdfBlock[] = [];
 
   const totals: Array<{ label: string; value: string; strong?: boolean }> = [
@@ -141,7 +133,7 @@ export function publicStatementPdfDocument(data: PublicStatement, logo: PdfLogo 
   const morePayments = morePaymentsText(data.paymentsMore);
   if (morePayments) blocks.push({ kind: "paragraph", text: morePayments, muted: true });
 
-  blocks.push(...bankBlock(data.bank));
+  blocks.push(...bankBlock(data.bank, bankLine));
 
   return {
     title: data.customerName ? `דף חשבון: ${data.customerName}` : "דף חשבון",
@@ -152,112 +144,6 @@ export function publicStatementPdfDocument(data: PublicStatement, logo: PdfLogo 
     meta: addressee(data.customerName, data.today),
     blocks,
     closing: `הדף מציג את החובות הפתוחים ואת התשלומים שהתקבלו לפי הרישומים של ${data.business.name} נכון להיום. זה אינו מסמך חשבונאי. לשאלות על החשבון פנו לעסק.`,
-    pageNote: `דף חשבון נכון ל-${day(data.today)}`,
-  };
-}
-
-const amount = (agorot: number) => (agorot === 0 ? "" : formatMoney(agorot));
-
-/** The staff's statement: the ledger of the period with the running balance, today's open, overdue and credit, and the aging. */
-export function ledgerStatementPdfDocument(data: LedgerStatementData, logo: PdfLogo | null): PdfDocument {
-  const { ledger } = data;
-  const blocks: PdfBlock[] = [];
-
-  blocks.push({
-    kind: "totals",
-    rows: [
-      { label: "יתרת חוב פתוחה", value: formatMoney(ledger.open_debt), strong: true },
-      { label: "מתוכה באיחור", value: formatMoney(data.overdueAgorot) },
-      { label: "יתרת זכות", value: formatMoney(ledger.credit_balance) },
-    ],
-    notes: ledger.credit_balance > 0 ? ["יתרת הזכות מוצגת בנפרד, ועוד לא קוזזה מיתרת החוב."] : [],
-  });
-
-  if (data.aging && ledger.open_debt > 0) {
-    const aging = data.aging;
-    const total = AGING_BUCKETS.reduce((sum, b) => sum + aging[b.key], 0);
-    blocks.push({ kind: "heading", text: "גיול החוב הפתוח (לפי ימים מתאריך התשלום)" });
-    blocks.push({
-      kind: "table",
-      label: "גיול החוב",
-      columns: [
-        { title: "ותק", width: 50, align: "start" },
-        { title: "סכום", width: 25, align: "end" },
-        { title: "חלק מהחוב", width: 25, align: "end" },
-      ],
-      rows: AGING_BUCKETS.map((b) => ({
-        cells: [
-          { text: b.label, muted: aging[b.key] === 0 },
-          { text: formatMoney(aging[b.key]), muted: aging[b.key] === 0 },
-          { text: total > 0 ? `${Math.round((aging[b.key] / total) * 100)}%` : "", muted: aging[b.key] === 0 },
-        ],
-      })),
-    });
-  }
-
-  blocks.push({ kind: "heading", text: `כרטסת מ-${day(ledger.from)} עד ${day(ledger.to)}` });
-  const rows: PdfRow[] = [
-    {
-      cells: [
-        day(ledger.from),
-        { text: ledger.truncated ? "יתרה לפני השורות המוצגות" : "יתרת פתיחה", muted: true },
-        "",
-        "",
-        formatMoney(ledger.shown_opening),
-      ],
-    },
-    ...ledger.lines.map((line) => {
-      const muted = lineMuted(line);
-      const note = lineNote(line);
-      const sub = note ? `${note}${muted && line.amount ? ` · ${formatMoney(line.amount)}` : ""}` : undefined;
-      return {
-        cells: [
-          { text: day(line.date), muted },
-          { text: lineTitle(line), muted, sub },
-          { text: amount(line.debit), muted },
-          { text: amount(line.credit), muted },
-          { text: formatMoney(line.balance), muted },
-        ],
-      };
-    }),
-    {
-      cells: [
-        "",
-        { text: "סך התקופה", bold: true },
-        { text: formatMoney(ledger.debit), bold: true },
-        { text: formatMoney(ledger.credit), bold: true },
-        { text: formatMoney(ledger.closing), bold: true },
-      ],
-    },
-  ];
-  blocks.push({
-    kind: "table",
-    label: "שורות הכרטסת",
-    columns: [
-      { title: "תאריך", width: 14, align: "start" },
-      { title: "פירוט", width: 41, align: "start" },
-      { title: "חובה", width: 15, align: "end" },
-      { title: "זכות", width: 15, align: "end" },
-      { title: "יתרה", width: 15, align: "end" },
-    ],
-    rows,
-  });
-  if (ledger.lines.length === 0) blocks.push({ kind: "paragraph", text: "אין מסמכים או תשלומים בתקופה הזו.", muted: true });
-  if (ledger.truncated) {
-    blocks.push({ kind: "paragraph", text: "מוצגות 500 השורות האחרונות בתקופה. היתרה לפניהן מופיעה בשורה הראשונה.", muted: true });
-  }
-
-  blocks.push(...bankBlock(data.bank));
-
-  return {
-    title: data.customerName ? `דף חשבון: ${data.customerName}` : "דף חשבון",
-    heading: "דף חשבון",
-    color: data.color,
-    logo,
-    from: letterhead(data.business),
-    meta: [...addressee(data.customerName, data.today), { text: `תקופה: ${day(ledger.from)} עד ${day(ledger.to)}`, muted: true }],
-    blocks,
-    closing: `דף החשבון מציג את המסמכים והתשלומים לפי הרישומים של ${data.business.name} נכון ל-${day(data.today)}. זה אינו מסמך חשבונאי. חובה: חשבוניות ומסמכים לתשלום. זכות: תשלומים שהתקבלו וזיכויים.`,
     pageNote: `דף חשבון נכון ל-${day(data.today)}`,
   };
 }

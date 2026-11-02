@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { PAYMENT_METHOD_LABELS } from "@/features/payments/schema";
 import { renderPdf } from "@/features/pdf/render";
-import { ledgerStatementPdfDocument, publicStatementPdfDocument, statementPdfFileName, type LedgerStatementData } from "@/features/statements/pdf";
+import { publicStatementPdfDocument, STATEMENT_BANK_ELSEWHERE, statementPdfFileName } from "@/features/statements/pdf";
 import type { PublicStatement } from "@/features/statements/public";
+import { staffStatementFrom } from "@/features/statements/staff";
 
 import { pdfText } from "./pdf-text";
 
 // BAL-04 (owner, 1 November 2026, answer (2) א): the statement PDF, made for each request and never stored. A real file is
 // made and read back (tests/unit/pdf-text.ts): every line is drawn left to right in visual order, so Hebrew is expected
-// reversed. The customer's file holds what the page shows; the staff's file holds the card's ledger.
+// reversed. The customer's file holds what the page shows; since 2 November 2026 the staff's file is the same document.
 
 // an amount as the file draws it: the sign, a no-break space, the number (the RLM marks are not drawn)
 const nis = (n: string) => `₪\u00a0${n}`;
@@ -133,63 +134,68 @@ describe("the customer's statement PDF, read back from a real file (BAL-04)", ()
   });
 });
 
-function ledgerData(lines: number): LedgerStatementData {
-  const base = statement(0, 0);
+/** A raw answer of public.statement_staff_view (statement_public's shape plus the staff keys). */
+function staffAnswer(extra: Record<string, unknown> = {}) {
   return {
-    business: base.business,
-    color: null,
-    customerName: "לקוח בדיקה",
-    today: "2026-11-01",
-    overdueAgorot: 30000,
-    aging: { current: 10000, d1_30: 30000, d31_60: 0, d61_90: 0, d91_plus: 0 },
+    allowed: true,
+    partial: false,
+    business: { name: "חברת הדוגמה", legal_name: null, tax_id: null, address_line: null, city: null, postal_code: null, phone: null, email: null },
+    brand: { logo: null, color: null },
+    customer: { name: "ישראל ישראלי" },
+    today: "2026-11-02",
+    currency: "ILS",
+    documents: [{ type: "tax_invoice", number: "INV-7", doc_date: "2026-09-01", due_date: "2026-10-01", amount_agorot: 10000, balance_agorot: 6000, overdue_days: 32 }],
+    more: 0,
+    payments: [{ paid_on: "2026-10-05", method: "transfer", amount_agorot: 4000 }],
+    payments_more: 0,
     bank: null,
-    ledger: {
-      allowed: true,
-      partial: false,
-      from: "2025-11-01",
-      to: "2026-11-01",
-      opening: 0,
-      shown_opening: 0,
-      truncated: false,
-      debit: 1000000,
-      credit: 960000,
-      closing: 40000,
-      open_debt: 40000,
-      credit_balance: 0,
-      lines: Array.from({ length: lines }, (_, i) =>
-        i % 2 === 0
-          ? { kind: "document" as const, id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, date: "2026-03-01", type: "tax_invoice", label: `${2000 + i}`, status: "active", invoice_number: null, proforma_number: null, amount: 50000, debit: 50000, credit: 0, balance: 50000 }
-          : { kind: "payment" as const, id: `00000000-0000-4000-9000-${String(i).padStart(12, "0")}`, date: "2026-03-05", type: "cash", label: null, status: "cancelled", invoice_number: null, proforma_number: null, amount: 48000, debit: 0, credit: 0, balance: 50000 },
-      ),
-    },
+    bank_elsewhere: true,
+    totals: { open_agorot: 6000, overdue_agorot: 6000, credit_agorot: 0 },
+    built_with: false,
+    ...extra,
   };
 }
 
-describe("the staff's statement PDF (BAL-04, the card's ledger)", () => {
-  it("shows the totals, the aging and the ledger with its running balance over several pages", async () => {
-    const pages = pdfText(await renderPdf(ledgerStatementPdfDocument(ledgerData(120), null)));
-    expect(pages.length).toBeGreaterThanOrEqual(3);
-    const all = pieces(pages);
-    expect(all).toContain(visual("יתרת חוב פתוחה"));
-    expect(all).toContain(visual("יתרת פתיחה"));
-    expect(all).toContain(visual("סך התקופה"));
-    expect(all).toContain("םוי 90 לעמ");
-    expect(all).toContain(nis("400"));
-    // a cancelled payment says so, as on the card
-    expect(all.some((p) => p.includes(visual("לא נספר")))).toBe(true);
-    const ledgerPages = pages.filter((page) => page.pieces.some((p) => p.text.includes("2010")));
-    expect(ledgerPages.length).toBeGreaterThanOrEqual(1);
-    const rowPages = pages.filter((page) => page.pieces.some((p) => p.text.includes(visual("חשבונית מס"))));
-    expect(rowPages.length).toBeGreaterThanOrEqual(2);
-    for (const page of rowPages) expect(page.pieces.map((p) => p.text)).toContain(visual("פירוט"));
-    expect(all.join("\n")).not.toContain("�");
-    expectNoIds(all);
+describe("the staff's statement PDF (BAL-04, owner 2 November 2026: the customer's document)", () => {
+  it("reads the view's refusals and its content", () => {
+    expect(staffStatementFrom({ allowed: false })).toEqual({ state: "not-allowed" });
+    expect(staffStatementFrom({ allowed: true, partial: true })).toEqual({ state: "partial" });
+    expect(staffStatementFrom({ allowed: true, partial: false, refused: "company" })).toEqual({ state: "company" });
+    expect(staffStatementFrom({ allowed: true, partial: false, refused: "not_found" })).toEqual({ state: "not-found" });
+    expect(staffStatementFrom({ allowed: true, partial: false })).toBeNull();
+    expect(staffStatementFrom(null)).toBeNull();
+    const ok = staffStatementFrom(staffAnswer());
+    expect(ok?.state).toBe("ok");
+    if (ok?.state !== "ok") return;
+    expect(ok.bankElsewhere).toBe(true);
+    expect(ok.statement.lines).toHaveLength(1);
+    expect(ok.statement.bank).toBeNull();
+    const admin = staffStatementFrom(staffAnswer({ bank_elsewhere: false, bank: { bank_name: "בנק", bank_branch: "1", bank_account: "999", bank_account_name: null } }));
+    expect(admin?.state === "ok" && admin.bankElsewhere).toBe(false);
+    expect(admin?.state === "ok" && admin.statement.bank?.account).toBe("999");
   });
 
-  it("leaves the aging out when nothing is open", () => {
-    const data = ledgerData(2);
-    data.ledger = { ...data.ledger, open_debt: 0 };
-    data.aging = null;
-    expect(ledgerStatementPdfDocument(data, null).blocks.some((b) => b.kind === "table" && b.label === "גיול החוב")).toBe(false);
+  it("prints the line in place of the bank details, never both, and no ids", async () => {
+    const data = { ...statement(3, 2), bank: null };
+    const doc = publicStatementPdfDocument(data, null, STATEMENT_BANK_ELSEWHERE);
+    expect(doc.blocks.filter((b) => b.kind === "section")).toEqual([{ kind: "section", title: "פרטים להעברה בנקאית", text: STATEMENT_BANK_ELSEWHERE }]);
+    const all = pieces(pdfText(await renderPdf(doc)));
+    expect(all).toContain(visual(STATEMENT_BANK_ELSEWHERE));
+    expect(all).not.toContain("12345678 :ןובשח רפסמ");
+    expectNoIds(all);
+
+    // an owner or admin with the switch on: the details, and the line is not printed
+    const withBank = publicStatementPdfDocument(statement(3, 2), null, null);
+    const sections = withBank.blocks.filter((b) => b.kind === "section");
+    expect(sections).toHaveLength(1);
+    expect(JSON.stringify(sections)).not.toContain(STATEMENT_BANK_ELSEWHERE);
+    expect(JSON.stringify(sections)).toContain("12345678");
+    // the details win if both arrive
+    expect(JSON.stringify(publicStatementPdfDocument(statement(1, 1), null, STATEMENT_BANK_ELSEWHERE).blocks)).not.toContain(STATEMENT_BANK_ELSEWHERE);
+  });
+
+  it("is the customer's document: the same blocks as the customer's file", () => {
+    const data = statement(5, 4);
+    expect(publicStatementPdfDocument(data, null, null)).toEqual(publicStatementPdfDocument(data, null));
   });
 });

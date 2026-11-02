@@ -18,16 +18,14 @@ type Props = {
   // a contact of a company: the statement is the company's (BAL-02's customer)
   company?: { id: string; name: string | null } | null;
   recipient: { name: string | null; phoneE164: string | null; email: string | null };
-  // the ledger's period from the page's address (lf, lt), so the PDF covers what the "כספים" card shows
-  period?: { from?: string | null; to?: string | null };
 };
 
 /**
  * BAL-04: "דף חשבון ללקוח" on the contact and company cards: a secret link the customer opens to see their open debts (the
- * PDF of the ledger is made on each download, never stored). For whoever opens the customer's ledger (BAL-01's rule and keys); the database decides the
+ * PDF, the same document the customer gets, is made on each download, never stored). For whoever opens the customer's ledger (BAL-01's rule and keys); the database decides the
  * rest (the partial rule, the customer).
  */
-export async function StatementLinkCard({ orgId, customer, company, recipient, period = {} }: Props) {
+export async function StatementLinkCard({ orgId, customer, company, recipient }: Props) {
   if (!(await seesBalances(orgId))) return null;
   const titleId = `statement-${customer.id}`;
   if (customer.kind === "contact" && company) {
@@ -71,8 +69,8 @@ export async function StatementLinkCard({ orgId, customer, company, recipient, p
               </p>
             ) : (
               <>
-                <p className="text-sm text-ink-soft">PDF של דף החשבון לתקופה שמוצגת בכספים, להדפסה או לשליחה ללקוח.</p>
-                <a href={staffStatementPdfPath(orgId, customer, period)} className={buttonClasses("secondary", "sm")}>
+                <p className="text-sm text-ink-soft">PDF של דף החשבון, כמו שהלקוח רואה אותו, להדפסה או לשליחה ללקוח.</p>
+                <a href={staffStatementPdfPath(orgId, customer)} className={buttonClasses("secondary", "sm")}>
                   הורדת PDF
                 </a>
               </>
