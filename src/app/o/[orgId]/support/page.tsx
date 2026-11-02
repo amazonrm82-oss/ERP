@@ -5,7 +5,7 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { getOrgContextForOwner, getUserNames } from "@/features/shell/queries";
 import { SUPPORT_CATEGORIES, supportPagePath, supportStatusLabel, type SupportCategory } from "@/features/support-requests/categories";
 import { SupportForm } from "@/features/support-requests/components/support-form";
 import { listSupportRequests } from "@/features/support-requests/queries";
@@ -21,7 +21,8 @@ const STATUS_TONES: Record<string, BadgeTone> = { open: "accent", in_progress: "
 // owners and admins see every request of the business. The request reaches the platform's support (ADM-05).
 export default async function SupportPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  const context = await getOrgContext(orgId);
+  // the owner of a closed business still reaches support (anyone else there goes to the closed screen)
+  const context = await getOrgContextForOwner(orgId);
   const requestHeaders = await headers();
   const from = supportPagePath(requestHeaders.get("referer"), requestHeaders.get("host"));
   const page = from === paths.support(orgId) ? null : from;

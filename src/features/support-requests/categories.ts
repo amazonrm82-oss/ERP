@@ -39,11 +39,13 @@ export function supportPagePath(referrer: string | null, host: string | null): s
   }
   if (url.host !== host || (url.protocol !== "https:" && url.protocol !== "http:")) return null;
   const path = url.pathname;
-  if (!path.startsWith("/") || /\s/.test(path) || path.length > SUPPORT_PAGE_MAX) return null;
-  return path;
+  return validPagePath(path) ? path : null;
 }
 
-/** The server's check of a sent path (the database checks the same shape). */
+/**
+ * The server's check of a sent path (the database checks the same shape): one leading slash, never "//" or "/\"
+ * (read by a browser as another site), no query, fragment or whitespace.
+ */
 export function validPagePath(value: string): boolean {
-  return value.length >= 1 && value.length <= SUPPORT_PAGE_MAX && /^\/[^?#\s]*$/.test(value);
+  return value.length >= 1 && value.length <= SUPPORT_PAGE_MAX && /^\/(?![/\\])[^?#\s]*$/.test(value);
 }

@@ -80,6 +80,8 @@ export default async function OrgLayout({ children, params }: Props) {
               links={[
                 { href: paths.home, label: "החלפת עסק" },
                 { href: paths.help, label: "מרכז עזרה" },
+                // USR-12: the owner of a closed business can still write to support
+                ...(context.role === "owner" ? [{ href: paths.support(org.id), label: "פנייה לתמיכה" }] : []),
               ]}
             >
               <SignOutButton className={buttonClasses("ghost", "sm", "w-full justify-start")} />

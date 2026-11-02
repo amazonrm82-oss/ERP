@@ -67,6 +67,7 @@ export function UserMenu({ name, email, roleLabel, links, children }: Props) {
         </span>
         <span className="hidden max-w-40 truncate text-md sm:block">{name}</span>
         <span className="sr-only sm:hidden">{name}</span>
+        {links.some((link) => link.dot) ? <span className="sr-only"> (יש חדש)</span> : null}
         <ChevronDownIcon className="size-4 text-ink-soft" />
       </button>
 

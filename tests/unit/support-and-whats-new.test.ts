@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { SUPPORT_CATEGORIES, SUPPORT_STATUSES, supportPagePath, validPagePath } from "@/features/support-requests/categories";
@@ -27,6 +30,11 @@ describe("USR-12: support requests", () => {
     expect(validPagePath("/o/1/leads")).toBe(true);
     expect(validPagePath("/o/1?x=1")).toBe(false);
     expect(validPagePath("o/1")).toBe(false);
+    // L5: "//host" and "/\\host" are another site to a browser
+    expect(validPagePath("//evil.example/x")).toBe(false);
+    expect(validPagePath("/\\evil.example/x")).toBe(false);
+    expect(supportPagePath("https://crm.example//evil.example/x", "crm.example")).toBeNull();
+    expect(listIn(migration(), "support_requests_category_check").length).toBeGreaterThan(0);
   });
 });
 
@@ -47,5 +55,28 @@ describe("USR-12: what's new", () => {
     expect(hasUnreadWhatsNew(null)).toBe(true);
     expect(hasUnreadWhatsNew("2020-01-01")).toBe(true);
     expect(hasUnreadWhatsNew(LATEST_WHATS_NEW)).toBe(false);
+  });
+});
+
+describe("USR-12 review: who reaches support, and what the menu says", () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("the support page lets the owner of a closed business in (M1)", () => {
+    const page = read("src/app/o/[orgId]/support/page.tsx");
+    expect(page).toContain("getOrgContextForOwner(orgId)");
+    expect(page).not.toMatch(/getOrgContext\(orgId\)/);
+  });
+
+  it("the closed business's frame offers support and shows the banners (M1)", () => {
+    const layout = read("src/app/o/[orgId]/layout.tsx");
+    const closed = layout.slice(layout.indexOf("if (context.closed)"), layout.indexOf("const [notifications"));
+    expect(closed).toContain("paths.support(org.id)");
+    expect(closed).toContain("<SystemBanners");
+  });
+
+  it("the account button names the unread dot for screen readers (L8)", () => {
+    const menu = read("src/features/shell/components/user-menu.tsx");
+    const button = menu.slice(menu.indexOf("<button"), menu.indexOf("</button>"));
+    expect(button).toContain('className="sr-only"> (יש חדש)');
   });
 });

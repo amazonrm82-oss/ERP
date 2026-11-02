@@ -10,7 +10,8 @@
 -- Support requests: public.support_requests, one row per request a person sends from inside a business.
 --   * category from a closed list (question | bug | billing | feature | other, mirrored by SUPPORT_CATEGORIES in
 --     src/features/support-requests/categories.ts), subject 1..120, message 1..2,000, and optionally the page the person was on
---     (a path without query or fragment, up to 300 characters)
+--     (a path without query or fragment, up to 300 characters; never starting with // or /\, which a browser reads
+--     as another site)
 --   * user_id comes from the session (trigger), status starts 'open'; open | in_progress | closed, changed only by
 --     platform staff (ADM-05, platform_* functions): clients have no update or delete grant
 --   * insert: an active member of the business (app.membership_role: a support session cannot write one; the owner of
@@ -40,7 +41,8 @@ create table if not exists public.support_requests (
                     constraint support_requests_message_check check (char_length(btrim(message)) between 1 and 2000),
   page_path         text
                     constraint support_requests_page_path_check check (
-                      page_path is null or (char_length(page_path) between 1 and 300 and page_path ~ '^/[^?#[:space:]]*$')),
+                      page_path is null or (char_length(page_path) between 1 and 300 and page_path ~ '^/[^?#[:space:]]*$'
+                                            and page_path !~ '^/[/\\]')),
   status            text not null default 'open'
                     constraint support_requests_status_check check (status in ('open', 'in_progress', 'closed')),
   status_changed_at timestamptz,

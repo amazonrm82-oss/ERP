@@ -56,6 +56,9 @@ describe("USR-12: support requests", () => {
     expect((await pgError(send(bob.id, orgB, { category: "other-thing" }))).code).toBe("23514");
     expect((await pgError(send(bob.id, orgB, { page: "/o/x?token=secret" }))).code).toBe("23514");
     expect((await pgError(send(bob.id, orgB, { page: "https://evil.example/" }))).code).toBe("23514");
+    // L5: a path a browser reads as another site
+    expect((await pgError(send(bob.id, orgB, { page: "//evil.example/x" }))).code).toBe("23514");
+    expect((await pgError(send(bob.id, orgB, { page: "/\\evil.example/x" }))).code).toBe("23514");
     await send(bob.id, orgB, { page: "/o/x/leads" });
     expect((await pgError(asUser(bob.id, (q) => q("insert into public.support_requests (organization_id, category, subject, message) values ($1, 'bug', '   ', 'x')", [orgB])))).code).toBe("23514");
     expect((await pgError(asUser(bob.id, (q) => q("insert into public.support_requests (organization_id, category, subject, message) values ($1, 'bug', 'x', $2)", [orgB, "א".repeat(2001)])))).code).toBe("23514");
