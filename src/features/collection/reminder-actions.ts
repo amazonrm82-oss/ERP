@@ -1,5 +1,6 @@
 "use server";
 
+import { isGender, type Gender } from "@/features/gender/gender";
 import { actionContext } from "@/lib/action-context";
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
@@ -25,6 +26,8 @@ export type CollectionReminderMessage =
       name: string;
       firstName: string | null;
       fullName: string | null;
+      // HEB-01: the contact's gender picks the wording; a company has none (neutral)
+      gender: Gender | null;
       document: string;
       // null when the user does not see all of the customer's money (BAL-01): {סכום} stays for the person
       amount: string | null;
@@ -73,7 +76,7 @@ export async function loadCollectionReminderAction(orgId: string, taskId: string
     companyId = companyId ?? deal.data?.company_id ?? null;
   }
   const contact = contactId
-    ? await supabase.from("contacts").select("id, full_name, first_name, phone_e164, company_id").eq("organization_id", orgId).eq("id", contactId).maybeSingle()
+    ? await supabase.from("contacts").select("id, full_name, first_name, phone_e164, company_id, gender").eq("organization_id", orgId).eq("id", contactId).maybeSingle()
     : null;
   if (contact?.error) return fail(dbErrorMessage(contact.error));
 
@@ -109,6 +112,7 @@ export async function loadCollectionReminderAction(orgId: string, taskId: string
       name,
       firstName: contact.data.first_name,
       fullName: contact.data.full_name,
+      gender: isGender(contact.data.gender) ? contact.data.gender : null,
       ...filled,
       templateId,
     });
@@ -125,6 +129,7 @@ export async function loadCollectionReminderAction(orgId: string, taskId: string
         name: company.data.name,
         firstName: null,
         fullName: company.data.name,
+        gender: null,
         ...filled,
         templateId,
       });

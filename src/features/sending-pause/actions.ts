@@ -11,6 +11,8 @@ import { pick } from "@/lib/validation";
 import { pauseSchema } from "./pause";
 
 const NOT_ADMIN = "רק בעלים ומנהלי מערכת יכולים לעצור ולחדש את השליחה ללקוחות.";
+// review L-4: the owner keeps a role in a closed business, but the switch is frozen there
+const CLOSED = "העסק סגור כרגע, ולכן אי אפשר לעצור או לחדש את השליחה.";
 
 type PauseValues = { paused: boolean; reason: string | null };
 
@@ -31,7 +33,13 @@ async function save(orgId: string, values: PauseValues): Promise<FormState> {
     orgId,
     values,
   );
-  if (!result.ok) return fail(result.error?.code === "42501" ? NOT_ADMIN : dbErrorMessage(result.error));
+  if (!result.ok) {
+    if (result.error?.code !== "42501") return fail(dbErrorMessage(result.error));
+    // refused by RLS: say why when the business is closed to the caller (public.closed_orgs, the caller's own businesses)
+    const closed = await supabase.rpc("closed_orgs");
+    const closedHere = !closed.error && Array.isArray(closed.data) && closed.data.some((row) => typeof row === "object" && row !== null && "id" in row && row.id === orgId);
+    return fail(closedHere ? CLOSED : NOT_ADMIN);
+  }
   // the banner sits in the business layout: every screen shows or drops it
   revalidatePath(`/o/${orgId}`, "layout");
   return {

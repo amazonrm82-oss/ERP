@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { NOT_PAUSED, pauseBannerText, pauseFromRow, pauseSchema, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
+import { NOT_PAUSED, pauseBannerText, pauseFromRow, pauseSchema, pauseTimeText, PAUSE_REASON_MAX } from "@/features/sending-pause/pause";
 
 // HEB-09: found by its suffix (the lead renumbers migrations at merge)
 const dir = new URL("../../supabase/migrations/", import.meta.url);
@@ -29,5 +29,13 @@ describe("sending pause (HEB-09)", () => {
     expect(pauseBannerText(pause, "2.11.2026, 10:00")).toBe("השליחה האוטומטית ללקוחות מושהית מאז 2.11.2026, 10:00 (יום אבל). הודעות לצוות ממשיכות כרגיל.");
     const resumed = pauseFromRow({ paused: false, reason: null, paused_at: "2026-11-02T08:00:00Z", paused_by: null, resumed_at: "2026-11-03T08:00:00Z", resumed_by: null });
     expect(pauseBannerText(resumed, "x")).toBeNull();
+  });
+
+  it("times show in the business's zone (review L-3)", () => {
+    const at = "2026-11-02T22:30:00Z";
+    expect(pauseTimeText(at, "Asia/Jerusalem")).toMatch(/3 .*0:30/);
+    expect(pauseTimeText(at, "America/New_York")).toMatch(/2 .*17:30/);
+    expect(pauseTimeText(null, "Asia/Jerusalem")).toBe("");
+    expect(pauseTimeText(at, "Not/AZone")).not.toBe("");
   });
 });

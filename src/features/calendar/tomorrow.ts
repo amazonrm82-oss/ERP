@@ -1,5 +1,6 @@
 import { addDays, MONTHS, weekday, WEEKDAYS_LONG } from "@/lib/calendar-grid";
 import { zoneTime } from "@/lib/format";
+import { isGender } from "@/features/gender/gender";
 import { firstNameOf, MEETING_REMINDER_KIND, whatsappMessageUrl, type TemplateValues } from "@/features/whatsapp/templates";
 
 // GAP-03: tomorrow's meetings with a one-tap WhatsApp reminder, until automatic reminders
@@ -30,6 +31,8 @@ export type ReminderPerson = {
   fullName: string | null;
   phone: string | null;
   phoneE164: string | null;
+  // HEB-01: picks the reminder's wording (none = neutral)
+  gender?: string | null;
 };
 
 /**
@@ -72,5 +75,7 @@ export function reminderValues(
     businessName: context.org.name,
     date: reminderDate(day),
     time: zoneTime(new Date(meeting.startsAt), context.org.timeZone),
+    // HEB-01: only a stored code; none = the neutral wording
+    ...(isGender(person.gender) ? { gender: person.gender } : {}),
   };
 }

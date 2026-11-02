@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { contactSchema } from "@/features/contacts/schema";
 import { GENDERS, GENDER_LABELS, genderFromForm, genderLabel, importGender } from "@/features/gender/gender";
+import { reminderValues } from "@/features/calendar/tomorrow";
 import { DEFAULT_TEMPLATES, fillTemplate, recordTemplateValues } from "@/features/whatsapp/templates";
 import { templateSchema } from "@/features/whatsapp/schema";
 import { pickVariants, templateVariantProblem } from "@/features/whatsapp/variants";
@@ -91,5 +92,14 @@ describe("gender wordings in templates (HEB-01)", () => {
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues[0].message).toBe(dbErrorMessage({ code: "P0001", hint: "whatsapp_template:neutral" }));
     expect(dbErrorMessage({ code: "P0001", hint: "whatsapp_template:variant" })).toContain("{זכר:");
+  });
+
+  it("tomorrow's meeting reminder takes the person's gender (review L-1)", () => {
+    const context = { user: { displayName: "רון" }, org: { name: "העסק", timeZone: "Asia/Jerusalem" } };
+    const person = { kind: "contact" as const, id: "c", firstName: "דנה", fullName: "דנה כהן", phone: null, phoneE164: null };
+    const body = "{זכר: אתה מוזמן | נקבה: את מוזמנת | ניטרלי: מחכים לך} מחר";
+    const meeting = { startsAt: "2026-11-03T08:00:00Z" };
+    expect(fillTemplate(body, reminderValues({ ...person, gender: "female" }, meeting, context, "2026-11-03"))).toBe("את מוזמנת מחר");
+    expect(fillTemplate(body, reminderValues(person, meeting, context, "2026-11-03"))).toBe("מחכים לך מחר");
   });
 });

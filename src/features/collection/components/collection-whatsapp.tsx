@@ -44,6 +44,7 @@ export function CollectionWhatsapp({ orgId, taskId, context }: Props) {
         values={{
           firstName: message.firstName?.trim() || (message.subject.kind === "contact" ? firstNameOf(message.fullName) : null),
           fullName: message.fullName,
+          gender: message.gender,
           userName: context.userName,
           businessName: context.businessName,
           document: message.document,

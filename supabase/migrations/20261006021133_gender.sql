@@ -108,64 +108,106 @@ grant execute on function app.card_layout_builtin_keys(text) to authenticated, s
 -- block start inside is 'variant'. The body splits on "|" outside a placeholder; each part must start with
 -- optional spaces, a label and ":", each label at most once ('variant'); a block without the neutral label
 -- is 'neutral'. The first problem in reading order is answered.
+-- Linear in the text's length (review M-1): the walk reads the UTF-8 bytes (get_byte and a short substring
+-- are constant time on a bytea, unlike substr on multi-byte text). The delimiters { } | : and the space are
+-- ASCII, and no byte of a multi-byte UTF-8 character is ever ASCII, so a byte walk sees exactly the
+-- characters a character walk sees. The labels are compared as their UTF-8 bytes:
+-- זכר = d796d79bd7a8, נקבה = d7a0d7a7d791d794, ניטרלי = d7a0d799d798d7a8d79cd799.
+
+-- The label of a part head (or a block head after its "{") that starts at byte p (0-based) and must end,
+-- with its ":", before byte p_end; null when there is none.
+create or replace function app.template_variant_head(p_bytes bytea, p_at integer, p_end integer) returns text
+language plpgsql immutable
+set search_path = ''
+as $$
+declare
+  v_p integer := p_at;
+  v_label text;
+begin
+  while v_p < p_end and get_byte(p_bytes, v_p) = 32 loop
+    v_p := v_p + 1;
+  end loop;
+  if v_p + 6 <= p_end and substring(p_bytes from v_p + 1 for 6) = decode('d796d79bd7a8', 'hex') then
+    v_label := 'male';
+    v_p := v_p + 6;
+  elsif v_p + 8 <= p_end and substring(p_bytes from v_p + 1 for 8) = decode('d7a0d7a7d791d794', 'hex') then
+    v_label := 'female';
+    v_p := v_p + 8;
+  elsif v_p + 12 <= p_end and substring(p_bytes from v_p + 1 for 12) = decode('d7a0d799d798d7a8d79cd799', 'hex') then
+    v_label := 'neutral';
+    v_p := v_p + 12;
+  else
+    return null;
+  end if;
+  while v_p < p_end and get_byte(p_bytes, v_p) = 32 loop
+    v_p := v_p + 1;
+  end loop;
+  if v_p < p_end and get_byte(p_bytes, v_p) = 58 then
+    return v_label;
+  end if;
+  return null;
+end;
+$$;
+revoke all on function app.template_variant_head(bytea, integer, integer) from public, anon, authenticated;
+grant execute on function app.template_variant_head(bytea, integer, integer) to authenticated;
+
 create or replace function app.template_variant_problem(p_text text) returns text
 language plpgsql immutable
 set search_path = ''
 as $$
 declare
-  v_start constant text := '^[{] *(זכר|נקבה|ניטרלי) *:';
-  v_part constant text := '^ *(זכר|נקבה|ניטרלי) *:';
-  v_n integer := char_length(coalesce(p_text, ''));
-  v_i integer := 1;
+  v_b bytea := convert_to(coalesce(p_text, ''), 'UTF8');
+  v_n integer := length(convert_to(coalesce(p_text, ''), 'UTF8'));
+  v_i integer := 0;
   v_j integer;
   v_depth integer;
   v_close integer;
-  v_ch text;
+  v_ch integer;
   v_bounds integer[];
   v_k integer;
   v_label text;
   v_seen text[];
 begin
-  while v_i <= v_n loop
-    if substr(p_text, v_i, 1) <> '{' or substr(p_text, v_i) !~ v_start then
+  while v_i < v_n loop
+    if get_byte(v_b, v_i) <> 123 or app.template_variant_head(v_b, v_i + 1, v_n) is null then
       v_i := v_i + 1;
       continue;
     end if;
     v_depth := 0;
-    v_close := 0;
+    v_close := -1;
     v_bounds := array[v_i];
     v_j := v_i + 1;
-    while v_j <= v_n loop
-      v_ch := substr(p_text, v_j, 1);
-      if v_ch = '{' then
-        if v_depth > 0 or substr(p_text, v_j) ~ v_start then
+    while v_j < v_n loop
+      v_ch := get_byte(v_b, v_j);
+      if v_ch = 123 then
+        if v_depth > 0 or app.template_variant_head(v_b, v_j + 1, v_n) is not null then
           return 'variant';
         end if;
         v_depth := 1;
-      elsif v_ch = '}' then
+      elsif v_ch = 125 then
         if v_depth = 0 then
           v_close := v_j;
           exit;
         end if;
         v_depth := 0;
-      elsif v_ch = '|' and v_depth = 0 then
+      elsif v_ch = 124 and v_depth = 0 then
         v_bounds := v_bounds || v_j;
       end if;
       v_j := v_j + 1;
     end loop;
-    if v_close = 0 then
+    if v_close < 0 then
       return 'variant';
     end if;
     v_bounds := v_bounds || v_close;
     v_seen := array[]::text[];
     for v_k in 1 .. array_length(v_bounds, 1) - 1 loop
-      v_label := substring(substr(p_text, v_bounds[v_k] + 1, v_bounds[v_k + 1] - v_bounds[v_k] - 1) from v_part);
+      v_label := app.template_variant_head(v_b, v_bounds[v_k] + 1, v_bounds[v_k + 1]);
       if v_label is null or v_label = any (v_seen) then
         return 'variant';
       end if;
       v_seen := v_seen || v_label;
     end loop;
-    if not ('ניטרלי' = any (v_seen)) then
+    if not ('neutral' = any (v_seen)) then
       return 'neutral';
     end if;
     v_i := v_close + 1;
@@ -184,6 +226,10 @@ declare
   v_problem text;
 begin
   if tg_op = 'UPDATE' and new.body is not distinct from old.body then
+    return new;
+  end if;
+  -- longer than the column allows: its check constraint refuses it, without walking it (review M-1)
+  if char_length(new.body) > 1000 then
     return new;
   end if;
   v_problem := app.template_variant_problem(new.body);

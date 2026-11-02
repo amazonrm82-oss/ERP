@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LOCALE } from "@/lib/app";
+
 // HEB-09: "stop everything". While a business has paused, no automatic message goes to its customers
 // (app.customer_sending_paused, migration customer_sending_pause); messages to the staff go on.
 
@@ -48,3 +50,17 @@ export function pauseBannerText(pause: SendingPause, pausedAtText: string | null
   const reason = pause.reason ? ` (${pause.reason})` : "";
   return `השליחה האוטומטית ללקוחות מושהית${since}${reason}. הודעות לצוות ממשיכות כרגיל.`;
 }
+
+/** A pause or resume time in the business's own zone (review L-3); "" for none or an invalid time. */
+export function pauseTimeText(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short", timeZone }).format(at);
+  } catch {
+    // a zone the runtime does not know (the database refuses those, RVW-58): the app's default
+    return new Intl.DateTimeFormat(LOCALE, { dateStyle: "medium", timeStyle: "short" }).format(at);
+  }
+}
+

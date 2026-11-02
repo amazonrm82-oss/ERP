@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PauseSendingForm, ResumeSendingForm } from "@/features/sending-pause/components/sending-pause-form";
+import { pauseTimeText } from "@/features/sending-pause/pause";
 import { getSendingPause } from "@/features/sending-pause/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
-import { formatDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "עצירת שליחה ללקוחות" };
 
@@ -18,6 +18,7 @@ export default async function SendingPausePage({ params }: Props) {
   const pause = await getSendingPause(orgId);
   const editable = isAdminRole(context.role);
   const names = await getUserNames([pause.pausedBy, pause.resumedBy]);
+  const zone = context.org.timeZone;
   const by = (id: string | null) => (id ? (names.get(id) ?? null) : null);
   return (
     <div className="space-y-5">
@@ -32,7 +33,7 @@ export default async function SendingPausePage({ params }: Props) {
             <dl className="grid gap-x-3 gap-y-1 text-md sm:grid-cols-[auto_1fr]">
               <dt className="font-medium">מאז</dt>
               <dd className="text-ink-soft">
-                {pause.pausedAt ? formatDateTime(pause.pausedAt) : "לא ידוע"}
+                {pause.pausedAt ? pauseTimeText(pause.pausedAt, zone) : "לא ידוע"}
                 {by(pause.pausedBy) ? `, על ידי ${by(pause.pausedBy)}` : ""}
               </dd>
               <dt className="font-medium">סיבה</dt>
@@ -40,7 +41,7 @@ export default async function SendingPausePage({ params }: Props) {
             </dl>
           ) : pause.resumedAt ? (
             <p className="text-md text-ink-soft">
-              חודשה ב-{formatDateTime(pause.resumedAt)}
+              חודשה ב-{pauseTimeText(pause.resumedAt, zone)}
               {by(pause.resumedBy) ? `, על ידי ${by(pause.resumedBy)}` : ""}.
             </p>
           ) : null}

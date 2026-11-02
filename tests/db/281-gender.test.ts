@@ -61,6 +61,23 @@ describe("gender (HEB-01)", () => {
     await asUser(owner.id, (q) => q("update public.whatsapp_templates set name = 'מוזמנים' where id = $1", [id]));
   });
 
+  it("the check is linear: a full 1,000-character body is judged fast, a longer one is refused by the length check (review M-1)", async () => {
+    const block = "{זכר: א | נקבה: ב | ניטרלי: ג}";
+    const full = block.repeat(Math.floor(1000 / block.length));
+    expect([...full].length).toBeLessThanOrEqual(1000);
+    let started = performance.now();
+    await asUser(owner.id, (q) => q("insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'ארוך', $2)", [org, full]));
+    expect(performance.now() - started).toBeLessThan(100);
+    // the worst shape for a walk: every character opens something
+    started = performance.now();
+    expect(await asAdmin(async (q) => (await q<{ p: string | null }>("select app.template_variant_problem($1) as p", ["{ ".repeat(500)])).rows[0].p)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(100);
+    started = performance.now();
+    const refused = await pgError(asUser(owner.id, (q) => q("insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'ארוך מדי', $2)", [org, block.repeat(1000)])));
+    expect(refused.code).toBe("23514");
+    expect(performance.now() - started).toBeLessThan(100);
+  });
+
   it("the seeded defaults hold no problem", async () => {
     const bodies = await asAdmin(async (q) => (await q<{ p: string | null }>("select app.template_variant_problem(body) as p from public.whatsapp_templates where organization_id = $1", [org])).rows);
     expect(bodies.length).toBeGreaterThan(0);

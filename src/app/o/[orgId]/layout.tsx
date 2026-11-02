@@ -216,7 +216,7 @@ export default async function OrgLayout({ children, params }: Props) {
       </Suspense>
 
       {/* HEB-09: automatic sending to customers is paused */}
-      <SendingPauseBanner orgId={org.id} admin={isAdminRole(context.role)} />
+      <SendingPauseBanner orgId={org.id} admin={isAdminRole(context.role)} timeZone={org.timeZone} />
 
       {/* bottom padding leaves room for the phone navigation bar */}
       <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:px-6 sm:pt-7 md:pb-12">

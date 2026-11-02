@@ -68,23 +68,23 @@ export async function listTomorrowMeetings(
     const rows = must(
       await supabase
         .from("contacts")
-        .select("id, first_name, full_name, phone, phone_e164")
+        .select("id, first_name, full_name, phone, phone_e164, gender")
         .eq("organization_id", orgId)
         .is("deleted_at", null)
         .in("id", ids),
       "tomorrow contacts",
     );
     for (const row of rows) {
-      people.set(`contact:${row.id}`, { kind: "contact", id: row.id, firstName: row.first_name, fullName: row.full_name, phone: row.phone, phoneE164: row.phone_e164 });
+      people.set(`contact:${row.id}`, { kind: "contact", id: row.id, firstName: row.first_name, fullName: row.full_name, phone: row.phone, phoneE164: row.phone_e164, gender: row.gender });
     }
   }
   for (const ids of chunks(leadIds)) {
     const rows = must(
-      await supabase.from("leads").select("id, full_name, phone, phone_e164").eq("organization_id", orgId).is("deleted_at", null).in("id", ids),
+      await supabase.from("leads").select("id, full_name, phone, phone_e164, gender").eq("organization_id", orgId).is("deleted_at", null).in("id", ids),
       "tomorrow leads",
     );
     for (const row of rows) {
-      people.set(`lead:${row.id}`, { kind: "lead", id: row.id, firstName: null, fullName: row.full_name, phone: row.phone, phoneE164: row.phone_e164 });
+      people.set(`lead:${row.id}`, { kind: "lead", id: row.id, firstName: null, fullName: row.full_name, phone: row.phone, phoneE164: row.phone_e164, gender: row.gender });
     }
   }
 
