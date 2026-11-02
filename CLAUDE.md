@@ -1607,7 +1607,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   kind of the document's first link, deal else contact else company, no longer equals the document's; lead's reading, question 22).
   Since 021116 (owner (22) א) one rule says "attached", `app.collection_task_attached` (pure, no grants), read by both jobs: the
   reminder job never moves, retitles or re-dates a detached task and makes a new attached one for the stage; a document with no deal,
-  contact or company gets no reminder. `app.send_collection_reminders` and `app.close_paid_collection_tasks` were last redefined in 021116.
+  contact or company gets no reminder. `app.close_paid_collection_tasks` was last redefined in 021116, `app.send_collection_reminders` in 021135 (HEB-09 line).
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
@@ -1978,6 +1978,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (logged once per session), and `app.support_session()` is true only while that row's grant is live (not revoked, not
   expired); then `app.role_in()` returns `viewer` (`app.membership_role()` is the plain membership). A grant alone gives nothing.
   The panel is `src/app/admin` + `src/features/platform/`.
+- Gender and wordings (HEB-01, migration 021133; owner (44) א, every plan): `leads.gender` / `contacts.gender` null|male|female|unknown
+  (check constraints, column grants; set only by a person or a mapped import column with a closed list, never guessed; not on public
+  forms); conversion fills an empty contact gender (`leads_convert_gender`, definer); `gender` is a card-layout built-in key
+  (`app.card_layout_builtin_keys`, last redefined there). Merge picks are a shared-ground follow-up. A WhatsApp template may hold one
+  block `{זכר: … | נקבה: … | ניטרלי: …}` (neutral part required): `app.template_variant_problem` (linear UTF-8 byte walk, labels compared
+  as hex bytes) = `templateVariantProblem()` in `src/features/whatsapp/variants.ts` (shared fixture `gender-variants.json`); trigger
+  `whatsapp_templates_variants` (invoker, every writer, skips a body over 1,000 so the check constraint refuses it; hints
+  `whatsapp_template:variant|neutral`); `fillTemplate` picks by gender (unknown/none = neutral). Record pages, tomorrow's reminders and
+  the collection reminder pass the gender; lists, My day and the money report still send neutral (follow-up).
+- Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
+  admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
+  read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
+  sender of a message to a customer (OPS-04 queue, CNS-07, MSG/EML/SMS, AUT-08, booking confirmations, provider adapters) asks it first
+  and sends nothing while true; none exists yet. Staff notices and collection reminder TASKS are not paused; a reminder task made while
+  paused carries "השליחה ללקוחות עצורה" in its description (`app.send_collection_reminders`, last redefined in 021135), and its WhatsApp
+  button shows the line only while still paused. Banner `SendingPauseBanner` in the business frame (business zone), page
+  `/settings/sending-pause`.
 - System banners, what's new and support requests (ADM-04, USR-12, ADM-05; migrations 021130-021132; owner 2 November 2026, answers
   (47) א (48) ג (49) א (50) א): `app.system_banners` (platform table, RLS on, no grants; text 1..300 one line, info|warning, a warning may
   be non-dismissable, window at most 367 days, target all | 1..200 org ids | a plan read when shown) written only by
