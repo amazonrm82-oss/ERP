@@ -21,11 +21,16 @@ type Guard =
   /** Supabase Auth's own limits (sign-in, sign-up, e-mail sends, code checks) */
   | "supabase-auth"
   /** the same static text for everyone, from code only; nothing per visitor is read */
-  | "static";
+  | "static"
+  /**
+   * no limit on purpose: it answers a constant and reads nothing. The functions it names are called with the anon key, take no
+   * argument, read no table and answer a constant (checked by the test; tests/db/289 pins the body and grants)
+   */
+  | "constant";
 
 type Entry = {
   guard: Guard;
-  /** the public SQL functions its page or route calls through `.rpc("<name>"` (database guard only; checked by the test) */
+  /** the public SQL functions its page or route calls through `.rpc("<name>"` (database and constant guards only; checked by the test) */
   functions?: string[];
   /** the limit as it stands, in words (window, per link / per sender / in total, before or after the token lookup) */
   limit: string;
@@ -249,6 +254,12 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   },
   "/api/push/dispatch": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute", refusal: "401" },
   "/api/files/cleanup": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken nightly by pg_cron", refusal: "401" },
+  "/api/health": {
+    guard: "constant",
+    functions: ["health_check"],
+    limit: "no limit: answers a constant, reads nothing (OPS-05, owner (72) ב: the anon key calls public.health_check(), which answers true and reads no table; the reply is only {ok} with no-store)",
+    refusal: "none (503 {ok:false} when the database does not answer true within 3 s)",
+  },
   "/api/jobs/run": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute while jobs are due", refusal: "401" },
 };
 
@@ -323,9 +334,11 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-const migrations = readdirSync(join(ROOT, "supabase/migrations"))
-  .map((f) => readFileSync(join(ROOT, "supabase/migrations", f), "utf8"))
-  .join("\n");
+const migrationFiles = readdirSync(join(ROOT, "supabase/migrations")).map((name) => ({
+  name,
+  text: readFileSync(join(ROOT, "supabase/migrations", name), "utf8"),
+}));
+const migrations = migrationFiles.map((f) => f.text).join("\n");
 
 describe("OPS-02: every public path has a named limit", () => {
   it("every page and route the proxy lets through without a session is in the inventory, and nothing else is", () => {
@@ -338,6 +351,37 @@ describe("OPS-02: every public path has a named limit", () => {
   it("a database-limited entry names functions that exist and are for the service role only", () => {
     for (const [path, entry] of Object.entries(PUBLIC_ENTRY_POINTS)) {
       expect(entry.limit.length, path).toBeGreaterThan(10);
+      if (entry.guard === "constant") {
+        // OPS-05: called with the anon key, no argument, no table read, a constant answer
+        expect(entry.limit, path).toMatch(/^no limit: answers a constant, reads nothing/);
+        expect(entry.sender, path).toBeUndefined();
+        expect(entry.functions?.length, path).toBeGreaterThan(0);
+        const code = [...importClosure(entryFile(path)).values()].join("\n");
+        expect(code, `${path} never uses the service key`).not.toMatch(/supabase\/service|SERVICE_ROLE/);
+        // the route and what it imports reach the database only through the named functions: no other rpc, no table, no auth
+        const rpcs = [...code.matchAll(/\.rpc\(\s*([^)]*)\)/g)].map((m) => m[1].trim());
+        expect(rpcs.length, `${path} calls the database`).toBeGreaterThan(0);
+        for (const call of rpcs) expect((entry.functions ?? []).map((fn) => `"${fn}"`), `${path}: .rpc(${call})`).toContain(call);
+        expect(code, `${path} reads no table`).not.toMatch(/\.from\(/);
+        expect(code, `${path} touches no auth`).not.toMatch(/\.auth\./);
+        for (const fn of entry.functions ?? []) {
+          expect(rpcs, `${path} calls .rpc("${fn}")`).toContain(`"${fn}"`);
+          // judged in each migration file that defines it, never across files joined
+          const defining = migrationFiles.filter((f) => new RegExp(`function public\\.${fn}\\s*\\(`).test(f.text));
+          expect(defining.length, `${path}: a migration defines public.${fn}`).toBeGreaterThan(0);
+          for (const file of defining) {
+            const defs = [...file.text.matchAll(new RegExp(`create or replace function public\\.${fn}\\s*\\([\\s\\S]*?\\$\\$;`, "g"))];
+            expect(defs.length, `${file.name}: public.${fn} is created once`).toBe(1);
+            expect(defs[0][0], `${file.name}: public.${fn}() answers the constant true`).toMatch(
+              new RegExp(`^create or replace function public\\.${fn}\\(\\)\\s*returns boolean\\s+language sql\\s+stable\\s+security invoker\\s+set search_path = ''\\s+as \\$\\$\\s*select true\\s*\\$\\$;$`),
+            );
+            expect(file.text, `${file.name}: public.${fn} granted to anon`).toMatch(
+              new RegExp(`grant execute on function public\\.${fn}\\s*\\(\\) to anon`),
+            );
+          }
+        }
+        continue;
+      }
       if (entry.guard !== "database") {
         expect(entry.functions, path).toBeUndefined();
         continue;

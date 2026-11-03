@@ -3491,6 +3491,8 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      // OPS-05: the uptime route's check, called with the anon key; answers true and reads nothing
+      health_check: { Args: Record<string, never>; Returns: boolean };
       create_organization: {
         Args: { p_name: string; p_industry?: string | null; p_team_size?: string | null; p_phone?: string | null };
         Returns: string;

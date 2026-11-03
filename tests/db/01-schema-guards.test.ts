@@ -96,7 +96,7 @@ describe("schema guards", () => {
     expect(result.columns).toEqual([]);
   });
 
-  it("anon cannot execute any function in public or app", async () => {
+  it("anon cannot execute any function in public or app, but the health check", async () => {
     const rows = await asAdmin(async (q) =>
       (
         await q<{ fn: string }>(`
@@ -107,7 +107,9 @@ describe("schema guards", () => {
           order by 1`)
       ).rows.map((r) => r.fn),
     );
-    expect(rows).toEqual([]);
+    // OPS-05, owner (72) ב: public.health_check is the ONLY function anon may execute. The uptime route calls it with the anon
+    // key; it answers true and reads nothing (test 289 pins it). Never add another name here without the owner's approval.
+    expect(rows).toEqual(["public.health_check"]);
   });
 
   it("anon is refused at run time too", async () => {

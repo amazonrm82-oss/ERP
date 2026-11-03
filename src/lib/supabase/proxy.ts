@@ -15,8 +15,12 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
-// a secret), the file cleanup and the job worker (same), the service worker, the offline page, the app manifest, the help
+// a secret), the file cleanup and the job worker (same), the uptime check, the service worker, the offline page, the app manifest, the help
 // center, the legal documents, and robots.txt / sitemap.xml for search engines (LND-11).
+// Reached without a session at exactly these paths (no prefix match: /api/healthz or /api/health/x stay private).
+// OPS-05: the uptime check (external monitor, no session); answers only ok or not ok.
+const PUBLIC_EXACT = ["/api/health"];
+
 const PUBLIC_PREFIXES = [
   "/auth/",
   "/f/",
@@ -39,7 +43,12 @@ const PUBLIC_PREFIXES = [
 
 export function isPublicPath(pathname: string): boolean {
   // "/" is the public landing page (LND-01)
-  return pathname === "/" || AUTH_PAGES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return (
+    pathname === "/" ||
+    AUTH_PAGES.includes(pathname) ||
+    PUBLIC_EXACT.includes(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  );
 }
 
 // Runs on every matched request: refreshes the Supabase session cookies and
