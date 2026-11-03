@@ -2132,7 +2132,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   with the user's session and links to `/legal/subprocessors` (no new service-key use); printable through GAP-11.
   Wordings (PRK-04, no migration): `/settings/privacy/wordings` shows CAP-07's consent wording and version unchanged, and a privacy-notice
   paragraph versioned in code (`PRIVACY_NOTICE_VERSION`, text pinned by `tests/unit/privacy-wordings.test.ts`; a text change needs a new
-  version); both DRAFT until the lawyer edits them. The paragraph names no employee (owner question 74).
+  version, now `notice-draft-2`); both DRAFT until the lawyer edits them. The paragraph names the role "אחראי/ת הפרטיות" with
+  the business's contact details, never a person (owner (74) ג); `NoticeDetails` has no officer name.
 - Privacy requests (PRK-02, migration 021147; privacy, every plan): `public.privacy_requests` is server-written (no insert or delete
   grant); owners/admins read it and update status, `verify_method`/`verify_note` (once), `refusal_reason` and `lead_id` | `contact_id`
   (column grants) while `app.privacy_requests_workable` holds (not deleted, suspended or cancelled: a read-only business still handles
@@ -2145,7 +2146,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   one counting notice (`app.privacy_request_notice_days`). An `erase` audit entry of a lead/contact (so PRV-03 and PRV-01 too) fires
   `audit_log_privacy_requests_erase`, matching the current or any former link. Merge moves requests through the `merged` entry. Execution
   is the existing PRV-02 export / PRV-03 erase on `/settings/privacy/requests/[id]`. Audited on update only; in `EXPORT_TABLES`.
-  Open (owner question 76): retention of closed and never-linked requests; `app.privacy_request_notice_days` rows are never cleared.
+  Retention (owner (76) א, migration 021149): pg_cron `crm-privacy-request-retention` (02:23 UTC) runs
+  `app.run_privacy_request_retention(1,000)` (definer, no grants, SKIP LOCKED): a request whose `coalesce(closed_at, received_at)` is more
+  than `app.privacy_request_retention_months()` (12) ago loses name, contact, text, identity note and refusal reason (neutral line) and its
+  own audit entries, as `app.privacy_requests_erase` (keep the two in step); an update, never a delete; server-only `erased_by_retention`
+  makes the page say "פרטי הבקשה נמחקו לפי מדיניות השמירה". `app.privacy_request_notice_days` rows are never cleared (needs a hand-pasted
+  delete).
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
