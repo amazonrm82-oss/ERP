@@ -1731,6 +1731,37 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `payment:has_refunds|refunded_amount|allocated`). Erasure: `payments_zz_refunds_erase` empties reference/note/reason and their
   audit entries when `app.payment_server = 'erase'`. PAY-03 totals refreshed by the deferred `payment_refunds_credit_companies`.
   Test 64's re-run list ends with `_payment_refunds.sql`; test 275 pins `statement_public`'s new md5.
+- Punch cards (PKG-01/02, migrations 021163-021168; owner (66) ג plan key `punch_cards` from basic up, (84)-(87), (93)-(95),
+  (99)-(101), (106)-(109); six independent reviews): `products.kind` takes 'punch_card' with `punch_entries`,
+  `punch_validity_count/unit` and `punch_meeting_type_ids` (CAL-08 types a held meeting uses an entry of; read live;
+  `products_punch_shape`, definer trigger `products_punch_card`, hints `feature:punch_cards`, `punch_card:meeting_types|kind_in_use`).
+  `public.punch_cards` (one contact's card: snapshot of name, entries, validity; pending|active|cancelled; `expires_on` by the
+  business calendar; price with VAT (owner (93) ב) counted against its payment; server-only line/unit, `payment_void_at`,
+  `former_contact_ids`, `holder_history`, `deal_line_id`; read by whoever reads the contact; no client writes; audited) through
+  definer `punch_card_open|activate|cancel|transfer` (sellers = `app.can_record_payments`; manual activation, cancel and transfer
+  owners/admins). Automatic opening (owner (85) ב): a counted payment on an order or accepted quote with a punch-card line, or
+  allocated to its document, opens one card per line unit (unique per line and unit), room = what of the payment reached that
+  document (`app.punch_cards_room`); quote chains are one purchase, an addendum its own (owner (100)-(101)); one `system`
+  entry per payment (`punch_card_opened`, guarded). Lock order everywhere (owner (106) א): payment rows first in id order, then the
+  order/quote-chain advisory keys ascending (`app.punch_card_lock_keys`); an opener takes no key and leaves no row when the
+  business lacks the key or no linked document has a punch-card line (`app.punch_doc_has_lines`, a plain read before the keys).
+  Quick sale (owner (107) ב): `deals.quick_sale_at` stamped only by `quick_sale` (transaction setting), `punch_card_open_for_sale`.
+  Opening retries (owner (109) ב): a failed automatic opening (or a payment's cards judged again, `void_sync`) is kept in
+  `app.punch_card_retries` (ids and codes only; RLS on, no grants; cascades; one waiting row per event) by
+  `app.punch_card_retry_record` (never raises); pg_cron `crm-punch-card-retry` (every 5 minutes) runs
+  `app.retry_punch_card_openings(20, 100)`: businesses in turn, rows skip locked, each in its own block, never waits (payment rows
+  `for update nowait`, keys `pg_try_advisory_xact_lock`, 55P03 = later, lock_timeout 2s); a 'link' opening holds only while the
+  payment still links that order or quote (judged in `app.punch_cards_auto_open` after the payment lock); backoff 5 min, 15 min,
+  then hourly; given up after 3 days (also while not writable). An event's end is told once by
+  `app.punch_card_retry_event_end` from the last of its rows (same created_at and payment, or quote): nothing while a sibling
+  waits; the give-up notice when any row was given up; else the "ended without a card" notice when none opened one; a row whose
+  business lost the key closes silently but still lets an earlier given-up sibling be told. Done rows keep `done_at` (removal
+  needs a hand-pasted delete). PKG-02: `public.punch_card_uses` (one used entry per held meeting of a covered type, server
+  written, returned on leaving held or by owners/admins/managers with a reason, `punch_card_use_return`; audited; erasure
+  reaches entries and return reasons, `app.punch_cards_erase`, last redefined in 021168). Merge moves cards on the `merged`
+  entry (`app.merge_punch_cards`). `app.sample_untouched`, `app.import_record_worked`, `app.audit_erase_core` and
+  `public.quick_sale` were last redefined in 021165-021167. The advisor's findings on the six definer RPCs and on
+  `app.punch_card_retries` / `app.quick_sale_lines` are expected. Re-running 021166 needs 021168 after it.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
